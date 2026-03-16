@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable } from "@workspace/db";
-import { eq, ilike, or, sql, desc, and, ne } from "drizzle-orm";
+import { eq, ilike, or, sql, desc, and, ne, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
@@ -98,7 +98,7 @@ router.get("/containers", requireAuth, async (req, res) => {
     if (staffIds.length > 0) {
       const staffRows = await db.select({ id: usersTable.id, name: usersTable.name })
         .from(usersTable)
-        .where(sql`${usersTable.id} = ANY(${staffIds})`);
+        .where(inArray(usersTable.id, staffIds as number[]));
       staffRows.forEach(s => { staffMap[s.id] = s.name; });
     }
 
@@ -107,11 +107,11 @@ router.get("/containers", requireAuth, async (req, res) => {
     const totalsMap: Record<number, number> = {};
     const dutyMap: Record<number, number> = {};
     if (containerIds.length > 0) {
-      const shippingRows = await db.select().from(shippingChargesTable).where(sql`${shippingChargesTable.containerId} = ANY(${containerIds})`);
-      const customsRows = await db.select().from(customsChargesTable).where(sql`${customsChargesTable.containerId} = ANY(${containerIds})`);
-      const terminalRows = await db.select().from(terminalChargesTable).where(sql`${terminalChargesTable.containerId} = ANY(${containerIds})`);
-      const deliveryRows = await db.select().from(deliveryChargesTable).where(sql`${deliveryChargesTable.containerId} = ANY(${containerIds})`);
-      const opsRows = await db.select().from(operationsChargesTable).where(sql`${operationsChargesTable.containerId} = ANY(${containerIds})`);
+      const shippingRows = await db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, containerIds));
+      const customsRows  = await db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, containerIds));
+      const terminalRows = await db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, containerIds));
+      const deliveryRows = await db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, containerIds));
+      const opsRows      = await db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, containerIds));
 
       const indexBy = (arr: any[]) => {
         const m: Record<number, any> = {};
