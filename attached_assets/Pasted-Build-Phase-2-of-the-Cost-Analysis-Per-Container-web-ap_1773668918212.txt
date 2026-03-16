@@ -1,0 +1,134 @@
+Build Phase 2 of the “Cost Analysis Per Container” web application.
+
+Phase 2 should add control, workflow, permissions, approvals, and accountability on top of the already completed Phase 1 system.
+
+Include these Phase 2 features only:
+
+1. Section-Based Permissions
+Allow Admin to assign permissions per section for each staff user.
+
+Permission types:
+- No Access
+- View Only
+- Edit
+
+Sections:
+- Basic Info
+- Shipping
+- Customs
+- Terminal
+- Delivery / Truck
+- Operations / Misc
+- Final Accounting Summary
+
+2. Workflow Engine
+Each container should move through stages:
+- New Upload
+- Documentation Review
+- Shipping Entry
+- Customs Entry
+- Terminal Entry
+- Delivery Entry
+- Accounting Review
+- Management Approval
+- Completed
+- Closed
+
+Show:
+- current stage
+- stage progress bar
+- stage owner
+- section completion checklist
+
+3. Approval / Rejection System
+Staff should be able to submit completed sections for review.
+
+Admin should be able to:
+- approve section
+- reject section with reason
+
+Track:
+- submitted by
+- submitted date
+- approved/rejected by
+- approval date
+- rejection reason
+
+4. Section Locking and Record Locking
+Admin should be able to:
+- lock/unlock a section
+- lock/unlock a full container record
+
+Locked sections and locked records must become read-only.
+
+5. Audit Trail
+Track all important changes:
+- user
+- role
+- container
+- section
+- field name
+- old value
+- new value
+- date/time
+- action type
+- reason if available
+
+Display audit history in the container detail page.
+
+6. Role-Aware Dashboards
+Admin dashboard should show:
+- total containers
+- pending approvals
+- rejected sections
+- locked records
+- workflow summary
+
+Staff dashboard should show:
+- my assigned containers
+- my pending sections
+- submitted for review
+- rejected for correction
+- recently updated records
+
+7. Approval Queue Page
+Create an admin-only page showing submitted sections waiting for review.
+
+Show:
+- container
+- section
+- submitted by
+- submitted date
+- action buttons for Approve and Reject
+
+8. My Work / My Tasks Page
+Create a staff page that shows:
+- assigned containers
+- editable sections
+- pending submissions
+- rejected sections needing correction
+
+9. Financial Control Rules
+- staff cannot manually edit Total Cost
+- staff cannot manually edit Gross Profit
+- Final Accounting Summary should be admin-only by default unless permission is granted
+- admin financial overrides should require reason logging
+
+10. Data Integrity Rules
+- do not allow moving to next workflow stage if required section is incomplete
+- do not allow approval of incomplete required section
+- do not allow editing of locked section or locked record
+- do not allow closure of record until required stages are completed
+
+11. UI Requirements
+- role-aware interface
+- permission-aware editing
+- status badges
+- approval badges
+- lock badges
+- workflow progress indicators
+- clean approval queue page
+- audit log view
+- responsive layout
+
+Do not build dynamic section builder, custom field builder, executive analytics, document attachments, timeline manager, or advanced task scheduling in this phase yet. Focus on workflow control, approvals, permissions, and accountability only.
