@@ -1,0 +1,19 @@
+packages:
+  "recharts": "For dashboard analytics and data visualization"
+  "@tanstack/react-table": "For the smart data tables on containers and users pages"
+  "papaparse": "For parsing CSV uploads client-side"
+  "xlsx": "For parsing Excel uploads client-side"
+  "framer-motion": "For page transitions and polished animations"
+  "@hookform/resolvers": "For Zod schema validation with react-hook-form"
+  "date-fns": "For human-readable date formatting"
+  "lucide-react": "For UI icons"
+
+images:
+  - path: "artifacts/cost-analysis/public/images/auth-bg.png"
+    description: "Abstract dark enterprise logistic network visualization, glowing blue nodes on deep slate background, low opacity"
+    aspect_ratio: "16:9"
+
+notes:
+  - Assumes generated API client exists at @workspace/api-client-react
+  - wouter is used for routing, components use standard wouter Link
+  - All numbers are coerced to numbers via Zod for the forms to match API schema

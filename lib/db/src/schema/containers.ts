@@ -1,0 +1,29 @@
+import { pgTable, serial, text, boolean, timestamp, integer, numeric } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
+import { usersTable } from "./users";
+
+export const containersTable = pgTable("containers", {
+  id: serial("id").primaryKey(),
+  customerName: text("customer_name").notNull(),
+  containerNumber: text("container_number").notNull().unique(),
+  blNumber: text("bl_number").notNull().unique(),
+  declaration: text("declaration").notNull().default(""),
+  size: text("size").notNull().default(""),
+  vessel: text("vessel").notNull().default(""),
+  status: text("status").notNull().default("new_upload"),
+  isLocked: boolean("is_locked").notNull().default(false),
+  assignedStaffId: integer("assigned_staff_id").references(() => usersTable.id),
+  clearingCharges: numeric("clearing_charges", { precision: 15, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertContainerSchema = createInsertSchema(containersTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertContainer = z.infer<typeof insertContainerSchema>;
+export type Container = typeof containersTable.$inferSelect;

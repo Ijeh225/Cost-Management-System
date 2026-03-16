@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Cost Analysis Per Container"
+version = "1.0.0"
+id = "artifacts/cost-analysis"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 23284
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/cost-analysis run dev"
+
+[services.env]
+PORT = "23284"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/cost-analysis", "run", "build"]
+publicDir = "artifacts/cost-analysis/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"

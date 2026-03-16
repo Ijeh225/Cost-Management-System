@@ -1,22 +1,29 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Cost Analysis Per Container API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: containers
+    description: Container records
+  - name: charges
+    description: Container charges
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +31,347 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current user
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /containers:
+    get:
+      operationId: listContainers
+      tags: [containers]
+      summary: List all containers
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of containers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerListResponse"
+    post:
+      operationId: createContainer
+      tags: [containers]
+      summary: Create a single container record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContainerRequest"
+      responses:
+        "201":
+          description: Container created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Container"
+
+  /containers/upload:
+    post:
+      operationId: uploadContainers
+      tags: [containers]
+      summary: Upload containers from CSV/Excel data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadContainersRequest"
+      responses:
+        "200":
+          description: Upload result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadContainersResponse"
+
+  /containers/{id}:
+    get:
+      operationId: getContainer
+      tags: [containers]
+      summary: Get a container by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Container details with charges
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerDetail"
+    put:
+      operationId: updateContainer
+      tags: [containers]
+      summary: Update container basic info
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContainerRequest"
+      responses:
+        "200":
+          description: Updated container
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Container"
+
+  /containers/{id}/lock:
+    post:
+      operationId: lockContainer
+      tags: [containers]
+      summary: Lock or unlock a container record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LockContainerRequest"
+      responses:
+        "200":
+          description: Lock status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Container"
+
+  /containers/{id}/charges:
+    get:
+      operationId: getContainerCharges
+      tags: [charges]
+      summary: Get all charges for a container
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Charges
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerCharges"
+    put:
+      operationId: updateContainerCharges
+      tags: [charges]
+      summary: Update charges for a container section
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContainerChargesRequest"
+      responses:
+        "200":
+          description: Updated charges
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerCharges"
+
+  /containers/{id}/audit:
+    get:
+      operationId: getContainerAuditLog
+      tags: [containers]
+      summary: Get audit log for a container
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [containers]
+      summary: Get dashboard summary statistics
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +379,519 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        message:
+          type: string
+      required: [user, message]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, staff]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, email, name, role, isActive, createdAt]
+
+    CreateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [admin, staff]
+      required: [email, name, password, role]
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, staff]
+        isActive:
+          type: boolean
+        password:
+          type: string
+
+    Container:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerName:
+          type: string
+        containerNumber:
+          type: string
+        blNumber:
+          type: string
+        declaration:
+          type: string
+        size:
+          type: string
+        vessel:
+          type: string
+        status:
+          type: string
+          enum: [new_upload, documentation_review, shipping_entry, customs_entry, terminal_entry, delivery_entry, accounting_review, management_approval, completed, closed]
+        isLocked:
+          type: boolean
+        assignedStaffId:
+          type: integer
+          nullable: true
+        assignedStaffName:
+          type: string
+          nullable: true
+        totalCost:
+          type: number
+        clearingCharges:
+          type: number
+        grossProfit:
+          type: number
+        dutyNotPaid:
+          type: number
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, customerName, containerNumber, blNumber, declaration, size, vessel, status, isLocked, totalCost, clearingCharges, grossProfit, dutyNotPaid, createdAt, updatedAt]
+
+    ContainerListResponse:
+      type: object
+      properties:
+        containers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Container"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [containers, total, page, limit]
+
+    CreateContainerRequest:
+      type: object
+      properties:
+        customerName:
+          type: string
+        containerNumber:
+          type: string
+        blNumber:
+          type: string
+        declaration:
+          type: string
+        size:
+          type: string
+        vessel:
+          type: string
+        clearingCharges:
+          type: number
+      required: [customerName, containerNumber, blNumber, declaration, size, vessel]
+
+    UpdateContainerRequest:
+      type: object
+      properties:
+        customerName:
+          type: string
+        containerNumber:
+          type: string
+        blNumber:
+          type: string
+        declaration:
+          type: string
+        size:
+          type: string
+        vessel:
+          type: string
+        status:
+          type: string
+        assignedStaffId:
+          type: integer
+          nullable: true
+        clearingCharges:
+          type: number
+
+    UploadContainersRequest:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/UploadRow"
+      required: [rows]
+
+    UploadRow:
+      type: object
+      properties:
+        customerName:
+          type: string
+        containerNumber:
+          type: string
+        blNumber:
+          type: string
+        declaration:
+          type: string
+        size:
+          type: string
+        vessel:
+          type: string
+        clearingCharges:
+          type: number
+      required: [customerName, containerNumber, blNumber]
+
+    UploadContainersResponse:
+      type: object
+      properties:
+        created:
+          type: integer
+        duplicates:
+          type: array
+          items:
+            type: string
+        errors:
+          type: array
+          items:
+            type: string
+      required: [created, duplicates, errors]
+
+    LockContainerRequest:
+      type: object
+      properties:
+        locked:
+          type: boolean
+        reason:
+          type: string
+      required: [locked]
+
+    ContainerCharges:
+      type: object
+      properties:
+        containerId:
+          type: integer
+        shipping:
+          $ref: "#/components/schemas/ShippingCharges"
+        customs:
+          $ref: "#/components/schemas/CustomsCharges"
+        terminal:
+          $ref: "#/components/schemas/TerminalCharges"
+        delivery:
+          $ref: "#/components/schemas/DeliveryCharges"
+        operations:
+          $ref: "#/components/schemas/OperationsCharges"
+        totalCost:
+          type: number
+        clearingCharges:
+          type: number
+        grossProfit:
+          type: number
+      required: [containerId, shipping, customs, terminal, delivery, operations, totalCost, clearingCharges, grossProfit]
+
+    ShippingCharges:
+      type: object
+      properties:
+        shippingCompany:
+          type: number
+        shippingPaymentVat:
+          type: number
+        consignee:
+          type: number
+        finalInvoiceShippingCompany:
+          type: number
+        telexCharge:
+          type: number
+        shippingRunnings:
+          type: number
+        shippingDetentionToBePaidByCustomer:
+          type: number
+
+    CustomsCharges:
+      type: object
+      properties:
+        duty:
+          type: number
+        dutyPaid:
+          type: number
+        dutyNotPaid:
+          type: number
+        valuation:
+          type: number
+        ciu:
+          type: number
+        upCountryCustom:
+          type: number
+        dciu:
+          type: number
+        mdReleasingPackage:
+          type: number
+        ocSettlement:
+          type: number
+        ocReleaseLocal:
+          type: number
+        dcEnforcementForTransire:
+          type: number
+        complianceTeam:
+          type: number
+        cacSettlement:
+          type: number
+        crffn:
+          type: number
+        soncap:
+          type: number
+        alerts:
+          type: number
+        examinationBonus:
+          type: number
+
+    TerminalCharges:
+      type: object
+      properties:
+        terminalCharges:
+          type: number
+        terminalAdditions1:
+          type: number
+        ikorouduTerminalAdditions2:
+          type: number
+        terminalDemurrageToBePaidByCustomer:
+          type: number
+        terminalPaymentVat:
+          type: number
+        wharfageFeeForNpa:
+          type: number
+        sifaxGmtSigning:
+          type: number
+        tsDcAdmin:
+          type: number
+        tincanBond:
+          type: number
+        bond:
+          type: number
+        manifest:
+          type: number
+
+    DeliveryCharges:
+      type: object
+      properties:
+        passingOfTruck:
+          type: number
+        passingOfTruckForEmptyReturn:
+          type: number
+        parkingForPullout:
+          type: number
+        pullout:
+          type: number
+        delivery:
+          type: number
+        emptyReturn:
+          type: number
+        unchainingTruck:
+          type: number
+        emptyCallUp:
+          type: number
+        pulloutExpenses:
+          type: number
+        transferToIkorodu:
+          type: number
+        transportAllowance:
+          type: number
+
+    OperationsCharges:
+      type: object
+      properties:
+        fouBooking:
+          type: number
+        fou:
+          type: number
+        scanningToPhysical:
+          type: number
+        security:
+          type: number
+        additionalDeliveryExpenses:
+          type: number
+        miscellaneous:
+          type: number
+        abandoned:
+          type: number
+        agenciesBlocks:
+          type: number
+        callUp:
+          type: number
+        transireRunnings:
+          type: number
+        officePtml:
+          type: number
+        freshPayment:
+          type: number
+
+    UpdateContainerChargesRequest:
+      type: object
+      properties:
+        section:
+          type: string
+          enum: [shipping, customs, terminal, delivery, operations]
+        shipping:
+          $ref: "#/components/schemas/ShippingCharges"
+        customs:
+          $ref: "#/components/schemas/CustomsCharges"
+        terminal:
+          $ref: "#/components/schemas/TerminalCharges"
+        delivery:
+          $ref: "#/components/schemas/DeliveryCharges"
+        operations:
+          $ref: "#/components/schemas/OperationsCharges"
+        clearingCharges:
+          type: number
+        reason:
+          type: string
+      required: [section]
+
+    ContainerDetail:
+      type: object
+      properties:
+        container:
+          $ref: "#/components/schemas/Container"
+        charges:
+          $ref: "#/components/schemas/ContainerCharges"
+      required: [container, charges]
+
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        containerId:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        action:
+          type: string
+        section:
+          type: string
+          nullable: true
+        fieldChanged:
+          type: string
+          nullable: true
+        oldValue:
+          type: string
+          nullable: true
+        newValue:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, containerId, userId, userName, action, createdAt]
+
+    DashboardStats:
+      type: object
+      properties:
+        totalContainers:
+          type: integer
+        inProgress:
+          type: integer
+        completed:
+          type: integer
+        closed:
+          type: integer
+        totalCost:
+          type: number
+        totalClearingCharges:
+          type: number
+        totalGrossProfit:
+          type: number
+        totalDutyNotPaid:
+          type: number
+        containersByStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              count:
+                type: integer
+            required: [status, count]
+        profitByCustomer:
+          type: array
+          items:
+            type: object
+            properties:
+              customer:
+                type: string
+              profit:
+                type: number
+            required: [customer, profit]
+        costByVessel:
+          type: array
+          items:
+            type: object
+            properties:
+              vessel:
+                type: string
+              cost:
+                type: number
+            required: [vessel, cost]
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEntry"
+        alerts:
+          type: object
+          properties:
+            lowProfitContainers:
+              type: integer
+            outstandingDuty:
+              type: integer
+            delayedContainers:
+              type: integer
+          required: [lowProfitContainers, outstandingDuty, delayedContainers]
+      required: [totalContainers, inProgress, completed, closed, totalCost, totalClearingCharges, totalGrossProfit, totalDutyNotPaid, containersByStatus, profitByCustomer, costByVessel, recentActivity, alerts]

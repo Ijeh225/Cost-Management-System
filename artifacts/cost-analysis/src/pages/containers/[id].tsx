@@ -1,0 +1,369 @@
+import { useState } from "react";
+import { useParams, Link } from "wouter";
+import { useGetContainer, useUpdateContainerCharges, useLockContainer } from "@workspace/api-client-react";
+import { useAuth } from "@/components/layout/auth-provider";
+import { formatCurrency, getStatusColor, getStatusLabel } from "@/lib/format";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { 
+  ArrowLeft, Lock, Unlock, Anchor, User as UserIcon, FileText, 
+  Save, AlertCircle, Loader2, DollarSign, Calculator
+} from "lucide-react";
+type UpdateContainerChargesRequestSection = string;
+
+// Helper to generate schema for any object of numbers
+const createNumberSchema = (keys: string[]) => {
+  const shape: Record<string, z.ZodTypeAny> = {};
+  keys.forEach(k => {
+    shape[k] = z.coerce.number().optional().default(0);
+  });
+  return z.object(shape);
+};
+
+// Define section schemas based on OpenAPI definitions
+const shippingSchema = createNumberSchema(['shippingCompany', 'shippingPaymentVat', 'consignee', 'finalInvoiceShippingCompany', 'telexCharge', 'shippingRunnings', 'shippingDetentionToBePaidByCustomer']);
+const customsSchema = createNumberSchema(['duty', 'dutyPaid', 'dutyNotPaid', 'valuation', 'ciu', 'upCountryCustom', 'dciu', 'mdReleasingPackage', 'ocSettlement', 'ocReleaseLocal', 'dcEnforcementForTransire', 'complianceTeam', 'cacSettlement', 'crffn', 'soncap', 'alerts', 'examinationBonus']);
+const terminalSchema = createNumberSchema(['terminalCharges', 'terminalAdditions1', 'ikorouduTerminalAdditions2', 'terminalDemurrageToBePaidByCustomer', 'terminalPaymentVat', 'wharfageFeeForNpa', 'sifaxGmtSigning', 'tsDcAdmin', 'tincanBond', 'bond', 'manifest']);
+const deliverySchema = createNumberSchema(['passingOfTruck', 'passingOfTruckForEmptyReturn', 'parkingForPullout', 'pullout', 'delivery', 'emptyReturn', 'unchainingTruck', 'emptyCallUp', 'pulloutExpenses', 'transferToIkorodu', 'transportAllowance']);
+const operationsSchema = createNumberSchema(['fouBooking', 'fou', 'scanningToPhysical', 'security', 'additionalDeliveryExpenses', 'miscellaneous', 'abandoned', 'agenciesBlocks', 'callUp', 'transireRunnings', 'officePtml', 'freshPayment']);
+
+// Generic Section Form Component
+function ChargeSectionForm({ 
+  containerId, 
+  sectionKey, 
+  title, 
+  schema, 
+  initialData, 
+  isLocked 
+}: { 
+  containerId: number, 
+  sectionKey: UpdateContainerChargesRequestSection, 
+  title: string, 
+  schema: z.ZodObject<any>, 
+  initialData: any, 
+  isLocked: boolean 
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const updateMutation = useUpdateContainerCharges();
+  const [isEditing, setIsEditing] = useState(false);
+
+  const form = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: initialData || {},
+  });
+
+  const fields = Object.keys(schema.shape);
+
+  const onSubmit = (data: any) => {
+    updateMutation.mutate(
+      { 
+        id: containerId, 
+        data: { 
+          section: sectionKey, 
+          [sectionKey]: data,
+          reason: "Manual UI update" // Could add a prompt for this in a real app
+        } 
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/dashboard/stats`] });
+          toast({ title: "Charges Updated", description: `${title} section saved successfully.` });
+          setIsEditing(false);
+        },
+        onError: (err: any) => {
+          toast({ variant: "destructive", title: "Update Failed", description: err.message });
+        }
+      }
+    );
+  };
+
+  const total = fields.reduce((sum, field) => sum + Number(initialData?.[field] || 0), 0);
+
+  return (
+    <AccordionItem value={sectionKey} className="border-border/50 bg-card/20 px-4 rounded-lg mb-4 shadow-sm">
+      <AccordionTrigger className="hover:no-underline py-4">
+        <div className="flex items-center justify-between w-full pr-4">
+          <span className="font-semibold text-base">{title}</span>
+          <span className="font-mono text-primary font-medium">{formatCurrency(total)}</span>
+        </div>
+      </AccordionTrigger>
+      <AccordionContent className="pt-2 pb-6">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+              {fields.map((field) => (
+                <FormField
+                  key={field}
+                  control={form.control}
+                  name={field}
+                  render={({ field: formField }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-muted-foreground capitalize flex justify-between">
+                        {field.replace(/([A-Z])/g, ' $1').trim()}
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
+                          <Input 
+                            type="number" 
+                            disabled={!isEditing || isLocked || updateMutation.isPending} 
+                            {...formField} 
+                            className="pl-7 font-mono text-sm bg-background/50 border-border/60 disabled:opacity-70 h-10"
+                            onFocus={(e) => e.target.select()}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ))}
+            </div>
+            
+            {!isLocked && (
+              <div className="flex justify-end gap-3 pt-4 border-t border-border/40 mt-6">
+                {isEditing ? (
+                  <>
+                    <Button type="button" variant="outline" onClick={() => { form.reset(initialData); setIsEditing(false); }} disabled={updateMutation.isPending}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={updateMutation.isPending} className="active:scale-95 transition-transform hover-elevate shadow-md">
+                      {updateMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                      Save Changes
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" variant="secondary" onClick={() => setIsEditing(true)}>
+                    Edit {title}
+                  </Button>
+                )}
+              </div>
+            )}
+          </form>
+        </Form>
+      </AccordionContent>
+    </AccordionItem>
+  );
+}
+
+
+export default function ContainerDetail() {
+  const { id } = useParams();
+  const containerId = Number(id);
+  const { isAdmin } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const { data, isLoading, isError } = useGetContainer(containerId);
+  const lockMutation = useLockContainer();
+
+  if (isLoading) return <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
+
+  const { container, charges } = data;
+
+  const handleLockToggle = () => {
+    lockMutation.mutate(
+      { id: containerId, data: { locked: !container.isLocked } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          toast({ 
+            title: container.isLocked ? "Container Unlocked" : "Container Locked", 
+            description: container.isLocked ? "Editing is now enabled." : "Record is now read-only." 
+          });
+        }
+      }
+    );
+  };
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto pb-24">
+      <div className="flex items-center gap-4">
+        <Link href="/containers">
+          <Button variant="ghost" size="icon" className="hover:bg-accent rounded-full"><ArrowLeft className="w-5 h-5" /></Button>
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            {container.containerNumber}
+            {container.isLocked && <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 px-2 py-0.5"><Lock className="w-3 h-3 mr-1"/> Locked</Badge>}
+          </h1>
+          <p className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
+            <FileText className="w-3.5 h-3.5" /> BL: {container.blNumber}
+          </p>
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          <span className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider ${getStatusColor(container.status)}`}>
+            {getStatusLabel(container.status)}
+          </span>
+          {isAdmin && (
+            <Button 
+              variant={container.isLocked ? "outline" : "secondary"} 
+              size="sm" 
+              onClick={handleLockToggle}
+              disabled={lockMutation.isPending}
+              className={container.isLocked ? "border-destructive/50 text-destructive hover:bg-destructive/10" : ""}
+            >
+              {container.isLocked ? <><Unlock className="w-4 h-4 mr-2" /> Unlock Record</> : <><Lock className="w-4 h-4 mr-2" /> Lock Record</>}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {container.isLocked && (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
+          <div>
+            <h4 className="font-semibold text-destructive text-sm">Record Locked</h4>
+            <p className="text-xs text-destructive/80 mt-1">This container's financial data is locked and cannot be edited. Contact an administrator to unlock.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Hero Summary Card */}
+      <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+          <Anchor className="w-48 h-48" />
+        </div>
+        <CardContent className="p-6 relative z-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div>
+              <p className="text-xs font-mono text-muted-foreground uppercase mb-1">Customer</p>
+              <p className="font-semibold text-foreground text-lg">{container.customerName}</p>
+            </div>
+            <div>
+              <p className="text-xs font-mono text-muted-foreground uppercase mb-1">Vessel</p>
+              <p className="font-medium text-foreground">{container.vessel || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs font-mono text-muted-foreground uppercase mb-1">Size / Type</p>
+              <p className="font-medium text-foreground">{container.size || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs font-mono text-muted-foreground uppercase mb-1">Assigned To</p>
+              <p className="font-medium text-foreground flex items-center gap-2">
+                <UserIcon className="w-4 h-4 text-primary" /> 
+                {container.assignedStaffName || 'Unassigned'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        
+        {/* Charge Sections (Left 2/3) */}
+        <div className="lg:col-span-2 space-y-2">
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Calculator className="w-5 h-5 text-primary" /> Breakdown of Charges</h3>
+          <Accordion type="single" collapsible className="w-full">
+            <ChargeSectionForm 
+              containerId={containerId} 
+              sectionKey="shipping" 
+              title="Shipping Charges" 
+              schema={shippingSchema} 
+              initialData={charges.shipping} 
+              isLocked={container.isLocked} 
+            />
+            <ChargeSectionForm 
+              containerId={containerId} 
+              sectionKey="customs" 
+              title="Customs Duty & Taxes" 
+              schema={customsSchema} 
+              initialData={charges.customs} 
+              isLocked={container.isLocked} 
+            />
+            <ChargeSectionForm 
+              containerId={containerId} 
+              sectionKey="terminal" 
+              title="Terminal Charges" 
+              schema={terminalSchema} 
+              initialData={charges.terminal} 
+              isLocked={container.isLocked} 
+            />
+            <ChargeSectionForm 
+              containerId={containerId} 
+              sectionKey="delivery" 
+              title="Delivery & Transport" 
+              schema={deliverySchema} 
+              initialData={charges.delivery} 
+              isLocked={container.isLocked} 
+            />
+            <ChargeSectionForm 
+              containerId={containerId} 
+              sectionKey="operations" 
+              title="Operations & Misc." 
+              schema={operationsSchema} 
+              initialData={charges.operations} 
+              isLocked={container.isLocked} 
+            />
+          </Accordion>
+        </div>
+
+        {/* Final Accounting Summary (Right 1/3 - Sticky) */}
+        <div className="lg:sticky top-24">
+          <Card className="border-primary/20 bg-card/60 backdrop-blur shadow-xl overflow-hidden relative">
+            <div className="absolute h-1 w-full bg-gradient-to-r from-primary via-indigo-500 to-purple-500 top-0 left-0" />
+            <CardHeader className="pb-4 border-b border-border/40">
+              <CardTitle className="text-lg font-bold">Accounting Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              
+              <div>
+                <p className="text-sm font-medium text-muted-foreground flex justify-between mb-1">
+                  <span>Total Actual Cost</span>
+                </p>
+                <p className="text-2xl font-mono font-bold text-foreground">{formatCurrency(charges.totalCost)}</p>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-muted-foreground flex justify-between mb-1">
+                  <span>Agreed Clearing Charges</span>
+                </p>
+                <p className="text-2xl font-mono font-bold text-primary">{formatCurrency(charges.clearingCharges)}</p>
+              </div>
+
+              <div className="pt-6 border-t border-border/40">
+                <p className="text-sm font-medium text-muted-foreground flex justify-between mb-2">
+                  <span>Gross Profit/Loss</span>
+                  {charges.grossProfit >= 0 ? (
+                    <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-0">PROFIT</Badge>
+                  ) : (
+                    <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/20 border-0">LOSS</Badge>
+                  )}
+                </p>
+                <p className={`text-4xl font-mono font-black tracking-tighter ${charges.grossProfit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>
+                  {formatCurrency(charges.grossProfit)}
+                </p>
+              </div>
+
+              {charges.customs.dutyNotPaid !== undefined && charges.customs.dutyNotPaid > 0 && (
+                <div className="mt-4 p-3 bg-amber-500/10 rounded border border-amber-500/20 flex justify-between items-center">
+                  <span className="text-xs font-semibold text-amber-500">Unpaid Duty:</span>
+                  <span className="font-mono text-sm font-bold text-amber-500">{formatCurrency(charges.customs.dutyNotPaid)}</span>
+                </div>
+              )}
+
+            </CardContent>
+          </Card>
+        </div>
+
+      </div>
+    </div>
+  );
+}

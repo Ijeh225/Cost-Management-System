@@ -1,0 +1,566 @@
+Build a modern professional web application called:
+
+COST ANALYSIS PER CONTAINER
+
+This is an enterprise-style container clearing cost analysis and operations management web application used by a port clearing/logistics company.
+
+The system tracks all operational and financial costs related to clearing containers from the port.
+
+The application must allow staff to input operational charges while automatically calculating total container cost, clearing charges, and gross profit.
+
+The interface must be modern, clean, and professional, similar to premium accounting or logistics management software.
+
+Use dashboards, charts, smart tables, and collapsible sections to make the interface easy to understand.
+
+------------------------------------------------
+
+TECH STACK
+
+Frontend
+React
+Tailwind CSS
+React Router
+Modern dashboard layout
+
+Backend
+Node.js
+Express.js
+
+Database
+PostgreSQL (preferred) or SQLite for MVP
+
+Authentication
+JWT login system
+
+File Upload
+CSV and Excel parsing
+
+Architecture
+Use modular scalable architecture.
+
+The system must support both system-defined sections and admin-created custom sections.
+
+------------------------------------------------
+
+CORE PURPOSE
+
+The system manages container clearing records and performs cost analysis for each container.
+
+Users should be able to:
+
+Upload container records from Excel
+Track all charges for each container
+Assign staff responsibilities
+Calculate total cost automatically
+Calculate clearing charges
+Calculate gross profit
+Track operational progress
+Generate business analytics
+
+------------------------------------------------
+
+USER ROLES
+
+Admin
+Staff
+
+Admin:
+Full control of the system
+
+Staff:
+Limited access based on permissions
+
+------------------------------------------------
+
+AUTHENTICATION
+
+Create login system with:
+
+Email / username
+Password
+
+Admin can:
+
+Create users
+Edit users
+Disable users
+Assign permissions
+
+------------------------------------------------
+
+PERMISSION SYSTEM
+
+Use SECTION-BASED PERMISSIONS.
+
+Permissions are assigned per section instead of per field.
+
+Sections include:
+
+Basic Info
+Shipping
+Customs
+Terminal
+Delivery / Truck
+Operations / Misc
+Final Accounting Summary
+Custom Admin Sections
+
+Admin can control:
+
+Which staff can edit which section
+Which staff can only view a section
+Which sections are admin-only
+
+Staff cannot edit restricted sections.
+
+------------------------------------------------
+
+WORKFLOW ENGINE
+
+Each container must move through workflow stages:
+
+New Upload
+Documentation Review
+Shipping Entry
+Customs Entry
+Terminal Entry
+Delivery Entry
+Accounting Review
+Management Approval
+Completed
+Closed
+
+Each stage controls:
+
+Editable sections
+Required sections
+Approval requirements
+Locking behavior
+
+Add:
+
+Stage progress bar
+Stage owner
+Stage completion checklist
+Approval / reject system
+Admin approval queue
+
+------------------------------------------------
+
+DASHBOARD PAGE
+
+Create an executive dashboard with smart business insights.
+
+Summary cards:
+
+Total Containers
+Containers In Progress
+Completed Containers
+Total Cost
+Total Clearing Charges
+Gross Profit
+Duty Not Paid
+
+Charts:
+
+Containers by Status
+Profit by Customer
+Cost by Vessel
+Monthly Operations
+Top Customers by Profit
+
+Alerts:
+
+Low Profit Containers
+Outstanding Duty
+Delayed Containers
+Missing Required Charges
+Awaiting Approval
+
+Recent activity feed.
+
+Quick search bar.
+
+------------------------------------------------
+
+UPLOAD PAGE
+
+Admin can upload Excel or CSV files.
+
+Columns:
+
+CUSTOMER NAME
+CON
+B/LADING
+DECLARATION
+SIZE
+VESSEL
+
+System must:
+
+Preview uploaded data
+Validate required fields
+Detect duplicate container numbers
+Detect duplicate BL numbers
+Allow confirmation before saving
+
+------------------------------------------------
+
+CONTAINERS PAGE
+
+Display all containers in a smart table.
+
+Columns:
+
+Customer Name
+Container Number
+BL Number
+Declaration
+Size
+Vessel
+Status
+Total Cost
+Clearing Charges
+Gross Profit
+
+Features:
+
+Search
+Sort
+Filter
+Pagination
+Open container detail page
+
+------------------------------------------------
+
+CONTAINER DETAIL PAGE
+
+This is the main page for editing container records.
+
+Use TABS or COLLAPSIBLE SECTIONS.
+
+TOP SUMMARY CARD
+
+Customer Name
+Container Number
+BL Number
+Declaration
+Size
+Vessel
+Status
+Assigned Staff
+Profit Indicator
+
+------------------------------------------------
+
+CORE SYSTEM SECTIONS
+
+1 SHIPPING
+
+Shipping Company
+Shipping Payment VAT
+Consignee
+Final Invoice Shipping Company
+Telex Charge
+Shipping Runnings
+Shipping Detention To Be Paid By Customer
+
+------------------------------------------------
+
+2 CUSTOMS
+
+Duty
+Duty Paid
+Duty Not Paid
+Valuation
+CIU
+Up Country Custom
+DCIU
+MD/Releasing Package
+OC Settlement
+OC Release Local
+DC Enforcement For Transire
+Compliance Team
+CAC Settlement
+CRFFN
+SONCAP
+Alerts
+Examination Bonus
+
+------------------------------------------------
+
+3 TERMINAL
+
+Terminal Charges
+Terminal Additions 1
+Ikorodu Terminal Additions 2
+Terminal Demurrage To Be Paid By Customer
+Terminal Payment VAT
+Wharfage Fee For NPA
+Sifax/GMT Signing
+TS/DC Admin
+Tincan Bond
+Bond
+Manifest
+
+------------------------------------------------
+
+4 DELIVERY / TRUCK
+
+Passing Of Truck
+Passing Of Truck For Empty Return
+Parking For Pullout
+Pullout
+Delivery
+Empty Return
+Unchaining Truck
+Empty Call Up
+Pullout Expenses
+Transfer To Ikorodu
+Transport Allowance
+
+------------------------------------------------
+
+5 OPERATIONS / MISC
+
+FOU Booking
+FOU
+Scanning To Physical
+Security
+Additional Delivery Expenses
+Miscellaneous
+Abandoned
+Agencies Blocks
+Call Up
+Transire Runnings
+Office/PTML
+Fresh Payment
+
+------------------------------------------------
+
+6 FINAL ACCOUNTING SUMMARY
+
+Total Cost
+Clearing Charges
+Gross Profit
+
+------------------------------------------------
+
+SMART CALCULATIONS
+
+Total Cost =
+Sum of all numeric expense fields.
+
+Gross Profit =
+Clearing Charges minus Total Cost.
+
+All numeric fields must default to 0.
+
+Numbers must display with comma formatting.
+
+Staff cannot manually edit Total Cost or Gross Profit.
+
+------------------------------------------------
+
+AUDIT TRAIL SYSTEM
+
+Track all important changes.
+
+Store:
+
+User
+Field changed
+Old value
+New value
+Section
+Date/time
+Reason
+
+Display change history in container record.
+
+------------------------------------------------
+
+RECORD LOCKING
+
+Admin can lock a container record.
+
+When locked:
+
+No editing allowed
+Read-only mode
+
+Unlocking must be logged.
+
+------------------------------------------------
+
+SEARCH PAGE
+
+Allow search by:
+
+BL Number
+Container Number
+Customer Name
+
+Display full container details and cost summary.
+
+------------------------------------------------
+
+USER MANAGEMENT PAGE
+
+Admin can:
+
+Create staff
+Assign permissions
+Disable users
+Edit roles
+
+------------------------------------------------
+
+REPORTS PAGE
+
+Generate business reports.
+
+Examples:
+
+Profit by customer
+Cost by vessel
+Total containers per month
+Gross profit summary
+
+Allow export to CSV.
+
+------------------------------------------------
+
+ENTERPRISE UPGRADE: EXECUTIVE ANALYTICS
+
+Add analytics insights such as:
+
+Containers with negative profit
+High cost categories
+Most expensive vessels
+Staff productivity
+Container cost comparison
+
+------------------------------------------------
+
+ENTERPRISE UPGRADE: DYNAMIC SECTION BUILDER
+
+Create an admin tool called:
+
+SECTION & FIELD BUILDER
+
+Admin must be able to:
+
+Create new sections
+Rename sections
+Reorder sections
+Archive sections
+Assign section permissions
+
+Each section supports custom fields.
+
+Field types:
+
+Number
+Text
+Textarea
+Date
+Dropdown
+Checkbox
+
+Admin can configure each field:
+
+Field name
+Field type
+Placeholder
+Default value
+Required or optional
+Editable by admin or staff
+Include in total cost or not
+Visibility rules
+
+If a numeric field is marked:
+
+Include in Total Cost = TRUE
+
+It must automatically be included in cost calculations.
+
+Custom sections should appear naturally inside container detail page.
+
+------------------------------------------------
+
+UI REQUIREMENTS
+
+Modern enterprise dashboard design.
+
+Use:
+
+Cards
+Charts
+Collapsible sections
+Clean tables
+Status badges
+
+Color examples:
+
+Green = Completed
+Yellow = In Progress
+Red = Issue
+
+Responsive layout.
+
+------------------------------------------------
+
+ACTIVITY LOG
+
+Track:
+
+User actions
+Container updates
+Section edits
+Workflow approvals
+
+------------------------------------------------
+
+WORKFLOW SUMMARY
+
+Admin logs in.
+
+Admin uploads container file.
+
+Records are created.
+
+Admin creates staff accounts.
+
+Staff log in.
+
+Staff update permitted sections.
+
+System calculates costs automatically.
+
+Admin reviews records.
+
+Admin approves and locks records.
+
+Containers move through workflow stages.
+
+------------------------------------------------
+
+DELIVERABLE
+
+Complete working enterprise-style MVP web application.
+
+Include:
+
+Frontend
+Backend
+Database schema
+Authentication
+File upload
+Workflow engine
+Section permissions
+Dynamic section builder
+Audit trail
+Dashboard analytics
+
+Provide instructions to run the project inside Replit.
