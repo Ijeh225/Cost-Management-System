@@ -16,21 +16,59 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { SECTION_LABELS } from "@/lib/format";
+
+const SECTION_OPTIONS = [
+  { value: "_none", label: "All Sections (Admin)" },
+  ...Object.entries(SECTION_LABELS).map(([value, label]) => ({ value, label })),
+];
 
 const createSchema = z.object({
-  name:     z.string().min(2, "Name required"),
-  email:    z.string().email("Valid email required"),
-  password: z.string().min(6, "Min 6 characters"),
-  role:     z.enum(["admin", "staff"]),
+  name:              z.string().min(2, "Name required"),
+  email:             z.string().email("Valid email required"),
+  password:          z.string().min(6, "Min 6 characters"),
+  role:              z.enum(["admin", "staff"]),
+  sectionPermission: z.string().optional(),
 });
 
 const editSchema = z.object({
-  name:     z.string().min(2, "Name required"),
-  role:     z.enum(["admin", "staff"]),
-  password: z.string().optional(),
+  name:              z.string().min(2, "Name required"),
+  role:              z.enum(["admin", "staff"]),
+  password:          z.string().optional(),
+  sectionPermission: z.string().optional(),
 });
 
-type UserRow = { id: number; name: string; email: string; role: string; isActive: boolean; createdAt: string };
+type UserRow = {
+  id: number; name: string; email: string; role: string;
+  sectionPermission?: string | null; isActive: boolean; createdAt: string;
+};
+
+function SectionPermissionField({ control, name, role }: { control: any; name: string; role: string }) {
+  return (
+    <FormField control={control} name={name} render={({ field }) => (
+      <FormItem>
+        <FormLabel>Section Permission <span className="text-muted-foreground font-normal">(staff only)</span></FormLabel>
+        <Select
+          onValueChange={field.onChange}
+          value={field.value || "_none"}
+          disabled={role === "admin"}
+        >
+          <FormControl>
+            <SelectTrigger>
+              <SelectValue placeholder="Select section" />
+            </SelectTrigger>
+          </FormControl>
+          <SelectContent>
+            {SECTION_OPTIONS.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <FormMessage />
+      </FormItem>
+    )} />
+  );
+}
 
 function CreateUserDialog() {
   const [open, setOpen] = useState(false);
@@ -40,11 +78,19 @@ function CreateUserDialog() {
 
   const form = useForm({
     resolver: zodResolver(createSchema),
-    defaultValues: { name: "", email: "", password: "", role: "staff" as const },
+    defaultValues: { name: "", email: "", password: "", role: "staff" as const, sectionPermission: "_none" },
   });
 
+  const watchedRole = form.watch("role");
+
   const onSubmit = (data: any) => {
-    createMutation.mutate({ data }, {
+    const payload: any = { name: data.name, email: data.email, password: data.password, role: data.role };
+    if (data.role === "staff" && data.sectionPermission && data.sectionPermission !== "_none") {
+      payload.sectionPermission = data.sectionPermission;
+    } else {
+      payload.sectionPermission = null;
+    }
+    createMutation.mutate({ data: payload }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/users"] });
         toast({ title: "User created successfully." });
@@ -63,9 +109,7 @@ function CreateUserDialog() {
         </Button>
       </DialogTrigger>
       <DialogContent className="border-border/50 bg-card/95 backdrop-blur">
-        <DialogHeader>
-          <DialogTitle>Create New User</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Create New User</DialogTitle></DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
             <FormField control={form.control} name="name" render={({ field }) => (
@@ -90,6 +134,7 @@ function CreateUserDialog() {
                 <FormMessage />
               </FormItem>
             )} />
+            <SectionPermissionField control={form.control} name="sectionPermission" role={watchedRole} />
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending}>
@@ -111,12 +156,24 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
 
   const form = useForm({
     resolver: zodResolver(editSchema),
-    defaultValues: { name: user.name, role: user.role as "admin" | "staff", password: "" },
+    defaultValues: {
+      name: user.name,
+      role: user.role as "admin" | "staff",
+      password: "",
+      sectionPermission: user.sectionPermission || "_none",
+    },
   });
+
+  const watchedRole = form.watch("role");
 
   const onSubmit = (data: any) => {
     const payload: any = { name: data.name, role: data.role };
     if (data.password) payload.password = data.password;
+    if (data.role === "staff" && data.sectionPermission && data.sectionPermission !== "_none") {
+      payload.sectionPermission = data.sectionPermission;
+    } else {
+      payload.sectionPermission = null;
+    }
     updateMutation.mutate({ id: user.id, data: payload }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -129,9 +186,7 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
 
   return (
     <DialogContent className="border-border/50 bg-card/95 backdrop-blur">
-      <DialogHeader>
-        <DialogTitle>Edit User — {user.name}</DialogTitle>
-      </DialogHeader>
+      <DialogHeader><DialogTitle>Edit User — {user.name}</DialogTitle></DialogHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
           <FormField control={form.control} name="name" render={({ field }) => (
@@ -153,6 +208,7 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
               <FormMessage />
             </FormItem>
           )} />
+          <SectionPermissionField control={form.control} name="sectionPermission" role={watchedRole} />
           <FormField control={form.control} name="password" render={({ field }) => (
             <FormItem>
               <FormLabel>New Password <span className="text-muted-foreground font-normal">(leave blank to keep current)</span></FormLabel>
@@ -182,10 +238,7 @@ export default function Users() {
   const { toast } = useToast();
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
 
-  if (!isAdmin) {
-    setLocation("/");
-    return null;
-  }
+  if (!isAdmin) { setLocation("/"); return null; }
 
   const handleToggleActive = (u: UserRow) => {
     if (u.id === currentUser?.id) {
@@ -209,7 +262,7 @@ export default function Users() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">User Management</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage system access, roles, and accounts.</p>
+          <p className="text-muted-foreground text-sm mt-1">Manage system access, roles, and section permissions.</p>
         </div>
         <CreateUserDialog />
       </div>
@@ -221,6 +274,7 @@ export default function Users() {
               <tr>
                 <th className="px-6 py-4 font-medium">User</th>
                 <th className="px-6 py-4 font-medium">Role</th>
+                <th className="px-6 py-4 font-medium">Section</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Created</th>
                 <th className="px-6 py-4 font-medium text-right">Actions</th>
@@ -228,17 +282,9 @@ export default function Users() {
             </thead>
             <tbody className="divide-y divide-border/50">
               {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-                  </td>
-                </tr>
+                <tr><td colSpan={6} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></td></tr>
               ) : users?.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground text-sm">
-                    No users found.
-                  </td>
-                </tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-muted-foreground text-sm">No users found.</td></tr>
               ) : (
                 users?.map((u) => (
                   <tr key={u.id} className={`transition-colors ${u.isActive ? "hover:bg-accent/50" : "opacity-60 hover:bg-accent/30"}`}>
@@ -253,6 +299,15 @@ export default function Users() {
                         {u.role === "admin" ? <Shield className="w-3 h-3 mr-1" /> : <UserIcon className="w-3 h-3 mr-1" />}
                         {u.role === "admin" ? "Administrator" : "Staff"}
                       </Badge>
+                    </td>
+                    <td className="px-6 py-4">
+                      {(u as UserRow).sectionPermission ? (
+                        <span className="capitalize text-xs font-medium text-foreground/80">
+                          {SECTION_LABELS[(u as UserRow).sectionPermission!] ?? (u as UserRow).sectionPermission}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">All sections</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {u.isActive ? (
@@ -272,12 +327,8 @@ export default function Users() {
                       <div className="flex items-center justify-end gap-2">
                         <Dialog open={editingUser?.id === u.id} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
                           <DialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingUser(u as UserRow)}
-                              className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary"
-                            >
+                            <Button variant="ghost" size="sm" onClick={() => setEditingUser(u as UserRow)}
+                              className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary">
                               <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
                             </Button>
                           </DialogTrigger>
@@ -285,19 +336,10 @@ export default function Users() {
                             <EditUserDialog user={editingUser} onClose={() => setEditingUser(null)} />
                           )}
                         </Dialog>
-
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleActive(u as UserRow)}
+                        <Button variant="ghost" size="sm" onClick={() => handleToggleActive(u as UserRow)}
                           disabled={updateMutation.isPending || u.id === currentUser?.id}
-                          className={`h-8 px-3 text-xs ${u.isActive
-                            ? "hover:bg-destructive/10 hover:text-destructive"
-                            : "hover:bg-emerald-500/10 hover:text-emerald-500"}`}
-                        >
-                          {u.isActive
-                            ? <><PowerOff className="w-3.5 h-3.5 mr-1" /> Disable</>
-                            : <><Power className="w-3.5 h-3.5 mr-1" /> Enable</>}
+                          className={`h-8 px-3 text-xs ${u.isActive ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-emerald-500/10 hover:text-emerald-500"}`}>
+                          {u.isActive ? <><PowerOff className="w-3.5 h-3.5 mr-1" /> Disable</> : <><Power className="w-3.5 h-3.5 mr-1" /> Enable</>}
                         </Button>
                       </div>
                     </td>

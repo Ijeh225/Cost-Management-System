@@ -67,6 +67,7 @@ router.get("/auth/me", requireAuth, (req: AuthRequest, res) => {
       email: u.email,
       name: u.name,
       role: u.role,
+      sectionPermission: u.sectionPermission ?? null,
       isActive: u.isActive,
       createdAt: u.createdAt.toISOString(),
     });

@@ -28,6 +28,18 @@ export const LoginResponse = zod.object({
     email: zod.string(),
     name: zod.string(),
     role: zod.enum(["admin", "staff"]),
+    sectionPermission: zod
+      .union([
+        zod.literal("shipping"),
+        zod.literal("customs"),
+        zod.literal("terminal"),
+        zod.literal("delivery"),
+        zod.literal("operations"),
+        zod.literal("accounting"),
+        zod.literal("management"),
+        zod.literal(null),
+      ])
+      .nullish(),
     isActive: zod.boolean(),
     createdAt: zod.string(),
   }),
@@ -49,6 +61,18 @@ export const GetCurrentUserResponse = zod.object({
   email: zod.string(),
   name: zod.string(),
   role: zod.enum(["admin", "staff"]),
+  sectionPermission: zod
+    .union([
+      zod.literal("shipping"),
+      zod.literal("customs"),
+      zod.literal("terminal"),
+      zod.literal("delivery"),
+      zod.literal("operations"),
+      zod.literal("accounting"),
+      zod.literal("management"),
+      zod.literal(null),
+    ])
+    .nullish(),
   isActive: zod.boolean(),
   createdAt: zod.string(),
 });
@@ -61,6 +85,18 @@ export const ListUsersResponseItem = zod.object({
   email: zod.string(),
   name: zod.string(),
   role: zod.enum(["admin", "staff"]),
+  sectionPermission: zod
+    .union([
+      zod.literal("shipping"),
+      zod.literal("customs"),
+      zod.literal("terminal"),
+      zod.literal("delivery"),
+      zod.literal("operations"),
+      zod.literal("accounting"),
+      zod.literal("management"),
+      zod.literal(null),
+    ])
+    .nullish(),
   isActive: zod.boolean(),
   createdAt: zod.string(),
 });
@@ -74,6 +110,7 @@ export const CreateUserBody = zod.object({
   name: zod.string(),
   password: zod.string(),
   role: zod.enum(["admin", "staff"]),
+  sectionPermission: zod.string().nullish(),
 });
 
 /**
@@ -88,6 +125,18 @@ export const GetUserResponse = zod.object({
   email: zod.string(),
   name: zod.string(),
   role: zod.enum(["admin", "staff"]),
+  sectionPermission: zod
+    .union([
+      zod.literal("shipping"),
+      zod.literal("customs"),
+      zod.literal("terminal"),
+      zod.literal("delivery"),
+      zod.literal("operations"),
+      zod.literal("accounting"),
+      zod.literal("management"),
+      zod.literal(null),
+    ])
+    .nullish(),
   isActive: zod.boolean(),
   createdAt: zod.string(),
 });
@@ -102,8 +151,10 @@ export const UpdateUserParams = zod.object({
 export const UpdateUserBody = zod.object({
   name: zod.string().optional(),
   role: zod.enum(["admin", "staff"]).optional(),
+  sectionPermission: zod.string().nullish(),
   isActive: zod.boolean().optional(),
   password: zod.string().optional(),
+  status: zod.string().optional(),
 });
 
 export const UpdateUserResponse = zod.object({
@@ -111,6 +162,18 @@ export const UpdateUserResponse = zod.object({
   email: zod.string(),
   name: zod.string(),
   role: zod.enum(["admin", "staff"]),
+  sectionPermission: zod
+    .union([
+      zod.literal("shipping"),
+      zod.literal("customs"),
+      zod.literal("terminal"),
+      zod.literal("delivery"),
+      zod.literal("operations"),
+      zod.literal("accounting"),
+      zod.literal("management"),
+      zod.literal(null),
+    ])
+    .nullish(),
   isActive: zod.boolean(),
   createdAt: zod.string(),
 });

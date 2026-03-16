@@ -364,6 +364,25 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
     }
     const { section, shipping, customs, terminal, delivery, operations, clearingCharges, reason } = req.body;
 
+    // Phase 2: section permission check for non-admin staff
+    const user = req.user!;
+    if (user.role !== "admin" && section) {
+      const stageForSection: Record<string, string[]> = {
+        shipping:   ["shipping_entry"],
+        customs:    ["customs_entry"],
+        terminal:   ["terminal_entry"],
+        delivery:   ["delivery_entry"],
+        operations: ["delivery_entry"],
+      };
+      const allowedStages = stageForSection[section] ?? [];
+      const hasSection = user.sectionPermission === section;
+      const atRightStage = allowedStages.includes(c.status);
+      if (!hasSection || !atRightStage) {
+        res.status(403).json({ error: `You are not authorized to edit the ${section} section at stage "${c.status}".` });
+        return;
+      }
+    }
+
     const strNums = (obj: any) => {
       if (!obj) return undefined;
       const out: any = {};

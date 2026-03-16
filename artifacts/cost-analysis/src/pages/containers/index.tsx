@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useListContainers } from "@workspace/api-client-react";
-import { formatCurrency, getStatusColor, getStatusLabel, PHASE1_STATUSES } from "@/lib/format";
+import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -103,7 +103,7 @@ export default function Containers() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                {PHASE1_STATUSES.map(s => (
+                {WORKFLOW_STAGES.map(s => (
                   <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                 ))}
               </SelectContent>

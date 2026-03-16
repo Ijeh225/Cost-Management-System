@@ -13,47 +13,82 @@ export function formatNumber(amount: number | null | undefined): string {
   return new Intl.NumberFormat("en-US").format(amount);
 }
 
-const IN_PROGRESS_STAGES = new Set([
-  "documentation_review",
-  "shipping_entry",
-  "customs_entry",
-  "terminal_entry",
-  "delivery_entry",
-  "accounting_review",
-  "management_approval",
-  "in_progress",
-]);
+export const WORKFLOW_STAGES = [
+  { value: "new_upload",          label: "New Upload",          short: "New" },
+  { value: "documentation_review",label: "Documentation Review",short: "Docs" },
+  { value: "shipping_entry",      label: "Shipping Entry",      short: "Shipping" },
+  { value: "customs_entry",       label: "Customs Entry",       short: "Customs" },
+  { value: "terminal_entry",      label: "Terminal Entry",      short: "Terminal" },
+  { value: "delivery_entry",      label: "Delivery Entry",      short: "Delivery" },
+  { value: "accounting_review",   label: "Accounting Review",   short: "Accounting" },
+  { value: "management_approval", label: "Management Approval", short: "Mgmt" },
+  { value: "completed",           label: "Completed",           short: "Done" },
+  { value: "closed",              label: "Closed",              short: "Closed" },
+];
 
-export function normalizeStatus(status: string): string {
-  if (IN_PROGRESS_STAGES.has(status)) return "in_progress";
-  return status;
+export function getNextStage(current: string): string | null {
+  const idx = WORKFLOW_STAGES.findIndex(s => s.value === current);
+  if (idx === -1 || idx === WORKFLOW_STAGES.length - 1) return null;
+  return WORKFLOW_STAGES[idx + 1].value;
+}
+
+export function getStageIndex(status: string): number {
+  return WORKFLOW_STAGES.findIndex(s => s.value === status);
+}
+
+export const STAGE_SECTION: Record<string, string> = {
+  shipping_entry: "shipping",
+  customs_entry:  "customs",
+  terminal_entry: "terminal",
+  delivery_entry: "delivery",
+};
+
+export function canEditSection(
+  sectionKey: string,
+  containerStatus: string,
+  isAdmin: boolean,
+  userSectionPermission: string | null | undefined
+): boolean {
+  if (isAdmin) return true;
+  if (!userSectionPermission) return false;
+  const activeSection = STAGE_SECTION[containerStatus];
+  if (activeSection !== userSectionPermission) return false;
+  if (sectionKey === userSectionPermission) return true;
+  if (sectionKey === "operations" && userSectionPermission === "delivery") return true;
+  return false;
 }
 
 export function getStatusColor(status: string): string {
-  const normalized = normalizeStatus(status);
   const colors: Record<string, string> = {
-    new_upload:  "bg-slate-500/20 text-slate-300 border-slate-500/50",
-    in_progress: "bg-blue-500/20 text-blue-400 border-blue-500/50",
-    completed:   "bg-emerald-500/20 text-emerald-400 border-emerald-500/50",
-    closed:      "bg-slate-800 text-slate-400 border-slate-700",
+    new_upload:           "bg-slate-500/20 text-slate-300 border-slate-500/50",
+    documentation_review: "bg-yellow-500/20 text-yellow-400 border-yellow-500/50",
+    shipping_entry:       "bg-blue-500/20 text-blue-400 border-blue-500/50",
+    customs_entry:        "bg-purple-500/20 text-purple-400 border-purple-500/50",
+    terminal_entry:       "bg-orange-500/20 text-orange-400 border-orange-500/50",
+    delivery_entry:       "bg-cyan-500/20 text-cyan-400 border-cyan-500/50",
+    accounting_review:    "bg-amber-500/20 text-amber-400 border-amber-500/50",
+    management_approval:  "bg-indigo-500/20 text-indigo-400 border-indigo-500/50",
+    completed:            "bg-emerald-500/20 text-emerald-400 border-emerald-500/50",
+    closed:               "bg-slate-800 text-slate-400 border-slate-700",
+    in_progress:          "bg-blue-500/20 text-blue-400 border-blue-500/50",
   };
-  return colors[normalized] || "bg-slate-800 text-slate-300";
+  return colors[status] || "bg-slate-800 text-slate-300";
 }
 
 export function getStatusLabel(status: string): string {
-  const normalized = normalizeStatus(status);
-  const labels: Record<string, string> = {
-    new_upload:  "New Upload",
-    in_progress: "In Progress",
-    completed:   "Completed",
-    closed:      "Closed",
-  };
-  return labels[normalized] || status.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  const stage = WORKFLOW_STAGES.find(s => s.value === status);
+  if (stage) return stage.label;
+  return status.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
-export const PHASE1_STATUSES = [
-  { value: "new_upload",  label: "New Upload" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "completed",   label: "Completed" },
-  { value: "closed",      label: "Closed" },
-];
+export const PHASE1_STATUSES = WORKFLOW_STAGES;
+
+export const SECTION_LABELS: Record<string, string> = {
+  shipping:   "Shipping",
+  customs:    "Customs",
+  terminal:   "Terminal",
+  delivery:   "Delivery",
+  operations: "Operations",
+  accounting: "Accounting",
+  management: "Management",
+};

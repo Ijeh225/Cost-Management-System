@@ -42,3 +42,4 @@ export * from "./uploadContainersResponse";
 export * from "./uploadRow";
 export * from "./user";
 export * from "./userRole";
+export * from "./userSectionPermission";

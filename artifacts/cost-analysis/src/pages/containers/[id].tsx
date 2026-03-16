@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetContainer, useUpdateContainerCharges, useLockContainer, useUpdateContainer } from "@workspace/api-client-react";
+import {
+  useGetContainer, useUpdateContainerCharges,
+  useLockContainer, useUpdateContainer, useGetContainerAuditLog,
+  type AuditEntry,
+} from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
-import { formatCurrency, getStatusColor, getStatusLabel, PHASE1_STATUSES } from "@/lib/format";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  formatCurrency, getStatusColor, getStatusLabel,
+  WORKFLOW_STAGES, getNextStage, getStageIndex, canEditSection, STAGE_SECTION,
+} from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,51 +18,38 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { 
-  ArrowLeft, Lock, Unlock, Anchor, User as UserIcon, FileText, 
-  Save, AlertCircle, Loader2, DollarSign, Calculator
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ArrowLeft, Lock, Unlock, Anchor, User as UserIcon, FileText,
+  Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
+  History, BarChart3,
 } from "lucide-react";
-type UpdateContainerChargesRequestSection = string;
 
-// Helper to generate schema for any object of numbers
 const createNumberSchema = (keys: string[]) => {
   const shape: Record<string, z.ZodTypeAny> = {};
-  keys.forEach(k => {
-    shape[k] = z.coerce.number().optional().default(0);
-  });
+  keys.forEach(k => { shape[k] = z.coerce.number().optional().default(0); });
   return z.object(shape);
 };
 
-// Define section schemas based on OpenAPI definitions
 const shippingSchema = createNumberSchema(['shippingCompany', 'shippingPaymentVat', 'consignee', 'finalInvoiceShippingCompany', 'telexCharge', 'shippingRunnings', 'shippingDetentionToBePaidByCustomer']);
 const customsSchema = createNumberSchema(['duty', 'dutyPaid', 'dutyNotPaid', 'valuation', 'ciu', 'upCountryCustom', 'dciu', 'mdReleasingPackage', 'ocSettlement', 'ocReleaseLocal', 'dcEnforcementForTransire', 'complianceTeam', 'cacSettlement', 'crffn', 'soncap', 'alerts', 'examinationBonus']);
 const terminalSchema = createNumberSchema(['terminalCharges', 'terminalAdditions1', 'ikorouduTerminalAdditions2', 'terminalDemurrageToBePaidByCustomer', 'terminalPaymentVat', 'wharfageFeeForNpa', 'sifaxGmtSigning', 'tsDcAdmin', 'tincanBond', 'bond', 'manifest']);
 const deliverySchema = createNumberSchema(['passingOfTruck', 'passingOfTruckForEmptyReturn', 'parkingForPullout', 'pullout', 'delivery', 'emptyReturn', 'unchainingTruck', 'emptyCallUp', 'pulloutExpenses', 'transferToIkorodu', 'transportAllowance']);
 const operationsSchema = createNumberSchema(['fouBooking', 'fou', 'scanningToPhysical', 'security', 'additionalDeliveryExpenses', 'miscellaneous', 'abandoned', 'agenciesBlocks', 'callUp', 'transireRunnings', 'officePtml', 'freshPayment']);
 
-// Generic Section Form Component
-function ChargeSectionForm({ 
-  containerId, 
-  sectionKey, 
-  title, 
-  schema, 
-  initialData, 
-  isLocked 
-}: { 
-  containerId: number, 
-  sectionKey: UpdateContainerChargesRequestSection, 
-  title: string, 
-  schema: z.ZodObject<any>, 
-  initialData: any, 
-  isLocked: boolean 
+function ChargeSectionForm({
+  containerId, sectionKey, title, schema, initialData, isLocked, isEditable,
+}: {
+  containerId: number;
+  sectionKey: string;
+  title: string;
+  schema: z.ZodObject<any>;
+  initialData: any;
+  isLocked: boolean;
+  isEditable: boolean;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -69,39 +62,37 @@ function ChargeSectionForm({
   });
 
   const fields = Object.keys(schema.shape);
+  const total = fields.reduce((sum, field) => sum + Number(initialData?.[field] || 0), 0);
 
   const onSubmit = (data: any) => {
     updateMutation.mutate(
-      { 
-        id: containerId, 
-        data: { 
-          section: sectionKey, 
-          [sectionKey]: data,
-          reason: "Manual UI update" // Could add a prompt for this in a real app
-        } 
-      },
+      { id: containerId, data: { section: sectionKey, [sectionKey]: data, reason: "Manual UI update" } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
-          queryClient.invalidateQueries({ queryKey: [`/api/dashboard/stats`] });
-          toast({ title: "Charges Updated", description: `${title} section saved successfully.` });
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+          toast({ title: "Charges Updated", description: `${title} section saved.` });
           setIsEditing(false);
         },
-        onError: (err: any) => {
-          toast({ variant: "destructive", title: "Update Failed", description: err.message });
-        }
+        onError: (err: any) => toast({ variant: "destructive", title: "Update Failed", description: err?.message ?? "Something went wrong" }),
       }
     );
   };
 
-  const total = fields.reduce((sum, field) => sum + Number(initialData?.[field] || 0), 0);
+  const canEdit = isEditable && !isLocked;
 
   return (
     <AccordionItem value={sectionKey} className="border-border/50 bg-card/20 px-4 rounded-lg mb-4 shadow-sm">
       <AccordionTrigger className="hover:no-underline py-4">
         <div className="flex items-center justify-between w-full pr-4">
           <span className="font-semibold text-base">{title}</span>
-          <span className="font-mono text-primary font-medium">{formatCurrency(total)}</span>
+          <div className="flex items-center gap-3">
+            {!isEditable && !isLocked && (
+              <span className="text-xs text-muted-foreground font-normal">(read-only)</span>
+            )}
+            <span className="font-mono text-primary font-medium">{formatCurrency(total)}</span>
+          </div>
         </div>
       </AccordionTrigger>
       <AccordionContent className="pt-2 pb-6">
@@ -109,42 +100,36 @@ function ChargeSectionForm({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
               {fields.map((field) => (
-                <FormField
-                  key={field}
-                  control={form.control}
-                  name={field}
-                  render={({ field: formField }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-muted-foreground capitalize flex justify-between">
-                        {field.replace(/([A-Z])/g, ' $1').trim()}
-                      </FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
-                          <Input 
-                            type="number" 
-                            disabled={!isEditing || isLocked || updateMutation.isPending} 
-                            {...formField} 
-                            className="pl-7 font-mono text-sm bg-background/50 border-border/60 disabled:opacity-70 h-10"
-                            onFocus={(e) => e.target.select()}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormField key={field} control={form.control} name={field} render={({ field: ff }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-muted-foreground capitalize">
+                      {field.replace(/([A-Z])/g, ' $1').trim()}
+                    </FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
+                        <Input
+                          type="number"
+                          disabled={!isEditing || !canEdit || updateMutation.isPending}
+                          {...ff}
+                          className="pl-7 font-mono text-sm bg-background/50 border-border/60 disabled:opacity-70 h-10"
+                          onFocus={(e) => e.target.select()}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               ))}
             </div>
-            
-            {!isLocked && (
+            {canEdit && (
               <div className="flex justify-end gap-3 pt-4 border-t border-border/40 mt-6">
                 {isEditing ? (
                   <>
                     <Button type="button" variant="outline" onClick={() => { form.reset(initialData); setIsEditing(false); }} disabled={updateMutation.isPending}>
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={updateMutation.isPending} className="active:scale-95 transition-transform hover-elevate shadow-md">
+                    <Button type="submit" disabled={updateMutation.isPending} className="active:scale-95 transition-transform shadow-md">
                       {updateMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                       Save Changes
                     </Button>
@@ -163,14 +148,94 @@ function ChargeSectionForm({
   );
 }
 
+function WorkflowProgress({ currentStatus }: { currentStatus: string }) {
+  const currentIdx = getStageIndex(currentStatus);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Workflow Progress</span>
+        <span className="text-xs font-semibold text-foreground">{currentIdx + 1} / {WORKFLOW_STAGES.length}</span>
+      </div>
+      <div className="flex gap-1">
+        {WORKFLOW_STAGES.map((stage, idx) => (
+          <div
+            key={stage.value}
+            title={stage.label}
+            className={`h-2 flex-1 rounded-full transition-all duration-300 ${
+              idx < currentIdx
+                ? "bg-primary/60"
+                : idx === currentIdx
+                ? "bg-primary"
+                : "bg-border/40"
+            }`}
+          />
+        ))}
+      </div>
+      <div className="flex justify-between text-[10px] text-muted-foreground/60">
+        <span>{WORKFLOW_STAGES[0].short}</span>
+        <span className="font-medium text-primary">{getStatusLabel(currentStatus)}</span>
+        <span>{WORKFLOW_STAGES[WORKFLOW_STAGES.length - 1].short}</span>
+      </div>
+    </div>
+  );
+}
+
+function AuditTrail({ containerId }: { containerId: number }) {
+  const { data: entries, isLoading } = useGetContainerAuditLog(containerId);
+
+  if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  if (!entries?.length) return (
+    <div className="text-center py-16 text-muted-foreground">
+      <History className="w-10 h-10 mx-auto mb-3 opacity-30" />
+      <p className="text-sm">No activity recorded yet.</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {entries.map((entry: AuditEntry, i: number) => (
+        <div key={i} className="flex gap-4 p-4 bg-card/30 rounded-lg border border-border/40 hover:border-border/60 transition-colors">
+          <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+            <History className="w-4 h-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground capitalize">
+                  {entry.changeType?.replace(/_/g, " ") ?? "Update"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  by <span className="font-medium text-foreground/80">{(entry as any).userName ?? "System"}</span>
+                  {(entry as any).reason && <> — <span className="italic">{(entry as any).reason}</span></>}
+                </p>
+              </div>
+              <span className="text-xs font-mono text-muted-foreground/60 shrink-0">
+                {new Date(entry.createdAt).toLocaleString()}
+              </span>
+            </div>
+            {(entry as any).newData && (
+              <details className="mt-2">
+                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">View changes</summary>
+                <pre className="text-xs bg-secondary/30 rounded p-2 mt-1 overflow-x-auto text-foreground/70 max-h-48">
+                  {JSON.stringify((entry as any).newData, null, 2)}
+                </pre>
+              </details>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function ContainerDetail() {
   const { id } = useParams();
   const containerId = Number(id);
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+  const [activeTab, setActiveTab] = useState("charges");
+
   const { data, isLoading, isError } = useGetContainer(containerId);
   const lockMutation = useLockContainer();
   const updateMutation = useUpdateContainer();
@@ -179,20 +244,26 @@ export default function ContainerDetail() {
   if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
 
   const { container, charges } = data;
+  const nextStage = getNextStage(container.status);
+  const userSection = (user as any)?.sectionPermission ?? null;
+  const activeSection = STAGE_SECTION[container.status] ?? null;
 
-  const handleStatusChange = (newStatus: string) => {
-    if (newStatus === container.status) return;
+  const canAdvance = !container.isLocked && nextStage !== null && (
+    isAdmin || (userSection && userSection === activeSection)
+  );
+
+  const handleAdvance = () => {
+    if (!nextStage) return;
     updateMutation.mutate(
-      { id: containerId, data: { status: newStatus } },
+      { id: containerId, data: { status: nextStage } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-          toast({ title: "Status Updated", description: `Container moved to ${getStatusLabel(newStatus)}.` });
+          toast({ title: "Stage Advanced", description: `Container moved to "${getStatusLabel(nextStage)}".` });
         },
-        onError: (err: any) => {
-          toast({ variant: "destructive", title: "Update Failed", description: err.message });
-        }
+        onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err?.message }),
       }
     );
   };
@@ -203,17 +274,18 @@ export default function ContainerDetail() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
-          toast({ 
-            title: container.isLocked ? "Container Unlocked" : "Container Locked", 
-            description: container.isLocked ? "Editing is now enabled." : "Record is now read-only." 
-          });
-        }
+          toast({ title: container.isLocked ? "Container Unlocked" : "Container Locked" });
+        },
       }
     );
   };
 
+  const sectionEditable = (sectionKey: string) =>
+    canEditSection(sectionKey, container.status, isAdmin, userSection);
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-24">
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/containers">
           <Button variant="ghost" size="icon" className="hover:bg-accent rounded-full"><ArrowLeft className="w-5 h-5" /></Button>
@@ -221,66 +293,63 @@ export default function ContainerDetail() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
             {container.containerNumber}
-            {container.isLocked && <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 px-2 py-0.5"><Lock className="w-3 h-3 mr-1"/> Locked</Badge>}
+            {container.isLocked && (
+              <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 px-2 py-0.5">
+                <Lock className="w-3 h-3 mr-1" /> Locked
+              </Badge>
+            )}
           </h1>
           <p className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
             <FileText className="w-3.5 h-3.5" /> BL: {container.blNumber}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-3">
-          {container.isLocked ? (
-            <span className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider ${getStatusColor(container.status)}`}>
-              {getStatusLabel(container.status)}
-            </span>
-          ) : (
-            <Select
-              value={container.status}
-              onValueChange={handleStatusChange}
+        <div className="ml-auto flex items-center gap-3 flex-wrap justify-end">
+          <span className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider border ${getStatusColor(container.status)}`}>
+            {getStatusLabel(container.status)}
+          </span>
+          {canAdvance && (
+            <Button
+              size="sm"
+              onClick={handleAdvance}
               disabled={updateMutation.isPending}
+              className="active:scale-95 transition-transform shadow-md shadow-primary/20 gap-1.5"
             >
-              <SelectTrigger className={`w-[160px] text-xs font-semibold uppercase tracking-wider border ${getStatusColor(container.status)} bg-transparent`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PHASE1_STATUSES.map(s => (
-                  <SelectItem key={s.value} value={s.value} className="text-xs">
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
+              Advance to {getStatusLabel(nextStage!)}
+            </Button>
           )}
           {isAdmin && (
-            <Button 
-              variant={container.isLocked ? "outline" : "secondary"} 
-              size="sm" 
+            <Button
+              variant={container.isLocked ? "outline" : "secondary"}
+              size="sm"
               onClick={handleLockToggle}
               disabled={lockMutation.isPending}
               className={container.isLocked ? "border-destructive/50 text-destructive hover:bg-destructive/10" : ""}
             >
-              {container.isLocked ? <><Unlock className="w-4 h-4 mr-2" /> Unlock Record</> : <><Lock className="w-4 h-4 mr-2" /> Lock Record</>}
+              {container.isLocked ? <><Unlock className="w-4 h-4 mr-2" />Unlock</> : <><Lock className="w-4 h-4 mr-2" />Lock</>}
             </Button>
           )}
         </div>
       </div>
 
+      {/* Lock warning */}
       {container.isLocked && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
           <div>
             <h4 className="font-semibold text-destructive text-sm">Record Locked</h4>
-            <p className="text-xs text-destructive/80 mt-1">This container's financial data is locked and cannot be edited. Contact an administrator to unlock.</p>
+            <p className="text-xs text-destructive/80 mt-1">This container's data is locked and cannot be edited.</p>
           </div>
         </div>
       )}
 
-      {/* Hero Summary Card */}
+      {/* Hero Summary */}
       <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg overflow-hidden relative">
         <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
           <Anchor className="w-48 h-48" />
         </div>
         <CardContent className="p-6 relative z-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
             <div>
               <p className="text-xs font-mono text-muted-foreground uppercase mb-1">Customer</p>
               <p className="font-semibold text-foreground text-lg">{container.customerName}</p>
@@ -296,112 +365,107 @@ export default function ContainerDetail() {
             <div>
               <p className="text-xs font-mono text-muted-foreground uppercase mb-1">Assigned To</p>
               <p className="font-medium text-foreground flex items-center gap-2">
-                <UserIcon className="w-4 h-4 text-primary" /> 
+                <UserIcon className="w-4 h-4 text-primary" />
                 {container.assignedStaffName || 'Unassigned'}
               </p>
             </div>
           </div>
+          <WorkflowProgress currentStatus={container.status} />
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
-        {/* Charge Sections (Left 2/3) */}
-        <div className="lg:col-span-2 space-y-2">
-          <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Calculator className="w-5 h-5 text-primary" /> Breakdown of Charges</h3>
-          <Accordion type="single" collapsible className="w-full">
-            <ChargeSectionForm 
-              containerId={containerId} 
-              sectionKey="shipping" 
-              title="Shipping Charges" 
-              schema={shippingSchema} 
-              initialData={charges.shipping} 
-              isLocked={container.isLocked} 
-            />
-            <ChargeSectionForm 
-              containerId={containerId} 
-              sectionKey="customs" 
-              title="Customs Duty & Taxes" 
-              schema={customsSchema} 
-              initialData={charges.customs} 
-              isLocked={container.isLocked} 
-            />
-            <ChargeSectionForm 
-              containerId={containerId} 
-              sectionKey="terminal" 
-              title="Terminal Charges" 
-              schema={terminalSchema} 
-              initialData={charges.terminal} 
-              isLocked={container.isLocked} 
-            />
-            <ChargeSectionForm 
-              containerId={containerId} 
-              sectionKey="delivery" 
-              title="Delivery & Transport" 
-              schema={deliverySchema} 
-              initialData={charges.delivery} 
-              isLocked={container.isLocked} 
-            />
-            <ChargeSectionForm 
-              containerId={containerId} 
-              sectionKey="operations" 
-              title="Operations & Misc." 
-              schema={operationsSchema} 
-              initialData={charges.operations} 
-              isLocked={container.isLocked} 
-            />
-          </Accordion>
-        </div>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-card/40 border border-border/50">
+          <TabsTrigger value="charges" className="gap-2">
+            <Calculator className="w-4 h-4" /> Charges
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="gap-2">
+            <History className="w-4 h-4" /> Audit Trail
+          </TabsTrigger>
+        </TabsList>
 
-        {/* Final Accounting Summary (Right 1/3 - Sticky) */}
-        <div className="lg:sticky top-24">
-          <Card className="border-primary/20 bg-card/60 backdrop-blur shadow-xl overflow-hidden relative">
-            <div className="absolute h-1 w-full bg-gradient-to-r from-primary via-indigo-500 to-purple-500 top-0 left-0" />
-            <CardHeader className="pb-4 border-b border-border/40">
-              <CardTitle className="text-lg font-bold">Accounting Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              
-              <div>
-                <p className="text-sm font-medium text-muted-foreground flex justify-between mb-1">
-                  <span>Total Actual Cost</span>
-                </p>
-                <p className="text-2xl font-mono font-bold text-foreground">{formatCurrency(charges.totalCost)}</p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground flex justify-between mb-1">
-                  <span>Agreed Clearing Charges</span>
-                </p>
-                <p className="text-2xl font-mono font-bold text-primary">{formatCurrency(charges.clearingCharges)}</p>
-              </div>
-
-              <div className="pt-6 border-t border-border/40">
-                <p className="text-sm font-medium text-muted-foreground flex justify-between mb-2">
-                  <span>Gross Profit/Loss</span>
-                  {charges.grossProfit >= 0 ? (
-                    <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-0">PROFIT</Badge>
-                  ) : (
-                    <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/20 border-0">LOSS</Badge>
-                  )}
-                </p>
-                <p className={`text-4xl font-mono font-black tracking-tighter ${charges.grossProfit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>
-                  {formatCurrency(charges.grossProfit)}
-                </p>
-              </div>
-
-              {charges.customs.dutyNotPaid !== undefined && charges.customs.dutyNotPaid > 0 && (
-                <div className="mt-4 p-3 bg-amber-500/10 rounded border border-amber-500/20 flex justify-between items-center">
-                  <span className="text-xs font-semibold text-amber-500">Unpaid Duty:</span>
-                  <span className="font-mono text-sm font-bold text-amber-500">{formatCurrency(charges.customs.dutyNotPaid)}</span>
+        <TabsContent value="charges" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="lg:col-span-2 space-y-2">
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-primary" /> Breakdown of Charges
+              </h3>
+              {!isAdmin && userSection && (
+                <div className="mb-4 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 text-sm flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-primary shrink-0" />
+                  <span className="text-muted-foreground">
+                    You can edit the <span className="font-semibold text-foreground capitalize">{userSection}</span> section
+                    {activeSection === userSection
+                      ? " — this container is at your stage."
+                      : ` once the container reaches ${userSection} stage.`}
+                  </span>
                 </div>
               )}
+              <Accordion type="single" collapsible className="w-full">
+                <ChargeSectionForm containerId={containerId} sectionKey="shipping" title="Shipping Charges" schema={shippingSchema} initialData={charges.shipping} isLocked={container.isLocked} isEditable={sectionEditable("shipping")} />
+                <ChargeSectionForm containerId={containerId} sectionKey="customs" title="Customs Duty & Taxes" schema={customsSchema} initialData={charges.customs} isLocked={container.isLocked} isEditable={sectionEditable("customs")} />
+                <ChargeSectionForm containerId={containerId} sectionKey="terminal" title="Terminal Charges" schema={terminalSchema} initialData={charges.terminal} isLocked={container.isLocked} isEditable={sectionEditable("terminal")} />
+                <ChargeSectionForm containerId={containerId} sectionKey="delivery" title="Delivery & Transport" schema={deliverySchema} initialData={charges.delivery} isLocked={container.isLocked} isEditable={sectionEditable("delivery")} />
+                <ChargeSectionForm containerId={containerId} sectionKey="operations" title="Operations & Misc." schema={operationsSchema} initialData={charges.operations} isLocked={container.isLocked} isEditable={sectionEditable("operations")} />
+              </Accordion>
+            </div>
 
+            <div className="lg:sticky top-24">
+              <Card className="border-primary/20 bg-card/60 backdrop-blur shadow-xl overflow-hidden relative">
+                <div className="absolute h-1 w-full bg-gradient-to-r from-primary via-indigo-500 to-purple-500 top-0 left-0" />
+                <CardHeader className="pb-4 border-b border-border/40">
+                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-primary" /> Accounting Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Total Actual Cost</p>
+                    <p className="text-2xl font-mono font-bold text-foreground">{formatCurrency(charges.totalCost)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Agreed Clearing Charges</p>
+                    <p className="text-2xl font-mono font-bold text-primary">{formatCurrency(charges.clearingCharges)}</p>
+                  </div>
+                  <div className="pt-6 border-t border-border/40">
+                    <p className="text-sm font-medium text-muted-foreground flex justify-between mb-2">
+                      <span>Gross Profit/Loss</span>
+                      {charges.grossProfit >= 0 ? (
+                        <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-0">PROFIT</Badge>
+                      ) : (
+                        <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/20 border-0">LOSS</Badge>
+                      )}
+                    </p>
+                    <p className={`text-4xl font-mono font-black tracking-tighter ${charges.grossProfit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>
+                      {formatCurrency(charges.grossProfit)}
+                    </p>
+                  </div>
+                  {charges.customs?.dutyNotPaid !== undefined && charges.customs.dutyNotPaid > 0 && (
+                    <div className="p-3 bg-amber-500/10 rounded border border-amber-500/20 flex justify-between items-center">
+                      <span className="text-xs font-semibold text-amber-500">Unpaid Duty:</span>
+                      <span className="font-mono text-sm font-bold text-amber-500">{formatCurrency(charges.customs.dutyNotPaid)}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="audit" className="mt-6">
+          <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg">
+            <CardHeader className="border-b border-border/40">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <History className="w-5 h-5 text-primary" /> Audit Trail
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <AuditTrail containerId={containerId} />
             </CardContent>
           </Card>
-        </div>
-
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

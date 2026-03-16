@@ -29,11 +29,26 @@ export const UserRole = {
   staff: "staff",
 } as const;
 
+export type UserSectionPermission =
+  | (typeof UserSectionPermission)[keyof typeof UserSectionPermission]
+  | null;
+
+export const UserSectionPermission = {
+  shipping: "shipping",
+  customs: "customs",
+  terminal: "terminal",
+  delivery: "delivery",
+  operations: "operations",
+  accounting: "accounting",
+  management: "management",
+} as const;
+
 export interface User {
   id: number;
   email: string;
   name: string;
   role: UserRole;
+  sectionPermission?: UserSectionPermission;
   isActive: boolean;
   createdAt: string;
 }
@@ -56,6 +71,7 @@ export interface CreateUserRequest {
   name: string;
   password: string;
   role: CreateUserRequestRole;
+  sectionPermission?: string | null;
 }
 
 export type UpdateUserRequestRole =
@@ -69,8 +85,10 @@ export const UpdateUserRequestRole = {
 export interface UpdateUserRequest {
   name?: string;
   role?: UpdateUserRequestRole;
+  sectionPermission?: string | null;
   isActive?: boolean;
   password?: string;
+  status?: string;
 }
 
 export type ContainerStatus =

@@ -425,6 +425,10 @@ components:
         role:
           type: string
           enum: [admin, staff]
+        sectionPermission:
+          type: string
+          nullable: true
+          enum: [shipping, customs, terminal, delivery, operations, accounting, management, null]
         isActive:
           type: boolean
         createdAt:
@@ -443,6 +447,9 @@ components:
         role:
           type: string
           enum: [admin, staff]
+        sectionPermission:
+          type: string
+          nullable: true
       required: [email, name, password, role]
 
     UpdateUserRequest:
@@ -453,9 +460,14 @@ components:
         role:
           type: string
           enum: [admin, staff]
+        sectionPermission:
+          type: string
+          nullable: true
         isActive:
           type: boolean
         password:
+          type: string
+        status:
           type: string
 
     Container:
