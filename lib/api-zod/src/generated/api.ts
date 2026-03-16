@@ -943,3 +943,117 @@ export const GetDashboardStatsResponse = zod.object({
   myPendingSections: zod.number(),
   mySections: zod.array(zod.string()).optional(),
 });
+
+/**
+ * @summary Get analytics data
+ */
+export const GetAnalyticsResponse = zod.object({
+  summary: zod.object({
+    totalRevenue: zod.number(),
+    totalCost: zod.number(),
+    grossProfit: zod.number(),
+    profitMargin: zod.number(),
+    containerCount: zod.number(),
+  }),
+  profitByCustomer: zod.array(
+    zod.object({
+      customer: zod.string(),
+      revenue: zod.number(),
+      cost: zod.number(),
+      grossProfit: zod.number(),
+      count: zod.number(),
+    }),
+  ),
+  costBySection: zod.array(
+    zod.object({
+      section: zod.string(),
+      cost: zod.number(),
+      pct: zod.number(),
+    }),
+  ),
+  profitByVessel: zod.array(
+    zod.object({
+      vessel: zod.string(),
+      revenue: zod.number(),
+      cost: zod.number(),
+      grossProfit: zod.number(),
+      count: zod.number(),
+    }),
+  ),
+  monthlyTrend: zod.array(
+    zod.object({
+      month: zod.string(),
+      label: zod.string(),
+      count: zod.number(),
+      revenue: zod.number(),
+      cost: zod.number(),
+      grossProfit: zod.number(),
+    }),
+  ),
+  negativeProfitContainers: zod.array(
+    zod.object({
+      id: zod.number(),
+      containerNumber: zod.string(),
+      customerName: zod.string(),
+      vessel: zod.string().nullish(),
+      clearingCharges: zod.number(),
+      totalCost: zod.number(),
+      grossProfit: zod.number(),
+      status: zod.string(),
+    }),
+  ),
+  staffProductivity: zod.array(
+    zod.object({
+      userId: zod.number(),
+      name: zod.string(),
+      containersAssigned: zod.number(),
+      sectionsSubmitted: zod.number(),
+      sectionsApproved: zod.number(),
+      sectionsRejected: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get container report data
+ */
+export const GetContainerReportQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+  from: zod.date().optional(),
+  to: zod.date().optional(),
+});
+
+export const GetContainerReportResponse = zod.object({
+  containers: zod.array(
+    zod.object({
+      id: zod.number(),
+      containerNumber: zod.string(),
+      blNumber: zod.string().nullish(),
+      customerName: zod.string(),
+      vessel: zod.string(),
+      size: zod.string(),
+      status: zod.string(),
+      assignedTo: zod.string(),
+      isLocked: zod.boolean().nullish(),
+      clearingCharges: zod.number(),
+      totalCost: zod.number(),
+      grossProfit: zod.number(),
+      shippingCost: zod.number(),
+      customsCost: zod.number(),
+      terminalCost: zod.number(),
+      deliveryCost: zod.number(),
+      operationsCost: zod.number(),
+      dutyNotPaid: zod.number(),
+      createdAt: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Export containers as CSV
+ */
+export const ExportContainersCSVQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+  from: zod.date().optional(),
+  to: zod.date().optional(),
+});

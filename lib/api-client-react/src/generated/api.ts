@@ -17,16 +17,20 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AnalyticsResponse,
   ApprovalQueueItem,
   AuditEntry,
   Container,
   ContainerCharges,
   ContainerDetail,
   ContainerListResponse,
+  ContainerReportResponse,
   CreateContainerRequest,
   CreateUserRequest,
   DashboardStats,
   ErrorResponse,
+  ExportContainersCSVParams,
+  GetContainerReportParams,
   HealthStatus,
   ListContainersParams,
   LockContainerRequest,
@@ -2118,6 +2122,281 @@ export function useGetDashboardStats<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetDashboardStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get analytics data
+ */
+export const getGetAnalyticsUrl = () => {
+  return `/api/api/analytics`;
+};
+
+export const getAnalytics = async (
+  options?: RequestInit,
+): Promise<AnalyticsResponse> => {
+  return customFetch<AnalyticsResponse>(getGetAnalyticsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAnalyticsQueryKey = () => {
+  return [`/api/api/analytics`] as const;
+};
+
+export const getGetAnalyticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAnalytics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAnalytics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAnalyticsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalytics>>> = ({
+    signal,
+  }) => getAnalytics({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAnalytics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAnalyticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAnalytics>>
+>;
+export type GetAnalyticsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get analytics data
+ */
+
+export function useGetAnalytics<
+  TData = Awaited<ReturnType<typeof getAnalytics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAnalytics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAnalyticsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get container report data
+ */
+export const getGetContainerReportUrl = (params?: GetContainerReportParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/api/reports/containers?${stringifiedParams}`
+    : `/api/api/reports/containers`;
+};
+
+export const getContainerReport = async (
+  params?: GetContainerReportParams,
+  options?: RequestInit,
+): Promise<ContainerReportResponse> => {
+  return customFetch<ContainerReportResponse>(
+    getGetContainerReportUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetContainerReportQueryKey = (
+  params?: GetContainerReportParams,
+) => {
+  return [`/api/api/reports/containers`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetContainerReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getContainerReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetContainerReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getContainerReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetContainerReportQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getContainerReport>>
+  > = ({ signal }) => getContainerReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getContainerReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetContainerReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getContainerReport>>
+>;
+export type GetContainerReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get container report data
+ */
+
+export function useGetContainerReport<
+  TData = Awaited<ReturnType<typeof getContainerReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetContainerReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getContainerReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetContainerReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Export containers as CSV
+ */
+export const getExportContainersCSVUrl = (
+  params?: ExportContainersCSVParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/api/reports/export?${stringifiedParams}`
+    : `/api/api/reports/export`;
+};
+
+export const exportContainersCSV = async (
+  params?: ExportContainersCSVParams,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getExportContainersCSVUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportContainersCSVQueryKey = (
+  params?: ExportContainersCSVParams,
+) => {
+  return [`/api/api/reports/export`, ...(params ? [params] : [])] as const;
+};
+
+export const getExportContainersCSVQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportContainersCSV>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ExportContainersCSVParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportContainersCSV>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getExportContainersCSVQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportContainersCSV>>
+  > = ({ signal }) =>
+    exportContainersCSV(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportContainersCSV>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportContainersCSVQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportContainersCSV>>
+>;
+export type ExportContainersCSVQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Export containers as CSV
+ */
+
+export function useExportContainersCSV<
+  TData = Awaited<ReturnType<typeof exportContainersCSV>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ExportContainersCSVParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportContainersCSV>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportContainersCSVQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

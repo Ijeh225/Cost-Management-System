@@ -526,6 +526,68 @@ paths:
               schema:
                 $ref: "#/components/schemas/DashboardStats"
 
+  /api/analytics:
+    get:
+      summary: Get analytics data
+      operationId: getAnalytics
+      tags: [Analytics]
+      security: [{cookieAuth: []}]
+      responses:
+        "200":
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsResponse"
+
+  /api/reports/containers:
+    get:
+      summary: Get container report data
+      operationId: getContainerReport
+      tags: [Reports]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: query
+          name: status
+          schema: {type: string}
+        - in: query
+          name: from
+          schema: {type: string, format: date}
+        - in: query
+          name: to
+          schema: {type: string, format: date}
+      responses:
+        "200":
+          description: Report data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerReportResponse"
+
+  /api/reports/export:
+    get:
+      summary: Export containers as CSV
+      operationId: exportContainersCSV
+      tags: [Reports]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: query
+          name: status
+          schema: {type: string}
+        - in: query
+          name: from
+          schema: {type: string, format: date}
+        - in: query
+          name: to
+          schema: {type: string, format: date}
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
 components:
   schemas:
     HealthStatus:
@@ -1175,3 +1237,119 @@ components:
         reason:
           type: string
       required: [reason]
+
+    AnalyticsResponse:
+      type: object
+      properties:
+        summary:
+          type: object
+          properties:
+            totalRevenue: {type: number}
+            totalCost: {type: number}
+            grossProfit: {type: number}
+            profitMargin: {type: number}
+            containerCount: {type: number}
+          required: [totalRevenue, totalCost, grossProfit, profitMargin, containerCount]
+        profitByCustomer:
+          type: array
+          items:
+            type: object
+            properties:
+              customer: {type: string}
+              revenue: {type: number}
+              cost: {type: number}
+              grossProfit: {type: number}
+              count: {type: number}
+            required: [customer, revenue, cost, grossProfit, count]
+        costBySection:
+          type: array
+          items:
+            type: object
+            properties:
+              section: {type: string}
+              cost: {type: number}
+              pct: {type: number}
+            required: [section, cost, pct]
+        profitByVessel:
+          type: array
+          items:
+            type: object
+            properties:
+              vessel: {type: string}
+              revenue: {type: number}
+              cost: {type: number}
+              grossProfit: {type: number}
+              count: {type: number}
+            required: [vessel, revenue, cost, grossProfit, count]
+        monthlyTrend:
+          type: array
+          items:
+            type: object
+            properties:
+              month: {type: string}
+              label: {type: string}
+              count: {type: number}
+              revenue: {type: number}
+              cost: {type: number}
+              grossProfit: {type: number}
+            required: [month, label, count, revenue, cost, grossProfit]
+        negativeProfitContainers:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: number}
+              containerNumber: {type: string}
+              customerName: {type: string}
+              vessel: {type: string, nullable: true}
+              clearingCharges: {type: number}
+              totalCost: {type: number}
+              grossProfit: {type: number}
+              status: {type: string}
+            required: [id, containerNumber, customerName, clearingCharges, totalCost, grossProfit, status]
+        staffProductivity:
+          type: array
+          items:
+            type: object
+            properties:
+              userId: {type: number}
+              name: {type: string}
+              containersAssigned: {type: number}
+              sectionsSubmitted: {type: number}
+              sectionsApproved: {type: number}
+              sectionsRejected: {type: number}
+            required: [userId, name, containersAssigned, sectionsSubmitted, sectionsApproved, sectionsRejected]
+      required: [summary, profitByCustomer, costBySection, profitByVessel, monthlyTrend, negativeProfitContainers, staffProductivity]
+
+    ContainerReportRow:
+      type: object
+      properties:
+        id: {type: number}
+        containerNumber: {type: string}
+        blNumber: {type: string, nullable: true}
+        customerName: {type: string}
+        vessel: {type: string}
+        size: {type: string}
+        status: {type: string}
+        assignedTo: {type: string}
+        isLocked: {type: boolean, nullable: true}
+        clearingCharges: {type: number}
+        totalCost: {type: number}
+        grossProfit: {type: number}
+        shippingCost: {type: number}
+        customsCost: {type: number}
+        terminalCost: {type: number}
+        deliveryCost: {type: number}
+        operationsCost: {type: number}
+        dutyNotPaid: {type: number}
+        createdAt: {type: string}
+      required: [id, containerNumber, customerName, vessel, size, status, assignedTo, clearingCharges, totalCost, grossProfit, shippingCost, customsCost, terminalCost, deliveryCost, operationsCost, dutyNotPaid, createdAt]
+
+    ContainerReportResponse:
+      type: object
+      properties:
+        containers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContainerReportRow"
+      required: [containers]

@@ -1,0 +1,189 @@
+import { Router } from "express";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, sectionApprovalsTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
+import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { calcTotalCost } from "../lib/calculations.js";
+
+export const analyticsRouter = Router();
+
+function sumFields(obj: Record<string, any>, keys: string[]): number {
+  return keys.reduce((s, k) => s + parseFloat(obj?.[k] ?? "0"), 0);
+}
+
+analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const allContainers = await db.select({
+      id: containersTable.id,
+      containerNumber: containersTable.containerNumber,
+      customerName: containersTable.customerName,
+      vessel: containersTable.vessel,
+      status: containersTable.status,
+      clearingCharges: containersTable.clearingCharges,
+      assignedStaffId: containersTable.assignedStaffId,
+      createdAt: containersTable.createdAt,
+    }).from(containersTable);
+
+    if (allContainers.length === 0) {
+      return res.json({
+        profitByCustomer: [], costBySection: [], profitByVessel: [],
+        monthlyTrend: [], negativeProfitContainers: [], staffProductivity: [],
+        summary: { totalRevenue: 0, totalCost: 0, grossProfit: 0, profitMargin: 0, containerCount: 0 },
+      });
+    }
+
+    const allShipping   = await db.select().from(shippingChargesTable);
+    const allCustoms    = await db.select().from(customsChargesTable);
+    const allTerminal   = await db.select().from(terminalChargesTable);
+    const allDelivery   = await db.select().from(deliveryChargesTable);
+    const allOps        = await db.select().from(operationsChargesTable);
+
+    const idx = (arr: any[]) => { const m: Record<number, any> = {}; arr.forEach(r => { m[r.containerId] = r; }); return m; };
+    const sMap = idx(allShipping);
+    const cMap = idx(allCustoms);
+    const tMap = idx(allTerminal);
+    const dMap = idx(allDelivery);
+    const oMap = idx(allOps);
+
+    const SHIPPING_KEYS   = ["shippingCompany","shippingPaymentVat","consignee","finalInvoiceShippingCompany","telexCharge","shippingRunnings","shippingDetentionToBePaidByCustomer"];
+    const CUSTOMS_KEYS    = ["duty","dutyPaid","dutyNotPaid","valuation","ciu","upCountryCustom","dciu","mdReleasingPackage","ocSettlement","ocReleaseLocal","dcEnforcementForTransire","complianceTeam","cacSettlement","crffn","soncap","alerts","examinationBonus"];
+    const TERMINAL_KEYS   = ["terminalCharges","terminalAdditions1","ikorouduTerminalAdditions2","terminalDemurrageToBePaidByCustomer","terminalPaymentVat","wharfageFeeForNpa","sifaxGmtSigning","tsDcAdmin","tincanBond","bond","manifest"];
+    const DELIVERY_KEYS   = ["passingOfTruck","passingOfTruckForEmptyReturn","parkingForPullout","pullout","delivery","emptyReturn","unchainingTruck","emptyCallUp","pulloutExpenses","transferToIkorodu","transportAllowance"];
+    const OPERATIONS_KEYS = ["fouBooking","fou","scanningToPhysical","security","additionalDeliveryExpenses","miscellaneous","abandoned","agenciesBlocks","callUp","transireRunnings","officePtml","freshPayment"];
+
+    let totalRevenue = 0;
+    let totalCost = 0;
+    let sectionTotals = { shipping: 0, customs: 0, terminal: 0, delivery: 0, operations: 0 };
+
+    const customerData: Record<string, { revenue: number; cost: number; count: number }> = {};
+    const vesselData:   Record<string, { revenue: number; cost: number; count: number }> = {};
+    const monthlyData:  Record<string, { count: number; revenue: number; cost: number }> = {};
+    const containerResults: Array<{ id: number; containerNumber: string; customerName: string; vessel: string | null; clearingCharges: number; totalCost: number; grossProfit: number; status: string }> = [];
+
+    for (const c of allContainers) {
+      const s = sMap[c.id] ?? {};
+      const cu = cMap[c.id] ?? {};
+      const t = tMap[c.id] ?? {};
+      const d = dMap[c.id] ?? {};
+      const o = oMap[c.id] ?? {};
+      const cost = calcTotalCost(s, cu, t, d, o);
+      const revenue = parseFloat(c.clearingCharges as string ?? "0");
+      const grossProfit = revenue - cost;
+
+      totalRevenue += revenue;
+      totalCost += cost;
+      sectionTotals.shipping   += sumFields(s, SHIPPING_KEYS);
+      sectionTotals.customs    += sumFields(cu, CUSTOMS_KEYS);
+      sectionTotals.terminal   += sumFields(t, TERMINAL_KEYS);
+      sectionTotals.delivery   += sumFields(d, DELIVERY_KEYS);
+      sectionTotals.operations += sumFields(o, OPERATIONS_KEYS);
+
+      // Customer
+      const cust = c.customerName || "Unknown";
+      if (!customerData[cust]) customerData[cust] = { revenue: 0, cost: 0, count: 0 };
+      customerData[cust].revenue += revenue;
+      customerData[cust].cost    += cost;
+      customerData[cust].count++;
+
+      // Vessel
+      const vessel = c.vessel || "Unknown";
+      if (!vesselData[vessel]) vesselData[vessel] = { revenue: 0, cost: 0, count: 0 };
+      vesselData[vessel].revenue += revenue;
+      vesselData[vessel].cost    += cost;
+      vesselData[vessel].count++;
+
+      // Monthly trend (by createdAt)
+      const month = c.createdAt.toISOString().slice(0, 7); // "YYYY-MM"
+      if (!monthlyData[month]) monthlyData[month] = { count: 0, revenue: 0, cost: 0 };
+      monthlyData[month].count++;
+      monthlyData[month].revenue += revenue;
+      monthlyData[month].cost    += cost;
+
+      containerResults.push({
+        id: c.id,
+        containerNumber: c.containerNumber,
+        customerName: c.customerName,
+        vessel: c.vessel,
+        clearingCharges: revenue,
+        totalCost: cost,
+        grossProfit,
+        status: c.status,
+      });
+    }
+
+    // Staff productivity
+    const allUsers = await db.select({
+      id: usersTable.id,
+      name: usersTable.name,
+      role: usersTable.role,
+    }).from(usersTable).where(eq(usersTable.isActive, true));
+
+    const allApprovals = await db.select().from(sectionApprovalsTable);
+    const staffProductivity = allUsers
+      .filter(u => u.role === "staff")
+      .map(u => {
+        const assigned = allContainers.filter(c => c.assignedStaffId === u.id).length;
+        const submitted = allApprovals.filter(a => a.submittedById === u.id).length;
+        const approved  = allApprovals.filter(a => a.approvedById === u.id).length;
+        const rejected  = allApprovals.filter(a => a.status === "rejected" && a.submittedById === u.id).length;
+        return { userId: u.id, name: u.name, containersAssigned: assigned, sectionsSubmitted: submitted, sectionsApproved: approved, sectionsRejected: rejected };
+      })
+      .sort((a, b) => b.containersAssigned - a.containersAssigned);
+
+    const profitByCustomer = Object.entries(customerData)
+      .map(([customer, d]) => ({ customer, revenue: d.revenue, cost: d.cost, grossProfit: d.revenue - d.cost, count: d.count }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 15);
+
+    const profitByVessel = Object.entries(vesselData)
+      .filter(([v]) => v !== "Unknown")
+      .map(([vessel, d]) => ({ vessel, revenue: d.revenue, cost: d.cost, grossProfit: d.revenue - d.cost, count: d.count }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+
+    const costBySection = [
+      { section: "Shipping",   cost: sectionTotals.shipping,   pct: totalCost ? Math.round(sectionTotals.shipping / totalCost * 100) : 0 },
+      { section: "Customs",    cost: sectionTotals.customs,    pct: totalCost ? Math.round(sectionTotals.customs / totalCost * 100) : 0 },
+      { section: "Terminal",   cost: sectionTotals.terminal,   pct: totalCost ? Math.round(sectionTotals.terminal / totalCost * 100) : 0 },
+      { section: "Delivery",   cost: sectionTotals.delivery,   pct: totalCost ? Math.round(sectionTotals.delivery / totalCost * 100) : 0 },
+      { section: "Operations", cost: sectionTotals.operations, pct: totalCost ? Math.round(sectionTotals.operations / totalCost * 100) : 0 },
+    ];
+
+    const monthlyTrend = Object.entries(monthlyData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, d]) => ({
+        month,
+        label: new Date(month + "-01").toLocaleString("en-US", { month: "short", year: "2-digit" }),
+        count: d.count,
+        revenue: d.revenue,
+        cost: d.cost,
+        grossProfit: d.revenue - d.cost,
+      }));
+
+    const negativeProfitContainers = containerResults
+      .filter(c => c.grossProfit < 0)
+      .sort((a, b) => a.grossProfit - b.grossProfit)
+      .slice(0, 10);
+
+    const grossProfit = totalRevenue - totalCost;
+    const summary = {
+      totalRevenue,
+      totalCost,
+      grossProfit,
+      profitMargin: totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 100) : 0,
+      containerCount: allContainers.length,
+    };
+
+    return res.json({
+      summary,
+      profitByCustomer,
+      costBySection,
+      profitByVessel,
+      monthlyTrend,
+      negativeProfitContainers,
+      staffProductivity,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});

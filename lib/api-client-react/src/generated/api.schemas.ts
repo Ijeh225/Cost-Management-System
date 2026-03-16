@@ -396,9 +396,116 @@ export interface RejectSectionRequest {
   reason: string;
 }
 
+export type AnalyticsResponseSummary = {
+  totalRevenue: number;
+  totalCost: number;
+  grossProfit: number;
+  profitMargin: number;
+  containerCount: number;
+};
+
+export type AnalyticsResponseProfitByCustomerItem = {
+  customer: string;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+  count: number;
+};
+
+export type AnalyticsResponseCostBySectionItem = {
+  section: string;
+  cost: number;
+  pct: number;
+};
+
+export type AnalyticsResponseProfitByVesselItem = {
+  vessel: string;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+  count: number;
+};
+
+export type AnalyticsResponseMonthlyTrendItem = {
+  month: string;
+  label: string;
+  count: number;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+};
+
+export type AnalyticsResponseNegativeProfitContainersItem = {
+  id: number;
+  containerNumber: string;
+  customerName: string;
+  vessel?: string | null;
+  clearingCharges: number;
+  totalCost: number;
+  grossProfit: number;
+  status: string;
+};
+
+export type AnalyticsResponseStaffProductivityItem = {
+  userId: number;
+  name: string;
+  containersAssigned: number;
+  sectionsSubmitted: number;
+  sectionsApproved: number;
+  sectionsRejected: number;
+};
+
+export interface AnalyticsResponse {
+  summary: AnalyticsResponseSummary;
+  profitByCustomer: AnalyticsResponseProfitByCustomerItem[];
+  costBySection: AnalyticsResponseCostBySectionItem[];
+  profitByVessel: AnalyticsResponseProfitByVesselItem[];
+  monthlyTrend: AnalyticsResponseMonthlyTrendItem[];
+  negativeProfitContainers: AnalyticsResponseNegativeProfitContainersItem[];
+  staffProductivity: AnalyticsResponseStaffProductivityItem[];
+}
+
+export interface ContainerReportRow {
+  id: number;
+  containerNumber: string;
+  blNumber?: string | null;
+  customerName: string;
+  vessel: string;
+  size: string;
+  status: string;
+  assignedTo: string;
+  isLocked?: boolean | null;
+  clearingCharges: number;
+  totalCost: number;
+  grossProfit: number;
+  shippingCost: number;
+  customsCost: number;
+  terminalCost: number;
+  deliveryCost: number;
+  operationsCost: number;
+  dutyNotPaid: number;
+  createdAt: string;
+}
+
+export interface ContainerReportResponse {
+  containers: ContainerReportRow[];
+}
+
 export type ListContainersParams = {
   search?: string;
   status?: string;
   page?: number;
   limit?: number;
+};
+
+export type GetContainerReportParams = {
+  status?: string;
+  from?: string;
+  to?: string;
+};
+
+export type ExportContainersCSVParams = {
+  status?: string;
+  from?: string;
+  to?: string;
 };
