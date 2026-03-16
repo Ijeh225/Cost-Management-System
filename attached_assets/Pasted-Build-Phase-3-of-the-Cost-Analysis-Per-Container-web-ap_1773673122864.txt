@@ -1,0 +1,209 @@
+Build Phase 3 of the “Cost Analysis Per Container” web application.
+
+Phase 3 should add enterprise flexibility, advanced analytics, premium management features, and customization on top of the already completed Phase 1 and Phase 2 system.
+
+Include these Phase 3 features only:
+
+1. Dynamic Section Builder
+Create an admin page called “Section & Field Builder”.
+
+Allow admin to:
+- create custom sections
+- rename sections
+- reorder sections
+- archive or disable sections
+- assign section color/icon
+- assign section permissions
+- mark sections as required or optional in workflow
+
+Keep existing core sections, but allow new custom sections to be added.
+
+2. Dynamic Field Builder
+Allow admin to add custom fields inside sections.
+
+Field types:
+- number
+- text
+- textarea
+- date
+- dropdown
+- checkbox
+
+For each field, admin can define:
+- field name
+- field type
+- placeholder
+- help text
+- default value
+- required or optional
+- visible by role
+- editable by role
+- include in total cost or not
+- field order
+
+If a field is numeric and marked “include in total cost”, it must automatically be added to the total cost calculation engine.
+
+3. Executive Analytics Dashboard
+Upgrade the dashboard with advanced analytics such as:
+- gross profit by customer
+- cost by vessel
+- cost by month
+- top profitable customers
+- low-profit containers
+- negative profit alerts
+- high-cost categories
+- unpaid duty analysis
+- delayed jobs
+- staff activity summary
+
+4. Profit Intelligence
+Add smart insights and alerts such as:
+- negative profit warning
+- low margin warning
+- unusually high delivery cost
+- unusually high terminal cost
+- customer cost comparison
+- vessel cost comparison
+- historical average comparison
+
+5. Operations Timeline
+Each container should have a visual timeline showing important events such as:
+- uploaded
+- documentation reviewed
+- shipping entered
+- customs entered
+- duty paid
+- terminal updated
+- pullout completed
+- delivery completed
+- empty return completed
+- accounting approved
+- closed
+
+Each timeline event should store:
+- title
+- user
+- date/time
+- notes
+- status
+- optional attachment
+
+6. Task Manager Per Container
+Allow users to create and manage tasks for each container.
+
+Task fields:
+- task title
+- assigned staff
+- due date
+- priority
+- status
+- notes
+
+Task statuses:
+- Pending
+- In Progress
+- Completed
+- Overdue
+- Cancelled
+
+7. Delay Detection Alerts
+Add delay warnings for situations such as:
+- terminal delay
+- delivery delay
+- duty not paid delay
+- approval delay
+- empty return overdue
+
+Show alerts on dashboard and container detail page.
+
+8. Document Attachment System
+Allow documents to be uploaded per container and optionally per section or timeline event.
+
+Examples:
+- shipping invoice
+- customs receipt
+- terminal invoice
+- proof of delivery
+- release documents
+- photos
+
+Track:
+- uploaded by
+- upload date
+- related section
+
+9. Advanced Reports
+Create advanced reports with filters for:
+- date range
+- customer
+- vessel
+- workflow stage
+- status
+- assigned staff
+- container size
+
+Report types:
+- profit by customer
+- cost by vessel
+- monthly summary
+- low-profit jobs
+- delayed jobs
+- staff activity report
+- terminal charges summary
+- delivery cost summary
+
+Allow export to CSV and printable views. Add PDF export for single container summary if feasible.
+
+10. Printable Container Summary
+Create a clean printable container report page that shows:
+- customer information
+- container information
+- full cost breakdown
+- total cost
+- clearing charges
+- gross profit
+- workflow stage
+- approvals
+- notes
+
+11. Role-Aware Dashboards
+Admin should see:
+- executive analytics
+- delay alerts
+- staff productivity
+- profit summaries
+- custom section insights
+
+Staff should see:
+- my tasks
+- due today
+- overdue items
+- recently updated containers
+- assigned work
+
+12. Search Enhancements
+Upgrade search and filters to support:
+- BL number
+- container number
+- customer
+- vessel
+- status
+- workflow stage
+- assigned staff
+- date range
+- delayed only
+- negative profit only
+- profit range
+
+13. UI Requirements
+- premium enterprise dashboard look
+- polished charts
+- timeline component
+- task panels
+- section builder interface
+- file attachment components
+- printable report view
+- advanced filters
+- responsive layout
+
+Do not redesign or break the completed Phase 1 and Phase 2 structure. Build Phase 3 as an extension of the existing system with clean scalable architecture.
