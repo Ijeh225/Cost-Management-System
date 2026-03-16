@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useGetCurrentUser } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +29,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAuthPage = location === "/login";
   const isSetupPage = location === "/setup";
 
+  const lastKnownUser = useRef<User | null>(null);
+  const initialLoadDone = useRef(false);
+
   const { data: setupStatus, isLoading: setupLoading } = useQuery({
     queryKey: ["/api/auth/setup-required"],
     queryFn: checkSetupRequired,
@@ -36,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     staleTime: 30_000,
   });
 
-  const { data: user, isLoading: userLoading, isError, isFetching } = useGetCurrentUser({
+  const { data: user, isLoading: userLoading, isError, isFetching, error } = useGetCurrentUser({
     query: {
       retry: 1,
       staleTime: Infinity,
@@ -44,27 +47,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
+  if (user) {
+    lastKnownUser.current = user;
+  }
+
   const isLoading = setupLoading || (setupStatus && !setupStatus.required && userLoading);
+
+  if (!isLoading && !userLoading) {
+    initialLoadDone.current = true;
+  }
+
+  const is401 = isError && (error as any)?.status === 401;
+
+  const effectiveUser = user ?? (
+    is401 || (isError && !isFetching && initialLoadDone.current && !lastKnownUser.current)
+      ? null
+      : lastKnownUser.current
+  );
 
   useEffect(() => {
     if (setupLoading) return;
 
-    // If setup is required, redirect to /setup
     if (setupStatus?.required) {
       if (!isSetupPage) setLocation("/setup");
       return;
     }
 
-    // Setup done — handle normal auth flow
-    // Don't redirect while a background re-fetch is in progress
     if (!userLoading && !isFetching) {
-      if (isError || !user) {
+      if (!effectiveUser) {
         if (!isAuthPage && !isSetupPage) setLocation("/login");
       } else if (isAuthPage || isSetupPage) {
         setLocation("/");
       }
     }
-  }, [user, userLoading, isFetching, isError, isAuthPage, isSetupPage, setupStatus, setupLoading, setLocation]);
+  }, [effectiveUser, userLoading, isFetching, isAuthPage, isSetupPage, setupStatus, setupLoading, setLocation]);
 
   if (isLoading && !isAuthPage && !isSetupPage) {
     return (
@@ -80,10 +96,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user: user || null,
+        user: effectiveUser,
         isLoading: !!isLoading,
-        isAuthenticated: !!user,
-        isAdmin: user?.role === "admin",
+        isAuthenticated: !!effectiveUser,
+        isAdmin: effectiveUser?.role === "admin",
       }}
     >
       {children}
