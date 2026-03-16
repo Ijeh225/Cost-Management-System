@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetContainer, useUpdateContainerCharges, useLockContainer } from "@workspace/api-client-react";
+import { useGetContainer, useUpdateContainerCharges, useLockContainer, useUpdateContainer } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
-import { formatCurrency, getStatusColor, getStatusLabel } from "@/lib/format";
+import { formatCurrency, getStatusColor, getStatusLabel, PHASE1_STATUSES } from "@/lib/format";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -172,11 +173,29 @@ export default function ContainerDetail() {
   
   const { data, isLoading, isError } = useGetContainer(containerId);
   const lockMutation = useLockContainer();
+  const updateMutation = useUpdateContainer();
 
   if (isLoading) return <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
 
   const { container, charges } = data;
+
+  const handleStatusChange = (newStatus: string) => {
+    if (newStatus === container.status) return;
+    updateMutation.mutate(
+      { id: containerId, data: { status: newStatus } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+          toast({ title: "Status Updated", description: `Container moved to ${getStatusLabel(newStatus)}.` });
+        },
+        onError: (err: any) => {
+          toast({ variant: "destructive", title: "Update Failed", description: err.message });
+        }
+      }
+    );
+  };
 
   const handleLockToggle = () => {
     lockMutation.mutate(
@@ -209,9 +228,28 @@ export default function ContainerDetail() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <span className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider ${getStatusColor(container.status)}`}>
-            {getStatusLabel(container.status)}
-          </span>
+          {container.isLocked ? (
+            <span className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider ${getStatusColor(container.status)}`}>
+              {getStatusLabel(container.status)}
+            </span>
+          ) : (
+            <Select
+              value={container.status}
+              onValueChange={handleStatusChange}
+              disabled={updateMutation.isPending}
+            >
+              <SelectTrigger className={`w-[160px] text-xs font-semibold uppercase tracking-wider border ${getStatusColor(container.status)} bg-transparent`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PHASE1_STATUSES.map(s => (
+                  <SelectItem key={s.value} value={s.value} className="text-xs">
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {isAdmin && (
             <Button 
               variant={container.isLocked ? "outline" : "secondary"} 
