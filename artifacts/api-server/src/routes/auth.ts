@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   hashPassword,
   verifyPassword,
@@ -71,6 +71,64 @@ router.get("/auth/me", requireAuth, (req: AuthRequest, res) => {
       createdAt: u.createdAt.toISOString(),
     });
   }).catch(() => res.status(500).json({ error: "Server error" }));
+});
+
+// Check if first-time setup is needed (no users in the system)
+router.get("/auth/setup-required", async (_req, res) => {
+  try {
+    const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(usersTable);
+    res.json({ required: Number(count) === 0 });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Create the first admin account (only works when no users exist)
+router.post("/auth/setup", async (req, res) => {
+  try {
+    const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(usersTable);
+    if (Number(count) > 0) {
+      res.status(403).json({ error: "Setup already completed. Please log in." });
+      return;
+    }
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) {
+      res.status(400).json({ error: "Name, email, and password are required" });
+      return;
+    }
+    if (password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+    const passwordHash = await hashPassword(password);
+    const [user] = await db.insert(usersTable).values({
+      name,
+      email,
+      passwordHash,
+      role: "admin",
+      isActive: true,
+    }).returning();
+
+    const token = signToken(user.id);
+    setAuthCookie(res, token);
+    res.status(201).json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt.toISOString(),
+      },
+      message: "Admin account created successfully",
+    });
+  } catch (err: any) {
+    if (err.code === "23505") {
+      res.status(400).json({ error: "An account with this email already exists" });
+      return;
+    }
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 export { router as authRouter };

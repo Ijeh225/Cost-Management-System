@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 
 // Pages
 import Login from "@/pages/login";
+import Setup from "@/pages/setup";
 import Dashboard from "@/pages/dashboard";
 import Containers from "@/pages/containers/index";
 import UploadPage from "@/pages/containers/upload";
@@ -27,6 +28,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/setup" component={Setup} />
       <Route>
         <AppLayout>
           <Switch>
