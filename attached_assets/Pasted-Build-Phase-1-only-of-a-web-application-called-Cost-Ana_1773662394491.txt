@@ -1,0 +1,119 @@
+Build Phase 1 only of a web application called “Cost Analysis Per Container”.
+
+Phase 1 is the core MVP foundation only.
+
+Include these features only:
+
+1. Project setup
+- React frontend
+- Tailwind CSS
+- Node.js + Express backend
+- PostgreSQL or SQLite database
+- clean architecture
+
+2. Authentication
+- login page
+- JWT authentication
+- Admin and Staff roles
+- protected routes
+- logout
+
+3. Dashboard
+- Total Containers
+- Containers In Progress
+- Completed Containers
+- Total Cost
+- Total Clearing Charges
+- Gross Profit
+- recent containers table
+- quick search
+
+4. File Upload Page
+Allow Admin to upload CSV or Excel file containing:
+- CUSTOMER NAME
+- CON
+- B/LADING
+- DECLARATION
+- SIZE
+- VESSEL
+
+Add:
+- preview before saving
+- duplicate validation
+- required field validation
+
+5. Containers Page
+Create a smart table showing:
+- Customer Name
+- Container Number
+- B/Lading
+- Declaration
+- Size
+- Vessel
+- Status
+- Total Cost
+- Clearing Charges
+- Gross Profit
+
+Add:
+- search
+- sort
+- filter
+- pagination
+
+6. Container Detail Page
+Use tabs or collapsible sections.
+
+Include these fixed sections:
+- Shipping
+- Customs
+- Terminal
+- Delivery / Truck
+- Operations / Misc
+- Final Accounting Summary
+
+Include all fields discussed for those sections.
+
+7. Cost Calculations
+- numeric fields default to 0
+- Total Cost auto-calculated from all cost fields
+- Gross Profit = Clearing Charges - Total Cost
+- format money values with commas
+- prevent invalid text in numeric inputs
+
+8. Basic Status System
+Statuses:
+- New Upload
+- In Progress
+- Completed
+- Closed
+
+9. Search
+Allow search by:
+- B/Lading
+- Container Number
+- Customer Name
+
+10. Basic User Management
+Admin can:
+- create staff
+- edit staff
+- disable staff
+- assign Admin or Staff role
+
+11. Validation
+- required fields
+- duplicate warnings
+- numeric field validation
+- clean error messages
+
+12. UI
+- modern responsive dashboard
+- sidebar
+- top bar
+- clean cards
+- smart data table
+- status badges
+- good loading and empty states
+
+Do not include advanced workflow engine, dynamic section builder, approval system, audit trail, or enterprise analytics yet. Focus on building a stable, clean, fully working Phase 1 MVP.
