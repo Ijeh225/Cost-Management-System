@@ -36,9 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     staleTime: 30_000,
   });
 
-  const { data: user, isLoading: userLoading, isError } = useGetCurrentUser({
+  const { data: user, isLoading: userLoading, isError, isFetching } = useGetCurrentUser({
     query: {
-      retry: false,
+      retry: 1,
       staleTime: Infinity,
       enabled: setupStatus ? !setupStatus.required : false,
     }
@@ -56,14 +56,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Setup done — handle normal auth flow
-    if (!userLoading) {
+    // Don't redirect while a background re-fetch is in progress
+    if (!userLoading && !isFetching) {
       if (isError || !user) {
         if (!isAuthPage && !isSetupPage) setLocation("/login");
       } else if (isAuthPage || isSetupPage) {
         setLocation("/");
       }
     }
-  }, [user, userLoading, isError, isAuthPage, isSetupPage, setupStatus, setupLoading, setLocation]);
+  }, [user, userLoading, isFetching, isError, isAuthPage, isSetupPage, setupStatus, setupLoading, setLocation]);
 
   if (isLoading && !isAuthPage && !isSetupPage) {
     return (
