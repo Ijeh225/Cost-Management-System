@@ -30,7 +30,7 @@ import { Label } from "@/components/ui/label";
 import {
   ArrowLeft, Lock, Unlock, Anchor, User as UserIcon, FileText,
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
-  History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck,
+  History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
 } from "lucide-react";
 
 const createNumberSchema = (keys: string[]) => {
@@ -336,6 +336,8 @@ export default function ContainerDetail() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("charges");
   const [rejectTargetSection, setRejectTargetSection] = useState<string | null>(null);
+  const [editingClearing, setEditingClearing] = useState(false);
+  const [clearingInput, setClearingInput] = useState("");
 
   const { data, isLoading, isError } = useGetContainer(containerId);
   const lockMutation = useLockContainer();
@@ -411,6 +413,26 @@ export default function ContainerDetail() {
       onSuccess: () => { invalidate(); toast({ title: `${section} rejected.` }); setRejectTargetSection(null); },
       onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
     });
+  };
+
+  const handleSaveClearingCharges = () => {
+    const value = parseFloat(clearingInput);
+    if (isNaN(value) || value < 0) {
+      toast({ variant: "destructive", title: "Invalid amount", description: "Please enter a valid number." });
+      return;
+    }
+    updateMutation.mutate(
+      { id: containerId, data: { clearingCharges: value } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+          toast({ title: "Clearing charges updated." });
+          setEditingClearing(false);
+        },
+        onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err?.message }),
+      }
+    );
   };
 
   const handleToggleSectionLock = (section: string, lock: boolean) => {
@@ -595,8 +617,41 @@ export default function ContainerDetail() {
                     <p className="text-2xl font-mono font-bold text-foreground">{formatCurrency(charges.totalCost)}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Agreed Clearing Charges</p>
-                    <p className="text-2xl font-mono font-bold text-primary">{formatCurrency(charges.clearingCharges)}</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium text-muted-foreground">Agreed Clearing Charges</p>
+                      {isAdmin && !container.isLocked && !editingClearing && (
+                        <button
+                          onClick={() => { setClearingInput(String(charges.clearingCharges ?? 0)); setEditingClearing(true); }}
+                          className="text-xs text-primary/60 hover:text-primary flex items-center gap-1 transition-colors"
+                        >
+                          <Pencil className="w-3 h-3" /> Edit
+                        </button>
+                      )}
+                    </div>
+                    {editingClearing ? (
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
+                          <Input
+                            type="number"
+                            value={clearingInput}
+                            onChange={e => setClearingInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") handleSaveClearingCharges(); if (e.key === "Escape") setEditingClearing(false); }}
+                            className="pl-7 font-mono text-sm"
+                            autoFocus
+                            onFocus={e => e.target.select()}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" className="h-7 text-xs flex-1" onClick={handleSaveClearingCharges} disabled={updateMutation.isPending}>
+                            {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditingClearing(false)}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-2xl font-mono font-bold text-primary">{formatCurrency(charges.clearingCharges)}</p>
+                    )}
                   </div>
                   <div className="pt-6 border-t border-border/40">
                     <p className="text-sm font-medium text-muted-foreground flex justify-between mb-2">
