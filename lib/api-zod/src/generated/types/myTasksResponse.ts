@@ -6,11 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Container } from "./container";
-import type { ContainerCharges } from "./containerCharges";
 import type { SectionApproval } from "./sectionApproval";
 
-export interface ContainerDetail {
-  container: Container;
-  charges: ContainerCharges;
+export interface MyTasksResponse {
+  assignedContainers: Container[];
   sectionApprovals: SectionApproval[];
+  mySections: string[];
 }

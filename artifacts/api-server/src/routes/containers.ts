@@ -1,12 +1,14 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable } from "@workspace/db";
-import { eq, ilike, or, sql, desc, and, ne, inArray } from "drizzle-orm";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable } from "@workspace/db";
+import { eq, ilike, or, sql, desc, and, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
 const router = Router();
 
 function formatContainer(c: any, staffName?: string | null) {
+  let lockedSections: string[] = [];
+  try { lockedSections = JSON.parse(c.lockedSections ?? "[]"); } catch {}
   return {
     id: c.id,
     customerName: c.customerName,
@@ -17,6 +19,7 @@ function formatContainer(c: any, staffName?: string | null) {
     vessel: c.vessel ?? "",
     status: c.status,
     isLocked: c.isLocked,
+    lockedSections,
     assignedStaffId: c.assignedStaffId ?? null,
     assignedStaffName: staffName ?? null,
     totalCost: parseFloat(c.totalCost ?? "0"),
@@ -25,6 +28,38 @@ function formatContainer(c: any, staffName?: string | null) {
     dutyNotPaid: 0,
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
+  };
+}
+
+async function getOrCreateSectionApproval(containerId: number, section: string) {
+  let [row] = await db.select().from(sectionApprovalsTable)
+    .where(and(eq(sectionApprovalsTable.containerId, containerId), eq(sectionApprovalsTable.section, section)));
+  if (!row) {
+    [row] = await db.insert(sectionApprovalsTable).values({ containerId, section, status: "draft" }).returning();
+  }
+  return row;
+}
+
+async function formatSectionApproval(row: any) {
+  const submittedBy = row.submittedById
+    ? (await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, row.submittedById)))[0]?.name ?? null
+    : null;
+  const reviewedBy = row.reviewedById
+    ? (await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, row.reviewedById)))[0]?.name ?? null
+    : null;
+  return {
+    id: row.id,
+    containerId: row.containerId,
+    section: row.section,
+    status: row.status,
+    submittedById: row.submittedById ?? null,
+    submittedByName: submittedBy,
+    submittedAt: row.submittedAt instanceof Date ? row.submittedAt.toISOString() : row.submittedAt ?? null,
+    reviewedById: row.reviewedById ?? null,
+    reviewedByName: reviewedBy,
+    reviewedAt: row.reviewedAt instanceof Date ? row.reviewedAt.toISOString() : row.reviewedAt ?? null,
+    rejectionReason: row.rejectionReason ?? null,
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
   };
 }
 
@@ -239,6 +274,10 @@ router.get("/containers/:id", requireAuth, async (req, res) => {
       dutyNotPaid,
     };
 
+    const sectionApprovalRows = await db.select().from(sectionApprovalsTable)
+      .where(eq(sectionApprovalsTable.containerId, id));
+    const sectionApprovals = await Promise.all(sectionApprovalRows.map(formatSectionApproval));
+
     res.json({
       container: containerFormatted,
       charges: {
@@ -252,6 +291,7 @@ router.get("/containers/:id", requireAuth, async (req, res) => {
         clearingCharges: parseFloat(c.clearingCharges ?? "0"),
         grossProfit: parseFloat(c.clearingCharges ?? "0") - totalCost,
       },
+      sectionApprovals,
     });
   } catch (err) {
     console.error(err);
@@ -364,21 +404,24 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
     }
     const { section, shipping, customs, terminal, delivery, operations, clearingCharges, reason } = req.body;
 
+    // Check section-level lock
+    if (section) {
+      let lockedSections: string[] = [];
+      try { lockedSections = JSON.parse(c.lockedSections ?? "[]"); } catch {}
+      if (lockedSections.includes(section)) {
+        res.status(403).json({ error: `The ${section} section is locked.` });
+        return;
+      }
+    }
+
     // Phase 2: section permission check for non-admin staff
     const user = req.user!;
     if (user.role !== "admin" && section) {
-      const stageForSection: Record<string, string[]> = {
-        shipping:   ["shipping_entry"],
-        customs:    ["customs_entry"],
-        terminal:   ["terminal_entry"],
-        delivery:   ["delivery_entry"],
-        operations: ["delivery_entry"],
-      };
-      const allowedStages = stageForSection[section] ?? [];
-      const hasSection = user.sectionPermission === section;
-      const atRightStage = allowedStages.includes(c.status);
-      if (!hasSection || !atRightStage) {
-        res.status(403).json({ error: `You are not authorized to edit the ${section} section at stage "${c.status}".` });
+      let permsObj: Record<string, string> = {};
+      try { if (user.sectionPermissions) permsObj = JSON.parse(user.sectionPermissions as string); } catch {}
+      const sectionPerm = permsObj[section] ?? (user.sectionPermission === section ? "edit" : "no_access");
+      if (sectionPerm !== "edit") {
+        res.status(403).json({ error: `You do not have edit access to the ${section} section.` });
         return;
       }
     }
@@ -452,6 +495,125 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
   }
 });
 
+router.post("/containers/:id/sections/:section/submit", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const section = req.params.section;
+    const user = req.user!;
+    const approval = await getOrCreateSectionApproval(id, section);
+    if (approval.status === "submitted") {
+      res.status(400).json({ error: "Section already submitted" });
+      return;
+    }
+    const [updated] = await db.update(sectionApprovalsTable)
+      .set({ status: "submitted", submittedById: user.id, submittedAt: new Date(), reviewedById: null, reviewedAt: null, rejectionReason: null, updatedAt: new Date() })
+      .where(eq(sectionApprovalsTable.id, approval.id))
+      .returning();
+    await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_submitted", section });
+    res.json(await formatSectionApproval(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/containers/:id/sections/:section/approve", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const section = req.params.section;
+    const user = req.user!;
+    const approval = await getOrCreateSectionApproval(id, section);
+    if (approval.status !== "submitted") {
+      res.status(400).json({ error: "Section must be submitted before approval" });
+      return;
+    }
+    const [updated] = await db.update(sectionApprovalsTable)
+      .set({ status: "approved", reviewedById: user.id, reviewedAt: new Date(), updatedAt: new Date() })
+      .where(eq(sectionApprovalsTable.id, approval.id))
+      .returning();
+    // Auto-lock the section after approval
+    const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (container) {
+      let lockedSections: string[] = [];
+      try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
+      if (!lockedSections.includes(section)) {
+        lockedSections.push(section);
+        await db.update(containersTable).set({ lockedSections: JSON.stringify(lockedSections), updatedAt: new Date() }).where(eq(containersTable.id, id));
+      }
+    }
+    await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_approved", section });
+    res.json(await formatSectionApproval(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/containers/:id/sections/:section/reject", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const section = req.params.section;
+    const user = req.user!;
+    const { reason } = req.body;
+    if (!reason) {
+      res.status(400).json({ error: "Rejection reason is required" });
+      return;
+    }
+    const approval = await getOrCreateSectionApproval(id, section);
+    if (approval.status !== "submitted") {
+      res.status(400).json({ error: "Section must be submitted before rejection" });
+      return;
+    }
+    const [updated] = await db.update(sectionApprovalsTable)
+      .set({ status: "rejected", reviewedById: user.id, reviewedAt: new Date(), rejectionReason: reason, updatedAt: new Date() })
+      .where(eq(sectionApprovalsTable.id, approval.id))
+      .returning();
+    await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_rejected", section, reason });
+    res.json(await formatSectionApproval(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/containers/:id/sections/:section/lock", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const section = req.params.section;
+    const user = req.user!;
+    const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!container) { res.status(404).json({ error: "Container not found" }); return; }
+    let lockedSections: string[] = [];
+    try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
+    if (!lockedSections.includes(section)) {
+      lockedSections.push(section);
+      await db.update(containersTable).set({ lockedSections: JSON.stringify(lockedSections), updatedAt: new Date() }).where(eq(containersTable.id, id));
+    }
+    await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_locked", section });
+    res.json({ message: `Section "${section}" locked` });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/containers/:id/sections/:section/unlock", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const section = req.params.section;
+    const user = req.user!;
+    const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!container) { res.status(404).json({ error: "Container not found" }); return; }
+    let lockedSections: string[] = [];
+    try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
+    lockedSections = lockedSections.filter(s => s !== section);
+    await db.update(containersTable).set({ lockedSections: JSON.stringify(lockedSections), updatedAt: new Date() }).where(eq(containersTable.id, id));
+    await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_unlocked", section });
+    res.json({ message: `Section "${section}" unlocked` });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 router.get("/containers/:id/audit", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -478,7 +640,7 @@ router.get("/containers/:id/audit", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/dashboard/stats", requireAuth, async (_req, res) => {
+router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
   try {
     const allContainers = await db.select().from(containersTable);
     const totalContainers = allContainers.length;
@@ -574,6 +736,32 @@ router.get("/dashboard/stats", requireAuth, async (_req, res) => {
       .orderBy(desc(auditLogTable.createdAt))
       .limit(10);
 
+    // Role-aware: pendingApprovals and myPendingSections
+    const user = (req as AuthRequest).user!;
+    let pendingApprovals = 0;
+    let myPendingSections = 0;
+    let mySections: string[] = [];
+
+    const allApprovals = await db.select().from(sectionApprovalsTable);
+    pendingApprovals = allApprovals.filter(a => a.status === "submitted").length;
+
+    if (user.role !== "admin") {
+      let permsObj: Record<string, string> = {};
+      try { if (user.sectionPermissions) permsObj = JSON.parse(user.sectionPermissions as string); } catch {}
+      mySections = Object.keys(permsObj).length > 0
+        ? Object.entries(permsObj).filter(([, v]) => v !== "no_access").map(([k]) => k)
+        : user.sectionPermission ? [user.sectionPermission as string] : [];
+
+      const myContainerIds = allContainers
+        .filter(c => c.assignedStaffId === user.id)
+        .map(c => c.id);
+      myPendingSections = allApprovals.filter(a =>
+        myContainerIds.includes(a.containerId) &&
+        mySections.includes(a.section) &&
+        a.status === "draft"
+      ).length;
+    }
+
     res.json({
       totalContainers,
       inProgress,
@@ -592,6 +780,9 @@ router.get("/dashboard/stats", requireAuth, async (_req, res) => {
         outstandingDuty: allContainers.filter(c => parseFloat(customsByContainer[c.id]?.dutyNotPaid ?? "0") > 0).length,
         delayedContainers: 0,
       },
+      pendingApprovals,
+      myPendingSections,
+      mySections,
     });
   } catch (err) {
     console.error(err);

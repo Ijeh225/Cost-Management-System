@@ -12,7 +12,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Box, UploadCloud, Users, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck, ListTodo } from "lucide-react";
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -21,9 +21,11 @@ export function AppSidebar() {
   const mainNav = [
     { title: "Dashboard", url: "/", icon: LayoutDashboard },
     { title: "Containers", url: "/containers", icon: Box },
+    { title: "My Tasks", url: "/my-tasks", icon: ListTodo },
   ];
 
   const adminNav = [
+    { title: "Approval Queue", url: "/approvals", icon: ClipboardCheck },
     { title: "Upload Data", url: "/upload", icon: UploadCloud },
     { title: "User Management", url: "/users", icon: Users },
   ];

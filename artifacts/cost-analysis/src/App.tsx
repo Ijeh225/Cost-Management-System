@@ -14,6 +14,8 @@ import Containers from "@/pages/containers/index";
 import UploadPage from "@/pages/containers/upload";
 import ContainerDetail from "@/pages/containers/[id]";
 import Users from "@/pages/users/index";
+import ApprovalsPage from "@/pages/approvals/index";
+import MyTasksPage from "@/pages/my-tasks/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +40,8 @@ function Router() {
             <Route path="/containers/:id" component={ContainerDetail} />
             <Route path="/users" component={Users} />
             <Route path="/upload" component={UploadPage} />
+            <Route path="/approvals" component={ApprovalsPage} />
+            <Route path="/my-tasks" component={MyTasksPage} />
             <Route component={NotFound} />
           </Switch>
         </AppLayout>

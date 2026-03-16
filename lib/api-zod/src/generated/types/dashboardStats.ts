@@ -25,4 +25,7 @@ export interface DashboardStats {
   costByVessel: DashboardStatsCostByVesselItem[];
   recentActivity: AuditEntry[];
   alerts: DashboardStatsAlerts;
+  pendingApprovals: number;
+  myPendingSections: number;
+  mySections?: string[];
 }

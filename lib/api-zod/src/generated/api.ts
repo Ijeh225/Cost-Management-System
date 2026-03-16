@@ -28,18 +28,8 @@ export const LoginResponse = zod.object({
     email: zod.string(),
     name: zod.string(),
     role: zod.enum(["admin", "staff"]),
-    sectionPermission: zod
-      .union([
-        zod.literal("shipping"),
-        zod.literal("customs"),
-        zod.literal("terminal"),
-        zod.literal("delivery"),
-        zod.literal("operations"),
-        zod.literal("accounting"),
-        zod.literal("management"),
-        zod.literal(null),
-      ])
-      .nullish(),
+    sectionPermission: zod.string().nullish(),
+    sectionPermissions: zod.string().nullish(),
     isActive: zod.boolean(),
     createdAt: zod.string(),
   }),
@@ -61,18 +51,8 @@ export const GetCurrentUserResponse = zod.object({
   email: zod.string(),
   name: zod.string(),
   role: zod.enum(["admin", "staff"]),
-  sectionPermission: zod
-    .union([
-      zod.literal("shipping"),
-      zod.literal("customs"),
-      zod.literal("terminal"),
-      zod.literal("delivery"),
-      zod.literal("operations"),
-      zod.literal("accounting"),
-      zod.literal("management"),
-      zod.literal(null),
-    ])
-    .nullish(),
+  sectionPermission: zod.string().nullish(),
+  sectionPermissions: zod.string().nullish(),
   isActive: zod.boolean(),
   createdAt: zod.string(),
 });
@@ -85,18 +65,8 @@ export const ListUsersResponseItem = zod.object({
   email: zod.string(),
   name: zod.string(),
   role: zod.enum(["admin", "staff"]),
-  sectionPermission: zod
-    .union([
-      zod.literal("shipping"),
-      zod.literal("customs"),
-      zod.literal("terminal"),
-      zod.literal("delivery"),
-      zod.literal("operations"),
-      zod.literal("accounting"),
-      zod.literal("management"),
-      zod.literal(null),
-    ])
-    .nullish(),
+  sectionPermission: zod.string().nullish(),
+  sectionPermissions: zod.string().nullish(),
   isActive: zod.boolean(),
   createdAt: zod.string(),
 });
@@ -111,6 +81,7 @@ export const CreateUserBody = zod.object({
   password: zod.string(),
   role: zod.enum(["admin", "staff"]),
   sectionPermission: zod.string().nullish(),
+  sectionPermissions: zod.string().nullish(),
 });
 
 /**
@@ -125,18 +96,8 @@ export const GetUserResponse = zod.object({
   email: zod.string(),
   name: zod.string(),
   role: zod.enum(["admin", "staff"]),
-  sectionPermission: zod
-    .union([
-      zod.literal("shipping"),
-      zod.literal("customs"),
-      zod.literal("terminal"),
-      zod.literal("delivery"),
-      zod.literal("operations"),
-      zod.literal("accounting"),
-      zod.literal("management"),
-      zod.literal(null),
-    ])
-    .nullish(),
+  sectionPermission: zod.string().nullish(),
+  sectionPermissions: zod.string().nullish(),
   isActive: zod.boolean(),
   createdAt: zod.string(),
 });
@@ -152,6 +113,7 @@ export const UpdateUserBody = zod.object({
   name: zod.string().optional(),
   role: zod.enum(["admin", "staff"]).optional(),
   sectionPermission: zod.string().nullish(),
+  sectionPermissions: zod.string().nullish(),
   isActive: zod.boolean().optional(),
   password: zod.string().optional(),
   status: zod.string().optional(),
@@ -162,18 +124,8 @@ export const UpdateUserResponse = zod.object({
   email: zod.string(),
   name: zod.string(),
   role: zod.enum(["admin", "staff"]),
-  sectionPermission: zod
-    .union([
-      zod.literal("shipping"),
-      zod.literal("customs"),
-      zod.literal("terminal"),
-      zod.literal("delivery"),
-      zod.literal("operations"),
-      zod.literal("accounting"),
-      zod.literal("management"),
-      zod.literal(null),
-    ])
-    .nullish(),
+  sectionPermission: zod.string().nullish(),
+  sectionPermissions: zod.string().nullish(),
   isActive: zod.boolean(),
   createdAt: zod.string(),
 });
@@ -211,6 +163,7 @@ export const ListContainersResponse = zod.object({
         "closed",
       ]),
       isLocked: zod.boolean(),
+      lockedSections: zod.array(zod.string()).optional(),
       assignedStaffId: zod.number().nullish(),
       assignedStaffName: zod.string().nullish(),
       totalCost: zod.number(),
@@ -291,6 +244,7 @@ export const GetContainerResponse = zod.object({
       "closed",
     ]),
     isLocked: zod.boolean(),
+    lockedSections: zod.array(zod.string()).optional(),
     assignedStaffId: zod.number().nullish(),
     assignedStaffName: zod.string().nullish(),
     totalCost: zod.number(),
@@ -374,6 +328,22 @@ export const GetContainerResponse = zod.object({
     clearingCharges: zod.number(),
     grossProfit: zod.number(),
   }),
+  sectionApprovals: zod.array(
+    zod.object({
+      id: zod.number(),
+      containerId: zod.number(),
+      section: zod.string(),
+      status: zod.enum(["draft", "submitted", "approved", "rejected"]),
+      submittedById: zod.number().nullish(),
+      submittedByName: zod.string().nullish(),
+      submittedAt: zod.string().nullish(),
+      reviewedById: zod.number().nullish(),
+      reviewedByName: zod.string().nullish(),
+      reviewedAt: zod.string().nullish(),
+      rejectionReason: zod.string().nullish(),
+      updatedAt: zod.string(),
+    }),
+  ),
 });
 
 /**
@@ -416,6 +386,7 @@ export const UpdateContainerResponse = zod.object({
     "closed",
   ]),
   isLocked: zod.boolean(),
+  lockedSections: zod.array(zod.string()).optional(),
   assignedStaffId: zod.number().nullish(),
   assignedStaffName: zod.string().nullish(),
   totalCost: zod.number(),
@@ -459,6 +430,7 @@ export const LockContainerResponse = zod.object({
     "closed",
   ]),
   isLocked: zod.boolean(),
+  lockedSections: zod.array(zod.string()).optional(),
   assignedStaffId: zod.number().nullish(),
   assignedStaffName: zod.string().nullish(),
   totalCost: zod.number(),
@@ -748,6 +720,176 @@ export const GetContainerAuditLogResponse = zod.array(
 );
 
 /**
+ * @summary Staff submits a section for review
+ */
+export const SubmitSectionParams = zod.object({
+  id: zod.coerce.number(),
+  section: zod.coerce.string(),
+});
+
+export const SubmitSectionResponse = zod.object({
+  id: zod.number(),
+  containerId: zod.number(),
+  section: zod.string(),
+  status: zod.enum(["draft", "submitted", "approved", "rejected"]),
+  submittedById: zod.number().nullish(),
+  submittedByName: zod.string().nullish(),
+  submittedAt: zod.string().nullish(),
+  reviewedById: zod.number().nullish(),
+  reviewedByName: zod.string().nullish(),
+  reviewedAt: zod.string().nullish(),
+  rejectionReason: zod.string().nullish(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Admin approves a submitted section
+ */
+export const ApproveSectionParams = zod.object({
+  id: zod.coerce.number(),
+  section: zod.coerce.string(),
+});
+
+export const ApproveSectionResponse = zod.object({
+  id: zod.number(),
+  containerId: zod.number(),
+  section: zod.string(),
+  status: zod.enum(["draft", "submitted", "approved", "rejected"]),
+  submittedById: zod.number().nullish(),
+  submittedByName: zod.string().nullish(),
+  submittedAt: zod.string().nullish(),
+  reviewedById: zod.number().nullish(),
+  reviewedByName: zod.string().nullish(),
+  reviewedAt: zod.string().nullish(),
+  rejectionReason: zod.string().nullish(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Admin rejects a submitted section
+ */
+export const RejectSectionParams = zod.object({
+  id: zod.coerce.number(),
+  section: zod.coerce.string(),
+});
+
+export const RejectSectionBody = zod.object({
+  reason: zod.string(),
+});
+
+export const RejectSectionResponse = zod.object({
+  id: zod.number(),
+  containerId: zod.number(),
+  section: zod.string(),
+  status: zod.enum(["draft", "submitted", "approved", "rejected"]),
+  submittedById: zod.number().nullish(),
+  submittedByName: zod.string().nullish(),
+  submittedAt: zod.string().nullish(),
+  reviewedById: zod.number().nullish(),
+  reviewedByName: zod.string().nullish(),
+  reviewedAt: zod.string().nullish(),
+  rejectionReason: zod.string().nullish(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Admin locks a specific section
+ */
+export const LockSectionParams = zod.object({
+  id: zod.coerce.number(),
+  section: zod.coerce.string(),
+});
+
+export const LockSectionResponse = zod.object({
+  message: zod.string(),
+});
+
+/**
+ * @summary Admin unlocks a specific section
+ */
+export const UnlockSectionParams = zod.object({
+  id: zod.coerce.number(),
+  section: zod.coerce.string(),
+});
+
+export const UnlockSectionResponse = zod.object({
+  message: zod.string(),
+});
+
+/**
+ * @summary Get admin approval queue (submitted sections)
+ */
+export const GetApprovalQueueResponseItem = zod.object({
+  id: zod.number(),
+  containerId: zod.number(),
+  containerNumber: zod.string(),
+  customerName: zod.string(),
+  section: zod.string(),
+  status: zod.enum(["draft", "submitted", "approved", "rejected"]),
+  submittedByName: zod.string().nullish(),
+  submittedAt: zod.string().nullish(),
+  rejectionReason: zod.string().nullish(),
+  updatedAt: zod.string(),
+});
+export const GetApprovalQueueResponse = zod.array(GetApprovalQueueResponseItem);
+
+/**
+ * @summary Get staff task list
+ */
+export const GetMyTasksResponse = zod.object({
+  assignedContainers: zod.array(
+    zod.object({
+      id: zod.number(),
+      customerName: zod.string(),
+      containerNumber: zod.string(),
+      blNumber: zod.string(),
+      declaration: zod.string(),
+      size: zod.string(),
+      vessel: zod.string(),
+      status: zod.enum([
+        "new_upload",
+        "documentation_review",
+        "shipping_entry",
+        "customs_entry",
+        "terminal_entry",
+        "delivery_entry",
+        "accounting_review",
+        "management_approval",
+        "completed",
+        "closed",
+      ]),
+      isLocked: zod.boolean(),
+      lockedSections: zod.array(zod.string()).optional(),
+      assignedStaffId: zod.number().nullish(),
+      assignedStaffName: zod.string().nullish(),
+      totalCost: zod.number(),
+      clearingCharges: zod.number(),
+      grossProfit: zod.number(),
+      dutyNotPaid: zod.number(),
+      createdAt: zod.string(),
+      updatedAt: zod.string(),
+    }),
+  ),
+  sectionApprovals: zod.array(
+    zod.object({
+      id: zod.number(),
+      containerId: zod.number(),
+      section: zod.string(),
+      status: zod.enum(["draft", "submitted", "approved", "rejected"]),
+      submittedById: zod.number().nullish(),
+      submittedByName: zod.string().nullish(),
+      submittedAt: zod.string().nullish(),
+      reviewedById: zod.number().nullish(),
+      reviewedByName: zod.string().nullish(),
+      reviewedAt: zod.string().nullish(),
+      rejectionReason: zod.string().nullish(),
+      updatedAt: zod.string(),
+    }),
+  ),
+  mySections: zod.array(zod.string()),
+});
+
+/**
  * @summary Get dashboard summary statistics
  */
 export const GetDashboardStatsResponse = zod.object({
@@ -797,4 +939,7 @@ export const GetDashboardStatsResponse = zod.object({
     outstandingDuty: zod.number(),
     delayedContainers: zod.number(),
   }),
+  pendingApprovals: zod.number(),
+  myPendingSections: zod.number(),
+  mySections: zod.array(zod.string()).optional(),
 });

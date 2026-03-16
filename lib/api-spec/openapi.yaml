@@ -359,6 +359,160 @@ paths:
                 items:
                   $ref: "#/components/schemas/AuditEntry"
 
+  /containers/{id}/sections/{section}/submit:
+    post:
+      operationId: submitSection
+      tags: [containers]
+      summary: Staff submits a section for review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: section
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Section submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SectionApproval"
+
+  /containers/{id}/sections/{section}/approve:
+    post:
+      operationId: approveSection
+      tags: [containers]
+      summary: Admin approves a submitted section
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: section
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Section approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SectionApproval"
+
+  /containers/{id}/sections/{section}/reject:
+    post:
+      operationId: rejectSection
+      tags: [containers]
+      summary: Admin rejects a submitted section
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: section
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectSectionRequest"
+      responses:
+        "200":
+          description: Section rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SectionApproval"
+
+  /containers/{id}/sections/{section}/lock:
+    post:
+      operationId: lockSection
+      tags: [containers]
+      summary: Admin locks a specific section
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: section
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Section locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /containers/{id}/sections/{section}/unlock:
+    post:
+      operationId: unlockSection
+      tags: [containers]
+      summary: Admin unlocks a specific section
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: section
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Section unlocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /approvals:
+    get:
+      operationId: getApprovalQueue
+      tags: [containers]
+      summary: Get admin approval queue (submitted sections)
+      responses:
+        "200":
+          description: Approval queue items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApprovalQueueItem"
+
+  /my-tasks:
+    get:
+      operationId: getMyTasks
+      tags: [containers]
+      summary: Get staff task list
+      responses:
+        "200":
+          description: Staff task list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyTasksResponse"
+
   /dashboard/stats:
     get:
       operationId: getDashboardStats
@@ -428,7 +582,9 @@ components:
         sectionPermission:
           type: string
           nullable: true
-          enum: [shipping, customs, terminal, delivery, operations, accounting, management, null]
+        sectionPermissions:
+          type: string
+          nullable: true
         isActive:
           type: boolean
         createdAt:
@@ -450,6 +606,9 @@ components:
         sectionPermission:
           type: string
           nullable: true
+        sectionPermissions:
+          type: string
+          nullable: true
       required: [email, name, password, role]
 
     UpdateUserRequest:
@@ -461,6 +620,9 @@ components:
           type: string
           enum: [admin, staff]
         sectionPermission:
+          type: string
+          nullable: true
+        sectionPermissions:
           type: string
           nullable: true
         isActive:
@@ -492,6 +654,10 @@ components:
           enum: [new_upload, documentation_review, shipping_entry, customs_entry, terminal_entry, delivery_entry, accounting_review, management_approval, completed, closed]
         isLocked:
           type: boolean
+        lockedSections:
+          type: array
+          items:
+            type: string
         assignedStaffId:
           type: integer
           nullable: true
@@ -809,7 +975,11 @@ components:
           $ref: "#/components/schemas/Container"
         charges:
           $ref: "#/components/schemas/ContainerCharges"
-      required: [container, charges]
+        sectionApprovals:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectionApproval"
+      required: [container, charges, sectionApprovals]
 
     AuditEntry:
       type: object
@@ -906,4 +1076,102 @@ components:
             delayedContainers:
               type: integer
           required: [lowProfitContainers, outstandingDuty, delayedContainers]
-      required: [totalContainers, inProgress, completed, closed, totalCost, totalClearingCharges, totalGrossProfit, totalDutyNotPaid, containersByStatus, profitByCustomer, costByVessel, recentActivity, alerts]
+        pendingApprovals:
+          type: integer
+        myPendingSections:
+          type: integer
+        mySections:
+          type: array
+          items:
+            type: string
+      required: [totalContainers, inProgress, completed, closed, totalCost, totalClearingCharges, totalGrossProfit, totalDutyNotPaid, containersByStatus, profitByCustomer, costByVessel, recentActivity, alerts, pendingApprovals, myPendingSections]
+
+    SectionApproval:
+      type: object
+      properties:
+        id:
+          type: integer
+        containerId:
+          type: integer
+        section:
+          type: string
+        status:
+          type: string
+          enum: [draft, submitted, approved, rejected]
+        submittedById:
+          type: integer
+          nullable: true
+        submittedByName:
+          type: string
+          nullable: true
+        submittedAt:
+          type: string
+          nullable: true
+        reviewedById:
+          type: integer
+          nullable: true
+        reviewedByName:
+          type: string
+          nullable: true
+        reviewedAt:
+          type: string
+          nullable: true
+        rejectionReason:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+      required: [id, containerId, section, status, updatedAt]
+
+    ApprovalQueueItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        containerId:
+          type: integer
+        containerNumber:
+          type: string
+        customerName:
+          type: string
+        section:
+          type: string
+        status:
+          type: string
+          enum: [draft, submitted, approved, rejected]
+        submittedByName:
+          type: string
+          nullable: true
+        submittedAt:
+          type: string
+          nullable: true
+        rejectionReason:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+      required: [id, containerId, containerNumber, customerName, section, status, updatedAt]
+
+    MyTasksResponse:
+      type: object
+      properties:
+        assignedContainers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Container"
+        sectionApprovals:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectionApproval"
+        mySections:
+          type: array
+          items:
+            type: string
+      required: [assignedContainers, sectionApprovals, mySections]
+
+    RejectSectionRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+      required: [reason]

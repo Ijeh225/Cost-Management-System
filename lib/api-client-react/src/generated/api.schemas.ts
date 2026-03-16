@@ -29,26 +29,13 @@ export const UserRole = {
   staff: "staff",
 } as const;
 
-export type UserSectionPermission =
-  | (typeof UserSectionPermission)[keyof typeof UserSectionPermission]
-  | null;
-
-export const UserSectionPermission = {
-  shipping: "shipping",
-  customs: "customs",
-  terminal: "terminal",
-  delivery: "delivery",
-  operations: "operations",
-  accounting: "accounting",
-  management: "management",
-} as const;
-
 export interface User {
   id: number;
   email: string;
   name: string;
   role: UserRole;
-  sectionPermission?: UserSectionPermission;
+  sectionPermission?: string | null;
+  sectionPermissions?: string | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -72,6 +59,7 @@ export interface CreateUserRequest {
   password: string;
   role: CreateUserRequestRole;
   sectionPermission?: string | null;
+  sectionPermissions?: string | null;
 }
 
 export type UpdateUserRequestRole =
@@ -86,6 +74,7 @@ export interface UpdateUserRequest {
   name?: string;
   role?: UpdateUserRequestRole;
   sectionPermission?: string | null;
+  sectionPermissions?: string | null;
   isActive?: boolean;
   password?: string;
   status?: string;
@@ -117,6 +106,7 @@ export interface Container {
   vessel: string;
   status: ContainerStatus;
   isLocked: boolean;
+  lockedSections?: string[];
   assignedStaffId?: number | null;
   assignedStaffName?: string | null;
   totalCost: number;
@@ -288,9 +278,35 @@ export interface UpdateContainerChargesRequest {
   reason?: string;
 }
 
+export type SectionApprovalStatus =
+  (typeof SectionApprovalStatus)[keyof typeof SectionApprovalStatus];
+
+export const SectionApprovalStatus = {
+  draft: "draft",
+  submitted: "submitted",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export interface SectionApproval {
+  id: number;
+  containerId: number;
+  section: string;
+  status: SectionApprovalStatus;
+  submittedById?: number | null;
+  submittedByName?: string | null;
+  submittedAt?: string | null;
+  reviewedById?: number | null;
+  reviewedByName?: string | null;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  updatedAt: string;
+}
+
 export interface ContainerDetail {
   container: Container;
   charges: ContainerCharges;
+  sectionApprovals: SectionApproval[];
 }
 
 export interface AuditEntry {
@@ -342,6 +358,42 @@ export interface DashboardStats {
   costByVessel: DashboardStatsCostByVesselItem[];
   recentActivity: AuditEntry[];
   alerts: DashboardStatsAlerts;
+  pendingApprovals: number;
+  myPendingSections: number;
+  mySections?: string[];
+}
+
+export type ApprovalQueueItemStatus =
+  (typeof ApprovalQueueItemStatus)[keyof typeof ApprovalQueueItemStatus];
+
+export const ApprovalQueueItemStatus = {
+  draft: "draft",
+  submitted: "submitted",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export interface ApprovalQueueItem {
+  id: number;
+  containerId: number;
+  containerNumber: string;
+  customerName: string;
+  section: string;
+  status: ApprovalQueueItemStatus;
+  submittedByName?: string | null;
+  submittedAt?: string | null;
+  rejectionReason?: string | null;
+  updatedAt: string;
+}
+
+export interface MyTasksResponse {
+  assignedContainers: Container[];
+  sectionApprovals: SectionApproval[];
+  mySections: string[];
+}
+
+export interface RejectSectionRequest {
+  reason: string;
 }
 
 export type ListContainersParams = {

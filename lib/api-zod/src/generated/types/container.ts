@@ -17,6 +17,7 @@ export interface Container {
   vessel: string;
   status: ContainerStatus;
   isLocked: boolean;
+  lockedSections?: string[];
   assignedStaffId?: number | null;
   assignedStaffName?: string | null;
   totalCost: number;

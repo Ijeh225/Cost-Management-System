@@ -92,3 +92,54 @@ export const SECTION_LABELS: Record<string, string> = {
   accounting: "Accounting",
   management: "Management",
 };
+
+export const CHARGE_SECTIONS = ["shipping", "customs", "terminal", "delivery", "operations"] as const;
+export type ChargeSection = (typeof CHARGE_SECTIONS)[number];
+
+export type SectionPermLevel = "no_access" | "view" | "edit";
+
+export function parseSectionPermissions(raw: string | null | undefined): Record<string, SectionPermLevel> {
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch { return {}; }
+}
+
+export function getUserSectionPerm(
+  sectionKey: string,
+  sectionPermissions: string | null | undefined,
+  legacySectionPermission: string | null | undefined
+): SectionPermLevel {
+  const perms = parseSectionPermissions(sectionPermissions);
+  if (Object.keys(perms).length > 0) return (perms[sectionKey] as SectionPermLevel) ?? "no_access";
+  if (legacySectionPermission === sectionKey) return "edit";
+  return "no_access";
+}
+
+export function canEditSectionGranular(
+  sectionKey: string,
+  isAdmin: boolean,
+  sectionPermissions: string | null | undefined,
+  legacySectionPermission: string | null | undefined
+): boolean {
+  if (isAdmin) return true;
+  return getUserSectionPerm(sectionKey, sectionPermissions, legacySectionPermission) === "edit";
+}
+
+export function getApprovalStatusColor(status: string): string {
+  switch (status) {
+    case "draft":     return "bg-slate-500/20 text-slate-400 border-slate-500/50";
+    case "submitted": return "bg-amber-500/20 text-amber-400 border-amber-500/50";
+    case "approved":  return "bg-emerald-500/20 text-emerald-400 border-emerald-500/50";
+    case "rejected":  return "bg-red-500/20 text-red-400 border-red-500/50";
+    default:          return "bg-slate-500/20 text-slate-400 border-slate-500/50";
+  }
+}
+
+export function getApprovalStatusLabel(status: string): string {
+  switch (status) {
+    case "draft":     return "Draft";
+    case "submitted": return "Pending Review";
+    case "approved":  return "Approved";
+    case "rejected":  return "Rejected";
+    default:          return status;
+  }
+}

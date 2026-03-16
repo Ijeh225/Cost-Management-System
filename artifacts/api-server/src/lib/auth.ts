@@ -33,7 +33,7 @@ export function clearAuthCookie(res: Response) {
 }
 
 export interface AuthRequest extends Request {
-  user?: { id: number; email: string; name: string; role: string; sectionPermission: string | null };
+  user?: { id: number; email: string; name: string; role: string; sectionPermission: string | null; sectionPermissions: string | null };
 }
 
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
@@ -50,7 +50,14 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
-    req.user = { id: user.id, email: user.email, name: user.name, role: user.role, sectionPermission: user.sectionPermission ?? null };
+    req.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      sectionPermission: user.sectionPermission ?? null,
+      sectionPermissions: user.sectionPermissions ?? null,
+    };
     next();
   } catch {
     res.status(401).json({ error: "Not authenticated" });

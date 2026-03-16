@@ -13,6 +13,7 @@ export const containersTable = pgTable("containers", {
   vessel: text("vessel").notNull().default(""),
   status: text("status").notNull().default("new_upload"),
   isLocked: boolean("is_locked").notNull().default(false),
+  lockedSections: text("locked_sections").notNull().default("[]"),
   assignedStaffId: integer("assigned_staff_id").references(() => usersTable.id),
   clearingCharges: numeric("clearing_charges", { precision: 15, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

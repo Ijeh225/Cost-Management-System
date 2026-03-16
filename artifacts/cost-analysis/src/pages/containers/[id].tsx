@@ -3,12 +3,14 @@ import { useParams, Link } from "wouter";
 import {
   useGetContainer, useUpdateContainerCharges,
   useLockContainer, useUpdateContainer, useGetContainerAuditLog,
-  type AuditEntry,
+  useSubmitSection, useApproveSection, useRejectSection, useLockSection, useUnlockSection,
+  type AuditEntry, type SectionApproval, type UpdateContainerChargesRequestSection,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
   formatCurrency, getStatusColor, getStatusLabel,
-  WORKFLOW_STAGES, getNextStage, getStageIndex, canEditSection, STAGE_SECTION,
+  WORKFLOW_STAGES, getNextStage, getStageIndex, STAGE_SECTION,
+  getApprovalStatusColor, getApprovalStatusLabel, canEditSectionGranular,
 } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,10 +24,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   ArrowLeft, Lock, Unlock, Anchor, User as UserIcon, FileText,
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
-  History, BarChart3,
+  History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck,
 } from "lucide-react";
 
 const createNumberSchema = (keys: string[]) => {
@@ -40,16 +45,51 @@ const terminalSchema = createNumberSchema(['terminalCharges', 'terminalAdditions
 const deliverySchema = createNumberSchema(['passingOfTruck', 'passingOfTruckForEmptyReturn', 'parkingForPullout', 'pullout', 'delivery', 'emptyReturn', 'unchainingTruck', 'emptyCallUp', 'pulloutExpenses', 'transferToIkorodu', 'transportAllowance']);
 const operationsSchema = createNumberSchema(['fouBooking', 'fou', 'scanningToPhysical', 'security', 'additionalDeliveryExpenses', 'miscellaneous', 'abandoned', 'agenciesBlocks', 'callUp', 'transireRunnings', 'officePtml', 'freshPayment']);
 
+function RejectSectionDialog({
+  open, onClose, onConfirm, isPending,
+}: {
+  open: boolean; onClose: () => void; onConfirm: (r: string) => void; isPending: boolean;
+}) {
+  const [reason, setReason] = useState("");
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) { onClose(); setReason(""); } }}>
+      <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-md">
+        <DialogHeader><DialogTitle className="text-destructive">Reject Section</DialogTitle></DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="space-y-2">
+            <Label>Reason for Rejection <span className="text-destructive">*</span></Label>
+            <Textarea placeholder="Explain what needs to be corrected…" value={reason} onChange={e => setReason(e.target.value)} rows={4} className="resize-none" />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => { onClose(); setReason(""); }}>Cancel</Button>
+            <Button variant="destructive" disabled={!reason.trim() || isPending} onClick={() => onConfirm(reason.trim())}>
+              {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Reject
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ChargeSectionForm({
-  containerId, sectionKey, title, schema, initialData, isLocked, isEditable,
+  containerId, sectionKey, title, schema, initialData, isRecordLocked, isSectionLocked, isEditable, isAdmin,
+  approval, onSubmitSection, onApproveSection, onRejectSection, onToggleSectionLock,
 }: {
   containerId: number;
   sectionKey: string;
   title: string;
   schema: z.ZodObject<any>;
   initialData: any;
-  isLocked: boolean;
+  isRecordLocked: boolean;
+  isSectionLocked: boolean;
   isEditable: boolean;
+  isAdmin: boolean;
+  approval: SectionApproval | undefined;
+  onSubmitSection: (section: string) => void;
+  onApproveSection: (section: string) => void;
+  onRejectSection: (section: string) => void;
+  onToggleSectionLock: (section: string, lock: boolean) => void;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -64,9 +104,14 @@ function ChargeSectionForm({
   const fields = Object.keys(schema.shape);
   const total = fields.reduce((sum, field) => sum + Number(initialData?.[field] || 0), 0);
 
+  const approvalStatus = approval?.status ?? "draft";
+  const effectivelyLocked = isRecordLocked || isSectionLocked;
+  const canEdit = isEditable && !effectivelyLocked && approvalStatus !== "approved";
+  const canSubmit = isEditable && !effectivelyLocked && (approvalStatus === "draft" || approvalStatus === "rejected");
+
   const onSubmit = (data: any) => {
     updateMutation.mutate(
-      { id: containerId, data: { section: sectionKey, [sectionKey]: data, reason: "Manual UI update" } },
+      { id: containerId, data: { section: sectionKey as UpdateContainerChargesRequestSection, [sectionKey]: data, reason: "Manual UI update" } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
@@ -80,71 +125,132 @@ function ChargeSectionForm({
     );
   };
 
-  const canEdit = isEditable && !isLocked;
-
   return (
-    <AccordionItem value={sectionKey} className="border-border/50 bg-card/20 px-4 rounded-lg mb-4 shadow-sm">
-      <AccordionTrigger className="hover:no-underline py-4">
-        <div className="flex items-center justify-between w-full pr-4">
-          <span className="font-semibold text-base">{title}</span>
-          <div className="flex items-center gap-3">
-            {!isEditable && !isLocked && (
-              <span className="text-xs text-muted-foreground font-normal">(read-only)</span>
-            )}
+    <>
+      <AccordionItem value={sectionKey} className="border-border/50 bg-card/20 px-4 rounded-lg mb-4 shadow-sm">
+        <AccordionTrigger className="hover:no-underline py-4">
+          <div className="flex items-center justify-between w-full pr-4">
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-base">{title}</span>
+              {(isSectionLocked || approvalStatus === "approved") && (
+                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] py-0 px-1.5">
+                  <ShieldCheck className="w-3 h-3 mr-1" /> Locked
+                </Badge>
+              )}
+              {approval && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${getApprovalStatusColor(approvalStatus)}`}>
+                  {getApprovalStatusLabel(approvalStatus)}
+                </span>
+              )}
+            </div>
             <span className="font-mono text-primary font-medium">{formatCurrency(total)}</span>
           </div>
-        </div>
-      </AccordionTrigger>
-      <AccordionContent className="pt-2 pb-6">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-              {fields.map((field) => (
-                <FormField key={field} control={form.control} name={field} render={({ field: ff }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-muted-foreground capitalize">
-                      {field.replace(/([A-Z])/g, ' $1').trim()}
-                    </FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
-                        <Input
-                          type="number"
-                          disabled={!isEditing || !canEdit || updateMutation.isPending}
-                          {...ff}
-                          className="pl-7 font-mono text-sm bg-background/50 border-border/60 disabled:opacity-70 h-10"
-                          onFocus={(e) => e.target.select()}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              ))}
+        </AccordionTrigger>
+        <AccordionContent className="pt-2 pb-6">
+          {/* Rejection reason banner */}
+          {approvalStatus === "rejected" && approval?.rejectionReason && (
+            <div className="mb-4 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+              <div>
+                <span className="font-semibold text-destructive">Rejected: </span>
+                <span className="text-destructive/90">{approval.rejectionReason}</span>
+              </div>
             </div>
-            {canEdit && (
-              <div className="flex justify-end gap-3 pt-4 border-t border-border/40 mt-6">
-                {isEditing ? (
-                  <>
-                    <Button type="button" variant="outline" onClick={() => { form.reset(initialData); setIsEditing(false); }} disabled={updateMutation.isPending}>
-                      Cancel
+          )}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                {fields.map((field) => (
+                  <FormField key={field} control={form.control} name={field} render={({ field: ff }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-muted-foreground capitalize">
+                        {field.replace(/([A-Z])/g, ' $1').trim()}
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
+                          <Input
+                            type="number"
+                            disabled={!isEditing || !canEdit || updateMutation.isPending}
+                            {...ff}
+                            className="pl-7 font-mono text-sm bg-background/50 border-border/60 disabled:opacity-70 h-10"
+                            onFocus={(e) => e.target.select()}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border/40 mt-6">
+                <div className="flex items-center gap-2">
+                  {/* Admin: approve/reject when submitted */}
+                  {isAdmin && approvalStatus === "submitted" && (
+                    <>
+                      <Button type="button" size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => onApproveSection(sectionKey)}>
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Approve
+                      </Button>
+                      <Button type="button" size="sm" variant="destructive" className="h-8 text-xs"
+                        onClick={() => onRejectSection(sectionKey)}>
+                        <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                      </Button>
+                    </>
+                  )}
+                  {/* Admin: section lock toggle */}
+                  {isAdmin && approvalStatus !== "submitted" && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={`h-8 text-xs ${isSectionLocked || approvalStatus === "approved" ? "border-amber-500/40 text-amber-400 hover:bg-amber-500/10" : ""}`}
+                      onClick={() => onToggleSectionLock(sectionKey, !(isSectionLocked || approvalStatus === "approved"))}
+                    >
+                      {isSectionLocked || approvalStatus === "approved"
+                        ? <><Unlock className="w-3 h-3 mr-1" /> Unlock Section</>
+                        : <><Lock className="w-3 h-3 mr-1" /> Lock Section</>}
                     </Button>
-                    <Button type="submit" disabled={updateMutation.isPending} className="active:scale-95 transition-transform shadow-md">
-                      {updateMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                      Save Changes
+                  )}
+                  {/* Staff: submit for review */}
+                  {!isAdmin && canSubmit && (
+                    <Button type="button" size="sm" variant="outline" className="h-8 text-xs border-primary/40 text-primary hover:bg-primary/10"
+                      onClick={() => onSubmitSection(sectionKey)}>
+                      <Send className="w-3.5 h-3.5 mr-1" /> Submit for Review
                     </Button>
-                  </>
-                ) : (
-                  <Button type="button" variant="secondary" onClick={() => setIsEditing(true)}>
-                    Edit {title}
-                  </Button>
+                  )}
+                </div>
+                {/* Edit / Save buttons */}
+                {canEdit && (
+                  <div className="flex items-center gap-2">
+                    {isEditing ? (
+                      <>
+                        <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => { form.reset(initialData); setIsEditing(false); }} disabled={updateMutation.isPending}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" size="sm" className="h-8 text-xs active:scale-95 transition-transform shadow-md" disabled={updateMutation.isPending}>
+                          {updateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                          Save
+                        </Button>
+                      </>
+                    ) : (
+                      <Button type="button" variant="secondary" size="sm" className="h-8 text-xs" onClick={() => setIsEditing(true)}>
+                        Edit {title.split(" ")[0]}
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {!canEdit && approvalStatus !== "submitted" && (
+                  <span className="text-xs text-muted-foreground italic">
+                    {approvalStatus === "approved" ? "Approved — section locked" : effectivelyLocked ? "Section locked" : "Read-only"}
+                  </span>
                 )}
               </div>
-            )}
-          </form>
-        </Form>
-      </AccordionContent>
-    </AccordionItem>
+            </form>
+          </Form>
+        </AccordionContent>
+      </AccordionItem>
+    </>
   );
 }
 
@@ -158,16 +264,8 @@ function WorkflowProgress({ currentStatus }: { currentStatus: string }) {
       </div>
       <div className="flex gap-1">
         {WORKFLOW_STAGES.map((stage, idx) => (
-          <div
-            key={stage.value}
-            title={stage.label}
-            className={`h-2 flex-1 rounded-full transition-all duration-300 ${
-              idx < currentIdx
-                ? "bg-primary/60"
-                : idx === currentIdx
-                ? "bg-primary"
-                : "bg-border/40"
-            }`}
+          <div key={stage.value} title={stage.label}
+            className={`h-2 flex-1 rounded-full transition-all duration-300 ${idx < currentIdx ? "bg-primary/60" : idx === currentIdx ? "bg-primary" : "bg-border/40"}`}
           />
         ))}
       </div>
@@ -182,7 +280,6 @@ function WorkflowProgress({ currentStatus }: { currentStatus: string }) {
 
 function AuditTrail({ containerId }: { containerId: number }) {
   const { data: entries, isLoading } = useGetContainerAuditLog(containerId);
-
   if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
   if (!entries?.length) return (
     <div className="text-center py-16 text-muted-foreground">
@@ -190,7 +287,17 @@ function AuditTrail({ containerId }: { containerId: number }) {
       <p className="text-sm">No activity recorded yet.</p>
     </div>
   );
-
+  const ACTION_LABELS: Record<string, string> = {
+    update_charges: "Charges Updated",
+    update_container: "Container Updated",
+    locked: "Container Locked",
+    unlocked: "Container Unlocked",
+    section_submitted: "Section Submitted",
+    section_approved: "Section Approved",
+    section_rejected: "Section Rejected",
+    section_locked: "Section Locked",
+    section_unlocked: "Section Unlocked",
+  };
   return (
     <div className="space-y-3">
       {entries.map((entry: AuditEntry, i: number) => (
@@ -201,8 +308,9 @@ function AuditTrail({ containerId }: { containerId: number }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-foreground capitalize">
-                  {entry.changeType?.replace(/_/g, " ") ?? "Update"}
+                <p className="text-sm font-medium text-foreground">
+                  {ACTION_LABELS[(entry as any).action] ?? (entry as any).action?.replace(/_/g, " ") ?? "Update"}
+                  {(entry as any).section && <span className="text-muted-foreground text-xs ml-2 capitalize">({(entry as any).section})</span>}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   by <span className="font-medium text-foreground/80">{(entry as any).userName ?? "System"}</span>
@@ -213,14 +321,6 @@ function AuditTrail({ containerId }: { containerId: number }) {
                 {new Date(entry.createdAt).toLocaleString()}
               </span>
             </div>
-            {(entry as any).newData && (
-              <details className="mt-2">
-                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">View changes</summary>
-                <pre className="text-xs bg-secondary/30 rounded p-2 mt-1 overflow-x-auto text-foreground/70 max-h-48">
-                  {JSON.stringify((entry as any).newData, null, 2)}
-                </pre>
-              </details>
-            )}
           </div>
         </div>
       ))}
@@ -235,22 +335,28 @@ export default function ContainerDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("charges");
+  const [rejectTargetSection, setRejectTargetSection] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useGetContainer(containerId);
   const lockMutation = useLockContainer();
   const updateMutation = useUpdateContainer();
+  const submitSectionMutation = useSubmitSection();
+  const approveSectionMutation = useApproveSection();
+  const rejectSectionMutation = useRejectSection();
+  const lockSectionMutation = useLockSection();
+  const unlockSectionMutation = useUnlockSection();
 
   if (isLoading) return <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
 
-  const { container, charges } = data;
+  const { container, charges, sectionApprovals = [] } = data as any;
   const nextStage = getNextStage(container.status);
-  const userSection = (user as any)?.sectionPermission ?? null;
+  const userSectionPermission: string | null = (user as any)?.sectionPermission ?? null;
+  const userSectionPermissions: string | null = (user as any)?.sectionPermissions ?? null;
   const activeSection = STAGE_SECTION[container.status] ?? null;
+  const lockedSections: string[] = container.lockedSections ?? [];
 
-  const canAdvance = !container.isLocked && nextStage !== null && (
-    isAdmin || (userSection && userSection === activeSection)
-  );
+  const canAdvance = !container.isLocked && nextStage !== null && isAdmin;
 
   const handleAdvance = () => {
     if (!nextStage) return;
@@ -280,8 +386,56 @@ export default function ContainerDetail() {
     );
   };
 
-  const sectionEditable = (sectionKey: string) =>
-    canEditSection(sectionKey, container.status, isAdmin, userSection);
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
+    queryClient.invalidateQueries({ queryKey: ["/api/approvals"] });
+  };
+
+  const handleSubmitSection = (section: string) => {
+    submitSectionMutation.mutate({ id: containerId, section }, {
+      onSuccess: () => { invalidate(); toast({ title: `${section} submitted for review.` }); },
+      onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
+    });
+  };
+
+  const handleApproveSection = (section: string) => {
+    approveSectionMutation.mutate({ id: containerId, section }, {
+      onSuccess: () => { invalidate(); toast({ title: `${section} approved and locked.` }); },
+      onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
+    });
+  };
+
+  const handleRejectSection = (section: string, reason: string) => {
+    rejectSectionMutation.mutate({ id: containerId, section, data: { reason } }, {
+      onSuccess: () => { invalidate(); toast({ title: `${section} rejected.` }); setRejectTargetSection(null); },
+      onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
+    });
+  };
+
+  const handleToggleSectionLock = (section: string, lock: boolean) => {
+    const mutation = lock ? lockSectionMutation : unlockSectionMutation;
+    mutation.mutate({ id: containerId, section }, {
+      onSuccess: () => { invalidate(); toast({ title: `${section} section ${lock ? "locked" : "unlocked"}.` }); },
+      onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
+    });
+  };
+
+  const getSectionApproval = (sectionKey: string): SectionApproval | undefined =>
+    sectionApprovals.find((a: SectionApproval) => a.section === sectionKey);
+
+  const isSectionEditable = (sectionKey: string) =>
+    canEditSectionGranular(sectionKey, isAdmin, userSectionPermissions, userSectionPermission);
+
+  const CHARGE_SECTIONS = [
+    { key: "shipping",   title: "Shipping Charges",      schema: shippingSchema,   data: charges.shipping },
+    { key: "customs",    title: "Customs Duty & Taxes",  schema: customsSchema,    data: charges.customs },
+    { key: "terminal",   title: "Terminal Charges",       schema: terminalSchema,   data: charges.terminal },
+    { key: "delivery",   title: "Delivery & Transport",  schema: deliverySchema,   data: charges.delivery },
+    { key: "operations", title: "Operations & Misc.",     schema: operationsSchema, data: charges.operations },
+  ];
+
+  const pendingApprovals = sectionApprovals.filter((a: SectionApproval) => a.status === "submitted").length;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-24">
@@ -296,6 +450,11 @@ export default function ContainerDetail() {
             {container.isLocked && (
               <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 px-2 py-0.5">
                 <Lock className="w-3 h-3 mr-1" /> Locked
+              </Badge>
+            )}
+            {pendingApprovals > 0 && isAdmin && (
+              <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/50 text-xs">
+                {pendingApprovals} pending
               </Badge>
             )}
           </h1>
@@ -332,7 +491,6 @@ export default function ContainerDetail() {
         </div>
       </div>
 
-      {/* Lock warning */}
       {container.isLocked && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
@@ -391,23 +549,35 @@ export default function ContainerDetail() {
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                 <Calculator className="w-5 h-5 text-primary" /> Breakdown of Charges
               </h3>
-              {!isAdmin && userSection && (
+              {!isAdmin && (userSectionPermission || userSectionPermissions) && (
                 <div className="mb-4 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 text-sm flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-primary shrink-0" />
                   <span className="text-muted-foreground">
-                    You can edit the <span className="font-semibold text-foreground capitalize">{userSection}</span> section
-                    {activeSection === userSection
-                      ? " — this container is at your stage."
-                      : ` once the container reaches ${userSection} stage.`}
+                    Submit sections for admin review when your entries are complete.
+                    {activeSection && <> Current workflow stage: <span className="font-semibold text-foreground capitalize">{activeSection}</span>.</>}
                   </span>
                 </div>
               )}
               <Accordion type="single" collapsible className="w-full">
-                <ChargeSectionForm containerId={containerId} sectionKey="shipping" title="Shipping Charges" schema={shippingSchema} initialData={charges.shipping} isLocked={container.isLocked} isEditable={sectionEditable("shipping")} />
-                <ChargeSectionForm containerId={containerId} sectionKey="customs" title="Customs Duty & Taxes" schema={customsSchema} initialData={charges.customs} isLocked={container.isLocked} isEditable={sectionEditable("customs")} />
-                <ChargeSectionForm containerId={containerId} sectionKey="terminal" title="Terminal Charges" schema={terminalSchema} initialData={charges.terminal} isLocked={container.isLocked} isEditable={sectionEditable("terminal")} />
-                <ChargeSectionForm containerId={containerId} sectionKey="delivery" title="Delivery & Transport" schema={deliverySchema} initialData={charges.delivery} isLocked={container.isLocked} isEditable={sectionEditable("delivery")} />
-                <ChargeSectionForm containerId={containerId} sectionKey="operations" title="Operations & Misc." schema={operationsSchema} initialData={charges.operations} isLocked={container.isLocked} isEditable={sectionEditable("operations")} />
+                {CHARGE_SECTIONS.map(s => (
+                  <ChargeSectionForm
+                    key={s.key}
+                    containerId={containerId}
+                    sectionKey={s.key}
+                    title={s.title}
+                    schema={s.schema}
+                    initialData={s.data}
+                    isRecordLocked={container.isLocked}
+                    isSectionLocked={lockedSections.includes(s.key)}
+                    isEditable={isSectionEditable(s.key)}
+                    isAdmin={isAdmin}
+                    approval={getSectionApproval(s.key)}
+                    onSubmitSection={handleSubmitSection}
+                    onApproveSection={handleApproveSection}
+                    onRejectSection={(section) => setRejectTargetSection(section)}
+                    onToggleSectionLock={handleToggleSectionLock}
+                  />
+                ))}
               </Accordion>
             </div>
 
@@ -447,6 +617,20 @@ export default function ContainerDetail() {
                       <span className="font-mono text-sm font-bold text-amber-500">{formatCurrency(charges.customs.dutyNotPaid)}</span>
                     </div>
                   )}
+                  {/* Section Approval Status */}
+                  {sectionApprovals.length > 0 && (
+                    <div className="pt-4 border-t border-border/40 space-y-2">
+                      <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Section Status</p>
+                      {sectionApprovals.map((a: SectionApproval) => (
+                        <div key={a.section} className="flex items-center justify-between">
+                          <span className="text-xs capitalize text-foreground/70">{a.section}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase border ${getApprovalStatusColor(a.status)}`}>
+                            {getApprovalStatusLabel(a.status)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -466,6 +650,14 @@ export default function ContainerDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Global reject dialog */}
+      <RejectSectionDialog
+        open={!!rejectTargetSection}
+        onClose={() => setRejectTargetSection(null)}
+        onConfirm={(reason) => { if (rejectTargetSection) handleRejectSection(rejectTargetSection, reason); }}
+        isPending={rejectSectionMutation.isPending}
+      />
     </div>
   );
 }

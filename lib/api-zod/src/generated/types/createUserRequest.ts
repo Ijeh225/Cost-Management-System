@@ -13,4 +13,5 @@ export interface CreateUserRequest {
   password: string;
   role: CreateUserRequestRole;
   sectionPermission?: string | null;
+  sectionPermissions?: string | null;
 }

@@ -16,79 +16,124 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { SECTION_LABELS } from "@/lib/format";
+import { SECTION_LABELS, CHARGE_SECTIONS, parseSectionPermissions, type SectionPermLevel } from "@/lib/format";
 
-const SECTION_OPTIONS = [
-  { value: "_none", label: "All Sections (Admin)" },
-  ...Object.entries(SECTION_LABELS).map(([value, label]) => ({ value, label })),
+type SectionPermissionsMap = Record<string, SectionPermLevel>;
+
+const PERM_LEVELS: { value: SectionPermLevel; label: string }[] = [
+  { value: "no_access", label: "No Access" },
+  { value: "view", label: "View Only" },
+  { value: "edit", label: "Edit" },
 ];
 
+function GranularPermissionsEditor({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: SectionPermissionsMap;
+  onChange: (v: SectionPermissionsMap) => void;
+  disabled?: boolean;
+}) {
+  const handleChange = (section: string, perm: SectionPermLevel) => {
+    onChange({ ...value, [section]: perm });
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Section Permissions</p>
+      <div className="border border-border/50 rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-secondary/30 text-xs text-muted-foreground uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-2 text-left font-medium">Section</th>
+              {PERM_LEVELS.map(p => (
+                <th key={p.value} className="px-3 py-2 text-center font-medium">{p.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/40">
+            {CHARGE_SECTIONS.map(section => {
+              const current = value[section] ?? "no_access";
+              return (
+                <tr key={section} className="hover:bg-accent/20 transition-colors">
+                  <td className="px-4 py-2.5 font-medium capitalize text-foreground/80">{SECTION_LABELS[section] ?? section}</td>
+                  {PERM_LEVELS.map(p => (
+                    <td key={p.value} className="px-3 py-2.5 text-center">
+                      <input
+                        type="radio"
+                        name={`perm-${section}`}
+                        value={p.value}
+                        checked={current === p.value}
+                        disabled={disabled}
+                        onChange={() => handleChange(section, p.value)}
+                        className="w-4 h-4 accent-primary cursor-pointer"
+                      />
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 const createSchema = z.object({
-  name:              z.string().min(2, "Name required"),
-  email:             z.string().email("Valid email required"),
-  password:          z.string().min(6, "Min 6 characters"),
-  role:              z.enum(["admin", "staff"]),
-  sectionPermission: z.string().optional(),
+  name:     z.string().min(2, "Name required"),
+  email:    z.string().email("Valid email required"),
+  password: z.string().min(6, "Min 6 characters"),
+  role:     z.enum(["admin", "staff"]),
 });
 
 const editSchema = z.object({
-  name:              z.string().min(2, "Name required"),
-  role:              z.enum(["admin", "staff"]),
-  password:          z.string().optional(),
-  sectionPermission: z.string().optional(),
+  name:     z.string().min(2, "Name required"),
+  role:     z.enum(["admin", "staff"]),
+  password: z.string().optional(),
 });
 
 type UserRow = {
   id: number; name: string; email: string; role: string;
-  sectionPermission?: string | null; isActive: boolean; createdAt: string;
+  sectionPermission?: string | null;
+  sectionPermissions?: string | null;
+  isActive: boolean; createdAt: string;
 };
 
-function SectionPermissionField({ control, name, role }: { control: any; name: string; role: string }) {
-  return (
-    <FormField control={control} name={name} render={({ field }) => (
-      <FormItem>
-        <FormLabel>Section Permission <span className="text-muted-foreground font-normal">(staff only)</span></FormLabel>
-        <Select
-          onValueChange={field.onChange}
-          value={field.value || "_none"}
-          disabled={role === "admin"}
-        >
-          <FormControl>
-            <SelectTrigger>
-              <SelectValue placeholder="Select section" />
-            </SelectTrigger>
-          </FormControl>
-          <SelectContent>
-            {SECTION_OPTIONS.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <FormMessage />
-      </FormItem>
-    )} />
-  );
+function formatPermissionsSummary(user: UserRow): string {
+  if (user.role === "admin") return "All sections";
+  if (user.sectionPermissions) {
+    const perms = parseSectionPermissions(user.sectionPermissions);
+    const editSections = Object.entries(perms).filter(([, v]) => v === "edit").map(([k]) => SECTION_LABELS[k] ?? k);
+    const viewSections = Object.entries(perms).filter(([, v]) => v === "view").map(([k]) => SECTION_LABELS[k] ?? k);
+    const parts: string[] = [];
+    if (editSections.length > 0) parts.push(`Edit: ${editSections.join(", ")}`);
+    if (viewSections.length > 0) parts.push(`View: ${viewSections.join(", ")}`);
+    return parts.length > 0 ? parts.join(" | ") : "No access";
+  }
+  if (user.sectionPermission) return `${SECTION_LABELS[user.sectionPermission] ?? user.sectionPermission} (legacy)`;
+  return "All sections";
 }
 
 function CreateUserDialog() {
   const [open, setOpen] = useState(false);
+  const [sectionPerms, setSectionPerms] = useState<SectionPermissionsMap>({});
   const createMutation = useCreateUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const form = useForm({
     resolver: zodResolver(createSchema),
-    defaultValues: { name: "", email: "", password: "", role: "staff" as const, sectionPermission: "_none" },
+    defaultValues: { name: "", email: "", password: "", role: "staff" as const },
   });
 
   const watchedRole = form.watch("role");
 
   const onSubmit = (data: any) => {
     const payload: any = { name: data.name, email: data.email, password: data.password, role: data.role };
-    if (data.role === "staff" && data.sectionPermission && data.sectionPermission !== "_none") {
-      payload.sectionPermission = data.sectionPermission;
-    } else {
-      payload.sectionPermission = null;
+    if (data.role === "staff") {
+      payload.sectionPermissions = JSON.stringify(sectionPerms);
     }
     createMutation.mutate({ data: payload }, {
       onSuccess: () => {
@@ -96,6 +141,7 @@ function CreateUserDialog() {
         toast({ title: "User created successfully." });
         setOpen(false);
         form.reset();
+        setSectionPerms({});
       },
       onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
     });
@@ -108,7 +154,7 @@ function CreateUserDialog() {
           <Plus className="w-4 h-4 mr-2" /> Add User
         </Button>
       </DialogTrigger>
-      <DialogContent className="border-border/50 bg-card/95 backdrop-blur">
+      <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Create New User</DialogTitle></DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
@@ -134,7 +180,9 @@ function CreateUserDialog() {
                 <FormMessage />
               </FormItem>
             )} />
-            <SectionPermissionField control={form.control} name="sectionPermission" role={watchedRole} />
+            {watchedRole === "staff" && (
+              <GranularPermissionsEditor value={sectionPerms} onChange={setSectionPerms} />
+            )}
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending}>
@@ -154,14 +202,12 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const initialPerms = parseSectionPermissions(user.sectionPermissions);
+  const [sectionPerms, setSectionPerms] = useState<SectionPermissionsMap>(initialPerms);
+
   const form = useForm({
     resolver: zodResolver(editSchema),
-    defaultValues: {
-      name: user.name,
-      role: user.role as "admin" | "staff",
-      password: "",
-      sectionPermission: user.sectionPermission || "_none",
-    },
+    defaultValues: { name: user.name, role: user.role as "admin" | "staff", password: "" },
   });
 
   const watchedRole = form.watch("role");
@@ -169,10 +215,10 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
   const onSubmit = (data: any) => {
     const payload: any = { name: data.name, role: data.role };
     if (data.password) payload.password = data.password;
-    if (data.role === "staff" && data.sectionPermission && data.sectionPermission !== "_none") {
-      payload.sectionPermission = data.sectionPermission;
+    if (data.role === "staff") {
+      payload.sectionPermissions = JSON.stringify(sectionPerms);
     } else {
-      payload.sectionPermission = null;
+      payload.sectionPermissions = null;
     }
     updateMutation.mutate({ id: user.id, data: payload }, {
       onSuccess: () => {
@@ -185,7 +231,7 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
   };
 
   return (
-    <DialogContent className="border-border/50 bg-card/95 backdrop-blur">
+    <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>Edit User — {user.name}</DialogTitle></DialogHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
@@ -208,7 +254,9 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
               <FormMessage />
             </FormItem>
           )} />
-          <SectionPermissionField control={form.control} name="sectionPermission" role={watchedRole} />
+          {watchedRole === "staff" && (
+            <GranularPermissionsEditor value={sectionPerms} onChange={setSectionPerms} />
+          )}
           <FormField control={form.control} name="password" render={({ field }) => (
             <FormItem>
               <FormLabel>New Password <span className="text-muted-foreground font-normal">(leave blank to keep current)</span></FormLabel>
@@ -274,7 +322,7 @@ export default function Users() {
               <tr>
                 <th className="px-6 py-4 font-medium">User</th>
                 <th className="px-6 py-4 font-medium">Role</th>
-                <th className="px-6 py-4 font-medium">Section</th>
+                <th className="px-6 py-4 font-medium">Section Access</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Created</th>
                 <th className="px-6 py-4 font-medium text-right">Actions</th>
@@ -300,14 +348,8 @@ export default function Users() {
                         {u.role === "admin" ? "Administrator" : "Staff"}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4">
-                      {(u as UserRow).sectionPermission ? (
-                        <span className="capitalize text-xs font-medium text-foreground/80">
-                          {SECTION_LABELS[(u as UserRow).sectionPermission!] ?? (u as UserRow).sectionPermission}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">All sections</span>
-                      )}
+                    <td className="px-6 py-4 max-w-xs">
+                      <span className="text-xs text-foreground/70 line-clamp-2">{formatPermissionsSummary(u as UserRow)}</span>
                     </td>
                     <td className="px-6 py-4">
                       {u.isActive ? (

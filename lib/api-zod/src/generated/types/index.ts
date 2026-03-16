@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./approvalQueueItem";
+export * from "./approvalQueueItemStatus";
 export * from "./auditEntry";
 export * from "./container";
 export * from "./containerCharges";
@@ -29,7 +31,11 @@ export * from "./lockContainerRequest";
 export * from "./loginRequest";
 export * from "./loginResponse";
 export * from "./messageResponse";
+export * from "./myTasksResponse";
 export * from "./operationsCharges";
+export * from "./rejectSectionRequest";
+export * from "./sectionApproval";
+export * from "./sectionApprovalStatus";
 export * from "./shippingCharges";
 export * from "./terminalCharges";
 export * from "./updateContainerChargesRequest";
@@ -42,4 +48,3 @@ export * from "./uploadContainersResponse";
 export * from "./uploadRow";
 export * from "./user";
 export * from "./userRole";
-export * from "./userSectionPermission";

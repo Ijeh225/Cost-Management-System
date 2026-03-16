@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  ApprovalQueueItem,
   AuditEntry,
   Container,
   ContainerCharges,
@@ -32,6 +33,9 @@ import type {
   LoginRequest,
   LoginResponse,
   MessageResponse,
+  MyTasksResponse,
+  RejectSectionRequest,
+  SectionApproval,
   UpdateContainerChargesRequest,
   UpdateContainerRequest,
   UpdateUserRequest,
@@ -1461,6 +1465,584 @@ export function useGetContainerAuditLog<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetContainerAuditLogQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Staff submits a section for review
+ */
+export const getSubmitSectionUrl = (id: number, section: string) => {
+  return `/api/containers/${id}/sections/${section}/submit`;
+};
+
+export const submitSection = async (
+  id: number,
+  section: string,
+  options?: RequestInit,
+): Promise<SectionApproval> => {
+  return customFetch<SectionApproval>(getSubmitSectionUrl(id, section), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSubmitSectionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitSection>>,
+    TError,
+    { id: number; section: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitSection>>,
+  TError,
+  { id: number; section: string },
+  TContext
+> => {
+  const mutationKey = ["submitSection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitSection>>,
+    { id: number; section: string }
+  > = (props) => {
+    const { id, section } = props ?? {};
+
+    return submitSection(id, section, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitSectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitSection>>
+>;
+
+export type SubmitSectionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Staff submits a section for review
+ */
+export const useSubmitSection = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitSection>>,
+    TError,
+    { id: number; section: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitSection>>,
+  TError,
+  { id: number; section: string },
+  TContext
+> => {
+  return useMutation(getSubmitSectionMutationOptions(options));
+};
+
+/**
+ * @summary Admin approves a submitted section
+ */
+export const getApproveSectionUrl = (id: number, section: string) => {
+  return `/api/containers/${id}/sections/${section}/approve`;
+};
+
+export const approveSection = async (
+  id: number,
+  section: string,
+  options?: RequestInit,
+): Promise<SectionApproval> => {
+  return customFetch<SectionApproval>(getApproveSectionUrl(id, section), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getApproveSectionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveSection>>,
+    TError,
+    { id: number; section: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof approveSection>>,
+  TError,
+  { id: number; section: string },
+  TContext
+> => {
+  const mutationKey = ["approveSection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof approveSection>>,
+    { id: number; section: string }
+  > = (props) => {
+    const { id, section } = props ?? {};
+
+    return approveSection(id, section, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApproveSectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof approveSection>>
+>;
+
+export type ApproveSectionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Admin approves a submitted section
+ */
+export const useApproveSection = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveSection>>,
+    TError,
+    { id: number; section: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof approveSection>>,
+  TError,
+  { id: number; section: string },
+  TContext
+> => {
+  return useMutation(getApproveSectionMutationOptions(options));
+};
+
+/**
+ * @summary Admin rejects a submitted section
+ */
+export const getRejectSectionUrl = (id: number, section: string) => {
+  return `/api/containers/${id}/sections/${section}/reject`;
+};
+
+export const rejectSection = async (
+  id: number,
+  section: string,
+  rejectSectionRequest: RejectSectionRequest,
+  options?: RequestInit,
+): Promise<SectionApproval> => {
+  return customFetch<SectionApproval>(getRejectSectionUrl(id, section), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(rejectSectionRequest),
+  });
+};
+
+export const getRejectSectionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rejectSection>>,
+    TError,
+    { id: number; section: string; data: BodyType<RejectSectionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof rejectSection>>,
+  TError,
+  { id: number; section: string; data: BodyType<RejectSectionRequest> },
+  TContext
+> => {
+  const mutationKey = ["rejectSection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof rejectSection>>,
+    { id: number; section: string; data: BodyType<RejectSectionRequest> }
+  > = (props) => {
+    const { id, section, data } = props ?? {};
+
+    return rejectSection(id, section, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RejectSectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof rejectSection>>
+>;
+export type RejectSectionMutationBody = BodyType<RejectSectionRequest>;
+export type RejectSectionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Admin rejects a submitted section
+ */
+export const useRejectSection = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rejectSection>>,
+    TError,
+    { id: number; section: string; data: BodyType<RejectSectionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof rejectSection>>,
+  TError,
+  { id: number; section: string; data: BodyType<RejectSectionRequest> },
+  TContext
+> => {
+  return useMutation(getRejectSectionMutationOptions(options));
+};
+
+/**
+ * @summary Admin locks a specific section
+ */
+export const getLockSectionUrl = (id: number, section: string) => {
+  return `/api/containers/${id}/sections/${section}/lock`;
+};
+
+export const lockSection = async (
+  id: number,
+  section: string,
+  options?: RequestInit,
+): Promise<MessageResponse> => {
+  return customFetch<MessageResponse>(getLockSectionUrl(id, section), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getLockSectionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof lockSection>>,
+    TError,
+    { id: number; section: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof lockSection>>,
+  TError,
+  { id: number; section: string },
+  TContext
+> => {
+  const mutationKey = ["lockSection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof lockSection>>,
+    { id: number; section: string }
+  > = (props) => {
+    const { id, section } = props ?? {};
+
+    return lockSection(id, section, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LockSectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof lockSection>>
+>;
+
+export type LockSectionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Admin locks a specific section
+ */
+export const useLockSection = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof lockSection>>,
+    TError,
+    { id: number; section: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof lockSection>>,
+  TError,
+  { id: number; section: string },
+  TContext
+> => {
+  return useMutation(getLockSectionMutationOptions(options));
+};
+
+/**
+ * @summary Admin unlocks a specific section
+ */
+export const getUnlockSectionUrl = (id: number, section: string) => {
+  return `/api/containers/${id}/sections/${section}/unlock`;
+};
+
+export const unlockSection = async (
+  id: number,
+  section: string,
+  options?: RequestInit,
+): Promise<MessageResponse> => {
+  return customFetch<MessageResponse>(getUnlockSectionUrl(id, section), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getUnlockSectionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unlockSection>>,
+    TError,
+    { id: number; section: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unlockSection>>,
+  TError,
+  { id: number; section: string },
+  TContext
+> => {
+  const mutationKey = ["unlockSection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unlockSection>>,
+    { id: number; section: string }
+  > = (props) => {
+    const { id, section } = props ?? {};
+
+    return unlockSection(id, section, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnlockSectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unlockSection>>
+>;
+
+export type UnlockSectionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Admin unlocks a specific section
+ */
+export const useUnlockSection = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unlockSection>>,
+    TError,
+    { id: number; section: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof unlockSection>>,
+  TError,
+  { id: number; section: string },
+  TContext
+> => {
+  return useMutation(getUnlockSectionMutationOptions(options));
+};
+
+/**
+ * @summary Get admin approval queue (submitted sections)
+ */
+export const getGetApprovalQueueUrl = () => {
+  return `/api/approvals`;
+};
+
+export const getApprovalQueue = async (
+  options?: RequestInit,
+): Promise<ApprovalQueueItem[]> => {
+  return customFetch<ApprovalQueueItem[]>(getGetApprovalQueueUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetApprovalQueueQueryKey = () => {
+  return [`/api/approvals`] as const;
+};
+
+export const getGetApprovalQueueQueryOptions = <
+  TData = Awaited<ReturnType<typeof getApprovalQueue>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getApprovalQueue>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetApprovalQueueQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getApprovalQueue>>
+  > = ({ signal }) => getApprovalQueue({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getApprovalQueue>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetApprovalQueueQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getApprovalQueue>>
+>;
+export type GetApprovalQueueQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get admin approval queue (submitted sections)
+ */
+
+export function useGetApprovalQueue<
+  TData = Awaited<ReturnType<typeof getApprovalQueue>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getApprovalQueue>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetApprovalQueueQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get staff task list
+ */
+export const getGetMyTasksUrl = () => {
+  return `/api/my-tasks`;
+};
+
+export const getMyTasks = async (
+  options?: RequestInit,
+): Promise<MyTasksResponse> => {
+  return customFetch<MyTasksResponse>(getGetMyTasksUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMyTasksQueryKey = () => {
+  return [`/api/my-tasks`] as const;
+};
+
+export const getGetMyTasksQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMyTasks>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyTasks>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMyTasksQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyTasks>>> = ({
+    signal,
+  }) => getMyTasks({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMyTasks>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMyTasksQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMyTasks>>
+>;
+export type GetMyTasksQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get staff task list
+ */
+
+export function useGetMyTasks<
+  TData = Awaited<ReturnType<typeof getMyTasks>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyTasks>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMyTasksQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

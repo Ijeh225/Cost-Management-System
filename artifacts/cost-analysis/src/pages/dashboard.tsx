@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useGetDashboardStats, useListContainers } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
+import { useAuth } from "@/components/layout/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import {
 } from "recharts";
 import {
   Box, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity,
-  FileText, Search, CheckCircle2, ArrowRight, Loader2
+  FileText, Search, CheckCircle2, ArrowRight, Loader2, ClipboardCheck, ListTodo
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
@@ -51,6 +52,7 @@ function StatCard({ title, value, icon: Icon, isCurrency = false, colorClass = "
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [searchInput, setSearchInput] = useState("");
+  const { isAdmin } = useAuth();
 
   const { data: stats, isLoading, isError } = useGetDashboardStats();
   const { data: recentData, isLoading: recentLoading } = useListContainers(
@@ -144,7 +146,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 6 KPI Cards */}
+      {/* 6 KPI Cards + Role-aware extras */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard title="Total Containers"     value={stats.totalContainers}       icon={Box} />
         <StatCard title="In Progress"          value={stats.inProgress}            icon={Activity} colorClass="text-blue-400" />
@@ -158,6 +160,38 @@ export default function Dashboard() {
           isCurrency
           colorClass={grossProfit >= 0 ? "text-emerald-400" : "text-destructive"}
         />
+      </div>
+
+      {/* Role-aware action cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {isAdmin && (stats.pendingApprovals ?? 0) > 0 && (
+          <Link href="/approvals" className="block">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center gap-4 hover:bg-amber-500/15 transition-colors cursor-pointer">
+              <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <ClipboardCheck className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-amber-400 text-sm">Sections Awaiting Approval</div>
+                <div className="text-xs text-amber-400/70 mt-0.5">{stats.pendingApprovals} section{(stats.pendingApprovals ?? 0) !== 1 ? "s" : ""} submitted for review</div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-amber-400/60" />
+            </div>
+          </Link>
+        )}
+        {!isAdmin && (stats.myPendingSections ?? 0) > 0 && (
+          <Link href="/my-tasks" className="block">
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 flex items-center gap-4 hover:bg-blue-500/15 transition-colors cursor-pointer">
+              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <ListTodo className="w-5 h-5 text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-blue-400 text-sm">Sections to Submit</div>
+                <div className="text-xs text-blue-400/70 mt-0.5">{stats.myPendingSections} section{(stats.myPendingSections ?? 0) !== 1 ? "s" : ""} ready to submit for review</div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-blue-400/60" />
+            </div>
+          </Link>
+        )}
       </div>
 
       {/* Charts Row */}
