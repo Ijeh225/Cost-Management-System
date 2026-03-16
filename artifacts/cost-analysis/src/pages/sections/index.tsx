@@ -551,10 +551,10 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
         }}
       >
         <div
-          className="w-3.5 h-3.5 rounded-full flex-shrink-0 ring-2 ring-offset-1 ring-offset-background"
+          className="w-3.5 h-3.5 rounded-full flex-shrink-0"
           style={{
             background: section.color,
-            ringColor: section.color + "60",
+            boxShadow: `0 0 0 2px var(--background), 0 0 0 4px ${section.color}60`,
           }}
         />
 

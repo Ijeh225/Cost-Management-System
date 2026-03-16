@@ -6,7 +6,7 @@ import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/components/layout/auth-provider";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useAuth } from "@/components/layout/auth-provider";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 
 // Pages
@@ -37,7 +37,6 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   const { isAdmin, isLoading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const adminConfirmed = useRef(false);
-  const [ready, setReady] = useState(false);
 
   if (isAdmin && !adminConfirmed.current) {
     adminConfirmed.current = true;
@@ -45,10 +44,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoading) return;
-    if (adminConfirmed.current) {
-      setReady(true);
-      return;
-    }
+    if (adminConfirmed.current) return;
     if (!isAuthenticated) {
       setLocation("/login");
     } else if (!isAdmin) {
