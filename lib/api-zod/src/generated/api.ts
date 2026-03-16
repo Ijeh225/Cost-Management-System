@@ -1057,3 +1057,337 @@ export const ExportContainersCSVQueryParams = zod.object({
   from: zod.date().optional(),
   to: zod.date().optional(),
 });
+
+/**
+ * @summary Get container timeline
+ */
+export const GetContainerTimelineParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetContainerTimelineResponseItem = zod.object({
+  id: zod.number(),
+  containerId: zod.number(),
+  title: zod.string(),
+  eventType: zod.string(),
+  description: zod.string(),
+  userId: zod.number().nullish(),
+  userName: zod.string(),
+  status: zod.string(),
+  createdAt: zod.string(),
+});
+export const GetContainerTimelineResponse = zod.array(
+  GetContainerTimelineResponseItem,
+);
+
+/**
+ * @summary Add timeline event
+ */
+export const AddTimelineEventParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddTimelineEventBody = zod.object({
+  title: zod.string(),
+  eventType: zod.string().optional(),
+  description: zod.string().optional(),
+  status: zod.string().optional(),
+});
+
+/**
+ * @summary Delete timeline event
+ */
+export const DeleteTimelineEventParams = zod.object({
+  id: zod.coerce.number(),
+  eventId: zod.coerce.number(),
+});
+
+/**
+ * @summary Get container tasks
+ */
+export const GetContainerTasksParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetContainerTasksResponseItem = zod.object({
+  id: zod.number(),
+  containerId: zod.number(),
+  title: zod.string(),
+  assignedStaffId: zod.number().nullish(),
+  assignedStaffName: zod.string().nullish(),
+  dueDate: zod.string().nullish(),
+  priority: zod.string(),
+  status: zod.string(),
+  notes: zod.string(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const GetContainerTasksResponse = zod.array(
+  GetContainerTasksResponseItem,
+);
+
+/**
+ * @summary Create task
+ */
+export const CreateContainerTaskParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CreateContainerTaskBody = zod.object({
+  title: zod.string(),
+  assignedStaffId: zod.number().nullish(),
+  dueDate: zod.string().nullish(),
+  priority: zod.string().optional(),
+  notes: zod.string().optional(),
+});
+
+/**
+ * @summary Update task
+ */
+export const UpdateContainerTaskParams = zod.object({
+  id: zod.coerce.number(),
+  taskId: zod.coerce.number(),
+});
+
+export const UpdateContainerTaskBody = zod.object({
+  title: zod.string().optional(),
+  assignedStaffId: zod.number().nullish(),
+  dueDate: zod.string().nullish(),
+  priority: zod.string().optional(),
+  status: zod.string().optional(),
+  notes: zod.string().optional(),
+});
+
+export const UpdateContainerTaskResponse = zod.object({
+  id: zod.number(),
+  containerId: zod.number(),
+  title: zod.string(),
+  assignedStaffId: zod.number().nullish(),
+  assignedStaffName: zod.string().nullish(),
+  dueDate: zod.string().nullish(),
+  priority: zod.string(),
+  status: zod.string(),
+  notes: zod.string(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete task
+ */
+export const DeleteContainerTaskParams = zod.object({
+  id: zod.coerce.number(),
+  taskId: zod.coerce.number(),
+});
+
+/**
+ * @summary Get container documents
+ */
+export const GetContainerDocumentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetContainerDocumentsResponseItem = zod.object({
+  id: zod.number(),
+  containerId: zod.number(),
+  section: zod.string().nullish(),
+  filename: zod.string(),
+  originalName: zod.string(),
+  mimeType: zod.string(),
+  size: zod.number(),
+  uploadedById: zod.number().nullish(),
+  uploaderName: zod.string(),
+  createdAt: zod.string(),
+});
+export const GetContainerDocumentsResponse = zod.array(
+  GetContainerDocumentsResponseItem,
+);
+
+/**
+ * @summary Delete document
+ */
+export const DeleteContainerDocumentParams = zod.object({
+  id: zod.coerce.number(),
+  docId: zod.coerce.number(),
+});
+
+/**
+ * @summary Get custom field values for container
+ */
+export const GetCustomFieldValuesParams = zod.object({
+  containerId: zod.coerce.number(),
+});
+
+export const GetCustomFieldValuesResponseItem = zod.object({
+  id: zod.number(),
+  containerId: zod.number(),
+  fieldId: zod.number(),
+  value: zod.string(),
+  updatedById: zod.number().nullish(),
+  updatedAt: zod.string(),
+});
+export const GetCustomFieldValuesResponse = zod.array(
+  GetCustomFieldValuesResponseItem,
+);
+
+/**
+ * @summary Save custom field values
+ */
+export const SaveCustomFieldValuesParams = zod.object({
+  containerId: zod.coerce.number(),
+});
+
+export const SaveCustomFieldValuesBody = zod.object({
+  values: zod.array(
+    zod.object({
+      fieldId: zod.number(),
+      value: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary List custom sections with fields
+ */
+export const GetCustomSectionsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  slug: zod.string(),
+  color: zod.string(),
+  icon: zod.string(),
+  isRequired: zod.boolean(),
+  isArchived: zod.boolean(),
+  sectionOrder: zod.number(),
+  permissions: zod.string(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+  fields: zod.array(
+    zod.object({
+      id: zod.number(),
+      sectionId: zod.number(),
+      name: zod.string(),
+      fieldType: zod.string(),
+      placeholder: zod.string(),
+      helpText: zod.string(),
+      defaultValue: zod.string(),
+      isRequired: zod.boolean(),
+      includeInTotal: zod.boolean(),
+      visibleByRole: zod.string(),
+      editableByRole: zod.string(),
+      dropdownOptions: zod.string(),
+      fieldOrder: zod.number(),
+      createdAt: zod.string(),
+    }),
+  ),
+});
+export const GetCustomSectionsResponse = zod.array(
+  GetCustomSectionsResponseItem,
+);
+
+/**
+ * @summary Create custom section
+ */
+export const CreateCustomSectionBody = zod.object({
+  name: zod.string(),
+  color: zod.string().optional(),
+  icon: zod.string().optional(),
+  isRequired: zod.boolean().optional(),
+});
+
+/**
+ * @summary Update custom section
+ */
+export const UpdateCustomSectionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateCustomSectionBody = zod.object({
+  name: zod.string().optional(),
+  color: zod.string().optional(),
+  icon: zod.string().optional(),
+  isRequired: zod.boolean().optional(),
+  isArchived: zod.boolean().optional(),
+  sectionOrder: zod.number().optional(),
+});
+
+/**
+ * @summary Delete custom section
+ */
+export const DeleteCustomSectionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Add field to section
+ */
+export const AddCustomFieldParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddCustomFieldBody = zod.object({
+  name: zod.string(),
+  fieldType: zod.string().optional(),
+  placeholder: zod.string().optional(),
+  helpText: zod.string().optional(),
+  defaultValue: zod.string().optional(),
+  isRequired: zod.boolean().optional(),
+  includeInTotal: zod.boolean().optional(),
+  visibleByRole: zod.string().optional(),
+  editableByRole: zod.string().optional(),
+  dropdownOptions: zod.string().optional(),
+  fieldOrder: zod.number().optional(),
+});
+
+/**
+ * @summary Update custom field
+ */
+export const UpdateCustomFieldParams = zod.object({
+  id: zod.coerce.number(),
+  fieldId: zod.coerce.number(),
+});
+
+export const UpdateCustomFieldBody = zod.object({
+  name: zod.string(),
+  fieldType: zod.string().optional(),
+  placeholder: zod.string().optional(),
+  helpText: zod.string().optional(),
+  defaultValue: zod.string().optional(),
+  isRequired: zod.boolean().optional(),
+  includeInTotal: zod.boolean().optional(),
+  visibleByRole: zod.string().optional(),
+  editableByRole: zod.string().optional(),
+  dropdownOptions: zod.string().optional(),
+  fieldOrder: zod.number().optional(),
+});
+
+/**
+ * @summary Delete custom field
+ */
+export const DeleteCustomFieldParams = zod.object({
+  id: zod.coerce.number(),
+  fieldId: zod.coerce.number(),
+});
+
+/**
+ * @summary Get profit intelligence and delay alerts
+ */
+export const GetIntelligenceAlertsResponse = zod.object({
+  alerts: zod.array(
+    zod.object({
+      type: zod.string(),
+      severity: zod.string(),
+      message: zod.string(),
+      containerId: zod.number().nullish(),
+      containerNumber: zod.string().nullish(),
+    }),
+  ),
+  insights: zod.array(
+    zod.object({
+      type: zod.string(),
+      value: zod.unknown(),
+    }),
+  ),
+});

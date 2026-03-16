@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { useGetDashboardStats, useListContainers } from "@workspace/api-client-react";
+import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from "recharts";
 import {
   Box, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity,
-  FileText, Search, CheckCircle2, ArrowRight, Loader2, ClipboardCheck, ListTodo
+  FileText, Search, CheckCircle2, ArrowRight, Loader2, ClipboardCheck, ListTodo,
+  Brain, ShieldAlert, Clock, ExternalLink,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
@@ -23,6 +25,64 @@ const COLORS = [
   "hsl(var(--chart-3))",
   "hsl(var(--chart-4))",
 ];
+
+const ALERT_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string; border: string; label: string }> = {
+  loss_making:     { icon: TrendingDown, color: "text-destructive",  bg: "bg-destructive/10",  border: "border-destructive/20",  label: "Loss-Making Container" },
+  low_profit:      { icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Low Profit Margin" },
+  overdue_duty:    { icon: DollarSign, color: "text-amber-400", bg: "bg-amber-400/10", border: "border-amber-400/20", label: "Outstanding Duty" },
+  delayed:         { icon: Clock, color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20", label: "Possible Delay" },
+  stale_approval:  { icon: ShieldAlert, color: "text-violet-400", bg: "bg-violet-400/10", border: "border-violet-400/20", label: "Stale Approval" },
+  overdue_task:    { icon: ListTodo, color: "text-rose-400", bg: "bg-rose-400/10", border: "border-rose-400/20", label: "Overdue Task" },
+};
+
+function IntelligenceAlertsPanel() {
+  const { data, isLoading } = useGetIntelligenceAlerts();
+  const alerts: any[] = (data as any)?.alerts ?? [];
+
+  if (isLoading) return null;
+  if (alerts.length === 0) return (
+    <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+      <p className="text-sm text-emerald-400 font-medium">All systems healthy — no issues detected.</p>
+    </div>
+  );
+
+  return (
+    <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
+      <CardHeader className="pb-3 pt-4 px-4 border-b border-border/40 flex flex-row items-center gap-2">
+        <Brain className="w-4 h-4 text-primary" />
+        <CardTitle className="text-sm font-semibold">Profit Intelligence Alerts</CardTitle>
+        <Badge variant="outline" className="ml-auto text-xs px-1.5 py-0 border-destructive/40 text-destructive">{alerts.length} alert{alerts.length !== 1 ? "s" : ""}</Badge>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y divide-border/30 max-h-64 overflow-y-auto">
+          {alerts.map((alert: any, i: number) => {
+            const cfg = ALERT_CONFIG[alert.type] ?? ALERT_CONFIG.low_profit;
+            const Icon = cfg.icon;
+            return (
+              <div key={i} className={`flex items-start gap-3 px-4 py-3 ${cfg.bg} group`}>
+                <div className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border}`}>
+                  <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-bold uppercase tracking-wide ${cfg.color}`}>{cfg.label}</span>
+                    {alert.containerNumber && (
+                      <Link href={`/containers/${alert.containerId}`} className="text-xs font-mono text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5">
+                        {alert.containerNumber} <ExternalLink className="w-2.5 h-2.5 inline opacity-0 group-hover:opacity-100" />
+                      </Link>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{alert.message}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function StatCard({ title, value, icon: Icon, isCurrency = false, colorClass = "" }: {
   title: string;
@@ -122,29 +182,8 @@ export default function Dashboard() {
         </form>
       </div>
 
-      {/* Alerts */}
-      {(stats.alerts.lowProfitContainers > 0 || stats.alerts.outstandingDuty > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {stats.alerts.lowProfitContainers > 0 && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
-              <div>
-                <h4 className="font-semibold text-destructive text-sm">Low Profit Margin</h4>
-                <p className="text-xs text-destructive/80 mt-1">{stats.alerts.lowProfitContainers} containers have negative or zero profit.</p>
-              </div>
-            </div>
-          )}
-          {stats.alerts.outstandingDuty > 0 && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 flex items-start gap-3">
-              <DollarSign className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
-              <div>
-                <h4 className="font-semibold text-amber-500 text-sm">Outstanding Duty</h4>
-                <p className="text-xs text-amber-500/80 mt-1">{stats.alerts.outstandingDuty} containers have unpaid customs duties.</p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Intelligence Alerts Panel */}
+      <IntelligenceAlertsPanel />
 
       {/* 6 KPI Cards + Role-aware extras */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

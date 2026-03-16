@@ -12,7 +12,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck, ListTodo, BarChart2, FileDown } from "lucide-react";
+import { LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck, ListTodo, BarChart2, FileDown, Layers } from "lucide-react";
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -28,6 +28,7 @@ export function AppSidebar() {
     { title: "Approval Queue", url: "/approvals", icon: ClipboardCheck },
     { title: "Analytics", url: "/analytics", icon: BarChart2 },
     { title: "Reports", url: "/reports", icon: FileDown },
+    { title: "Section Builder", url: "/sections", icon: Layers },
     { title: "Upload Data", url: "/upload", icon: UploadCloud },
     { title: "User Management", url: "/users", icon: Users },
   ];

@@ -7,6 +7,11 @@ import { approvalsRouter } from "./approvals.js";
 import { myTasksRouter } from "./my-tasks.js";
 import { analyticsRouter } from "./analytics.js";
 import { reportsRouter } from "./reports.js";
+import { timelineRouter } from "./timeline.js";
+import { tasksRouter } from "./tasks.js";
+import { documentsRouter } from "./documents.js";
+import { intelligenceRouter } from "./intelligence.js";
+import { sectionsRouter } from "./sections.js";
 
 const router: IRouter = Router();
 
@@ -18,5 +23,10 @@ router.use(approvalsRouter);
 router.use(myTasksRouter);
 router.use(analyticsRouter);
 router.use(reportsRouter);
+router.use(timelineRouter);
+router.use(tasksRouter);
+router.use(documentsRouter);
+router.use(intelligenceRouter);
+router.use(sectionsRouter);
 
 export default router;

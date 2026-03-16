@@ -5,12 +5,14 @@ import { Link, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Search, SlidersHorizontal, ChevronLeft, ChevronRight,
-  AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown
+  AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown,
+  X, Filter, TrendingDown,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 type SortField = "containerNumber" | "customerName" | "declaration" | "status" | "clearingCharges" | "totalCost" | "grossProfit";
 type SortDir = "asc" | "desc";
@@ -26,6 +28,10 @@ export default function Containers() {
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
+  const [profitFilter, setProfitFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>("containerNumber");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -44,6 +50,8 @@ export default function Containers() {
     { query: { keepPreviousData: true } }
   );
 
+  const hasActiveFilters = status !== "all" || profitFilter !== "all" || dateFrom || dateTo;
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -53,7 +61,14 @@ export default function Containers() {
     }
   };
 
-  const sorted = [...(data?.containers ?? [])].sort((a, b) => {
+  const sorted = [...(data?.containers ?? [])].filter((c: any) => {
+    if (profitFilter === "profitable" && (c.grossProfit ?? 0) <= 0) return false;
+    if (profitFilter === "loss" && (c.grossProfit ?? 0) > 0) return false;
+    if (profitFilter === "low" && ((c.grossProfit ?? 0) <= 0 || (c.grossProfit / (c.clearingCharges || 1)) > 0.1)) return false;
+    if (dateFrom && new Date(c.createdAt) < new Date(dateFrom)) return false;
+    if (dateTo && new Date(c.createdAt) > new Date(dateTo + "T23:59:59")) return false;
+    return true;
+  }).sort((a, b) => {
     let av: any = a[sortField as keyof typeof a] ?? "";
     let bv: any = b[sortField as keyof typeof b] ?? "";
     if (typeof av === "number" && typeof bv === "number") {
@@ -84,31 +99,101 @@ export default function Containers() {
       </div>
 
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm shadow-lg overflow-hidden">
-        {/* Filters */}
-        <div className="p-4 border-b border-border/50 flex flex-col sm:flex-row gap-3 bg-background/50">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by Container #, BL #, Customer…"
-              className="pl-9 bg-background border-border/60"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            />
+        {/* Search + filter bar */}
+        <div className="p-4 border-b border-border/50 bg-background/50 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by Container #, BL #, Customer, Vessel…"
+                className="pl-9 bg-background border-border/60"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              />
+              {search && (
+                <button onClick={() => { setSearch(""); setPage(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
+                <SelectTrigger className="w-full sm:w-[180px] bg-background border-border/60">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {WORKFLOW_STAGES.map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                variant={showFilters ? "default" : "outline"}
+                onClick={() => setShowFilters(v => !v)}
+                className="gap-1.5 shrink-0"
+              >
+                <Filter className="w-3.5 h-3.5" />
+                Filters
+                {hasActiveFilters && <Badge className="ml-0.5 h-4 px-1 text-[10px] leading-none bg-primary/30 text-primary border-0">!</Badge>}
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <SlidersHorizontal className="w-4 h-4 text-muted-foreground hidden sm:block shrink-0" />
-            <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
-              <SelectTrigger className="w-full sm:w-[180px] bg-background border-border/60">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {WORKFLOW_STAGES.map(s => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-border/40 mt-1">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground font-medium">Profit Status</label>
+                    <Select value={profitFilter} onValueChange={(v) => { setProfitFilter(v); setPage(1); }}>
+                      <SelectTrigger className="h-8 text-xs bg-background border-border/60">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Containers</SelectItem>
+                        <SelectItem value="profitable">Profitable Only</SelectItem>
+                        <SelectItem value="low">Low Margin (&lt;10%)</SelectItem>
+                        <SelectItem value="loss">Loss-Making</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground font-medium">Created From</label>
+                    <Input
+                      type="date"
+                      value={dateFrom}
+                      onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+                      className="h-8 text-xs bg-background border-border/60"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground font-medium">Created To</label>
+                    <Input
+                      type="date"
+                      value={dateTo}
+                      onChange={e => { setDateTo(e.target.value); setPage(1); }}
+                      className="h-8 text-xs bg-background border-border/60"
+                    />
+                  </div>
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    onClick={() => { setStatus("all"); setProfitFilter("all"); setDateFrom(""); setDateTo(""); setPage(1); }}
+                    className="mt-2 text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+                  >
+                    <X className="w-3 h-3" /> Clear all filters
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Table */}

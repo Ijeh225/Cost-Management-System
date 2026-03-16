@@ -588,6 +588,388 @@ paths:
               schema:
                 type: string
 
+  /api/containers/{id}/timeline:
+    get:
+      summary: Get container timeline
+      operationId: getContainerTimeline
+      tags: [Timeline]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Timeline events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimelineEvent"
+    post:
+      summary: Add timeline event
+      operationId: addTimelineEvent
+      tags: [Timeline]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTimelineEventRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimelineEvent"
+
+  /api/containers/{id}/timeline/{eventId}:
+    delete:
+      summary: Delete timeline event
+      operationId: deleteTimelineEvent
+      tags: [Timeline]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+        - in: path
+          name: eventId
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Deleted
+
+  /api/containers/{id}/tasks:
+    get:
+      summary: Get container tasks
+      operationId: getContainerTasks
+      tags: [Tasks]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContainerTask"
+    post:
+      summary: Create task
+      operationId: createContainerTask
+      tags: [Tasks]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerTask"
+
+  /api/containers/{id}/tasks/{taskId}:
+    patch:
+      summary: Update task
+      operationId: updateContainerTask
+      tags: [Tasks]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+        - in: path
+          name: taskId
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerTask"
+    delete:
+      summary: Delete task
+      operationId: deleteContainerTask
+      tags: [Tasks]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+        - in: path
+          name: taskId
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Deleted
+
+  /api/containers/{id}/documents:
+    get:
+      summary: Get container documents
+      operationId: getContainerDocuments
+      tags: [Documents]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContainerDocument"
+
+  /api/containers/{id}/documents/{docId}:
+    delete:
+      summary: Delete document
+      operationId: deleteContainerDocument
+      tags: [Documents]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+        - in: path
+          name: docId
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Deleted
+
+  /api/containers/{containerId}/custom-values:
+    get:
+      summary: Get custom field values for container
+      operationId: getCustomFieldValues
+      tags: [Sections]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: containerId
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Field values
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomFieldValue"
+    post:
+      summary: Save custom field values
+      operationId: saveCustomFieldValues
+      tags: [Sections]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: containerId
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveCustomFieldValuesRequest"
+      responses:
+        "200":
+          description: Saved
+
+  /api/custom-sections:
+    get:
+      summary: List custom sections with fields
+      operationId: getCustomSections
+      tags: [Sections]
+      security: [{cookieAuth: []}]
+      responses:
+        "200":
+          description: Sections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomSectionWithFields"
+    post:
+      summary: Create custom section
+      operationId: createCustomSection
+      tags: [Sections]
+      security: [{cookieAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomSectionRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomSectionWithFields"
+
+  /api/custom-sections/{id}:
+    patch:
+      summary: Update custom section
+      operationId: updateCustomSection
+      tags: [Sections]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCustomSectionRequest"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Delete custom section
+      operationId: deleteCustomSection
+      tags: [Sections]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Deleted
+
+  /api/custom-sections/{id}/fields:
+    post:
+      summary: Add field to section
+      operationId: addCustomField
+      tags: [Sections]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomFieldRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomField"
+
+  /api/custom-sections/{id}/fields/{fieldId}:
+    patch:
+      summary: Update custom field
+      operationId: updateCustomField
+      tags: [Sections]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+        - in: path
+          name: fieldId
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomFieldRequest"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Delete custom field
+      operationId: deleteCustomField
+      tags: [Sections]
+      security: [{cookieAuth: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+        - in: path
+          name: fieldId
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Deleted
+
+  /api/intelligence/alerts:
+    get:
+      summary: Get profit intelligence and delay alerts
+      operationId: getIntelligenceAlerts
+      tags: [Intelligence]
+      security: [{cookieAuth: []}]
+      responses:
+        "200":
+          description: Alerts and insights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -1353,3 +1735,207 @@ components:
           items:
             $ref: "#/components/schemas/ContainerReportRow"
       required: [containers]
+
+    TimelineEvent:
+      type: object
+      properties:
+        id: {type: integer}
+        containerId: {type: integer}
+        title: {type: string}
+        eventType: {type: string}
+        description: {type: string}
+        userId: {type: integer, nullable: true}
+        userName: {type: string}
+        status: {type: string}
+        createdAt: {type: string}
+      required: [id, containerId, title, eventType, description, userName, status, createdAt]
+
+    CreateTimelineEventRequest:
+      type: object
+      properties:
+        title: {type: string}
+        eventType: {type: string}
+        description: {type: string}
+        status: {type: string}
+      required: [title]
+
+    ContainerTask:
+      type: object
+      properties:
+        id: {type: integer}
+        containerId: {type: integer}
+        title: {type: string}
+        assignedStaffId: {type: integer, nullable: true}
+        assignedStaffName: {type: string, nullable: true}
+        dueDate: {type: string, nullable: true}
+        priority: {type: string}
+        status: {type: string}
+        notes: {type: string}
+        createdById: {type: integer, nullable: true}
+        createdAt: {type: string}
+        updatedAt: {type: string}
+      required: [id, containerId, title, priority, status, notes, createdAt, updatedAt]
+
+    CreateTaskRequest:
+      type: object
+      properties:
+        title: {type: string}
+        assignedStaffId: {type: integer, nullable: true}
+        dueDate: {type: string, nullable: true}
+        priority: {type: string}
+        notes: {type: string}
+      required: [title]
+
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title: {type: string}
+        assignedStaffId: {type: integer, nullable: true}
+        dueDate: {type: string, nullable: true}
+        priority: {type: string}
+        status: {type: string}
+        notes: {type: string}
+
+    ContainerDocument:
+      type: object
+      properties:
+        id: {type: integer}
+        containerId: {type: integer}
+        section: {type: string, nullable: true}
+        filename: {type: string}
+        originalName: {type: string}
+        mimeType: {type: string}
+        size: {type: integer}
+        uploadedById: {type: integer, nullable: true}
+        uploaderName: {type: string}
+        createdAt: {type: string}
+      required: [id, containerId, filename, originalName, mimeType, size, uploaderName, createdAt]
+
+    CustomFieldValue:
+      type: object
+      properties:
+        id: {type: integer}
+        containerId: {type: integer}
+        fieldId: {type: integer}
+        value: {type: string}
+        updatedById: {type: integer, nullable: true}
+        updatedAt: {type: string}
+      required: [id, containerId, fieldId, value, updatedAt]
+
+    SaveCustomFieldValuesRequest:
+      type: object
+      properties:
+        values:
+          type: array
+          items:
+            type: object
+            properties:
+              fieldId: {type: integer}
+              value: {type: string}
+            required: [fieldId, value]
+      required: [values]
+
+    CustomField:
+      type: object
+      properties:
+        id: {type: integer}
+        sectionId: {type: integer}
+        name: {type: string}
+        fieldType: {type: string}
+        placeholder: {type: string}
+        helpText: {type: string}
+        defaultValue: {type: string}
+        isRequired: {type: boolean}
+        includeInTotal: {type: boolean}
+        visibleByRole: {type: string}
+        editableByRole: {type: string}
+        dropdownOptions: {type: string}
+        fieldOrder: {type: integer}
+        createdAt: {type: string}
+      required: [id, sectionId, name, fieldType, placeholder, helpText, defaultValue, isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions, fieldOrder, createdAt]
+
+    CustomSectionWithFields:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        slug: {type: string}
+        color: {type: string}
+        icon: {type: string}
+        isRequired: {type: boolean}
+        isArchived: {type: boolean}
+        sectionOrder: {type: integer}
+        permissions: {type: string}
+        createdById: {type: integer, nullable: true}
+        createdAt: {type: string}
+        updatedAt: {type: string}
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomField"
+      required: [id, name, slug, color, icon, isRequired, isArchived, sectionOrder, permissions, createdAt, updatedAt, fields]
+
+    CreateCustomSectionRequest:
+      type: object
+      properties:
+        name: {type: string}
+        color: {type: string}
+        icon: {type: string}
+        isRequired: {type: boolean}
+      required: [name]
+
+    UpdateCustomSectionRequest:
+      type: object
+      properties:
+        name: {type: string}
+        color: {type: string}
+        icon: {type: string}
+        isRequired: {type: boolean}
+        isArchived: {type: boolean}
+        sectionOrder: {type: integer}
+
+    CreateCustomFieldRequest:
+      type: object
+      properties:
+        name: {type: string}
+        fieldType: {type: string}
+        placeholder: {type: string}
+        helpText: {type: string}
+        defaultValue: {type: string}
+        isRequired: {type: boolean}
+        includeInTotal: {type: boolean}
+        visibleByRole: {type: string}
+        editableByRole: {type: string}
+        dropdownOptions: {type: string}
+        fieldOrder: {type: integer}
+      required: [name]
+
+    IntelligenceAlert:
+      type: object
+      properties:
+        type: {type: string}
+        severity: {type: string}
+        message: {type: string}
+        containerId: {type: integer, nullable: true}
+        containerNumber: {type: string, nullable: true}
+      required: [type, severity, message]
+
+    IntelligenceInsight:
+      type: object
+      properties:
+        type: {type: string}
+        value: {}
+      required: [type, value]
+
+    IntelligenceResponse:
+      type: object
+      properties:
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntelligenceAlert"
+        insights:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntelligenceInsight"
+      required: [alerts, insights]

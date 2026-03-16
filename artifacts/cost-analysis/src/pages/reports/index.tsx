@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, FileDown, Filter, AlertTriangle, RefreshCw } from "lucide-react";
+import { Loader2, FileDown, Filter, AlertTriangle, RefreshCw, TrendingDown, TrendingUp, DollarSign, CheckCircle2 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 
@@ -30,6 +31,7 @@ export default function ReportsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [applied, setApplied] = useState<{ status: string; from: string; to: string }>({ status: "", from: "", to: "" });
+  const [reportTab, setReportTab] = useState("all");
   const [exporting, setExporting] = useState(false);
 
   const { data, isLoading, isError, refetch } = useGetContainerReport(
@@ -37,7 +39,14 @@ export default function ReportsPage() {
     { query: { enabled: true } }
   );
 
-  const containers = (data as any)?.containers ?? [];
+  const allContainers = (data as any)?.containers ?? [];
+  const containers = allContainers.filter((c: any) => {
+    if (reportTab === "loss") return (c.grossProfit ?? 0) < 0;
+    if (reportTab === "profitable") return (c.grossProfit ?? 0) > 0;
+    if (reportTab === "duty") return (c.charges?.customs?.dutyNotPaid ?? 0) > 0;
+    if (reportTab === "completed") return c.status === "completed";
+    return true;
+  });
 
   const handleApply = () => setApplied({ status, from, to });
   const handleReset = () => { setStatus(""); setFrom(""); setTo(""); setApplied({ status: "", from: "", to: "" }); };
@@ -83,6 +92,27 @@ export default function ReportsPage() {
           Export CSV ({containers.length})
         </Button>
       </div>
+
+      {/* Report Type Tabs */}
+      <Tabs value={reportTab} onValueChange={setReportTab} className="w-full">
+        <TabsList className="bg-card/40 border border-border/50 flex-wrap h-auto w-full sm:w-auto">
+          <TabsTrigger value="all" className="gap-1.5 text-xs">
+            All Containers <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 ml-0.5">{allContainers.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="profitable" className="gap-1.5 text-xs text-emerald-400">
+            <TrendingUp className="w-3 h-3" /> Profitable
+          </TabsTrigger>
+          <TabsTrigger value="loss" className="gap-1.5 text-xs text-destructive">
+            <TrendingDown className="w-3 h-3" /> Loss-Making
+          </TabsTrigger>
+          <TabsTrigger value="duty" className="gap-1.5 text-xs text-amber-400">
+            <DollarSign className="w-3 h-3" /> Outstanding Duty
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="gap-1.5 text-xs">
+            <CheckCircle2 className="w-3 h-3" /> Completed
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Filters */}
       <Card className="border-border/40 bg-card/40 backdrop-blur-sm">

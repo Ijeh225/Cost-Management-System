@@ -491,6 +491,169 @@ export interface ContainerReportResponse {
   containers: ContainerReportRow[];
 }
 
+export interface TimelineEvent {
+  id: number;
+  containerId: number;
+  title: string;
+  eventType: string;
+  description: string;
+  userId?: number | null;
+  userName: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface CreateTimelineEventRequest {
+  title: string;
+  eventType?: string;
+  description?: string;
+  status?: string;
+}
+
+export interface ContainerTask {
+  id: number;
+  containerId: number;
+  title: string;
+  assignedStaffId?: number | null;
+  assignedStaffName?: string | null;
+  dueDate?: string | null;
+  priority: string;
+  status: string;
+  notes: string;
+  createdById?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTaskRequest {
+  title: string;
+  assignedStaffId?: number | null;
+  dueDate?: string | null;
+  priority?: string;
+  notes?: string;
+}
+
+export interface UpdateTaskRequest {
+  title?: string;
+  assignedStaffId?: number | null;
+  dueDate?: string | null;
+  priority?: string;
+  status?: string;
+  notes?: string;
+}
+
+export interface ContainerDocument {
+  id: number;
+  containerId: number;
+  section?: string | null;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  uploadedById?: number | null;
+  uploaderName: string;
+  createdAt: string;
+}
+
+export interface CustomFieldValue {
+  id: number;
+  containerId: number;
+  fieldId: number;
+  value: string;
+  updatedById?: number | null;
+  updatedAt: string;
+}
+
+export type SaveCustomFieldValuesRequestValuesItem = {
+  fieldId: number;
+  value: string;
+};
+
+export interface SaveCustomFieldValuesRequest {
+  values: SaveCustomFieldValuesRequestValuesItem[];
+}
+
+export interface CustomField {
+  id: number;
+  sectionId: number;
+  name: string;
+  fieldType: string;
+  placeholder: string;
+  helpText: string;
+  defaultValue: string;
+  isRequired: boolean;
+  includeInTotal: boolean;
+  visibleByRole: string;
+  editableByRole: string;
+  dropdownOptions: string;
+  fieldOrder: number;
+  createdAt: string;
+}
+
+export interface CustomSectionWithFields {
+  id: number;
+  name: string;
+  slug: string;
+  color: string;
+  icon: string;
+  isRequired: boolean;
+  isArchived: boolean;
+  sectionOrder: number;
+  permissions: string;
+  createdById?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  fields: CustomField[];
+}
+
+export interface CreateCustomSectionRequest {
+  name: string;
+  color?: string;
+  icon?: string;
+  isRequired?: boolean;
+}
+
+export interface UpdateCustomSectionRequest {
+  name?: string;
+  color?: string;
+  icon?: string;
+  isRequired?: boolean;
+  isArchived?: boolean;
+  sectionOrder?: number;
+}
+
+export interface CreateCustomFieldRequest {
+  name: string;
+  fieldType?: string;
+  placeholder?: string;
+  helpText?: string;
+  defaultValue?: string;
+  isRequired?: boolean;
+  includeInTotal?: boolean;
+  visibleByRole?: string;
+  editableByRole?: string;
+  dropdownOptions?: string;
+  fieldOrder?: number;
+}
+
+export interface IntelligenceAlert {
+  type: string;
+  severity: string;
+  message: string;
+  containerId?: number | null;
+  containerNumber?: string | null;
+}
+
+export interface IntelligenceInsight {
+  type: string;
+  value: unknown;
+}
+
+export interface IntelligenceResponse {
+  alerts: IntelligenceAlert[];
+  insights: IntelligenceInsight[];
+}
+
 export type ListContainersParams = {
   search?: string;
   status?: string;

@@ -18,6 +18,8 @@ import ApprovalsPage from "@/pages/approvals/index";
 import MyTasksPage from "@/pages/my-tasks/index";
 import AnalyticsPage from "@/pages/analytics/index";
 import ReportsPage from "@/pages/reports/index";
+import SectionsBuilderPage from "@/pages/sections/index";
+import ContainerPrintPage from "@/pages/containers/print/[id]";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +35,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/setup" component={Setup} />
+      <Route path="/containers/:id/print" component={ContainerPrintPage} />
       <Route>
         <AppLayout>
           <Switch>
@@ -46,6 +49,7 @@ function Router() {
             <Route path="/my-tasks" component={MyTasksPage} />
             <Route path="/analytics" component={AnalyticsPage} />
             <Route path="/reports" component={ReportsPage} />
+            <Route path="/sections" component={SectionsBuilderPage} />
             <Route component={NotFound} />
           </Switch>
         </AppLayout>

@@ -31,7 +31,11 @@ import {
   ArrowLeft, Lock, Unlock, Anchor, User as UserIcon, FileText,
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
+  Clock, CheckSquare, Printer, ExternalLink,
 } from "lucide-react";
+import { TimelineTab } from "@/components/containers/TimelineTab";
+import { TasksTab } from "@/components/containers/TasksTab";
+import { DocumentsTab } from "@/components/containers/DocumentsTab";
 
 const createNumberSchema = (keys: string[]) => {
   const shape: Record<string, z.ZodTypeAny> = {};
@@ -556,14 +560,30 @@ export default function ContainerDetail() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-card/40 border border-border/50">
-          <TabsTrigger value="charges" className="gap-2">
-            <Calculator className="w-4 h-4" /> Charges
-          </TabsTrigger>
-          <TabsTrigger value="audit" className="gap-2">
-            <History className="w-4 h-4" /> Audit Trail
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <TabsList className="bg-card/40 border border-border/50 flex-wrap h-auto">
+            <TabsTrigger value="charges" className="gap-2">
+              <Calculator className="w-4 h-4" /> Charges
+            </TabsTrigger>
+            <TabsTrigger value="timeline" className="gap-2">
+              <Clock className="w-4 h-4" /> Timeline
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="gap-2">
+              <CheckSquare className="w-4 h-4" /> Tasks
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="gap-2">
+              <FileText className="w-4 h-4" /> Documents
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-2">
+              <History className="w-4 h-4" /> Audit Trail
+            </TabsTrigger>
+          </TabsList>
+          <a href={`/containers/${containerId}/print`} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="outline" className="gap-2 text-muted-foreground">
+              <Printer className="w-3.5 h-3.5" /> Print Summary
+            </Button>
+          </a>
+        </div>
 
         <TabsContent value="charges" className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -690,6 +710,45 @@ export default function ContainerDetail() {
               </Card>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="timeline" className="mt-6">
+          <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg">
+            <CardHeader className="border-b border-border/40">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Clock className="w-5 h-5 text-primary" /> Operations Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <TimelineTab containerId={containerId} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tasks" className="mt-6">
+          <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg">
+            <CardHeader className="border-b border-border/40">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <CheckSquare className="w-5 h-5 text-primary" /> Task Manager
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <TasksTab containerId={containerId} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="mt-6">
+          <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg">
+            <CardHeader className="border-b border-border/40">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" /> Document Attachments
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <DocumentsTab containerId={containerId} />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="audit" className="mt-6">
