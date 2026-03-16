@@ -1,17 +1,49 @@
-import { useEffect, useState } from "react";
-import { useGetCustomSections, useCreateCustomSection, useUpdateCustomSection, useDeleteCustomSection, useAddCustomField, useDeleteCustomField, useUpdateCustomField } from "@workspace/api-client-react";
+import { useState } from "react";
+import {
+  useGetCustomSections,
+  useCreateCustomSection,
+  useUpdateCustomSection,
+  useDeleteCustomSection,
+  useAddCustomField,
+  useDeleteCustomField,
+  useUpdateCustomField,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion, AnimatePresence } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Plus, Pencil, Trash2, Layers, ChevronDown, ChevronRight, Archive, Eye, EyeOff, Hash, Type, AlignLeft, Calendar, ToggleLeft, List } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Loader2,
+  Plus,
+  Pencil,
+  Trash2,
+  Layers,
+  ChevronDown,
+  ChevronRight,
+  Archive,
+  ArchiveRestore,
+  Check,
+  X,
+  Hash,
+  Type,
+  AlignLeft,
+  Calendar,
+  ToggleLeft,
+  List,
+  Save,
+} from "lucide-react";
 
 const FIELD_TYPES = [
   { value: "number", label: "Number", icon: Hash },
@@ -22,7 +54,16 @@ const FIELD_TYPES = [
   { value: "dropdown", label: "Dropdown", icon: List },
 ];
 
-const COLORS = ["#6366f1","#8b5cf6","#ec4899","#ef4444","#f59e0b","#10b981","#06b6d4","#3b82f6"];
+const COLORS = [
+  "#6366f1",
+  "#8b5cf6",
+  "#ec4899",
+  "#ef4444",
+  "#f59e0b",
+  "#10b981",
+  "#06b6d4",
+  "#3b82f6",
+];
 
 const ROLES = [
   { value: "all", label: "All Roles" },
@@ -31,148 +72,435 @@ const ROLES = [
 ];
 
 function FieldTypeIcon({ type }: { type: string }) {
-  const found = FIELD_TYPES.find(t => t.value === type);
+  const found = FIELD_TYPES.find((t) => t.value === type);
   const Icon = found?.icon ?? Type;
   return <Icon className="w-3.5 h-3.5" />;
 }
 
-function AddFieldDialog({ sectionId, onClose }: { sectionId: number; onClose: () => void }) {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const addFieldMutation = useAddCustomField();
-  const [form, setForm] = useState({
-    name: "", fieldType: "text", placeholder: "", helpText: "",
-    defaultValue: "", isRequired: false, includeInTotal: false,
-    visibleByRole: "all", editableByRole: "all", dropdownOptions: "",
-  });
-
-  const handleSubmit = async () => {
-    if (!form.name.trim()) return;
-    try {
-      await addFieldMutation.mutateAsync({
-        id: sectionId,
-        data: {
-          ...form,
-          dropdownOptions: form.dropdownOptions ? JSON.stringify(form.dropdownOptions.split("\n").map(o => o.trim()).filter(Boolean)) : "[]",
-        }
-      });
-      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
-      toast({ title: "Field added" });
-      onClose();
-    } catch {
-      toast({ variant: "destructive", title: "Failed to add field" });
-    }
-  };
-
+function ColorPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (c: string) => void;
+}) {
   return (
-    <Dialog open onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-md">
-        <DialogHeader><DialogTitle>Add Custom Field</DialogTitle></DialogHeader>
-        <div className="space-y-3 pt-2">
-          <div className="space-y-1">
-            <Label className="text-xs">Field Name *</Label>
-            <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Port Levy" className="h-8 text-sm" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Field Type</Label>
-              <Select value={form.fieldType} onValueChange={v => setForm(p => ({ ...p, fieldType: v }))}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {FIELD_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Visible By Role</Label>
-              <Select value={form.visibleByRole} onValueChange={v => setForm(p => ({ ...p, visibleByRole: v }))}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ROLES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Placeholder</Label>
-            <Input value={form.placeholder} onChange={e => setForm(p => ({ ...p, placeholder: e.target.value }))} className="h-8 text-sm" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Help Text</Label>
-            <Input value={form.helpText} onChange={e => setForm(p => ({ ...p, helpText: e.target.value }))} className="h-8 text-sm" />
-          </div>
-          {form.fieldType === "dropdown" && (
-            <div className="space-y-1">
-              <Label className="text-xs">Dropdown Options (one per line)</Label>
-              <textarea value={form.dropdownOptions} onChange={e => setForm(p => ({ ...p, dropdownOptions: e.target.value }))} rows={3} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" placeholder={"Option 1\nOption 2\nOption 3"} />
-            </div>
-          )}
-          <div className="flex gap-4 pt-1">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Switch checked={form.isRequired} onCheckedChange={v => setForm(p => ({ ...p, isRequired: v }))} />
-              <span className="text-xs">Required</span>
-            </label>
-            {form.fieldType === "number" && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Switch checked={form.includeInTotal} onCheckedChange={v => setForm(p => ({ ...p, includeInTotal: v }))} />
-                <span className="text-xs">Include in Total Cost</span>
-              </label>
-            )}
-          </div>
-          <div className="flex gap-2 justify-end pt-2">
-            <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button size="sm" onClick={handleSubmit} disabled={!form.name.trim() || addFieldMutation.isPending}>
-              {addFieldMutation.isPending && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />} Add Field
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="flex gap-1.5 flex-wrap">
+      {COLORS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onChange(c)}
+          className={`w-6 h-6 rounded-full border-2 transition-all ${value === c ? "border-foreground scale-110 shadow-md" : "border-transparent hover:scale-105"}`}
+          style={{ background: c }}
+        />
+      ))}
+    </div>
   );
 }
 
-export default function SectionsBuilderPage() {
+type FieldForm = {
+  name: string;
+  fieldType: string;
+  placeholder: string;
+  helpText: string;
+  defaultValue: string;
+  isRequired: boolean;
+  includeInTotal: boolean;
+  visibleByRole: string;
+  editableByRole: string;
+  dropdownOptions: string;
+};
+
+const EMPTY_FIELD: FieldForm = {
+  name: "",
+  fieldType: "text",
+  placeholder: "",
+  helpText: "",
+  defaultValue: "",
+  isRequired: false,
+  includeInTotal: false,
+  visibleByRole: "all",
+  editableByRole: "all",
+  dropdownOptions: "",
+};
+
+function fieldToForm(f: any): FieldForm {
+  let opts = "";
+  try {
+    const parsed = JSON.parse(f.dropdownOptions || "[]");
+    opts = Array.isArray(parsed) ? parsed.join("\n") : "";
+  } catch {
+    opts = "";
+  }
+  return {
+    name: f.name ?? "",
+    fieldType: f.fieldType ?? "text",
+    placeholder: f.placeholder ?? "",
+    helpText: f.helpText ?? "",
+    defaultValue: f.defaultValue ?? "",
+    isRequired: !!f.isRequired,
+    includeInTotal: !!f.includeInTotal,
+    visibleByRole: f.visibleByRole ?? "all",
+    editableByRole: f.editableByRole ?? "all",
+    dropdownOptions: opts,
+  };
+}
+
+function InlineFieldForm({
+  form,
+  onChange,
+  onSave,
+  onCancel,
+  saving,
+  saveLabel,
+}: {
+  form: FieldForm;
+  onChange: (f: FieldForm) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+  saveLabel: string;
+}) {
+  const set = (patch: Partial<FieldForm>) =>
+    onChange({ ...form, ...patch });
+
+  return (
+    <div className="space-y-3 p-4 bg-accent/10 rounded-lg border border-border/40">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs font-medium">Field Name *</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => set({ name: e.target.value })}
+            placeholder="e.g. Port Levy"
+            className="h-8 text-sm"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium">Field Type</Label>
+          <Select
+            value={form.fieldType}
+            onValueChange={(v) => set({ fieldType: v })}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FIELD_TYPES.map((t) => (
+                <SelectItem key={t.value} value={t.value}>
+                  <span className="flex items-center gap-1.5">
+                    <t.icon className="w-3 h-3" /> {t.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs font-medium">Placeholder</Label>
+          <Input
+            value={form.placeholder}
+            onChange={(e) => set({ placeholder: e.target.value })}
+            className="h-8 text-sm"
+            placeholder="Placeholder text..."
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium">Help Text</Label>
+          <Input
+            value={form.helpText}
+            onChange={(e) => set({ helpText: e.target.value })}
+            className="h-8 text-sm"
+            placeholder="Guidance for the user..."
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs font-medium">Visible By</Label>
+          <Select
+            value={form.visibleByRole}
+            onValueChange={(v) => set({ visibleByRole: v })}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROLES.map((r) => (
+                <SelectItem key={r.value} value={r.value}>
+                  {r.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium">Editable By</Label>
+          <Select
+            value={form.editableByRole}
+            onValueChange={(v) => set({ editableByRole: v })}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROLES.map((r) => (
+                <SelectItem key={r.value} value={r.value}>
+                  {r.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {form.fieldType === "dropdown" && (
+        <div className="space-y-1">
+          <Label className="text-xs font-medium">
+            Dropdown Options (one per line)
+          </Label>
+          <textarea
+            value={form.dropdownOptions}
+            onChange={(e) => set({ dropdownOptions: e.target.value })}
+            rows={3}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder={"Option 1\nOption 2\nOption 3"}
+          />
+        </div>
+      )}
+      <div className="flex flex-wrap gap-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <Switch
+            checked={form.isRequired}
+            onCheckedChange={(v) => set({ isRequired: v })}
+          />
+          <span className="text-xs">Required</span>
+        </label>
+        {form.fieldType === "number" && (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Switch
+              checked={form.includeInTotal}
+              onCheckedChange={(v) => set({ includeInTotal: v })}
+            />
+            <span className="text-xs">Include in Total Cost</span>
+          </label>
+        )}
+      </div>
+      <div className="flex gap-2 justify-end pt-1">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onCancel}
+          className="h-7 text-xs gap-1"
+        >
+          <X className="w-3 h-3" /> Cancel
+        </Button>
+        <Button
+          size="sm"
+          onClick={onSave}
+          disabled={!form.name.trim() || saving}
+          className="h-7 text-xs gap-1"
+        >
+          {saving ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <Save className="w-3 h-3" />
+          )}
+          {saveLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function FieldRow({
+  field,
+  sectionId,
+  isEditing,
+  onStartEdit,
+  onCancelEdit,
+}: {
+  field: any;
+  sectionId: number;
+  isEditing: boolean;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+}) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const updateMutation = useUpdateCustomField();
+  const deleteMutation = useDeleteCustomField();
+  const [form, setForm] = useState<FieldForm>(fieldToForm(field));
 
-  const { data: sections = [], isLoading } = useGetCustomSections();
-  const createMutation = useCreateCustomSection();
-  const updateMutation = useUpdateCustomSection();
-  const deleteMutation = useDeleteCustomSection();
-  const deleteFieldMutation = useDeleteCustomField();
-
-  const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newColor, setNewColor] = useState("#6366f1");
-  const [newRequired, setNewRequired] = useState(false);
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const [addFieldFor, setAddFieldFor] = useState<number | null>(null);
-
-  const handleCreate = async () => {
-    if (!newName.trim()) return;
+  const handleSave = async () => {
+    if (!form.name.trim()) return;
     try {
-      await createMutation.mutateAsync({ data: { name: newName, color: newColor, isRequired: newRequired } });
+      await updateMutation.mutateAsync({
+        id: sectionId,
+        fieldId: field.id,
+        data: {
+          ...form,
+          dropdownOptions: form.dropdownOptions
+            ? JSON.stringify(
+                form.dropdownOptions
+                  .split("\n")
+                  .map((o) => o.trim())
+                  .filter(Boolean)
+              )
+            : "[]",
+        },
+      });
       qc.invalidateQueries({ queryKey: ["getCustomSections"] });
-      toast({ title: "Section created" });
-      setNewName(""); setNewColor("#6366f1"); setNewRequired(false); setShowCreate(false);
+      toast({ title: "Field updated" });
+      onCancelEdit();
     } catch {
-      toast({ variant: "destructive", title: "Failed to create section" });
+      toast({ variant: "destructive", title: "Failed to update field" });
     }
   };
 
-  const handleToggleArchive = async (s: any) => {
+  const handleDelete = async () => {
+    if (!confirm(`Delete field "${field.name}"?`)) return;
     try {
-      await updateMutation.mutateAsync({ id: s.id, data: { isArchived: !s.isArchived } });
+      await deleteMutation.mutateAsync({ id: sectionId, fieldId: field.id });
       qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      toast({ title: "Field deleted" });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to delete field" });
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <InlineFieldForm
+        form={form}
+        onChange={setForm}
+        onSave={handleSave}
+        onCancel={() => {
+          setForm(fieldToForm(field));
+          onCancelEdit();
+        }}
+        saving={updateMutation.isPending}
+        saveLabel="Save Changes"
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between px-4 py-2.5 hover:bg-accent/10 transition-colors group">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 text-muted-foreground w-20 flex-shrink-0">
+          <FieldTypeIcon type={field.fieldType} />
+          <span className="text-xs capitalize truncate">
+            {field.fieldType}
+          </span>
+        </div>
+        <span className="text-sm font-medium truncate">{field.name}</span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {field.isRequired && (
+            <Badge
+              variant="outline"
+              className="text-[10px] py-0 px-1.5 border-primary/40 text-primary"
+            >
+              Required
+            </Badge>
+          )}
+          {field.includeInTotal && (
+            <Badge
+              variant="outline"
+              className="text-[10px] py-0 px-1.5 border-emerald-500/40 text-emerald-500"
+            >
+              In Total
+            </Badge>
+          )}
+          {field.visibleByRole !== "all" && (
+            <Badge
+              variant="outline"
+              className="text-[10px] py-0 px-1.5 border-muted-foreground/40 text-muted-foreground capitalize"
+            >
+              {field.visibleByRole}
+            </Badge>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        <button
+          onClick={onStartEdit}
+          title="Edit field"
+          className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded-md hover:bg-accent/30"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={handleDelete}
+          title="Delete field"
+          className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({ section }: { section: any }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const updateMutation = useUpdateCustomSection();
+  const deleteMutation = useDeleteCustomSection();
+  const addFieldMutation = useAddCustomField();
+
+  const [expanded, setExpanded] = useState(false);
+  const [editingSection, setEditingSection] = useState(false);
+  const [editName, setEditName] = useState(section.name);
+  const [editColor, setEditColor] = useState(section.color);
+  const [editRequired, setEditRequired] = useState(!!section.isRequired);
+  const [editingFieldId, setEditingFieldId] = useState<number | null>(null);
+  const [showAddField, setShowAddField] = useState(false);
+  const [newFieldForm, setNewFieldForm] = useState<FieldForm>(EMPTY_FIELD);
+
+  const resetSectionEdit = () => {
+    setEditName(section.name);
+    setEditColor(section.color);
+    setEditRequired(!!section.isRequired);
+    setEditingSection(false);
+  };
+
+  const handleSaveSection = async () => {
+    if (!editName.trim()) return;
+    try {
+      await updateMutation.mutateAsync({
+        id: section.id,
+        data: { name: editName, color: editColor, isRequired: editRequired },
+      });
+      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      toast({ title: "Section updated" });
+      setEditingSection(false);
     } catch {
       toast({ variant: "destructive", title: "Failed to update section" });
     }
   };
 
-  const handleDeleteSection = async (id: number) => {
-    if (!confirm("Delete this section and all its fields?")) return;
+  const handleToggleArchive = async () => {
     try {
-      await deleteMutation.mutateAsync({ id });
+      await updateMutation.mutateAsync({
+        id: section.id,
+        data: { isArchived: !section.isArchived },
+      });
+      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      toast({
+        title: section.isArchived ? "Section restored" : "Section archived",
+      });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to update section" });
+    }
+  };
+
+  const handleDeleteSection = async () => {
+    if (!confirm(`Delete "${section.name}" and all its fields?`)) return;
+    try {
+      await deleteMutation.mutateAsync({ id: section.id });
       qc.invalidateQueries({ queryKey: ["getCustomSections"] });
       toast({ title: "Section deleted" });
     } catch {
@@ -180,164 +508,419 @@ export default function SectionsBuilderPage() {
     }
   };
 
-  const handleDeleteField = async (sectionId: number, fieldId: number) => {
+  const handleAddField = async () => {
+    if (!newFieldForm.name.trim()) return;
     try {
-      await deleteFieldMutation.mutateAsync({ id: sectionId, fieldId });
+      await addFieldMutation.mutateAsync({
+        id: section.id,
+        data: {
+          ...newFieldForm,
+          dropdownOptions: newFieldForm.dropdownOptions
+            ? JSON.stringify(
+                newFieldForm.dropdownOptions
+                  .split("\n")
+                  .map((o) => o.trim())
+                  .filter(Boolean)
+              )
+            : "[]",
+        },
+      });
       qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      toast({ title: "Field added" });
+      setNewFieldForm(EMPTY_FIELD);
+      setShowAddField(false);
     } catch {
-      toast({ variant: "destructive", title: "Failed to delete field" });
+      toast({ variant: "destructive", title: "Failed to add field" });
+    }
+  };
+
+  const fields = section.fields ?? [];
+
+  return (
+    <Card
+      className={`border-border/40 bg-card/50 backdrop-blur-sm overflow-hidden transition-all ${section.isArchived ? "opacity-60" : ""}`}
+    >
+      <div
+        className="flex items-center gap-3 p-4 cursor-pointer hover:bg-accent/10 transition-colors"
+        onClick={() => {
+          if (!editingSection) setExpanded((v) => !v);
+        }}
+      >
+        <div
+          className="w-3.5 h-3.5 rounded-full flex-shrink-0 ring-2 ring-offset-1 ring-offset-background"
+          style={{
+            background: section.color,
+            ringColor: section.color + "60",
+          }}
+        />
+
+        {editingSection ? (
+          <div
+            className="flex-1 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex gap-3 flex-wrap items-end">
+              <div className="space-y-1 flex-1 min-w-[160px]">
+                <Label className="text-xs font-medium">Section Name *</Label>
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="h-8 text-sm"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveSection();
+                    if (e.key === "Escape") resetSectionEdit();
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Color</Label>
+                <ColorPicker
+                  value={editColor}
+                  onChange={setEditColor}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Switch
+                  checked={editRequired}
+                  onCheckedChange={setEditRequired}
+                />
+                <span className="text-xs">Required in Workflow</span>
+              </label>
+              <div className="flex gap-2 ml-auto">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={resetSectionEdit}
+                  className="h-7 text-xs gap-1"
+                >
+                  <X className="w-3 h-3" /> Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveSection}
+                  disabled={
+                    !editName.trim() || updateMutation.isPending
+                  }
+                  className="h-7 text-xs gap-1"
+                >
+                  {updateMutation.isPending ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Check className="w-3 h-3" />
+                  )}
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm truncate">
+                  {section.name}
+                </span>
+                {section.isRequired && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] py-0 px-1.5 border-primary/40 text-primary flex-shrink-0"
+                  >
+                    Required
+                  </Badge>
+                )}
+                {section.isArchived && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] py-0 px-1.5 border-amber-500/40 text-amber-500 flex-shrink-0"
+                  >
+                    Archived
+                  </Badge>
+                )}
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {fields.length} {fields.length === 1 ? "field" : "fields"}
+              </span>
+            </div>
+            <div
+              className="flex items-center gap-0.5 flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => {
+                  setEditName(section.name);
+                  setEditColor(section.color);
+                  setEditRequired(!!section.isRequired);
+                  setEditingSection(true);
+                }}
+                title="Edit section"
+                className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded-md hover:bg-accent/30"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleToggleArchive}
+                title={section.isArchived ? "Restore" : "Archive"}
+                className="p-1.5 text-muted-foreground hover:text-amber-500 transition-colors rounded-md hover:bg-amber-500/10"
+              >
+                {section.isArchived ? (
+                  <ArchiveRestore className="w-3.5 h-3.5" />
+                ) : (
+                  <Archive className="w-3.5 h-3.5" />
+                )}
+              </button>
+              <button
+                onClick={handleDeleteSection}
+                title="Delete section"
+                className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+              {expanded ? (
+                <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-border/40">
+              {fields.length === 0 && !showAddField ? (
+                <div className="px-6 py-8 text-center text-muted-foreground">
+                  <Hash className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm font-medium">No fields yet</p>
+                  <p className="text-xs mt-1">
+                    Add fields to collect data in this section.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowAddField(true)}
+                    className="mt-3 gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add First Field
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="divide-y divide-border/30">
+                    {fields.map((field: any) => (
+                      <FieldRow
+                        key={field.id}
+                        field={field}
+                        sectionId={section.id}
+                        isEditing={editingFieldId === field.id}
+                        onStartEdit={() => setEditingFieldId(field.id)}
+                        onCancelEdit={() => setEditingFieldId(null)}
+                      />
+                    ))}
+                  </div>
+
+                  {!showAddField && (
+                    <div className="px-4 py-3 border-t border-border/30">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowAddField(true)}
+                        className="gap-1.5 h-7 text-xs"
+                      >
+                        <Plus className="w-3 h-3" /> Add Field
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {showAddField && (
+                <div className="px-4 py-3 border-t border-border/30">
+                  <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+                    New Field
+                  </p>
+                  <InlineFieldForm
+                    form={newFieldForm}
+                    onChange={setNewFieldForm}
+                    onSave={handleAddField}
+                    onCancel={() => {
+                      setShowAddField(false);
+                      setNewFieldForm(EMPTY_FIELD);
+                    }}
+                    saving={addFieldMutation.isPending}
+                    saveLabel="Add Field"
+                  />
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+}
+
+export default function SectionsBuilderPage() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const { data: sections = [], isLoading } = useGetCustomSections();
+  const createMutation = useCreateCustomSection();
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState("#6366f1");
+  const [newRequired, setNewRequired] = useState(false);
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    try {
+      await createMutation.mutateAsync({
+        data: { name: newName, color: newColor, isRequired: newRequired },
+      });
+      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      toast({ title: "Section created" });
+      setNewName("");
+      setNewColor("#6366f1");
+      setNewRequired(false);
+      setShowCreate(false);
+    } catch {
+      toast({ variant: "destructive", title: "Failed to create section" });
     }
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Layers className="w-6 h-6 text-primary" /> Section & Field Builder
+            <Layers className="w-6 h-6 text-primary" /> Section Builder
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Create and manage custom sections and fields for container data collection.</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            Create and manage custom sections and fields for container cost
+            tracking.
+          </p>
         </div>
-        <Button onClick={() => setShowCreate(v => !v)} className="gap-2 shadow-md">
+        <Button
+          onClick={() => setShowCreate((v) => !v)}
+          className="gap-2 shadow-md"
+        >
           <Plus className="w-4 h-4" /> New Section
         </Button>
       </div>
 
-      {showCreate && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4">
-            <div className="flex gap-3 flex-wrap items-end">
-              <div className="space-y-1 flex-1 min-w-[180px]">
-                <Label className="text-xs">Section Name *</Label>
-                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Bank Charges" className="h-8 text-sm" onKeyDown={e => e.key === "Enter" && handleCreate()} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Color</Label>
-                <div className="flex gap-1 flex-wrap">
-                  {COLORS.map(c => (
-                    <button key={c} onClick={() => setNewColor(c)} className={`w-6 h-6 rounded-full border-2 transition-all ${newColor === c ? "border-foreground scale-110" : "border-transparent"}`} style={{ background: c }} />
-                  ))}
+      <AnimatePresence>
+        {showCreate && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-4 space-y-3">
+                <p className="text-xs font-medium text-primary uppercase tracking-wider">
+                  Create New Section
+                </p>
+                <div className="flex gap-3 flex-wrap items-end">
+                  <div className="space-y-1 flex-1 min-w-[180px]">
+                    <Label className="text-xs font-medium">
+                      Section Name *
+                    </Label>
+                    <Input
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      placeholder="e.g. Bank Charges"
+                      className="h-8 text-sm"
+                      autoFocus
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && handleCreate()
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Color</Label>
+                    <ColorPicker
+                      value={newColor}
+                      onChange={setNewColor}
+                    />
+                  </div>
                 </div>
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer pb-1">
-                <Switch checked={newRequired} onCheckedChange={setNewRequired} />
-                <span className="text-xs">Required in Workflow</span>
-              </label>
-              <div className="flex gap-2 pb-1">
-                <Button size="sm" variant="outline" onClick={() => { setShowCreate(false); setNewName(""); }}>Cancel</Button>
-                <Button size="sm" onClick={handleCreate} disabled={!newName.trim() || createMutation.isPending}>
-                  {createMutation.isPending && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />} Create
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <div className="flex items-center gap-4 flex-wrap">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Switch
+                      checked={newRequired}
+                      onCheckedChange={setNewRequired}
+                    />
+                    <span className="text-xs">Required in Workflow</span>
+                  </label>
+                  <div className="flex gap-2 ml-auto">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setShowCreate(false);
+                        setNewName("");
+                      }}
+                      className="h-7 text-xs gap-1"
+                    >
+                      <X className="w-3 h-3" /> Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleCreate}
+                      disabled={
+                        !newName.trim() || createMutation.isPending
+                      }
+                      className="h-7 text-xs gap-1"
+                    >
+                      {createMutation.isPending ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Plus className="w-3 h-3" />
+                      )}
+                      Create Section
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {isLoading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-primary" /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-7 h-7 animate-spin text-primary" />
+        </div>
       ) : (sections as any[]).length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <Layers className="w-12 h-12 mx-auto mb-4 opacity-20" />
+        <div className="text-center py-20 text-muted-foreground">
+          <Layers className="w-14 h-14 mx-auto mb-4 opacity-15" />
           <p className="text-lg font-medium">No custom sections yet</p>
-          <p className="text-sm">Create a section above to start adding custom fields.</p>
+          <p className="text-sm mt-1 max-w-sm mx-auto">
+            Sections let you add custom cost fields to every container. Click
+            "New Section" above to get started.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
           {(sections as any[]).map((section: any) => (
-            <Card key={section.id} className={`border-border/40 bg-card/40 backdrop-blur overflow-hidden ${section.isArchived ? "opacity-50" : ""}`}>
-              <div
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent/20 transition-colors"
-                onClick={() => setExpanded(expanded === section.id ? null : section.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: section.color }} />
-                  <div>
-                    <span className="font-semibold text-sm">{section.name}</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-muted-foreground">{section.fields?.length ?? 0} fields</span>
-                      {section.isRequired && <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-primary/40 text-primary">Required</Badge>}
-                      {section.isArchived && <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-muted-foreground/40 text-muted-foreground">Archived</Badge>}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setAddFieldFor(section.id)} title="Add field" className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded">
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => handleToggleArchive(section)} title={section.isArchived ? "Restore" : "Archive"} className="p-1.5 text-muted-foreground hover:text-amber-400 transition-colors rounded">
-                    <Archive className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => handleDeleteSection(section.id)} title="Delete section" className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                  {expanded === section.id ? <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" /> : <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />}
-                </div>
-              </div>
-
-              {expanded === section.id && (
-                <div className="border-t border-border/40">
-                  {section.fields?.length === 0 ? (
-                    <div className="px-6 py-4 text-sm text-muted-foreground flex items-center justify-between">
-                      <span>No fields yet.</span>
-                      <Button size="sm" variant="outline" onClick={() => setAddFieldFor(section.id)} className="gap-1.5">
-                        <Plus className="w-3.5 h-3.5" /> Add Field
-                      </Button>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead className="bg-secondary/20 text-muted-foreground uppercase tracking-wider">
-                            <tr>
-                              <th className="px-4 py-2 text-left font-medium">Field Name</th>
-                              <th className="px-4 py-2 text-left font-medium">Type</th>
-                              <th className="px-4 py-2 text-center font-medium">Required</th>
-                              <th className="px-4 py-2 text-center font-medium">In Total</th>
-                              <th className="px-4 py-2 text-left font-medium">Visible To</th>
-                              <th className="px-4 py-2 text-right font-medium">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border/30">
-                            {section.fields.map((field: any) => (
-                              <tr key={field.id} className="hover:bg-accent/20">
-                                <td className="px-4 py-2.5 font-medium">{field.name}</td>
-                                <td className="px-4 py-2.5">
-                                  <span className="flex items-center gap-1.5 text-muted-foreground capitalize">
-                                    <FieldTypeIcon type={field.fieldType} /> {field.fieldType}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2.5 text-center">{field.isRequired ? "✓" : "—"}</td>
-                                <td className="px-4 py-2.5 text-center">
-                                  {field.includeInTotal ? <span className="text-emerald-400 font-semibold">✓</span> : "—"}
-                                </td>
-                                <td className="px-4 py-2.5 text-muted-foreground capitalize">{field.visibleByRole}</td>
-                                <td className="px-4 py-2.5 text-right">
-                                  <button onClick={() => handleDeleteField(section.id, field.id)} className="p-1 text-muted-foreground hover:text-destructive transition-colors rounded">
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="px-4 py-3 border-t border-border/30">
-                        <Button size="sm" variant="outline" onClick={() => setAddFieldFor(section.id)} className="gap-1.5 h-7 text-xs">
-                          <Plus className="w-3 h-3" /> Add Field
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </Card>
+            <SectionCard key={section.id} section={section} />
           ))}
         </div>
-      )}
-
-      {addFieldFor !== null && (
-        <AddFieldDialog sectionId={addFieldFor} onClose={() => setAddFieldFor(null)} />
       )}
     </motion.div>
   );
