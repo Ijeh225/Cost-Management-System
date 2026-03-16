@@ -7,6 +7,11 @@ import {
   useAddCustomField,
   useDeleteCustomField,
   useUpdateCustomField,
+  getGetCustomSectionsQueryKey,
+} from "@workspace/api-client-react";
+import type {
+  CustomSectionWithFields,
+  CustomField,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -71,6 +76,8 @@ const ROLES = [
   { value: "staff", label: "Staff Only" },
 ];
 
+const SECTIONS_QUERY_KEY = getGetCustomSectionsQueryKey();
+
 function FieldTypeIcon({ type }: { type: string }) {
   const found = FIELD_TYPES.find((t) => t.value === type);
   const Icon = found?.icon ?? Type;
@@ -125,7 +132,7 @@ const EMPTY_FIELD: FieldForm = {
   dropdownOptions: "",
 };
 
-function fieldToForm(f: any): FieldForm {
+function fieldToForm(f: CustomField): FieldForm {
   let opts = "";
   try {
     const parsed = JSON.parse(f.dropdownOptions || "[]");
@@ -145,6 +152,17 @@ function fieldToForm(f: any): FieldForm {
     editableByRole: f.editableByRole ?? "all",
     dropdownOptions: opts,
   };
+}
+
+function serializeDropdownOptions(raw: string): string {
+  return raw
+    ? JSON.stringify(
+        raw
+          .split("\n")
+          .map((o) => o.trim())
+          .filter(Boolean)
+      )
+    : "[]";
 }
 
 function InlineFieldForm({
@@ -322,7 +340,7 @@ function FieldRow({
   onStartEdit,
   onCancelEdit,
 }: {
-  field: any;
+  field: CustomField;
   sectionId: number;
   isEditing: boolean;
   onStartEdit: () => void;
@@ -342,17 +360,10 @@ function FieldRow({
         fieldId: field.id,
         data: {
           ...form,
-          dropdownOptions: form.dropdownOptions
-            ? JSON.stringify(
-                form.dropdownOptions
-                  .split("\n")
-                  .map((o) => o.trim())
-                  .filter(Boolean)
-              )
-            : "[]",
+          dropdownOptions: serializeDropdownOptions(form.dropdownOptions),
         },
       });
-      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({ title: "Field updated" });
       onCancelEdit();
     } catch {
@@ -364,7 +375,7 @@ function FieldRow({
     if (!confirm(`Delete field "${field.name}"?`)) return;
     try {
       await deleteMutation.mutateAsync({ id: sectionId, fieldId: field.id });
-      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({ title: "Field deleted" });
     } catch {
       toast({ variant: "destructive", title: "Failed to delete field" });
@@ -444,7 +455,7 @@ function FieldRow({
   );
 }
 
-function SectionCard({ section }: { section: any }) {
+function SectionCard({ section }: { section: CustomSectionWithFields }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const updateMutation = useUpdateCustomSection();
@@ -455,7 +466,7 @@ function SectionCard({ section }: { section: any }) {
   const [editingSection, setEditingSection] = useState(false);
   const [editName, setEditName] = useState(section.name);
   const [editColor, setEditColor] = useState(section.color);
-  const [editRequired, setEditRequired] = useState(!!section.isRequired);
+  const [editRequired, setEditRequired] = useState(section.isRequired);
   const [editingFieldId, setEditingFieldId] = useState<number | null>(null);
   const [showAddField, setShowAddField] = useState(false);
   const [newFieldForm, setNewFieldForm] = useState<FieldForm>(EMPTY_FIELD);
@@ -463,7 +474,7 @@ function SectionCard({ section }: { section: any }) {
   const resetSectionEdit = () => {
     setEditName(section.name);
     setEditColor(section.color);
-    setEditRequired(!!section.isRequired);
+    setEditRequired(section.isRequired);
     setEditingSection(false);
   };
 
@@ -474,7 +485,7 @@ function SectionCard({ section }: { section: any }) {
         id: section.id,
         data: { name: editName, color: editColor, isRequired: editRequired },
       });
-      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({ title: "Section updated" });
       setEditingSection(false);
     } catch {
@@ -488,7 +499,7 @@ function SectionCard({ section }: { section: any }) {
         id: section.id,
         data: { isArchived: !section.isArchived },
       });
-      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({
         title: section.isArchived ? "Section restored" : "Section archived",
       });
@@ -501,7 +512,7 @@ function SectionCard({ section }: { section: any }) {
     if (!confirm(`Delete "${section.name}" and all its fields?`)) return;
     try {
       await deleteMutation.mutateAsync({ id: section.id });
-      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({ title: "Section deleted" });
     } catch {
       toast({ variant: "destructive", title: "Failed to delete section" });
@@ -515,17 +526,10 @@ function SectionCard({ section }: { section: any }) {
         id: section.id,
         data: {
           ...newFieldForm,
-          dropdownOptions: newFieldForm.dropdownOptions
-            ? JSON.stringify(
-                newFieldForm.dropdownOptions
-                  .split("\n")
-                  .map((o) => o.trim())
-                  .filter(Boolean)
-              )
-            : "[]",
+          dropdownOptions: serializeDropdownOptions(newFieldForm.dropdownOptions),
         },
       });
-      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({ title: "Field added" });
       setNewFieldForm(EMPTY_FIELD);
       setShowAddField(false);
@@ -652,7 +656,7 @@ function SectionCard({ section }: { section: any }) {
                 onClick={() => {
                   setEditName(section.name);
                   setEditColor(section.color);
-                  setEditRequired(!!section.isRequired);
+                  setEditRequired(section.isRequired);
                   setEditingSection(true);
                 }}
                 title="Edit section"
@@ -717,7 +721,7 @@ function SectionCard({ section }: { section: any }) {
               ) : (
                 <>
                   <div className="divide-y divide-border/30">
-                    {fields.map((field: any) => (
+                    {fields.map((field: CustomField) => (
                       <FieldRow
                         key={field.id}
                         field={field}
@@ -787,7 +791,7 @@ export default function SectionsBuilderPage() {
       await createMutation.mutateAsync({
         data: { name: newName, color: newColor, isRequired: newRequired },
       });
-      qc.invalidateQueries({ queryKey: ["getCustomSections"] });
+      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({ title: "Section created" });
       setNewName("");
       setNewColor("#6366f1");
@@ -797,6 +801,8 @@ export default function SectionsBuilderPage() {
       toast({ variant: "destructive", title: "Failed to create section" });
     }
   };
+
+  const sectionsList = sections as CustomSectionWithFields[];
 
   return (
     <motion.div
@@ -906,7 +912,7 @@ export default function SectionsBuilderPage() {
         <div className="flex justify-center py-16">
           <Loader2 className="w-7 h-7 animate-spin text-primary" />
         </div>
-      ) : (sections as any[]).length === 0 ? (
+      ) : sectionsList.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground">
           <Layers className="w-14 h-14 mx-auto mb-4 opacity-15" />
           <p className="text-lg font-medium">No custom sections yet</p>
@@ -917,7 +923,7 @@ export default function SectionsBuilderPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {(sections as any[]).map((section: any) => (
+          {sectionsList.map((section) => (
             <SectionCard key={section.id} section={section} />
           ))}
         </div>
