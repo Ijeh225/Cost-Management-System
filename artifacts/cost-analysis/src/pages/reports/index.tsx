@@ -23,9 +23,9 @@ function buildQueryString(params: Record<string, string>) {
 }
 
 export default function ReportsPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
-  useEffect(() => { if (!isAdmin) setLocation("/"); }, [isAdmin]);
+  useEffect(() => { if (!authLoading && !isAdmin) setLocation("/"); }, [isAdmin, authLoading]);
   const { toast } = useToast();
   const [status, setStatus] = useState("");
   const [from, setFrom] = useState("");

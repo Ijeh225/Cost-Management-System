@@ -52,9 +52,9 @@ const customTooltipStyle = {
 };
 
 export default function AnalyticsPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
-  useEffect(() => { if (!isAdmin) setLocation("/"); }, [isAdmin]);
+  useEffect(() => { if (!authLoading && !isAdmin) setLocation("/"); }, [isAdmin, authLoading]);
   const { data, isLoading, isError } = useGetAnalytics();
 
   if (isLoading) return (

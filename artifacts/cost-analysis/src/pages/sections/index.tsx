@@ -134,9 +134,9 @@ function AddFieldDialog({ sectionId, onClose }: { sectionId: number; onClose: ()
 }
 
 export default function SectionsBuilderPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
-  useEffect(() => { if (!isAdmin) setLocation("/"); }, [isAdmin]);
+  useEffect(() => { if (!authLoading && !isAdmin) setLocation("/"); }, [isAdmin, authLoading]);
   const { toast } = useToast();
   const qc = useQueryClient();
 
