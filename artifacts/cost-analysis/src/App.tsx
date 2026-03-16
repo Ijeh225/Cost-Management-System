@@ -1,10 +1,13 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/components/layout/auth-provider";
 import { AppLayout } from "@/components/layout/app-layout";
+import { useAuth } from "@/components/layout/auth-provider";
+import { useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 // Pages
 import Login from "@/pages/login";
@@ -30,6 +33,40 @@ const queryClient = new QueryClient({
   }
 });
 
+function AdminGuard({ children }: { children: React.ReactNode }) {
+  const { isAdmin, isLoading, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
+  const adminConfirmed = useRef(false);
+  const [ready, setReady] = useState(false);
+
+  if (isAdmin && !adminConfirmed.current) {
+    adminConfirmed.current = true;
+  }
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (adminConfirmed.current) {
+      setReady(true);
+      return;
+    }
+    if (!isAuthenticated) {
+      setLocation("/login");
+    } else if (!isAdmin) {
+      setLocation("/");
+    }
+  }, [isAdmin, isLoading, isAuthenticated, setLocation]);
+
+  if (!adminConfirmed.current) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function Router() {
   return (
     <Switch>
@@ -47,9 +84,15 @@ function Router() {
             <Route path="/upload" component={UploadPage} />
             <Route path="/approvals" component={ApprovalsPage} />
             <Route path="/my-tasks" component={MyTasksPage} />
-            <Route path="/analytics" component={AnalyticsPage} />
-            <Route path="/reports" component={ReportsPage} />
-            <Route path="/sections" component={SectionsBuilderPage} />
+            <Route path="/analytics">
+              <AdminGuard><AnalyticsPage /></AdminGuard>
+            </Route>
+            <Route path="/reports">
+              <AdminGuard><ReportsPage /></AdminGuard>
+            </Route>
+            <Route path="/sections">
+              <AdminGuard><SectionsBuilderPage /></AdminGuard>
+            </Route>
             <Route component={NotFound} />
           </Switch>
         </AppLayout>

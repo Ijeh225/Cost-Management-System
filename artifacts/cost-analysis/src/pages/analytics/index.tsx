@@ -1,7 +1,5 @@
-import { useEffect } from "react";
 import { useGetAnalytics } from "@workspace/api-client-react";
-import { useAuth } from "@/components/layout/auth-provider";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, BarChart2, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Box, Users, ArrowRight } from "lucide-react";
@@ -52,9 +50,6 @@ const customTooltipStyle = {
 };
 
 export default function AnalyticsPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
-  const [, setLocation] = useLocation();
-  useEffect(() => { if (!authLoading && !isAdmin) setLocation("/"); }, [isAdmin, authLoading]);
   const { data, isLoading, isError } = useGetAnalytics();
 
   if (isLoading) return (

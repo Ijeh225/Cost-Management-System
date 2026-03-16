@@ -1,7 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useGetContainerReport } from "@workspace/api-client-react";
-import { useAuth } from "@/components/layout/auth-provider";
-import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,9 +21,6 @@ function buildQueryString(params: Record<string, string>) {
 }
 
 export default function ReportsPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
-  const [, setLocation] = useLocation();
-  useEffect(() => { if (!authLoading && !isAdmin) setLocation("/"); }, [isAdmin, authLoading]);
   const { toast } = useToast();
   const [status, setStatus] = useState("");
   const [from, setFrom] = useState("");

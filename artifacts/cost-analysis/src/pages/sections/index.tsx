@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGetCustomSections, useCreateCustomSection, useUpdateCustomSection, useDeleteCustomSection, useAddCustomField, useDeleteCustomField, useUpdateCustomField } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/components/layout/auth-provider";
-import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -134,9 +132,6 @@ function AddFieldDialog({ sectionId, onClose }: { sectionId: number; onClose: ()
 }
 
 export default function SectionsBuilderPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
-  const [, setLocation] = useLocation();
-  useEffect(() => { if (!authLoading && !isAdmin) setLocation("/"); }, [isAdmin, authLoading]);
   const { toast } = useToast();
   const qc = useQueryClient();
 
