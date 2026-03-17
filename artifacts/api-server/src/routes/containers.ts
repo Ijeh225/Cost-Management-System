@@ -538,14 +538,21 @@ router.post("/containers/:id/sections/:section/approve", requireAdmin, async (re
       .set({ status: "approved", reviewedById: user.id, reviewedAt: new Date(), updatedAt: new Date() })
       .where(eq(sectionApprovalsTable.id, approval.id))
       .returning();
-    // Auto-lock the section after approval
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (container) {
-      let lockedSections: string[] = [];
-      try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
-      if (!lockedSections.includes(section)) {
-        lockedSections.push(section);
-        await db.update(containersTable).set({ lockedSections: JSON.stringify(lockedSections), updatedAt: new Date() }).where(eq(containersTable.id, id));
+    if (section === "container_review") {
+      // Full container review approval — advance status to completed
+      if (container && container.status !== "completed" && container.status !== "closed") {
+        await db.update(containersTable).set({ status: "completed", updatedAt: new Date() }).where(eq(containersTable.id, id));
+      }
+    } else {
+      // Auto-lock the section after approval
+      if (container) {
+        let lockedSections: string[] = [];
+        try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
+        if (!lockedSections.includes(section)) {
+          lockedSections.push(section);
+          await db.update(containersTable).set({ lockedSections: JSON.stringify(lockedSections), updatedAt: new Date() }).where(eq(containersTable.id, id));
+        }
       }
     }
     await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_approved", section });

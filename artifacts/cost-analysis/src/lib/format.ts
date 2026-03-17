@@ -84,13 +84,14 @@ export function getStatusLabel(status: string): string {
 export const PHASE1_STATUSES = WORKFLOW_STAGES;
 
 export const SECTION_LABELS: Record<string, string> = {
-  shipping:   "Shipping",
-  customs:    "Customs",
-  terminal:   "Terminal",
-  delivery:   "Delivery",
-  operations: "Operations",
-  accounting: "Accounting",
-  management: "Management",
+  shipping:         "Shipping",
+  customs:          "Customs",
+  terminal:         "Terminal",
+  delivery:         "Delivery",
+  operations:       "Operations",
+  accounting:       "Accounting",
+  management:       "Management",
+  container_review: "Full Container Review",
 };
 
 export const CHARGE_SECTIONS = ["shipping", "customs", "terminal", "delivery", "operations"] as const;

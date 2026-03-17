@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link } from "wouter";
 import {
   useGetContainer, useUpdateContainerCharges,
@@ -37,6 +37,7 @@ import {
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
   Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink, X,
+  ClipboardCheck, ArrowRightCircle,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
@@ -266,6 +267,7 @@ function RejectSectionDialog({
 function ChargeSectionForm({
   containerId, sectionKey, title, schema, initialData, isRecordLocked, isSectionLocked, isEditable, isAdmin,
   approval, onSubmitSection, onApproveSection, onRejectSection, onToggleSectionLock, sectionSettings,
+  isActiveSection, nextStageLabel, onAdvanceAfterSave,
 }: {
   containerId: number;
   sectionKey: string;
@@ -282,10 +284,14 @@ function ChargeSectionForm({
   onApproveSection: (section: string) => void;
   onRejectSection: (section: string) => void;
   onToggleSectionLock: (section: string, lock: boolean) => void;
+  isActiveSection?: boolean;
+  nextStageLabel?: string | null;
+  onAdvanceAfterSave?: () => void;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const updateMutation = useUpdateContainerCharges();
+  const shouldAdvanceRef = useRef(false);
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: initialData || {},
@@ -307,6 +313,8 @@ function ChargeSectionForm({
   const canSubmit = isEditable && !effectivelyLocked && (approvalStatus === "draft" || approvalStatus === "rejected");
 
   const onSubmit = (data: any) => {
+    const willAdvance = shouldAdvanceRef.current;
+    shouldAdvanceRef.current = false;
     updateMutation.mutate(
       { id: containerId, data: { section: sectionKey as UpdateContainerChargesRequestSection, [sectionKey]: data, reason: "Manual UI update" } },
       {
@@ -314,8 +322,12 @@ function ChargeSectionForm({
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-          toast({ title: "Charges Updated", description: `${title} section saved.` });
           form.reset(data);
+          if (willAdvance && onAdvanceAfterSave) {
+            onAdvanceAfterSave();
+          } else {
+            toast({ title: "Charges Updated", description: `${title} section saved.` });
+          }
         },
         onError: (err: any) => toast({ variant: "destructive", title: "Update Failed", description: err?.message ?? "Something went wrong" }),
       }
@@ -419,14 +431,26 @@ function ChargeSectionForm({
                 </div>
                 {/* Save bar — appears only when there are unsaved changes */}
                 {canEdit && isDirty && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => form.reset(initialData)} disabled={updateMutation.isPending}>
                       Discard
                     </Button>
-                    <Button type="submit" size="sm" className="h-8 text-xs active:scale-95 transition-transform shadow-md" disabled={updateMutation.isPending}>
-                      {updateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                    <Button type="submit" size="sm" variant="outline" className="h-8 text-xs active:scale-95 transition-transform" disabled={updateMutation.isPending}>
+                      {updateMutation.isPending && !shouldAdvanceRef.current ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
                       Save Changes
                     </Button>
+                    {isActiveSection && onAdvanceAfterSave && nextStageLabel && (
+                      <Button
+                        type="submit"
+                        size="sm"
+                        className="h-8 text-xs active:scale-95 transition-transform shadow-md shadow-primary/20 gap-1.5"
+                        disabled={updateMutation.isPending}
+                        onClick={() => { shouldAdvanceRef.current = true; }}
+                      >
+                        {updateMutation.isPending && shouldAdvanceRef.current ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRightCircle className="w-3.5 h-3.5" />}
+                        Save & Advance to {nextStageLabel}
+                      </Button>
+                    )}
                   </div>
                 )}
                 {!canEdit && approvalStatus !== "submitted" && (
@@ -614,6 +638,22 @@ export default function ContainerDetail() {
     );
   };
 
+  const handleSaveAndAdvance = () => {
+    if (!nextStage) return;
+    updateMutation.mutate(
+      { id: containerId, data: { status: nextStage } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+          toast({ title: "Saved & Advanced", description: `Charges saved. Moved to "${getStatusLabel(nextStage)}".` });
+        },
+        onError: (err: any) => toast({ variant: "destructive", title: "Error advancing stage", description: err?.message }),
+      }
+    );
+  };
+
   const handleLockToggle = () => {
     lockMutation.mutate(
       { id: containerId, data: { locked: !container.isLocked } },
@@ -683,6 +723,30 @@ export default function ContainerDetail() {
 
   const getSectionApproval = (sectionKey: string): SectionApproval | undefined =>
     sectionApprovals.find((a: SectionApproval) => a.section === sectionKey);
+
+  const containerReviewApproval = getSectionApproval("container_review");
+  const containerReviewStatus = containerReviewApproval?.status ?? "draft";
+
+  const handleSubmitContainerReview = () => {
+    submitSectionMutation.mutate({ id: containerId, section: "container_review" }, {
+      onSuccess: () => { invalidate(); toast({ title: "Submitted for Admin Review", description: "The admin has been notified to review this container." }); },
+      onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
+    });
+  };
+
+  const handleApproveContainerReview = () => {
+    approveSectionMutation.mutate({ id: containerId, section: "container_review" }, {
+      onSuccess: () => { invalidate(); toast({ title: "Container Approved", description: "Container has been approved and marked as completed." }); },
+      onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
+    });
+  };
+
+  const handleRejectContainerReview = (reason: string) => {
+    rejectSectionMutation.mutate({ id: containerId, section: "container_review", data: { reason } }, {
+      onSuccess: () => { invalidate(); toast({ title: "Review Rejected", description: "Corrections required — staff notified." }); setRejectTargetSection(null); },
+      onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
+    });
+  };
 
   const isSectionEditable = (sectionKey: string) =>
     canEditSectionGranular(sectionKey, isAdmin, userSectionPermissions, userSectionPermission);
@@ -893,26 +957,33 @@ export default function ContainerDetail() {
                 </div>
               )}
               <Accordion type="single" collapsible className="w-full">
-                {CHARGE_SECTIONS.map(s => (
-                  <ChargeSectionForm
-                    key={s.key}
-                    containerId={containerId}
-                    sectionKey={s.key}
-                    title={s.title}
-                    schema={s.schema}
-                    initialData={s.data}
-                    isRecordLocked={container.isLocked}
-                    isSectionLocked={lockedSections.includes(s.key)}
-                    isEditable={isSectionEditable(s.key)}
-                    isAdmin={isAdmin}
-                    approval={getSectionApproval(s.key)}
-                    onSubmitSection={handleSubmitSection}
-                    onApproveSection={handleApproveSection}
-                    onRejectSection={(section) => setRejectTargetSection(section)}
-                    onToggleSectionLock={handleToggleSectionLock}
-                    sectionSettings={sn}
-                  />
-                ))}
+                {CHARGE_SECTIONS.map(s => {
+                  const isActiveSec = STAGE_SECTION[container.status] === s.key;
+                  const sectionNextStage = isActiveSec ? getNextStage(container.status) : null;
+                  return (
+                    <ChargeSectionForm
+                      key={s.key}
+                      containerId={containerId}
+                      sectionKey={s.key}
+                      title={s.title}
+                      schema={s.schema}
+                      initialData={s.data}
+                      isRecordLocked={container.isLocked}
+                      isSectionLocked={lockedSections.includes(s.key)}
+                      isEditable={isSectionEditable(s.key)}
+                      isAdmin={isAdmin}
+                      approval={getSectionApproval(s.key)}
+                      onSubmitSection={handleSubmitSection}
+                      onApproveSection={handleApproveSection}
+                      onRejectSection={(section) => setRejectTargetSection(section)}
+                      onToggleSectionLock={handleToggleSectionLock}
+                      sectionSettings={sn}
+                      isActiveSection={isActiveSec}
+                      nextStageLabel={sectionNextStage ? getStatusLabel(sectionNextStage) : null}
+                      onAdvanceAfterSave={isActiveSec && !container.isLocked && sectionNextStage ? handleSaveAndAdvance : undefined}
+                    />
+                  );
+                })}
                 {customSections.map(section => (
                   <CustomSectionForm
                     key={section.id}
@@ -923,6 +994,88 @@ export default function ContainerDetail() {
                   />
                 ))}
               </Accordion>
+
+              {/* Submit for Admin Review panel */}
+              {!container.isLocked && container.status !== "closed" && (
+                <div className={`mt-6 rounded-xl border p-5 ${
+                  containerReviewStatus === "approved"
+                    ? "bg-emerald-500/10 border-emerald-500/30"
+                    : containerReviewStatus === "submitted"
+                    ? "bg-amber-500/10 border-amber-500/30"
+                    : containerReviewStatus === "rejected"
+                    ? "bg-destructive/10 border-destructive/30"
+                    : "bg-primary/5 border-primary/20"
+                }`}>
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="flex items-start gap-3">
+                      <ClipboardCheck className={`w-5 h-5 mt-0.5 shrink-0 ${
+                        containerReviewStatus === "approved" ? "text-emerald-400"
+                        : containerReviewStatus === "submitted" ? "text-amber-400"
+                        : containerReviewStatus === "rejected" ? "text-destructive"
+                        : "text-primary"
+                      }`} />
+                      <div>
+                        <p className="font-semibold text-sm text-foreground">
+                          {containerReviewStatus === "approved"
+                            ? "Container Approved"
+                            : containerReviewStatus === "submitted"
+                            ? "Pending Admin Review"
+                            : containerReviewStatus === "rejected"
+                            ? "Review Rejected — Corrections Required"
+                            : "Submit for Admin Review"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {containerReviewStatus === "approved"
+                            ? "All entries have been reviewed and approved by the admin."
+                            : containerReviewStatus === "submitted"
+                            ? "Your submission is awaiting admin review. Check My Tasks for updates."
+                            : containerReviewStatus === "rejected"
+                            ? containerReviewApproval?.rejectionReason
+                              ? `Reason: "${containerReviewApproval.rejectionReason}". Please make corrections and resubmit.`
+                              : "Please make corrections and resubmit."
+                            : "Once all entries are complete, submit this container for admin review and approval."}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Admin: approve/reject */}
+                      {isAdmin && containerReviewStatus === "submitted" && (
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                            onClick={handleApproveContainerReview}
+                            disabled={approveSectionMutation.isPending}
+                          >
+                            {approveSectionMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-8 text-xs gap-1.5"
+                            onClick={() => setRejectTargetSection("container_review")}
+                          >
+                            <XCircle className="w-3.5 h-3.5" /> Reject
+                          </Button>
+                        </>
+                      )}
+                      {/* Submit / Resubmit button */}
+                      {(containerReviewStatus === "draft" || containerReviewStatus === "rejected") && (
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs gap-1.5"
+                          onClick={handleSubmitContainerReview}
+                          disabled={submitSectionMutation.isPending}
+                        >
+                          {submitSectionMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                          {containerReviewStatus === "rejected" ? "Resubmit for Review" : "Submit for Admin Review"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="lg:sticky top-24">
@@ -1099,7 +1252,14 @@ export default function ContainerDetail() {
       <RejectSectionDialog
         open={!!rejectTargetSection}
         onClose={() => setRejectTargetSection(null)}
-        onConfirm={(reason) => { if (rejectTargetSection) handleRejectSection(rejectTargetSection, reason); }}
+        onConfirm={(reason) => {
+          if (!rejectTargetSection) return;
+          if (rejectTargetSection === "container_review") {
+            handleRejectContainerReview(reason);
+          } else {
+            handleRejectSection(rejectTargetSection, reason);
+          }
+        }}
         isPending={rejectSectionMutation.isPending}
       />
 
