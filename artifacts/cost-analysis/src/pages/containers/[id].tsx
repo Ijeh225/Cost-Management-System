@@ -8,6 +8,7 @@ import {
   useGetCustomSections, useGetCustomFieldValues, useSaveCustomFieldValues,
   getGetCustomFieldValuesQueryKey,
   type CustomSectionWithFields, type CustomField,
+  useGetSettings, BUILT_IN_SECTION_DEFAULTS,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -544,6 +545,7 @@ export default function ContainerDetail() {
   const linkContainerMutation = useLinkContainerToClient();
   const { data: customSectionsRaw } = useGetCustomSections();
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
+  const { data: sectionSettings } = useGetSettings();
 
   const handleLinkClient = () => {
     if (!selectedClientId) return;
@@ -686,12 +688,13 @@ export default function ContainerDetail() {
   const isSectionEditable = (sectionKey: string) =>
     canEditSectionGranular(sectionKey, isAdmin, userSectionPermissions, userSectionPermission);
 
+  const sn = (sectionSettings ?? {}) as Record<string, string>;
   const CHARGE_SECTIONS = [
-    { key: "shipping",   title: "Shipping Charges",      schema: shippingSchema,   data: charges.shipping },
-    { key: "customs",    title: "Customs Duty & Taxes",  schema: customsSchema,    data: charges.customs },
-    { key: "terminal",   title: "Terminal Charges",       schema: terminalSchema,   data: charges.terminal },
-    { key: "delivery",   title: "Delivery & Transport",  schema: deliverySchema,   data: charges.delivery },
-    { key: "operations", title: "Operations & Misc.",     schema: operationsSchema, data: charges.operations },
+    { key: "shipping",   title: sn.shipping   ?? BUILT_IN_SECTION_DEFAULTS.shipping,   schema: shippingSchema,   data: charges.shipping },
+    { key: "customs",    title: sn.customs    ?? BUILT_IN_SECTION_DEFAULTS.customs,    schema: customsSchema,    data: charges.customs },
+    { key: "terminal",   title: sn.terminal   ?? BUILT_IN_SECTION_DEFAULTS.terminal,   schema: terminalSchema,   data: charges.terminal },
+    { key: "delivery",   title: sn.delivery   ?? BUILT_IN_SECTION_DEFAULTS.delivery,   schema: deliverySchema,   data: charges.delivery },
+    { key: "operations", title: sn.operations ?? BUILT_IN_SECTION_DEFAULTS.operations, schema: operationsSchema, data: charges.operations },
   ];
 
   const customSections = ((customSectionsRaw ?? []) as CustomSectionWithFields[]).filter(s => !s.isArchived);

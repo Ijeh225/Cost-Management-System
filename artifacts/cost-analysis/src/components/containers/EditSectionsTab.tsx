@@ -8,6 +8,9 @@ import {
   useDeleteCustomField,
   useUpdateCustomField,
   getGetCustomSectionsQueryKey,
+  useGetSettings,
+  useUpdateSettings,
+  BUILT_IN_SECTIONS,
 } from "@workspace/api-client-react";
 import type { CustomSectionWithFields, CustomField } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -623,16 +626,90 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
   );
 }
 
+function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, onSave }: {
+  sectionKey: string;
+  defaultTitle: string;
+  currentTitle: string;
+  onSave: (key: string, title: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(currentTitle);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!value.trim()) return;
+    setSaving(true);
+    await onSave(sectionKey, value.trim());
+    setSaving(false);
+    setEditing(false);
+  };
+
+  const handleCancel = () => {
+    setValue(currentTitle);
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/10 transition-colors group rounded-md">
+      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-muted-foreground/30" />
+      {editing ? (
+        <div className="flex items-center gap-2 flex-1">
+          <Input
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            className="h-7 text-sm flex-1"
+            autoFocus
+            onKeyDown={e => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancel(); }}
+          />
+          <Button size="sm" variant="outline" onClick={handleCancel} className="h-7 text-xs px-2">
+            <X className="w-3 h-3" />
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={!value.trim() || saving} className="h-7 text-xs gap-1 px-2">
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+            Save
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-medium">{currentTitle}</span>
+            {currentTitle !== defaultTitle && (
+              <span className="ml-2 text-xs text-muted-foreground">({defaultTitle})</span>
+            )}
+          </div>
+          <button
+            onClick={() => { setValue(currentTitle); setEditing(true); }}
+            className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded-md hover:bg-accent/30 opacity-0 group-hover:opacity-100"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function EditSectionsTab() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data: sections = [], isLoading } = useGetCustomSections();
+  const { data: settings = {} } = useGetSettings();
+  const updateSettingsMutation = useUpdateSettings();
   const createMutation = useCreateCustomSection();
 
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("#6366f1");
   const [newRequired, setNewRequired] = useState(false);
+
+  const handleRenameBuiltIn = async (key: string, title: string) => {
+    try {
+      await updateSettingsMutation.mutateAsync({ [key]: title });
+      toast({ title: "Section renamed" });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to rename section" });
+    }
+  };
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -660,17 +737,36 @@ export function EditSectionsTab() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Create and manage custom cost sections and their fields. Number fields inside cost sections are automatically included in Total Cost.
-          </p>
+    <div className="space-y-6">
+      {/* Built-in sections renaming */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Built-in Sections</p>
+          <p className="text-xs text-muted-foreground">Hover a row to rename</p>
         </div>
-        <Button onClick={() => setShowCreate((v) => !v)} className="gap-2 shadow-md" size="sm">
-          <Plus className="w-4 h-4" /> New Section
-        </Button>
+        <Card className="border-border/40 bg-card/50">
+          <div className="divide-y divide-border/30 py-1">
+            {BUILT_IN_SECTIONS.map(s => (
+              <BuiltInSectionRow
+                key={s.key}
+                sectionKey={s.key}
+                defaultTitle={s.defaultTitle}
+                currentTitle={(settings as Record<string, string>)[s.key] ?? s.defaultTitle}
+                onSave={handleRenameBuiltIn}
+              />
+            ))}
+          </div>
+        </Card>
       </div>
+
+      {/* Custom sections */}
+      <div>
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Custom Sections</p>
+          <Button onClick={() => setShowCreate((v) => !v)} className="gap-2 shadow-md" size="sm">
+            <Plus className="w-4 h-4" /> New Section
+          </Button>
+        </div>
 
       <AnimatePresence>
         {showCreate && (
@@ -727,7 +823,7 @@ export function EditSectionsTab() {
       </AnimatePresence>
 
       {sectionsList.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
+        <div className="text-center py-12 text-muted-foreground">
           <Layers className="w-12 h-12 mx-auto mb-3 opacity-20" />
           <p className="font-medium">No custom sections yet</p>
           <p className="text-sm mt-1">Create your first section to start adding custom cost fields.</p>
@@ -739,6 +835,7 @@ export function EditSectionsTab() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

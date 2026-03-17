@@ -13,6 +13,7 @@ import { tasksRouter } from "./tasks.js";
 import { documentsRouter } from "./documents.js";
 import { intelligenceRouter } from "./intelligence.js";
 import { sectionsRouter } from "./sections.js";
+import { settingsRouter } from "./settings.js";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(tasksRouter);
 router.use(documentsRouter);
 router.use(intelligenceRouter);
 router.use(sectionsRouter);
+router.use(settingsRouter);
 
 export default router;
