@@ -60,7 +60,6 @@ const ROLES = [
   { value: "staff", label: "Staff Only" },
 ];
 
-const SECTIONS_QUERY_KEY = getGetCustomSectionsQueryKey();
 
 type FieldForm = {
   name: string;
@@ -292,13 +291,14 @@ function InlineFieldForm({
 }
 
 function FieldRow({
-  field, sectionId, isEditing, onStartEdit, onCancelEdit,
+  field, sectionId, isEditing, onStartEdit, onCancelEdit, sectionsQueryKey,
 }: {
   field: CustomField;
   sectionId: number;
   isEditing: boolean;
   onStartEdit: () => void;
   onCancelEdit: () => void;
+  sectionsQueryKey: readonly unknown[];
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -316,7 +316,7 @@ function FieldRow({
         fieldId: field.id,
         data: { ...form, dropdownOptions: serializeDropdownOptions(form.dropdownOptions) },
       });
-      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: sectionsQueryKey });
       toast({ title: "Field updated" });
       onCancelEdit();
     } catch {
@@ -328,7 +328,7 @@ function FieldRow({
     if (!confirm(`Delete field "${field.name}"?`)) return;
     try {
       await deleteMutation.mutateAsync({ id: sectionId, fieldId: field.id });
-      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: sectionsQueryKey });
       toast({ title: "Field deleted" });
     } catch {
       toast({ variant: "destructive", title: "Failed to delete field" });
@@ -396,7 +396,7 @@ function FieldRow({
   );
 }
 
-function SectionCard({ section }: { section: CustomSectionWithFields }) {
+function SectionCard({ section, sectionsQueryKey }: { section: CustomSectionWithFields; sectionsQueryKey: readonly unknown[] }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const updateMutation = useUpdateCustomSection();
@@ -426,7 +426,7 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
         id: section.id,
         data: { name: editName, color: editColor, isRequired: editRequired },
       });
-      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: sectionsQueryKey });
       toast({ title: "Section updated" });
       setEditingSection(false);
     } catch {
@@ -437,7 +437,7 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
   const handleToggleArchive = async () => {
     try {
       await updateMutation.mutateAsync({ id: section.id, data: { isArchived: !section.isArchived } });
-      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: sectionsQueryKey });
       toast({ title: section.isArchived ? "Section restored" : "Section archived" });
     } catch {
       toast({ variant: "destructive", title: "Failed to update section" });
@@ -448,7 +448,7 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
     if (!confirm(`Delete "${section.name}" and all its fields?`)) return;
     try {
       await deleteMutation.mutateAsync({ id: section.id });
-      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: sectionsQueryKey });
       toast({ title: "Section deleted" });
     } catch {
       toast({ variant: "destructive", title: "Failed to delete section" });
@@ -462,7 +462,7 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
         id: section.id,
         data: { ...newFieldForm, dropdownOptions: serializeDropdownOptions(newFieldForm.dropdownOptions) },
       });
-      qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: sectionsQueryKey });
       toast({ title: "Field added" });
       setNewFieldForm(EMPTY_FIELD);
       setShowAddField(false);
@@ -598,6 +598,7 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
                         isEditing={editingFieldId === field.id}
                         onStartEdit={() => setEditingFieldId(field.id)}
                         onCancelEdit={() => setEditingFieldId(null)}
+                        sectionsQueryKey={sectionsQueryKey}
                       />
                     ))}
                   </div>
@@ -815,10 +816,11 @@ function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, o
   );
 }
 
-export function EditSectionsTab() {
+export function EditSectionsTab({ containerId }: { containerId: number }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: sections = [], isLoading } = useGetCustomSections();
+  const SECTIONS_QUERY_KEY = getGetCustomSectionsQueryKey(containerId);
+  const { data: sections = [], isLoading } = useGetCustomSections(containerId);
   const { data: settings = {} } = useGetSettings();
   const updateSettingsMutation = useUpdateSettings();
   const createMutation = useCreateCustomSection();
@@ -839,7 +841,7 @@ export function EditSectionsTab() {
   const handleCreate = async () => {
     if (!newName.trim()) return;
     try {
-      await createMutation.mutateAsync({ data: { name: newName, color: newColor, isRequired: newRequired } });
+      await createMutation.mutateAsync({ data: { name: newName, color: newColor, isRequired: newRequired, containerId } });
       qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({ title: "Section created" });
       setNewName("");
@@ -957,7 +959,7 @@ export function EditSectionsTab() {
       ) : (
         <div className="space-y-3">
           {sectionsList.map((section) => (
-            <SectionCard key={section.id} section={section} />
+            <SectionCard key={section.id} section={section} sectionsQueryKey={SECTIONS_QUERY_KEY} />
           ))}
         </div>
       )}

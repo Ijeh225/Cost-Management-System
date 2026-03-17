@@ -2,9 +2,11 @@ import { pgTable, serial, integer, text, boolean, timestamp } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
+import { containersTable } from "./containers";
 
 export const customSectionsTable = pgTable("custom_sections", {
   id: serial("id").primaryKey(),
+  containerId: integer("container_id").references(() => containersTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   color: text("color").notNull().default("#6366f1"),

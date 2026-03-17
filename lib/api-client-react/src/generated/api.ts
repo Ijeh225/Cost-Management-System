@@ -3385,27 +3385,28 @@ export const useSaveCustomFieldValues = <
 /**
  * @summary List custom sections with fields
  */
-export const getGetCustomSectionsUrl = () => {
-  return `/api/custom-sections`;
+export const getGetCustomSectionsUrl = (containerId?: number) => {
+  return containerId != null ? `/api/custom-sections?containerId=${containerId}` : `/api/custom-sections`;
 };
 
 export const getCustomSections = async (
+  containerId?: number,
   options?: RequestInit,
 ): Promise<CustomSectionWithFields[]> => {
-  return customFetch<CustomSectionWithFields[]>(getGetCustomSectionsUrl(), {
+  return customFetch<CustomSectionWithFields[]>(getGetCustomSectionsUrl(containerId), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetCustomSectionsQueryKey = () => {
-  return [`/api/custom-sections`] as const;
+export const getGetCustomSectionsQueryKey = (containerId?: number) => {
+  return containerId != null ? [`/api/custom-sections`, containerId] as const : [`/api/custom-sections`] as const;
 };
 
 export const getGetCustomSectionsQueryOptions = <
   TData = Awaited<ReturnType<typeof getCustomSections>>,
   TError = ErrorType<unknown>,
->(options?: {
+>(containerId?: number, options?: {
   query?: UseQueryOptions<
     Awaited<ReturnType<typeof getCustomSections>>,
     TError,
@@ -3415,11 +3416,11 @@ export const getGetCustomSectionsQueryOptions = <
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetCustomSectionsQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getGetCustomSectionsQueryKey(containerId);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getCustomSections>>
-  > = ({ signal }) => getCustomSections({ signal, ...requestOptions });
+  > = ({ signal }) => getCustomSections(containerId, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getCustomSections>>,
@@ -3440,7 +3441,7 @@ export type GetCustomSectionsQueryError = ErrorType<unknown>;
 export function useGetCustomSections<
   TData = Awaited<ReturnType<typeof getCustomSections>>,
   TError = ErrorType<unknown>,
->(options?: {
+>(containerId?: number, options?: {
   query?: UseQueryOptions<
     Awaited<ReturnType<typeof getCustomSections>>,
     TError,
@@ -3448,7 +3449,7 @@ export function useGetCustomSections<
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetCustomSectionsQueryOptions(options);
+  const queryOptions = getGetCustomSectionsQueryOptions(containerId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

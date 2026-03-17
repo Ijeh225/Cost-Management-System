@@ -1,14 +1,18 @@
 import { Router } from "express";
 import { db, customSectionsTable, customFieldsTable, customFieldValuesTable } from "@workspace/db";
-import { eq, asc, inArray } from "drizzle-orm";
+import { eq, asc, and, isNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 
 export const sectionsRouter = Router();
 
-// List all custom sections with their fields
-sectionsRouter.get("/custom-sections", requireAuth, async (_req, res) => {
+// List custom sections with their fields — filtered by containerId
+sectionsRouter.get("/custom-sections", requireAuth, async (req, res) => {
   try {
-    const sections = await db.select().from(customSectionsTable).orderBy(asc(customSectionsTable.sectionOrder));
+    const containerId = req.query.containerId ? parseInt(req.query.containerId as string) : null;
+    const whereClause = containerId !== null
+      ? eq(customSectionsTable.containerId, containerId)
+      : isNull(customSectionsTable.containerId);
+    const sections = await db.select().from(customSectionsTable).where(whereClause).orderBy(asc(customSectionsTable.sectionOrder));
     const fields = await db.select().from(customFieldsTable).orderBy(asc(customFieldsTable.fieldOrder));
     const result = sections.map(s => ({
       ...s,
@@ -23,13 +27,17 @@ sectionsRouter.get("/custom-sections", requireAuth, async (_req, res) => {
 
 // Create section
 sectionsRouter.post("/custom-sections", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
-  const { name, color = "#6366f1", icon = "Layers", isRequired = false } = req.body;
+  const { name, color = "#6366f1", icon = "Layers", isRequired = false, containerId } = req.body;
   if (!name) return res.status(400).json({ error: "name required" });
+  const containerIdNum = containerId ? parseInt(containerId) : null;
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
   try {
-    const maxOrder = await db.select({ sectionOrder: customSectionsTable.sectionOrder }).from(customSectionsTable).orderBy(asc(customSectionsTable.sectionOrder));
+    const whereClause = containerIdNum !== null
+      ? eq(customSectionsTable.containerId, containerIdNum)
+      : isNull(customSectionsTable.containerId);
+    const maxOrder = await db.select({ sectionOrder: customSectionsTable.sectionOrder }).from(customSectionsTable).where(whereClause).orderBy(asc(customSectionsTable.sectionOrder));
     const nextOrder = maxOrder.length > 0 ? (maxOrder[maxOrder.length - 1].sectionOrder + 1) : 0;
-    const [section] = await db.insert(customSectionsTable).values({ name, slug: `${slug}_${Date.now()}`, color, icon, isRequired, sectionOrder: nextOrder, createdById: req.user!.id }).returning();
+    const [section] = await db.insert(customSectionsTable).values({ containerId: containerIdNum, name, slug: `${slug}_${Date.now()}`, color, icon, isRequired, sectionOrder: nextOrder, createdById: req.user!.id }).returning();
     return res.status(201).json({ ...section, fields: [] });
   } catch (err) {
     console.error(err);

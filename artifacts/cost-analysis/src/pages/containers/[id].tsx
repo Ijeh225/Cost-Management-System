@@ -566,7 +566,7 @@ export default function ContainerDetail() {
   const unlockSectionMutation = useUnlockSection();
   const { data: clientsList } = useListClients();
   const linkContainerMutation = useLinkContainerToClient();
-  const { data: customSectionsRaw } = useGetCustomSections();
+  const { data: customSectionsRaw } = useGetCustomSections(containerId);
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
   const { data: sectionSettings } = useGetSettings();
 
@@ -1243,7 +1243,7 @@ export default function ContainerDetail() {
             </div>
           </DialogHeader>
           <div className="overflow-y-auto flex-1 p-6">
-            <EditSectionsTab />
+            <EditSectionsTab containerId={containerId} />
           </div>
         </DialogContent>
       </Dialog>
