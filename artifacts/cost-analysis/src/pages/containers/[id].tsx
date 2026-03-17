@@ -863,7 +863,7 @@ export default function ContainerDetail() {
 
       {/* Edit Sections Modal */}
       <Dialog open={editSectionsOpen} onOpenChange={setEditSectionsOpen}>
-        <DialogContent className="max-w-3xl w-full max-h-[90vh] flex flex-col border-border/50 bg-card/95 backdrop-blur p-0">
+        <DialogContent className="max-w-4xl w-full max-h-[90vh] flex flex-col border-border/50 bg-card/95 backdrop-blur p-0">
           <DialogHeader className="px-6 py-4 border-b border-border/40 flex-shrink-0">
             <div className="flex items-center justify-between">
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
