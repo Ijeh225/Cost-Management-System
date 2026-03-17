@@ -3386,7 +3386,7 @@ export const useSaveCustomFieldValues = <
  * @summary List custom sections with fields
  */
 export const getGetCustomSectionsUrl = () => {
-  return `/api/api/custom-sections`;
+  return `/api/custom-sections`;
 };
 
 export const getCustomSections = async (
@@ -3399,7 +3399,7 @@ export const getCustomSections = async (
 };
 
 export const getGetCustomSectionsQueryKey = () => {
-  return [`/api/api/custom-sections`] as const;
+  return [`/api/custom-sections`] as const;
 };
 
 export const getGetCustomSectionsQueryOptions = <
@@ -3461,7 +3461,7 @@ export function useGetCustomSections<
  * @summary Create custom section
  */
 export const getCreateCustomSectionUrl = () => {
-  return `/api/api/custom-sections`;
+  return `/api/custom-sections`;
 };
 
 export const createCustomSection = async (
@@ -3548,7 +3548,7 @@ export const useCreateCustomSection = <
  * @summary Update custom section
  */
 export const getUpdateCustomSectionUrl = (id: number) => {
-  return `/api/api/custom-sections/${id}`;
+  return `/api/custom-sections/${id}`;
 };
 
 export const updateCustomSection = async (
@@ -3636,7 +3636,7 @@ export const useUpdateCustomSection = <
  * @summary Delete custom section
  */
 export const getDeleteCustomSectionUrl = (id: number) => {
-  return `/api/api/custom-sections/${id}`;
+  return `/api/custom-sections/${id}`;
 };
 
 export const deleteCustomSection = async (
@@ -3720,7 +3720,7 @@ export const useDeleteCustomSection = <
  * @summary Add field to section
  */
 export const getAddCustomFieldUrl = (id: number) => {
-  return `/api/api/custom-sections/${id}/fields`;
+  return `/api/custom-sections/${id}/fields`;
 };
 
 export const addCustomField = async (
@@ -3807,7 +3807,7 @@ export const useAddCustomField = <
  * @summary Update custom field
  */
 export const getUpdateCustomFieldUrl = (id: number, fieldId: number) => {
-  return `/api/api/custom-sections/${id}/fields/${fieldId}`;
+  return `/api/custom-sections/${id}/fields/${fieldId}`;
 };
 
 export const updateCustomField = async (
@@ -3895,7 +3895,7 @@ export const useUpdateCustomField = <
  * @summary Delete custom field
  */
 export const getDeleteCustomFieldUrl = (id: number, fieldId: number) => {
-  return `/api/api/custom-sections/${id}/fields/${fieldId}`;
+  return `/api/custom-sections/${id}/fields/${fieldId}`;
 };
 
 export const deleteCustomField = async (
