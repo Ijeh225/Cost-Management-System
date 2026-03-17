@@ -940,14 +940,8 @@ export default function ContainerDetail() {
                 <CardContent className="p-6 space-y-6">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground mb-1">Total Actual Cost</p>
-                    <p className="text-2xl font-mono font-bold text-foreground">{formatCurrency(charges.totalCost)}</p>
+                    <p className="text-2xl font-mono font-bold text-foreground">{formatCurrency((charges.totalCost ?? 0) + customTotal)}</p>
                   </div>
-                  {customTotal > 0 && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">Custom Sections Total</p>
-                      <p className="text-xl font-mono font-bold text-foreground">{formatCurrency(customTotal)}</p>
-                    </div>
-                  )}
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-medium text-muted-foreground">Agreed Clearing Charges</p>
@@ -986,17 +980,25 @@ export default function ContainerDetail() {
                     )}
                   </div>
                   <div className="pt-6 border-t border-border/40">
-                    <p className="text-sm font-medium text-muted-foreground flex justify-between mb-2">
-                      <span>Gross Profit/Loss</span>
-                      {charges.grossProfit >= 0 ? (
-                        <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-0">PROFIT</Badge>
-                      ) : (
-                        <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/20 border-0">LOSS</Badge>
-                      )}
-                    </p>
-                    <p className={`text-4xl font-mono font-black tracking-tighter ${charges.grossProfit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>
-                      {formatCurrency(charges.grossProfit)}
-                    </p>
+                    {(() => {
+                      const combinedCost = (charges.totalCost ?? 0) + customTotal;
+                      const combinedProfit = (charges.clearingCharges ?? 0) - combinedCost;
+                      return (
+                        <>
+                          <p className="text-sm font-medium text-muted-foreground flex justify-between mb-2">
+                            <span>Gross Profit/Loss</span>
+                            {combinedProfit >= 0 ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-0">PROFIT</Badge>
+                            ) : (
+                              <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/20 border-0">LOSS</Badge>
+                            )}
+                          </p>
+                          <p className={`text-4xl font-mono font-black tracking-tighter ${combinedProfit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>
+                            {formatCurrency(combinedProfit)}
+                          </p>
+                        </>
+                      );
+                    })()}
                   </div>
                   {charges.customs?.dutyNotPaid !== undefined && charges.customs.dutyNotPaid > 0 && (
                     <div className="p-3 bg-amber-500/10 rounded border border-amber-500/20 flex justify-between items-center">
