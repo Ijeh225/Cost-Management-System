@@ -371,7 +371,7 @@ function FieldRow({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+      <div className="flex items-center gap-0.5 flex-shrink-0">
         <button
           onClick={onStartEdit}
           title="Edit field"
@@ -383,8 +383,9 @@ function FieldRow({
           onClick={handleDelete}
           title="Delete field"
           className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10"
+          disabled={deleteMutation.isPending}
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
         </button>
       </div>
     </div>
@@ -398,7 +399,7 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
   const deleteMutation = useDeleteCustomSection();
   const addFieldMutation = useAddCustomField();
 
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState((section.fields ?? []).length > 0);
   const [editingSection, setEditingSection] = useState(false);
   const [editName, setEditName] = useState(section.name);
   const [editColor, setEditColor] = useState(section.color);
