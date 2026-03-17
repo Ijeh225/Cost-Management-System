@@ -11,6 +11,10 @@ import {
   useGetSettings,
   useUpdateSettings,
   BUILT_IN_SECTIONS,
+  BUILT_IN_FIELD_DEFAULTS,
+  builtInFieldLabelKey,
+  builtInFieldHiddenKey,
+  isBuiltInFieldHidden,
 } from "@workspace/api-client-react";
 import type { CustomSectionWithFields, CustomField } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,7 +37,7 @@ import {
   Loader2, Plus, Pencil, Trash2, Layers,
   ChevronDown, ChevronRight, Archive, ArchiveRestore,
   Check, X, Hash, Type, AlignLeft, Calendar,
-  ToggleLeft, List, Save, AlertTriangle,
+  ToggleLeft, List, Save, AlertTriangle, Eye, EyeOff,
 } from "lucide-react";
 
 const FIELD_TYPES = [
@@ -627,65 +631,186 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
   );
 }
 
-function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, onSave }: {
+function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, onSaveMany }: {
   sectionKey: string;
   defaultTitle: string;
   currentTitle: string;
-  onSave: (key: string, title: string) => Promise<void>;
+  settings: Record<string, string>;
+  onSaveMany: (updates: Record<string, string>) => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(currentTitle);
-  const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(currentTitle);
+  const [savingName, setSavingName] = useState(false);
+  const [editingFieldKey, setEditingFieldKey] = useState<string | null>(null);
+  const [fieldLabelValue, setFieldLabelValue] = useState("");
+  const [savingField, setSavingField] = useState(false);
+  const [togglingField, setTogglingField] = useState<string | null>(null);
 
-  const handleSave = async () => {
-    if (!value.trim()) return;
-    setSaving(true);
-    await onSave(sectionKey, value.trim());
-    setSaving(false);
-    setEditing(false);
+  const fieldDefs = Object.entries(BUILT_IN_FIELD_DEFAULTS[sectionKey] ?? {});
+  const visibleCount = fieldDefs.filter(([k]) => !isBuiltInFieldHidden(settings, sectionKey, k)).length;
+
+  const handleSaveName = async () => {
+    if (!nameValue.trim()) return;
+    setSavingName(true);
+    await onSaveMany({ [sectionKey]: nameValue.trim() });
+    setSavingName(false);
+    setEditingName(false);
   };
 
-  const handleCancel = () => {
-    setValue(currentTitle);
-    setEditing(false);
+  const handleToggleField = async (fieldKey: string) => {
+    setTogglingField(fieldKey);
+    const hiddenKey = builtInFieldHiddenKey(sectionKey, fieldKey);
+    const nowHidden = isBuiltInFieldHidden(settings, sectionKey, fieldKey);
+    await onSaveMany({ [hiddenKey]: nowHidden ? "" : "1" });
+    setTogglingField(null);
+  };
+
+  const handleSaveFieldLabel = async (fieldKey: string) => {
+    if (!fieldLabelValue.trim()) return;
+    setSavingField(true);
+    const labelKey = builtInFieldLabelKey(sectionKey, fieldKey);
+    await onSaveMany({ [labelKey]: fieldLabelValue.trim() });
+    setSavingField(false);
+    setEditingFieldKey(null);
+  };
+
+  const handleResetFieldLabel = async (fieldKey: string) => {
+    setSavingField(true);
+    const labelKey = builtInFieldLabelKey(sectionKey, fieldKey);
+    await onSaveMany({ [labelKey]: "" });
+    setSavingField(false);
+    setEditingFieldKey(null);
   };
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/10 transition-colors group rounded-md">
-      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-muted-foreground/30" />
-      {editing ? (
-        <div className="flex items-center gap-2 flex-1">
-          <Input
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            className="h-7 text-sm flex-1"
-            autoFocus
-            onKeyDown={e => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancel(); }}
-          />
-          <Button size="sm" variant="outline" onClick={handleCancel} className="h-7 text-xs px-2">
-            <X className="w-3 h-3" />
-          </Button>
-          <Button size="sm" onClick={handleSave} disabled={!value.trim() || saving} className="h-7 text-xs gap-1 px-2">
-            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-            Save
-          </Button>
-        </div>
-      ) : (
-        <>
-          <div className="flex-1 min-w-0">
-            <span className="text-sm font-medium">{currentTitle}</span>
-            {currentTitle !== defaultTitle && (
-              <span className="ml-2 text-xs text-muted-foreground">({defaultTitle})</span>
-            )}
+    <div>
+      {/* Section header row */}
+      <div
+        className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/10 transition-colors group rounded-md cursor-pointer"
+        onClick={() => !editingName && setExpanded(v => !v)}
+      >
+        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-muted-foreground/30" />
+        {editingName ? (
+          <div className="flex items-center gap-2 flex-1" onClick={e => e.stopPropagation()}>
+            <Input
+              value={nameValue}
+              onChange={e => setNameValue(e.target.value)}
+              className="h-7 text-sm flex-1"
+              autoFocus
+              onKeyDown={e => { if (e.key === "Enter") handleSaveName(); if (e.key === "Escape") { setNameValue(currentTitle); setEditingName(false); } }}
+            />
+            <Button size="sm" variant="outline" onClick={() => { setNameValue(currentTitle); setEditingName(false); }} className="h-7 text-xs px-2">
+              <X className="w-3 h-3" />
+            </Button>
+            <Button size="sm" onClick={handleSaveName} disabled={!nameValue.trim() || savingName} className="h-7 text-xs gap-1 px-2">
+              {savingName ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+              Save
+            </Button>
           </div>
-          <button
-            onClick={() => { setValue(currentTitle); setEditing(true); }}
-            className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded-md hover:bg-accent/30 opacity-0 group-hover:opacity-100"
+        ) : (
+          <>
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-medium">{currentTitle}</span>
+              {currentTitle !== defaultTitle && (
+                <span className="ml-1.5 text-xs text-muted-foreground">({defaultTitle})</span>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground flex-shrink-0">
+              {visibleCount}/{fieldDefs.length} fields
+            </span>
+            <button
+              onClick={e => { e.stopPropagation(); setNameValue(currentTitle); setEditingName(true); }}
+              className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded-md hover:bg-accent/30 opacity-0 group-hover:opacity-100 flex-shrink-0"
+              title="Rename section"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            {expanded
+              ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+          </>
+        )}
+      </div>
+
+      {/* Fields list */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="overflow-hidden"
           >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-        </>
-      )}
+            <div className="ml-7 border-l border-border/40 pl-3 pb-2 pt-1">
+              {fieldDefs.map(([fieldKey, defaultLabel]) => {
+                const hidden = isBuiltInFieldHidden(settings, sectionKey, fieldKey);
+                const customLabel = settings[builtInFieldLabelKey(sectionKey, fieldKey)];
+                const displayLabel = customLabel || defaultLabel;
+                const isEditingThis = editingFieldKey === fieldKey;
+
+                return (
+                  <div
+                    key={fieldKey}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/10 group/field transition-colors ${hidden ? "opacity-40" : ""}`}
+                  >
+                    <button
+                      onClick={() => handleToggleField(fieldKey)}
+                      className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+                      title={hidden ? "Show this field" : "Hide this field"}
+                    >
+                      {togglingField === fieldKey
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : hidden
+                          ? <EyeOff className="w-3.5 h-3.5" />
+                          : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+
+                    {isEditingThis ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          value={fieldLabelValue}
+                          onChange={e => setFieldLabelValue(e.target.value)}
+                          className="h-7 text-xs flex-1"
+                          autoFocus
+                          onKeyDown={e => { if (e.key === "Enter") handleSaveFieldLabel(fieldKey); if (e.key === "Escape") setEditingFieldKey(null); }}
+                        />
+                        {customLabel && (
+                          <button onClick={() => handleResetFieldLabel(fieldKey)} className="text-xs text-muted-foreground hover:text-destructive px-1 flex-shrink-0" title="Reset to default">
+                            Reset
+                          </button>
+                        )}
+                        <Button size="sm" variant="outline" onClick={() => setEditingFieldKey(null)} className="h-7 text-xs px-2 flex-shrink-0">
+                          <X className="w-3 h-3" />
+                        </Button>
+                        <Button size="sm" onClick={() => handleSaveFieldLabel(fieldKey)} disabled={!fieldLabelValue.trim() || savingField} className="h-7 text-xs gap-1 px-2 flex-shrink-0">
+                          {savingField ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                          Save
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-sm flex-1 min-w-0 truncate">{displayLabel}</span>
+                        {customLabel && (
+                          <span className="text-xs text-muted-foreground flex-shrink-0 truncate max-w-[120px]">({defaultLabel})</span>
+                        )}
+                        <button
+                          onClick={() => { setFieldLabelValue(displayLabel); setEditingFieldKey(fieldKey); }}
+                          className="p-1 text-muted-foreground hover:text-primary transition-colors rounded flex-shrink-0 opacity-0 group-hover/field:opacity-100"
+                          title="Rename field"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -703,12 +828,11 @@ export function EditSectionsTab() {
   const [newColor, setNewColor] = useState("#6366f1");
   const [newRequired, setNewRequired] = useState(false);
 
-  const handleRenameBuiltIn = async (key: string, title: string) => {
+  const handleSaveBuiltInSettings = async (updates: Record<string, string>) => {
     try {
-      await updateSettingsMutation.mutateAsync({ [key]: title });
-      toast({ title: "Section renamed" });
+      await updateSettingsMutation.mutateAsync(updates);
     } catch {
-      toast({ variant: "destructive", title: "Failed to rename section" });
+      toast({ variant: "destructive", title: "Failed to save" });
     }
   };
 
@@ -743,7 +867,7 @@ export function EditSectionsTab() {
       <div>
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Built-in Sections</p>
-          <p className="text-xs text-muted-foreground">Hover a row to rename</p>
+          <p className="text-xs text-muted-foreground">Click to expand · hover to rename</p>
         </div>
         <Card className="border-border/40 bg-card/50">
           <div className="divide-y divide-border/30 py-1">
@@ -753,7 +877,8 @@ export function EditSectionsTab() {
                 sectionKey={s.key}
                 defaultTitle={s.defaultTitle}
                 currentTitle={(settings as Record<string, string>)[s.key] ?? s.defaultTitle}
-                onSave={handleRenameBuiltIn}
+                settings={settings as Record<string, string>}
+                onSaveMany={handleSaveBuiltInSettings}
               />
             ))}
           </div>

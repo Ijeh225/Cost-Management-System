@@ -9,6 +9,7 @@ import {
   getGetCustomFieldValuesQueryKey,
   type CustomSectionWithFields, type CustomField,
   useGetSettings, BUILT_IN_SECTION_DEFAULTS,
+  getBuiltInFieldLabel, isBuiltInFieldHidden,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -264,7 +265,7 @@ function RejectSectionDialog({
 
 function ChargeSectionForm({
   containerId, sectionKey, title, schema, initialData, isRecordLocked, isSectionLocked, isEditable, isAdmin,
-  approval, onSubmitSection, onApproveSection, onRejectSection, onToggleSectionLock,
+  approval, onSubmitSection, onApproveSection, onRejectSection, onToggleSectionLock, sectionSettings,
 }: {
   containerId: number;
   sectionKey: string;
@@ -272,6 +273,7 @@ function ChargeSectionForm({
   schema: z.ZodObject<any>;
   initialData: any;
   isRecordLocked: boolean;
+  sectionSettings: Record<string, string>;
   isSectionLocked: boolean;
   isEditable: boolean;
   isAdmin: boolean;
@@ -291,7 +293,8 @@ function ChargeSectionForm({
     defaultValues: initialData || {},
   });
 
-  const fields = Object.keys(schema.shape);
+  const allFields = Object.keys(schema.shape);
+  const fields = allFields.filter(f => !isBuiltInFieldHidden(sectionSettings, sectionKey, f));
   const total = fields.reduce((sum, field) => sum + Number(initialData?.[field] || 0), 0);
 
   const approvalStatus = approval?.status ?? "draft";
@@ -353,8 +356,8 @@ function ChargeSectionForm({
                 {fields.map((field) => (
                   <FormField key={field} control={form.control} name={field} render={({ field: ff }) => (
                     <FormItem>
-                      <FormLabel className="text-xs text-muted-foreground capitalize">
-                        {field.replace(/([A-Z])/g, ' $1').trim()}
+                      <FormLabel className="text-xs text-muted-foreground">
+                        {getBuiltInFieldLabel(sectionSettings, sectionKey, field)}
                       </FormLabel>
                       <FormControl>
                         <div className="relative">
@@ -911,6 +914,7 @@ export default function ContainerDetail() {
                     onApproveSection={handleApproveSection}
                     onRejectSection={(section) => setRejectTargetSection(section)}
                     onToggleSectionLock={handleToggleSectionLock}
+                    sectionSettings={sn}
                   />
                 ))}
                 {customSections.map(section => (
