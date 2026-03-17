@@ -31,7 +31,7 @@ import {
   ArrowLeft, Lock, Unlock, Anchor, User as UserIcon, FileText,
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
-  Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink,
+  Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink, X,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
@@ -348,6 +348,7 @@ export default function ContainerDetail() {
   const [linkClientDialog, setLinkClientDialog] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [linkingClient, setLinkingClient] = useState(false);
+  const [editSectionsOpen, setEditSectionsOpen] = useState(false);
 
   const { data, isLoading, isError } = useGetContainer(containerId);
   const lockMutation = useLockContainer();
@@ -664,17 +665,19 @@ export default function ContainerDetail() {
             <TabsTrigger value="audit" className="gap-2">
               <History className="w-4 h-4" /> Audit Trail
             </TabsTrigger>
-            {isAdmin && (
-              <TabsTrigger value="edit-sections" className="gap-2">
-                <Layers className="w-4 h-4" /> Edit Sections
-              </TabsTrigger>
-            )}
           </TabsList>
-          <a href={`/containers/${containerId}/print`} target="_blank" rel="noopener noreferrer">
-            <Button size="sm" variant="outline" className="gap-2 text-muted-foreground">
-              <Printer className="w-3.5 h-3.5" /> Print Summary
-            </Button>
-          </a>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button size="sm" variant="outline" className="gap-2 text-muted-foreground" onClick={() => setEditSectionsOpen(true)}>
+                <Layers className="w-3.5 h-3.5" /> Edit Sections
+              </Button>
+            )}
+            <a href={`/containers/${containerId}/print`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="outline" className="gap-2 text-muted-foreground">
+                <Printer className="w-3.5 h-3.5" /> Print Summary
+              </Button>
+            </a>
+          </div>
         </div>
 
         <TabsContent value="charges" className="mt-6">
@@ -856,21 +859,26 @@ export default function ContainerDetail() {
           </Card>
         </TabsContent>
 
-        {isAdmin && (
-          <TabsContent value="edit-sections" className="mt-6">
-            <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg">
-              <CardHeader className="border-b border-border/40">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-primary" /> Edit Cost Sections
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <EditSectionsTab />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
       </Tabs>
+
+      {/* Edit Sections Modal */}
+      <Dialog open={editSectionsOpen} onOpenChange={setEditSectionsOpen}>
+        <DialogContent className="max-w-3xl w-full max-h-[90vh] flex flex-col border-border/50 bg-card/95 backdrop-blur p-0">
+          <DialogHeader className="px-6 py-4 border-b border-border/40 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                <Layers className="w-5 h-5 text-primary" /> Edit Cost Sections
+              </DialogTitle>
+              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => setEditSectionsOpen(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 p-6">
+            <EditSectionsTab />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Global reject dialog */}
       <RejectSectionDialog
