@@ -286,12 +286,16 @@ function ChargeSectionForm({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const updateMutation = useUpdateContainerCharges();
-  const [isEditing, setIsEditing] = useState(false);
-
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: initialData || {},
   });
+
+  const isDirty = form.formState.isDirty;
+
+  useEffect(() => {
+    form.reset(initialData || {});
+  }, [JSON.stringify(initialData)]);
 
   const allFields = Object.keys(schema.shape);
   const fields = allFields.filter(f => !isBuiltInFieldHidden(sectionSettings, sectionKey, f));
@@ -311,7 +315,7 @@ function ChargeSectionForm({
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
           toast({ title: "Charges Updated", description: `${title} section saved.` });
-          setIsEditing(false);
+          form.reset(data);
         },
         onError: (err: any) => toast({ variant: "destructive", title: "Update Failed", description: err?.message ?? "Something went wrong" }),
       }
@@ -364,7 +368,7 @@ function ChargeSectionForm({
                           <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
                           <Input
                             type="number"
-                            disabled={!isEditing || !canEdit || updateMutation.isPending}
+                            disabled={!canEdit || updateMutation.isPending}
                             {...ff}
                             className="pl-7 font-mono text-sm bg-background/50 border-border/60 disabled:opacity-70 h-10"
                             onFocus={(e) => e.target.select()}
@@ -413,24 +417,16 @@ function ChargeSectionForm({
                     </Button>
                   )}
                 </div>
-                {/* Edit / Save buttons */}
-                {canEdit && (
+                {/* Save bar — appears only when there are unsaved changes */}
+                {canEdit && isDirty && (
                   <div className="flex items-center gap-2">
-                    {isEditing ? (
-                      <>
-                        <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => { form.reset(initialData); setIsEditing(false); }} disabled={updateMutation.isPending}>
-                          Cancel
-                        </Button>
-                        <Button type="submit" size="sm" className="h-8 text-xs active:scale-95 transition-transform shadow-md" disabled={updateMutation.isPending}>
-                          {updateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
-                          Save
-                        </Button>
-                      </>
-                    ) : (
-                      <Button type="button" variant="secondary" size="sm" className="h-8 text-xs" onClick={() => setIsEditing(true)}>
-                        Edit {title.split(" ")[0]}
-                      </Button>
-                    )}
+                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => form.reset(initialData)} disabled={updateMutation.isPending}>
+                      Discard
+                    </Button>
+                    <Button type="submit" size="sm" className="h-8 text-xs active:scale-95 transition-transform shadow-md" disabled={updateMutation.isPending}>
+                      {updateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                      Save Changes
+                    </Button>
                   </div>
                 )}
                 {!canEdit && approvalStatus !== "submitted" && (
