@@ -1,12 +1,12 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable } from "@workspace/db";
+import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
 const router = Router();
 
-function formatContainer(c: any, staffName?: string | null) {
+function formatContainer(c: any, staffName?: string | null, clientName?: string | null) {
   let lockedSections: string[] = [];
   try { lockedSections = JSON.parse(c.lockedSections ?? "[]"); } catch {}
   return {
@@ -22,6 +22,8 @@ function formatContainer(c: any, staffName?: string | null) {
     lockedSections,
     assignedStaffId: c.assignedStaffId ?? null,
     assignedStaffName: staffName ?? null,
+    clientId: c.clientId ?? null,
+    clientName: clientName ?? null,
     totalCost: parseFloat(c.totalCost ?? "0"),
     clearingCharges: parseFloat(c.clearingCharges ?? "0"),
     grossProfit: parseFloat(c.clearingCharges ?? "0") - parseFloat(c.totalCost ?? "0"),
@@ -263,12 +265,17 @@ router.get("/containers/:id", requireAuth, async (req, res) => {
       const [staff] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, c.assignedStaffId));
       staffName = staff?.name ?? null;
     }
+    let clientName: string | null = null;
+    if (c.clientId) {
+      const [client] = await db.select({ name: clientsTable.name }).from(clientsTable).where(eq(clientsTable.id, c.clientId));
+      clientName = client?.name ?? null;
+    }
     const charges = await getOrCreateCharges(id);
     const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations);
     const dutyNotPaid = parseFloat(charges.customs.dutyNotPaid ?? "0");
 
     const containerFormatted = {
-      ...formatContainer(c, staffName),
+      ...formatContainer(c, staffName, clientName),
       totalCost,
       grossProfit: parseFloat(c.clearingCharges ?? "0") - totalCost,
       dutyNotPaid,

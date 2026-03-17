@@ -2,6 +2,7 @@ import { pgTable, serial, text, boolean, timestamp, integer, numeric } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
+import { clientsTable } from "./clients";
 
 export const containersTable = pgTable("containers", {
   id: serial("id").primaryKey(),
@@ -14,6 +15,7 @@ export const containersTable = pgTable("containers", {
   status: text("status").notNull().default("new_upload"),
   isLocked: boolean("is_locked").notNull().default(false),
   lockedSections: text("locked_sections").notNull().default("[]"),
+  clientId: integer("client_id").references(() => clientsTable.id),
   assignedStaffId: integer("assigned_staff_id").references(() => usersTable.id),
   clearingCharges: numeric("clearing_charges", { precision: 15, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

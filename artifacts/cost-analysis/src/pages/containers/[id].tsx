@@ -31,12 +31,14 @@ import {
   ArrowLeft, Lock, Unlock, Anchor, User as UserIcon, FileText,
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
-  Clock, CheckSquare, Printer, ExternalLink, Layers,
+  Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
 import { DocumentsTab } from "@/components/containers/DocumentsTab";
 import { EditSectionsTab } from "@/components/containers/EditSectionsTab";
+import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY } from "@workspace/api-client-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const createNumberSchema = (keys: string[]) => {
   const shape: Record<string, z.ZodTypeAny> = {};
@@ -343,6 +345,9 @@ export default function ContainerDetail() {
   const [rejectTargetSection, setRejectTargetSection] = useState<string | null>(null);
   const [editingClearing, setEditingClearing] = useState(false);
   const [clearingInput, setClearingInput] = useState("");
+  const [linkClientDialog, setLinkClientDialog] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [linkingClient, setLinkingClient] = useState(false);
 
   const { data, isLoading, isError } = useGetContainer(containerId);
   const lockMutation = useLockContainer();
@@ -352,6 +357,48 @@ export default function ContainerDetail() {
   const rejectSectionMutation = useRejectSection();
   const lockSectionMutation = useLockSection();
   const unlockSectionMutation = useUnlockSection();
+  const { data: clientsList } = useListClients();
+  const linkContainerMutation = useLinkContainerToClient();
+
+  const handleLinkClient = () => {
+    if (!selectedClientId) return;
+    setLinkingClient(true);
+    linkContainerMutation.mutate(
+      { clientId: Number(selectedClientId), containerId },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          setLinkClientDialog(false);
+          setSelectedClientId("");
+          toast({ title: "Client linked", description: "Container is now linked to the selected client." });
+          setLinkingClient(false);
+        },
+        onError: () => {
+          toast({ variant: "destructive", title: "Failed to link client" });
+          setLinkingClient(false);
+        },
+      }
+    );
+  };
+
+  const handleUnlinkClient = async () => {
+    setLinkingClient(true);
+    try {
+      const res = await fetch(`/api/containers/${containerId}/unlink-client`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("Unlink failed");
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+      toast({ title: "Client unlinked", description: "Container is no longer linked to a client." });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to unlink client" });
+    } finally {
+      setLinkingClient(false);
+    }
+  };
 
   if (isLoading) return <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
@@ -554,6 +601,45 @@ export default function ContainerDetail() {
                 {container.assignedStaffName || 'Unassigned'}
               </p>
             </div>
+          </div>
+          <div className="border-t border-border/30 pt-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Users className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs font-mono text-muted-foreground uppercase mb-0.5">Linked Client</p>
+                {container.clientId ? (
+                  <Link href={`/clients/${container.clientId}`}>
+                    <span className="font-semibold text-primary hover:underline cursor-pointer">{container.clientName || "Unknown Client"}</span>
+                  </Link>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No client linked</p>
+                )}
+              </div>
+            </div>
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                {container.clientId ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                    onClick={handleUnlinkClient}
+                    disabled={linkingClient}
+                  >
+                    {linkingClient ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unlink className="w-3 h-3" />} Unlink Client
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    onClick={() => setLinkClientDialog(true)}
+                  >
+                    <LinkIcon className="w-3 h-3" /> Link to Client
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
           <WorkflowProgress currentStatus={container.status} />
         </CardContent>
@@ -793,6 +879,34 @@ export default function ContainerDetail() {
         onConfirm={(reason) => { if (rejectTargetSection) handleRejectSection(rejectTargetSection, reason); }}
         isPending={rejectSectionMutation.isPending}
       />
+
+      {/* Link Client dialog */}
+      <Dialog open={linkClientDialog} onOpenChange={v => { if (!v) { setLinkClientDialog(false); setSelectedClientId(""); } }}>
+        <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><LinkIcon className="w-4 h-4 text-primary" /> Link to Client</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Select Client</Label>
+              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Choose a client…" /></SelectTrigger>
+                <SelectContent>
+                  {(clientsList ?? []).map((c: any) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => { setLinkClientDialog(false); setSelectedClientId(""); }}>Cancel</Button>
+              <Button disabled={!selectedClientId || linkingClient} onClick={handleLinkClient} className="gap-2">
+                {linkingClient ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />} Link Client
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

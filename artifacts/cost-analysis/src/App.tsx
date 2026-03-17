@@ -21,6 +21,8 @@ import ApprovalsPage from "@/pages/approvals/index";
 import MyTasksPage from "@/pages/my-tasks/index";
 import AnalyticsPage from "@/pages/analytics/index";
 import ReportsPage from "@/pages/reports/index";
+import ClientsPage from "@/pages/clients/index";
+import ClientDetailPage from "@/pages/clients/[id]";
 import ContainerPrintPage from "@/pages/containers/print/[id]";
 
 const queryClient = new QueryClient({
@@ -85,6 +87,8 @@ function Router() {
             <Route path="/reports">
               <AdminGuard><ReportsPage /></AdminGuard>
             </Route>
+            <Route path="/clients" component={ClientsPage} />
+            <Route path="/clients/:id" component={ClientDetailPage} />
             <Route component={NotFound} />
           </Switch>
         </AppLayout>

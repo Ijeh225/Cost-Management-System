@@ -98,7 +98,17 @@ All 8 remaining features implemented:
 
 7. **Reports with Type Tabs** — Reports page now has 5 tabs: All Containers, Profitable, Loss-Making, Outstanding Duty, Completed — filters the displayed results and export count.
 
-8. **Section Builder** — Admin-only page (`/sections`) to create custom sections with color coding, add custom fields (text/number/date/checkbox/dropdown/textarea), configure role visibility and totals inclusion.
+8. **Section Builder** — Admin-only inline tab ("Edit Sections") embedded in container detail page for creating custom sections with color coding, custom fields, and role visibility.
+
+### Phase 4 ✅ COMPLETE
+
+1. **Clients Feature** — Full CRUD for client accounts; DB table + nullable `clientId` FK on containers; API routes at `/api/clients`; Clients list page + Client detail page showing linked containers and financial stats.
+
+2. **Enhanced Reports Page** — 5 report tabs: All Containers (with profitable/loss/duty/completed sub-tabs), Client Report (grouped by customer), Operations (by vessel & size), Financial (cost breakdown by category), Monthly Summary. Exports: CSV, Excel (4-sheet xlsx), PDF (browser print).
+
+3. **Container-to-Client Linking** — Container detail page hero card shows linked client (clickable link to client page). Admin can link/unlink any container to a client via a dropdown dialog. API: `PATCH /api/clients/:id/link-container` and `PATCH /api/containers/:id/unlink-client`.
+
+4. **API Server Fix** — Removed zod import from clients route (not available in api-server package); replaced with manual field validation. `formatContainer` now returns `clientId` and `clientName`.
 
 ## API Endpoints
 
@@ -157,6 +167,15 @@ All 8 remaining features implemented:
 ### Dashboard
 - `GET /api/dashboard/stats` — KPI stats + alerts summary
 
+### Clients
+- `GET /api/clients` — List/search clients
+- `POST /api/clients` — Create client (admin)
+- `GET /api/clients/:id` — Get client + linked containers
+- `PATCH /api/clients/:id` — Update client (admin)
+- `DELETE /api/clients/:id` — Delete client, unlinks containers (admin)
+- `PATCH /api/clients/:id/link-container` — Link container to client (admin)
+- `PATCH /api/containers/:id/unlink-client` — Unlink container from client (admin)
+
 ### Section Builder
 - `GET /api/custom-sections` — List sections with fields
 - `POST /api/custom-sections` — Create section
@@ -176,8 +195,9 @@ All 8 remaining features implemented:
 - `src/pages/containers/[id].tsx` — Container detail (Charges / Timeline / Tasks / Documents / Audit tabs)
 - `src/pages/containers/print/[id].tsx` — Print-ready container summary
 - `src/pages/analytics/index.tsx` — Analytics charts (Recharts)
-- `src/pages/reports/index.tsx` — Reports + type tabs + CSV export
-- `src/pages/sections/index.tsx` — Section Builder (admin)
+- `src/pages/reports/index.tsx` — Enhanced reports: 5 tabs (All Containers, Client, Operations, Financial, Monthly), CSV/Excel/PDF export
+- `src/pages/clients/index.tsx` — Clients list with CRUD
+- `src/pages/clients/[id].tsx` — Client detail with linked containers + financial stats
 - `src/pages/approvals/index.tsx` — Admin approval queue
 - `src/pages/my-tasks/index.tsx` — Staff task overview
 
