@@ -9,10 +9,7 @@ import {
   useUpdateCustomField,
   getGetCustomSectionsQueryKey,
 } from "@workspace/api-client-react";
-import type {
-  CustomSectionWithFields,
-  CustomField,
-} from "@workspace/api-client-react";
+import type { CustomSectionWithFields, CustomField } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,24 +27,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Loader2,
-  Plus,
-  Pencil,
-  Trash2,
-  Layers,
-  ChevronDown,
-  ChevronRight,
-  Archive,
-  ArchiveRestore,
-  Check,
-  X,
-  Hash,
-  Type,
-  AlignLeft,
-  Calendar,
-  ToggleLeft,
-  List,
-  Save,
+  Loader2, Plus, Pencil, Trash2, Layers,
+  ChevronDown, ChevronRight, Archive, ArchiveRestore,
+  Check, X, Hash, Type, AlignLeft, Calendar,
+  ToggleLeft, List, Save, AlertTriangle,
 } from "lucide-react";
 
 const FIELD_TYPES = [
@@ -60,14 +43,8 @@ const FIELD_TYPES = [
 ];
 
 const COLORS = [
-  "#6366f1",
-  "#8b5cf6",
-  "#ec4899",
-  "#ef4444",
-  "#f59e0b",
-  "#10b981",
-  "#06b6d4",
-  "#3b82f6",
+  "#6366f1", "#8b5cf6", "#ec4899", "#ef4444",
+  "#f59e0b", "#10b981", "#06b6d4", "#3b82f6",
 ];
 
 const ROLES = [
@@ -77,34 +54,6 @@ const ROLES = [
 ];
 
 const SECTIONS_QUERY_KEY = getGetCustomSectionsQueryKey();
-
-function FieldTypeIcon({ type }: { type: string }) {
-  const found = FIELD_TYPES.find((t) => t.value === type);
-  const Icon = found?.icon ?? Type;
-  return <Icon className="w-3.5 h-3.5" />;
-}
-
-function ColorPicker({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (c: string) => void;
-}) {
-  return (
-    <div className="flex gap-1.5 flex-wrap">
-      {COLORS.map((c) => (
-        <button
-          key={c}
-          type="button"
-          onClick={() => onChange(c)}
-          className={`w-6 h-6 rounded-full border-2 transition-all ${value === c ? "border-foreground scale-110 shadow-md" : "border-transparent hover:scale-105"}`}
-          style={{ background: c }}
-        />
-      ))}
-    </div>
-  );
-}
 
 type FieldForm = {
   name: string;
@@ -121,16 +70,20 @@ type FieldForm = {
 
 const EMPTY_FIELD: FieldForm = {
   name: "",
-  fieldType: "text",
+  fieldType: "number",
   placeholder: "",
   helpText: "",
   defaultValue: "",
   isRequired: false,
-  includeInTotal: false,
+  includeInTotal: true,
   visibleByRole: "all",
   editableByRole: "all",
   dropdownOptions: "",
 };
+
+function smartIncludeInTotal(fieldType: string): boolean {
+  return fieldType === "number";
+}
 
 function fieldToForm(f: CustomField): FieldForm {
   let opts = "";
@@ -156,22 +109,34 @@ function fieldToForm(f: CustomField): FieldForm {
 
 function serializeDropdownOptions(raw: string): string {
   return raw
-    ? JSON.stringify(
-        raw
-          .split("\n")
-          .map((o) => o.trim())
-          .filter(Boolean)
-      )
+    ? JSON.stringify(raw.split("\n").map((o) => o.trim()).filter(Boolean))
     : "[]";
 }
 
+function FieldTypeIcon({ type }: { type: string }) {
+  const found = FIELD_TYPES.find((t) => t.value === type);
+  const Icon = found?.icon ?? Type;
+  return <Icon className="w-3.5 h-3.5" />;
+}
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {COLORS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onChange(c)}
+          className={`w-6 h-6 rounded-full border-2 transition-all ${value === c ? "border-foreground scale-110 shadow-md" : "border-transparent hover:scale-105"}`}
+          style={{ background: c }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function InlineFieldForm({
-  form,
-  onChange,
-  onSave,
-  onCancel,
-  saving,
-  saveLabel,
+  form, onChange, onSave, onCancel, saving, saveLabel,
 }: {
   form: FieldForm;
   onChange: (f: FieldForm) => void;
@@ -180,8 +145,16 @@ function InlineFieldForm({
   saving: boolean;
   saveLabel: string;
 }) {
-  const set = (patch: Partial<FieldForm>) =>
-    onChange({ ...form, ...patch });
+  const set = (patch: Partial<FieldForm>) => {
+    const next = { ...form, ...patch };
+    if (patch.fieldType !== undefined) {
+      next.includeInTotal = smartIncludeInTotal(patch.fieldType);
+    }
+    onChange(next);
+  };
+
+  const showCostWarning =
+    form.fieldType === "number" && !form.includeInTotal;
 
   return (
     <div className="space-y-3 p-4 bg-accent/10 rounded-lg border border-border/40">
@@ -197,13 +170,8 @@ function InlineFieldForm({
         </div>
         <div className="space-y-1">
           <Label className="text-xs font-medium">Field Type</Label>
-          <Select
-            value={form.fieldType}
-            onValueChange={(v) => set({ fieldType: v })}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
+          <Select value={form.fieldType} onValueChange={(v) => set({ fieldType: v })}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {FIELD_TYPES.map((t) => (
                 <SelectItem key={t.value} value={t.value}>
@@ -239,36 +207,22 @@ function InlineFieldForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs font-medium">Visible By</Label>
-          <Select
-            value={form.visibleByRole}
-            onValueChange={(v) => set({ visibleByRole: v })}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
+          <Select value={form.visibleByRole} onValueChange={(v) => set({ visibleByRole: v })}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {ROLES.map((r) => (
-                <SelectItem key={r.value} value={r.value}>
-                  {r.label}
-                </SelectItem>
+                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
           <Label className="text-xs font-medium">Editable By</Label>
-          <Select
-            value={form.editableByRole}
-            onValueChange={(v) => set({ editableByRole: v })}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
+          <Select value={form.editableByRole} onValueChange={(v) => set({ editableByRole: v })}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {ROLES.map((r) => (
-                <SelectItem key={r.value} value={r.value}>
-                  {r.label}
-                </SelectItem>
+                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -276,9 +230,7 @@ function InlineFieldForm({
       </div>
       {form.fieldType === "dropdown" && (
         <div className="space-y-1">
-          <Label className="text-xs font-medium">
-            Dropdown Options (one per line)
-          </Label>
+          <Label className="text-xs font-medium">Dropdown Options (one per line)</Label>
           <textarea
             value={form.dropdownOptions}
             onChange={(e) => set({ dropdownOptions: e.target.value })}
@@ -306,13 +258,16 @@ function InlineFieldForm({
           </label>
         )}
       </div>
+      {showCostWarning && (
+        <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <p className="text-xs">
+            This is a Number field but is excluded from Total Cost. Only override this if it is intentionally non-financial (e.g. a count or reference number).
+          </p>
+        </div>
+      )}
       <div className="flex gap-2 justify-end pt-1">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onCancel}
-          className="h-7 text-xs gap-1"
-        >
+        <Button size="sm" variant="outline" onClick={onCancel} className="h-7 text-xs gap-1">
           <X className="w-3 h-3" /> Cancel
         </Button>
         <Button
@@ -321,11 +276,7 @@ function InlineFieldForm({
           disabled={!form.name.trim() || saving}
           className="h-7 text-xs gap-1"
         >
-          {saving ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : (
-            <Save className="w-3 h-3" />
-          )}
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
           {saveLabel}
         </Button>
       </div>
@@ -334,11 +285,7 @@ function InlineFieldForm({
 }
 
 function FieldRow({
-  field,
-  sectionId,
-  isEditing,
-  onStartEdit,
-  onCancelEdit,
+  field, sectionId, isEditing, onStartEdit, onCancelEdit,
 }: {
   field: CustomField;
   sectionId: number;
@@ -352,16 +299,15 @@ function FieldRow({
   const deleteMutation = useDeleteCustomField();
   const [form, setForm] = useState<FieldForm>(fieldToForm(field));
 
+  const showCostWarning = field.fieldType === "number" && !field.includeInTotal;
+
   const handleSave = async () => {
     if (!form.name.trim()) return;
     try {
       await updateMutation.mutateAsync({
         id: sectionId,
         fieldId: field.id,
-        data: {
-          ...form,
-          dropdownOptions: serializeDropdownOptions(form.dropdownOptions),
-        },
+        data: { ...form, dropdownOptions: serializeDropdownOptions(form.dropdownOptions) },
       });
       qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({ title: "Field updated" });
@@ -388,10 +334,7 @@ function FieldRow({
         form={form}
         onChange={setForm}
         onSave={handleSave}
-        onCancel={() => {
-          setForm(fieldToForm(field));
-          onCancelEdit();
-        }}
+        onCancel={() => { setForm(fieldToForm(field)); onCancelEdit(); }}
         saving={updateMutation.isPending}
         saveLabel="Save Changes"
       />
@@ -403,33 +346,23 @@ function FieldRow({
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <div className="flex items-center gap-1.5 text-muted-foreground w-20 flex-shrink-0">
           <FieldTypeIcon type={field.fieldType} />
-          <span className="text-xs capitalize truncate">
-            {field.fieldType}
-          </span>
+          <span className="text-xs capitalize truncate">{field.fieldType}</span>
         </div>
         <span className="text-sm font-medium truncate">{field.name}</span>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {field.isRequired && (
-            <Badge
-              variant="outline"
-              className="text-[10px] py-0 px-1.5 border-primary/40 text-primary"
-            >
-              Required
-            </Badge>
+            <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-primary/40 text-primary">Required</Badge>
           )}
           {field.includeInTotal && (
-            <Badge
-              variant="outline"
-              className="text-[10px] py-0 px-1.5 border-emerald-500/40 text-emerald-500"
-            >
-              In Total
+            <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-emerald-500/40 text-emerald-500">In Total</Badge>
+          )}
+          {showCostWarning && (
+            <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-amber-500/40 text-amber-500 gap-0.5">
+              <AlertTriangle className="w-2.5 h-2.5" /> Excluded
             </Badge>
           )}
           {field.visibleByRole !== "all" && (
-            <Badge
-              variant="outline"
-              className="text-[10px] py-0 px-1.5 border-muted-foreground/40 text-muted-foreground capitalize"
-            >
+            <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-muted-foreground/40 text-muted-foreground capitalize">
               {field.visibleByRole}
             </Badge>
           )}
@@ -495,14 +428,9 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
 
   const handleToggleArchive = async () => {
     try {
-      await updateMutation.mutateAsync({
-        id: section.id,
-        data: { isArchived: !section.isArchived },
-      });
+      await updateMutation.mutateAsync({ id: section.id, data: { isArchived: !section.isArchived } });
       qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
-      toast({
-        title: section.isArchived ? "Section restored" : "Section archived",
-      });
+      toast({ title: section.isArchived ? "Section restored" : "Section archived" });
     } catch {
       toast({ variant: "destructive", title: "Failed to update section" });
     }
@@ -524,10 +452,7 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
     try {
       await addFieldMutation.mutateAsync({
         id: section.id,
-        data: {
-          ...newFieldForm,
-          dropdownOptions: serializeDropdownOptions(newFieldForm.dropdownOptions),
-        },
+        data: { ...newFieldForm, dropdownOptions: serializeDropdownOptions(newFieldForm.dropdownOptions) },
       });
       qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({ title: "Field added" });
@@ -538,31 +463,21 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
     }
   };
 
-  const fields = section.fields ?? [];
+  const fields = (section.fields ?? []) as CustomField[];
 
   return (
-    <Card
-      className={`border-border/40 bg-card/50 backdrop-blur-sm overflow-hidden transition-all ${section.isArchived ? "opacity-60" : ""}`}
-    >
+    <Card className={`border-border/40 bg-card/50 backdrop-blur-sm overflow-hidden transition-all ${section.isArchived ? "opacity-60" : ""}`}>
       <div
         className="flex items-center gap-3 p-4 cursor-pointer hover:bg-accent/10 transition-colors"
-        onClick={() => {
-          if (!editingSection) setExpanded((v) => !v);
-        }}
+        onClick={() => { if (!editingSection) setExpanded((v) => !v); }}
       >
         <div
           className="w-3.5 h-3.5 rounded-full flex-shrink-0"
-          style={{
-            background: section.color,
-            boxShadow: `0 0 0 2px var(--background), 0 0 0 4px ${section.color}60`,
-          }}
+          style={{ background: section.color, boxShadow: `0 0 0 2px var(--background), 0 0 0 4px ${section.color}60` }}
         />
 
         {editingSection ? (
-          <div
-            className="flex-1 space-y-3"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="flex-1 space-y-3" onClick={(e) => e.stopPropagation()}>
             <div className="flex gap-3 flex-wrap items-end">
               <div className="space-y-1 flex-1 min-w-[160px]">
                 <Label className="text-xs font-medium">Section Name *</Label>
@@ -571,50 +486,30 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
                   onChange={(e) => setEditName(e.target.value)}
                   className="h-8 text-sm"
                   autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSaveSection();
-                    if (e.key === "Escape") resetSectionEdit();
-                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveSection(); if (e.key === "Escape") resetSectionEdit(); }}
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Color</Label>
-                <ColorPicker
-                  value={editColor}
-                  onChange={setEditColor}
-                />
+                <ColorPicker value={editColor} onChange={setEditColor} />
               </div>
             </div>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
-                <Switch
-                  checked={editRequired}
-                  onCheckedChange={setEditRequired}
-                />
+                <Switch checked={editRequired} onCheckedChange={setEditRequired} />
                 <span className="text-xs">Required in Workflow</span>
               </label>
               <div className="flex gap-2 ml-auto">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={resetSectionEdit}
-                  className="h-7 text-xs gap-1"
-                >
+                <Button size="sm" variant="outline" onClick={resetSectionEdit} className="h-7 text-xs gap-1">
                   <X className="w-3 h-3" /> Cancel
                 </Button>
                 <Button
                   size="sm"
                   onClick={handleSaveSection}
-                  disabled={
-                    !editName.trim() || updateMutation.isPending
-                  }
+                  disabled={!editName.trim() || updateMutation.isPending}
                   className="h-7 text-xs gap-1"
                 >
-                  {updateMutation.isPending ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Check className="w-3 h-3" />
-                  )}
+                  {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                   Save
                 </Button>
               </div>
@@ -624,41 +519,19 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
           <>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm truncate">
-                  {section.name}
-                </span>
+                <span className="font-semibold text-sm truncate">{section.name}</span>
                 {section.isRequired && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] py-0 px-1.5 border-primary/40 text-primary flex-shrink-0"
-                  >
-                    Required
-                  </Badge>
+                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-primary/40 text-primary flex-shrink-0">Required</Badge>
                 )}
                 {section.isArchived && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] py-0 px-1.5 border-amber-500/40 text-amber-500 flex-shrink-0"
-                  >
-                    Archived
-                  </Badge>
+                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-amber-500/40 text-amber-500 flex-shrink-0">Archived</Badge>
                 )}
               </div>
-              <span className="text-xs text-muted-foreground">
-                {fields.length} {fields.length === 1 ? "field" : "fields"}
-              </span>
+              <span className="text-xs text-muted-foreground">{fields.length} {fields.length === 1 ? "field" : "fields"}</span>
             </div>
-            <div
-              className="flex items-center gap-0.5 flex-shrink-0"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
               <button
-                onClick={() => {
-                  setEditName(section.name);
-                  setEditColor(section.color);
-                  setEditRequired(section.isRequired);
-                  setEditingSection(true);
-                }}
+                onClick={() => { setEditName(section.name); setEditColor(section.color); setEditRequired(section.isRequired); setEditingSection(true); }}
                 title="Edit section"
                 className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded-md hover:bg-accent/30"
               >
@@ -669,11 +542,7 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
                 title={section.isArchived ? "Restore" : "Archive"}
                 className="p-1.5 text-muted-foreground hover:text-amber-500 transition-colors rounded-md hover:bg-amber-500/10"
               >
-                {section.isArchived ? (
-                  <ArchiveRestore className="w-3.5 h-3.5" />
-                ) : (
-                  <Archive className="w-3.5 h-3.5" />
-                )}
+                {section.isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
               </button>
               <button
                 onClick={handleDeleteSection}
@@ -682,11 +551,10 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
-              {expanded ? (
-                <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" />
-              ) : (
-                <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />
-              )}
+              {expanded
+                ? <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" />
+                : <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />
+              }
             </div>
           </>
         )}
@@ -706,15 +574,8 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
                 <div className="px-6 py-8 text-center text-muted-foreground">
                   <Hash className="w-8 h-8 mx-auto mb-2 opacity-20" />
                   <p className="text-sm font-medium">No fields yet</p>
-                  <p className="text-xs mt-1">
-                    Add fields to collect data in this section.
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setShowAddField(true)}
-                    className="mt-3 gap-1.5"
-                  >
+                  <p className="text-xs mt-1">Add fields to collect data in this section.</p>
+                  <Button size="sm" variant="outline" onClick={() => setShowAddField(true)} className="mt-3 gap-1.5">
                     <Plus className="w-3.5 h-3.5" /> Add First Field
                   </Button>
                 </div>
@@ -732,35 +593,23 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
                       />
                     ))}
                   </div>
-
                   {!showAddField && (
                     <div className="px-4 py-3 border-t border-border/30">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setShowAddField(true)}
-                        className="gap-1.5 h-7 text-xs"
-                      >
+                      <Button size="sm" variant="outline" onClick={() => setShowAddField(true)} className="gap-1.5 h-7 text-xs">
                         <Plus className="w-3 h-3" /> Add Field
                       </Button>
                     </div>
                   )}
                 </>
               )}
-
               {showAddField && (
                 <div className="px-4 py-3 border-t border-border/30">
-                  <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
-                    New Field
-                  </p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">New Field</p>
                   <InlineFieldForm
                     form={newFieldForm}
                     onChange={setNewFieldForm}
                     onSave={handleAddField}
-                    onCancel={() => {
-                      setShowAddField(false);
-                      setNewFieldForm(EMPTY_FIELD);
-                    }}
+                    onCancel={() => { setShowAddField(false); setNewFieldForm(EMPTY_FIELD); }}
                     saving={addFieldMutation.isPending}
                     saveLabel="Add Field"
                   />
@@ -774,7 +623,7 @@ function SectionCard({ section }: { section: CustomSectionWithFields }) {
   );
 }
 
-export default function SectionsBuilderPage() {
+export function EditSectionsTab() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data: sections = [], isLoading } = useGetCustomSections();
@@ -788,9 +637,7 @@ export default function SectionsBuilderPage() {
   const handleCreate = async () => {
     if (!newName.trim()) return;
     try {
-      await createMutation.mutateAsync({
-        data: { name: newName, color: newColor, isRequired: newRequired },
-      });
+      await createMutation.mutateAsync({ data: { name: newName, color: newColor, isRequired: newRequired } });
       qc.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
       toast({ title: "Section created" });
       setNewName("");
@@ -804,26 +651,23 @@ export default function SectionsBuilderPage() {
 
   const sectionsList = sections as CustomSectionWithFields[];
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
-    >
-      <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Layers className="w-6 h-6 text-primary" /> Section Builder
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Create and manage custom sections and fields for container cost
-            tracking.
+          <p className="text-sm text-muted-foreground">
+            Create and manage custom cost sections and their fields. Number fields inside cost sections are automatically included in Total Cost.
           </p>
         </div>
-        <Button
-          onClick={() => setShowCreate((v) => !v)}
-          className="gap-2 shadow-md"
-        >
+        <Button onClick={() => setShowCreate((v) => !v)} className="gap-2 shadow-md" size="sm">
           <Plus className="w-4 h-4" /> New Section
         </Button>
       </div>
@@ -838,67 +682,41 @@ export default function SectionsBuilderPage() {
           >
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="p-4 space-y-3">
-                <p className="text-xs font-medium text-primary uppercase tracking-wider">
-                  Create New Section
-                </p>
+                <p className="text-xs font-medium text-primary uppercase tracking-wider">Create New Section</p>
                 <div className="flex gap-3 flex-wrap items-end">
                   <div className="space-y-1 flex-1 min-w-[180px]">
-                    <Label className="text-xs font-medium">
-                      Section Name *
-                    </Label>
+                    <Label className="text-xs font-medium">Section Name *</Label>
                     <Input
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
                       placeholder="e.g. Bank Charges"
                       className="h-8 text-sm"
                       autoFocus
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && handleCreate()
-                      }
+                      onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs font-medium">Color</Label>
-                    <ColorPicker
-                      value={newColor}
-                      onChange={setNewColor}
-                    />
+                    <ColorPicker value={newColor} onChange={setNewColor} />
                   </div>
                 </div>
                 <div className="flex items-center gap-4 flex-wrap">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <Switch
-                      checked={newRequired}
-                      onCheckedChange={setNewRequired}
-                    />
+                    <Switch checked={newRequired} onCheckedChange={setNewRequired} />
                     <span className="text-xs">Required in Workflow</span>
                   </label>
                   <div className="flex gap-2 ml-auto">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setShowCreate(false);
-                        setNewName("");
-                      }}
-                      className="h-7 text-xs gap-1"
-                    >
+                    <Button size="sm" variant="outline" onClick={() => { setShowCreate(false); setNewName(""); }} className="h-7 text-xs gap-1">
                       <X className="w-3 h-3" /> Cancel
                     </Button>
                     <Button
                       size="sm"
                       onClick={handleCreate}
-                      disabled={
-                        !newName.trim() || createMutation.isPending
-                      }
+                      disabled={!newName.trim() || createMutation.isPending}
                       className="h-7 text-xs gap-1"
                     >
-                      {createMutation.isPending ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Plus className="w-3 h-3" />
-                      )}
-                      Create Section
+                      {createMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                      Create
                     </Button>
                   </div>
                 </div>
@@ -908,18 +726,11 @@ export default function SectionsBuilderPage() {
         )}
       </AnimatePresence>
 
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="w-7 h-7 animate-spin text-primary" />
-        </div>
-      ) : sectionsList.length === 0 ? (
-        <div className="text-center py-20 text-muted-foreground">
-          <Layers className="w-14 h-14 mx-auto mb-4 opacity-15" />
-          <p className="text-lg font-medium">No custom sections yet</p>
-          <p className="text-sm mt-1 max-w-sm mx-auto">
-            Sections let you add custom cost fields to every container. Click
-            "New Section" above to get started.
-          </p>
+      {sectionsList.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <Layers className="w-12 h-12 mx-auto mb-3 opacity-20" />
+          <p className="font-medium">No custom sections yet</p>
+          <p className="text-sm mt-1">Create your first section to start adding custom cost fields.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -928,6 +739,6 @@ export default function SectionsBuilderPage() {
           ))}
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }

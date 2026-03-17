@@ -1,0 +1,97 @@
+At the end of each month, the system should allow us to generate professional reports similar to what an accountant or auditor would expect.
+
+Examples of reports:
+
+Client Reports
+Total containers per client
+Total revenue per client
+Total cost per client
+Gross profit per client
+
+Operations Reports
+Total containers handled
+Containers by vessel
+Containers by size (20ft / 40ft)
+
+Financial Reports
+Total operational expenses
+Cost breakdown by category
+Total clearing charges
+Total gross profit
+
+Monthly Summary
+Total containers processed
+Total revenue
+Total expenses
+Net profit
+
+Reports should be exportable as:
+
+PDF
+Excel
+CSV
+
+The main goal is to change the system from a container-first workflow to a client-first workflow.
+
+The new structure should look like this:
+
+Client → Job Batch → Containers → Expenses → Profit Analysis → Reports
+
+
+
+SECTION BUILDER MODIFICATION
+
+The application currently has a Section Builder feature. I would like this Section Builder to be removed completely.
+
+The existing Section Builder code should be deleted.
+
+Instead of having a separate Section Builder page, section editing should be handled directly inside the Container page.
+
+On the Container page, at the top of the interface (where we currently have items such as Timeline, Tasks, Documents, and Audit Trail), we should add a new option called:
+
+"Edit Sections"
+
+When the user clicks "Edit Sections", it should open a section editing interface.
+
+From this interface, the user should be able to:
+
+Edit existing sections
+Rename sections
+Reorder sections
+Add new sections
+Delete sections if necessary
+
+This section editing should work similarly to how the system shows the breakdown of charges when we click on a container.
+
+The goal is to allow the user to manage sections dynamically without needing a separate Section Builder page.
+
+The section editor should allow the user to:
+
+Modify the structure of sections
+Add new cost sections
+Adjust existing sections
+Update the layout of sections within the container
+
+This editing interface should appear directly within the container context so that users can immediately see how sections affect the container cost breakdown.
+
+In summary:
+
+Remove the standalone Section Builder.
+
+Add a new "Edit Sections" option at the top of the container page.
+
+Allow full section editing from within the container interface.
+
+The system should make cost inclusion automatic so staff do not need to remember it manually.
+
+For all built-in core expense fields, the app should automatically treat them as cost fields and include them in Total Cost calculation by default.
+
+For non-financial fields such as notes, remarks, vessel, declaration, status, and comments, the app should automatically exclude them from Total Cost.
+
+For custom fields created later, the system should use smart defaults:
+- if the field type is Number and it is created inside a cost-related section, default "Include in Total Cost" to Yes
+- if the field type is Text, Textarea, Date, Dropdown, or Checkbox, default "Include in Total Cost" to No
+
+Only admins should be able to override this setting.
+
+Also add a safety validation warning if a numeric field in a cost-related section is excluded from Total Cost, so mistakes can be caught early.

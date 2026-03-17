@@ -31,11 +31,12 @@ import {
   ArrowLeft, Lock, Unlock, Anchor, User as UserIcon, FileText,
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
-  Clock, CheckSquare, Printer, ExternalLink,
+  Clock, CheckSquare, Printer, ExternalLink, Layers,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
 import { DocumentsTab } from "@/components/containers/DocumentsTab";
+import { EditSectionsTab } from "@/components/containers/EditSectionsTab";
 
 const createNumberSchema = (keys: string[]) => {
   const shape: Record<string, z.ZodTypeAny> = {};
@@ -577,6 +578,11 @@ export default function ContainerDetail() {
             <TabsTrigger value="audit" className="gap-2">
               <History className="w-4 h-4" /> Audit Trail
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="edit-sections" className="gap-2">
+                <Layers className="w-4 h-4" /> Edit Sections
+              </TabsTrigger>
+            )}
           </TabsList>
           <a href={`/containers/${containerId}/print`} target="_blank" rel="noopener noreferrer">
             <Button size="sm" variant="outline" className="gap-2 text-muted-foreground">
@@ -763,6 +769,21 @@ export default function ContainerDetail() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="edit-sections" className="mt-6">
+            <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg">
+              <CardHeader className="border-b border-border/40">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-primary" /> Edit Cost Sections
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <EditSectionsTab />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Global reject dialog */}
