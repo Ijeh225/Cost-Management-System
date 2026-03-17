@@ -43,9 +43,7 @@ export function useListClients(search?: string) {
     queryKey: [...CLIENTS_QUERY_KEY, search ?? ""],
     queryFn: async () => {
       const url = search ? `/api/clients?search=${encodeURIComponent(search)}` : "/api/clients";
-      const res = await customFetch(url);
-      if (!res.ok) throw new Error("Failed to fetch clients");
-      return res.json() as Promise<Client[]>;
+      return customFetch<Client[]>(url);
     },
   });
 }
@@ -54,9 +52,7 @@ export function useGetClient(id: number | null) {
   return useQuery({
     queryKey: [...CLIENTS_QUERY_KEY, id],
     queryFn: async () => {
-      const res = await customFetch(`/api/clients/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch client");
-      return res.json() as Promise<ClientWithContainers>;
+      return customFetch<ClientWithContainers>(`/api/clients/${id}`);
     },
     enabled: !!id,
   });
@@ -66,13 +62,11 @@ export function useCreateClient() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: CreateClientBody) => {
-      const res = await customFetch("/api/clients", {
+      return customFetch<Client>("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to create client");
-      return res.json() as Promise<Client>;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY }); },
   });
@@ -82,13 +76,11 @@ export function useUpdateClient() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<CreateClientBody> }) => {
-      const res = await customFetch(`/api/clients/${id}`, {
+      return customFetch<Client>(`/api/clients/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to update client");
-      return res.json() as Promise<Client>;
     },
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
@@ -101,9 +93,7 @@ export function useDeleteClient() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      const res = await customFetch(`/api/clients/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete client");
-      return res.json();
+      return customFetch<{ success: boolean }>(`/api/clients/${id}`, { method: "DELETE" });
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY }); },
   });
@@ -113,13 +103,11 @@ export function useLinkContainerToClient() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ clientId, containerId }: { clientId: number; containerId: number }) => {
-      const res = await customFetch(`/api/clients/${clientId}/link-container`, {
+      return customFetch<{ success: boolean }>(`/api/clients/${clientId}/link-container`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ containerId }),
       });
-      if (!res.ok) throw new Error("Failed to link container");
-      return res.json();
     },
     onSuccess: (_, { clientId }) => {
       qc.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
