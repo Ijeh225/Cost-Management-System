@@ -2148,7 +2148,7 @@ export function useGetDashboardStats<
  * @summary Get analytics data
  */
 export const getGetAnalyticsUrl = () => {
-  return `/api/api/analytics`;
+  return `/api/analytics`;
 };
 
 export const getAnalytics = async (
@@ -2161,7 +2161,7 @@ export const getAnalytics = async (
 };
 
 export const getGetAnalyticsQueryKey = () => {
-  return [`/api/api/analytics`] as const;
+  return [`/api/analytics`] as const;
 };
 
 export const getGetAnalyticsQueryOptions = <
@@ -2234,8 +2234,8 @@ export const getGetContainerReportUrl = (params?: GetContainerReportParams) => {
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/api/api/reports/containers?${stringifiedParams}`
-    : `/api/api/reports/containers`;
+    ? `/api/reports/containers?${stringifiedParams}`
+    : `/api/reports/containers`;
 };
 
 export const getContainerReport = async (
@@ -2254,7 +2254,7 @@ export const getContainerReport = async (
 export const getGetContainerReportQueryKey = (
   params?: GetContainerReportParams,
 ) => {
-  return [`/api/api/reports/containers`, ...(params ? [params] : [])] as const;
+  return [`/api/reports/containers`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetContainerReportQueryOptions = <
@@ -2336,8 +2336,8 @@ export const getExportContainersCSVUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/api/api/reports/export?${stringifiedParams}`
-    : `/api/api/reports/export`;
+    ? `/api/reports/export?${stringifiedParams}`
+    : `/api/reports/export`;
 };
 
 export const exportContainersCSV = async (
@@ -2353,7 +2353,7 @@ export const exportContainersCSV = async (
 export const getExportContainersCSVQueryKey = (
   params?: ExportContainersCSVParams,
 ) => {
-  return [`/api/api/reports/export`, ...(params ? [params] : [])] as const;
+  return [`/api/reports/export`, ...(params ? [params] : [])] as const;
 };
 
 export const getExportContainersCSVQueryOptions = <
@@ -2423,7 +2423,7 @@ export function useExportContainersCSV<
  * @summary Get container timeline
  */
 export const getGetContainerTimelineUrl = (id: number) => {
-  return `/api/api/containers/${id}/timeline`;
+  return `/api/containers/${id}/timeline`;
 };
 
 export const getContainerTimeline = async (
@@ -2437,7 +2437,7 @@ export const getContainerTimeline = async (
 };
 
 export const getGetContainerTimelineQueryKey = (id: number) => {
-  return [`/api/api/containers/${id}/timeline`] as const;
+  return [`/api/containers/${id}/timeline`] as const;
 };
 
 export const getGetContainerTimelineQueryOptions = <
@@ -2511,7 +2511,7 @@ export function useGetContainerTimeline<
  * @summary Add timeline event
  */
 export const getAddTimelineEventUrl = (id: number) => {
-  return `/api/api/containers/${id}/timeline`;
+  return `/api/containers/${id}/timeline`;
 };
 
 export const addTimelineEvent = async (
@@ -2598,7 +2598,7 @@ export const useAddTimelineEvent = <
  * @summary Delete timeline event
  */
 export const getDeleteTimelineEventUrl = (id: number, eventId: number) => {
-  return `/api/api/containers/${id}/timeline/${eventId}`;
+  return `/api/containers/${id}/timeline/${eventId}`;
 };
 
 export const deleteTimelineEvent = async (
@@ -2683,7 +2683,7 @@ export const useDeleteTimelineEvent = <
  * @summary Get container tasks
  */
 export const getGetContainerTasksUrl = (id: number) => {
-  return `/api/api/containers/${id}/tasks`;
+  return `/api/containers/${id}/tasks`;
 };
 
 export const getContainerTasks = async (
@@ -2697,7 +2697,7 @@ export const getContainerTasks = async (
 };
 
 export const getGetContainerTasksQueryKey = (id: number) => {
-  return [`/api/api/containers/${id}/tasks`] as const;
+  return [`/api/containers/${id}/tasks`] as const;
 };
 
 export const getGetContainerTasksQueryOptions = <
@@ -2770,7 +2770,7 @@ export function useGetContainerTasks<
  * @summary Create task
  */
 export const getCreateContainerTaskUrl = (id: number) => {
-  return `/api/api/containers/${id}/tasks`;
+  return `/api/containers/${id}/tasks`;
 };
 
 export const createContainerTask = async (
@@ -2857,7 +2857,7 @@ export const useCreateContainerTask = <
  * @summary Update task
  */
 export const getUpdateContainerTaskUrl = (id: number, taskId: number) => {
-  return `/api/api/containers/${id}/tasks/${taskId}`;
+  return `/api/containers/${id}/tasks/${taskId}`;
 };
 
 export const updateContainerTask = async (
@@ -2945,7 +2945,7 @@ export const useUpdateContainerTask = <
  * @summary Delete task
  */
 export const getDeleteContainerTaskUrl = (id: number, taskId: number) => {
-  return `/api/api/containers/${id}/tasks/${taskId}`;
+  return `/api/containers/${id}/tasks/${taskId}`;
 };
 
 export const deleteContainerTask = async (
@@ -3030,7 +3030,7 @@ export const useDeleteContainerTask = <
  * @summary Get container documents
  */
 export const getGetContainerDocumentsUrl = (id: number) => {
-  return `/api/api/containers/${id}/documents`;
+  return `/api/containers/${id}/documents`;
 };
 
 export const getContainerDocuments = async (
@@ -3044,7 +3044,7 @@ export const getContainerDocuments = async (
 };
 
 export const getGetContainerDocumentsQueryKey = (id: number) => {
-  return [`/api/api/containers/${id}/documents`] as const;
+  return [`/api/containers/${id}/documents`] as const;
 };
 
 export const getGetContainerDocumentsQueryOptions = <
@@ -3118,7 +3118,7 @@ export function useGetContainerDocuments<
  * @summary Delete document
  */
 export const getDeleteContainerDocumentUrl = (id: number, docId: number) => {
-  return `/api/api/containers/${id}/documents/${docId}`;
+  return `/api/containers/${id}/documents/${docId}`;
 };
 
 export const deleteContainerDocument = async (
@@ -3203,7 +3203,7 @@ export const useDeleteContainerDocument = <
  * @summary Get custom field values for container
  */
 export const getGetCustomFieldValuesUrl = (containerId: number) => {
-  return `/api/api/containers/${containerId}/custom-values`;
+  return `/api/containers/${containerId}/custom-values`;
 };
 
 export const getCustomFieldValues = async (
@@ -3220,7 +3220,7 @@ export const getCustomFieldValues = async (
 };
 
 export const getGetCustomFieldValuesQueryKey = (containerId: number) => {
-  return [`/api/api/containers/${containerId}/custom-values`] as const;
+  return [`/api/containers/${containerId}/custom-values`] as const;
 };
 
 export const getGetCustomFieldValuesQueryOptions = <
@@ -3298,7 +3298,7 @@ export function useGetCustomFieldValues<
  * @summary Save custom field values
  */
 export const getSaveCustomFieldValuesUrl = (containerId: number) => {
-  return `/api/api/containers/${containerId}/custom-values`;
+  return `/api/containers/${containerId}/custom-values`;
 };
 
 export const saveCustomFieldValues = async (
@@ -3980,7 +3980,7 @@ export const useDeleteCustomField = <
  * @summary Get profit intelligence and delay alerts
  */
 export const getGetIntelligenceAlertsUrl = () => {
-  return `/api/api/intelligence/alerts`;
+  return `/api/intelligence/alerts`;
 };
 
 export const getIntelligenceAlerts = async (
@@ -3993,7 +3993,7 @@ export const getIntelligenceAlerts = async (
 };
 
 export const getGetIntelligenceAlertsQueryKey = () => {
-  return [`/api/api/intelligence/alerts`] as const;
+  return [`/api/intelligence/alerts`] as const;
 };
 
 export const getGetIntelligenceAlertsQueryOptions = <

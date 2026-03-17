@@ -5,6 +5,9 @@ import {
   useLockContainer, useUpdateContainer, useGetContainerAuditLog,
   useSubmitSection, useApproveSection, useRejectSection, useLockSection, useUnlockSection,
   type AuditEntry, type SectionApproval, type UpdateContainerChargesRequestSection,
+  useGetCustomSections, useGetCustomFieldValues, useSaveCustomFieldValues,
+  getGetCustomFieldValuesQueryKey,
+  type CustomSectionWithFields, type CustomField,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -39,6 +42,7 @@ import { DocumentsTab } from "@/components/containers/DocumentsTab";
 import { EditSectionsTab } from "@/components/containers/EditSectionsTab";
 import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 const createNumberSchema = (keys: string[]) => {
   const shape: Record<string, z.ZodTypeAny> = {};
@@ -51,6 +55,184 @@ const customsSchema = createNumberSchema(['duty', 'dutyPaid', 'dutyNotPaid', 'va
 const terminalSchema = createNumberSchema(['terminalCharges', 'terminalAdditions1', 'ikorouduTerminalAdditions2', 'terminalDemurrageToBePaidByCustomer', 'terminalPaymentVat', 'wharfageFeeForNpa', 'sifaxGmtSigning', 'tsDcAdmin', 'tincanBond', 'bond', 'manifest']);
 const deliverySchema = createNumberSchema(['passingOfTruck', 'passingOfTruckForEmptyReturn', 'parkingForPullout', 'pullout', 'delivery', 'emptyReturn', 'unchainingTruck', 'emptyCallUp', 'pulloutExpenses', 'transferToIkorodu', 'transportAllowance']);
 const operationsSchema = createNumberSchema(['fouBooking', 'fou', 'scanningToPhysical', 'security', 'additionalDeliveryExpenses', 'miscellaneous', 'abandoned', 'agenciesBlocks', 'callUp', 'transireRunnings', 'officePtml', 'freshPayment']);
+
+function CustomSectionForm({
+  section, containerId, savedValues, onSaved,
+}: {
+  section: CustomSectionWithFields;
+  containerId: number;
+  savedValues: Record<number, string>;
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const saveMutation = useSaveCustomFieldValues();
+  const [isEditing, setIsEditing] = useState(false);
+  const [localValues, setLocalValues] = useState<Record<number, string>>({});
+
+  const fields = (section.fields ?? []) as CustomField[];
+
+  const displayValues = isEditing ? localValues : savedValues;
+
+  const sectionTotal = fields
+    .filter(f => f.fieldType === "number" && f.includeInTotal)
+    .reduce((sum, f) => sum + (parseFloat(displayValues[f.id] ?? "0") || 0), 0);
+
+  const handleStartEdit = () => {
+    const init: Record<number, string> = {};
+    for (const f of fields) {
+      init[f.id] = savedValues[f.id] ?? (f.defaultValue ?? "");
+    }
+    setLocalValues(init);
+    setIsEditing(true);
+  };
+
+  const setValue = (fieldId: number, value: string) =>
+    setLocalValues(prev => ({ ...prev, [fieldId]: value }));
+
+  const handleSave = async () => {
+    const values = Object.entries(localValues).map(([fieldId, value]) => ({
+      fieldId: Number(fieldId),
+      value,
+    }));
+    try {
+      await saveMutation.mutateAsync({ containerId, data: { values } });
+      toast({ title: "Saved", description: `${section.name} saved.` });
+      onSaved();
+      setIsEditing(false);
+    } catch {
+      toast({ variant: "destructive", title: "Failed to save" });
+    }
+  };
+
+  return (
+    <AccordionItem value={`custom-${section.id}`} className="border-border/50 bg-card/20 px-4 rounded-lg mb-4 shadow-sm">
+      <AccordionTrigger className="hover:no-underline py-4">
+        <div className="flex items-center justify-between w-full pr-4">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: section.color }} />
+            <span className="font-semibold text-base">{section.name}</span>
+            {section.isRequired && (
+              <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-primary/40 text-primary">Required</Badge>
+            )}
+          </div>
+          <span className="font-mono text-primary font-medium">{formatCurrency(sectionTotal)}</span>
+        </div>
+      </AccordionTrigger>
+      <AccordionContent className="pt-2 pb-6">
+        {fields.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            No fields yet. Add fields via <strong>Edit Sections</strong>.
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+              {fields.map((field) => {
+                const val = displayValues[field.id] ?? "";
+                return (
+                  <div key={field.id} className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                      {field.name}
+                      {field.isRequired && <span className="text-destructive">*</span>}
+                    </label>
+                    {field.fieldType === "number" && (
+                      <div className="relative">
+                        {field.includeInTotal && (
+                          <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
+                        )}
+                        <Input
+                          type="number"
+                          disabled={!isEditing}
+                          value={val}
+                          onChange={e => setValue(field.id, e.target.value)}
+                          className={`${field.includeInTotal ? "pl-7" : ""} font-mono text-sm h-9`}
+                          placeholder={field.placeholder ?? "0"}
+                        />
+                      </div>
+                    )}
+                    {field.fieldType === "text" && (
+                      <Input
+                        disabled={!isEditing}
+                        value={val}
+                        onChange={e => setValue(field.id, e.target.value)}
+                        className="h-9 text-sm"
+                        placeholder={field.placeholder ?? ""}
+                      />
+                    )}
+                    {field.fieldType === "textarea" && (
+                      <Textarea
+                        disabled={!isEditing}
+                        value={val}
+                        onChange={e => setValue(field.id, e.target.value)}
+                        className="text-sm resize-none"
+                        rows={2}
+                        placeholder={field.placeholder ?? ""}
+                      />
+                    )}
+                    {field.fieldType === "date" && (
+                      <Input
+                        type="date"
+                        disabled={!isEditing}
+                        value={val}
+                        onChange={e => setValue(field.id, e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    )}
+                    {field.fieldType === "checkbox" && (
+                      <div className="flex items-center gap-2 h-9">
+                        <Switch
+                          disabled={!isEditing}
+                          checked={val === "true"}
+                          onCheckedChange={v => setValue(field.id, String(v))}
+                        />
+                        <span className="text-xs text-muted-foreground">{val === "true" ? "Yes" : "No"}</span>
+                      </div>
+                    )}
+                    {field.fieldType === "dropdown" && (() => {
+                      let opts: string[] = [];
+                      try { opts = JSON.parse(field.dropdownOptions ?? "[]"); } catch { opts = []; }
+                      return (
+                        <Select
+                          disabled={!isEditing}
+                          value={val}
+                          onValueChange={v => setValue(field.id, v)}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder={field.placeholder ?? "Select…"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {opts.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
+                    {field.helpText && (
+                      <p className="text-xs text-muted-foreground/70">{field.helpText}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              {isEditing ? (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+                  <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending} className="gap-1.5">
+                    {saveMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    Save
+                  </Button>
+                </>
+              ) : (
+                <Button size="sm" variant="outline" onClick={handleStartEdit} className="gap-1.5">
+                  <Pencil className="w-3.5 h-3.5" /> Edit
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+      </AccordionContent>
+    </AccordionItem>
+  );
+}
 
 function RejectSectionDialog({
   open, onClose, onConfirm, isPending,
@@ -360,6 +542,8 @@ export default function ContainerDetail() {
   const unlockSectionMutation = useUnlockSection();
   const { data: clientsList } = useListClients();
   const linkContainerMutation = useLinkContainerToClient();
+  const { data: customSectionsRaw } = useGetCustomSections();
+  const { data: customValuesData } = useGetCustomFieldValues(containerId);
 
   const handleLinkClient = () => {
     if (!selectedClientId) return;
@@ -509,6 +693,17 @@ export default function ContainerDetail() {
     { key: "delivery",   title: "Delivery & Transport",  schema: deliverySchema,   data: charges.delivery },
     { key: "operations", title: "Operations & Misc.",     schema: operationsSchema, data: charges.operations },
   ];
+
+  const customSections = ((customSectionsRaw ?? []) as CustomSectionWithFields[]).filter(s => !s.isArchived);
+  const customValuesMap: Record<number, string> = {};
+  for (const v of (customValuesData ?? [])) {
+    customValuesMap[v.fieldId] = v.value;
+  }
+  const customTotal = customSections.reduce((sum, section) => {
+    return sum + (section.fields as CustomField[])
+      .filter(f => f.fieldType === "number" && f.includeInTotal)
+      .reduce((s2, f) => s2 + (parseFloat(customValuesMap[f.id] ?? "0") || 0), 0);
+  }, 0);
 
   const pendingApprovals = sectionApprovals.filter((a: SectionApproval) => a.status === "submitted").length;
 
@@ -715,6 +910,15 @@ export default function ContainerDetail() {
                     onToggleSectionLock={handleToggleSectionLock}
                   />
                 ))}
+                {customSections.map(section => (
+                  <CustomSectionForm
+                    key={section.id}
+                    section={section}
+                    containerId={containerId}
+                    savedValues={customValuesMap}
+                    onSaved={() => queryClient.invalidateQueries({ queryKey: getGetCustomFieldValuesQueryKey(containerId) })}
+                  />
+                ))}
               </Accordion>
             </div>
 
@@ -731,6 +935,12 @@ export default function ContainerDetail() {
                     <p className="text-sm font-medium text-muted-foreground mb-1">Total Actual Cost</p>
                     <p className="text-2xl font-mono font-bold text-foreground">{formatCurrency(charges.totalCost)}</p>
                   </div>
+                  {customTotal > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-1">Custom Sections Total</p>
+                      <p className="text-xl font-mono font-bold text-foreground">{formatCurrency(customTotal)}</p>
+                    </div>
+                  )}
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-medium text-muted-foreground">Agreed Clearing Charges</p>
