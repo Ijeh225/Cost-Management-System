@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -12,8 +12,8 @@ import {
 } from "recharts";
 import {
   Box, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity,
-  FileText, Search, CheckCircle2, ArrowRight, Loader2, ClipboardCheck, ListTodo,
-  Brain, ShieldAlert, Clock, ExternalLink, X, EyeOff,
+  FileText, Search, CheckCircle2, ArrowRight, ClipboardCheck, ListTodo,
+  Brain, ShieldAlert, Clock, ExternalLink, X, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
@@ -26,174 +26,213 @@ const COLORS = [
   "hsl(var(--chart-4))",
 ];
 
-const ALERT_CONFIG: Record<string, {
+type AlertCfg = {
   icon: React.ElementType;
   color: string;
   accent: string;
   label: string;
   severity: "critical" | "warning" | "info";
-}> = {
-  loss_making:    { icon: TrendingDown, color: "text-red-400",    accent: "border-l-red-500",    label: "Loss-Making",      severity: "critical" },
-  low_profit:     { icon: AlertTriangle,color: "text-orange-400", accent: "border-l-orange-500", label: "Low Margin",       severity: "warning"  },
-  overdue_duty:   { icon: DollarSign,   color: "text-amber-400",  accent: "border-l-amber-500",  label: "Outstanding Duty", severity: "warning"  },
-  delayed:        { icon: Clock,        color: "text-blue-400",   accent: "border-l-blue-500",   label: "Possible Delay",   severity: "info"     },
-  stale_approval: { icon: ShieldAlert,  color: "text-violet-400", accent: "border-l-violet-500", label: "Stale Approval",   severity: "warning"  },
-  overdue_task:   { icon: ListTodo,     color: "text-rose-400",   accent: "border-l-rose-500",   label: "Overdue Task",     severity: "warning"  },
+};
+
+const ALERT_CONFIG: Record<string, AlertCfg> = {
+  loss_making:    { icon: TrendingDown,  color: "text-red-400",    accent: "border-l-red-500",    label: "Loss-Making",      severity: "critical" },
+  low_profit:     { icon: AlertTriangle, color: "text-orange-400", accent: "border-l-orange-500", label: "Low Margin",       severity: "warning"  },
+  overdue_duty:   { icon: DollarSign,    color: "text-amber-400",  accent: "border-l-amber-500",  label: "Outstanding Duty", severity: "warning"  },
+  delayed:        { icon: Clock,         color: "text-blue-400",   accent: "border-l-blue-500",   label: "Possible Delay",   severity: "info"     },
+  stale_approval: { icon: ShieldAlert,   color: "text-violet-400", accent: "border-l-violet-500", label: "Stale Approval",   severity: "warning"  },
+  overdue_task:   { icon: ListTodo,      color: "text-rose-400",   accent: "border-l-rose-500",   label: "Overdue Task",     severity: "warning"  },
 };
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
-const DISMISS_TTL_MS = 30 * 60 * 1000; // 30 minutes
-const DISMISS_KEY = "intel_alerts_dismissed_v1";
+const SEEN_KEY = "intel_alerts_seen_v1";
 
-function getDismissed(): Record<string, number> {
-  try { return JSON.parse(localStorage.getItem(DISMISS_KEY) ?? "{}"); } catch { return {}; }
+function alertKey(a: { type: string; containerId?: number | null }) {
+  return `${a.type}:${a.containerId ?? "global"}`;
 }
-function setDismissed(map: Record<string, number>) {
-  try { localStorage.setItem(DISMISS_KEY, JSON.stringify(map)); } catch {}
+function getSeenKey(): string {
+  try { return localStorage.getItem(SEEN_KEY) ?? ""; } catch { return ""; }
 }
-function alertKey(alert: { type: string; containerId?: number | null }) {
-  return `${alert.type}:${alert.containerId ?? "global"}`;
+function setSeenKey(k: string) {
+  try { localStorage.setItem(SEEN_KEY, k); } catch {}
 }
 
-function IntelligenceAlertsPanel() {
+type RawAlert = {
+  type: string;
+  severity: string;
+  message: string;
+  containerId?: number | null;
+  containerNumber?: string | null;
+};
+
+function AlertBeacon() {
   const { data, isLoading } = useGetIntelligenceAlerts();
-  const rawAlerts: Array<{ type: string; severity: string; message: string; containerId?: number | null; containerNumber?: string | null }> =
-    (data as any)?.alerts ?? [];
+  const rawAlerts: RawAlert[] = (data as any)?.alerts ?? [];
 
-  const [dismissed, setDismissedState] = useState<Record<string, number>>(getDismissed);
+  const [open, setOpen] = useState(false);
+  const [seenKey, setSeenKeyState] = useState(getSeenKey);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  const dismiss = useCallback((key: string) => {
-    const next = { ...getDismissed(), [key]: Date.now() };
-    setDismissed(next);
-    setDismissedState(next);
-  }, []);
+  const sorted = useMemo(
+    () => [...rawAlerts].sort((a, b) => {
+      const ao = SEVERITY_ORDER[ALERT_CONFIG[a.type]?.severity ?? "info"] ?? 2;
+      const bo = SEVERITY_ORDER[ALERT_CONFIG[b.type]?.severity ?? "info"] ?? 2;
+      return ao - bo;
+    }),
+    [rawAlerts]
+  );
 
-  const dismissAll = useCallback((keys: string[]) => {
-    const base = getDismissed();
-    const now = Date.now();
-    const next = keys.reduce((acc, k) => ({ ...acc, [k]: now }), base);
-    setDismissed(next);
-    setDismissedState(next);
-  }, []);
+  const currentKey = useMemo(
+    () => sorted.map(alertKey).join("|"),
+    [sorted]
+  );
 
-  const alerts = useMemo(() => {
-    const now = Date.now();
-    return rawAlerts
-      .filter(a => {
-        const k = alertKey(a);
-        const ts = dismissed[k];
-        return !ts || (now - ts) >= DISMISS_TTL_MS;
-      })
-      .sort((a, b) => {
-        const aCfg = ALERT_CONFIG[a.type];
-        const bCfg = ALERT_CONFIG[b.type];
-        return (SEVERITY_ORDER[aCfg?.severity ?? "info"] ?? 2) - (SEVERITY_ORDER[bCfg?.severity ?? "info"] ?? 2);
-      });
-  }, [rawAlerts, dismissed]);
+  const isBlinking = !isLoading && sorted.length > 0 && currentKey !== seenKey;
+  const hasCritical = sorted.some(a => ALERT_CONFIG[a.type]?.severity === "critical");
 
-  const hiddenCount = rawAlerts.length - alerts.length;
+  const handleOpen = () => {
+    if (!open) {
+      setSeenKey(currentKey);
+      setSeenKeyState(currentKey);
+    }
+    setOpen(v => !v);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
 
   if (isLoading) return null;
 
-  if (rawAlerts.length === 0) return (
-    <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-      <p className="text-sm text-emerald-400 font-medium">All systems healthy — no issues detected.</p>
-    </div>
-  );
+  if (sorted.length === 0) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400 font-medium">
+        <CheckCircle2 className="w-4 h-4 shrink-0" />
+        <span className="hidden sm:inline">All systems healthy</span>
+      </div>
+    );
+  }
 
-  if (alerts.length === 0) return (
-    <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary/40 border border-border/40">
-      <EyeOff className="w-4 h-4 text-muted-foreground shrink-0" />
-      <p className="text-sm text-muted-foreground flex-1">
-        {hiddenCount} alert{hiddenCount !== 1 ? "s" : ""} dismissed — will reappear after 30 minutes.
-      </p>
-    </div>
-  );
-
-  const criticalCount = alerts.filter(a => (ALERT_CONFIG[a.type]?.severity ?? "info") === "critical").length;
-  const warningCount  = alerts.filter(a => (ALERT_CONFIG[a.type]?.severity ?? "info") === "warning").length;
-  const allKeys = alerts.map(alertKey);
+  const beaconColor = hasCritical
+    ? "bg-red-500 border-red-400 shadow-red-500/40"
+    : "bg-orange-500 border-orange-400 shadow-orange-500/40";
+  const ringColor = hasCritical ? "bg-red-500" : "bg-orange-500";
+  const glowColor = hasCritical
+    ? "shadow-[0_0_18px_4px_rgba(239,68,68,0.55)]"
+    : "shadow-[0_0_18px_4px_rgba(249,115,22,0.55)]";
 
   return (
-    <Card className="border-border/40 bg-card/40 backdrop-blur-sm overflow-hidden">
-      <CardHeader className="pb-3 pt-4 px-4 border-b border-border/40">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Brain className="w-4 h-4 text-primary shrink-0" />
-          <CardTitle className="text-sm font-semibold">Profit Intelligence Alerts</CardTitle>
-          <div className="flex items-center gap-1.5 ml-1">
-            {criticalCount > 0 && (
-              <Badge className="text-[10px] px-1.5 py-0 bg-red-500/15 text-red-400 border border-red-500/30">
-                {criticalCount} critical
-              </Badge>
-            )}
-            {warningCount > 0 && (
-              <Badge className="text-[10px] px-1.5 py-0 bg-orange-500/15 text-orange-400 border border-orange-500/30">
-                {warningCount} warning{warningCount !== 1 ? "s" : ""}
-              </Badge>
-            )}
-            {hiddenCount > 0 && (
-              <span className="text-[10px] text-muted-foreground/60">· {hiddenCount} hidden</span>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => dismissAll(allKeys)}
-            className="ml-auto h-6 text-[11px] px-2 text-muted-foreground hover:text-foreground gap-1"
-          >
-            <EyeOff className="w-3 h-3" /> Dismiss all
-          </Button>
+    <div className="relative" ref={panelRef}>
+      <button
+        onClick={handleOpen}
+        className={`
+          relative flex items-center gap-2.5 px-4 py-2 rounded-xl border
+          font-semibold text-sm text-white transition-all duration-200
+          ${beaconColor}
+          ${isBlinking ? `${glowColor} hover:scale-[1.03] active:scale-[0.97]` : "opacity-90 hover:opacity-100"}
+        `}
+      >
+        {isBlinking && (
+          <span className={`absolute inset-0 rounded-xl ${ringColor} animate-ping opacity-30 pointer-events-none`} />
+        )}
+
+        <div className="relative w-4 h-4 shrink-0">
+          <Brain className="w-4 h-4" />
+          {isBlinking && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white animate-pulse" />
+          )}
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <AnimatePresence initial={false}>
-          {alerts.map((alert) => {
-            const cfg = ALERT_CONFIG[alert.type] ?? ALERT_CONFIG.low_profit;
-            const Icon = cfg.icon;
-            const key = alertKey(alert);
-            return (
-              <motion.div
-                key={key}
-                layout
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0, overflow: "hidden" }}
-                transition={{ duration: 0.18 }}
+
+        <span>
+          {sorted.length} Alert{sorted.length !== 1 ? "s" : ""}
+        </span>
+
+        {hasCritical && (
+          <Badge className="text-[10px] px-1.5 py-0 bg-white/20 text-white border-white/30 border">
+            Critical
+          </Badge>
+        )}
+
+        {open ? <ChevronUp className="w-3.5 h-3.5 opacity-70" /> : <ChevronDown className="w-3.5 h-3.5 opacity-70" />}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ duration: 0.16 }}
+            className="absolute right-0 top-full mt-2 w-[420px] max-w-[90vw] z-50 rounded-xl border border-border/60 bg-card/95 backdrop-blur-md shadow-2xl overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-card/80">
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Intelligence Alerts</span>
+                {hasCritical && (
+                  <Badge className="text-[10px] px-1.5 py-0 bg-red-500/20 text-red-400 border border-red-500/30">
+                    Critical
+                  </Badge>
+                )}
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
-                <div className={`flex items-start gap-3 px-4 py-3 border-b border-border/30 last:border-0 border-l-[3px] ${cfg.accent} group hover:bg-accent/20 transition-colors`}>
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-background/60`}>
-                    <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[11px] font-bold uppercase tracking-wider ${cfg.color}`}>{cfg.label}</span>
-                      {alert.containerNumber && (
-                        <Link
-                          href={`/containers/${alert.containerId}`}
-                          className="text-[11px] font-mono text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5"
-                        >
-                          {alert.containerNumber}
-                          <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-70 transition-opacity" />
-                        </Link>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{alert.message}</p>
-                  </div>
-                  <button
-                    onClick={() => dismiss(key)}
-                    className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent transition-all opacity-0 group-hover:opacity-100 mt-0.5"
-                    title="Dismiss for 30 minutes"
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto divide-y divide-border/30">
+              {sorted.map((alert) => {
+                const cfg = ALERT_CONFIG[alert.type] ?? ALERT_CONFIG.low_profit;
+                const Icon = cfg.icon;
+                return (
+                  <div
+                    key={alertKey(alert)}
+                    className={`flex items-start gap-3 px-4 py-3.5 border-l-[3px] ${cfg.accent} group hover:bg-accent/20 transition-colors`}
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </CardContent>
-    </Card>
+                    <div className="w-7 h-7 rounded-lg bg-background/60 border border-border/40 flex items-center justify-center shrink-0 mt-0.5">
+                      <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[11px] font-bold uppercase tracking-wider ${cfg.color}`}>
+                          {cfg.label}
+                        </span>
+                        {alert.containerNumber && (
+                          <Link
+                            href={`/containers/${alert.containerId}`}
+                            onClick={() => setOpen(false)}
+                            className="text-[11px] font-mono text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5"
+                          >
+                            {alert.containerNumber}
+                            <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-70 transition-opacity" />
+                          </Link>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{alert.message}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="px-4 py-2.5 border-t border-border/50 bg-card/60">
+              <p className="text-[11px] text-muted-foreground/60 text-center">
+                Auto-refreshes every 60 seconds · Click any container to investigate
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -273,14 +312,18 @@ export default function Dashboard() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* Header + Quick Search */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Overview</h1>
-          <p className="text-muted-foreground mt-1">Real-time insights into container logistics and financials.</p>
+      {/* Header row: title + alert beacon + search */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Overview</h1>
+            <p className="text-muted-foreground mt-0.5 text-sm">Real-time insights into container logistics and financials.</p>
+          </div>
+          <AlertBeacon />
         </div>
-        <form onSubmit={handleSearch} className="flex items-center gap-2 w-full md:w-auto">
-          <div className="relative flex-1 md:w-72">
+
+        <form onSubmit={handleSearch} className="flex items-center gap-2 w-full sm:max-w-sm">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Quick search containers…"
@@ -295,16 +338,13 @@ export default function Dashboard() {
         </form>
       </div>
 
-      {/* Intelligence Alerts Panel */}
-      <IntelligenceAlertsPanel />
-
-      {/* 6 KPI Cards + Role-aware extras */}
+      {/* 6 KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard title="Total Containers"     value={stats.totalContainers}       icon={Box} />
-        <StatCard title="In Progress"          value={stats.inProgress}            icon={Activity} colorClass="text-blue-400" />
-        <StatCard title="Completed"            value={stats.completed}             icon={CheckCircle2} colorClass="text-emerald-400" />
-        <StatCard title="Total Cost"           value={stats.totalCost}             icon={DollarSign} isCurrency />
-        <StatCard title="Total Clearing Charges" value={stats.totalClearingCharges} icon={FileText} isCurrency />
+        <StatCard title="Total Containers"       value={stats.totalContainers}        icon={Box} />
+        <StatCard title="In Progress"            value={stats.inProgress}             icon={Activity}    colorClass="text-blue-400" />
+        <StatCard title="Completed"              value={stats.completed}              icon={CheckCircle2} colorClass="text-emerald-400" />
+        <StatCard title="Total Cost"             value={stats.totalCost}              icon={DollarSign}  isCurrency />
+        <StatCard title="Total Clearing Charges" value={stats.totalClearingCharges}   icon={FileText}    isCurrency />
         <StatCard
           title="Gross Profit"
           value={grossProfit}
