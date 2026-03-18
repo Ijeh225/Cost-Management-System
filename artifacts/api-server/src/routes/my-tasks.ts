@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, sectionApprovalsTable, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable } from "@workspace/db";
+import { db, sectionApprovalsTable, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerTasksTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
@@ -110,7 +110,24 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
         }));
     }
 
-    res.json({ assignedContainers, sectionApprovals, mySections });
+    // Get container tasks assigned to this user (pending, high-priority rejection follow-ups)
+    const myContainerTasks = await db.select().from(containerTasksTable)
+      .where(eq(containerTasksTable.assignedStaffId, user.id));
+    const correctionTasks = myContainerTasks
+      .filter(t => t.status !== "completed")
+      .map(t => ({
+        id: t.id,
+        containerId: t.containerId,
+        title: t.title,
+        notes: t.notes,
+        priority: t.priority,
+        status: t.status,
+        dueDate: t.dueDate instanceof Date ? t.dueDate.toISOString() : t.dueDate ?? null,
+        createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt,
+        isRejectionTask: t.title.startsWith("Resubmit "),
+      }));
+
+    res.json({ assignedContainers, sectionApprovals, mySections, correctionTasks });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });

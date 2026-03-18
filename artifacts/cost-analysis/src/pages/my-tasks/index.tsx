@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, ListTodo, Box, AlertTriangle, ClipboardCheck, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, ListTodo, Box, AlertTriangle, ClipboardCheck, CheckCircle2, XCircle, ArrowRight } from "lucide-react";
 import { getStatusColor, getStatusLabel, getApprovalStatusColor, getApprovalStatusLabel, SECTION_LABELS, formatCurrency } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -67,6 +67,7 @@ export default function MyTasksPage() {
   const mySections = data?.mySections ?? [];
   const assignedContainers = data?.assignedContainers ?? [];
   const sectionApprovals = data?.sectionApprovals ?? [];
+  const correctionTasks = (data as any)?.correctionTasks ?? [];
 
   const containerReviews = sectionApprovals.filter(a => a.section === "container_review");
   const regularApprovals = sectionApprovals.filter(a => a.section !== "container_review");
@@ -238,6 +239,58 @@ export default function MyTasksPage() {
                 </ul>
               </div>
             </div>
+          )}
+
+          {/* Correction Tasks — auto-created on rejection */}
+          {correctionTasks.filter((t: any) => t.isRejectionTask).length > 0 && (
+            <Card className="border-destructive/30 bg-destructive/5 backdrop-blur-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <XCircle className="w-4 h-4 text-destructive" />
+                  Correction Required
+                  <Badge className="ml-1 bg-destructive/20 text-destructive border-destructive/40 text-xs">
+                    {correctionTasks.filter((t: any) => t.isRejectionTask).length} task{correctionTasks.filter((t: any) => t.isRejectionTask).length !== 1 ? "s" : ""}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border/40">
+                  {correctionTasks.filter((t: any) => t.isRejectionTask).map((task: any) => {
+                    const container = assignedContainers.find((c: any) => c.id === task.containerId);
+                    return (
+                      <div key={task.id} className="flex items-start justify-between px-6 py-4 gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-destructive/40 text-destructive bg-destructive/10">
+                              Rejected
+                            </Badge>
+                            <span className="text-sm font-semibold text-foreground">{task.title}</span>
+                          </div>
+                          {task.notes && (
+                            <p className="text-xs text-muted-foreground mt-1 italic leading-relaxed">
+                              Admin feedback: "{task.notes}"
+                            </p>
+                          )}
+                          {task.dueDate && (
+                            <p className="text-xs text-muted-foreground/60 mt-1">
+                              Due {new Date(task.dueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                            </p>
+                          )}
+                        </div>
+                        {task.containerId && (
+                          <Link href={`/containers/${task.containerId}`}>
+                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1 shrink-0 border-primary/30 text-primary hover:bg-primary/10">
+                              {container?.containerNumber ?? `#${task.containerId}`}
+                              <ArrowRight className="w-3 h-3" />
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Section approvals (non-container-review) */}

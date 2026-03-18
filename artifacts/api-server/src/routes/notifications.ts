@@ -21,7 +21,7 @@ async function getAgingThresholds() {
   };
 }
 
-async function computeAlerts() {
+async function computeAlerts(userId?: number) {
   const allContainers = await db.select().from(containersTable);
   if (allContainers.length === 0) return [];
 
@@ -118,13 +118,37 @@ async function computeAlerts() {
     alerts.push({ alertKey: `stale_approval_${stalePending.length}`, type: "stale_approval", severity: "info", message: `${stalePending.length} section approval(s) waiting more than 3 days`, generatedAt: now });
   }
 
+  if (userId) {
+    const SECTION_NAME: Record<string, string> = {
+      shipping: "Shipping", customs: "Customs", terminal: "Terminal",
+      delivery: "Delivery", operations: "Operations",
+    };
+    const myRejected = allApprovals.filter(a => a.status === "rejected" && a.submittedById === userId);
+    const containerMap: Record<number, string> = {};
+    for (const c of allContainers) containerMap[c.id] = c.containerNumber;
+    for (const a of myRejected) {
+      const sectionLabel = SECTION_NAME[a.section] ?? a.section;
+      const containerNumber = containerMap[a.containerId] ?? `#${a.containerId}`;
+      const reasonSnippet = a.rejectionReason ? `: "${a.rejectionReason}"` : "";
+      alerts.push({
+        alertKey: `rejected_section_${a.id}`,
+        type: "rejected_section",
+        severity: "critical",
+        message: `${sectionLabel} section rejected for ${containerNumber}${reasonSnippet}`,
+        containerId: a.containerId,
+        containerNumber,
+        generatedAt: now,
+      });
+    }
+  }
+
   return alerts;
 }
 
 notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
   try {
     const userId = (req as AuthRequest).user.id;
-    const alerts = await computeAlerts();
+    const alerts = await computeAlerts(userId);
     const readRows = await db.select().from(notificationsReadTable).where(eq(notificationsReadTable.userId, userId));
     const readMap: Record<string, { isRead: boolean; readAt: string | null }> = {};
     for (const r of readRows) {
@@ -164,7 +188,7 @@ notificationsRouter.post("/notifications/:alertKey/read", requireAuth, async (re
 notificationsRouter.post("/notifications/read-all", requireAuth, async (req, res) => {
   try {
     const userId = (req as AuthRequest).user.id;
-    const alerts = await computeAlerts();
+    const alerts = await computeAlerts(userId);
     if (alerts.length === 0) return res.json({ success: true });
 
     const now = new Date();
@@ -271,7 +295,7 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
 notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, res) => {
   try {
     const userId = (req as AuthRequest).user.id;
-    const alerts = await computeAlerts();
+    const alerts = await computeAlerts(userId);
     if (alerts.length === 0) return res.json({ success: true, marked: 0 });
 
     const now = new Date();

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable } from "@workspace/db";
+import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
@@ -574,6 +574,26 @@ router.post("/containers/:id/sections/:section/reject", requireAdmin, async (req
       .where(eq(sectionApprovalsTable.id, approval.id))
       .returning();
     await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_rejected", section, reason });
+
+    const SECTION_NAME: Record<string, string> = {
+      shipping: "Shipping", customs: "Customs", terminal: "Terminal",
+      delivery: "Delivery", operations: "Operations",
+    };
+    const sectionLabel = SECTION_NAME[section] ?? section;
+    if (approval.submittedById) {
+      const dueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+      await db.insert(containerTasksTable).values({
+        containerId: id,
+        title: `Resubmit ${sectionLabel} — correction needed`,
+        assignedStaffId: approval.submittedById,
+        createdById: user.id,
+        priority: "high",
+        status: "pending",
+        notes: reason,
+        dueDate,
+      });
+    }
+
     res.json(await formatSectionApproval(updated));
   } catch (err) {
     console.error(err);
