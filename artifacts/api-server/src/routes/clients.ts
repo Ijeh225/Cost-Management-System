@@ -24,7 +24,7 @@ clientsRouter.get("/clients", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-clientsRouter.post("/clients", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+clientsRouter.post("/clients", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { name, contactName = "", contactEmail = "", contactPhone = "", address = "", notes = "" } = req.body;
     if (!name || typeof name !== "string" || name.trim() === "") {
@@ -64,7 +64,7 @@ clientsRouter.get("/clients/:id", requireAuth, async (req: AuthRequest, res) => 
   }
 });
 
-clientsRouter.patch("/clients/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+clientsRouter.patch("/clients/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
@@ -130,7 +130,7 @@ clientsRouter.patch("/containers/:id/unlink-client", requireAuth, requireAdmin, 
   }
 });
 
-clientsRouter.post("/clients/bulk", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+clientsRouter.post("/clients/bulk", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { rows } = req.body as { rows: Array<{ name: string; contactName?: string; contactEmail?: string; contactPhone?: string; address?: string; notes?: string }> };
     if (!Array.isArray(rows)) return res.status(400).json({ error: "rows must be an array" });

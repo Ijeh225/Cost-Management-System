@@ -424,18 +424,6 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       }
     }
 
-    // Phase 2: section permission check for non-admin staff
-    const user = req.user!;
-    if (user.role !== "admin" && section) {
-      let permsObj: Record<string, string> = {};
-      try { if (user.sectionPermissions) permsObj = JSON.parse(user.sectionPermissions as string); } catch {}
-      const sectionPerm = permsObj[section] ?? (user.sectionPermission === section ? "edit" : "no_access");
-      if (sectionPerm !== "edit") {
-        res.status(403).json({ error: `You do not have edit access to the ${section} section.` });
-        return;
-      }
-    }
-
     const strNums = (obj: any) => {
       if (!obj) return undefined;
       const out: any = {};

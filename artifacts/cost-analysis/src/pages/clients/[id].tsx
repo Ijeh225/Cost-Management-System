@@ -3,7 +3,6 @@ import { useParams, Link } from "wouter";
 import {
   useGetClient, useUpdateClient, type ClientWithContainers,
 } from "@workspace/api-client-react";
-import { useAuth } from "@/components/layout/auth-provider";
 import { formatCurrency, getStatusColor, getStatusLabel } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,7 +32,6 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const clientId = parseInt(id ?? "");
-  const { isAdmin } = useAuth();
   const { toast } = useToast();
   const { data: client, isLoading } = useGetClient(isNaN(clientId) ? null : clientId);
   const updateMutation = useUpdateClient();
@@ -108,7 +106,7 @@ export default function ClientDetailPage() {
           </div>
           <h1 className="text-xl font-bold tracking-tight">{client.name}</h1>
         </div>
-        {isAdmin && !editing && (
+        {!editing && (
           <Button variant="outline" size="sm" onClick={startEdit} className="ml-auto gap-2">
             <Pencil className="w-3.5 h-3.5" /> Edit
           </Button>

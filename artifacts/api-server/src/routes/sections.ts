@@ -26,7 +26,7 @@ sectionsRouter.get("/custom-sections", requireAuth, async (req, res) => {
 });
 
 // Create section
-sectionsRouter.post("/custom-sections", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+sectionsRouter.post("/custom-sections", requireAuth, async (req: AuthRequest, res) => {
   const { name, color = "#6366f1", icon = "Layers", isRequired = false, containerId } = req.body;
   if (!name) return res.status(400).json({ error: "name required" });
   const containerIdNum = containerId ? parseInt(containerId) : null;
@@ -46,7 +46,7 @@ sectionsRouter.post("/custom-sections", requireAuth, requireAdmin, async (req: A
 });
 
 // Update section
-sectionsRouter.patch("/custom-sections/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+sectionsRouter.patch("/custom-sections/:id", requireAuth, async (req: AuthRequest, res) => {
   const id = parseInt(req.params.id);
   const { name, color, icon, isRequired, isArchived, sectionOrder } = req.body;
   const updates: Record<string, any> = { updatedAt: new Date() };

@@ -928,11 +928,9 @@ export default function ContainerDetail() {
             </TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
-            {isAdmin && (
-              <Button size="sm" variant="outline" className="gap-2 text-muted-foreground" onClick={() => setEditSectionsOpen(true)}>
-                <Layers className="w-3.5 h-3.5" /> Edit Sections
-              </Button>
-            )}
+            <Button size="sm" variant="outline" className="gap-2 text-muted-foreground" onClick={() => setEditSectionsOpen(true)}>
+              <Layers className="w-3.5 h-3.5" /> Edit Sections
+            </Button>
             <a href={`/containers/${containerId}/print`} target="_blank" rel="noopener noreferrer">
               <Button size="sm" variant="outline" className="gap-2 text-muted-foreground">
                 <Printer className="w-3.5 h-3.5" /> Print Summary

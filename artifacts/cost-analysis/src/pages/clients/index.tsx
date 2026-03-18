@@ -444,39 +444,37 @@ export default function ClientsPage() {
             Manage client accounts and view their container history.
           </p>
         </div>
-        {isAdmin && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="gap-2 shadow-md">
-                <Plus className="w-4 h-4" /> Add Client <ChevronDown className="w-3.5 h-3.5 ml-0.5 opacity-70" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={() => setShowCreate(true)} className="gap-2.5 cursor-pointer">
-                <Building2 className="w-4 h-4 text-primary" />
-                <div>
-                  <div className="font-medium text-sm">Add New Client</div>
-                  <div className="text-xs text-muted-foreground">Fill in a single form</div>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setShowBulk(true)} className="gap-2.5 cursor-pointer">
-                <Upload className="w-4 h-4 text-blue-400" />
-                <div>
-                  <div className="font-medium text-sm">Bulk Upload Excel</div>
-                  <div className="text-xs text-muted-foreground">Import multiple at once</div>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={downloadClientTemplate} className="gap-2.5 cursor-pointer">
-                <Download className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <div className="font-medium text-sm">Download Template</div>
-                  <div className="text-xs text-muted-foreground">Excel format for bulk upload</div>
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="gap-2 shadow-md">
+              <Plus className="w-4 h-4" /> Add Client <ChevronDown className="w-3.5 h-3.5 ml-0.5 opacity-70" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={() => setShowCreate(true)} className="gap-2.5 cursor-pointer">
+              <Building2 className="w-4 h-4 text-primary" />
+              <div>
+                <div className="font-medium text-sm">Add New Client</div>
+                <div className="text-xs text-muted-foreground">Fill in a single form</div>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setShowBulk(true)} className="gap-2.5 cursor-pointer">
+              <Upload className="w-4 h-4 text-blue-400" />
+              <div>
+                <div className="font-medium text-sm">Bulk Upload Excel</div>
+                <div className="text-xs text-muted-foreground">Import multiple at once</div>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={downloadClientTemplate} className="gap-2.5 cursor-pointer">
+              <Download className="w-4 h-4 text-muted-foreground" />
+              <div>
+                <div className="font-medium text-sm">Download Template</div>
+                <div className="text-xs text-muted-foreground">Excel format for bulk upload</div>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="relative max-w-sm">

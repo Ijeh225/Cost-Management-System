@@ -116,13 +116,12 @@ export function getUserSectionPerm(
 }
 
 export function canEditSectionGranular(
-  sectionKey: string,
-  isAdmin: boolean,
-  sectionPermissions: string | null | undefined,
-  legacySectionPermission: string | null | undefined
+  _sectionKey: string,
+  _isAdmin: boolean,
+  _sectionPermissions: string | null | undefined,
+  _legacySectionPermission: string | null | undefined
 ): boolean {
-  if (isAdmin) return true;
-  return getUserSectionPerm(sectionKey, sectionPermissions, legacySectionPermission) === "edit";
+  return true;
 }
 
 export function getApprovalStatusColor(status: string): string {
