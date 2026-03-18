@@ -26,6 +26,10 @@ const ALERT_CONFIG: Record<string, { icon: any; color: string; bg: string; borde
   high_delivery:   { icon: DollarSign,   color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "High Delivery Cost"},
   unpaid_duty:     { icon: DollarSign,   color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20", label: "Unpaid Duty"       },
   delayed:         { icon: Clock,        color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "Delayed Container" },
+  aging_warn:      { icon: Clock,        color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "Clearing Delay"    },
+  aging_high:      { icon: Clock,        color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Long Delay"        },
+  aging_critical:  { icon: Clock,        color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Critical Delay"    },
+  inactive:        { icon: Activity,     color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "No Activity"       },
   overdue_task:    { icon: ListTodo,     color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Overdue Task"      },
   stale_approval:  { icon: ShieldAlert,  color: "text-violet-400", bg: "bg-violet-400/10", border: "border-violet-400/20", label: "Stale Approval"    },
 };

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
-  ListTodo, BarChart2, FileDown, Building2, Bell,
+  ListTodo, BarChart2, FileDown, Building2, Bell, Settings,
 } from "lucide-react";
 
 function NotificationsBadge({ count }: { count: number }) {
@@ -50,6 +50,7 @@ export function AppSidebar() {
     { title: "Reports",          url: "/reports",    icon: FileDown        },
     { title: "Upload Data",      url: "/upload",     icon: UploadCloud     },
     { title: "User Management",  url: "/users",      icon: Users           },
+    { title: "Settings",         url: "/settings",   icon: Settings        },
   ];
 
   return (

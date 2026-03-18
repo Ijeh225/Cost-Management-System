@@ -25,6 +25,7 @@ import ClientsPage from "@/pages/clients/index";
 import ClientDetailPage from "@/pages/clients/[id]";
 import ContainerPrintPage from "@/pages/containers/print/[id]";
 import NotificationsPage from "@/pages/notifications/index";
+import SettingsPage from "@/pages/settings/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -91,6 +92,9 @@ function Router() {
             <Route path="/clients" component={ClientsPage} />
             <Route path="/clients/:id" component={ClientDetailPage} />
             <Route path="/notifications" component={NotificationsPage} />
+            <Route path="/settings">
+              <AdminGuard><SettingsPage /></AdminGuard>
+            </Route>
             <Route component={NotFound} />
           </Switch>
         </AppLayout>

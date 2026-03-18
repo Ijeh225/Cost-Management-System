@@ -15,6 +15,15 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 type SortField = "containerNumber" | "customerName" | "declaration" | "status" | "clearingCharges" | "totalCost" | "grossProfit";
+
+function AgingBadge({ createdAt, status }: { createdAt: string; status: string }) {
+  if (["completed", "closed"].includes(status)) return null;
+  const ageDays = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24));
+  if (ageDays >= 90) return <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/20 text-red-400 border border-red-500/30">{ageDays}d</span>;
+  if (ageDays >= 60) return <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-500/20 text-orange-400 border border-orange-500/30">{ageDays}d</span>;
+  if (ageDays >= 30) return <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">{ageDays}d</span>;
+  return null;
+}
 type SortDir = "asc" | "desc";
 
 function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: SortField; sortDir: SortDir }) {
@@ -263,9 +272,12 @@ export default function Containers() {
                       <div className="text-xs text-muted-foreground mt-0.5">{container.size || "—"}</div>
                     </td>
                     <td className="px-4 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium border uppercase tracking-wider ${getStatusColor(container.status)}`}>
-                        {getStatusLabel(container.status)}
-                      </span>
+                      <div className="flex items-center flex-wrap gap-1">
+                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium border uppercase tracking-wider ${getStatusColor(container.status)}`}>
+                          {getStatusLabel(container.status)}
+                        </span>
+                        <AgingBadge createdAt={container.createdAt} status={container.status} />
+                      </div>
                     </td>
                     <td className="px-4 py-4 text-right">
                       <span className="font-mono text-sm text-foreground">
