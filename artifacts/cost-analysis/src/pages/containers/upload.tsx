@@ -309,17 +309,6 @@ export default function UploadPage() {
                   })}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/40">
-                {SAMPLE_ROWS.map((row, i) => (
-                  <tr key={i} className="hover:bg-accent/30 transition-colors">
-                    {COLUMNS.map((col) => (
-                      <td key={col} className="px-4 py-2.5 font-mono text-muted-foreground">
-                        {row[col as keyof typeof row]}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
             </table>
           </div>
         </CardContent>
