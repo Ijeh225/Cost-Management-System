@@ -14,6 +14,18 @@ import { getStatusColor, getStatusLabel, getApprovalStatusColor, getApprovalStat
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
+type CorrectionTask = {
+  id: number;
+  containerId: number;
+  title: string;
+  notes: string;
+  priority: string;
+  status: string;
+  dueDate: string | null;
+  createdAt: string;
+  isRejectionTask: boolean;
+};
+
 function RejectDialog({
   open, onClose, onConfirm, isPending,
 }: {
@@ -67,7 +79,7 @@ export default function MyTasksPage() {
   const mySections = data?.mySections ?? [];
   const assignedContainers = data?.assignedContainers ?? [];
   const sectionApprovals = data?.sectionApprovals ?? [];
-  const correctionTasks = (data as any)?.correctionTasks ?? [];
+  const correctionTasks: CorrectionTask[] = (data as { correctionTasks?: CorrectionTask[] })?.correctionTasks ?? [];
 
   const containerReviews = sectionApprovals.filter(a => a.section === "container_review");
   const regularApprovals = sectionApprovals.filter(a => a.section !== "container_review");
@@ -242,21 +254,21 @@ export default function MyTasksPage() {
           )}
 
           {/* Correction Tasks — auto-created on rejection */}
-          {correctionTasks.filter((t: any) => t.isRejectionTask).length > 0 && (
+          {correctionTasks.filter(t => t.isRejectionTask).length > 0 && (
             <Card className="border-destructive/30 bg-destructive/5 backdrop-blur-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <XCircle className="w-4 h-4 text-destructive" />
                   Correction Required
                   <Badge className="ml-1 bg-destructive/20 text-destructive border-destructive/40 text-xs">
-                    {correctionTasks.filter((t: any) => t.isRejectionTask).length} task{correctionTasks.filter((t: any) => t.isRejectionTask).length !== 1 ? "s" : ""}
+                    {correctionTasks.filter(t => t.isRejectionTask).length} task{correctionTasks.filter(t => t.isRejectionTask).length !== 1 ? "s" : ""}
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y divide-border/40">
-                  {correctionTasks.filter((t: any) => t.isRejectionTask).map((task: any) => {
-                    const container = assignedContainers.find((c: any) => c.id === task.containerId);
+                  {correctionTasks.filter(t => t.isRejectionTask).map(task => {
+                    const container = assignedContainers.find(c => c.id === task.containerId);
                     return (
                       <div key={task.id} className="flex items-start justify-between px-6 py-4 gap-4">
                         <div className="flex-1 min-w-0">

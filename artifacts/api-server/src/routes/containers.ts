@@ -575,12 +575,12 @@ router.post("/containers/:id/sections/:section/reject", requireAdmin, async (req
       .returning();
     await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_rejected", section, reason });
 
-    const SECTION_NAME: Record<string, string> = {
+    const CHARGE_SECTION_NAME: Record<string, string> = {
       shipping: "Shipping", customs: "Customs", terminal: "Terminal",
       delivery: "Delivery", operations: "Operations",
     };
-    const sectionLabel = SECTION_NAME[section] ?? section;
-    if (approval.submittedById) {
+    const sectionLabel = CHARGE_SECTION_NAME[section];
+    if (approval.submittedById && sectionLabel) {
       const dueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
       await db.insert(containerTasksTable).values({
         containerId: id,
