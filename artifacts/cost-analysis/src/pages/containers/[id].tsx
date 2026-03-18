@@ -1241,7 +1241,7 @@ export default function ContainerDetail() {
             </div>
           </DialogHeader>
           <div className="overflow-y-auto flex-1 p-6">
-            <EditSectionsTab containerId={containerId} />
+            <EditSectionsTab containerId={containerId} isAdmin={isAdmin} />
           </div>
         </DialogContent>
       </Dialog>

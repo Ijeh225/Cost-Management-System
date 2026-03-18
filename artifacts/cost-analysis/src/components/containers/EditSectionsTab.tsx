@@ -291,7 +291,7 @@ function InlineFieldForm({
 }
 
 function FieldRow({
-  field, sectionId, isEditing, onStartEdit, onCancelEdit, sectionsQueryKey,
+  field, sectionId, isEditing, onStartEdit, onCancelEdit, sectionsQueryKey, isAdmin,
 }: {
   field: CustomField;
   sectionId: number;
@@ -299,6 +299,7 @@ function FieldRow({
   onStartEdit: () => void;
   onCancelEdit: () => void;
   sectionsQueryKey: readonly unknown[];
+  isAdmin: boolean;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -383,20 +384,22 @@ function FieldRow({
         >
           <Pencil className="w-3.5 h-3.5" />
         </button>
-        <button
-          onClick={handleDelete}
-          title="Delete field"
-          className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10"
-          disabled={deleteMutation.isPending}
-        >
-          {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-        </button>
+        {isAdmin && (
+          <button
+            onClick={handleDelete}
+            title="Delete field"
+            className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10"
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function SectionCard({ section, sectionsQueryKey }: { section: CustomSectionWithFields; sectionsQueryKey: readonly unknown[] }) {
+function SectionCard({ section, sectionsQueryKey, isAdmin }: { section: CustomSectionWithFields; sectionsQueryKey: readonly unknown[]; isAdmin: boolean }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const updateMutation = useUpdateCustomSection();
@@ -552,13 +555,15 @@ function SectionCard({ section, sectionsQueryKey }: { section: CustomSectionWith
               >
                 {section.isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
               </button>
-              <button
-                onClick={handleDeleteSection}
-                title="Delete section"
-                className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={handleDeleteSection}
+                  title="Delete section"
+                  className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
               {expanded
                 ? <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" />
                 : <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />
@@ -599,6 +604,7 @@ function SectionCard({ section, sectionsQueryKey }: { section: CustomSectionWith
                         onStartEdit={() => setEditingFieldId(field.id)}
                         onCancelEdit={() => setEditingFieldId(null)}
                         sectionsQueryKey={sectionsQueryKey}
+                        isAdmin={isAdmin}
                       />
                     ))}
                   </div>
@@ -816,7 +822,7 @@ function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, o
   );
 }
 
-export function EditSectionsTab({ containerId }: { containerId: number }) {
+export function EditSectionsTab({ containerId, isAdmin }: { containerId: number; isAdmin: boolean }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const SECTIONS_QUERY_KEY = getGetCustomSectionsQueryKey(containerId);
@@ -959,7 +965,7 @@ export function EditSectionsTab({ containerId }: { containerId: number }) {
       ) : (
         <div className="space-y-3">
           {sectionsList.map((section) => (
-            <SectionCard key={section.id} section={section} sectionsQueryKey={SECTIONS_QUERY_KEY} />
+            <SectionCard key={section.id} section={section} sectionsQueryKey={SECTIONS_QUERY_KEY} isAdmin={isAdmin} />
           ))}
         </div>
       )}
