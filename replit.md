@@ -223,6 +223,37 @@ All 8 remaining features implemented:
 - `reports/index.tsx` — `queryKey` in enabled option
 - `containers/upload.tsx` — missing `@types/papaparse`
 
+### Phase 5 ✅ COMPLETE
+
+1. **Notifications System** — Persistent read/unread alert tracking (`notifications_read` table). `/notifications` page with filters (all/unread/read, by type). Sidebar shows unread badge. Alerts auto-merge with read state per user. Mark-all-read + auto-mark-viewed on page visit.
+
+2. **Clients Bulk Upload** — Clients page has DropdownMenu: "Add New Client" / "Bulk Upload (Excel)" / "Download Template". Bulk route: `POST /api/clients/bulk`. Hook: `useCreateClientsBulk`.
+
+3. **Upload Mode Selector** — Upload page has two modes: General Upload (customer name from file) and Customer-Linked Upload (all rows linked to one selected client). `clientId` passed to `/api/containers/upload`.
+
+4. **Container Aging Alerts** — Configurable thresholds in Settings (30/60/90-day aging + 7-day inactivity). `AgingBadge` on container list. 4 alert types: `aging_warn`, `aging_high`, `aging_critical`, `inactive`.
+
+5. **Settings Page** — `/settings` (admin-only). Configures aging thresholds + email alert recipients. `Send Digest Now` button.
+
+6. **Email Digest (Resend)** — `POST /api/notifications/send-email-digest` endpoint built. Reads `RESEND_API_KEY` env var. Sends HTML digest of critical/warning alerts. **NOTE: Resend integration was dismissed by user**. To enable: either connect via Replit Resend integration OR set `RESEND_API_KEY` as a secret manually.
+
+### Notifications API
+- `GET /api/notifications` — Merged live alerts + per-user read status
+- `POST /api/notifications/:alertKey/read` — Mark one read
+- `POST /api/notifications/read-all` — Mark all read
+- `POST /api/notifications/mark-viewed` — Mark page visited (clears sidebar badge)
+- `POST /api/notifications/send-email-digest` — Send HTML email digest (requires RESEND_API_KEY)
+
+### Settings API
+- `GET /api/settings` — All key-value settings
+- `PUT /api/settings` — Bulk update settings
+
+## Email Alerts
+Provider: Resend (`connector:ccfg_resend_01K69QKYK789WN202XSE3QS17V`)
+Status: **NOT connected** — user dismissed the integration prompt.
+To activate: connect the Resend integration or set `RESEND_API_KEY` secret.
+From address used: `alerts@updates.costanalysis.app` (requires verified sender domain in Resend).
+
 ## Financial Calculations
 All calculations in `artifacts/api-server/src/lib/calculations.ts`:
 - `calcTotalCost(charges)` — Sum of all 5 sections
