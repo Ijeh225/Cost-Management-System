@@ -1,13 +1,20 @@
 import { useState, useRef } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { useUploadContainers } from "@workspace/api-client-react";
+import { useUploadContainers, useListClients } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileType, CheckCircle2, AlertTriangle, Loader2, X, Download, TableProperties } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  UploadCloud, FileType, CheckCircle2, AlertTriangle, Loader2, X,
+  Download, TableProperties, Globe, Building2,
+} from "lucide-react";
 import type { UploadRow } from "@workspace/api-client-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -15,7 +22,7 @@ const SAMPLE_ROWS = [
   { "CUSTOMER NAME": "Dangote Industries Ltd",  "CON": "MSCU1234567", "B/LADING": "MSC0012345", "DECLARATION": "ND20251001", "SIZE": "40FT",  "VESSEL": "MSC ANNA"       },
   { "CUSTOMER NAME": "Nestlé Nigeria Plc",       "CON": "HLCU8765432", "B/LADING": "HLC0056789", "DECLARATION": "ND20251002", "SIZE": "20FT",  "VESSEL": "HAPAG SPIRIT"   },
   { "CUSTOMER NAME": "BUA Cement Plc",           "CON": "CMAU5553210", "B/LADING": "CMA0078901", "DECLARATION": "ND20251003", "SIZE": "40FT",  "VESSEL": "CMA KALAHARI"   },
-  { "CUSTOMER NAME": "Guinness Nigeria Plc",     "CON": "MAEU3214567", "B/LADING": "MAE0034567", "DECLARATION": "ND20251004", "SIZE": "40HC", "VESSEL": "MAERSK ESSEX"    },
+  { "CUSTOMER NAME": "Guinness Nigeria Plc",     "CON": "MAEU3214567", "B/LADING": "MAE0034567", "DECLARATION": "ND20251004", "SIZE": "40HC",  "VESSEL": "MAERSK ESSEX"   },
 ];
 
 const COLUMNS = ["CUSTOMER NAME", "CON", "B/LADING", "DECLARATION", "SIZE", "VESSEL"];
@@ -29,11 +36,16 @@ function downloadTemplate() {
   XLSX.writeFile(wb, "container_upload_template.xlsx");
 }
 
+type UploadMode = "general" | "client";
+
 export default function UploadPage() {
   const { isAdmin } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [mode, setMode] = useState<UploadMode>("general");
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
 
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<UploadRow[]>([]);
@@ -41,11 +53,14 @@ export default function UploadPage() {
   const [errors, setErrors] = useState<string[]>([]);
 
   const uploadMutation = useUploadContainers();
+  const { data: clients = [] } = useListClients();
 
   if (!isAdmin) {
     setLocation("/");
     return null;
   }
+
+  const selectedClient = clients.find(c => String(c.id) === selectedClientId);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -73,7 +88,7 @@ export default function UploadPage() {
       if (ext === "csv") {
         const text = await f.text();
         const result = Papa.parse(text, { header: true, skipEmptyLines: true });
-        rawData = result.data;
+        rawData = result.data as any[];
       } else if (ext === "xlsx" || ext === "xls") {
         const buffer = await f.arrayBuffer();
         const workbook = XLSX.read(buffer);
@@ -97,17 +112,21 @@ export default function UploadPage() {
           return undefined;
         };
 
-        const customerName    = getVal(["customername", "customer", "consignee"]);
         const containerNumber = getVal(["containernumber", "container", "con", "containerno"]);
         const blNumber        = getVal(["blnumber", "bl", "blading", "billoflading"]);
 
-        if (!customerName || !containerNumber || !blNumber) {
-          errs.push(`Row ${idx + 1}: Missing required fields (Customer Name, CON, or B/Lading)`);
+        if (!containerNumber || !blNumber) {
+          errs.push(`Row ${idx + 1}: Missing required fields (CON or B/Lading)`);
           return;
         }
 
+        const customerName =
+          mode === "client" && selectedClient
+            ? selectedClient.name
+            : getVal(["customername", "customer", "consignee"]);
+
         mapped.push({
-          customerName,
+          customerName: customerName ?? "",
           containerNumber,
           blNumber,
           declaration:     getVal(["declaration", "sgad"]),
@@ -135,7 +154,8 @@ export default function UploadPage() {
 
   const handleUpload = () => {
     if (parsedData.length === 0) return;
-    uploadMutation.mutate({ data: { rows: parsedData } }, {
+    const clientId = mode === "client" && selectedClientId ? Number(selectedClientId) : undefined;
+    uploadMutation.mutate({ data: { rows: parsedData, clientId } }, {
       onSuccess: (res) => {
         toast({
           title: "Upload Complete",
@@ -153,6 +173,8 @@ export default function UploadPage() {
     });
   };
 
+  const canUpload = mode === "general" || (mode === "client" && !!selectedClientId);
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -165,6 +187,92 @@ export default function UploadPage() {
         </Button>
       </div>
 
+      {/* Mode Selector */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          onClick={() => setMode("general")}
+          className={`flex items-start gap-4 p-4 rounded-xl border text-left transition-all ${
+            mode === "general"
+              ? "border-primary/50 bg-primary/5 shadow-sm"
+              : "border-border/50 bg-card/40 hover:bg-card/70 hover:border-border"
+          }`}
+        >
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${mode === "general" ? "bg-primary/20" : "bg-secondary"}`}>
+            <Globe className={`w-4 h-4 ${mode === "general" ? "text-primary" : "text-muted-foreground"}`} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className={`text-sm font-semibold ${mode === "general" ? "text-foreground" : "text-muted-foreground"}`}>
+                General Upload
+              </p>
+              {mode === "general" && <Badge className="text-[10px] px-1.5 py-0 bg-primary/20 text-primary border border-primary/30">Selected</Badge>}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Import containers from any customer. Customer names come from the file.
+            </p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setMode("client")}
+          className={`flex items-start gap-4 p-4 rounded-xl border text-left transition-all ${
+            mode === "client"
+              ? "border-primary/50 bg-primary/5 shadow-sm"
+              : "border-border/50 bg-card/40 hover:bg-card/70 hover:border-border"
+          }`}
+        >
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${mode === "client" ? "bg-primary/20" : "bg-secondary"}`}>
+            <Building2 className={`w-4 h-4 ${mode === "client" ? "text-primary" : "text-muted-foreground"}`} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className={`text-sm font-semibold ${mode === "client" ? "text-foreground" : "text-muted-foreground"}`}>
+                Customer-Linked Upload
+              </p>
+              {mode === "client" && <Badge className="text-[10px] px-1.5 py-0 bg-primary/20 text-primary border border-primary/30">Selected</Badge>}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              All containers in the file are linked to one specific client.
+            </p>
+          </div>
+        </button>
+      </div>
+
+      {/* Client Picker (mode = client) */}
+      <AnimatePresence>
+        {mode === "client" && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <Card className="border-border/50 bg-card/40">
+              <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground mb-1">Select Customer</p>
+                  <p className="text-xs text-muted-foreground">All containers will be auto-linked to this client and the customer name taken from their profile.</p>
+                </div>
+                <div className="w-full sm:w-72">
+                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                    <SelectTrigger className="h-9 text-sm border-border/50 bg-background/50">
+                      <SelectValue placeholder={clients.length === 0 ? "No clients yet" : "Choose a client…"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map(c => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sample Format Card */}
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
         <CardHeader className="pb-3 flex flex-row items-center gap-3">
@@ -173,7 +281,11 @@ export default function UploadPage() {
           </div>
           <div>
             <CardTitle className="text-sm font-semibold">Required File Format</CardTitle>
-            <CardDescription className="text-xs">Your file must contain these columns (order does not matter). Highlighted columns are required.</CardDescription>
+            <CardDescription className="text-xs">
+              {mode === "client"
+                ? "CUSTOMER NAME column is optional — it will be overridden by the selected client's name."
+                : "Your file must contain these columns (order does not matter). Highlighted columns are required."}
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -181,18 +293,20 @@ export default function UploadPage() {
             <table className="w-full text-xs text-left">
               <thead className="border-y border-border/50 bg-secondary/20">
                 <tr>
-                  {COLUMNS.map((col) => (
-                    <th key={col} className={`px-4 py-2.5 font-mono font-semibold tracking-wider ${
-                      ["CUSTOMER NAME", "CON", "B/LADING"].includes(col)
-                        ? "text-primary"
-                        : "text-muted-foreground"
-                    }`}>
-                      {col}
-                      {["CUSTOMER NAME", "CON", "B/LADING"].includes(col) && (
-                        <span className="ml-1 text-[10px] bg-primary/10 text-primary px-1 rounded">required</span>
-                      )}
-                    </th>
-                  ))}
+                  {COLUMNS.map((col) => {
+                    const required = mode === "general"
+                      ? ["CUSTOMER NAME", "CON", "B/LADING"].includes(col)
+                      : ["CON", "B/LADING"].includes(col);
+                    return (
+                      <th key={col} className={`px-4 py-2.5 font-mono font-semibold tracking-wider ${required ? "text-primary" : "text-muted-foreground"}`}>
+                        {col}
+                        {required && <span className="ml-1 text-[10px] bg-primary/10 text-primary px-1 rounded">required</span>}
+                        {col === "CUSTOMER NAME" && mode === "client" && (
+                          <span className="ml-1 text-[10px] bg-secondary text-muted-foreground px-1 rounded">ignored</span>
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
@@ -208,14 +322,6 @@ export default function UploadPage() {
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-3 border-t border-border/50 bg-background/30 text-xs text-muted-foreground flex flex-wrap gap-4">
-            <span><span className="text-primary font-semibold">CUSTOMER NAME</span> — Full customer/consignee name</span>
-            <span><span className="text-primary font-semibold">CON</span> — Container number (e.g. MSCU1234567)</span>
-            <span><span className="text-primary font-semibold">B/LADING</span> — Bill of Lading number</span>
-            <span><span className="text-foreground font-semibold">DECLARATION</span> — SON/NAFDAC/Form M number</span>
-            <span><span className="text-foreground font-semibold">SIZE</span> — 20FT / 40FT / 40HC</span>
-            <span><span className="text-foreground font-semibold">VESSEL</span> — Vessel/ship name</span>
-          </div>
         </CardContent>
       </Card>
 
@@ -228,22 +334,36 @@ export default function UploadPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
           >
-            <Card className="border-border/50 border-dashed border-2 bg-card/20 hover:bg-card/40 transition-colors">
+            <Card className={`border-border/50 border-dashed border-2 bg-card/20 transition-colors ${canUpload ? "hover:bg-card/40 cursor-pointer" : "opacity-60 cursor-not-allowed"}`}>
               <CardContent className="p-12">
                 <div
-                  className="flex flex-col items-center justify-center text-center cursor-pointer"
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center text-center"
+                  onDragOver={canUpload ? handleDragOver : undefined}
+                  onDrop={canUpload ? handleDrop : undefined}
+                  onClick={() => canUpload && fileInputRef.current?.click()}
                 >
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                     <UploadCloud className="w-8 h-8 text-primary" />
                   </div>
-                  <h3 className="text-lg font-semibold mb-1">Click or drag your file here</h3>
-                  <p className="text-sm text-muted-foreground mb-6">Supports .csv and .xlsx — max 10MB</p>
-                  <Button variant="outline" className="hover-elevate pointer-events-none">
-                    Select File
-                  </Button>
+                  {!canUpload ? (
+                    <>
+                      <h3 className="text-lg font-semibold mb-1">Select a customer first</h3>
+                      <p className="text-sm text-muted-foreground">Choose a client from the dropdown above before uploading.</p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-semibold mb-1">Click or drag your file here</h3>
+                      <p className="text-sm text-muted-foreground mb-6">
+                        Supports .csv and .xlsx — max 10MB
+                        {mode === "client" && selectedClient && (
+                          <> · Will link to <span className="text-primary font-semibold">{selectedClient.name}</span></>
+                        )}
+                      </p>
+                      <Button variant="outline" className="hover-elevate pointer-events-none">
+                        Select File
+                      </Button>
+                    </>
+                  )}
                   <input
                     type="file"
                     className="hidden"
@@ -266,7 +386,14 @@ export default function UploadPage() {
                 <div className="flex items-center gap-3">
                   <FileType className="w-8 h-8 text-primary" />
                   <div>
-                    <CardTitle className="text-base">{file.name}</CardTitle>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      {file.name}
+                      {mode === "client" && selectedClient && (
+                        <Badge variant="outline" className="text-xs font-normal border-primary/30 text-primary bg-primary/10">
+                          → {selectedClient.name}
+                        </Badge>
+                      )}
+                    </CardTitle>
                     <CardDescription className="text-xs">
                       {(file.size / 1024).toFixed(1)} KB &bull; {parsedData.length} valid rows detected
                     </CardDescription>
@@ -320,7 +447,7 @@ export default function UploadPage() {
                             {parsedData.slice(0, 100).map((row, i) => (
                               <tr key={i} className="hover:bg-accent/30 transition-colors">
                                 <td className="px-4 py-2.5 text-muted-foreground/50 font-mono">{i + 1}</td>
-                                <td className="px-4 py-2.5 font-medium text-foreground">{row.customerName}</td>
+                                <td className="px-4 py-2.5 font-medium text-foreground">{row.customerName || "—"}</td>
                                 <td className="px-4 py-2.5 font-mono text-primary">{row.containerNumber}</td>
                                 <td className="px-4 py-2.5 font-mono">{row.blNumber}</td>
                                 <td className="px-4 py-2.5 text-muted-foreground">{row.declaration || "—"}</td>
@@ -344,6 +471,7 @@ export default function UploadPage() {
               <CardFooter className="p-4 border-t border-border/50 flex items-center justify-between bg-secondary/10">
                 <p className="text-xs text-muted-foreground">
                   {parsedData.length} records ready to import
+                  {mode === "client" && selectedClient && ` → ${selectedClient.name}`}
                 </p>
                 <div className="flex gap-3">
                   <Button variant="outline" onClick={clearFile} disabled={uploadMutation.isPending}>

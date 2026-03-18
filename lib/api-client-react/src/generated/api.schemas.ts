@@ -158,6 +158,7 @@ export interface UploadRow {
 
 export interface UploadContainersRequest {
   rows: UploadRow[];
+  clientId?: number;
 }
 
 export interface UploadContainersResponse {
@@ -673,3 +674,39 @@ export type ExportContainersCSVParams = {
   from?: string;
   to?: string;
 };
+
+export interface Notification {
+  alertKey: string;
+  type: string;
+  severity: string;
+  message: string;
+  containerId?: number;
+  containerNumber?: string;
+  generatedAt: string;
+  isRead: boolean;
+  readAt: string | null;
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+  unreadCount: number;
+}
+
+export interface BulkUploadClientsRow {
+  name: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  address?: string;
+  notes?: string;
+}
+
+export interface BulkUploadClientsRequest {
+  rows: BulkUploadClientsRow[];
+}
+
+export interface BulkUploadClientsResponse {
+  created: number;
+  duplicates: string[];
+  errors: string[];
+}

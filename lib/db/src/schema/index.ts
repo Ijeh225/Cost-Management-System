@@ -9,3 +9,4 @@ export * from "./tasks";
 export * from "./documents";
 export * from "./custom-sections";
 export * from "./settings";
+export * from "./notifications";

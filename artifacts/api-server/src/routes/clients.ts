@@ -129,3 +129,37 @@ clientsRouter.patch("/containers/:id/unlink-client", requireAuth, requireAdmin, 
     return res.status(500).json({ error: "Server error" });
   }
 });
+
+clientsRouter.post("/clients/bulk", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { rows } = req.body as { rows: Array<{ name: string; contactName?: string; contactEmail?: string; contactPhone?: string; address?: string; notes?: string }> };
+    if (!Array.isArray(rows)) return res.status(400).json({ error: "rows must be an array" });
+    let created = 0;
+    const duplicates: string[] = [];
+    const errors: string[] = [];
+    for (const row of rows) {
+      if (!row.name?.trim()) { errors.push(`Skipped row with missing name`); continue; }
+      try {
+        await db.insert(clientsTable).values({
+          name: row.name.trim(),
+          contactName: row.contactName ?? "",
+          contactEmail: row.contactEmail ?? "",
+          contactPhone: row.contactPhone ?? "",
+          address: row.address ?? "",
+          notes: row.notes ?? "",
+        });
+        created++;
+      } catch (err: any) {
+        if (err.code === "23505") {
+          duplicates.push(row.name);
+        } else {
+          errors.push(`Error for "${row.name}": ${err.message}`);
+        }
+      }
+    }
+    return res.json({ created, duplicates, errors });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});

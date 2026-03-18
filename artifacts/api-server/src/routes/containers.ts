@@ -210,29 +210,32 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
 
 router.post("/containers/upload", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const { rows } = req.body;
+    const { rows, clientId } = req.body;
     if (!Array.isArray(rows)) {
       res.status(400).json({ error: "rows must be an array" });
       return;
     }
+    const linkedClientId = clientId ? parseInt(clientId) : null;
     let created = 0;
     const duplicates: string[] = [];
     const errors: string[] = [];
 
     for (const row of rows) {
-      if (!row.customerName || !row.containerNumber || !row.blNumber) {
+      if (!row.containerNumber || !row.blNumber) {
         errors.push(`Missing required fields for row: ${JSON.stringify(row)}`);
         continue;
       }
+      const customerName = row.customerName || "";
       try {
         const [container] = await db.insert(containersTable).values({
-          customerName: row.customerName,
+          customerName,
           containerNumber: row.containerNumber,
           blNumber: row.blNumber,
           declaration: row.declaration ?? "",
           size: row.size ?? "",
           vessel: row.vessel ?? "",
           clearingCharges: String(row.clearingCharges ?? 0),
+          clientId: linkedClientId,
         }).returning();
         await getOrCreateCharges(container.id);
         created++;

@@ -60,6 +60,9 @@ import type {
   UploadContainersRequest,
   UploadContainersResponse,
   User,
+  NotificationsResponse,
+  BulkUploadClientsRequest,
+  BulkUploadClientsResponse,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -4051,3 +4054,50 @@ export function useGetIntelligenceAlerts<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+// ─── Notifications ──────────────────────────────────────────────────────────
+
+export const getGetNotificationsQueryKey = () => [`/api/notifications`] as const;
+
+export const getNotifications = async (options?: RequestInit): Promise<NotificationsResponse> =>
+  customFetch<NotificationsResponse>(`/api/notifications`, { ...options, method: "GET" });
+
+export function useGetNotifications<TData = NotificationsResponse, TError = ErrorType<unknown>>(options?: {
+  query?: UseQueryOptions<NotificationsResponse, TError, TData>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryKey = options?.query?.queryKey ?? getGetNotificationsQueryKey();
+  const queryFn: QueryFunction<NotificationsResponse> = ({ signal }) => getNotifications({ signal });
+  const queryOptions = { queryKey, queryFn, ...options?.query } as UseQueryOptions<NotificationsResponse, TError, TData> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  return { ...query, queryKey };
+}
+
+export const useMarkNotificationRead = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<{ success: boolean }, TError, { alertKey: string }, TContext>;
+}) =>
+  useMutation<{ success: boolean }, TError, { alertKey: string }, TContext>({
+    mutationFn: ({ alertKey }) => customFetch<{ success: boolean }>(`/api/notifications/${encodeURIComponent(alertKey)}/read`, { method: "POST" }),
+    ...options?.mutation,
+  });
+
+export const useMarkAllNotificationsRead = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<{ success: boolean }, TError, void, TContext>;
+}) =>
+  useMutation<{ success: boolean }, TError, void, TContext>({
+    mutationFn: () => customFetch<{ success: boolean }>(`/api/notifications/read-all`, { method: "POST" }),
+    ...options?.mutation,
+  });
+
+// ─── Bulk Client Upload ──────────────────────────────────────────────────────
+
+export const useCreateClientsBulk = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<BulkUploadClientsResponse, TError, { data: BulkUploadClientsRequest }, TContext>;
+}) =>
+  useMutation<BulkUploadClientsResponse, TError, { data: BulkUploadClientsRequest }, TContext>({
+    mutationFn: ({ data }) => customFetch<BulkUploadClientsResponse>(`/api/clients/bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+    ...options?.mutation,
+  });

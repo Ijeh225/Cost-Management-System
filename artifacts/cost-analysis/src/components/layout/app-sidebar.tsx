@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "./auth-provider";
+import { useGetNotifications, type NotificationsResponse } from "@workspace/api-client-react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,25 +13,43 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck, ListTodo, BarChart2, FileDown, Building2 } from "lucide-react";
+import {
+  LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
+  ListTodo, BarChart2, FileDown, Building2, Bell,
+} from "lucide-react";
+
+function NotificationsBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary/20 px-1.5 text-[10px] font-semibold text-primary border border-primary/30">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAuthenticated } = useAuth();
+
+  const { data: notifData } = useGetNotifications<NotificationsResponse>({
+    query: { refetchInterval: 60_000, enabled: !!isAuthenticated },
+  });
+  const unreadCount: number = notifData?.unreadCount ?? 0;
 
   const mainNav = [
-    { title: "Dashboard", url: "/", icon: LayoutDashboard },
-    { title: "Clients", url: "/clients", icon: Building2 },
-    { title: "Containers", url: "/containers", icon: Box },
-    { title: "My Tasks", url: "/my-tasks", icon: ListTodo },
+    { title: "Dashboard",     url: "/",            icon: LayoutDashboard },
+    { title: "Clients",       url: "/clients",     icon: Building2        },
+    { title: "Containers",    url: "/containers",  icon: Box              },
+    { title: "My Tasks",      url: "/my-tasks",    icon: ListTodo         },
+    { title: "Notifications", url: "/notifications", icon: Bell, badge: unreadCount },
   ];
 
   const adminNav = [
-    { title: "Approval Queue", url: "/approvals", icon: ClipboardCheck },
-    { title: "Analytics", url: "/analytics", icon: BarChart2 },
-    { title: "Reports", url: "/reports", icon: FileDown },
-    { title: "Upload Data", url: "/upload", icon: UploadCloud },
-    { title: "User Management", url: "/users", icon: Users },
+    { title: "Approval Queue",   url: "/approvals",  icon: ClipboardCheck },
+    { title: "Analytics",        url: "/analytics",  icon: BarChart2       },
+    { title: "Reports",          url: "/reports",    icon: FileDown        },
+    { title: "Upload Data",      url: "/upload",     icon: UploadCloud     },
+    { title: "User Management",  url: "/users",      icon: Users           },
   ];
 
   return (
@@ -53,8 +72,8 @@ export function AppSidebar() {
                 const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url));
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
-                      asChild 
+                    <SidebarMenuButton
+                      asChild
                       isActive={isActive}
                       tooltip={item.title}
                       className={`
@@ -63,8 +82,16 @@ export function AppSidebar() {
                       `}
                     >
                       <Link href={item.url} className="flex items-center gap-3 w-full px-3">
-                        <item.icon className={`w-4 h-4 ${isActive ? "text-primary" : ""}`} />
-                        <span>{item.title}</span>
+                        <div className="relative shrink-0">
+                          <item.icon className={`w-4 h-4 ${isActive ? "text-primary" : ""}`} />
+                          {(item as any).badge > 0 && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary group-data-[collapsible=icon]:block hidden" />
+                          )}
+                        </div>
+                        <span className="flex-1">{item.title}</span>
+                        {(item as any).badge != null && (
+                          <NotificationsBadge count={(item as any).badge} />
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -85,8 +112,8 @@ export function AppSidebar() {
                   const isActive = location === item.url || location.startsWith(item.url);
                   return (
                     <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton 
-                        asChild 
+                      <SidebarMenuButton
+                        asChild
                         isActive={isActive}
                         tooltip={item.title}
                         className={`
@@ -107,7 +134,7 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
       </SidebarContent>
-      
+
       <SidebarFooter className="p-4 border-t border-border/50 text-xs text-muted-foreground text-center group-data-[collapsible=icon]:hidden">
         v1.0.0 Enterprise
       </SidebarFooter>
