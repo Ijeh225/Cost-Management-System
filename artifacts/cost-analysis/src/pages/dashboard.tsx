@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -13,11 +13,11 @@ import {
 import {
   Box, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity,
   FileText, Search, CheckCircle2, ArrowRight, Loader2, ClipboardCheck, ListTodo,
-  Brain, ShieldAlert, Clock, ExternalLink,
+  Brain, ShieldAlert, Clock, ExternalLink, X, EyeOff,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 const COLORS = [
   "hsl(var(--chart-1))",
@@ -26,59 +26,172 @@ const COLORS = [
   "hsl(var(--chart-4))",
 ];
 
-const ALERT_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string; border: string; label: string }> = {
-  loss_making:     { icon: TrendingDown, color: "text-destructive",  bg: "bg-destructive/10",  border: "border-destructive/20",  label: "Loss-Making Container" },
-  low_profit:      { icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Low Profit Margin" },
-  overdue_duty:    { icon: DollarSign, color: "text-amber-400", bg: "bg-amber-400/10", border: "border-amber-400/20", label: "Outstanding Duty" },
-  delayed:         { icon: Clock, color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20", label: "Possible Delay" },
-  stale_approval:  { icon: ShieldAlert, color: "text-violet-400", bg: "bg-violet-400/10", border: "border-violet-400/20", label: "Stale Approval" },
-  overdue_task:    { icon: ListTodo, color: "text-rose-400", bg: "bg-rose-400/10", border: "border-rose-400/20", label: "Overdue Task" },
+const ALERT_CONFIG: Record<string, {
+  icon: React.ElementType;
+  color: string;
+  accent: string;
+  label: string;
+  severity: "critical" | "warning" | "info";
+}> = {
+  loss_making:    { icon: TrendingDown, color: "text-red-400",    accent: "border-l-red-500",    label: "Loss-Making",      severity: "critical" },
+  low_profit:     { icon: AlertTriangle,color: "text-orange-400", accent: "border-l-orange-500", label: "Low Margin",       severity: "warning"  },
+  overdue_duty:   { icon: DollarSign,   color: "text-amber-400",  accent: "border-l-amber-500",  label: "Outstanding Duty", severity: "warning"  },
+  delayed:        { icon: Clock,        color: "text-blue-400",   accent: "border-l-blue-500",   label: "Possible Delay",   severity: "info"     },
+  stale_approval: { icon: ShieldAlert,  color: "text-violet-400", accent: "border-l-violet-500", label: "Stale Approval",   severity: "warning"  },
+  overdue_task:   { icon: ListTodo,     color: "text-rose-400",   accent: "border-l-rose-500",   label: "Overdue Task",     severity: "warning"  },
 };
+
+const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
+const DISMISS_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const DISMISS_KEY = "intel_alerts_dismissed_v1";
+
+function getDismissed(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(DISMISS_KEY) ?? "{}"); } catch { return {}; }
+}
+function setDismissed(map: Record<string, number>) {
+  try { localStorage.setItem(DISMISS_KEY, JSON.stringify(map)); } catch {}
+}
+function alertKey(alert: { type: string; containerId?: number | null }) {
+  return `${alert.type}:${alert.containerId ?? "global"}`;
+}
 
 function IntelligenceAlertsPanel() {
   const { data, isLoading } = useGetIntelligenceAlerts();
-  const alerts: any[] = (data as any)?.alerts ?? [];
+  const rawAlerts: Array<{ type: string; severity: string; message: string; containerId?: number | null; containerNumber?: string | null }> =
+    (data as any)?.alerts ?? [];
+
+  const [dismissed, setDismissedState] = useState<Record<string, number>>(getDismissed);
+
+  const dismiss = useCallback((key: string) => {
+    const next = { ...getDismissed(), [key]: Date.now() };
+    setDismissed(next);
+    setDismissedState(next);
+  }, []);
+
+  const dismissAll = useCallback((keys: string[]) => {
+    const base = getDismissed();
+    const now = Date.now();
+    const next = keys.reduce((acc, k) => ({ ...acc, [k]: now }), base);
+    setDismissed(next);
+    setDismissedState(next);
+  }, []);
+
+  const alerts = useMemo(() => {
+    const now = Date.now();
+    return rawAlerts
+      .filter(a => {
+        const k = alertKey(a);
+        const ts = dismissed[k];
+        return !ts || (now - ts) >= DISMISS_TTL_MS;
+      })
+      .sort((a, b) => {
+        const aCfg = ALERT_CONFIG[a.type];
+        const bCfg = ALERT_CONFIG[b.type];
+        return (SEVERITY_ORDER[aCfg?.severity ?? "info"] ?? 2) - (SEVERITY_ORDER[bCfg?.severity ?? "info"] ?? 2);
+      });
+  }, [rawAlerts, dismissed]);
+
+  const hiddenCount = rawAlerts.length - alerts.length;
 
   if (isLoading) return null;
-  if (alerts.length === 0) return (
+
+  if (rawAlerts.length === 0) return (
     <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
       <p className="text-sm text-emerald-400 font-medium">All systems healthy — no issues detected.</p>
     </div>
   );
 
+  if (alerts.length === 0) return (
+    <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary/40 border border-border/40">
+      <EyeOff className="w-4 h-4 text-muted-foreground shrink-0" />
+      <p className="text-sm text-muted-foreground flex-1">
+        {hiddenCount} alert{hiddenCount !== 1 ? "s" : ""} dismissed — will reappear after 30 minutes.
+      </p>
+    </div>
+  );
+
+  const criticalCount = alerts.filter(a => (ALERT_CONFIG[a.type]?.severity ?? "info") === "critical").length;
+  const warningCount  = alerts.filter(a => (ALERT_CONFIG[a.type]?.severity ?? "info") === "warning").length;
+  const allKeys = alerts.map(alertKey);
+
   return (
-    <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
-      <CardHeader className="pb-3 pt-4 px-4 border-b border-border/40 flex flex-row items-center gap-2">
-        <Brain className="w-4 h-4 text-primary" />
-        <CardTitle className="text-sm font-semibold">Profit Intelligence Alerts</CardTitle>
-        <Badge variant="outline" className="ml-auto text-xs px-1.5 py-0 border-destructive/40 text-destructive">{alerts.length} alert{alerts.length !== 1 ? "s" : ""}</Badge>
+    <Card className="border-border/40 bg-card/40 backdrop-blur-sm overflow-hidden">
+      <CardHeader className="pb-3 pt-4 px-4 border-b border-border/40">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Brain className="w-4 h-4 text-primary shrink-0" />
+          <CardTitle className="text-sm font-semibold">Profit Intelligence Alerts</CardTitle>
+          <div className="flex items-center gap-1.5 ml-1">
+            {criticalCount > 0 && (
+              <Badge className="text-[10px] px-1.5 py-0 bg-red-500/15 text-red-400 border border-red-500/30">
+                {criticalCount} critical
+              </Badge>
+            )}
+            {warningCount > 0 && (
+              <Badge className="text-[10px] px-1.5 py-0 bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                {warningCount} warning{warningCount !== 1 ? "s" : ""}
+              </Badge>
+            )}
+            {hiddenCount > 0 && (
+              <span className="text-[10px] text-muted-foreground/60">· {hiddenCount} hidden</span>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => dismissAll(allKeys)}
+            className="ml-auto h-6 text-[11px] px-2 text-muted-foreground hover:text-foreground gap-1"
+          >
+            <EyeOff className="w-3 h-3" /> Dismiss all
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="divide-y divide-border/30 max-h-64 overflow-y-auto">
-          {alerts.map((alert: any, i: number) => {
+        <AnimatePresence initial={false}>
+          {alerts.map((alert) => {
             const cfg = ALERT_CONFIG[alert.type] ?? ALERT_CONFIG.low_profit;
             const Icon = cfg.icon;
+            const key = alertKey(alert);
             return (
-              <div key={i} className={`flex items-start gap-3 px-4 py-3 ${cfg.bg} group`}>
-                <div className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border}`}>
-                  <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-xs font-bold uppercase tracking-wide ${cfg.color}`}>{cfg.label}</span>
-                    {alert.containerNumber && (
-                      <Link href={`/containers/${alert.containerId}`} className="text-xs font-mono text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5">
-                        {alert.containerNumber} <ExternalLink className="w-2.5 h-2.5 inline opacity-0 group-hover:opacity-100" />
-                      </Link>
-                    )}
+              <motion.div
+                key={key}
+                layout
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0, overflow: "hidden" }}
+                transition={{ duration: 0.18 }}
+              >
+                <div className={`flex items-start gap-3 px-4 py-3 border-b border-border/30 last:border-0 border-l-[3px] ${cfg.accent} group hover:bg-accent/20 transition-colors`}>
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-background/60`}>
+                    <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{alert.message}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-[11px] font-bold uppercase tracking-wider ${cfg.color}`}>{cfg.label}</span>
+                      {alert.containerNumber && (
+                        <Link
+                          href={`/containers/${alert.containerId}`}
+                          className="text-[11px] font-mono text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5"
+                        >
+                          {alert.containerNumber}
+                          <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-70 transition-opacity" />
+                        </Link>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{alert.message}</p>
+                  </div>
+                  <button
+                    onClick={() => dismiss(key)}
+                    className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent transition-all opacity-0 group-hover:opacity-100 mt-0.5"
+                    title="Dismiss for 30 minutes"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </AnimatePresence>
       </CardContent>
     </Card>
   );
