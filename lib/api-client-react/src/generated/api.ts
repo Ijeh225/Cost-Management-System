@@ -4088,6 +4088,14 @@ export const useMarkAllNotificationsRead = <TError = ErrorType<unknown>, TContex
     ...options?.mutation,
   });
 
+export const useMarkNotificationsViewed = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<{ success: boolean; marked: number }, TError, void, TContext>;
+}) =>
+  useMutation<{ success: boolean; marked: number }, TError, void, TContext>({
+    mutationFn: () => customFetch<{ success: boolean; marked: number }>(`/api/notifications/mark-viewed`, { method: "POST" }),
+    ...options?.mutation,
+  });
+
 // ─── Bulk Client Upload ──────────────────────────────────────────────────────
 
 export const useCreateClientsBulk = <TError = ErrorType<unknown>, TContext = unknown>(options?: {

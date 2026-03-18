@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import {
-  useGetNotifications, useMarkNotificationRead, useMarkAllNotificationsRead,
+  useGetNotifications, useMarkAllNotificationsRead, useMarkNotificationsViewed,
   type Notification,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -41,7 +41,7 @@ function formatTime(iso: string) {
   return d.toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" });
 }
 
-function NotificationRow({ notif, onRead }: { notif: Notification; onRead: (key: string) => void }) {
+function NotificationRow({ notif }: { notif: Notification }) {
   const cfg = ALERT_CONFIG[notif.type] ?? ALERT_CONFIG.low_margin;
   const sev = SEVERITY_CONFIG[notif.severity] ?? SEVERITY_CONFIG.info;
   const Icon = cfg.icon;
@@ -68,24 +68,16 @@ function NotificationRow({ notif, onRead }: { notif: Notification; onRead: (key:
           <span className="text-[11px] text-muted-foreground shrink-0">{formatTime(notif.generatedAt)}</span>
         </div>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
-        <div className="flex items-center gap-3 mt-2">
-          {notif.containerId && (
+        {notif.containerId && (
+          <div className="mt-2">
             <Link href={`/containers/${notif.containerId}`}>
-              <span className="flex items-center gap-1 text-xs text-primary hover:underline">
+              <span className="flex items-center gap-1 text-xs text-primary hover:underline w-fit">
                 View container {notif.containerNumber && `· ${notif.containerNumber}`}
                 <ExternalLink className="w-3 h-3" />
               </span>
             </Link>
-          )}
-          {!notif.isRead && (
-            <button
-              onClick={() => onRead(notif.alertKey)}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Mark as read
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -101,11 +93,19 @@ export default function NotificationsPage() {
     query: { refetchInterval: 60_000 },
   });
 
-  const markRead = useMarkNotificationRead();
+  const markViewed = useMarkNotificationsViewed();
   const markAll = useMarkAllNotificationsRead();
 
   const notifications: Notification[] = data?.notifications ?? [];
   const unreadCount: number = data?.unreadCount ?? 0;
+
+  useEffect(() => {
+    if (!isLoading && notifications.length > 0) {
+      markViewed.mutate(undefined, {
+        onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/notifications"] }),
+      });
+    }
+  }, [isLoading]);
 
   const filtered = notifications.filter(n => {
     if (filter === "unread" && n.isRead) return false;
@@ -113,13 +113,6 @@ export default function NotificationsPage() {
     if (typeFilter !== "all" && n.type !== typeFilter) return false;
     return true;
   });
-
-  const handleMarkRead = (alertKey: string) => {
-    markRead.mutate({ alertKey }, {
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/notifications"] }),
-      onError: () => toast({ variant: "destructive", title: "Failed to mark as read" }),
-    });
-  };
 
   const handleMarkAll = () => {
     markAll.mutate(undefined, {
@@ -211,7 +204,7 @@ export default function NotificationsPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            {unreadCount === 0 && filter === "all" ? (
+            {notifications.length === 0 ? (
               <>
                 <BellOff className="w-12 h-12 text-muted-foreground/20 mb-3" />
                 <p className="font-medium text-muted-foreground">No alerts</p>
@@ -227,7 +220,7 @@ export default function NotificationsPage() {
         ) : (
           <AnimatePresence>
             {filtered.map(n => (
-              <NotificationRow key={n.alertKey} notif={n} onRead={handleMarkRead} />
+              <NotificationRow key={n.alertKey} notif={n} />
             ))}
           </AnimatePresence>
         )}

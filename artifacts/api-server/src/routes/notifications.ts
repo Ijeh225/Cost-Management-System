@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable } from "@workspace/db";
-import { eq, lt } from "drizzle-orm";
+import { eq, lt, and, inArray } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery } from "../lib/calculations.js";
 
@@ -82,10 +82,11 @@ async function computeAlerts() {
   return alerts;
 }
 
-notificationsRouter.get("/notifications", requireAuth, async (_req, res) => {
+notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
   try {
+    const userId = (req as AuthRequest).user.id;
     const alerts = await computeAlerts();
-    const readRows = await db.select().from(notificationsReadTable);
+    const readRows = await db.select().from(notificationsReadTable).where(eq(notificationsReadTable.userId, userId));
     const readMap: Record<string, { isRead: boolean; readAt: string | null }> = {};
     for (const r of readRows) {
       readMap[r.alertKey] = { isRead: r.isRead, readAt: r.readAt ? r.readAt.toISOString() : null };
@@ -105,12 +106,15 @@ notificationsRouter.get("/notifications", requireAuth, async (_req, res) => {
 
 notificationsRouter.post("/notifications/:alertKey/read", requireAuth, async (req, res) => {
   try {
+    const userId = (req as AuthRequest).user.id;
     const { alertKey } = req.params;
-    const existing = await db.select().from(notificationsReadTable).where(eq(notificationsReadTable.alertKey, alertKey));
+    const existing = await db.select().from(notificationsReadTable)
+      .where(and(eq(notificationsReadTable.alertKey, alertKey), eq(notificationsReadTable.userId, userId)));
     if (existing.length > 0) {
-      await db.update(notificationsReadTable).set({ isRead: true, readAt: new Date() }).where(eq(notificationsReadTable.alertKey, alertKey));
+      await db.update(notificationsReadTable).set({ isRead: true, readAt: new Date() })
+        .where(and(eq(notificationsReadTable.alertKey, alertKey), eq(notificationsReadTable.userId, userId)));
     } else {
-      await db.insert(notificationsReadTable).values({ alertKey, isRead: true, readAt: new Date() });
+      await db.insert(notificationsReadTable).values({ alertKey, userId, isRead: true, readAt: new Date() });
     }
     return res.json({ success: true });
   } catch (err) {
@@ -119,18 +123,60 @@ notificationsRouter.post("/notifications/:alertKey/read", requireAuth, async (re
   }
 });
 
-notificationsRouter.post("/notifications/read-all", requireAuth, async (_req, res) => {
+notificationsRouter.post("/notifications/read-all", requireAuth, async (req, res) => {
   try {
+    const userId = (req as AuthRequest).user.id;
     const alerts = await computeAlerts();
+    if (alerts.length === 0) return res.json({ success: true });
+
+    const alertKeys = alerts.map(a => a.alertKey);
+    const existingRows = await db.select().from(notificationsReadTable)
+      .where(and(eq(notificationsReadTable.userId, userId), inArray(notificationsReadTable.alertKey, alertKeys)));
+    const existingKeys = new Set(existingRows.map(r => r.alertKey));
+
+    const now = new Date();
     for (const alert of alerts) {
-      const existing = await db.select().from(notificationsReadTable).where(eq(notificationsReadTable.alertKey, alert.alertKey));
-      if (existing.length > 0) {
-        await db.update(notificationsReadTable).set({ isRead: true, readAt: new Date() }).where(eq(notificationsReadTable.alertKey, alert.alertKey));
+      if (existingKeys.has(alert.alertKey)) {
+        await db.update(notificationsReadTable).set({ isRead: true, readAt: now })
+          .where(and(eq(notificationsReadTable.alertKey, alert.alertKey), eq(notificationsReadTable.userId, userId)));
       } else {
-        await db.insert(notificationsReadTable).values({ alertKey: alert.alertKey, isRead: true, readAt: new Date() });
+        await db.insert(notificationsReadTable).values({ alertKey: alert.alertKey, userId, isRead: true, readAt: now });
       }
     }
     return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as AuthRequest).user.id;
+    const alerts = await computeAlerts();
+    if (alerts.length === 0) return res.json({ success: true, marked: 0 });
+
+    const alertKeys = alerts.map(a => a.alertKey);
+    const existingRows = await db.select().from(notificationsReadTable)
+      .where(and(eq(notificationsReadTable.userId, userId), inArray(notificationsReadTable.alertKey, alertKeys)));
+    const existingKeys = new Set(existingRows.map(r => r.alertKey));
+
+    const now = new Date();
+    let marked = 0;
+    for (const alertKey of alertKeys) {
+      if (existingKeys.has(alertKey)) {
+        const row = existingRows.find(r => r.alertKey === alertKey)!;
+        if (!row.isRead) {
+          await db.update(notificationsReadTable).set({ isRead: true, readAt: now })
+            .where(and(eq(notificationsReadTable.alertKey, alertKey), eq(notificationsReadTable.userId, userId)));
+          marked++;
+        }
+      } else {
+        await db.insert(notificationsReadTable).values({ alertKey, userId, isRead: true, readAt: now });
+        marked++;
+      }
+    }
+    return res.json({ success: true, marked });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
