@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable } from "@workspace/db";
+import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
@@ -809,6 +809,34 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       myPendingSections,
       mySections,
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.delete("/containers/bulk", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  const { ids } = req.body as { ids?: unknown };
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: "ids must be a non-empty array" });
+  }
+  const numIds = ids.map(Number).filter(n => Number.isFinite(n) && n > 0);
+  if (numIds.length === 0) return res.status(400).json({ error: "No valid ids provided" });
+
+  try {
+    await db.delete(customFieldValuesTable).where(inArray(customFieldValuesTable.containerId, numIds));
+    await db.delete(containerDocumentsTable).where(inArray(containerDocumentsTable.containerId, numIds));
+    await db.delete(containerTimelineTable).where(inArray(containerTimelineTable.containerId, numIds));
+    await db.delete(containerTasksTable).where(inArray(containerTasksTable.containerId, numIds));
+    await db.delete(auditLogTable).where(inArray(auditLogTable.containerId, numIds));
+    await db.delete(sectionApprovalsTable).where(inArray(sectionApprovalsTable.containerId, numIds));
+    await db.delete(shippingChargesTable).where(inArray(shippingChargesTable.containerId, numIds));
+    await db.delete(customsChargesTable).where(inArray(customsChargesTable.containerId, numIds));
+    await db.delete(terminalChargesTable).where(inArray(terminalChargesTable.containerId, numIds));
+    await db.delete(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, numIds));
+    await db.delete(operationsChargesTable).where(inArray(operationsChargesTable.containerId, numIds));
+    await db.delete(containersTable).where(inArray(containersTable.id, numIds));
+    res.json({ deleted: numIds.length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });

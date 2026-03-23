@@ -2,19 +2,24 @@ import { useState, useEffect } from "react";
 import { useListContainers } from "@workspace/api-client-react";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/components/layout/auth-provider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import {
   Search, SlidersHorizontal, ChevronLeft, ChevronRight,
   AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown,
-  X, Filter, TrendingDown,
+  X, Filter, Trash2, Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type SortField = "containerNumber" | "customerName" | "declaration" | "status" | "clearingCharges" | "totalCost" | "grossProfit";
+type SortDir = "asc" | "desc";
 
 function AgingBadge({ createdAt, status }: { createdAt: string; status: string }) {
   if (["completed", "closed"].includes(status)) return null;
@@ -24,7 +29,6 @@ function AgingBadge({ createdAt, status }: { createdAt: string; status: string }
   if (ageDays >= 30) return <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">{ageDays}d</span>;
   return null;
 }
-type SortDir = "asc" | "desc";
 
 function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: SortField; sortDir: SortDir }) {
   if (sortField !== field) return <ChevronsUpDown className="w-3.5 h-3.5 ml-1 text-muted-foreground/50 inline" />;
@@ -35,6 +39,10 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
 
 export default function Containers() {
   const [, setLocation] = useLocation();
+  const { isAdmin } = useAuth();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [profitFilter, setProfitFilter] = useState<string>("all");
@@ -44,6 +52,11 @@ export default function Containers() {
   const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>("containerNumber");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const limit = 15;
 
   useEffect(() => {
@@ -62,12 +75,8 @@ export default function Containers() {
   const hasActiveFilters = status !== "all" || profitFilter !== "all" || dateFrom || dateTo;
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir(d => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortField(field);
-      setSortDir("asc");
-    }
+    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
   };
 
   const sorted = [...(data?.containers ?? [])].filter((c: any) => {
@@ -80,13 +89,61 @@ export default function Containers() {
   }).sort((a, b) => {
     let av: any = a[sortField as keyof typeof a] ?? "";
     let bv: any = b[sortField as keyof typeof b] ?? "";
-    if (typeof av === "number" && typeof bv === "number") {
-      return sortDir === "asc" ? av - bv : bv - av;
-    }
+    if (typeof av === "number" && typeof bv === "number") return sortDir === "asc" ? av - bv : bv - av;
     av = String(av).toLowerCase();
     bv = String(bv).toLowerCase();
     return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
   });
+
+  const allVisibleIds = sorted.map(c => c.id);
+  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selected.has(id));
+  const someSelected = allVisibleIds.some(id => selected.has(id)) && !allSelected;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        allVisibleIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected(prev => new Set([...prev, ...allVisibleIds]));
+    }
+  };
+
+  const toggleOne = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    setIsDeleting(true);
+    try {
+      const res = await fetch("/api/containers/bulk", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...selected] }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Delete failed");
+      const { deleted } = await res.json();
+      toast({ title: `${deleted} container${deleted !== 1 ? "s" : ""} deleted` });
+      setSelected(new Set());
+      setConfirmDelete(false);
+      qc.invalidateQueries({ queryKey: ["/api/containers"] });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Delete failed", description: err.message });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelDelete = () => { setConfirmDelete(false); setSelected(new Set()); };
 
   const Th = ({ field, label, right = false }: { field: SortField; label: string; right?: boolean }) => (
     <th
@@ -97,6 +154,8 @@ export default function Containers() {
       <SortIcon field={field} sortField={sortField} sortDir={sortDir} />
     </th>
   );
+
+  const colSpan = isAdmin ? 9 : 8;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -162,9 +221,7 @@ export default function Containers() {
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground font-medium">Profit Status</label>
                     <Select value={profitFilter} onValueChange={(v) => { setProfitFilter(v); setPage(1); }}>
-                      <SelectTrigger className="h-8 text-xs bg-background border-border/60">
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger className="h-8 text-xs bg-background border-border/60"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Containers</SelectItem>
                         <SelectItem value="profitable">Profitable Only</SelectItem>
@@ -175,21 +232,11 @@ export default function Containers() {
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground font-medium">Created From</label>
-                    <Input
-                      type="date"
-                      value={dateFrom}
-                      onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-                      className="h-8 text-xs bg-background border-border/60"
-                    />
+                    <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className="h-8 text-xs bg-background border-border/60" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground font-medium">Created To</label>
-                    <Input
-                      type="date"
-                      value={dateTo}
-                      onChange={e => { setDateTo(e.target.value); setPage(1); }}
-                      className="h-8 text-xs bg-background border-border/60"
-                    />
+                    <Input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className="h-8 text-xs bg-background border-border/60" />
                   </div>
                 </div>
                 {hasActiveFilters && (
@@ -210,11 +257,22 @@ export default function Containers() {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted-foreground bg-secondary/30 uppercase tracking-wider border-b border-border/50">
               <tr>
+                {isAdmin && (
+                  <th className="px-4 py-3 w-10">
+                    <Checkbox
+                      checked={allSelected}
+                      data-state={someSelected ? "indeterminate" : allSelected ? "checked" : "unchecked"}
+                      onCheckedChange={toggleAll}
+                      aria-label="Select all"
+                      className="border-border/60"
+                    />
+                  </th>
+                )}
                 <Th field="containerNumber" label="Container / BL" />
                 <Th field="customerName"    label="Customer" />
                 <Th field="declaration"     label="Declaration" />
                 <th className="px-4 py-3 font-medium text-left">Vessel / Size</th>
-                <Th field="status"           label="Status" />
+                <Th field="status"          label="Status" />
                 <Th field="clearingCharges" label="Clearing Charges" right />
                 <Th field="totalCost"       label="Total Cost" right />
                 <Th field="grossProfit"     label="Gross Profit" right />
@@ -224,25 +282,22 @@ export default function Containers() {
               {isLoading ? (
                 [...Array(6)].map((_, i) => (
                   <tr key={i} className="animate-pulse bg-card/20">
-                    {[...Array(8)].map((__, j) => (
-                      <td key={j} className="px-4 py-4">
-                        <div className="h-4 bg-muted/50 rounded w-20" />
-                      </td>
+                    {[...Array(colSpan)].map((__, j) => (
+                      <td key={j} className="px-4 py-4"><div className="h-4 bg-muted/50 rounded w-20" /></td>
                     ))}
                   </tr>
                 ))
               ) : isError ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-destructive">
+                  <td colSpan={colSpan} className="px-6 py-12 text-center text-destructive">
                     <div className="flex flex-col items-center justify-center">
-                      <AlertCircle className="w-8 h-8 mb-2" />
-                      Failed to load containers.
+                      <AlertCircle className="w-8 h-8 mb-2" /> Failed to load containers.
                     </div>
                   </td>
                 </tr>
               ) : sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center text-muted-foreground">
+                  <td colSpan={colSpan} className="px-6 py-16 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center">
                       <FileSpreadsheet className="w-12 h-12 mb-4 text-muted-foreground/30" />
                       <p className="text-base">No containers found matching your criteria.</p>
@@ -251,51 +306,59 @@ export default function Containers() {
                   </td>
                 </tr>
               ) : (
-                sorted.map((container) => (
-                  <tr
-                    key={container.id}
-                    onClick={() => setLocation(`/containers/${container.id}`)}
-                    className="hover:bg-accent/50 cursor-pointer transition-colors group"
-                  >
-                    <td className="px-4 py-4">
-                      <div className="font-mono font-medium text-foreground group-hover:text-primary transition-colors">
-                        {container.containerNumber}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">BL: {container.blNumber}</div>
-                    </td>
-                    <td className="px-4 py-4 font-medium max-w-[140px] truncate">{container.customerName}</td>
-                    <td className="px-4 py-4 text-muted-foreground font-mono text-xs">
-                      {container.declaration || <span className="italic text-muted-foreground/50">—</span>}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="text-foreground">{container.vessel || "—"}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{container.size || "—"}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center flex-wrap gap-1">
-                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium border uppercase tracking-wider ${getStatusColor(container.status)}`}>
-                          {getStatusLabel(container.status)}
+                sorted.map((container) => {
+                  const isChecked = selected.has(container.id);
+                  return (
+                    <tr
+                      key={container.id}
+                      onClick={() => setLocation(`/containers/${container.id}`)}
+                      className={`hover:bg-accent/50 cursor-pointer transition-colors group ${isChecked ? "bg-primary/5" : ""}`}
+                    >
+                      {isAdmin && (
+                        <td className="px-4 py-4 w-10" onClick={(e) => toggleOne(container.id, e)}>
+                          <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={() => {}}
+                            className="border-border/60"
+                          />
+                        </td>
+                      )}
+                      <td className="px-4 py-4">
+                        <div className="font-mono font-medium text-foreground group-hover:text-primary transition-colors">
+                          {container.containerNumber}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">BL: {container.blNumber}</div>
+                      </td>
+                      <td className="px-4 py-4 font-medium max-w-[140px] truncate">{container.customerName}</td>
+                      <td className="px-4 py-4 text-muted-foreground font-mono text-xs">
+                        {container.declaration || <span className="italic text-muted-foreground/50">—</span>}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="text-foreground">{container.vessel || "—"}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{container.size || "—"}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center flex-wrap gap-1">
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium border uppercase tracking-wider ${getStatusColor(container.status)}`}>
+                            {getStatusLabel(container.status)}
+                          </span>
+                          <AgingBadge createdAt={container.createdAt} status={container.status} />
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className="font-mono text-sm text-foreground">{formatCurrency(container.clearingCharges)}</span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className="font-mono text-sm text-muted-foreground">{formatCurrency(container.totalCost)}</span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className={`font-mono font-semibold ${container.grossProfit < 0 ? "text-destructive" : container.grossProfit > 0 ? "text-emerald-400" : "text-muted-foreground"}`}>
+                          {formatCurrency(container.grossProfit)}
                         </span>
-                        <AgingBadge createdAt={container.createdAt} status={container.status} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <span className="font-mono text-sm text-foreground">
-                        {formatCurrency(container.clearingCharges)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <span className="font-mono text-sm text-muted-foreground">
-                        {formatCurrency(container.totalCost)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <span className={`font-mono font-semibold ${container.grossProfit < 0 ? "text-destructive" : container.grossProfit > 0 ? "text-emerald-400" : "text-muted-foreground"}`}>
-                        {formatCurrency(container.grossProfit)}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -309,26 +372,71 @@ export default function Containers() {
               <span className="font-medium text-foreground">{data.total}</span> entries
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline" size="sm"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="hover-elevate"
-              >
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="hover-elevate">
                 <ChevronLeft className="w-4 h-4 mr-1" /> Prev
               </Button>
-              <Button
-                variant="outline" size="sm"
-                onClick={() => setPage(p => p + 1)}
-                disabled={page * limit >= data.total}
-                className="hover-elevate"
-              >
+              <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page * limit >= data.total} className="hover-elevate">
                 Next <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </div>
           </div>
         )}
       </Card>
+
+      {/* Floating delete action bar */}
+      <AnimatePresence>
+        {isAdmin && selected.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+          >
+            <div className={`flex items-center gap-3 px-5 py-3 rounded-2xl border shadow-2xl backdrop-blur-md transition-colors ${
+              confirmDelete
+                ? "bg-destructive/95 border-destructive/60"
+                : "bg-card/95 border-border/60"
+            }`}>
+              {confirmDelete ? (
+                <>
+                  <span className="text-sm font-semibold text-white">
+                    Permanently delete {selected.size} container{selected.size !== 1 ? "s" : ""}? This cannot be undone.
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="bg-white text-destructive hover:bg-white/90 font-semibold h-8"
+                  >
+                    {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Yes, Delete"}
+                  </Button>
+                  <button onClick={cancelDelete} className="text-white/70 hover:text-white transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm font-medium text-foreground">
+                    <span className="text-primary font-bold">{selected.size}</span> container{selected.size !== 1 ? "s" : ""} selected
+                  </span>
+                  <div className="w-px h-4 bg-border/60" />
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleDelete}
+                    className="gap-1.5 h-8"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete Selected
+                  </Button>
+                  <button onClick={() => setSelected(new Set())} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
