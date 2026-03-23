@@ -10,3 +10,4 @@ export * from "./documents";
 export * from "./custom-sections";
 export * from "./settings";
 export * from "./notifications";
+export * from "./invoices";

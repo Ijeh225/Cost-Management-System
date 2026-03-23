@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import {
   useGetContainer, useUpdateContainerCharges,
   useLockContainer, useUpdateContainer, useGetContainerAuditLog,
@@ -37,13 +37,13 @@ import {
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
   Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink, X,
-  ClipboardCheck, ArrowRightCircle,
+  ClipboardCheck, ArrowRightCircle, PlusCircle,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
 import { DocumentsTab } from "@/components/containers/DocumentsTab";
 import { EditSectionsTab } from "@/components/containers/EditSectionsTab";
-import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY } from "@workspace/api-client-react";
+import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY, useCreateInvoice, useListInvoices } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
@@ -555,6 +555,11 @@ export default function ContainerDetail() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [linkingClient, setLinkingClient] = useState(false);
   const [editSectionsOpen, setEditSectionsOpen] = useState(false);
+  const [invoiceDialog, setInvoiceDialog] = useState(false);
+  const [invoiceDueDate, setInvoiceDueDate] = useState("");
+  const [invoiceVatRate, setInvoiceVatRate] = useState("");
+  const [invoiceNotes, setInvoiceNotes] = useState("");
+  const [, setLocation] = useLocation();
 
   const { data, isLoading, isError } = useGetContainer(containerId);
   const lockMutation = useLockContainer();
@@ -566,6 +571,9 @@ export default function ContainerDetail() {
   const unlockSectionMutation = useUnlockSection();
   const { data: clientsList } = useListClients();
   const linkContainerMutation = useLinkContainerToClient();
+  const createInvoiceMutation = useCreateInvoice();
+  const { data: allInvoices } = useListInvoices();
+  const containerInvoices = (allInvoices ?? []).filter(inv => inv.containerId === containerId);
   const { data: customSectionsRaw } = useGetCustomSections(containerId);
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
   const { data: sectionSettings } = useGetSettings();
@@ -748,6 +756,25 @@ export default function ContainerDetail() {
     });
   };
 
+  const handleCreateInvoice = async () => {
+    try {
+      const inv = await createInvoiceMutation.mutateAsync({
+        containerId,
+        vatRate: invoiceVatRate ? parseFloat(invoiceVatRate) : undefined,
+        dueDate: invoiceDueDate || undefined,
+        notes: invoiceNotes || undefined,
+      });
+      toast({ title: "Invoice created", description: inv.invoiceNumber });
+      setInvoiceDialog(false);
+      setInvoiceDueDate("");
+      setInvoiceVatRate("");
+      setInvoiceNotes("");
+      setLocation(`/invoices/${inv.id}`);
+    } catch {
+      toast({ variant: "destructive", title: "Failed to create invoice" });
+    }
+  };
+
   const isSectionEditable = (sectionKey: string) =>
     canEditSectionGranular(sectionKey, isAdmin, userSectionPermissions, userSectionPermission);
 
@@ -802,6 +829,19 @@ export default function ContainerDetail() {
           <span className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider border ${getStatusColor(container.status)}`}>
             {getStatusLabel(container.status)}
           </span>
+          {containerInvoices.length > 0 ? (
+            <Link href="/invoices">
+              <Button variant="outline" size="sm" className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10">
+                <FileText className="w-3.5 h-3.5" />
+                {containerInvoices.length} Invoice{containerInvoices.length > 1 ? "s" : ""}
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setInvoiceDialog(true)}>
+              <PlusCircle className="w-3.5 h-3.5" />
+              Create Invoice
+            </Button>
+          )}
           {canAdvance && (
             <Button
               size="sm"
@@ -1283,6 +1323,64 @@ export default function ContainerDetail() {
               <Button variant="outline" onClick={() => { setLinkClientDialog(false); setSelectedClientId(""); }}>Cancel</Button>
               <Button disabled={!selectedClientId || linkingClient} onClick={handleLinkClient} className="gap-2">
                 {linkingClient ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />} Link Client
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Invoice dialog */}
+      <Dialog open={invoiceDialog} onOpenChange={v => { if (!v) setInvoiceDialog(false); }}>
+        <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlusCircle className="w-4 h-4 text-primary" /> Create Invoice
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+              Invoice will be created from the current total cost of <span className="font-semibold text-foreground">{formatCurrency(container.totalCost)}</span>.
+            </div>
+            <div>
+              <Label htmlFor="inv-due">Due Date (optional)</Label>
+              <Input
+                id="inv-due"
+                type="date"
+                value={invoiceDueDate}
+                onChange={e => setInvoiceDueDate(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="inv-vat">VAT Rate % (optional, e.g. 7.5)</Label>
+              <Input
+                id="inv-vat"
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                placeholder="0"
+                value={invoiceVatRate}
+                onChange={e => setInvoiceVatRate(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="inv-notes">Notes (optional)</Label>
+              <Textarea
+                id="inv-notes"
+                rows={2}
+                placeholder="Any additional notes for the invoice..."
+                value={invoiceNotes}
+                onChange={e => setInvoiceNotes(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setInvoiceDialog(false)}>Cancel</Button>
+              <Button onClick={handleCreateInvoice} disabled={createInvoiceMutation.isPending} className="gap-2">
+                {createInvoiceMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+                Create Invoice
               </Button>
             </div>
           </div>

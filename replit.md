@@ -110,6 +110,16 @@ All 8 remaining features implemented:
 
 4. **API Server Fix** — Removed zod import from clients route (not available in api-server package); replaced with manual field validation. `formatContainer` now returns `clientId` and `clientName`.
 
+### Phase 5 ✅ COMPLETE
+
+1. **Invoice & Payment Tracking** — Full invoice lifecycle management. Create invoices from any container (auto-generates invoice number INV-YYYYMM-NNN, pulls from container total cost), optional VAT rate, due date, notes. Status flow: draft → sent → paid / partial / overdue. Record payments with method (bank transfer/cash/cheque/POS), reference/teller number, and date. Payment progress bar. Outstanding balance auto-calculated. Admin can delete payments (status recalculates). New `/invoices` list page in sidebar with outstanding/collected stats.
+
+2. **WhatsApp Click-to-Send** — "Send via WhatsApp" button on invoice detail page. If the client linked to the container has a phone number stored, the button generates a `wa.me` link with a pre-written professional message (invoice number, container number, B/L, total, outstanding balance, due date). Opens WhatsApp with the message pre-filled — staff just hits Send. Free, no API required, works on desktop and mobile.
+
+### New DB Tables (Phase 5)
+- `invoices` — Invoice records (invoiceNumber, containerId, clientId, status, subtotal, vatAmount, total, dueDate, notes)
+- `invoice_payments` — Payment records per invoice (amount, paidAt, paymentMethod, reference, notes)
+
 ## API Endpoints
 
 ### Auth
