@@ -1,0 +1,120 @@
+Here are some genuinely useful features for a Nigerian port clearing operation, grouped by impact:
+
+High Impact — Operations
+
+Demurrage & Detention Tracker — One of the biggest pain points in Nigerian ports. Track daily terminal demurrage (per-day fees after free days expire) and shipping line detention for each container, with an automatic running total and alert when fees are approaching a threshold. Could feed directly into the terminal and shipping charge sections.
+
+Duty Estimator / Pre-Clearing Calculator — Before a container arrives, estimate expected customs duty based on CIF value, HS code, and duty rate. Useful for quoting clients upfront and planning cash flow.
+
+USD → NGN Cost Conversion — Many port charges (shipping, FOB, CIF) are invoiced in USD. A built-in exchange rate field per container, with automatic NGN conversion for all foreign-currency line items, would make financial reporting more accurate.
+
+High Impact — Finance
+
+Invoice Generator — Automatically produce a client-facing PDF invoice from the clearing charges on any container — with your company details, client details, itemized costs, and total in ₦. Avoids manual re-entry in Word/Excel.
+
+Payment Tracking — Record whether the client has paid the clearing fee and track partial payments. Show outstanding balances per client and overall. Currently the system tracks what you spent but not what you've collected.
+
+Medium Impact — Communication
+
+Client Portal / Shareable Status Link — Generate a read-only, password-protected link for each container that a client can open to see their container's current stage, charges, and timeline — without needing a login.
+
+Email Notifications — Send clients automatic updates when their container advances to a new stage, or alert staff when a task is overdue or a section is submitted for approval.
+
+Medium Impact — Planning
+
+Arrival Calendar — A calendar view showing expected vessel arrival dates and container due dates at a glance. Useful for planning staffing and cash flow across the week/month.
+
+Cost Templates — Save a set of typical charges as a template (e.g. "Standard 20ft import") that can be pre-filled when creating a new container, saving data entry time.
+
+Nice to Have
+
+Staff Performance Dashboard — Track which staff member processed the most containers, average turnaround time per stage, and section approval rates.
+The top three I'd suggest starting with would be Demurrage Tracker, Invoice Generator, and Payment Tracking — those are the most directly tied to money and are hard to manage in spreadsheets. Let me know which ones interest you and I'll build them.
+
+Thinking as a chartered accountant running a Nigerian port clearing firm, here is a much deeper list — organized by accounting discipline:
+
+Receivables & Cash Flow
+1. Invoice & Payment Tracking
+Every container cleared is a service rendered. The app currently tracks your costs but not your income collection. Add: raise an invoice from clearing charges, record client payments (full/partial), track outstanding balances, and flag overdue invoices. This turns the app into a proper debtors ledger.
+
+2. Receivables Aging Report
+Group unpaid invoices by age — 0–30 days, 31–60, 61–90, 90+ days overdue. Standard accounting tool that shows exactly who owes money and for how long. Essential for cash flow management.
+
+3. Client Statement of Account
+A formal monthly statement per client showing all containers, invoices raised, payments received, and closing balance — the kind you send to a client as a formal account summary.
+
+4. Cash Flow Forecast
+Based on containers currently in progress and their expected completion dates, project expected income for the next 30, 60, and 90 days. Also project expected cost outflows. Shows whether you'll have a cash deficit before it happens.
+
+Cost Control & Compliance
+5. Budget vs Actual per Container
+Before clearing begins, enter expected costs for each category. When actual costs are entered, the system flags any category that exceeds its budget, with a percentage variance. This is standard cost accounting.
+
+6. VAT Register
+In Nigeria, VAT (7.5%) applies to many clearing-related services. Track which line items attract VAT, auto-calculate the VAT component, and produce a VAT register that feeds into your FIRS filing. Separates VAT collected from revenue earned.
+
+7. Withholding Tax (WHT) Tracker
+Track WHT deducted from payments to service providers (shipping companies, agents, etc.) as required under Nigerian tax law. Show cumulative WHT obligations for remittance to FIRS.
+
+8. Expense Anomaly Detection
+If terminal charges for a 20ft container suddenly cost 3× the historical average, flag it automatically. An alert that says "Terminal charges are 280% above your average for this container size" catches billing errors and fraud early.
+
+9. Cost Cap / Margin Protection Alerts
+Set a minimum acceptable gross margin (e.g. 15%). When entering charges, the system calculates in real time whether that container will fall below the margin threshold — and alerts the operator before it does.
+
+Profitability Intelligence
+10. Break-Even Calculator
+For any container, calculate the minimum clearing charge needed to cover all costs and break even. Shows instantly whether a quoted price to the client is viable.
+
+11. Profitability Ranking
+Rank containers by gross margin %, rank clients by total profit contributed, rank vessel/shipping lines by average profitability of their cargo. Answers "who are our most valuable clients?" and "which type of cargo makes us the most money?"
+
+12. Year-to-Date vs Prior Year Comparison
+Compare this month's and this year's revenue, costs, and profit against the same period last year. Fundamental for understanding whether the business is growing or shrinking.
+
+13. Cost per TEU Benchmarking
+Calculate your average cost to clear a 20ft container vs a 40ft container. Track this over time. If your cost per TEU is rising while margins are flat, something in your operations is inefficient.
+
+Demurrage & Port-Specific Intelligence
+14. Demurrage Calculator & Early Warning
+Terminal demurrage at Apapa/Tin-Can accumulates daily after free days expire — this is one of the largest uncontrolled costs in Nigerian clearing. Track: vessel arrival date, number of free days given, daily demurrage rate, and calculate exactly how much is accumulating per day with a countdown alert. When free days are about to expire, send a prominent warning.
+
+15. Clearing Turnaround Time Analytics
+Track exactly how many days each container spends at each workflow stage. Identify which stage causes the most delay across all containers. Over time this builds a picture of your operational efficiency — and where you're losing money to time.
+
+Creditors & Payables
+16. Creditors/Payables Ledger
+Track amounts owed to shipping companies, terminal operators, customs agents, haulage companies, etc. Record payment dates. See total outstanding payables at any time. Complements the receivables side to give a complete picture of your financial position.
+
+Exchange Rate & Forex
+17. Multi-Currency Cost Entry with Exchange Rate Lock
+Many port charges — shipping freight, FOB, CIF values — are billed in USD. Allow each line item to be entered in USD with the exchange rate on the date of payment, and convert to NGN automatically. Lock the rate so historical records don't change when the naira moves. Gives accurate naira P&L even when costs are in foreign currency.
+
+Reporting
+18. Management Accounts Pack
+A one-click report that produces a proper management accounts pack: P&L for the period, top 10 containers by profit, top 10 by loss, client profitability table, cash position, and outstanding receivables. The kind of document you'd present to a board or bank.
+
+19. Container Profitability Heatmap
+A visual grid showing each container as a colored tile — green (high margin), amber (low margin), red (loss) — giving an instant overview of the financial health of your entire portfolio at a glance.
+
+Of these, the ones that would make the biggest immediate difference for a Nigerian clearing firm are: Demurrage Calculator, Invoice & Payment Tracking, Receivables Aging, VAT Register, and Budget vs Actual. Want me to start building any of them?
+
+With "Smart Tracking Links" in your app, it becomes:
+
+Open the container in your app (you're already there)
+Click one button — "Track on Grimaldi"
+Your browser opens Grimaldi's tracking page with the container number already typed in and the result already showing
+The app knows the container number, and it knows which shipping line it is. So it builds the complete tracking URL automatically and opens it for you. You skip steps 2, 3, and 4 entirely.
+
+Example of what happens behind the scenes:
+
+Your container is GRIU1234567 on Grimaldi. The app opens:
+
+grimaldi-lines.com/tracking?container=GRIU1234567
+The tracking result is already there on screen. You just read it.
+
+The missing piece is that after seeing the result, your staff would type the ETA date into your app (takes 10 seconds). The app then shows that ETA date to everyone on your team without them needing to check again.
+
+It is not 100% automatic — but it is 90% of the work done for you, at zero cost. Does that make sense? Would you like me to build it?
+
+
