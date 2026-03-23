@@ -16,6 +16,7 @@ import { sectionsRouter } from "./sections.js";
 import { settingsRouter } from "./settings.js";
 import { notificationsRouter } from "./notifications.js";
 import { invoicesRouter } from "./invoices.js";
+import { trackingRouter } from "./tracking.js";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(sectionsRouter);
 router.use(settingsRouter);
 router.use(notificationsRouter);
 router.use(invoicesRouter);
+router.use(trackingRouter);
 
 export default router;
