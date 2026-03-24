@@ -873,7 +873,24 @@ export default function ContainerDetail() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            {container.containerNumber}
+            {(() => {
+              const line = getShippingLine(container.containerNumber);
+              if (line && !line.isMaersk) {
+                return (
+                  <a
+                    href={line.trackingUrl(container.containerNumber)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-primary transition-colors inline-flex items-center gap-1.5 group"
+                    title={`Track on ${line.name}`}
+                  >
+                    {container.containerNumber}
+                    <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </a>
+                );
+              }
+              return <span>{container.containerNumber}</span>;
+            })()}
             {container.isLocked && (
               <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 px-2 py-0.5">
                 <Lock className="w-3 h-3 mr-1" /> Locked

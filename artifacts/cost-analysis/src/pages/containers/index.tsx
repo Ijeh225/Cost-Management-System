@@ -14,8 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Search, SlidersHorizontal, ChevronLeft, ChevronRight,
   AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown,
-  X, Filter, Trash2, Loader2,
+  X, Filter, Trash2, Loader2, ExternalLink,
 } from "lucide-react";
+import { getShippingLine } from "@/lib/tracking";
 import { motion, AnimatePresence } from "framer-motion";
 
 type SortField = "containerNumber" | "customerName" | "declaration" | "status" | "clearingCharges" | "totalCost" | "grossProfit";
@@ -324,8 +325,24 @@ export default function Containers() {
                         </td>
                       )}
                       <td className="px-4 py-4">
-                        <div className="font-mono font-medium text-foreground group-hover:text-primary transition-colors">
+                        <div className="font-mono font-medium text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
                           {container.containerNumber}
+                          {(() => {
+                            const line = getShippingLine(container.containerNumber);
+                            if (!line) return null;
+                            return (
+                              <a
+                                href={line.trackingUrl(container.containerNumber)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Track on ${line.name}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            );
+                          })()}
                         </div>
                         <div className="text-xs text-muted-foreground mt-0.5">BL: {container.blNumber}</div>
                       </td>
