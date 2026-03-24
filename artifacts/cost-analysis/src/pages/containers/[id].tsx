@@ -951,18 +951,11 @@ export default function ContainerDetail() {
                   const url = getTrackingUrl(container.containerNumber);
                   const num = normalizeContainerNumber(container.containerNumber);
                   if (url) window.open(url, "_blank", "noopener,noreferrer");
-                  navigator.clipboard.writeText(num).then(() => {
-                    toast({
-                      title: `Opening ${line.name} tracking`,
-                      description: `Container number ${num} copied to clipboard. Paste it into the tracking box if it doesn't appear automatically.`,
-                      duration: 8000,
-                    });
-                  }).catch(() => {
-                    toast({
-                      title: `Opening ${line.name} tracking`,
-                      description: `Container number: ${num} — enter this in the tracking search box.`,
-                      duration: 8000,
-                    });
+                  navigator.clipboard.writeText(num).catch(() => {});
+                  toast({
+                    title: `Opening tracking for ${num}`,
+                    description: `The container number is pre-filled. Click "Track direct" on the page that opens to see live results.`,
+                    duration: 6000,
                   });
                 }}
               >
