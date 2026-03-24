@@ -14,9 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Search, SlidersHorizontal, ChevronLeft, ChevronRight,
   AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown,
-  X, Filter, Trash2, Loader2, ExternalLink,
+  X, Filter, Trash2, Loader2,
 } from "lucide-react";
-import { getShippingLine, getTrackingUrl } from "@/lib/tracking";
+import { getShippingLine } from "@/lib/tracking";
 import { motion, AnimatePresence } from "framer-motion";
 
 type SortField = "containerNumber" | "customerName" | "declaration" | "status" | "clearingCharges" | "totalCost" | "grossProfit";
@@ -331,25 +331,8 @@ export default function Containers() {
                         </td>
                       )}
                       <td className="px-4 py-4">
-                        <div className="font-mono font-medium text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
+                        <div className="font-mono font-medium text-foreground group-hover:text-primary transition-colors">
                           {container.containerNumber}
-                          {(() => {
-                            const line = getShippingLine(container.containerNumber);
-                            if (!line) return null;
-                            return (
-                              <a
-                                href={getTrackingUrl(container.containerNumber) ?? "#"}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={`Track on ${line.name}`}
-                                tabIndex={-1}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-muted-foreground hover:text-primary transition-colors"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            );
-                          })()}
                         </div>
                         <div className="text-xs text-muted-foreground mt-0.5">BL: {container.blNumber}</div>
                       </td>
