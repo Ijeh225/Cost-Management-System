@@ -156,7 +156,7 @@ export default function Containers() {
     </th>
   );
 
-  const colSpan = isAdmin ? 9 : 8;
+  const colSpan = isAdmin ? 10 : 9;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -273,6 +273,7 @@ export default function Containers() {
                 <Th field="customerName"    label="Customer" />
                 <Th field="declaration"     label="Declaration" />
                 <th className="px-4 py-3 font-medium text-left">Vessel / Size</th>
+                <th className="px-4 py-3 font-medium text-left">Shipping Line</th>
                 <Th field="status"          label="Status" />
                 <Th field="clearingCharges" label="Clearing Charges" right />
                 <Th field="totalCost"       label="Total Cost" right />
@@ -353,6 +354,21 @@ export default function Containers() {
                       <td className="px-4 py-4">
                         <div className="text-foreground">{container.vessel || "—"}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">{container.size || "—"}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {(() => {
+                          const line = getShippingLine(container.containerNumber);
+                          if (!line) return <span className="text-muted-foreground/50 text-xs italic">Unknown</span>;
+                          return (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                              line.isMaersk
+                                ? "bg-blue-500/10 text-blue-400 border-blue-500/25"
+                                : "bg-secondary text-muted-foreground border-border/50"
+                            }`}>
+                              {line.shortName}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center flex-wrap gap-1">
