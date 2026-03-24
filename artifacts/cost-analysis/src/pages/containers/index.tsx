@@ -178,6 +178,11 @@ export default function Containers() {
                 className="pl-9 bg-background border-border/60"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && sorted.length === 1) {
+                    setLocation(`/containers/${sorted[0].id}`);
+                  }
+                }}
               />
               {search && (
                 <button onClick={() => { setSearch(""); setPage(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -337,6 +342,7 @@ export default function Containers() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title={`Track on ${line.name}`}
+                                tabIndex={-1}
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-muted-foreground hover:text-primary transition-colors"
                               >
