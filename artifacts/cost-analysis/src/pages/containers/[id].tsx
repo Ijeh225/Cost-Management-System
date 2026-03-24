@@ -565,6 +565,7 @@ export default function ContainerDetail() {
   const [trackingData, setTrackingData] = useState<TrackingResult | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+  const autoFetchedRef = useRef(false);
 
   const { data, isLoading, isError } = useGetContainer(containerId);
   const lockMutation = useLockContainer();
@@ -761,18 +762,14 @@ export default function ContainerDetail() {
     });
   };
 
-  const handleTrackLive = async () => {
-    if (trackingOpen && trackingData) {
-      setTrackingOpen(false);
-      return;
-    }
+  const fetchTracking = async (containerNumber: string) => {
     setTrackingOpen(true);
     setTrackingLoading(true);
     setTrackingError(null);
     setTrackingData(null);
     try {
       const res = await fetch(
-        `/api/tracking/${encodeURIComponent(container.containerNumber)}`,
+        `/api/tracking/${encodeURIComponent(containerNumber)}`,
         { credentials: "include" }
       );
       const json = await res.json();
@@ -783,6 +780,24 @@ export default function ContainerDetail() {
     } finally {
       setTrackingLoading(false);
     }
+  };
+
+  // Auto-fetch tracking for Maersk containers when the page loads
+  useEffect(() => {
+    if (!container || autoFetchedRef.current) return;
+    const line = getShippingLine(container.containerNumber);
+    if (line?.isMaersk) {
+      autoFetchedRef.current = true;
+      fetchTracking(container.containerNumber);
+    }
+  }, [container?.containerNumber]);
+
+  const handleTrackLive = async () => {
+    if (trackingOpen && trackingData) {
+      setTrackingOpen(false);
+      return;
+    }
+    fetchTracking(container.containerNumber);
   };
 
   const handleSaveEta = async () => {
