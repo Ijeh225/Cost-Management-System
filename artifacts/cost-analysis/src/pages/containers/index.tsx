@@ -16,7 +16,7 @@ import {
   AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown,
   X, Filter, Trash2, Loader2, ExternalLink,
 } from "lucide-react";
-import { getShippingLine } from "@/lib/tracking";
+import { getShippingLine, getTrackingUrl } from "@/lib/tracking";
 import { motion, AnimatePresence } from "framer-motion";
 
 type SortField = "containerNumber" | "customerName" | "declaration" | "status" | "clearingCharges" | "totalCost" | "grossProfit";
@@ -333,7 +333,7 @@ export default function Containers() {
                             if (!line) return null;
                             return (
                               <a
-                                href={line.trackingUrl(container.containerNumber)}
+                                href={getTrackingUrl(container.containerNumber) ?? "#"}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title={`Track on ${line.name}`}

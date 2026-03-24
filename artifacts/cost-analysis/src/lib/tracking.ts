@@ -110,11 +110,23 @@ export type TrackingResult = {
   isMaersk: boolean;
 };
 
+export function normalizeContainerNumber(containerNumber: string): string {
+  return containerNumber.replace(/\s+/g, "").toUpperCase();
+}
+
 export function getShippingLine(containerNumber: string): ShippingLineInfo | null {
   if (!containerNumber || containerNumber.length < 4) return null;
-  const prefix4 = containerNumber.substring(0, 4).toUpperCase();
-  const prefix3 = containerNumber.substring(0, 3).toUpperCase();
+  const normalized = normalizeContainerNumber(containerNumber);
+  const prefix4 = normalized.substring(0, 4);
+  const prefix3 = normalized.substring(0, 3);
   return SHIPPING_LINES[prefix4] ?? SHIPPING_LINES[prefix3] ?? null;
+}
+
+export function getTrackingUrl(containerNumber: string): string | null {
+  const normalized = normalizeContainerNumber(containerNumber);
+  const line = getShippingLine(normalized);
+  if (!line) return null;
+  return line.trackingUrl(normalized);
 }
 
 export function isMaerskContainer(containerNumber: string): boolean {

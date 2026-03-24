@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
-import { getShippingLine, formatTrackingDate, formatTrackingDateTime, type TrackingResult } from "@/lib/tracking";
+import { getShippingLine, getTrackingUrl, formatTrackingDate, formatTrackingDateTime, type TrackingResult } from "@/lib/tracking";
 import {
   useGetContainer, useUpdateContainerCharges,
   useLockContainer, useUpdateContainer, useGetContainerAuditLog,
@@ -891,7 +891,7 @@ export default function ContainerDetail() {
               if (line && !line.isMaersk) {
                 return (
                   <a
-                    href={line.trackingUrl(container.containerNumber)}
+                    href={getTrackingUrl(container.containerNumber) ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-primary transition-colors inline-flex items-center gap-1.5 group"
@@ -943,7 +943,7 @@ export default function ContainerDetail() {
               );
             }
             return (
-              <a href={line.trackingUrl(container.containerNumber)} target="_blank" rel="noopener noreferrer">
+              <a href={getTrackingUrl(container.containerNumber) ?? "#"} target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" size="sm" className="gap-1.5 border-blue-500/40 text-blue-400 hover:bg-blue-500/10">
                   <ExternalLink className="w-3.5 h-3.5" />
                   Track on {line.shortName}
