@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, clientsTable, containersTable } from "@workspace/db";
+import { db, clientsTable, containersTable, invoicesTable, invoicePaymentsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 
@@ -17,7 +17,29 @@ clientsRouter.get("/clients", requireAuth, async (req: AuthRequest, res) => {
         c.contactEmail.toLowerCase().includes(term)
       );
     }
-    return res.json(rows);
+
+    const allInvoices = await db.select().from(invoicesTable);
+    const allPayments = await db.select().from(invoicePaymentsTable);
+    const paymentsByInvoice = new Map<number, typeof allPayments>();
+    for (const p of allPayments) {
+      if (!paymentsByInvoice.has(p.invoiceId)) paymentsByInvoice.set(p.invoiceId, []);
+      paymentsByInvoice.get(p.invoiceId)!.push(p);
+    }
+    const outstandingByClient = new Map<number, number>();
+    for (const inv of allInvoices) {
+      if (!inv.clientId) continue;
+      const total = parseFloat(inv.total ?? "0");
+      const paid = (paymentsByInvoice.get(inv.id) ?? []).reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+      const outstanding = Math.max(0, total - paid);
+      outstandingByClient.set(inv.clientId, (outstandingByClient.get(inv.clientId) ?? 0) + outstanding);
+    }
+
+    const result = rows.map(c => ({
+      ...c,
+      totalOutstanding: outstandingByClient.get(c.id) ?? 0,
+    }));
+
+    return res.json(result);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -124,6 +146,82 @@ clientsRouter.patch("/containers/:id/unlink-client", requireAuth, requireAdmin, 
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
     await db.update(containersTable).set({ clientId: null, updatedAt: new Date() }).where(eq(containersTable.id, id));
     return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const clientId = parseInt(req.params.id);
+    if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
+
+    const clientInvoices = await db
+      .select({
+        id: invoicesTable.id,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        status: invoicesTable.status,
+        containerId: invoicesTable.containerId,
+        containerNumber: containersTable.containerNumber,
+        subtotal: invoicesTable.subtotal,
+        vatAmount: invoicesTable.vatAmount,
+        total: invoicesTable.total,
+        dueDate: invoicesTable.dueDate,
+        createdAt: invoicesTable.createdAt,
+      })
+      .from(invoicesTable)
+      .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
+      .where(eq(invoicesTable.clientId, clientId))
+      .orderBy(desc(invoicesTable.createdAt));
+
+    const allPayments = await db.select().from(invoicePaymentsTable);
+    const paymentsByInvoice = new Map<number, typeof allPayments>();
+    for (const p of allPayments) {
+      if (!paymentsByInvoice.has(p.invoiceId)) paymentsByInvoice.set(p.invoiceId, []);
+      paymentsByInvoice.get(p.invoiceId)!.push(p);
+    }
+
+    let totalInvoiced = 0;
+    let totalCollected = 0;
+
+    const invoices = clientInvoices.map(inv => {
+      const total = parseFloat(inv.total ?? "0");
+      const payments = paymentsByInvoice.get(inv.id) ?? [];
+      const paid = payments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+      const outstanding = Math.max(0, total - paid);
+      totalInvoiced += total;
+      totalCollected += paid;
+      return {
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        status: inv.status,
+        containerId: inv.containerId,
+        containerNumber: inv.containerNumber ?? null,
+        subtotal: parseFloat(inv.subtotal ?? "0"),
+        vatAmount: parseFloat(inv.vatAmount ?? "0"),
+        total,
+        paid,
+        outstanding,
+        dueDate: inv.dueDate ?? null,
+        createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : inv.createdAt,
+        payments: payments.map(p => ({
+          id: p.id,
+          amount: parseFloat(p.amount ?? "0"),
+          paidAt: p.paidAt instanceof Date ? p.paidAt.toISOString() : p.paidAt,
+          paymentMethod: p.paymentMethod,
+          reference: p.reference,
+          notes: p.notes,
+        })),
+      };
+    });
+
+    return res.json({
+      totalInvoiced,
+      totalCollected,
+      totalOutstanding: Math.max(0, totalInvoiced - totalCollected),
+      invoices,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });

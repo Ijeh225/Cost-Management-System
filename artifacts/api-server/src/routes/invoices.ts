@@ -127,7 +127,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
 
     if (!container) return res.status(404).json({ error: "Container not found" });
 
-    const subtotal = parseFloat(container.totalCost ?? "0");
+    const subtotal = parseFloat(container.clearingCharges ?? "0");
     const vat = vatRate ? subtotal * (vatRate / 100) : 0;
     const total = subtotal + vat;
 

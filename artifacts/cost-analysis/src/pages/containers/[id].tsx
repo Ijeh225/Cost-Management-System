@@ -1380,6 +1380,30 @@ export default function ContainerDetail() {
                       );
                     })()}
                   </div>
+                  {containerInvoices.length > 0 && (() => {
+                    const totalInvoiced = containerInvoices.reduce((s, inv) => s + (inv.total ?? 0), 0);
+                    const totalCollected = containerInvoices.reduce((s, inv) => s + (inv.totalPaid ?? 0), 0);
+                    const totalOutstanding = containerInvoices.reduce((s, inv) => s + (inv.outstanding ?? 0), 0);
+                    return (
+                      <div className="pt-4 border-t border-border/40 space-y-2">
+                        <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Collections</p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Invoiced</span>
+                          <span className="font-mono text-sm font-semibold text-foreground">{formatCurrency(totalInvoiced)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Collected</span>
+                          <span className="font-mono text-sm font-semibold text-emerald-400">{formatCurrency(totalCollected)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Outstanding</span>
+                          <span className={`font-mono text-sm font-bold ${totalOutstanding > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
+                            {formatCurrency(totalOutstanding)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {charges.customs?.dutyNotPaid !== undefined && charges.customs.dutyNotPaid > 0 && (
                     <div className="p-3 bg-amber-500/10 rounded border border-amber-500/20 flex justify-between items-center">
                       <span className="text-xs font-semibold text-amber-500">Unpaid Duty:</span>
@@ -1532,7 +1556,7 @@ export default function ContainerDetail() {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
-              Invoice will be created from the current total cost of <span className="font-semibold text-foreground">{formatCurrency(container.totalCost)}</span>.
+              Invoice will be created from the clearing charges of <span className="font-semibold text-foreground">{formatCurrency(charges.clearingCharges)}</span>.
             </div>
             <div>
               <Label htmlFor="inv-due">Due Date (optional)</Label>

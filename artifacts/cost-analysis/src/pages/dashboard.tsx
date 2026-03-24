@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell, Legend, LineChart, Line,
 } from "recharts";
 import {
   Box, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity,
   FileText, Search, CheckCircle2, ArrowRight, ClipboardCheck, ListTodo,
   Brain, ShieldAlert, Clock, ExternalLink, X, ChevronDown, ChevronUp,
+  Wallet, CreditCard, ReceiptText,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
@@ -338,7 +339,7 @@ export default function Dashboard() {
         </form>
       </div>
 
-      {/* 6 KPI Cards */}
+      {/* 9 KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard title="Total Containers"       value={stats.totalContainers}        icon={Box} />
         <StatCard title="In Progress"            value={stats.inProgress}             icon={Activity}    colorClass="text-blue-400" />
@@ -351,6 +352,15 @@ export default function Dashboard() {
           icon={grossProfit >= 0 ? TrendingUp : TrendingDown}
           isCurrency
           colorClass={grossProfit >= 0 ? "text-emerald-400" : "text-destructive"}
+        />
+        <StatCard title="Total Invoiced"         value={stats.totalInvoiced ?? 0}     icon={ReceiptText} isCurrency />
+        <StatCard title="Total Collected"        value={stats.totalCollected ?? 0}    icon={Wallet}      isCurrency colorClass="text-emerald-400" />
+        <StatCard
+          title="Outstanding Receivables"
+          value={stats.totalOutstanding ?? 0}
+          icon={CreditCard}
+          isCurrency
+          colorClass={(stats.totalOutstanding ?? 0) > 0 ? "text-amber-400" : "text-muted-foreground"}
         />
       </div>
 
@@ -385,6 +395,35 @@ export default function Dashboard() {
           </Link>
         )}
       </div>
+
+      {/* Monthly Collections Trend */}
+      {(stats.monthlyCollectionsTrend ?? []).length > 0 && (
+        <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <ReceiptText className="w-4 h-4 text-primary" /> Monthly Collections Trend
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[220px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={stats.monthlyCollectionsTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                  <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis tickFormatter={(v) => `₦${(v / 1_000_000).toFixed(1)}M`} stroke="hsl(var(--muted-foreground))" fontSize={12} width={60} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px" }}
+                    formatter={(value: number, name: string) => [formatCurrency(value), name === "invoiced" ? "Invoiced" : "Collected"]}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: "12px" }} formatter={(v) => v === "invoiced" ? "Invoiced" : "Collected"} />
+                  <Line type="monotone" dataKey="invoiced" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  <Line type="monotone" dataKey="collected" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

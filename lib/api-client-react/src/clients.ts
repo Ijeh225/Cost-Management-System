@@ -9,6 +9,7 @@ export type Client = {
   contactPhone: string;
   address: string;
   notes: string;
+  totalOutstanding?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -36,6 +37,36 @@ export type CreateClientBody = {
   notes?: string;
 };
 
+export type ClientReceivablesInvoice = {
+  id: number;
+  invoiceNumber: string;
+  status: string;
+  containerId: number | null;
+  containerNumber: string | null;
+  subtotal: number;
+  vatAmount: number;
+  total: number;
+  paid: number;
+  outstanding: number;
+  dueDate: string | null;
+  createdAt: string;
+  payments: Array<{
+    id: number;
+    amount: number;
+    paidAt: string;
+    paymentMethod: string | null;
+    reference: string | null;
+    notes: string | null;
+  }>;
+};
+
+export type ClientReceivables = {
+  totalInvoiced: number;
+  totalCollected: number;
+  totalOutstanding: number;
+  invoices: ClientReceivablesInvoice[];
+};
+
 export const CLIENTS_QUERY_KEY = ["/api/clients"];
 
 export function useListClients(search?: string) {
@@ -53,6 +84,18 @@ export function useGetClient(id: number | null) {
     queryKey: [...CLIENTS_QUERY_KEY, id],
     queryFn: async () => {
       return customFetch<ClientWithContainers>(`/api/clients/${id}`);
+    },
+    enabled: !!id,
+  });
+}
+
+export function useGetClientReceivables(id: number | null) {
+  return useQuery({
+    queryKey: [...CLIENTS_QUERY_KEY, id, "receivables"],
+    queryFn: async () => {
+      const res = await fetch(`/api/clients/${id}/receivables`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch receivables");
+      return res.json() as Promise<ClientReceivables>;
     },
     enabled: !!id,
   });

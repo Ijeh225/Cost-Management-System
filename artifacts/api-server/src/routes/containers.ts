@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable } from "@workspace/db";
+import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
@@ -682,6 +682,11 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     let lowProfitContainers = 0;
 
     const customsByContainer: Record<number, any> = {};
+    let sMap: Record<number, any> = {};
+    let cMap: Record<number, any> = {};
+    let tMap: Record<number, any> = {};
+    let dMap: Record<number, any> = {};
+    let oMap: Record<number, any> = {};
 
     if (containerIds.length > 0) {
       const allShipping = await db.select().from(shippingChargesTable);
@@ -691,11 +696,11 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       const allOps = await db.select().from(operationsChargesTable);
 
       const indexBy = (arr: any[]) => { const m: Record<number, any> = {}; arr.forEach(r => { m[r.containerId] = r; }); return m; };
-      const sMap = indexBy(allShipping);
-      const cMap = indexBy(allCustoms);
-      const tMap = indexBy(allTerminal);
-      const dMap = indexBy(allDelivery);
-      const oMap = indexBy(allOps);
+      sMap = indexBy(allShipping);
+      cMap = indexBy(allCustoms);
+      tMap = indexBy(allTerminal);
+      dMap = indexBy(allDelivery);
+      oMap = indexBy(allOps);
 
       for (const c of allContainers) {
         const cost = calcTotalCost(sMap[c.id] ?? {}, cMap[c.id] ?? {}, tMap[c.id] ?? {}, dMap[c.id] ?? {}, oMap[c.id] ?? {});
@@ -726,22 +731,58 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       .sort((a, b) => b.profit - a.profit)
       .slice(0, 10);
 
-    // Cost by vessel (top 10)
+    // Cost by vessel (top 10) — fixed: reuse already-fetched maps (no N+1)
     const vesselCost: Record<string, number> = {};
     for (const c of allContainers) {
       if (!c.vessel) continue;
-      const allShipping2 = await db.select().from(shippingChargesTable).where(eq(shippingChargesTable.containerId, c.id));
-      const allCustoms2 = await db.select().from(customsChargesTable).where(eq(customsChargesTable.containerId, c.id));
-      const allTerminal2 = await db.select().from(terminalChargesTable).where(eq(terminalChargesTable.containerId, c.id));
-      const allDelivery2 = await db.select().from(deliveryChargesTable).where(eq(deliveryChargesTable.containerId, c.id));
-      const allOps2 = await db.select().from(operationsChargesTable).where(eq(operationsChargesTable.containerId, c.id));
-      const cost = calcTotalCost(allShipping2[0] ?? {}, allCustoms2[0] ?? {}, allTerminal2[0] ?? {}, allDelivery2[0] ?? {}, allOps2[0] ?? {});
+      const cost = calcTotalCost(sMap[c.id] ?? {}, cMap[c.id] ?? {}, tMap[c.id] ?? {}, dMap[c.id] ?? {}, oMap[c.id] ?? {});
       vesselCost[c.vessel] = (vesselCost[c.vessel] ?? 0) + cost;
     }
     const costByVessel = Object.entries(vesselCost)
       .map(([vessel, cost]) => ({ vessel, cost }))
       .sort((a, b) => b.cost - a.cost)
       .slice(0, 10);
+
+    // Invoice AR metrics
+    const allInvoices = await db.select().from(invoicesTable);
+    const allPayments = await db.select().from(invoicePaymentsTable);
+    const paymentsByInvoice = new Map<number, typeof allPayments>();
+    for (const p of allPayments) {
+      if (!paymentsByInvoice.has(p.invoiceId)) paymentsByInvoice.set(p.invoiceId, []);
+      paymentsByInvoice.get(p.invoiceId)!.push(p);
+    }
+    let totalInvoiced = 0;
+    let totalCollected = 0;
+    for (const inv of allInvoices) {
+      const total = parseFloat(inv.total ?? "0");
+      const paid = (paymentsByInvoice.get(inv.id) ?? []).reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+      totalInvoiced += total;
+      totalCollected += paid;
+    }
+    const totalOutstanding = Math.max(0, totalInvoiced - totalCollected);
+
+    // Monthly collections trend (last 6 months)
+    const now = new Date();
+    const monthlyTrend: { month: string; label: string; invoiced: number; collected: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const monthKey = `${yyyy}-${mm}`;
+      const label = d.toLocaleString("default", { month: "short", year: "2-digit" });
+      let mInvoiced = 0;
+      let mCollected = 0;
+      for (const inv of allInvoices) {
+        const created = new Date(inv.createdAt);
+        const iy = created.getFullYear();
+        const im = String(created.getMonth() + 1).padStart(2, "0");
+        if (`${iy}-${im}` === monthKey) {
+          mInvoiced += parseFloat(inv.total ?? "0");
+          mCollected += (paymentsByInvoice.get(inv.id) ?? []).reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+        }
+      }
+      monthlyTrend.push({ month: monthKey, label, invoiced: mInvoiced, collected: mCollected });
+    }
 
     // Recent activity
     const recentLogs = await db.select({
@@ -796,6 +837,10 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       totalClearingCharges,
       totalGrossProfit,
       totalDutyNotPaid,
+      totalInvoiced,
+      totalCollected,
+      totalOutstanding,
+      monthlyCollectionsTrend: monthlyTrend,
       containersByStatus,
       profitByCustomer,
       costByVessel,

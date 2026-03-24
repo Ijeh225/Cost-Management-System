@@ -345,6 +345,13 @@ export type DashboardStatsAlerts = {
   delayedContainers: number;
 };
 
+export type DashboardStatsMonthlyCollectionsTrendItem = {
+  month: string;
+  label: string;
+  invoiced: number;
+  collected: number;
+};
+
 export interface DashboardStats {
   totalContainers: number;
   inProgress: number;
@@ -354,6 +361,10 @@ export interface DashboardStats {
   totalClearingCharges: number;
   totalGrossProfit: number;
   totalDutyNotPaid: number;
+  totalInvoiced: number;
+  totalCollected: number;
+  totalOutstanding: number;
+  monthlyCollectionsTrend: DashboardStatsMonthlyCollectionsTrendItem[];
   containersByStatus: DashboardStatsContainersByStatusItem[];
   profitByCustomer: DashboardStatsProfitByCustomerItem[];
   costByVessel: DashboardStatsCostByVesselItem[];

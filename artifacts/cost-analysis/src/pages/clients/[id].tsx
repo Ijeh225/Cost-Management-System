@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
 import {
-  useGetClient, useUpdateClient, type ClientWithContainers,
+  useGetClient, useUpdateClient, useGetClientReceivables, type ClientWithContainers,
 } from "@workspace/api-client-react";
 import { formatCurrency, getStatusColor, getStatusLabel } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Building2, Phone, Mail, MapPin, FileText,
   Pencil, Check, X, Loader2, Box, Calendar,
+  ReceiptText, Wallet, CreditCard, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -34,7 +35,9 @@ export default function ClientDetailPage() {
   const clientId = parseInt(id ?? "");
   const { toast } = useToast();
   const { data: client, isLoading } = useGetClient(isNaN(clientId) ? null : clientId);
+  const { data: receivables } = useGetClientReceivables(isNaN(clientId) ? null : clientId);
   const updateMutation = useUpdateClient();
+  const [showInvoices, setShowInvoices] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -120,6 +123,91 @@ export default function ClientDetailPage() {
         <StatCard label="Container Sizes" value={Object.entries(sizes).map(([k, v]) => `${v}×${k}`).join(", ") || "—"} />
         <StatCard label="Since" value={new Date(client.createdAt).toLocaleDateString("en-NG", { month: "short", year: "numeric" })} />
       </div>
+
+      {/* Receivables Summary */}
+      {receivables && (receivables.totalInvoiced > 0) && (
+        <Card className="border-border/50 bg-card/50">
+          <CardHeader className="border-b border-border/40 pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <ReceiptText className="w-4 h-4 text-primary" /> Accounts Receivable
+              </CardTitle>
+              {receivables.invoices.length > 0 && (
+                <button
+                  onClick={() => setShowInvoices(v => !v)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showInvoices ? "Hide invoices" : `Show ${receivables.invoices.length} invoice${receivables.invoices.length !== 1 ? "s" : ""}`}
+                  {showInvoices ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                  <ReceiptText className="w-3 h-3" /> Invoiced
+                </p>
+                <p className="font-mono font-bold text-lg text-foreground">{formatCurrency(receivables.totalInvoiced)}</p>
+              </div>
+              <div className="text-center border-x border-border/40">
+                <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                  <Wallet className="w-3 h-3" /> Collected
+                </p>
+                <p className="font-mono font-bold text-lg text-emerald-400">{formatCurrency(receivables.totalCollected)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                  <CreditCard className="w-3 h-3" /> Outstanding
+                </p>
+                <p className={`font-mono font-bold text-lg ${receivables.totalOutstanding > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
+                  {formatCurrency(receivables.totalOutstanding)}
+                </p>
+              </div>
+            </div>
+
+            {showInvoices && receivables.invoices.length > 0 && (
+              <div className="border border-border/40 rounded-lg overflow-hidden mt-2">
+                <table className="w-full text-xs">
+                  <thead className="bg-secondary/30 border-b border-border/40">
+                    <tr className="text-muted-foreground font-mono uppercase tracking-wider">
+                      <th className="px-3 py-2 text-left font-medium">Invoice #</th>
+                      <th className="px-3 py-2 text-left font-medium">Container</th>
+                      <th className="px-3 py-2 text-right font-medium">Total</th>
+                      <th className="px-3 py-2 text-right font-medium">Paid</th>
+                      <th className="px-3 py-2 text-right font-medium">Outstanding</th>
+                      <th className="px-3 py-2 text-center font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {receivables.invoices.map(inv => (
+                      <tr key={inv.id} className="hover:bg-accent/10 transition-colors">
+                        <td className="px-3 py-2 font-mono text-primary">{inv.invoiceNumber}</td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {inv.containerNumber ? (
+                            <Link href={`/containers/${inv.containerId}`} className="hover:text-primary transition-colors">
+                              {inv.containerNumber}
+                            </Link>
+                          ) : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">{formatCurrency(inv.total)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-emerald-400">{formatCurrency(inv.paid)}</td>
+                        <td className={`px-3 py-2 text-right font-mono font-semibold ${inv.outstanding > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
+                          {formatCurrency(inv.outstanding)}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <Badge variant="secondary" className="text-[10px] py-0 capitalize">{inv.status}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Client Info */}

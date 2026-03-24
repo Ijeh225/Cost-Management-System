@@ -264,8 +264,31 @@ Status: **NOT connected** — user dismissed the integration prompt.
 To activate: connect the Resend integration or set `RESEND_API_KEY` secret.
 From address used: `alerts@updates.costanalysis.app` (requires verified sender domain in Resend).
 
+### Phase 6 ✅ COMPLETE
+
+1. **Invoice Subtotal Fix** — Invoice creation now uses `clearingCharges` (what customer owes) not `totalCost` (internal business cost). Both the API (`POST /api/invoices`) and the dialog UI were corrected.
+
+2. **Dashboard AR KPIs** — 3 new stat cards: Total Invoiced, Total Collected, Outstanding Receivables. Dashboard now shows 9 cards total.
+
+3. **Dashboard Collections Trend Chart** — Monthly line chart (last 6 months) showing Invoiced vs. Collected amounts using Recharts `LineChart`.
+
+4. **N+1 Fix** — Dashboard stats no longer re-queries the DB per vessel. Reuses the already-fetched charge maps (sMap, cMap, etc.) for the cost-by-vessel calculation.
+
+5. **Container Detail Collections** — After Gross Profit, shows a "Collections" mini-table: Invoiced / Collected / Outstanding (from existing container invoices). Only shown if at least one invoice exists.
+
+6. **Client Receivables API** — `GET /api/clients/:id/receivables` returns `totalInvoiced`, `totalCollected`, `totalOutstanding`, and a full `invoices[]` array with per-invoice payments. `GET /api/clients` list now includes `totalOutstanding` per client.
+
+7. **Client Detail Receivables Panel** — If a client has invoices, shows Accounts Receivable card with Invoiced/Collected/Outstanding summary, expandable invoice table per-invoice.
+
+8. **Client List Outstanding Badge** — Client cards show an amber "₦X.X owed" badge when they have outstanding balances.
+
+### Receivables API
+- `GET /api/clients` — Now includes `totalOutstanding` per client
+- `GET /api/clients/:id/receivables` — Full AR summary + invoices with payments for a specific client
+
 ## Financial Calculations
 All calculations in `artifacts/api-server/src/lib/calculations.ts`:
 - `calcTotalCost(charges)` — Sum of all 5 sections
 - `sumShipping/Customs/Terminal/Delivery/Operations(section)` — Per-section totals
 - Gross Profit = Clearing Charges − Total Cost
+- Invoice Subtotal = Clearing Charges (what customer owes to business)

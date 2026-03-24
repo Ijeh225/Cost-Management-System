@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Users, Plus, Search, Loader2, Trash2, ChevronRight, ChevronDown,
   Phone, Mail, MapPin, Building2, Upload, Download, AlertTriangle,
-  CheckCircle2,
+  CheckCircle2, CreditCard,
 } from "lucide-react";
 
 const CLIENT_TEMPLATE_ROWS = [
@@ -65,10 +65,16 @@ function ClientCard({ client, isAdmin }: { client: Client; isAdmin: boolean }) {
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Building2 className="w-5 h-5 text-primary" />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               {(client as any).containerCount != null && (
                 <Badge variant="secondary" className="text-xs font-mono">
                   {(client as any).containerCount} containers
+                </Badge>
+              )}
+              {(client as any).totalOutstanding > 0 && (
+                <Badge className="text-xs font-mono bg-amber-500/15 text-amber-400 border border-amber-500/30 gap-1 flex items-center">
+                  <CreditCard className="w-2.5 h-2.5" />
+                  {new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", notation: "compact", maximumFractionDigits: 1 }).format((client as any).totalOutstanding)} owed
                 </Badge>
               )}
               {isAdmin && (
