@@ -65,7 +65,7 @@ async function formatInvoice(inv: any, payments: any[]) {
   };
 }
 
-router.get("/api/invoices", requireAuth, async (req, res) => {
+router.get("/invoices", requireAuth, async (req, res) => {
   try {
     const rows = await db
       .select({
@@ -109,7 +109,7 @@ router.get("/api/invoices", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/api/invoices", requireAuth, async (req: AuthRequest, res) => {
+router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { containerId, vatRate, dueDate, notes } = req.body as {
       containerId: number;
@@ -160,7 +160,7 @@ router.post("/api/invoices", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/api/invoices/:id", requireAuth, async (req, res) => {
+router.get("/invoices/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -202,7 +202,7 @@ router.get("/api/invoices/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.patch("/api/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
+router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -261,7 +261,7 @@ router.patch("/api/invoices/:id", requireAuth, async (req: AuthRequest, res) => 
   }
 });
 
-router.delete("/api/invoices/:id", requireAdmin, async (req, res) => {
+router.delete("/invoices/:id", requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -273,7 +273,7 @@ router.delete("/api/invoices/:id", requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/api/invoices/:id/payments", requireAuth, async (req: AuthRequest, res) => {
+router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
@@ -325,7 +325,7 @@ router.post("/api/invoices/:id/payments", requireAuth, async (req: AuthRequest, 
   }
 });
 
-router.delete("/api/invoices/:id/payments/:paymentId", requireAdmin, async (req, res) => {
+router.delete("/invoices/:id/payments/:paymentId", requireAdmin, async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     const paymentId = parseInt(req.params.paymentId, 10);
