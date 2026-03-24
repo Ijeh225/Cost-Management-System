@@ -624,6 +624,29 @@ export default function ContainerDetail() {
     }
   };
 
+  // Auto-fetch tracking for Maersk containers — must be before early returns
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const containerNumber = (data as any)?.container?.containerNumber;
+    if (!containerNumber || autoFetchedRef.current) return;
+    const line = getShippingLine(containerNumber);
+    if (line?.isMaersk) {
+      autoFetchedRef.current = true;
+      setTrackingOpen(true);
+      setTrackingLoading(true);
+      setTrackingError(null);
+      setTrackingData(null);
+      fetch(`/api/tracking/${encodeURIComponent(containerNumber)}`, { credentials: "include" })
+        .then(res => res.json().then(json => ({ ok: res.ok, json })))
+        .then(({ ok, json }) => {
+          if (!ok) throw new Error(json.error ?? "Tracking failed");
+          setTrackingData(json);
+        })
+        .catch((err: any) => setTrackingError(err?.message ?? "Could not fetch tracking data"))
+        .finally(() => setTrackingLoading(false));
+    }
+  }, [(data as any)?.container?.containerNumber]);
+
   if (isLoading) return <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
 
@@ -781,16 +804,6 @@ export default function ContainerDetail() {
       setTrackingLoading(false);
     }
   };
-
-  // Auto-fetch tracking for Maersk containers when the page loads
-  useEffect(() => {
-    if (!container || autoFetchedRef.current) return;
-    const line = getShippingLine(container.containerNumber);
-    if (line?.isMaersk) {
-      autoFetchedRef.current = true;
-      fetchTracking(container.containerNumber);
-    }
-  }, [container?.containerNumber]);
 
   const handleTrackLive = async () => {
     if (trackingOpen && trackingData) {
