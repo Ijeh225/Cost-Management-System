@@ -6,8 +6,9 @@ import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/components/layout/auth-provider";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useAuth } from "@/components/layout/auth-provider";
-import { useEffect, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useRef, Component } from "react";
+import type { ReactNode } from "react";
+import { Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 
 // Pages
 import Login from "@/pages/login";
@@ -38,7 +39,56 @@ const queryClient = new QueryClient({
   }
 });
 
-function AdminGuard({ children }: { children: React.ReactNode }) {
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class PageErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    console.error("[PageErrorBoundary] Render error:", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 p-8">
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-destructive" />
+          </div>
+          <div className="text-center space-y-2 max-w-md">
+            <h2 className="text-xl font-bold text-foreground">Something went wrong</h2>
+            <p className="text-sm text-muted-foreground">
+              {this.state.error?.message || "An unexpected error occurred while loading this page."}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.reload();
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Reload page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AdminGuard({ children }: { children: ReactNode }) {
   const { isAdmin, isLoading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const adminConfirmed = useRef(false);
@@ -76,31 +126,33 @@ function Router() {
       <Route path="/containers/:id/print" component={ContainerPrintPage} />
       <Route>
         <AppLayout>
-          <Switch>
-            <Route path="/" component={Dashboard} />
-            <Route path="/containers" component={Containers} />
-            <Route path="/containers/upload" component={UploadPage} />
-            <Route path="/containers/:id" component={ContainerDetail} />
-            <Route path="/users" component={Users} />
-            <Route path="/upload" component={UploadPage} />
-            <Route path="/approvals" component={ApprovalsPage} />
-            <Route path="/my-tasks" component={MyTasksPage} />
-            <Route path="/analytics">
-              <AdminGuard><AnalyticsPage /></AdminGuard>
-            </Route>
-            <Route path="/reports">
-              <AdminGuard><ReportsPage /></AdminGuard>
-            </Route>
-            <Route path="/clients" component={ClientsPage} />
-            <Route path="/clients/:id" component={ClientDetailPage} />
-            <Route path="/notifications" component={NotificationsPage} />
-            <Route path="/invoices" component={InvoicesPage} />
-            <Route path="/invoices/:id" component={InvoiceDetailPage} />
-            <Route path="/settings">
-              <AdminGuard><SettingsPage /></AdminGuard>
-            </Route>
-            <Route component={NotFound} />
-          </Switch>
+          <PageErrorBoundary>
+            <Switch>
+              <Route path="/" component={Dashboard} />
+              <Route path="/containers" component={Containers} />
+              <Route path="/containers/upload" component={UploadPage} />
+              <Route path="/containers/:id" component={ContainerDetail} />
+              <Route path="/users" component={Users} />
+              <Route path="/upload" component={UploadPage} />
+              <Route path="/approvals" component={ApprovalsPage} />
+              <Route path="/my-tasks" component={MyTasksPage} />
+              <Route path="/analytics">
+                <AdminGuard><AnalyticsPage /></AdminGuard>
+              </Route>
+              <Route path="/reports">
+                <AdminGuard><ReportsPage /></AdminGuard>
+              </Route>
+              <Route path="/clients" component={ClientsPage} />
+              <Route path="/clients/:id" component={ClientDetailPage} />
+              <Route path="/notifications" component={NotificationsPage} />
+              <Route path="/invoices" component={InvoicesPage} />
+              <Route path="/invoices/:id" component={InvoiceDetailPage} />
+              <Route path="/settings">
+                <AdminGuard><SettingsPage /></AdminGuard>
+              </Route>
+              <Route component={NotFound} />
+            </Switch>
+          </PageErrorBoundary>
         </AppLayout>
       </Route>
     </Switch>
