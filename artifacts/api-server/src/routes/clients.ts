@@ -239,7 +239,7 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
         });
       }
     }
-    paymentHistory.sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime());
+    paymentHistory.sort((a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime());
 
     return res.json({
       totalInvoiced,
