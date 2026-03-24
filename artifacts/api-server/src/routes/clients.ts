@@ -235,7 +235,7 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
           invoiceId: inv.id,
           invoiceNumber: inv.invoiceNumber ?? "",
           containerId: inv.containerId ?? null,
-          containerNumber: (inv as any).containerNumber ?? null,
+          containerNumber: inv.containerNumber ?? null,
         });
       }
     }
