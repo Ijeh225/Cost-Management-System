@@ -216,11 +216,37 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
       };
     });
 
+    // Build consolidated payment history sorted by paidAt
+    const paymentHistory: Array<{
+      id: number; amount: number; paidAt: string; paymentMethod: string | null;
+      reference: string | null; notes: string | null; invoiceId: number;
+      invoiceNumber: string; containerId: number | null; containerNumber: string | null;
+    }> = [];
+    for (const inv of clientInvoices) {
+      const payments = paymentsByInvoice.get(inv.id) ?? [];
+      for (const p of payments) {
+        paymentHistory.push({
+          id: p.id,
+          amount: parseFloat(p.amount ?? "0"),
+          paidAt: p.paidAt instanceof Date ? p.paidAt.toISOString() : p.paidAt ?? "",
+          paymentMethod: p.paymentMethod ?? null,
+          reference: p.reference ?? null,
+          notes: p.notes ?? null,
+          invoiceId: inv.id,
+          invoiceNumber: inv.invoiceNumber ?? "",
+          containerId: inv.containerId ?? null,
+          containerNumber: (inv as any).containerNumber ?? null,
+        });
+      }
+    }
+    paymentHistory.sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime());
+
     return res.json({
       totalInvoiced,
       totalCollected,
       totalOutstanding: Math.max(0, totalInvoiced - totalCollected),
       invoices,
+      paymentHistory,
     });
   } catch (err) {
     console.error(err);

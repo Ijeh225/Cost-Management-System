@@ -60,11 +60,25 @@ export type ClientReceivablesInvoice = {
   }>;
 };
 
+export type PaymentHistoryEntry = {
+  id: number;
+  amount: number;
+  paidAt: string;
+  paymentMethod: string | null;
+  reference: string | null;
+  notes: string | null;
+  invoiceId: number;
+  invoiceNumber: string;
+  containerId: number | null;
+  containerNumber: string | null;
+};
+
 export type ClientReceivables = {
   totalInvoiced: number;
   totalCollected: number;
   totalOutstanding: number;
   invoices: ClientReceivablesInvoice[];
+  paymentHistory: PaymentHistoryEntry[];
 };
 
 export const CLIENTS_QUERY_KEY = ["/api/clients"];

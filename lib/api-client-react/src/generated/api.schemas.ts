@@ -345,11 +345,12 @@ export type DashboardStatsAlerts = {
   delayedContainers: number;
 };
 
-export type DashboardStatsMonthlyCollectionsTrendItem = {
+export type DashboardStatsMonthlyTrendItem = {
   month: string;
   label: string;
-  invoiced: number;
-  collected: number;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
 };
 
 export interface DashboardStats {
@@ -364,7 +365,7 @@ export interface DashboardStats {
   totalInvoiced: number;
   totalCollected: number;
   totalOutstanding: number;
-  monthlyCollectionsTrend: DashboardStatsMonthlyCollectionsTrendItem[];
+  monthlyTrend: DashboardStatsMonthlyTrendItem[];
   containersByStatus: DashboardStatsContainersByStatusItem[];
   profitByCustomer: DashboardStatsProfitByCustomerItem[];
   costByVessel: DashboardStatsCostByVesselItem[];

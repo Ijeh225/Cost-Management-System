@@ -15,7 +15,7 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Building2, Phone, Mail, MapPin, FileText,
   Pencil, Check, X, Loader2, Box, Calendar,
-  ReceiptText, Wallet, CreditCard, ChevronDown, ChevronUp,
+  ReceiptText, Wallet, CreditCard, ChevronDown, ChevronUp, History,
 } from "lucide-react";
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -38,6 +38,7 @@ export default function ClientDetailPage() {
   const { data: receivables } = useGetClientReceivables(isNaN(clientId) ? null : clientId);
   const updateMutation = useUpdateClient();
   const [showInvoices, setShowInvoices] = useState(false);
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -182,7 +183,7 @@ export default function ClientDetailPage() {
                   </thead>
                   <tbody className="divide-y divide-border/30">
                     {receivables.invoices.map(inv => (
-                      <tr key={inv.id} className="hover:bg-accent/10 transition-colors">
+                      <tr key={inv.id} className={`hover:bg-accent/10 transition-colors ${inv.outstanding === 0 && inv.paid > 0 ? "opacity-70" : ""}`}>
                         <td className="px-3 py-2 font-mono text-primary">{inv.invoiceNumber}</td>
                         <td className="px-3 py-2 text-muted-foreground">
                           {inv.containerNumber ? (
@@ -193,8 +194,8 @@ export default function ClientDetailPage() {
                         </td>
                         <td className="px-3 py-2 text-right font-mono">{formatCurrency(inv.total)}</td>
                         <td className="px-3 py-2 text-right font-mono text-emerald-400">{formatCurrency(inv.paid)}</td>
-                        <td className={`px-3 py-2 text-right font-mono font-semibold ${inv.outstanding > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
-                          {formatCurrency(inv.outstanding)}
+                        <td className={`px-3 py-2 text-right font-mono font-semibold ${inv.outstanding > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+                          {inv.outstanding > 0 ? formatCurrency(inv.outstanding) : "Cleared"}
                         </td>
                         <td className="px-3 py-2 text-center">
                           <Badge variant="secondary" className="text-[10px] py-0 capitalize">{inv.status}</Badge>
@@ -203,6 +204,58 @@ export default function ClientDetailPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Payment History */}
+            {(receivables.paymentHistory ?? []).length > 0 && (
+              <div className="mt-4 border-t border-border/40 pt-4">
+                <button
+                  onClick={() => setShowPaymentHistory(v => !v)}
+                  className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  {showPaymentHistory ? "Hide" : "Show"} payment history ({receivables.paymentHistory.length} payment{receivables.paymentHistory.length !== 1 ? "s" : ""})
+                  {showPaymentHistory ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+                {showPaymentHistory && (
+                  <div className="border border-border/40 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-secondary/30 border-b border-border/40">
+                        <tr className="text-muted-foreground font-mono uppercase tracking-wider">
+                          <th className="px-3 py-2 text-left font-medium">Date</th>
+                          <th className="px-3 py-2 text-left font-medium">Invoice</th>
+                          <th className="px-3 py-2 text-left font-medium">Container</th>
+                          <th className="px-3 py-2 text-right font-medium">Amount</th>
+                          <th className="px-3 py-2 text-left font-medium">Method</th>
+                          <th className="px-3 py-2 text-left font-medium">Reference</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {receivables.paymentHistory.map(p => (
+                          <tr key={p.id} className="hover:bg-accent/10 transition-colors">
+                            <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                              {new Date(p.paidAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                            </td>
+                            <td className="px-3 py-2 font-mono text-primary">{p.invoiceNumber}</td>
+                            <td className="px-3 py-2 text-muted-foreground">
+                              {p.containerNumber ? (
+                                <Link href={`/containers/${p.containerId}`} className="hover:text-primary transition-colors">
+                                  {p.containerNumber}
+                                </Link>
+                              ) : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono text-emerald-400 font-semibold">
+                              {formatCurrency(p.amount)}
+                            </td>
+                            <td className="px-3 py-2 text-muted-foreground capitalize">{p.paymentMethod ?? "—"}</td>
+                            <td className="px-3 py-2 text-muted-foreground font-mono">{p.reference ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

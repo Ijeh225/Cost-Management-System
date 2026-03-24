@@ -761,27 +761,27 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     }
     const totalOutstanding = Math.max(0, totalInvoiced - totalCollected);
 
-    // Monthly collections trend (last 6 months)
+    // Monthly revenue vs cost trend (last 6 months, using container data)
     const now = new Date();
-    const monthlyTrend: { month: string; label: string; invoiced: number; collected: number }[] = [];
+    const monthlyTrend: { month: string; label: string; revenue: number; cost: number; grossProfit: number }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, "0");
       const monthKey = `${yyyy}-${mm}`;
       const label = d.toLocaleString("default", { month: "short", year: "2-digit" });
-      let mInvoiced = 0;
-      let mCollected = 0;
-      for (const inv of allInvoices) {
-        const created = new Date(inv.createdAt);
-        const iy = created.getFullYear();
-        const im = String(created.getMonth() + 1).padStart(2, "0");
-        if (`${iy}-${im}` === monthKey) {
-          mInvoiced += parseFloat(inv.total ?? "0");
-          mCollected += (paymentsByInvoice.get(inv.id) ?? []).reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+      let mRevenue = 0;
+      let mCost = 0;
+      for (const c of allContainers) {
+        const created = new Date(c.createdAt);
+        const cy = created.getFullYear();
+        const cm = String(created.getMonth() + 1).padStart(2, "0");
+        if (`${cy}-${cm}` === monthKey) {
+          mRevenue += parseFloat(c.clearingCharges ?? "0");
+          mCost += calcTotalCost(sMap[c.id] ?? {}, cMap[c.id] ?? {}, tMap[c.id] ?? {}, dMap[c.id] ?? {}, oMap[c.id] ?? {});
         }
       }
-      monthlyTrend.push({ month: monthKey, label, invoiced: mInvoiced, collected: mCollected });
+      monthlyTrend.push({ month: monthKey, label, revenue: mRevenue, cost: mCost, grossProfit: mRevenue - mCost });
     }
 
     // Recent activity
@@ -840,7 +840,7 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       totalInvoiced,
       totalCollected,
       totalOutstanding,
-      monthlyCollectionsTrend: monthlyTrend,
+      monthlyTrend,
       containersByStatus,
       profitByCustomer,
       costByVessel,

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, LineChart, Line,
+  PieChart, Pie, Cell, Legend,
 } from "recharts";
 import {
   Box, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity,
@@ -396,29 +396,33 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Monthly Collections Trend */}
-      {(stats.monthlyCollectionsTrend ?? []).length > 0 && (
+      {/* Monthly Revenue vs Cost Trend */}
+      {(stats.monthlyTrend ?? []).length > 0 && (
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <ReceiptText className="w-4 h-4 text-primary" /> Monthly Collections Trend
+              <ReceiptText className="w-4 h-4 text-primary" /> Monthly Revenue vs Cost
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[220px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats.monthlyCollectionsTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <BarChart data={stats.monthlyTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
                   <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <YAxis tickFormatter={(v) => `₦${(v / 1_000_000).toFixed(1)}M`} stroke="hsl(var(--muted-foreground))" fontSize={12} width={60} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px" }}
-                    formatter={(value: number, name: string) => [formatCurrency(value), name === "invoiced" ? "Invoiced" : "Collected"]}
+                    formatter={(value: number, name: string) => [
+                      formatCurrency(value),
+                      name === "revenue" ? "Revenue" : name === "cost" ? "Total Cost" : "Gross Profit",
+                    ]}
                   />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: "12px" }} formatter={(v) => v === "invoiced" ? "Invoiced" : "Collected"} />
-                  <Line type="monotone" dataKey="invoiced" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                  <Line type="monotone" dataKey="collected" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                </LineChart>
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: "12px" }} formatter={(v) => v === "revenue" ? "Revenue" : v === "cost" ? "Total Cost" : "Gross Profit"} />
+                  <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="cost" fill="hsl(var(--chart-3))" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="grossProfit" fill="hsl(var(--chart-2))" radius={[3, 3, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
