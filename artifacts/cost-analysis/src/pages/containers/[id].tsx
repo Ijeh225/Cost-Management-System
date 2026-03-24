@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
-import { getShippingLine, getTrackingUrl, formatTrackingDate, formatTrackingDateTime, type TrackingResult } from "@/lib/tracking";
+import { getShippingLine, getTrackingUrl, normalizeContainerNumber, formatTrackingDate, formatTrackingDateTime, type TrackingResult } from "@/lib/tracking";
 import {
   useGetContainer, useUpdateContainerCharges,
   useLockContainer, useUpdateContainer, useGetContainerAuditLog,
@@ -943,12 +943,32 @@ export default function ContainerDetail() {
               );
             }
             return (
-              <a href={getTrackingUrl(container.containerNumber) ?? "#"} target="_blank" rel="noopener noreferrer">
-                <Button variant="outline" size="sm" className="gap-1.5 border-blue-500/40 text-blue-400 hover:bg-blue-500/10">
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Track on {line.shortName}
-                </Button>
-              </a>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-blue-500/40 text-blue-400 hover:bg-blue-500/10"
+                onClick={() => {
+                  const url = getTrackingUrl(container.containerNumber);
+                  const num = normalizeContainerNumber(container.containerNumber);
+                  if (url) window.open(url, "_blank", "noopener,noreferrer");
+                  navigator.clipboard.writeText(num).then(() => {
+                    toast({
+                      title: `Opening ${line.name} tracking`,
+                      description: `Container number ${num} copied to clipboard. Paste it into the tracking box if it doesn't appear automatically.`,
+                      duration: 8000,
+                    });
+                  }).catch(() => {
+                    toast({
+                      title: `Opening ${line.name} tracking`,
+                      description: `Container number: ${num} — enter this in the tracking search box.`,
+                      duration: 8000,
+                    });
+                  });
+                }}
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Track on {line.shortName}
+              </Button>
             );
           })()}
           {containerInvoices.length > 0 ? (
