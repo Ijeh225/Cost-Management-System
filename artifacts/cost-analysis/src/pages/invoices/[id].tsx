@@ -193,14 +193,13 @@ export default function InvoiceDetailPage() {
   const handleSendWhatsApp = async (type: "invoice" | "reminder") => {
     try {
       const fn = type === "invoice" ? sendWhatsAppMutation : sendReminderMutation;
-      const result = await fn.mutateAsync(invoiceId);
-      window.open(result.waUrl, "_blank", "noopener,noreferrer");
+      await fn.mutateAsync(invoiceId);
       toast({
-        title: type === "invoice" ? "Invoice opened in WhatsApp" : "Reminder opened in WhatsApp",
-        description: "WhatsApp has opened with the message pre-filled. Send it from there.",
+        title: type === "invoice" ? "Invoice sent via WhatsApp" : "Payment reminder sent via WhatsApp",
+        description: "The message was delivered through Twilio WhatsApp Business.",
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to prepare message";
+      const msg = err instanceof Error ? err.message : "Failed to send WhatsApp message";
       toast({ variant: "destructive", title: "WhatsApp error", description: msg });
     }
   };
@@ -351,38 +350,40 @@ export default function InvoiceDetailPage() {
           Record Payment
         </Button>
 
-        {hasPhone ? (
-          <Button
-            variant="outline"
-            className="gap-2 border-green-600 text-green-500 hover:bg-green-500/10"
-            onClick={() => handleSendWhatsApp("invoice")}
-            disabled={waIsPending}
-          >
-            {sendWhatsAppMutation.isPending
-              ? <Loader2 className="w-4 h-4 animate-spin" />
-              : <MessageCircle className="w-4 h-4" />
-            }
-            Send Invoice
-          </Button>
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0}>
-                <Button
-                  variant="outline"
-                  className="gap-2 border-green-600/40 text-green-500/40 cursor-not-allowed"
-                  disabled
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Send Invoice
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>Add a phone number to this client first</TooltipContent>
-          </Tooltip>
+        {isAdmin && (
+          hasPhone ? (
+            <Button
+              variant="outline"
+              className="gap-2 border-green-600 text-green-500 hover:bg-green-500/10"
+              onClick={() => handleSendWhatsApp("invoice")}
+              disabled={waIsPending}
+            >
+              {sendWhatsAppMutation.isPending
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <MessageCircle className="w-4 h-4" />
+              }
+              Send Invoice
+            </Button>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-green-600/40 text-green-500/40 cursor-not-allowed"
+                    disabled
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Send Invoice
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Add a phone number to this client first</TooltipContent>
+            </Tooltip>
+          )
         )}
 
-        {invoice.outstanding > 0 && (
+        {isAdmin && invoice.outstanding > 0 && (
           hasPhone ? (
             <Button
               variant="outline"
@@ -537,9 +538,9 @@ export default function InvoiceDetailPage() {
                         <span className="text-xs text-muted-foreground font-mono">{entry.phone}</span>
                         <Badge
                           variant="outline"
-                          className={`text-xs ${entry.status === "sent" ? "border-green-600 text-green-500" : "border-slate-600 text-slate-400"}`}
+                          className={`text-xs ${entry.status === "sent" ? "border-green-600 text-green-500" : "border-red-600 text-red-500"}`}
                         >
-                          {entry.status === "sent" ? "Sent via Twilio" : "Opened in WhatsApp"}
+                          {entry.status === "sent" ? "Sent" : "Failed"}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap">

@@ -415,10 +415,14 @@ function buildReminderMessage(inv: {
   return lines.join("\n");
 }
 
-router.post("/invoices/:id/send-whatsapp", requireAuth, async (req, res) => {
+router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM) {
+      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM to environment secrets" });
+    }
 
     const [row] = await db
       .select({
@@ -454,7 +458,6 @@ router.post("/invoices/:id/send-whatsapp", requireAuth, async (req, res) => {
     });
 
     const twilioResult = await sendViaTwilio(phone, messageBody);
-    const status = twilioResult.success ? "sent" : "logged";
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,
@@ -462,29 +465,29 @@ router.post("/invoices/:id/send-whatsapp", requireAuth, async (req, res) => {
       messageType: "invoice",
       phone,
       messageBody,
-      status,
+      status: twilioResult.success ? "sent" : "failed",
       errorMessage: twilioResult.success ? null : twilioResult.error ?? null,
     });
 
-    const waUrl = `https://wa.me/${phone.replace("+", "")}?text=${encodeURIComponent(messageBody)}`;
+    if (!twilioResult.success) {
+      return res.status(500).json({ error: twilioResult.error ?? "Failed to send WhatsApp message" });
+    }
 
-    res.json({
-      success: true,
-      waUrl,
-      messageBody,
-      twilioSent: twilioResult.success,
-      twilioSid: twilioResult.sid ?? null,
-    });
+    res.json({ success: true, twilioSid: twilioResult.sid ?? null });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to send WhatsApp message" });
   }
 });
 
-router.post("/invoices/:id/send-reminder", requireAuth, async (req, res) => {
+router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM) {
+      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM to environment secrets" });
+    }
 
     const [row] = await db
       .select({
@@ -525,7 +528,6 @@ router.post("/invoices/:id/send-reminder", requireAuth, async (req, res) => {
     });
 
     const twilioResult = await sendViaTwilio(phone, messageBody);
-    const status = twilioResult.success ? "sent" : "logged";
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,
@@ -533,19 +535,15 @@ router.post("/invoices/:id/send-reminder", requireAuth, async (req, res) => {
       messageType: "reminder",
       phone,
       messageBody,
-      status,
+      status: twilioResult.success ? "sent" : "failed",
       errorMessage: twilioResult.success ? null : twilioResult.error ?? null,
     });
 
-    const waUrl = `https://wa.me/${phone.replace("+", "")}?text=${encodeURIComponent(messageBody)}`;
+    if (!twilioResult.success) {
+      return res.status(500).json({ error: twilioResult.error ?? "Failed to send reminder" });
+    }
 
-    res.json({
-      success: true,
-      waUrl,
-      messageBody,
-      twilioSent: twilioResult.success,
-      twilioSid: twilioResult.sid ?? null,
-    });
+    res.json({ success: true, twilioSid: twilioResult.sid ?? null });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to send reminder" });

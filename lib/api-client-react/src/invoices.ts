@@ -8,7 +8,7 @@ export type WhatsAppLogEntry = {
   messageType: "invoice" | "reminder";
   phone: string;
   messageBody: string;
-  status: "sent" | "logged" | "failed";
+  status: "sent" | "failed";
   sentAt: string;
   errorMessage: string | null;
   createdAt: string;
@@ -16,9 +16,6 @@ export type WhatsAppLogEntry = {
 
 export type WhatsAppSendResponse = {
   success: boolean;
-  waUrl: string;
-  messageBody: string;
-  twilioSent: boolean;
   twilioSid: string | null;
 };
 
