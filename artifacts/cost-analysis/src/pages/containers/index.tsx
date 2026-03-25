@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useListContainers } from "@workspace/api-client-react";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useAuth } from "@/components/layout/auth-provider";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +12,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Search, SlidersHorizontal, ChevronLeft, ChevronRight,
+  Search, ChevronLeft, ChevronRight,
   AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown,
-  X, Filter, Trash2, Loader2,
+  X, Filter, Trash2, Loader2, Plus,
 } from "lucide-react";
 import { getShippingLine } from "@/lib/tracking";
 import { motion, AnimatePresence } from "framer-motion";
+import { NewContainerDialog } from "@/components/containers/new-container-dialog";
 
 type SortField = "containerNumber" | "customerName" | "declaration" | "status" | "clearingCharges" | "totalCost" | "grossProfit";
 type SortDir = "asc" | "desc";
@@ -53,6 +54,7 @@ export default function Containers() {
   const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>("containerNumber");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [showNewContainer, setShowNewContainer] = useState(false);
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -160,11 +162,19 @@ export default function Containers() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <NewContainerDialog open={showNewContainer} onOpenChange={setShowNewContainer} />
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Container Directory</h1>
           <p className="text-muted-foreground text-sm mt-1">Manage and track all container clearing records.</p>
         </div>
+        {isAdmin && (
+          <Button onClick={() => setShowNewContainer(true)} className="gap-2 shrink-0">
+            <Plus className="w-4 h-4" />
+            Add Container
+          </Button>
+        )}
       </div>
 
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm shadow-lg overflow-hidden">
@@ -307,8 +317,23 @@ export default function Containers() {
                   <td colSpan={colSpan} className="px-6 py-16 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center">
                       <FileSpreadsheet className="w-12 h-12 mb-4 text-muted-foreground/30" />
-                      <p className="text-base">No containers found matching your criteria.</p>
-                      <p className="text-sm mt-1">Try adjusting your search or filters.</p>
+                      {search || hasActiveFilters ? (
+                        <>
+                          <p className="text-base">No containers found matching your criteria.</p>
+                          <p className="text-sm mt-1">Try adjusting your search or filters.</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-base font-medium text-foreground">No containers yet</p>
+                          <p className="text-sm mt-1 mb-4">Get started by adding your first container.</p>
+                          {isAdmin && (
+                            <Button onClick={() => setShowNewContainer(true)} size="sm" className="gap-2">
+                              <Plus className="w-4 h-4" />
+                              Add your first container
+                            </Button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

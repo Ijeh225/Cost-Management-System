@@ -183,7 +183,7 @@ router.get("/containers", requireAuth, async (req, res) => {
 
 router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const { customerName, containerNumber, blNumber, declaration, size, vessel, clearingCharges } = req.body;
+    const { customerName, containerNumber, blNumber, declaration, size, vessel, clearingCharges, clientId } = req.body;
     if (!customerName || !containerNumber || !blNumber) {
       res.status(400).json({ error: "customerName, containerNumber, blNumber are required" });
       return;
@@ -196,6 +196,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       size: size ?? "",
       vessel: vessel ?? "",
       clearingCharges: String(clearingCharges ?? 0),
+      clientId: clientId ? Number(clientId) : null,
     }).returning();
     await getOrCreateCharges(container.id);
     res.status(201).json(formatContainer(container));

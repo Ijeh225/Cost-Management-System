@@ -128,10 +128,11 @@ export interface CreateContainerRequest {
   customerName: string;
   containerNumber: string;
   blNumber: string;
-  declaration: string;
-  size: string;
-  vessel: string;
+  declaration?: string;
+  size?: string;
+  vessel?: string;
   clearingCharges?: number;
+  clientId?: number | null;
 }
 
 export interface UpdateContainerRequest {
