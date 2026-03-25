@@ -72,18 +72,18 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
           customerName: form.customerName.trim(),
           containerNumber: form.containerNumber.trim().toUpperCase(),
           blNumber: form.blNumber.trim(),
-          declaration: form.declaration.trim() || undefined,
-          size: form.size || undefined,
-          vessel: form.vessel.trim() || undefined,
-          clearingCharges: charges || undefined,
+          ...(form.declaration.trim() && { declaration: form.declaration.trim() }),
+          ...(form.size && { size: form.size }),
+          ...(form.vessel.trim() && { vessel: form.vessel.trim() }),
+          ...(charges && { clearingCharges: charges }),
           clientId: form.clientId !== NO_CLIENT ? Number(form.clientId) : null,
         },
       });
       toast({ title: "Container created", description: `${container.containerNumber} has been added.` });
       onOpenChange(false);
       setLocation(`/containers/${container.id}`);
-    } catch (err: any) {
-      const msg = err?.message ?? "Failed to create container";
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to create container";
       toast({ variant: "destructive", title: "Error", description: msg });
     }
   };
