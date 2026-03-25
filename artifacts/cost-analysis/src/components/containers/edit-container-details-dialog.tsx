@@ -88,8 +88,8 @@ export function EditContainerDetailsDialog({
         id: container.id,
         data: {
           customerName: form.customerName.trim(),
-          ...(form.vessel.trim() && { vessel: form.vessel.trim() }),
-          ...(form.size && form.size !== NO_SIZE && { size: form.size }),
+          vessel: form.vessel.trim(),
+          size: form.size === NO_SIZE ? "" : form.size,
           declaration: form.declaration.trim(),
           clearingCharges: charges,
         },
