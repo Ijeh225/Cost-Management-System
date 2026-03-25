@@ -473,7 +473,7 @@ router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req, res) => {
       return res.status(500).json({ error: twilioResult.error ?? "Failed to send WhatsApp message" });
     }
 
-    res.json({ success: true, twilioSid: twilioResult.sid ?? null });
+    res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to send WhatsApp message" });
@@ -543,7 +543,7 @@ router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
       return res.status(500).json({ error: twilioResult.error ?? "Failed to send reminder" });
     }
 
-    res.json({ success: true, twilioSid: twilioResult.sid ?? null });
+    res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to send reminder" });

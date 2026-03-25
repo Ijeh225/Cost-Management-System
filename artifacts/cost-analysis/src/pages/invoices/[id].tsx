@@ -193,10 +193,11 @@ export default function InvoiceDetailPage() {
   const handleSendWhatsApp = async (type: "invoice" | "reminder") => {
     try {
       const fn = type === "invoice" ? sendWhatsAppMutation : sendReminderMutation;
-      await fn.mutateAsync(invoiceId);
+      const result = await fn.mutateAsync(invoiceId);
+      const preview = result.messageBody.split("\n").slice(0, 2).join(" · ").slice(0, 120);
       toast({
         title: type === "invoice" ? "Invoice sent via WhatsApp" : "Payment reminder sent via WhatsApp",
-        description: "The message was delivered through Twilio WhatsApp Business.",
+        description: preview,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to send WhatsApp message";

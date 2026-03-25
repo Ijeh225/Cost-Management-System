@@ -17,6 +17,7 @@ export type WhatsAppLogEntry = {
 export type WhatsAppSendResponse = {
   success: boolean;
   twilioSid: string | null;
+  messageBody: string;
 };
 
 export type InvoicePayment = {
