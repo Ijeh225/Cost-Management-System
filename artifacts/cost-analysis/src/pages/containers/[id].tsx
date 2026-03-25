@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
-import { getShippingLine, getTrackingUrl, normalizeContainerNumber, formatTrackingDate, formatTrackingDateTime, type TrackingResult } from "@/lib/tracking";
+import { getShippingLine, normalizeContainerNumber, formatTrackingDate, formatTrackingDateTime, isMaerskContainer, type TrackingResult } from "@/lib/tracking";
 import {
   useGetContainer, useUpdateContainerCharges,
   useLockContainer, useUpdateContainer, useGetContainerAuditLog,
@@ -45,6 +45,7 @@ import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
 import { DocumentsTab } from "@/components/containers/DocumentsTab";
 import { EditSectionsTab } from "@/components/containers/EditSectionsTab";
+import { EditContainerDetailsDialog } from "@/components/containers/edit-container-details-dialog";
 import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY, useCreateInvoice, useListInvoices } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -561,6 +562,7 @@ export default function ContainerDetail() {
   const [invoiceDueDate, setInvoiceDueDate] = useState("");
   const [invoiceVatRate, setInvoiceVatRate] = useState("");
   const [invoiceNotes, setInvoiceNotes] = useState("");
+  const [showEditDetails, setShowEditDetails] = useState(false);
   const [, setLocation] = useLocation();
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [trackingData, setTrackingData] = useState<TrackingResult | null>(null);
@@ -897,24 +899,7 @@ export default function ContainerDetail() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            {(() => {
-              const line = getShippingLine(container.containerNumber);
-              if (line && !line.isMaersk) {
-                return (
-                  <a
-                    href={getTrackingUrl(container.containerNumber) ?? "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-primary transition-colors inline-flex items-center gap-1.5 group"
-                    title={`Track on ${line.name}`}
-                  >
-                    {container.containerNumber}
-                    <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </a>
-                );
-              }
-              return <span>{container.containerNumber}</span>;
-            })()}
+            <span>{container.containerNumber}</span>
             {container.isLocked && (
               <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 px-2 py-0.5">
                 <Lock className="w-3 h-3 mr-1" /> Locked
@@ -934,47 +919,20 @@ export default function ContainerDetail() {
           <span className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider border ${getStatusColor(container.status)}`}>
             {getStatusLabel(container.status)}
           </span>
-          {(() => {
-            const line = getShippingLine(container.containerNumber);
-            if (!line) return null;
-            if (line.isMaersk) {
-              return (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`gap-1.5 transition-colors ${trackingOpen ? "border-blue-500/60 text-blue-400 bg-blue-500/10" : "border-blue-500/40 text-blue-400 hover:bg-blue-500/10"}`}
-                  onClick={handleTrackLive}
-                  disabled={trackingLoading}
-                >
-                  {trackingLoading
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <ExternalLink className="w-3.5 h-3.5" />}
-                  {trackingOpen ? "Hide Tracking" : "Track Live"}
-                </Button>
-              );
-            }
-            return (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 border-blue-500/40 text-blue-400 hover:bg-blue-500/10"
-                onClick={() => {
-                  const url = getTrackingUrl(container.containerNumber);
-                  const num = normalizeContainerNumber(container.containerNumber);
-                  if (url) window.open(url, "_blank", "noopener,noreferrer");
-                  navigator.clipboard.writeText(num).catch(() => {});
-                  toast({
-                    title: `Opening tracking for ${num}`,
-                    description: `The container number is pre-filled. Click "Track direct" on the page that opens to see live results.`,
-                    duration: 6000,
-                  });
-                }}
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Track on {line.shortName}
-              </Button>
-            );
-          })()}
+          {isMaerskContainer(container.containerNumber) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className={`gap-1.5 transition-colors ${trackingOpen ? "border-blue-500/60 text-blue-400 bg-blue-500/10" : "border-blue-500/40 text-blue-400 hover:bg-blue-500/10"}`}
+              onClick={handleTrackLive}
+              disabled={trackingLoading}
+            >
+              {trackingLoading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <ExternalLink className="w-3.5 h-3.5" />}
+              {trackingOpen ? "Hide Tracking" : "Track Live"}
+            </Button>
+          )}
           {containerInvoices.length > 0 ? (
             <Link href="/invoices">
               <Button variant="outline" size="sm" className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10">
@@ -999,6 +957,17 @@ export default function ContainerDetail() {
               Advance to {getStatusLabel(nextStage!)}
             </Button>
           )}
+          {isAdmin && !container.isLocked && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowEditDetails(true)}
+              className="gap-1.5"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit Details
+            </Button>
+          )}
           {isAdmin && (
             <Button
               variant={container.isLocked ? "outline" : "secondary"}
@@ -1012,6 +981,24 @@ export default function ContainerDetail() {
           )}
         </div>
       </div>
+
+      {isAdmin && (
+        <EditContainerDetailsDialog
+          open={showEditDetails}
+          onOpenChange={setShowEditDetails}
+          container={{
+            id: container.id,
+            containerNumber: container.containerNumber,
+            blNumber: container.blNumber,
+            customerName: container.customerName,
+            vessel: container.vessel ?? "",
+            size: container.size ?? "",
+            declaration: container.declaration ?? "",
+            clearingCharges: Number(container.clearingCharges) ?? 0,
+          }}
+          onSaved={() => queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] })}
+        />
+      )}
 
       {container.isLocked && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">

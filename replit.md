@@ -290,6 +290,10 @@ From address used: `alerts@updates.costanalysis.app` (requires verified sender d
 
 1. **Add Container Manual Form** — "Add Container" button in the containers list header (admin-only). Opens a dialog with all container fields: Customer Name*, Container #*, B/L Number*, Declaration, Size (20FT/40FT/40HC/45HC), Vessel, Clearing Charges (₦), and optional Client link. On success, navigates to the new container detail page. Empty state also shows an "Add your first container" CTA. Backend `POST /containers` now accepts `clientId` to link a client at creation time.
 
+2. **Remove non-Maersk tracking links** — Removed the "Track on X" external link button from the container detail page header for non-Maersk containers. Container number in the `<h1>` is now always plain text. Maersk "Track Live" button (in-app API tracking) is preserved unchanged. Shipping line badge in the container list remains (informational only).
+
+3. **Container basic-info editing** — "Edit Details" button (admin-only, hidden when container is locked) in the container detail page header. Opens a dialog pre-filled with Customer Name, Vessel, Size, Declaration, and Clearing Charges. Container # and BL # are shown read-only (immutable keys). On save, calls `PATCH /containers/:id` via `useUpdateContainer` and invalidates the container query to refresh the detail page.
+
 ## Financial Calculations
 All calculations in `artifacts/api-server/src/lib/calculations.ts`:
 - `calcTotalCost(charges)` — Sum of all 5 sections
