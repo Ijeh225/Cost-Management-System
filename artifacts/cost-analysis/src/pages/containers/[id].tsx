@@ -11,6 +11,7 @@ import {
   type CustomSectionWithFields, type CustomField,
   useGetSettings, BUILT_IN_SECTION_DEFAULTS,
   getBuiltInFieldLabel, isBuiltInFieldHidden,
+  useAddTimelineEvent,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -580,6 +581,7 @@ export default function ContainerDetail() {
   const createInvoiceMutation = useCreateInvoice();
   const { data: allInvoices } = useListInvoices();
   const containerInvoices = (allInvoices ?? []).filter(inv => inv.containerId === containerId);
+  const addTimelineEvent = useAddTimelineEvent();
   const { data: customSectionsRaw } = useGetCustomSections(containerId);
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
   const { data: sectionSettings } = useGetSettings();
@@ -816,20 +818,29 @@ export default function ContainerDetail() {
   const handleSaveEta = async () => {
     if (!trackingData?.eta) return;
     const etaDate = formatTrackingDate(trackingData.eta);
-    const currentNotes = container.clearingCharges ? "" : "";
     try {
-      await updateMutation.mutateAsync({
+      const vessel = trackingData.vessel ?? container.vessel ?? undefined;
+      const saveVessel = vessel && vessel !== container.vessel;
+      if (saveVessel) {
+        await updateMutation.mutateAsync({ id: containerId, data: { vessel } });
+      }
+      const parts: string[] = [`Maersk Live ETA: ${etaDate}`];
+      if (vessel) parts.push(`Vessel: ${vessel}`);
+      if (trackingData.portOfLoading) parts.push(`POL: ${trackingData.portOfLoading}`);
+      if (trackingData.portOfDischarge) parts.push(`POD: ${trackingData.portOfDischarge}`);
+      await addTimelineEvent.mutateAsync({
         id: containerId,
         data: {
-          vessel: trackingData.vessel ?? container.vessel ?? undefined,
+          title: `ETA recorded from Maersk tracking — ${etaDate}`,
+          eventType: "tracking",
+          description: parts.join(" · "),
+          status: "completed",
         },
       });
-      toast({
-        title: "ETA noted",
-        description: `ETA ${etaDate} — update your notes or timeline to record this.`,
-      });
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/timeline`] });
+      toast({ title: "ETA saved", description: `ETA ${etaDate} recorded on the container timeline.` });
     } catch {
-      toast({ variant: "destructive", title: "Could not save" });
+      toast({ variant: "destructive", title: "Could not save ETA" });
     }
   };
 
@@ -1191,6 +1202,24 @@ export default function ContainerDetail() {
 
                 {trackingData.events.length === 0 && (
                   <p className="text-sm text-muted-foreground/60 text-center py-2">No events available yet.</p>
+                )}
+
+                {trackingData.eta && (
+                  <div className="flex justify-end pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 text-xs border-blue-500/40 text-blue-400 hover:bg-blue-500/10"
+                      onClick={handleSaveEta}
+                      disabled={addTimelineEvent.isPending || updateMutation.isPending}
+                    >
+                      {(addTimelineEvent.isPending || updateMutation.isPending)
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <CheckCircle2 className="w-3 h-3" />
+                      }
+                      Save ETA to Timeline
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
