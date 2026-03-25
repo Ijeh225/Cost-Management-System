@@ -294,6 +294,10 @@ From address used: `alerts@updates.costanalysis.app` (requires verified sender d
 
 3. **Container basic-info editing** — "Edit Details" button (admin-only, hidden when container is locked) in the container detail page header. Opens a dialog pre-filled with Customer Name, Vessel, Size, Declaration, and Clearing Charges. Container # and BL # are shown read-only (immutable keys). On save, calls `PATCH /containers/:id` via `useUpdateContainer` and invalidates the container query to refresh the detail page.
 
+### Phase 8 ✅ COMPLETE
+
+1. **WhatsApp invoice messaging** — Two WhatsApp action buttons on the invoice detail page: "Send Invoice" (green) and "Send Reminder" (amber, only shown when outstanding balance > 0). Clicking either button calls the API, which builds a formatted Nigerian-business message, logs it to the `whatsapp_messages` DB table, and returns a wa.me URL. The browser then opens WhatsApp with the message pre-filled. Buttons are disabled (with tooltip) when the client has no phone number on file. Nigerian phone numbers (08XXXXXXXXX) are automatically normalized to E.164 (+234XXXXXXXXX) in the backend. A collapsible "WhatsApp Messages" section at the bottom of the invoice detail page shows the full log of all messages prepared/sent for that invoice, with type badge (Invoice/Reminder), phone, status, message preview, and timestamp. If Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM) are configured as secrets, messages are also sent directly via Twilio's WhatsApp Business API — without credentials the feature still works fully via wa.me links.
+
 ## Financial Calculations
 All calculations in `artifacts/api-server/src/lib/calculations.ts`:
 - `calcTotalCost(charges)` — Sum of all 5 sections

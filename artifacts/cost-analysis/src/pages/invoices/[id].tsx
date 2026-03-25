@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "wouter";
 import {
   useGetInvoice, useUpdateInvoice, useRecordPayment, useDeletePayment,
+  useGetInvoiceWhatsAppLog, useSendInvoiceWhatsApp, useSendInvoiceReminder,
   type RecordPaymentBody,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -17,10 +18,11 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   FileText, ArrowLeft, Phone, Loader2, Trash2, CheckCircle2,
   Clock, AlertTriangle, CreditCard, Send, PlusCircle, Building2,
-  Box, Calendar, StickyNote, MessageCircle,
+  Box, Calendar, StickyNote, MessageCircle, Bell, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 function statusConfig(status: string) {
@@ -38,38 +40,6 @@ function statusConfig(status: string) {
   }
 }
 
-function buildWhatsAppLink(phone: string, invoice: {
-  invoiceNumber: string;
-  containerNumber: string | null;
-  blNumber: string | null;
-  clientName: string | null;
-  total: number;
-  outstanding: number;
-  dueDate: string | null;
-}) {
-  const normalized = phone.replace(/\D/g, "");
-  const e164 = normalized.startsWith("0") ? "234" + normalized.slice(1) : normalized;
-
-  const lines = [
-    `Hello ${invoice.clientName ?? ""},`,
-    ``,
-    `Please find below the invoice details for your container clearance:`,
-    ``,
-    `📄 Invoice No: *${invoice.invoiceNumber}*`,
-    invoice.containerNumber ? `📦 Container: *${invoice.containerNumber}*` : null,
-    invoice.blNumber ? `📋 B/L Number: *${invoice.blNumber}*` : null,
-    ``,
-    `💰 Invoice Total: *${formatCurrency(invoice.total)}*`,
-    invoice.outstanding > 0 ? `⏳ Outstanding Balance: *${formatCurrency(invoice.outstanding)}*` : `✅ Balance: *Fully Settled*`,
-    invoice.dueDate ? `📅 Due Date: *${invoice.dueDate}*` : null,
-    ``,
-    `For any queries, please do not hesitate to reach out.`,
-    ``,
-    `Thank you for your business.`,
-  ].filter(l => l !== null).join("\n");
-
-  return `https://wa.me/${e164}?text=${encodeURIComponent(lines)}`;
-}
 
 function RecordPaymentDialog({
   open,
@@ -195,7 +165,11 @@ export default function InvoiceDetailPage() {
   const { data: invoice, isLoading } = useGetInvoice(isNaN(invoiceId) ? null : invoiceId);
   const updateMutation = useUpdateInvoice();
   const deletePaymentMutation = useDeletePayment();
+  const sendWhatsAppMutation = useSendInvoiceWhatsApp();
+  const sendReminderMutation = useSendInvoiceReminder();
+  const { data: whatsappLog } = useGetInvoiceWhatsAppLog(isNaN(invoiceId) ? null : invoiceId);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [whatsappLogOpen, setWhatsappLogOpen] = useState(false);
 
   const handleStatusChange = async (status: string) => {
     try {
@@ -213,6 +187,21 @@ export default function InvoiceDetailPage() {
       toast({ title: "Payment removed" });
     } catch {
       toast({ variant: "destructive", title: "Failed to remove payment" });
+    }
+  };
+
+  const handleSendWhatsApp = async (type: "invoice" | "reminder") => {
+    try {
+      const fn = type === "invoice" ? sendWhatsAppMutation : sendReminderMutation;
+      const result = await fn.mutateAsync(invoiceId);
+      window.open(result.waUrl, "_blank", "noopener,noreferrer");
+      toast({
+        title: type === "invoice" ? "Invoice opened in WhatsApp" : "Reminder opened in WhatsApp",
+        description: "WhatsApp has opened with the message pre-filled. Send it from there.",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to prepare message";
+      toast({ variant: "destructive", title: "WhatsApp error", description: msg });
     }
   };
 
@@ -237,9 +226,8 @@ export default function InvoiceDetailPage() {
   const cfg = statusConfig(invoice.status);
   const StatusIcon = cfg.icon;
   const paidPct = invoice.total > 0 ? Math.min(100, (invoice.totalPaid / invoice.total) * 100) : 0;
-  const whatsappLink = invoice.clientPhone
-    ? buildWhatsAppLink(invoice.clientPhone, invoice)
-    : null;
+  const hasPhone = !!invoice.clientPhone;
+  const waIsPending = sendWhatsAppMutation.isPending || sendReminderMutation.isPending;
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
@@ -363,13 +351,68 @@ export default function InvoiceDetailPage() {
           Record Payment
         </Button>
 
-        {whatsappLink && (
-          <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" className="gap-2 border-green-600 text-green-500 hover:bg-green-500/10">
-              <MessageCircle className="w-4 h-4" />
-              Send via WhatsApp
+        {hasPhone ? (
+          <Button
+            variant="outline"
+            className="gap-2 border-green-600 text-green-500 hover:bg-green-500/10"
+            onClick={() => handleSendWhatsApp("invoice")}
+            disabled={waIsPending}
+          >
+            {sendWhatsAppMutation.isPending
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <MessageCircle className="w-4 h-4" />
+            }
+            Send Invoice
+          </Button>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0}>
+                <Button
+                  variant="outline"
+                  className="gap-2 border-green-600/40 text-green-500/40 cursor-not-allowed"
+                  disabled
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Send Invoice
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Add a phone number to this client first</TooltipContent>
+          </Tooltip>
+        )}
+
+        {invoice.outstanding > 0 && (
+          hasPhone ? (
+            <Button
+              variant="outline"
+              className="gap-2 border-amber-600 text-amber-500 hover:bg-amber-500/10"
+              onClick={() => handleSendWhatsApp("reminder")}
+              disabled={waIsPending}
+            >
+              {sendReminderMutation.isPending
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Bell className="w-4 h-4" />
+              }
+              Send Reminder
             </Button>
-          </a>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-amber-600/40 text-amber-500/40 cursor-not-allowed"
+                    disabled
+                  >
+                    <Bell className="w-4 h-4" />
+                    Send Reminder
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Add a phone number to this client first</TooltipContent>
+            </Tooltip>
+          )
         )}
 
         {isAdmin && invoice.status === "draft" && (
@@ -456,6 +499,63 @@ export default function InvoiceDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {(whatsappLog && whatsappLog.length > 0) && (
+        <Card className="border-border/50">
+          <CardHeader className="pb-2 cursor-pointer" onClick={() => setWhatsappLogOpen(o => !o)}>
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-green-500" />
+              WhatsApp Messages
+              <Badge variant="secondary" className="ml-1">{whatsappLog.length}</Badge>
+              <span className="ml-auto text-muted-foreground">
+                {whatsappLogOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          {whatsappLogOpen && (
+            <CardContent>
+              <div className="space-y-2">
+                {whatsappLog.map(entry => (
+                  <div
+                    key={entry.id}
+                    className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-muted/30 border border-border/30"
+                  >
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${entry.messageType === "reminder" ? "bg-amber-500/20" : "bg-green-500/20"}`}>
+                      {entry.messageType === "reminder"
+                        ? <Bell className="w-3.5 h-3.5 text-amber-400" />
+                        : <MessageCircle className="w-3.5 h-3.5 text-green-400" />
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant="secondary"
+                          className={`text-xs capitalize ${entry.messageType === "reminder" ? "text-amber-400" : "text-green-400"}`}
+                        >
+                          {entry.messageType === "reminder" ? "Reminder" : "Invoice"}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground font-mono">{entry.phone}</span>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${entry.status === "sent" ? "border-green-600 text-green-500" : "border-slate-600 text-slate-400"}`}
+                        >
+                          {entry.status === "sent" ? "Sent via Twilio" : "Opened in WhatsApp"}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap">
+                        {entry.messageBody.split("\n").slice(0, 3).join(" · ")}
+                      </p>
+                      <span className="text-xs text-muted-foreground mt-0.5 block">
+                        {new Date(entry.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       <RecordPaymentDialog
         open={paymentOpen}

@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { db, invoicesTable, invoicePaymentsTable, containersTable, clientsTable } from "@workspace/db";
-import { eq, desc, sum, sql } from "drizzle-orm";
+import { db, invoicesTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable } from "@workspace/db";
+import { eq, desc, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { toE164Nigerian, sendViaTwilio } from "../lib/whatsapp.js";
 
 const router = Router();
 
@@ -351,6 +352,232 @@ router.delete("/invoices/:id/payments/:paymentId", requireAdmin, async (req, res
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to delete payment" });
+  }
+});
+
+function buildInvoiceMessage(inv: {
+  invoiceNumber: string;
+  clientName: string | null;
+  containerNumber: string | null;
+  blNumber: string | null;
+  total: number;
+  outstanding: number;
+  dueDate: string | null;
+}): string {
+  const lines: string[] = [
+    `Hello ${inv.clientName ?? ""},`,
+    ``,
+    `Your invoice for container clearance is ready:`,
+    ``,
+    `📄 Invoice No: *${inv.invoiceNumber}*`,
+  ];
+  if (inv.containerNumber) lines.push(`📦 Container: *${inv.containerNumber}*`);
+  if (inv.blNumber) lines.push(`📋 B/L No: *${inv.blNumber}*`);
+  lines.push(``);
+  lines.push(`💰 Invoice Total: *₦${Number(inv.total).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`);
+  if (inv.dueDate) lines.push(`📅 Due Date: *${inv.dueDate}*`);
+  lines.push(``);
+  lines.push(`Please arrange payment at your earliest convenience.`);
+  lines.push(`Thank you for your business.`);
+  return lines.join("\n");
+}
+
+function buildReminderMessage(inv: {
+  invoiceNumber: string;
+  clientName: string | null;
+  containerNumber: string | null;
+  total: number;
+  outstanding: number;
+  dueDate: string | null;
+}): string {
+  let overdueLine = "";
+  if (inv.dueDate) {
+    const due = new Date(inv.dueDate);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - due.getTime()) / 86400000);
+    overdueLine = diffDays > 0 ? ` (${diffDays} day${diffDays !== 1 ? "s" : ""} overdue)` : "";
+  }
+  const lines: string[] = [
+    `Hello ${inv.clientName ?? ""},`,
+    ``,
+    `This is a payment reminder for your outstanding invoice:`,
+    ``,
+    `📄 Invoice No: *${inv.invoiceNumber}*`,
+  ];
+  if (inv.containerNumber) lines.push(`📦 Container: *${inv.containerNumber}*`);
+  lines.push(``);
+  lines.push(`💰 Invoice Total: *₦${Number(inv.total).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`);
+  lines.push(`⏳ Outstanding: *₦${Number(inv.outstanding).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`);
+  if (inv.dueDate) lines.push(`📅 Due Date: *${inv.dueDate}*${overdueLine}`);
+  lines.push(``);
+  lines.push(`Please settle the outstanding amount at your earliest convenience.`);
+  lines.push(`Thank you.`);
+  return lines.join("\n");
+}
+
+router.post("/invoices/:id/send-whatsapp", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const [row] = await db
+      .select({
+        id: invoicesTable.id,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        containerId: invoicesTable.containerId,
+        containerNumber: containersTable.containerNumber,
+        blNumber: containersTable.blNumber,
+        clientId: invoicesTable.clientId,
+        clientName: clientsTable.name,
+        clientPhone: clientsTable.contactPhone,
+        total: invoicesTable.total,
+        outstanding: sql<number>`(${invoicesTable.total}::numeric - COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0))`,
+        dueDate: invoicesTable.dueDate,
+      })
+      .from(invoicesTable)
+      .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(eq(invoicesTable.id, id));
+
+    if (!row) return res.status(404).json({ error: "Invoice not found" });
+    if (!row.clientPhone) return res.status(400).json({ error: "Client has no phone number" });
+
+    const phone = toE164Nigerian(row.clientPhone);
+    const messageBody = buildInvoiceMessage({
+      invoiceNumber: row.invoiceNumber,
+      clientName: row.clientName ?? null,
+      containerNumber: row.containerNumber ?? null,
+      blNumber: row.blNumber ?? null,
+      total: parseFloat(row.total as unknown as string ?? "0"),
+      outstanding: Number(row.outstanding ?? 0),
+      dueDate: row.dueDate ?? null,
+    });
+
+    const twilioResult = await sendViaTwilio(phone, messageBody);
+    const status = twilioResult.success ? "sent" : "logged";
+
+    await db.insert(whatsappMessagesTable).values({
+      invoiceId: id,
+      clientId: row.clientId ?? null,
+      messageType: "invoice",
+      phone,
+      messageBody,
+      status,
+      errorMessage: twilioResult.success ? null : twilioResult.error ?? null,
+    });
+
+    const waUrl = `https://wa.me/${phone.replace("+", "")}?text=${encodeURIComponent(messageBody)}`;
+
+    res.json({
+      success: true,
+      waUrl,
+      messageBody,
+      twilioSent: twilioResult.success,
+      twilioSid: twilioResult.sid ?? null,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to send WhatsApp message" });
+  }
+});
+
+router.post("/invoices/:id/send-reminder", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const [row] = await db
+      .select({
+        id: invoicesTable.id,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        containerId: invoicesTable.containerId,
+        containerNumber: containersTable.containerNumber,
+        blNumber: containersTable.blNumber,
+        clientId: invoicesTable.clientId,
+        clientName: clientsTable.name,
+        clientPhone: clientsTable.contactPhone,
+        total: invoicesTable.total,
+        outstanding: sql<number>`(${invoicesTable.total}::numeric - COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0))`,
+        dueDate: invoicesTable.dueDate,
+        status: invoicesTable.status,
+      })
+      .from(invoicesTable)
+      .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(eq(invoicesTable.id, id));
+
+    if (!row) return res.status(404).json({ error: "Invoice not found" });
+    if (!row.clientPhone) return res.status(400).json({ error: "Client has no phone number" });
+
+    const outstanding = Number(row.outstanding ?? 0);
+    if (outstanding <= 0) {
+      return res.status(400).json({ error: "Invoice is fully paid — no reminder needed" });
+    }
+
+    const phone = toE164Nigerian(row.clientPhone);
+    const messageBody = buildReminderMessage({
+      invoiceNumber: row.invoiceNumber,
+      clientName: row.clientName ?? null,
+      containerNumber: row.containerNumber ?? null,
+      total: parseFloat(row.total as unknown as string ?? "0"),
+      outstanding,
+      dueDate: row.dueDate ?? null,
+    });
+
+    const twilioResult = await sendViaTwilio(phone, messageBody);
+    const status = twilioResult.success ? "sent" : "logged";
+
+    await db.insert(whatsappMessagesTable).values({
+      invoiceId: id,
+      clientId: row.clientId ?? null,
+      messageType: "reminder",
+      phone,
+      messageBody,
+      status,
+      errorMessage: twilioResult.success ? null : twilioResult.error ?? null,
+    });
+
+    const waUrl = `https://wa.me/${phone.replace("+", "")}?text=${encodeURIComponent(messageBody)}`;
+
+    res.json({
+      success: true,
+      waUrl,
+      messageBody,
+      twilioSent: twilioResult.success,
+      twilioSid: twilioResult.sid ?? null,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to send reminder" });
+  }
+});
+
+router.get("/invoices/:id/whatsapp-log", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const rows = await db
+      .select()
+      .from(whatsappMessagesTable)
+      .where(eq(whatsappMessagesTable.invoiceId, id))
+      .orderBy(desc(whatsappMessagesTable.createdAt));
+
+    res.json(rows.map(r => ({
+      id: r.id,
+      invoiceId: r.invoiceId,
+      clientId: r.clientId,
+      messageType: r.messageType,
+      phone: r.phone,
+      messageBody: r.messageBody,
+      status: r.status,
+      sentAt: r.sentAt instanceof Date ? r.sentAt.toISOString() : r.sentAt,
+      errorMessage: r.errorMessage,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+    })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch WhatsApp log" });
   }
 });
 

@@ -1,6 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
 
+export type WhatsAppLogEntry = {
+  id: number;
+  invoiceId: number;
+  clientId: number | null;
+  messageType: "invoice" | "reminder";
+  phone: string;
+  messageBody: string;
+  status: "sent" | "logged" | "failed";
+  sentAt: string;
+  errorMessage: string | null;
+  createdAt: string;
+};
+
+export type WhatsAppSendResponse = {
+  success: boolean;
+  waUrl: string;
+  messageBody: string;
+  twilioSent: boolean;
+  twilioSid: string | null;
+};
+
 export type InvoicePayment = {
   id: number;
   invoiceId: number;
@@ -142,6 +163,40 @@ export function useDeletePayment() {
     onSuccess: (_, { invoiceId }) => {
       qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+    },
+  });
+}
+
+export function useGetInvoiceWhatsAppLog(invoiceId: number | null) {
+  return useQuery({
+    queryKey: [...INVOICES_QUERY_KEY, invoiceId, "whatsapp-log"],
+    queryFn: () => customFetch<WhatsAppLogEntry[]>(`/api/invoices/${invoiceId}/whatsapp-log`),
+    enabled: !!invoiceId,
+  });
+}
+
+export function useSendInvoiceWhatsApp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (invoiceId: number) =>
+      customFetch<WhatsAppSendResponse>(`/api/invoices/${invoiceId}/send-whatsapp`, {
+        method: "POST",
+      }),
+    onSuccess: (_, invoiceId) => {
+      qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId, "whatsapp-log"] });
+    },
+  });
+}
+
+export function useSendInvoiceReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (invoiceId: number) =>
+      customFetch<WhatsAppSendResponse>(`/api/invoices/${invoiceId}/send-reminder`, {
+        method: "POST",
+      }),
+    onSuccess: (_, invoiceId) => {
+      qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId, "whatsapp-log"] });
     },
   });
 }
