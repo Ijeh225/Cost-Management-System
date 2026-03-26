@@ -757,19 +757,25 @@ export default function ContainerDetail() {
     );
   };
 
-  const handleSaveDeliveredAt = () => {
-    updateMutation.mutate(
-      { id: containerId, data: { deliveredAt: deliveredAtInput || null } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
-          queryClient.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
-          toast({ title: "Delivery date saved." });
-          setEditingDeliveredAt(false);
-        },
-        onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err?.message }),
+  const handleSaveDeliveredAt = async () => {
+    try {
+      const res = await fetch(`/api/containers/${containerId}/delivered-at`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveredAt: deliveredAtInput || null }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? "Update failed");
       }
-    );
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      queryClient.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
+      toast({ title: "Delivery date saved." });
+      setEditingDeliveredAt(false);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Could not save delivery date" });
+    }
   };
 
   const handleToggleSectionLock = (section: string, lock: boolean) => {
@@ -1076,7 +1082,7 @@ export default function ContainerDetail() {
                 )}
               </div>
             </div>
-            {isAdmin && !container.isLocked && !editingDeliveredAt && (
+            {!editingDeliveredAt && (
               <Button
                 variant="outline"
                 size="sm"

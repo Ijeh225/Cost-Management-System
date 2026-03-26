@@ -447,6 +447,34 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+router.patch("/containers/:id/delivered-at", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Container not found" });
+      return;
+    }
+    const { deliveredAt } = req.body;
+    const deliveredAtValue = deliveredAt ? new Date(deliveredAt) : null;
+    const [updated] = await db.update(containersTable)
+      .set({ deliveredAt: deliveredAtValue, deliveredAtEstimated: false })
+      .where(eq(containersTable.id, id))
+      .returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "update_container",
+      section: "basic_info",
+      reason: deliveredAt ? `Delivery date set to ${deliveredAt}` : "Delivery date cleared",
+    });
+    res.json(formatContainer(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 router.post("/containers/:id/lock", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);

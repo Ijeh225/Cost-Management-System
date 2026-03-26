@@ -59,6 +59,31 @@ export function useAdvanceContainerStatus() {
   });
 }
 
+export type ContainerDeliveryFields = {
+  deliveredAt: string | null;
+  deliveredAtEstimated: boolean;
+};
+
+export type UpdateDeliveredAtRequest = {
+  deliveredAt: string | null;
+};
+
+export function useUpdateDeliveredAt() {
+  const qc = useQueryClient();
+  return useMutation<ContainerDeliveryFields & Record<string, unknown>, Error, { id: number; deliveredAt: string | null }>({
+    mutationFn: ({ id, deliveredAt }) =>
+      customFetch(`/api/containers/${id}/delivered-at`, {
+        method: "PATCH",
+        body: JSON.stringify({ deliveredAt }),
+        headers: { "Content-Type": "application/json" },
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
+    },
+  });
+}
+
 export function useGetDeliveryReport(from?: string, to?: string) {
   const params = new URLSearchParams();
   if (from) params.set("from", from);
