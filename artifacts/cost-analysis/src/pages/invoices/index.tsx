@@ -51,7 +51,7 @@ function agingBadge(invoice: Invoice): { days: number; color: string } | null {
   if (days <= 0) return null;
   return {
     days,
-    color: days > 30
+    color: days >= 30
       ? "bg-red-500/20 text-red-400 border-red-500/40"
       : "bg-amber-500/20 text-amber-400 border-amber-500/40",
   };

@@ -46,6 +46,7 @@ export default function Containers() {
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [profitFilter, setProfitFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -66,12 +67,21 @@ export default function Containers() {
     const stored = sessionStorage.getItem("containerSearch");
     if (stored) {
       setSearch(stored);
+      setDebouncedSearch(stored);
       sessionStorage.removeItem("containerSearch");
     }
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const { data, isLoading, isError } = useListContainers(
-    { page, limit, ...(search ? { search } : {}), ...(status !== "all" ? { status } : {}) },
+    { page, limit, ...(debouncedSearch ? { search: debouncedSearch } : {}), ...(status !== "all" ? { status } : {}) },
     { query: { keepPreviousData: true } }
   );
 
