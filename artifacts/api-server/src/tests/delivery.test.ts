@@ -211,6 +211,15 @@ describe("API contract: backfill — deliveredAtEstimated flag", () => {
     expect(backfilled.deliveredAtEstimated).toBe(true);
   });
 
+  it("GET /api/containers/:id returns deliveredAt and deliveredAtEstimated for a backfilled record", async () => {
+    const res = await request(app)
+      .get(`/api/containers/${seedId}`)
+      .set("Cookie", ADMIN_COOKIE);
+    expect(res.status).toBe(200);
+    expect(res.body.container.deliveredAt).toBeTruthy();
+    expect(res.body.container.deliveredAtEstimated).toBe(true);
+  });
+
   it("manually setting delivery date via PATCH clears the estimated flag", async () => {
     const patch = await request(app)
       .patch(`/api/containers/${seedId}`)
