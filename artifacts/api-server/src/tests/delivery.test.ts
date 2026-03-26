@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import jwt from "jsonwebtoken";
 import app from "../app";
@@ -174,5 +174,57 @@ describe("PATCH /api/containers/:id — delivered date", () => {
       .send({ deliveredAt: "not-a-date" });
     expect(res.status).toBe(400);
     expect(res.body.error).toContain("Invalid");
+  });
+});
+
+describe("API contract: backfill — deliveredAtEstimated flag", () => {
+  let seedId: number;
+
+  beforeAll(async () => {
+    const [row] = await db
+      .insert(containersTable)
+      .values({
+        containerNumber: "TEST-BACKFILL-001",
+        blNumber: "BL-TEST-001",
+        customerName: "Test Client",
+        status: "completed",
+        deliveredAt: new Date("2025-06-01"),
+        deliveredAtEstimated: true,
+      })
+      .returning({ id: containersTable.id });
+    seedId = row.id;
+  });
+
+  afterAll(async () => {
+    await db.delete(containersTable).where(eq(containersTable.id, seedId));
+  });
+
+  it("backfilled container appears in analytics with deliveredAtEstimated=true", async () => {
+    const res = await request(app)
+      .get("/api/analytics/deliveries")
+      .set("Cookie", ADMIN_COOKIE);
+    expect(res.status).toBe(200);
+    const backfilled = res.body.items.find(
+      (i: { id: number }) => i.id === seedId
+    );
+    expect(backfilled).toBeDefined();
+    expect(backfilled.deliveredAtEstimated).toBe(true);
+  });
+
+  it("manually setting delivery date via PATCH clears the estimated flag", async () => {
+    const patch = await request(app)
+      .patch(`/api/containers/${seedId}`)
+      .set("Cookie", ADMIN_COOKIE)
+      .set("Content-Type", "application/json")
+      .send({ deliveredAt: "2025-07-15" });
+    expect(patch.status).toBe(200);
+    expect(patch.body.deliveredAtEstimated).toBe(false);
+
+    const analytics = await request(app)
+      .get("/api/analytics/deliveries")
+      .set("Cookie", ADMIN_COOKIE);
+    const item = analytics.body.items.find((i: { id: number }) => i.id === seedId);
+    expect(item).toBeDefined();
+    expect(item.deliveredAtEstimated).toBe(false);
   });
 });
