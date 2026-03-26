@@ -12,10 +12,12 @@ async function ensureMigrationsTable() {
 }
 
 async function runMigration(name: string, fn: () => Promise<void>) {
-  const existing = await db.select().from(appMigrationsTable).where(eq(appMigrationsTable.name, name));
-  if (existing.length > 0) return;
+  const result = await pool.query(
+    `INSERT INTO app_migrations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
+    [name]
+  );
+  if ((result as { rowCount: number | null }).rowCount === 0) return;
   await fn();
-  await db.insert(appMigrationsTable).values({ name });
   console.log(`[migration] Ran: ${name}`);
 }
 

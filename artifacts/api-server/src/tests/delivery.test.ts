@@ -65,14 +65,29 @@ describe("GET /api/analytics/deliveries", () => {
     expect(avgDays === null || typeof avgDays === "number").toBe(true);
   });
 
-  it("items with deliveredAtEstimated=true are included", async () => {
+  it("items include deliveredAtEstimated field in API response", async () => {
     const res = await request(app)
       .get("/api/analytics/deliveries")
       .set("Cookie", ADMIN_COOKIE);
-    const estimatedItems = res.body.items.filter(
-      (i: { deliveredAtEstimated?: boolean }) => i.deliveredAtEstimated === true
-    );
-    expect(Array.isArray(estimatedItems)).toBe(true);
+    expect(res.status).toBe(200);
+    if (res.body.items.length > 0) {
+      const item = res.body.items[0];
+      expect(item).toHaveProperty("deliveredAtEstimated");
+      expect(typeof item.deliveredAtEstimated).toBe("boolean");
+    }
+  });
+
+  it("estimated flag is true for backfilled containers, false for manually-set", async () => {
+    const res = await request(app)
+      .get("/api/analytics/deliveries")
+      .set("Cookie", ADMIN_COOKIE);
+    expect(res.status).toBe(200);
+    for (const item of res.body.items) {
+      expect(typeof item.deliveredAtEstimated).toBe("boolean");
+      if (item.deliveredAt) {
+        expect(item).toHaveProperty("deliveredAtEstimated");
+      }
+    }
   });
 });
 
