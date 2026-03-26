@@ -305,21 +305,32 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
   }
 });
 
+const PIPELINE_STAGE_ORDER = [
+  "new_upload", "documentation_review", "shipping_entry", "customs_entry",
+  "terminal_entry", "delivery_entry", "accounting_review", "management_approval",
+  "completed", "closed",
+];
+
 router.patch("/containers/:id/status", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { status } = req.body;
-    if (!status) {
-      res.status(400).json({ error: "status is required" });
-      return;
-    }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing) {
       res.status(404).json({ error: "Container not found" });
       return;
     }
+    const currentIdx = PIPELINE_STAGE_ORDER.indexOf(existing.status);
+    if (currentIdx === -1) {
+      res.status(400).json({ error: `Unknown current status: ${existing.status}` });
+      return;
+    }
+    if (currentIdx >= PIPELINE_STAGE_ORDER.length - 1) {
+      res.status(400).json({ error: "Container is already at the final stage" });
+      return;
+    }
+    const nextStatus = PIPELINE_STAGE_ORDER[currentIdx + 1];
     const [updated] = await db.update(containersTable)
-      .set({ status, updatedAt: new Date() })
+      .set({ status: nextStatus, updatedAt: new Date() })
       .where(eq(containersTable.id, id))
       .returning();
     await db.insert(auditLogTable).values({

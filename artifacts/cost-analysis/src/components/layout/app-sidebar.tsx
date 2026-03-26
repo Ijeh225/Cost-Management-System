@@ -39,8 +39,8 @@ export function AppSidebar() {
   const mainNav = [
     { title: "Dashboard",     url: "/",            icon: LayoutDashboard },
     { title: "Pipeline",      url: "/pipeline",    icon: GitBranch        },
-    { title: "Clients",       url: "/clients",     icon: Building2        },
     { title: "Containers",    url: "/containers",  icon: Box              },
+    { title: "Clients",       url: "/clients",     icon: Building2        },
     { title: "Invoices",      url: "/invoices",    icon: FileText         },
     { title: "My Tasks",      url: "/my-tasks",    icon: ListTodo         },
     { title: "Notifications", url: "/notifications", icon: Bell, badge: unreadCount },

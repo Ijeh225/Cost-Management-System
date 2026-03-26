@@ -186,16 +186,14 @@ function StageColumn({
 
 export default function PipelinePage() {
   const { isAdmin } = useAuth();
-  const [lastRefreshed, setLastRefreshed] = useState(new Date());
 
-  const { data, isLoading, refetch, isFetching } = useGetPipeline({
+  const { data, isLoading, refetch, isFetching, dataUpdatedAt } = useGetPipeline({
     query: { refetchInterval: 60_000 },
   });
 
-  const handleManualRefresh = async () => {
-    await refetch();
-    setLastRefreshed(new Date());
-  };
+  const lastRefreshed = dataUpdatedAt ? new Date(dataUpdatedAt) : new Date();
+
+  const handleManualRefresh = () => { refetch(); };
 
   const stages = data?.stages ?? {};
   const total = data?.total ?? 0;
