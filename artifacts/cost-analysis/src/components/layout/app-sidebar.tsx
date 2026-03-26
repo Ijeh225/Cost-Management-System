@@ -42,7 +42,7 @@ export function AppSidebar() {
     { title: "Containers",    url: "/containers",  icon: Box              },
     { title: "Clients",       url: "/clients",     icon: Building2        },
     { title: "Invoices",      url: "/invoices",    icon: FileText         },
-    { title: "Receivable",    url: "/accounts-receivable", icon: BookOpen  },
+    { title: "Accounts Receivable", url: "/accounts-receivable", icon: BookOpen },
     { title: "My Tasks",      url: "/my-tasks",    icon: ListTodo         },
     { title: "Notifications", url: "/notifications", icon: Bell, badge: unreadCount },
   ];

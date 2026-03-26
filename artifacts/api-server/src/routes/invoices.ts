@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable } from "@workspace/db";
-import { eq, desc, sql, inArray } from "drizzle-orm";
+import { eq, desc, sql, inArray, and, gte, lte } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio } from "../lib/whatsapp.js";
 
@@ -260,6 +260,14 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+    const { from, to } = req.query as { from?: string; to?: string };
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to + "T23:59:59") : null;
+
+    const conditions = [];
+    if (fromDate) conditions.push(gte(invoicesTable.createdAt, fromDate));
+    if (toDate) conditions.push(lte(invoicesTable.createdAt, toDate));
+
     const rows = await db
       .select({
         id: invoicesTable.id,
@@ -273,24 +281,29 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
       })
       .from(invoicesTable)
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(invoicesTable.createdAt));
 
-    const allPayments = await db.select({
-      id: invoicePaymentsTable.id,
-      invoiceId: invoicePaymentsTable.invoiceId,
+    const invoiceIds = rows.map(r => r.id);
+    const allPayments = invoiceIds.length > 0
+      ? await db.select({
+          id: invoicePaymentsTable.id,
+          invoiceId: invoicePaymentsTable.invoiceId,
+          amount: invoicePaymentsTable.amount,
+          paidAt: invoicePaymentsTable.paidAt,
+        }).from(invoicePaymentsTable).where(inArray(invoicePaymentsTable.invoiceId, invoiceIds))
+      : [];
+
+    const allPaymentsForMonth = await db.select({
       amount: invoicePaymentsTable.amount,
       paidAt: invoicePaymentsTable.paidAt,
-    }).from(invoicePaymentsTable);
+    }).from(invoicePaymentsTable).where(gte(invoicePaymentsTable.paidAt, monthStart));
+    const collectedThisMonth = allPaymentsForMonth.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
 
     const paymentsByInvoice = new Map<number, typeof allPayments>();
-    let collectedThisMonth = 0;
     for (const p of allPayments) {
       if (!paymentsByInvoice.has(p.invoiceId)) paymentsByInvoice.set(p.invoiceId, []);
       paymentsByInvoice.get(p.invoiceId)!.push(p);
-      const paidAt = p.paidAt instanceof Date ? p.paidAt : new Date(p.paidAt);
-      if (paidAt >= monthStart) {
-        collectedThisMonth += parseFloat(p.amount ?? "0");
-      }
     }
 
     type AgingBuckets = { current: number; days1to30: number; days31to60: number; days61to90: number; days90plus: number };
@@ -375,14 +388,14 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
     }
 
     const clients = [...clientMap.values()].sort((a, b) => b.outstanding - a.outstanding);
-    const totalOutstanding = summaryInvoiced - summaryCollected;
-    const totalOverdue = summaryAging.days1to30 + summaryAging.days31to60 + summaryAging.days61to90 + summaryAging.days90plus;
+    const totalOutstanding = Math.max(0, summaryInvoiced - summaryCollected);
+    const totalOverdue = summaryAging.days31to60 + summaryAging.days61to90 + summaryAging.days90plus;
 
     res.json({
       summary: {
         totalInvoiced: summaryInvoiced,
         totalCollected: summaryCollected,
-        totalOutstanding: Math.max(0, totalOutstanding),
+        totalOutstanding,
         collectedThisMonth,
         openInvoiceCount,
         totalOverdue,

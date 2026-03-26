@@ -164,38 +164,24 @@ function exportCsv(clients: ArClientRow[], fromDate: string, toDate: string) {
 }
 
 export default function AccountsReceivablePage() {
-  const { data, isLoading, isError } = useGetArLedger();
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
+
+  const { data, isLoading, isError } = useGetArLedger(
+    fromDate || toDate ? { from: fromDate || undefined, to: toDate || undefined } : undefined
+  );
 
   const clients = data?.clients ?? [];
   const summary = data?.summary;
   const aging = data?.aging;
 
   const filtered = useMemo(() => {
-    let result = [...clients];
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      result = result.filter(c => c.clientName.toLowerCase().includes(q));
-    }
-    if (fromDate || toDate) {
-      result = result.map(c => ({
-        ...c,
-        unpaidInvoices: c.unpaidInvoices.filter(inv => {
-          const d = inv.createdAt.slice(0, 10);
-          if (fromDate && d < fromDate) return false;
-          if (toDate && d > toDate) return false;
-          return true;
-        }),
-      })).filter(c => {
-        if (!fromDate && !toDate) return true;
-        return c.invoiceCount > 0 || c.unpaidInvoices.length > 0;
-      });
-    }
-    return result;
-  }, [clients, search, fromDate, toDate]);
+    if (!search.trim()) return clients;
+    const q = search.trim().toLowerCase();
+    return clients.filter(c => c.clientName.toLowerCase().includes(q));
+  }, [clients, search]);
 
   const toggleClient = (key: string) => {
     setExpandedClients(prev => {

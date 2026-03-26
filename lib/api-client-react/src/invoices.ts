@@ -267,12 +267,16 @@ export type ArLedgerResponse = {
   clients: ArClientRow[];
 };
 
-export const AR_QUERY_KEY = ["/api/invoices/accounts-receivable"];
+export const AR_QUERY_KEY = "/api/invoices/accounts-receivable";
 
-export function useGetArLedger() {
+export function useGetArLedger(params?: { from?: string; to?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  const url = qs.toString() ? `${AR_QUERY_KEY}?${qs}` : AR_QUERY_KEY;
   return useQuery<ArLedgerResponse>({
-    queryKey: AR_QUERY_KEY,
-    queryFn: () => customFetch<ArLedgerResponse>("/api/invoices/accounts-receivable"),
+    queryKey: [AR_QUERY_KEY, params?.from ?? "", params?.to ?? ""],
+    queryFn: () => customFetch<ArLedgerResponse>(url),
   });
 }
 
