@@ -175,34 +175,20 @@ function AddItemDialog({
   const available = allContainers.filter(c => !existingContainerIds.includes(c.id));
 
   const [containerId, setContainerId] = useState<string>("");
-  const [description, setDescription] = useState("Clearing Charges");
-  const [amount, setAmount] = useState<number | "">(0);
+  const selected = available.find(c => String(c.id) === containerId);
 
-  const selectedContainer = available.find(c => String(c.id) === containerId);
-
-  const handleContainerChange = (val: string) => {
-    setContainerId(val);
-    const c = available.find(x => String(x.id) === val);
-    if (c) {
-      setAmount(c.clearingCharges ?? 0);
-    }
-  };
-
-  const handleClose = () => {
-    setContainerId(""); setDescription("Clearing Charges"); setAmount(0);
-    onClose();
-  };
+  const handleClose = () => { setContainerId(""); onClose(); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!containerId) {
+      toast({ variant: "destructive", title: "Please select a container" });
+      return;
+    }
     try {
       await addMutation.mutateAsync({
         invoiceId,
-        data: {
-          containerId: containerId ? Number(containerId) : undefined,
-          description,
-          amount: Number(amount) || 0,
-        },
+        data: { containerId: Number(containerId) },
       });
       toast({ title: "Container added to invoice" });
       handleClose();
@@ -223,8 +209,8 @@ function AddItemDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
-            <Label>Container</Label>
-            <Select value={containerId} onValueChange={handleContainerChange}>
+            <Label>Select Container</Label>
+            <Select value={containerId} onValueChange={setContainerId}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder={available.length === 0 ? "No available containers" : "Select container…"} />
               </SelectTrigger>
@@ -236,41 +222,44 @@ function AddItemDialog({
                   </SelectItem>
                 ))}
                 {available.length === 0 && (
-                  <SelectItem value="__none" disabled>All containers already on invoice</SelectItem>
+                  <SelectItem value="__none" disabled>All containers are already on this invoice</SelectItem>
                 )}
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label htmlFor="add-desc">Description</Label>
-            <Input
-              id="add-desc"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Clearing Charges"
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label htmlFor="add-amount">Amount (₦)</Label>
-            <Input
-              id="add-amount"
-              type="number"
-              min="0"
-              step="0.01"
-              value={amount}
-              onChange={e => setAmount(parseFloat(e.target.value) || "")}
-              className="mt-1 font-mono"
-            />
-          </div>
-          {selectedContainer && (
-            <p className="text-xs text-muted-foreground">
-              B/L: <span className="font-mono">{selectedContainer.blNumber ?? "—"}</span>
-            </p>
+
+          {selected && (
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-1.5 text-sm">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Pulled from container record</p>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Container #</span>
+                <span className="font-mono font-medium">{selected.containerNumber}</span>
+              </div>
+              {selected.blNumber && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">B/L Number</span>
+                  <span className="font-mono text-muted-foreground">{selected.blNumber}</span>
+                </div>
+              )}
+              {selected.customerName && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Customer</span>
+                  <span>{selected.customerName}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-border/40 pt-1.5 mt-1">
+                <span className="text-muted-foreground">Clearing Charges</span>
+                <span className="font-mono font-semibold text-foreground">{formatCurrency(selected.clearingCharges ?? 0)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground pt-1">
+                The clearing charges from this container's record will be added as the line-item amount. No manual entry needed.
+              </p>
+            </div>
           )}
+
           <div className="flex gap-2 justify-end pt-1">
             <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-            <Button type="submit" disabled={addMutation.isPending}>
+            <Button type="submit" disabled={addMutation.isPending || !containerId}>
               {addMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               Add to Invoice
             </Button>
@@ -509,35 +498,45 @@ export default function InvoiceDetailPage() {
                     </thead>
                     <tbody>
                       {invoice.items.map(item => (
-                        <tr key={item.id} className="border-b border-border/30 last:border-0 group">
-                          <td className="py-1.5 pr-3">
+                        <tr key={item.id} className="border-b border-border/30 last:border-0">
+                          <td className="py-2 pr-3">
                             {item.containerId ? (
                               <Link href={`/containers/${item.containerId}`}>
                                 <span className="text-primary hover:underline font-mono">{item.containerNumber ?? `#${item.containerId}`}</span>
                               </Link>
                             ) : <span className="text-muted-foreground">—</span>}
                           </td>
-                          <td className="py-1.5 pr-3 font-mono text-muted-foreground">{item.blNumber ?? "—"}</td>
-                          <td className="py-1.5 pr-3 text-foreground">{item.description}</td>
-                          <td className="py-1.5 text-right font-mono font-semibold text-foreground">{formatCurrency(item.amount)}</td>
+                          <td className="py-2 pr-3 font-mono text-muted-foreground">{item.blNumber ?? "—"}</td>
+                          <td className="py-2 pr-3 text-foreground">{item.description}</td>
+                          <td className="py-2 text-right font-mono font-semibold text-foreground">{formatCurrency(item.amount)}</td>
                           {isAdmin && (
-                            <td className="py-1.5 pl-2">
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                                <button
-                                  onClick={() => setEditingItem(item)}
-                                  className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-                                  title="Edit line item"
-                                >
-                                  <Pencil className="w-3 h-3" />
-                                </button>
-                                <button
-                                  onClick={() => handleRemoveItem(item.id)}
-                                  disabled={removeItemMutation.isPending}
-                                  className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 disabled:opacity-50"
-                                  title={invoice.items.length <= 1 ? "Cannot remove last item" : "Remove line item"}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                            <td className="py-2 pl-2">
+                              <div className="flex items-center gap-1 justify-end">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      onClick={() => setEditingItem(item)}
+                                      className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Edit description or amount</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      onClick={() => handleRemoveItem(item.id)}
+                                      disabled={removeItemMutation.isPending || invoice.items.length <= 1}
+                                      className="p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {invoice.items.length <= 1 ? "Cannot remove the last line item" : "Remove container from invoice"}
+                                  </TooltipContent>
+                                </Tooltip>
                               </div>
                             </td>
                           )}
