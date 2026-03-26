@@ -223,3 +223,58 @@ export function useSendInvoiceReceipt() {
     },
   });
 }
+
+export type AddInvoiceItemBody = {
+  containerId?: number;
+  description?: string;
+  amount?: number;
+};
+
+export type EditInvoiceItemBody = {
+  description?: string;
+  amount?: number;
+};
+
+export function useAddInvoiceItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId, data }: { invoiceId: number; data: AddInvoiceItemBody }) =>
+      customFetch<Invoice>(`/api/invoices/${invoiceId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_, { invoiceId }) => {
+      qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+      qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
+    },
+  });
+}
+
+export function useEditInvoiceItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId, itemId, data }: { invoiceId: number; itemId: number; data: EditInvoiceItemBody }) =>
+      customFetch<Invoice>(`/api/invoices/${invoiceId}/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_, { invoiceId }) => {
+      qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+      qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
+    },
+  });
+}
+
+export function useRemoveInvoiceItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId, itemId }: { invoiceId: number; itemId: number }) =>
+      customFetch<Invoice>(`/api/invoices/${invoiceId}/items/${itemId}`, { method: "DELETE" }),
+    onSuccess: (_, { invoiceId }) => {
+      qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+      qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
+    },
+  });
+}

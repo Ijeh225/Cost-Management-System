@@ -374,6 +374,197 @@ router.delete("/invoices/:id", requireAdmin, async (req, res) => {
   }
 });
 
+async function recalcInvoiceTotals(tx: typeof db, invoiceId: number) {
+  const currentInv = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+  if (!currentInv[0]) return;
+  const items = await tx.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, invoiceId));
+  const subtotal = items.reduce((s, it) => s + parseFloat(String(it.amount)), 0);
+  const prevSubtotal = parseFloat(String(currentInv[0].subtotal));
+  const prevVat = parseFloat(String(currentInv[0].vatAmount));
+  const vatRate = prevSubtotal > 0 ? prevVat / prevSubtotal : 0;
+  const vatAmount = subtotal * vatRate;
+  const total = subtotal + vatAmount;
+  await tx.update(invoicesTable)
+    .set({ subtotal: String(subtotal), vatAmount: String(vatAmount), total: String(total), updatedAt: new Date() })
+    .where(eq(invoicesTable.id, invoiceId));
+}
+
+router.post("/invoices/:id/items", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id, 10);
+    if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
+
+    const { containerId, description, amount } = req.body as {
+      containerId?: number;
+      description?: string;
+      amount?: number;
+    };
+
+    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!inv) return res.status(404).json({ error: "Invoice not found" });
+
+    let resolvedAmount = amount;
+    let resolvedDescription = description ?? "Clearing Charges";
+    if (containerId) {
+      const [container] = await db.select().from(containersTable).where(eq(containersTable.id, containerId));
+      if (!container) return res.status(404).json({ error: "Container not found" });
+      if (resolvedAmount === undefined) resolvedAmount = parseFloat(container.clearingCharges ?? "0");
+    }
+    if (resolvedAmount === undefined || isNaN(resolvedAmount)) resolvedAmount = 0;
+
+    const existingItems = await db.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, invoiceId));
+    const maxSort = existingItems.reduce((m, it) => Math.max(m, it.sortOrder), -1);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(invoiceItemsTable).values({
+        invoiceId,
+        containerId: containerId ?? null,
+        description: resolvedDescription,
+        amount: String(resolvedAmount),
+        sortOrder: maxSort + 1,
+      });
+      await recalcInvoiceTotals(tx, invoiceId);
+    });
+
+    const itemsMap = await fetchItemsForInvoices([invoiceId]);
+    const items = itemsMap.get(invoiceId) ?? [];
+    const payments = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const [updatedRow] = await db
+      .select({
+        id: invoicesTable.id,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        status: invoicesTable.status,
+        containerId: invoicesTable.containerId,
+        containerNumber: containersTable.containerNumber,
+        blNumber: containersTable.blNumber,
+        clientId: invoicesTable.clientId,
+        clientName: clientsTable.name,
+        clientPhone: clientsTable.contactPhone,
+        subtotal: invoicesTable.subtotal,
+        vatAmount: invoicesTable.vatAmount,
+        total: invoicesTable.total,
+        dueDate: invoicesTable.dueDate,
+        notes: invoicesTable.notes,
+        createdAt: invoicesTable.createdAt,
+        updatedAt: invoicesTable.updatedAt,
+      })
+      .from(invoicesTable)
+      .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(eq(invoicesTable.id, invoiceId));
+    res.status(201).json(await formatInvoice(updatedRow, payments, items));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to add invoice item" });
+  }
+});
+
+router.patch("/invoices/:id/items/:itemId", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id, 10);
+    const itemId = parseInt(req.params.itemId, 10);
+    if (isNaN(invoiceId) || isNaN(itemId)) return res.status(400).json({ error: "Invalid id" });
+
+    const { description, amount } = req.body as { description?: string; amount?: number };
+
+    const [item] = await db.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.id, itemId));
+    if (!item || item.invoiceId !== invoiceId) return res.status(404).json({ error: "Item not found" });
+
+    const updates: Record<string, any> = {};
+    if (description !== undefined) updates.description = description;
+    if (amount !== undefined) updates.amount = String(amount);
+
+    await db.transaction(async (tx) => {
+      if (Object.keys(updates).length > 0) {
+        await tx.update(invoiceItemsTable).set(updates).where(eq(invoiceItemsTable.id, itemId));
+      }
+      await recalcInvoiceTotals(tx, invoiceId);
+    });
+
+    const itemsMap = await fetchItemsForInvoices([invoiceId]);
+    const items = itemsMap.get(invoiceId) ?? [];
+    const payments = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const [updatedRow] = await db
+      .select({
+        id: invoicesTable.id,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        status: invoicesTable.status,
+        containerId: invoicesTable.containerId,
+        containerNumber: containersTable.containerNumber,
+        blNumber: containersTable.blNumber,
+        clientId: invoicesTable.clientId,
+        clientName: clientsTable.name,
+        clientPhone: clientsTable.contactPhone,
+        subtotal: invoicesTable.subtotal,
+        vatAmount: invoicesTable.vatAmount,
+        total: invoicesTable.total,
+        dueDate: invoicesTable.dueDate,
+        notes: invoicesTable.notes,
+        createdAt: invoicesTable.createdAt,
+        updatedAt: invoicesTable.updatedAt,
+      })
+      .from(invoicesTable)
+      .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(eq(invoicesTable.id, invoiceId));
+    res.json(await formatInvoice(updatedRow, payments, items));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update invoice item" });
+  }
+});
+
+router.delete("/invoices/:id/items/:itemId", requireAdmin, async (req, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id, 10);
+    const itemId = parseInt(req.params.itemId, 10);
+    if (isNaN(invoiceId) || isNaN(itemId)) return res.status(400).json({ error: "Invalid id" });
+
+    const existingItems = await db.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, invoiceId));
+    if (existingItems.length <= 1) {
+      return res.status(400).json({ error: "Cannot remove the last line item from an invoice. Delete the invoice instead." });
+    }
+    const item = existingItems.find(it => it.id === itemId);
+    if (!item) return res.status(404).json({ error: "Item not found on this invoice" });
+
+    await db.transaction(async (tx) => {
+      await tx.delete(invoiceItemsTable).where(eq(invoiceItemsTable.id, itemId));
+      await recalcInvoiceTotals(tx, invoiceId);
+    });
+
+    const itemsMap = await fetchItemsForInvoices([invoiceId]);
+    const items = itemsMap.get(invoiceId) ?? [];
+    const payments = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const [updatedRow] = await db
+      .select({
+        id: invoicesTable.id,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        status: invoicesTable.status,
+        containerId: invoicesTable.containerId,
+        containerNumber: containersTable.containerNumber,
+        blNumber: containersTable.blNumber,
+        clientId: invoicesTable.clientId,
+        clientName: clientsTable.name,
+        clientPhone: clientsTable.contactPhone,
+        subtotal: invoicesTable.subtotal,
+        vatAmount: invoicesTable.vatAmount,
+        total: invoicesTable.total,
+        dueDate: invoicesTable.dueDate,
+        notes: invoicesTable.notes,
+        createdAt: invoicesTable.createdAt,
+        updatedAt: invoicesTable.updatedAt,
+      })
+      .from(invoicesTable)
+      .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(eq(invoicesTable.id, invoiceId));
+    res.json(await formatInvoice(updatedRow, payments, items));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to remove invoice item" });
+  }
+});
+
 router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);

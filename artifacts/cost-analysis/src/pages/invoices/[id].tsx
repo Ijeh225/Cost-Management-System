@@ -3,8 +3,10 @@ import { Link, useParams } from "wouter";
 import {
   useGetInvoice, useUpdateInvoice, useRecordPayment, useDeletePayment,
   useGetInvoiceWhatsAppLog, useSendInvoiceWhatsApp, useSendInvoiceReminder, useSendInvoiceReceipt,
-  type RecordPaymentBody,
+  useAddInvoiceItem, useEditInvoiceItem, useRemoveInvoiceItem,
+  type RecordPaymentBody, type InvoiceItem,
 } from "@workspace/api-client-react";
+import { useListContainers } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +25,7 @@ import {
   FileText, ArrowLeft, Phone, Loader2, Trash2, CheckCircle2,
   Clock, AlertTriangle, CreditCard, Send, PlusCircle, Building2,
   Box, Calendar, StickyNote, MessageCircle, Bell, ChevronDown, ChevronUp, Printer, Receipt,
+  Pencil,
 } from "lucide-react";
 
 function statusConfig(status: string) {
@@ -157,6 +160,203 @@ function RecordPaymentDialog({
   );
 }
 
+function AddItemDialog({
+  open, onClose, invoiceId, existingContainerIds,
+}: {
+  open: boolean;
+  onClose: () => void;
+  invoiceId: number;
+  existingContainerIds: number[];
+}) {
+  const { toast } = useToast();
+  const addMutation = useAddInvoiceItem();
+  const { data: allContainersData } = useListContainers(undefined, { query: { enabled: open } });
+  const allContainers = allContainersData?.containers ?? [];
+  const available = allContainers.filter(c => !existingContainerIds.includes(c.id));
+
+  const [containerId, setContainerId] = useState<string>("");
+  const [description, setDescription] = useState("Clearing Charges");
+  const [amount, setAmount] = useState<number | "">(0);
+
+  const selectedContainer = available.find(c => String(c.id) === containerId);
+
+  const handleContainerChange = (val: string) => {
+    setContainerId(val);
+    const c = available.find(x => String(x.id) === val);
+    if (c) {
+      setAmount(c.clearingCharges ?? 0);
+    }
+  };
+
+  const handleClose = () => {
+    setContainerId(""); setDescription("Clearing Charges"); setAmount(0);
+    onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await addMutation.mutateAsync({
+        invoiceId,
+        data: {
+          containerId: containerId ? Number(containerId) : undefined,
+          description,
+          amount: Number(amount) || 0,
+        },
+      });
+      toast({ title: "Container added to invoice" });
+      handleClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to add container";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PlusCircle className="w-4 h-4 text-primary" />
+            Add Container to Invoice
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div>
+            <Label>Container</Label>
+            <Select value={containerId} onValueChange={handleContainerChange}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder={available.length === 0 ? "No available containers" : "Select container…"} />
+              </SelectTrigger>
+              <SelectContent>
+                {available.map(c => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    <span className="font-mono">{c.containerNumber}</span>
+                    {c.customerName && <span className="text-muted-foreground ml-2 text-xs">· {c.customerName}</span>}
+                  </SelectItem>
+                ))}
+                {available.length === 0 && (
+                  <SelectItem value="__none" disabled>All containers already on invoice</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="add-desc">Description</Label>
+            <Input
+              id="add-desc"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Clearing Charges"
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label htmlFor="add-amount">Amount (₦)</Label>
+            <Input
+              id="add-amount"
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={e => setAmount(parseFloat(e.target.value) || "")}
+              className="mt-1 font-mono"
+            />
+          </div>
+          {selectedContainer && (
+            <p className="text-xs text-muted-foreground">
+              B/L: <span className="font-mono">{selectedContainer.blNumber ?? "—"}</span>
+            </p>
+          )}
+          <div className="flex gap-2 justify-end pt-1">
+            <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
+            <Button type="submit" disabled={addMutation.isPending}>
+              {addMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Add to Invoice
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditItemDialog({
+  open, onClose, invoiceId, item,
+}: {
+  open: boolean;
+  onClose: () => void;
+  invoiceId: number;
+  item: InvoiceItem | null;
+}) {
+  const { toast } = useToast();
+  const editMutation = useEditInvoiceItem();
+  const [description, setDescription] = useState(item?.description ?? "");
+  const [amount, setAmount] = useState<number>(item?.amount ?? 0);
+
+  const handleClose = () => { onClose(); };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!item) return;
+    try {
+      await editMutation.mutateAsync({ invoiceId, itemId: item.id, data: { description, amount } });
+      toast({ title: "Line item updated" });
+      handleClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to update item";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
+
+  if (!item) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="w-4 h-4 text-primary" />
+            Edit Line Item
+            {item.containerNumber && <span className="font-mono text-muted-foreground text-sm font-normal">· {item.containerNumber}</span>}
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div>
+            <Label htmlFor="edit-desc">Description</Label>
+            <Input
+              id="edit-desc"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Clearing Charges"
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label htmlFor="edit-amount">Amount (₦)</Label>
+            <Input
+              id="edit-amount"
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={e => setAmount(parseFloat(e.target.value) || 0)}
+              className="mt-1 font-mono"
+            />
+          </div>
+          <div className="flex gap-2 justify-end pt-1">
+            <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
+            <Button type="submit" disabled={editMutation.isPending}>
+              {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
   const invoiceId = parseInt(params.id, 10);
@@ -168,9 +368,12 @@ export default function InvoiceDetailPage() {
   const sendWhatsAppMutation = useSendInvoiceWhatsApp();
   const sendReminderMutation = useSendInvoiceReminder();
   const sendReceiptMutation = useSendInvoiceReceipt();
+  const removeItemMutation = useRemoveInvoiceItem();
   const { data: whatsappLog } = useGetInvoiceWhatsAppLog(isNaN(invoiceId) ? null : invoiceId);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [whatsappLogOpen, setWhatsappLogOpen] = useState(false);
+  const [addItemOpen, setAddItemOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<InvoiceItem | null>(null);
 
   const handleStatusChange = async (status: string) => {
     try {
@@ -203,6 +406,17 @@ export default function InvoiceDetailPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to send WhatsApp message";
       toast({ variant: "destructive", title: "WhatsApp error", description: msg });
+    }
+  };
+
+  const handleRemoveItem = async (itemId: number) => {
+    if (!confirm("Remove this line item from the invoice?")) return;
+    try {
+      await removeItemMutation.mutateAsync({ invoiceId, itemId });
+      toast({ title: "Line item removed" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to remove item";
+      toast({ variant: "destructive", title: "Error", description: msg });
     }
   };
 
@@ -270,6 +484,17 @@ export default function InvoiceDetailPage() {
                 <div className="flex items-center gap-2 text-sm mb-2">
                   <Box className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground font-medium">Containers ({invoice.items.length})</span>
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto h-6 text-xs gap-1 px-2"
+                      onClick={() => setAddItemOpen(true)}
+                    >
+                      <PlusCircle className="w-3 h-3" />
+                      Add Container
+                    </Button>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -279,11 +504,12 @@ export default function InvoiceDetailPage() {
                         <th className="text-left text-muted-foreground font-medium pb-1.5 pr-3">B/L Number</th>
                         <th className="text-left text-muted-foreground font-medium pb-1.5 pr-3">Description</th>
                         <th className="text-right text-muted-foreground font-medium pb-1.5">Amount</th>
+                        {isAdmin && <th className="pb-1.5 w-16" />}
                       </tr>
                     </thead>
                     <tbody>
                       {invoice.items.map(item => (
-                        <tr key={item.id} className="border-b border-border/30 last:border-0">
+                        <tr key={item.id} className="border-b border-border/30 last:border-0 group">
                           <td className="py-1.5 pr-3">
                             {item.containerId ? (
                               <Link href={`/containers/${item.containerId}`}>
@@ -294,6 +520,27 @@ export default function InvoiceDetailPage() {
                           <td className="py-1.5 pr-3 font-mono text-muted-foreground">{item.blNumber ?? "—"}</td>
                           <td className="py-1.5 pr-3 text-foreground">{item.description}</td>
                           <td className="py-1.5 text-right font-mono font-semibold text-foreground">{formatCurrency(item.amount)}</td>
+                          {isAdmin && (
+                            <td className="py-1.5 pl-2">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                                <button
+                                  onClick={() => setEditingItem(item)}
+                                  className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                                  title="Edit line item"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => handleRemoveItem(item.id)}
+                                  disabled={removeItemMutation.isPending}
+                                  className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 disabled:opacity-50"
+                                  title={invoice.items.length <= 1 ? "Cannot remove last item" : "Remove line item"}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -658,6 +905,20 @@ export default function InvoiceDetailPage() {
         open={paymentOpen}
         onClose={() => setPaymentOpen(false)}
         invoiceId={invoiceId}
+      />
+
+      <AddItemDialog
+        open={addItemOpen}
+        onClose={() => setAddItemOpen(false)}
+        invoiceId={invoiceId}
+        existingContainerIds={invoice.items.filter(it => it.containerId != null).map(it => it.containerId!)}
+      />
+
+      <EditItemDialog
+        open={!!editingItem}
+        onClose={() => setEditingItem(null)}
+        invoiceId={invoiceId}
+        item={editingItem}
       />
     </div>
   );
