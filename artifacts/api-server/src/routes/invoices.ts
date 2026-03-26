@@ -214,17 +214,18 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
       amount: c.clearingCharges ?? "0",
       sortOrder: idx,
     }));
-    await db.insert(invoiceItemsTable).values(itemRows);
+    const insertedItems = await db.insert(invoiceItemsTable).values(itemRows).returning();
 
-    const items = containers.map((c, idx) => ({
-      id: 0,
-      invoiceId: inv.id,
-      containerId: c.id,
-      description: "Clearing Charges",
-      amount: parseFloat(c.clearingCharges ?? "0"),
-      sortOrder: idx,
-      containerNumber: c.containerNumber,
-      blNumber: c.blNumber,
+    const containerMap = Object.fromEntries(containers.map(c => [c.id, c]));
+    const items = insertedItems.map(item => ({
+      id: item.id,
+      invoiceId: item.invoiceId,
+      containerId: item.containerId,
+      description: item.description,
+      amount: parseFloat(String(item.amount)),
+      sortOrder: item.sortOrder,
+      containerNumber: containerMap[item.containerId!]?.containerNumber ?? null,
+      blNumber: containerMap[item.containerId!]?.blNumber ?? null,
     }));
 
     let clientName: string | null = null;
