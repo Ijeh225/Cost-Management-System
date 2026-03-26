@@ -111,8 +111,8 @@ export default function InvoicePrintPage() {
       `}</style>
 
       <div className="action-bar no-print">
-        <a className="btn-back" href={`../invoices/${invoiceId}`} onClick={e => { e.preventDefault(); window.history.back(); }}>
-          ← Back
+        <a className="btn-back" href={`/invoices/${invoiceId}`}>
+          ← Back to Invoice
         </a>
         <button className="btn-print" onClick={() => window.print()}>
           🖨 Print / Save PDF
