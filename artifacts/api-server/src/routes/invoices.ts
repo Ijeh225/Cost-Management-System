@@ -671,6 +671,107 @@ router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
   }
 });
 
+router.post("/invoices/:id/send-receipt", requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM) {
+      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM to environment secrets" });
+    }
+
+    const [row] = await db
+      .select({
+        id: invoicesTable.id,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        containerId: invoicesTable.containerId,
+        containerNumber: containersTable.containerNumber,
+        blNumber: containersTable.blNumber,
+        clientId: invoicesTable.clientId,
+        clientName: clientsTable.name,
+        clientPhone: clientsTable.contactPhone,
+        total: invoicesTable.total,
+        outstanding: sql<number>`(${invoicesTable.total}::numeric - COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0))`,
+        totalPaid: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0)`,
+      })
+      .from(invoicesTable)
+      .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(eq(invoicesTable.id, id));
+
+    if (!row) return res.status(404).json({ error: "Invoice not found" });
+    if (!row.clientPhone) return res.status(400).json({ error: "Client has no phone number" });
+
+    const totalPaid = Number(row.totalPaid ?? 0);
+    if (totalPaid <= 0) {
+      return res.status(400).json({ error: "No payments recorded yet — cannot send receipt" });
+    }
+
+    const itemsMap = await fetchItemsForInvoices([id]);
+    const items = itemsMap.get(id) ?? [];
+
+    const mostRecentPayment = await db
+      .select()
+      .from(invoicePaymentsTable)
+      .where(eq(invoicePaymentsTable.invoiceId, id))
+      .orderBy(desc(invoicePaymentsTable.paidAt))
+      .limit(1);
+
+    const paymentDate = mostRecentPayment[0]?.paidAt
+      ? new Date(mostRecentPayment[0].paidAt).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })
+      : new Date().toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" });
+
+    const outstanding = Number(row.outstanding ?? 0);
+    const total = parseFloat(row.total as unknown as string ?? "0");
+
+    const itemsToUse = items.length > 0 ? items : (row.containerNumber ? [{ containerNumber: row.containerNumber }] : []);
+    const contLine = containerListLine(itemsToUse);
+
+    const lines: string[] = [
+      `Hello ${row.clientName ?? ""},`,
+      ``,
+      `We confirm receipt of your payment for the following:`,
+      ``,
+      `📄 Invoice No: *${row.invoiceNumber}*`,
+    ];
+    if (contLine) lines.push(contLine);
+    lines.push(``);
+    lines.push(`💰 Invoice Total: *₦${total.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`);
+    lines.push(`✅ Amount Received: *₦${totalPaid.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`);
+    lines.push(`📅 Payment Date: *${paymentDate}*`);
+    if (outstanding > 0) {
+      lines.push(`⏳ Remaining Balance: *₦${outstanding.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`);
+    } else {
+      lines.push(`🎉 Status: *Fully Settled*`);
+    }
+    lines.push(``);
+    lines.push(`Thank you for your payment. We appreciate your business.`);
+
+    const messageBody = lines.join("\n");
+    const phone = toE164Nigerian(row.clientPhone);
+    const twilioResult = await sendViaTwilio(phone, messageBody);
+
+    await db.insert(whatsappMessagesTable).values({
+      invoiceId: id,
+      clientId: row.clientId ?? null,
+      messageType: "receipt",
+      phone,
+      messageBody,
+      status: twilioResult.success ? "sent" : "failed",
+      errorMessage: twilioResult.success ? null : twilioResult.error ?? null,
+    });
+
+    if (!twilioResult.success) {
+      return res.status(500).json({ error: twilioResult.error ?? "Failed to send receipt" });
+    }
+
+    res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to send receipt" });
+  }
+});
+
 router.get("/invoices/:id/whatsapp-log", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);

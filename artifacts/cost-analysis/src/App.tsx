@@ -29,6 +29,7 @@ import NotificationsPage from "@/pages/notifications/index";
 import SettingsPage from "@/pages/settings/index";
 import InvoicesPage from "@/pages/invoices/index";
 import InvoiceDetailPage from "@/pages/invoices/[id]";
+import InvoicePrintPage from "@/pages/invoices/print/[id]";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -124,6 +125,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/setup" component={Setup} />
       <Route path="/containers/:id/print" component={ContainerPrintPage} />
+      <Route path="/invoices/:id/print" component={InvoicePrintPage} />
       <Route>
         <AppLayout>
           <PageErrorBoundary>

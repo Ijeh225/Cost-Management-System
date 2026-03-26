@@ -210,3 +210,16 @@ export function useSendInvoiceReminder() {
     },
   });
 }
+
+export function useSendInvoiceReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (invoiceId: number) =>
+      customFetch<WhatsAppSendResponse>(`/api/invoices/${invoiceId}/send-receipt`, {
+        method: "POST",
+      }),
+    onSuccess: (_, invoiceId) => {
+      qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId, "whatsapp-log"] });
+    },
+  });
+}

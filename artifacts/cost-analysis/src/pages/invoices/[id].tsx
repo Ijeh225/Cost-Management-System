@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "wouter";
 import {
   useGetInvoice, useUpdateInvoice, useRecordPayment, useDeletePayment,
-  useGetInvoiceWhatsAppLog, useSendInvoiceWhatsApp, useSendInvoiceReminder,
+  useGetInvoiceWhatsAppLog, useSendInvoiceWhatsApp, useSendInvoiceReminder, useSendInvoiceReceipt,
   type RecordPaymentBody,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -22,7 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import {
   FileText, ArrowLeft, Phone, Loader2, Trash2, CheckCircle2,
   Clock, AlertTriangle, CreditCard, Send, PlusCircle, Building2,
-  Box, Calendar, StickyNote, MessageCircle, Bell, ChevronDown, ChevronUp,
+  Box, Calendar, StickyNote, MessageCircle, Bell, ChevronDown, ChevronUp, Printer, Receipt,
 } from "lucide-react";
 
 function statusConfig(status: string) {
@@ -167,6 +167,7 @@ export default function InvoiceDetailPage() {
   const deletePaymentMutation = useDeletePayment();
   const sendWhatsAppMutation = useSendInvoiceWhatsApp();
   const sendReminderMutation = useSendInvoiceReminder();
+  const sendReceiptMutation = useSendInvoiceReceipt();
   const { data: whatsappLog } = useGetInvoiceWhatsAppLog(isNaN(invoiceId) ? null : invoiceId);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [whatsappLogOpen, setWhatsappLogOpen] = useState(false);
@@ -205,6 +206,17 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  const handleSendReceipt = async () => {
+    try {
+      const result = await sendReceiptMutation.mutateAsync(invoiceId);
+      const preview = result.messageBody.split("\n").slice(0, 2).join(" · ").slice(0, 120);
+      toast({ title: "Payment receipt sent via WhatsApp", description: preview });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to send receipt";
+      toast({ variant: "destructive", title: "WhatsApp error", description: msg });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -227,7 +239,7 @@ export default function InvoiceDetailPage() {
   const StatusIcon = cfg.icon;
   const paidPct = invoice.total > 0 ? Math.min(100, (invoice.totalPaid / invoice.total) * 100) : 0;
   const hasPhone = !!invoice.clientPhone;
-  const waIsPending = sendWhatsAppMutation.isPending || sendReminderMutation.isPending;
+  const waIsPending = sendWhatsAppMutation.isPending || sendReminderMutation.isPending || sendReceiptMutation.isPending;
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
@@ -389,6 +401,48 @@ export default function InvoiceDetailPage() {
           <PlusCircle className="w-4 h-4" />
           Record Payment
         </Button>
+
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => window.open(`${window.location.pathname}/print`, "_blank")}
+        >
+          <Printer className="w-4 h-4" />
+          Print Receipt
+        </Button>
+
+        {isAdmin && invoice.totalPaid > 0 && (
+          hasPhone ? (
+            <Button
+              variant="outline"
+              className="gap-2 border-teal-600 text-teal-500 hover:bg-teal-500/10"
+              onClick={handleSendReceipt}
+              disabled={waIsPending}
+            >
+              {sendReceiptMutation.isPending
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Receipt className="w-4 h-4" />
+              }
+              Send Receipt
+            </Button>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-teal-600/40 text-teal-500/40 cursor-not-allowed"
+                    disabled
+                  >
+                    <Receipt className="w-4 h-4" />
+                    Send Receipt
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Add a phone number to this client first</TooltipContent>
+            </Tooltip>
+          )
+        )}
 
         {isAdmin && (
           hasPhone ? (
@@ -561,19 +615,21 @@ export default function InvoiceDetailPage() {
                     key={entry.id}
                     className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-muted/30 border border-border/30"
                   >
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${entry.messageType === "reminder" ? "bg-amber-500/20" : "bg-green-500/20"}`}>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${entry.messageType === "reminder" ? "bg-amber-500/20" : entry.messageType === "receipt" ? "bg-teal-500/20" : "bg-green-500/20"}`}>
                       {entry.messageType === "reminder"
                         ? <Bell className="w-3.5 h-3.5 text-amber-400" />
-                        : <MessageCircle className="w-3.5 h-3.5 text-green-400" />
+                        : entry.messageType === "receipt"
+                          ? <Receipt className="w-3.5 h-3.5 text-teal-400" />
+                          : <MessageCircle className="w-3.5 h-3.5 text-green-400" />
                       }
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge
                           variant="secondary"
-                          className={`text-xs capitalize ${entry.messageType === "reminder" ? "text-amber-400" : "text-green-400"}`}
+                          className={`text-xs capitalize ${entry.messageType === "reminder" ? "text-amber-400" : entry.messageType === "receipt" ? "text-teal-400" : "text-green-400"}`}
                         >
-                          {entry.messageType === "reminder" ? "Reminder" : "Invoice"}
+                          {entry.messageType === "reminder" ? "Reminder" : entry.messageType === "receipt" ? "Receipt" : "Invoice"}
                         </Badge>
                         <span className="text-xs text-muted-foreground font-mono">{entry.phone}</span>
                         <Badge
