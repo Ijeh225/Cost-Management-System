@@ -764,7 +764,7 @@ export default function ContainerDetail() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
-          queryClient.invalidateQueries({ queryKey: ["/api/analytics/deliveries"] });
+          queryClient.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
           toast({ title: "Delivery date saved." });
           setEditingDeliveredAt(false);
         },
