@@ -188,15 +188,33 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
   }
 });
 
+function parseIsoDate(val: string | undefined): Date | null | "invalid" {
+  if (!val) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return "invalid";
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return "invalid";
+  return d;
+}
+
 analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const fromStr = req.query.from as string | undefined;
     const toStr = req.query.to as string | undefined;
 
+    const fromDate = parseIsoDate(fromStr);
+    const toDate = parseIsoDate(toStr);
+    if (fromDate === "invalid") {
+      res.status(400).json({ error: "Invalid 'from' date — expected YYYY-MM-DD format" });
+      return;
+    }
+    if (toDate === "invalid") {
+      res.status(400).json({ error: "Invalid 'to' date — expected YYYY-MM-DD format" });
+      return;
+    }
+
     const conditions: SQL[] = [isNotNull(containersTable.deliveredAt)];
-    if (fromStr) conditions.push(gte(containersTable.deliveredAt, new Date(fromStr)));
-    if (toStr) {
-      const toDate = new Date(toStr);
+    if (fromDate) conditions.push(gte(containersTable.deliveredAt, fromDate));
+    if (toDate) {
       toDate.setHours(23, 59, 59, 999);
       conditions.push(lte(containersTable.deliveredAt, toDate));
     }

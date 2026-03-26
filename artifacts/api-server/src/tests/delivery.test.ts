@@ -42,6 +42,22 @@ describe("GET /api/analytics/deliveries", () => {
     expect(res.body.items).toHaveLength(0);
   });
 
+  it("returns 400 for invalid from date", async () => {
+    const res = await request(app)
+      .get("/api/analytics/deliveries?from=not-a-date")
+      .set("Cookie", ADMIN_COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Invalid");
+  });
+
+  it("returns 400 for invalid to date", async () => {
+    const res = await request(app)
+      .get("/api/analytics/deliveries?to=2026-99-99")
+      .set("Cookie", ADMIN_COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Invalid");
+  });
+
   it("items include required fields when data exists", async () => {
     const res = await request(app)
       .get("/api/analytics/deliveries")
@@ -148,5 +164,15 @@ describe("PATCH /api/containers/:id — delivered date", () => {
       .set("Content-Type", "application/json")
       .send({ deliveredAt: "2026-01-01" });
     expect(res.status).toBe(404);
+  });
+
+  it("returns 400 for invalid deliveredAt format", async () => {
+    const res = await request(app)
+      .patch(`/api/containers/${testContainerId}`)
+      .set("Cookie", ADMIN_COOKIE)
+      .set("Content-Type", "application/json")
+      .send({ deliveredAt: "not-a-date" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Invalid");
   });
 });

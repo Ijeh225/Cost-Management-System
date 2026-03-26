@@ -456,6 +456,12 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
     const { deliveredAt } = req.body;
+    if (deliveredAt !== undefined && deliveredAt !== null) {
+      if (typeof deliveredAt !== "string" || !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(deliveredAt) || isNaN(new Date(deliveredAt).getTime())) {
+        res.status(400).json({ error: "Invalid deliveredAt — expected YYYY-MM-DD format" });
+        return;
+      }
+    }
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (deliveredAt !== undefined) {
       updates.deliveredAt = deliveredAt ? new Date(deliveredAt as string) : null;
