@@ -109,6 +109,8 @@ export interface Container {
   lockedSections?: string[];
   assignedStaffId?: number | null;
   assignedStaffName?: string | null;
+  clientId?: number | null;
+  clientName?: string | null;
   totalCost: number;
   clearingCharges: number;
   grossProfit: number;

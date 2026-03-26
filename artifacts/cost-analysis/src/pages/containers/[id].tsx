@@ -1606,7 +1606,7 @@ export default function ContainerDetail() {
       <CreateInvoiceDialog
         open={invoiceDialog}
         onClose={() => setInvoiceDialog(false)}
-        preselectedClientId={(data as any)?.clientId ?? null}
+        preselectedClientId={container?.clientId ?? null}
         preselectedContainerId={containerId}
       />
     </div>
