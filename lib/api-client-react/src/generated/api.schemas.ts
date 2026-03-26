@@ -109,12 +109,14 @@ export interface Container {
   lockedSections?: string[];
   assignedStaffId?: number | null;
   assignedStaffName?: string | null;
-  clientId?: number | null;
-  clientName?: string | null;
   totalCost: number;
   clearingCharges: number;
   grossProfit: number;
   dutyNotPaid: number;
+  clientId?: number | null;
+  clientName?: string | null;
+  deliveredAt?: string | null;
+  deliveredAtEstimated?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -130,11 +132,10 @@ export interface CreateContainerRequest {
   customerName: string;
   containerNumber: string;
   blNumber: string;
-  declaration?: string;
-  size?: string;
-  vessel?: string;
+  declaration: string;
+  size: string;
+  vessel: string;
   clearingCharges?: number;
-  clientId?: number | null;
 }
 
 export interface UpdateContainerRequest {
@@ -147,6 +148,7 @@ export interface UpdateContainerRequest {
   status?: string;
   assignedStaffId?: number | null;
   clearingCharges?: number;
+  deliveredAt?: string | null;
 }
 
 export interface UploadRow {
@@ -161,7 +163,6 @@ export interface UploadRow {
 
 export interface UploadContainersRequest {
   rows: UploadRow[];
-  clientId?: number;
 }
 
 export interface UploadContainersResponse {
@@ -348,14 +349,6 @@ export type DashboardStatsAlerts = {
   delayedContainers: number;
 };
 
-export type DashboardStatsMonthlyTrendItem = {
-  month: string;
-  label: string;
-  revenue: number;
-  cost: number;
-  grossProfit: number;
-};
-
 export interface DashboardStats {
   totalContainers: number;
   inProgress: number;
@@ -365,10 +358,6 @@ export interface DashboardStats {
   totalClearingCharges: number;
   totalGrossProfit: number;
   totalDutyNotPaid: number;
-  totalInvoiced: number;
-  totalCollected: number;
-  totalOutstanding: number;
-  monthlyTrend: DashboardStatsMonthlyTrendItem[];
   containersByStatus: DashboardStatsContainersByStatusItem[];
   profitByCustomer: DashboardStatsProfitByCustomerItem[];
   costByVessel: DashboardStatsCostByVesselItem[];
@@ -627,7 +616,6 @@ export interface CreateCustomSectionRequest {
   color?: string;
   icon?: string;
   isRequired?: boolean;
-  containerId?: number;
 }
 
 export interface UpdateCustomSectionRequest {
@@ -689,39 +677,3 @@ export type ExportContainersCSVParams = {
   from?: string;
   to?: string;
 };
-
-export interface Notification {
-  alertKey: string;
-  type: string;
-  severity: string;
-  message: string;
-  containerId?: number;
-  containerNumber?: string;
-  generatedAt: string;
-  isRead: boolean;
-  readAt: string | null;
-}
-
-export interface NotificationsResponse {
-  notifications: Notification[];
-  unreadCount: number;
-}
-
-export interface BulkUploadClientsRow {
-  name: string;
-  contactName?: string;
-  contactEmail?: string;
-  contactPhone?: string;
-  address?: string;
-  notes?: string;
-}
-
-export interface BulkUploadClientsRequest {
-  rows: BulkUploadClientsRow[];
-}
-
-export interface BulkUploadClientsResponse {
-  created: number;
-  duplicates: string[];
-  errors: string[];
-}

@@ -759,7 +759,7 @@ export default function ContainerDetail() {
 
   const handleSaveDeliveredAt = async () => {
     try {
-      const res = await fetch(`/api/containers/${containerId}/delivered-at`, {
+      const res = await fetch(`/api/containers/${containerId}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

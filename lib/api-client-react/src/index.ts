@@ -5,3 +5,4 @@ export * from "./settings";
 export * from "./invoices";
 export * from "./containers";
 export * from "./reports";
+export * from "./notifications";

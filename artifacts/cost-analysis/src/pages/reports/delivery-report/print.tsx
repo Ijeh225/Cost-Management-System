@@ -111,14 +111,14 @@ export default function DeliveryReportPrint() {
                     <div style={{ fontFamily: "monospace", fontWeight: 600, color: "#1e40af" }}>{item.containerNumber}</div>
                     <div style={{ color: "#94a3b8", fontSize: 11 }}>{item.blNumber}</div>
                   </td>
-                  <td style={{ padding: "7px 10px", fontWeight: 500 }}>{item.customerName}</td>
+                  <td style={{ padding: "7px 10px", fontWeight: 500 }}>{item.clientName}</td>
                   <td style={{ padding: "7px 10px" }}>
                     <div style={{ fontWeight: 500 }}>{fmtShort(item.deliveredAt)}</div>
                     {item.deliveredAtEstimated && (
                       <div style={{ fontSize: 10, color: "#d97706", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, display: "inline-block", padding: "1px 6px", marginTop: 2 }}>estimated</div>
                     )}
                   </td>
-                  <td style={{ padding: "7px 10px", textAlign: "right", fontFamily: "monospace" }}>{item.daysToDeliver !== null ? item.daysToDeliver : "—"}</td>
+                  <td style={{ padding: "7px 10px", textAlign: "right", fontFamily: "monospace" }}>{item.daysToComplete !== null ? item.daysToComplete : "—"}</td>
                   <td style={{ padding: "7px 10px", textAlign: "right", fontFamily: "monospace", color: "#1e40af" }}>{fmt(item.clearingCharges)}</td>
                   <td style={{ padding: "7px 10px" }}>
                     <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: item.status === "completed" || item.status === "closed" ? "#059669" : "#64748b", background: item.status === "completed" || item.status === "closed" ? "#d1fae5" : "#f1f5f9", border: `1px solid ${item.status === "completed" || item.status === "closed" ? "#a7f3d0" : "#e2e8f0"}`, borderRadius: 10, padding: "2px 8px" }}>

@@ -60,9 +60,6 @@ import type {
   UploadContainersRequest,
   UploadContainersResponse,
   User,
-  NotificationsResponse,
-  BulkUploadClientsRequest,
-  BulkUploadClientsResponse,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -1145,6 +1142,93 @@ export const useUpdateContainer = <
 };
 
 /**
+ * @summary Partially update a container (e.g. deliveredAt); bypasses lock for delivery date field
+ */
+export const getPatchContainerUrl = (id: number) => {
+  return `/api/containers/${id}`;
+};
+
+export const patchContainer = async (
+  id: number,
+  updateContainerRequest: UpdateContainerRequest,
+  options?: RequestInit,
+): Promise<Container> => {
+  return customFetch<Container>(getPatchContainerUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateContainerRequest),
+  });
+};
+
+export const getPatchContainerMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchContainer>>,
+    TError,
+    { id: number; data: BodyType<UpdateContainerRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof patchContainer>>,
+  TError,
+  { id: number; data: BodyType<UpdateContainerRequest> },
+  TContext
+> => {
+  const mutationKey = ["patchContainer"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof patchContainer>>,
+    { id: number; data: BodyType<UpdateContainerRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return patchContainer(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PatchContainerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchContainer>>
+>;
+export type PatchContainerMutationBody = BodyType<UpdateContainerRequest>;
+export type PatchContainerMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Partially update a container (e.g. deliveredAt); bypasses lock for delivery date field
+ */
+export const usePatchContainer = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchContainer>>,
+    TError,
+    { id: number; data: BodyType<UpdateContainerRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof patchContainer>>,
+  TError,
+  { id: number; data: BodyType<UpdateContainerRequest> },
+  TContext
+> => {
+  return useMutation(getPatchContainerMutationOptions(options));
+};
+
+/**
  * @summary Lock or unlock a container record
  */
 export const getLockContainerUrl = (id: number) => {
@@ -2151,7 +2235,7 @@ export function useGetDashboardStats<
  * @summary Get analytics data
  */
 export const getGetAnalyticsUrl = () => {
-  return `/api/analytics`;
+  return `/api/api/analytics`;
 };
 
 export const getAnalytics = async (
@@ -2164,7 +2248,7 @@ export const getAnalytics = async (
 };
 
 export const getGetAnalyticsQueryKey = () => {
-  return [`/api/analytics`] as const;
+  return [`/api/api/analytics`] as const;
 };
 
 export const getGetAnalyticsQueryOptions = <
@@ -2237,8 +2321,8 @@ export const getGetContainerReportUrl = (params?: GetContainerReportParams) => {
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/api/reports/containers?${stringifiedParams}`
-    : `/api/reports/containers`;
+    ? `/api/api/reports/containers?${stringifiedParams}`
+    : `/api/api/reports/containers`;
 };
 
 export const getContainerReport = async (
@@ -2257,7 +2341,7 @@ export const getContainerReport = async (
 export const getGetContainerReportQueryKey = (
   params?: GetContainerReportParams,
 ) => {
-  return [`/api/reports/containers`, ...(params ? [params] : [])] as const;
+  return [`/api/api/reports/containers`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetContainerReportQueryOptions = <
@@ -2339,8 +2423,8 @@ export const getExportContainersCSVUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/api/reports/export?${stringifiedParams}`
-    : `/api/reports/export`;
+    ? `/api/api/reports/export?${stringifiedParams}`
+    : `/api/api/reports/export`;
 };
 
 export const exportContainersCSV = async (
@@ -2356,7 +2440,7 @@ export const exportContainersCSV = async (
 export const getExportContainersCSVQueryKey = (
   params?: ExportContainersCSVParams,
 ) => {
-  return [`/api/reports/export`, ...(params ? [params] : [])] as const;
+  return [`/api/api/reports/export`, ...(params ? [params] : [])] as const;
 };
 
 export const getExportContainersCSVQueryOptions = <
@@ -2426,7 +2510,7 @@ export function useExportContainersCSV<
  * @summary Get container timeline
  */
 export const getGetContainerTimelineUrl = (id: number) => {
-  return `/api/containers/${id}/timeline`;
+  return `/api/api/containers/${id}/timeline`;
 };
 
 export const getContainerTimeline = async (
@@ -2440,7 +2524,7 @@ export const getContainerTimeline = async (
 };
 
 export const getGetContainerTimelineQueryKey = (id: number) => {
-  return [`/api/containers/${id}/timeline`] as const;
+  return [`/api/api/containers/${id}/timeline`] as const;
 };
 
 export const getGetContainerTimelineQueryOptions = <
@@ -2514,7 +2598,7 @@ export function useGetContainerTimeline<
  * @summary Add timeline event
  */
 export const getAddTimelineEventUrl = (id: number) => {
-  return `/api/containers/${id}/timeline`;
+  return `/api/api/containers/${id}/timeline`;
 };
 
 export const addTimelineEvent = async (
@@ -2601,7 +2685,7 @@ export const useAddTimelineEvent = <
  * @summary Delete timeline event
  */
 export const getDeleteTimelineEventUrl = (id: number, eventId: number) => {
-  return `/api/containers/${id}/timeline/${eventId}`;
+  return `/api/api/containers/${id}/timeline/${eventId}`;
 };
 
 export const deleteTimelineEvent = async (
@@ -2686,7 +2770,7 @@ export const useDeleteTimelineEvent = <
  * @summary Get container tasks
  */
 export const getGetContainerTasksUrl = (id: number) => {
-  return `/api/containers/${id}/tasks`;
+  return `/api/api/containers/${id}/tasks`;
 };
 
 export const getContainerTasks = async (
@@ -2700,7 +2784,7 @@ export const getContainerTasks = async (
 };
 
 export const getGetContainerTasksQueryKey = (id: number) => {
-  return [`/api/containers/${id}/tasks`] as const;
+  return [`/api/api/containers/${id}/tasks`] as const;
 };
 
 export const getGetContainerTasksQueryOptions = <
@@ -2773,7 +2857,7 @@ export function useGetContainerTasks<
  * @summary Create task
  */
 export const getCreateContainerTaskUrl = (id: number) => {
-  return `/api/containers/${id}/tasks`;
+  return `/api/api/containers/${id}/tasks`;
 };
 
 export const createContainerTask = async (
@@ -2860,7 +2944,7 @@ export const useCreateContainerTask = <
  * @summary Update task
  */
 export const getUpdateContainerTaskUrl = (id: number, taskId: number) => {
-  return `/api/containers/${id}/tasks/${taskId}`;
+  return `/api/api/containers/${id}/tasks/${taskId}`;
 };
 
 export const updateContainerTask = async (
@@ -2948,7 +3032,7 @@ export const useUpdateContainerTask = <
  * @summary Delete task
  */
 export const getDeleteContainerTaskUrl = (id: number, taskId: number) => {
-  return `/api/containers/${id}/tasks/${taskId}`;
+  return `/api/api/containers/${id}/tasks/${taskId}`;
 };
 
 export const deleteContainerTask = async (
@@ -3033,7 +3117,7 @@ export const useDeleteContainerTask = <
  * @summary Get container documents
  */
 export const getGetContainerDocumentsUrl = (id: number) => {
-  return `/api/containers/${id}/documents`;
+  return `/api/api/containers/${id}/documents`;
 };
 
 export const getContainerDocuments = async (
@@ -3047,7 +3131,7 @@ export const getContainerDocuments = async (
 };
 
 export const getGetContainerDocumentsQueryKey = (id: number) => {
-  return [`/api/containers/${id}/documents`] as const;
+  return [`/api/api/containers/${id}/documents`] as const;
 };
 
 export const getGetContainerDocumentsQueryOptions = <
@@ -3121,7 +3205,7 @@ export function useGetContainerDocuments<
  * @summary Delete document
  */
 export const getDeleteContainerDocumentUrl = (id: number, docId: number) => {
-  return `/api/containers/${id}/documents/${docId}`;
+  return `/api/api/containers/${id}/documents/${docId}`;
 };
 
 export const deleteContainerDocument = async (
@@ -3206,7 +3290,7 @@ export const useDeleteContainerDocument = <
  * @summary Get custom field values for container
  */
 export const getGetCustomFieldValuesUrl = (containerId: number) => {
-  return `/api/containers/${containerId}/custom-values`;
+  return `/api/api/containers/${containerId}/custom-values`;
 };
 
 export const getCustomFieldValues = async (
@@ -3223,7 +3307,7 @@ export const getCustomFieldValues = async (
 };
 
 export const getGetCustomFieldValuesQueryKey = (containerId: number) => {
-  return [`/api/containers/${containerId}/custom-values`] as const;
+  return [`/api/api/containers/${containerId}/custom-values`] as const;
 };
 
 export const getGetCustomFieldValuesQueryOptions = <
@@ -3301,7 +3385,7 @@ export function useGetCustomFieldValues<
  * @summary Save custom field values
  */
 export const getSaveCustomFieldValuesUrl = (containerId: number) => {
-  return `/api/containers/${containerId}/custom-values`;
+  return `/api/api/containers/${containerId}/custom-values`;
 };
 
 export const saveCustomFieldValues = async (
@@ -3388,28 +3472,27 @@ export const useSaveCustomFieldValues = <
 /**
  * @summary List custom sections with fields
  */
-export const getGetCustomSectionsUrl = (containerId?: number) => {
-  return containerId != null ? `/api/custom-sections?containerId=${containerId}` : `/api/custom-sections`;
+export const getGetCustomSectionsUrl = () => {
+  return `/api/api/custom-sections`;
 };
 
 export const getCustomSections = async (
-  containerId?: number,
   options?: RequestInit,
 ): Promise<CustomSectionWithFields[]> => {
-  return customFetch<CustomSectionWithFields[]>(getGetCustomSectionsUrl(containerId), {
+  return customFetch<CustomSectionWithFields[]>(getGetCustomSectionsUrl(), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetCustomSectionsQueryKey = (containerId?: number) => {
-  return containerId != null ? [`/api/custom-sections`, containerId] as const : [`/api/custom-sections`] as const;
+export const getGetCustomSectionsQueryKey = () => {
+  return [`/api/api/custom-sections`] as const;
 };
 
 export const getGetCustomSectionsQueryOptions = <
   TData = Awaited<ReturnType<typeof getCustomSections>>,
   TError = ErrorType<unknown>,
->(containerId?: number, options?: {
+>(options?: {
   query?: UseQueryOptions<
     Awaited<ReturnType<typeof getCustomSections>>,
     TError,
@@ -3419,11 +3502,11 @@ export const getGetCustomSectionsQueryOptions = <
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetCustomSectionsQueryKey(containerId);
+  const queryKey = queryOptions?.queryKey ?? getGetCustomSectionsQueryKey();
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getCustomSections>>
-  > = ({ signal }) => getCustomSections(containerId, { signal, ...requestOptions });
+  > = ({ signal }) => getCustomSections({ signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getCustomSections>>,
@@ -3444,7 +3527,7 @@ export type GetCustomSectionsQueryError = ErrorType<unknown>;
 export function useGetCustomSections<
   TData = Awaited<ReturnType<typeof getCustomSections>>,
   TError = ErrorType<unknown>,
->(containerId?: number, options?: {
+>(options?: {
   query?: UseQueryOptions<
     Awaited<ReturnType<typeof getCustomSections>>,
     TError,
@@ -3452,7 +3535,7 @@ export function useGetCustomSections<
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetCustomSectionsQueryOptions(containerId, options);
+  const queryOptions = getGetCustomSectionsQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -3465,7 +3548,7 @@ export function useGetCustomSections<
  * @summary Create custom section
  */
 export const getCreateCustomSectionUrl = () => {
-  return `/api/custom-sections`;
+  return `/api/api/custom-sections`;
 };
 
 export const createCustomSection = async (
@@ -3552,7 +3635,7 @@ export const useCreateCustomSection = <
  * @summary Update custom section
  */
 export const getUpdateCustomSectionUrl = (id: number) => {
-  return `/api/custom-sections/${id}`;
+  return `/api/api/custom-sections/${id}`;
 };
 
 export const updateCustomSection = async (
@@ -3640,7 +3723,7 @@ export const useUpdateCustomSection = <
  * @summary Delete custom section
  */
 export const getDeleteCustomSectionUrl = (id: number) => {
-  return `/api/custom-sections/${id}`;
+  return `/api/api/custom-sections/${id}`;
 };
 
 export const deleteCustomSection = async (
@@ -3724,7 +3807,7 @@ export const useDeleteCustomSection = <
  * @summary Add field to section
  */
 export const getAddCustomFieldUrl = (id: number) => {
-  return `/api/custom-sections/${id}/fields`;
+  return `/api/api/custom-sections/${id}/fields`;
 };
 
 export const addCustomField = async (
@@ -3811,7 +3894,7 @@ export const useAddCustomField = <
  * @summary Update custom field
  */
 export const getUpdateCustomFieldUrl = (id: number, fieldId: number) => {
-  return `/api/custom-sections/${id}/fields/${fieldId}`;
+  return `/api/api/custom-sections/${id}/fields/${fieldId}`;
 };
 
 export const updateCustomField = async (
@@ -3899,7 +3982,7 @@ export const useUpdateCustomField = <
  * @summary Delete custom field
  */
 export const getDeleteCustomFieldUrl = (id: number, fieldId: number) => {
-  return `/api/custom-sections/${id}/fields/${fieldId}`;
+  return `/api/api/custom-sections/${id}/fields/${fieldId}`;
 };
 
 export const deleteCustomField = async (
@@ -3984,7 +4067,7 @@ export const useDeleteCustomField = <
  * @summary Get profit intelligence and delay alerts
  */
 export const getGetIntelligenceAlertsUrl = () => {
-  return `/api/intelligence/alerts`;
+  return `/api/api/intelligence/alerts`;
 };
 
 export const getIntelligenceAlerts = async (
@@ -3997,7 +4080,7 @@ export const getIntelligenceAlerts = async (
 };
 
 export const getGetIntelligenceAlertsQueryKey = () => {
-  return [`/api/intelligence/alerts`] as const;
+  return [`/api/api/intelligence/alerts`] as const;
 };
 
 export const getGetIntelligenceAlertsQueryOptions = <
@@ -4054,58 +4137,3 @@ export function useGetIntelligenceAlerts<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
-
-// ─── Notifications ──────────────────────────────────────────────────────────
-
-export const getGetNotificationsQueryKey = () => [`/api/notifications`] as const;
-
-export const getNotifications = async (options?: RequestInit): Promise<NotificationsResponse> =>
-  customFetch<NotificationsResponse>(`/api/notifications`, { ...options, method: "GET" });
-
-export function useGetNotifications<TData = NotificationsResponse, TError = ErrorType<unknown>>(options?: {
-  query?: UseQueryOptions<NotificationsResponse, TError, TData>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryKey = options?.query?.queryKey ?? getGetNotificationsQueryKey();
-  const queryFn: QueryFunction<NotificationsResponse> = ({ signal }) => getNotifications({ signal });
-  const queryOptions = { queryKey, queryFn, ...options?.query } as UseQueryOptions<NotificationsResponse, TError, TData> & { queryKey: QueryKey };
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
-  return { ...query, queryKey };
-}
-
-export const useMarkNotificationRead = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
-  mutation?: UseMutationOptions<{ success: boolean }, TError, { alertKey: string }, TContext>;
-}) =>
-  useMutation<{ success: boolean }, TError, { alertKey: string }, TContext>({
-    mutationFn: ({ alertKey }) => customFetch<{ success: boolean }>(`/api/notifications/${encodeURIComponent(alertKey)}/read`, { method: "POST" }),
-    ...options?.mutation,
-  });
-
-export const useMarkAllNotificationsRead = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
-  mutation?: UseMutationOptions<{ success: boolean }, TError, void, TContext>;
-}) =>
-  useMutation<{ success: boolean }, TError, void, TContext>({
-    mutationFn: () => customFetch<{ success: boolean }>(`/api/notifications/read-all`, { method: "POST" }),
-    ...options?.mutation,
-  });
-
-export const useMarkNotificationsViewed = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
-  mutation?: UseMutationOptions<{ success: boolean; marked: number }, TError, void, TContext>;
-}) =>
-  useMutation<{ success: boolean; marked: number }, TError, void, TContext>({
-    mutationFn: () => customFetch<{ success: boolean; marked: number }>(`/api/notifications/mark-viewed`, { method: "POST" }),
-    ...options?.mutation,
-  });
-
-// ─── Bulk Client Upload ──────────────────────────────────────────────────────
-
-export const useCreateClientsBulk = <TError = ErrorType<unknown>, TContext = unknown>(options?: {
-  mutation?: UseMutationOptions<BulkUploadClientsResponse, TError, { data: BulkUploadClientsRequest }, TContext>;
-}) =>
-  useMutation<BulkUploadClientsResponse, TError, { data: BulkUploadClientsRequest }, TContext>({
-    mutationFn: ({ data }) => customFetch<BulkUploadClientsResponse>(`/api/clients/bulk`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    }),
-    ...options?.mutation,
-  });

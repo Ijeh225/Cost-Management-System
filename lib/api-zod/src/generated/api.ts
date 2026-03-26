@@ -170,6 +170,10 @@ export const ListContainersResponse = zod.object({
       clearingCharges: zod.number(),
       grossProfit: zod.number(),
       dutyNotPaid: zod.number(),
+      clientId: zod.number().nullish(),
+      clientName: zod.string().nullish(),
+      deliveredAt: zod.string().nullish(),
+      deliveredAtEstimated: zod.boolean().optional(),
       createdAt: zod.string(),
       updatedAt: zod.string(),
     }),
@@ -251,6 +255,10 @@ export const GetContainerResponse = zod.object({
     clearingCharges: zod.number(),
     grossProfit: zod.number(),
     dutyNotPaid: zod.number(),
+    clientId: zod.number().nullish(),
+    clientName: zod.string().nullish(),
+    deliveredAt: zod.string().nullish(),
+    deliveredAtEstimated: zod.boolean().optional(),
     createdAt: zod.string(),
     updatedAt: zod.string(),
   }),
@@ -363,6 +371,7 @@ export const UpdateContainerBody = zod.object({
   status: zod.string().optional(),
   assignedStaffId: zod.number().nullish(),
   clearingCharges: zod.number().optional(),
+  deliveredAt: zod.string().nullish(),
 });
 
 export const UpdateContainerResponse = zod.object({
@@ -393,6 +402,66 @@ export const UpdateContainerResponse = zod.object({
   clearingCharges: zod.number(),
   grossProfit: zod.number(),
   dutyNotPaid: zod.number(),
+  clientId: zod.number().nullish(),
+  clientName: zod.string().nullish(),
+  deliveredAt: zod.string().nullish(),
+  deliveredAtEstimated: zod.boolean().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Partially update a container (e.g. deliveredAt); bypasses lock for delivery date field
+ */
+export const PatchContainerParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchContainerBody = zod.object({
+  customerName: zod.string().optional(),
+  containerNumber: zod.string().optional(),
+  blNumber: zod.string().optional(),
+  declaration: zod.string().optional(),
+  size: zod.string().optional(),
+  vessel: zod.string().optional(),
+  status: zod.string().optional(),
+  assignedStaffId: zod.number().nullish(),
+  clearingCharges: zod.number().optional(),
+  deliveredAt: zod.string().nullish(),
+});
+
+export const PatchContainerResponse = zod.object({
+  id: zod.number(),
+  customerName: zod.string(),
+  containerNumber: zod.string(),
+  blNumber: zod.string(),
+  declaration: zod.string(),
+  size: zod.string(),
+  vessel: zod.string(),
+  status: zod.enum([
+    "new_upload",
+    "documentation_review",
+    "shipping_entry",
+    "customs_entry",
+    "terminal_entry",
+    "delivery_entry",
+    "accounting_review",
+    "management_approval",
+    "completed",
+    "closed",
+  ]),
+  isLocked: zod.boolean(),
+  lockedSections: zod.array(zod.string()).optional(),
+  assignedStaffId: zod.number().nullish(),
+  assignedStaffName: zod.string().nullish(),
+  totalCost: zod.number(),
+  clearingCharges: zod.number(),
+  grossProfit: zod.number(),
+  dutyNotPaid: zod.number(),
+  clientId: zod.number().nullish(),
+  clientName: zod.string().nullish(),
+  deliveredAt: zod.string().nullish(),
+  deliveredAtEstimated: zod.boolean().optional(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -437,6 +506,10 @@ export const LockContainerResponse = zod.object({
   clearingCharges: zod.number(),
   grossProfit: zod.number(),
   dutyNotPaid: zod.number(),
+  clientId: zod.number().nullish(),
+  clientName: zod.string().nullish(),
+  deliveredAt: zod.string().nullish(),
+  deliveredAtEstimated: zod.boolean().optional(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -866,6 +939,10 @@ export const GetMyTasksResponse = zod.object({
       clearingCharges: zod.number(),
       grossProfit: zod.number(),
       dutyNotPaid: zod.number(),
+      clientId: zod.number().nullish(),
+      clientName: zod.string().nullish(),
+      deliveredAt: zod.string().nullish(),
+      deliveredAtEstimated: zod.boolean().optional(),
       createdAt: zod.string(),
       updatedAt: zod.string(),
     }),

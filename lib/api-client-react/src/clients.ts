@@ -158,6 +158,36 @@ export function useDeleteClient() {
   });
 }
 
+export type BulkClientRow = {
+  name: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  address?: string;
+  notes?: string;
+};
+
+export type BulkClientResult = {
+  created: number;
+  duplicates: string[];
+  errors: string[];
+};
+
+export function useCreateClientsBulk() {
+  const qc = useQueryClient();
+  return useMutation<BulkClientResult, Error, { rows: BulkClientRow[] }>({
+    mutationFn: ({ rows }) =>
+      customFetch<BulkClientResult>("/api/clients/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
+    },
+  });
+}
+
 export function useLinkContainerToClient() {
   const qc = useQueryClient();
   return useMutation({

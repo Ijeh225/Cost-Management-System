@@ -493,7 +493,7 @@ function DeliveryReportSection() {
                             <div className="font-mono font-medium text-primary text-xs">{item.containerNumber}</div>
                             <div className="text-[11px] text-muted-foreground">{item.blNumber}</div>
                           </td>
-                          <td className="px-4 py-2.5 font-medium">{item.customerName}</td>
+                          <td className="px-4 py-2.5 font-medium">{item.clientName}</td>
                           <td className="px-4 py-2.5">
                             <div className="text-xs font-semibold text-emerald-400">
                               {new Date(item.deliveredAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
@@ -503,7 +503,7 @@ function DeliveryReportSection() {
                             )}
                           </td>
                           <td className="px-4 py-2.5 text-right font-mono text-xs">
-                            {item.daysToDeliver !== null ? item.daysToDeliver : "—"}
+                            {item.daysToComplete !== null ? item.daysToComplete : "—"}
                           </td>
                           <td className="px-4 py-2.5 text-right font-mono text-xs text-primary">{formatCurrency(item.clearingCharges)}</td>
                           <td className="px-4 py-2.5">

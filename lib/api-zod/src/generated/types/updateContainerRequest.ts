@@ -16,4 +16,5 @@ export interface UpdateContainerRequest {
   status?: string;
   assignedStaffId?: number | null;
   clearingCharges?: number;
+  deliveredAt?: string | null;
 }

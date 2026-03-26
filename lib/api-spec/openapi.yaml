@@ -270,6 +270,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Container"
+    patch:
+      operationId: patchContainer
+      tags: [containers]
+      summary: Partially update a container (e.g. deliveredAt); bypasses lock for delivery date field
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContainerRequest"
+      responses:
+        "200":
+          description: Updated container
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Container"
 
   /containers/{id}/lock:
     post:
@@ -1116,6 +1139,17 @@ components:
           type: number
         dutyNotPaid:
           type: number
+        clientId:
+          type: integer
+          nullable: true
+        clientName:
+          type: string
+          nullable: true
+        deliveredAt:
+          type: string
+          nullable: true
+        deliveredAtEstimated:
+          type: boolean
         createdAt:
           type: string
         updatedAt:
@@ -1178,6 +1212,9 @@ components:
           nullable: true
         clearingCharges:
           type: number
+        deliveredAt:
+          type: string
+          nullable: true
 
     UploadContainersRequest:
       type: object

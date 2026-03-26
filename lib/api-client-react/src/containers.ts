@@ -20,12 +20,12 @@ export type DeliveryReportItem = {
   id: number;
   containerNumber: string;
   blNumber: string;
-  customerName: string;
+  clientName: string;
   status: string;
   deliveredAt: string;
   deliveredAtEstimated: boolean;
   clearingCharges: number;
-  daysToDeliver: number | null;
+  daysToComplete: number | null;
   createdAt: string;
 };
 
@@ -72,7 +72,7 @@ export function useUpdateDeliveredAt() {
   const qc = useQueryClient();
   return useMutation<ContainerDeliveryFields & Record<string, unknown>, Error, { id: number; deliveredAt: string | null }>({
     mutationFn: ({ id, deliveredAt }) =>
-      customFetch(`/api/containers/${id}/delivered-at`, {
+      customFetch(`/api/containers/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ deliveredAt }),
         headers: { "Content-Type": "application/json" },

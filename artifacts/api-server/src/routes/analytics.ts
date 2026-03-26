@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, sectionApprovalsTable } from "@workspace/db";
-import { eq, desc, gte, lte, and, isNotNull } from "drizzle-orm";
+import { eq, desc, gte, lte, and, isNotNull, type SQL } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
@@ -193,7 +193,7 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
     const fromStr = req.query.from as string | undefined;
     const toStr = req.query.to as string | undefined;
 
-    const conditions: any[] = [isNotNull(containersTable.deliveredAt)];
+    const conditions: SQL[] = [isNotNull(containersTable.deliveredAt)];
     if (fromStr) conditions.push(gte(containersTable.deliveredAt, new Date(fromStr)));
     if (toStr) {
       const toDate = new Date(toStr);
@@ -221,13 +221,13 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
     const items = rows.map(c => {
       const revenue = parseFloat(c.clearingCharges ?? "0");
       totalRevenue += revenue;
-      const delivDate = c.deliveredAt instanceof Date ? c.deliveredAt : c.deliveredAt ? new Date(c.deliveredAt as any) : null;
-      const createDate = c.createdAt instanceof Date ? c.createdAt : new Date(c.createdAt as any);
-      let daysToDeliver: number | null = null;
+      const delivDate = c.deliveredAt instanceof Date ? c.deliveredAt : (c.deliveredAt ? new Date(String(c.deliveredAt)) : null);
+      const createDate = c.createdAt instanceof Date ? c.createdAt : new Date(String(c.createdAt));
+      let daysToComplete: number | null = null;
       if (delivDate) {
-        daysToDeliver = Math.floor((delivDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysToDeliver >= 0) {
-          totalDays += daysToDeliver;
+        daysToComplete = Math.floor((delivDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysToComplete >= 0) {
+          totalDays += daysToComplete;
           countWithDays++;
         }
       }
@@ -235,12 +235,12 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
         id: c.id,
         containerNumber: c.containerNumber,
         blNumber: c.blNumber,
-        customerName: c.customerName,
+        clientName: c.customerName,
         status: c.status,
         deliveredAt: delivDate ? delivDate.toISOString() : "",
         deliveredAtEstimated: c.deliveredAtEstimated ?? false,
         clearingCharges: revenue,
-        daysToDeliver,
+        daysToComplete,
         createdAt: createDate.toISOString(),
       };
     });
