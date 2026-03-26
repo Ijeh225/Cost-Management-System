@@ -36,6 +36,7 @@ clientsRouter.get("/clients", requireAuth, async (req: AuthRequest, res) => {
 
     const result = rows.map(c => ({
       ...c,
+      agreedClearingRate: c.agreedClearingRate != null ? parseFloat(c.agreedClearingRate) : null,
       totalOutstanding: outstandingByClient.get(c.id) ?? 0,
     }));
 
