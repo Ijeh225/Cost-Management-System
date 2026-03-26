@@ -402,8 +402,13 @@ function DeliveryReportSection() {
   const [drFrom, setDrFrom] = useState("");
   const [drTo, setDrTo] = useState("");
   const [applied, setApplied] = useState<{ from: string; to: string }>({ from: "", to: "" });
+  const [generated, setGenerated] = useState(false);
 
-  const { data, isLoading } = useGetDeliveryReport(applied.from || undefined, applied.to || undefined);
+  const { data, isLoading } = useGetDeliveryReport(
+    generated ? applied.from || undefined : undefined,
+    generated ? applied.to || undefined : undefined,
+    { query: { enabled: generated } }
+  );
 
   const openReport = (path: string, params: Record<string, string>) => {
     const qs = new URLSearchParams();
@@ -434,10 +439,10 @@ function DeliveryReportSection() {
               <Label className="text-xs">Delivered To</Label>
               <Input type="date" value={drTo} onChange={e => setDrTo(e.target.value)} className="h-8 text-xs w-40" />
             </div>
-            <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setApplied({ from: drFrom, to: drTo })}>
+            <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => { setApplied({ from: drFrom, to: drTo }); setGenerated(true); }}>
               <Filter className="w-3 h-3" /> Generate Report
             </Button>
-            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setDrFrom(""); setDrTo(""); setApplied({ from: "", to: "" }); }}>Reset</Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setDrFrom(""); setDrTo(""); setApplied({ from: "", to: "" }); setGenerated(false); }}>Reset</Button>
             {data && (
               <Button
                 size="sm"
@@ -518,6 +523,11 @@ function DeliveryReportSection() {
                 </div>
               )}
             </>
+          ) : !generated ? (
+            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
+              <Truck className="w-7 h-7 opacity-30" />
+              <p className="text-sm">Click <span className="font-medium text-foreground">Generate Report</span> to load delivery data</p>
+            </div>
           ) : null}
         </CardContent>
       </Card>

@@ -65,7 +65,11 @@ export function useUpdateDeliveredAt() {
   });
 }
 
-export function useGetDeliveryReport(from?: string, to?: string) {
+export function useGetDeliveryReport(
+  from?: string,
+  to?: string,
+  options?: { query?: { enabled?: boolean } }
+) {
   const params = new URLSearchParams();
   if (from) params.set("from", from);
   if (to) params.set("to", to);
@@ -73,5 +77,6 @@ export function useGetDeliveryReport(from?: string, to?: string) {
   return useQuery<DeliveryReportResponse>({
     queryKey: ["analytics", "deliveries", from, to],
     queryFn: () => customFetch<DeliveryReportResponse>(`/api/analytics/deliveries${qs ? `?${qs}` : ""}`),
+    enabled: options?.query?.enabled,
   });
 }
