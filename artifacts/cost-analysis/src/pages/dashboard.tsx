@@ -412,10 +412,10 @@ export default function Dashboard() {
             <CardContent>
               <div className="grid grid-cols-4 gap-3">
                 {[
-                  { label: "Current",  value: arData.aging.current,    color: "text-foreground",  bg: "bg-muted/40" },
-                  { label: "1–30 days",value: arData.aging.days1to30,  color: "text-amber-400",   bg: "bg-amber-500/10" },
-                  { label: "31–60 days",value: arData.aging.days31to60,color: "text-orange-400",  bg: "bg-orange-500/10" },
-                  { label: "60+ days", value: arData.aging.days61to90 + arData.aging.days90plus, color: "text-red-500", bg: "bg-red-500/15" },
+                  { label: "Current", value: arData.aging.current,    color: "text-foreground",  bg: "bg-muted/40" },
+                  { label: "30d",     value: arData.aging.days1to30,  color: "text-amber-400",   bg: "bg-amber-500/10" },
+                  { label: "60d",     value: arData.aging.days31to60, color: "text-orange-400",  bg: "bg-orange-500/10" },
+                  { label: "90d+",    value: arData.aging.days61to90 + arData.aging.days90plus, color: "text-red-500", bg: "bg-red-500/15" },
                 ].map(b => (
                   <div key={b.label} className={`rounded-lg p-3 ${b.bg} border border-border/20`}>
                     <div className="text-[10px] text-muted-foreground font-medium mb-1 truncate">{b.label}</div>
