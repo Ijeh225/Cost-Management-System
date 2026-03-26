@@ -1,6 +1,6 @@
 import app from "./app";
 import { db, pool, containersTable, appMigrationsTable } from "@workspace/db";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, inArray, isNull, sql } from "drizzle-orm";
 
 async function ensureMigrationsTable() {
   await pool.query(`
@@ -25,19 +25,18 @@ async function runStartupMigrations() {
   try {
     await ensureMigrationsTable();
     await runMigration("backfill_delivered_at_for_completed_containers", async () => {
-      const rows = await db.select({ id: containersTable.id, updatedAt: containersTable.updatedAt })
-        .from(containersTable)
+      const updated = await db.update(containersTable)
+        .set({
+          deliveredAt: sql`${containersTable.updatedAt}`,
+          deliveredAtEstimated: true,
+        })
         .where(and(
           inArray(containersTable.status, ["completed", "closed"]),
           isNull(containersTable.deliveredAt)
-        ));
-      for (const row of rows) {
-        await db.update(containersTable)
-          .set({ deliveredAt: row.updatedAt, deliveredAtEstimated: true })
-          .where(eq(containersTable.id, row.id));
-      }
-      if (rows.length > 0) {
-        console.log(`[migration] Backfilled deliveredAt for ${rows.length} completed/closed containers.`);
+        ))
+        .returning({ id: containersTable.id });
+      if (updated.length > 0) {
+        console.log(`[migration] Backfilled deliveredAt for ${updated.length} completed/closed containers.`);
       }
     });
   } catch (err) {
