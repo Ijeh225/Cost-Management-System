@@ -4,7 +4,7 @@ import { clientsTable } from "./clients";
 
 export const invoicesTable = pgTable("invoices", {
   id: serial("id").primaryKey(),
-  containerId: integer("container_id").notNull().references(() => containersTable.id, { onDelete: "cascade" }),
+  containerId: integer("container_id").references(() => containersTable.id, { onDelete: "set null" }),
   clientId: integer("client_id").references(() => clientsTable.id, { onDelete: "set null" }),
   invoiceNumber: text("invoice_number").notNull().unique(),
   status: text("status").notNull().default("draft"),
@@ -15,6 +15,16 @@ export const invoicesTable = pgTable("invoices", {
   notes: text("notes").notNull().default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const invoiceItemsTable = pgTable("invoice_items", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").notNull().references(() => invoicesTable.id, { onDelete: "cascade" }),
+  containerId: integer("container_id").references(() => containersTable.id, { onDelete: "set null" }),
+  description: text("description").notNull().default("Clearing Charges"),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull().default("0"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const invoicePaymentsTable = pgTable("invoice_payments", {
@@ -29,4 +39,5 @@ export const invoicePaymentsTable = pgTable("invoice_payments", {
 });
 
 export type Invoice = typeof invoicesTable.$inferSelect;
+export type InvoiceItem = typeof invoiceItemsTable.$inferSelect;
 export type InvoicePayment = typeof invoicePaymentsTable.$inferSelect;

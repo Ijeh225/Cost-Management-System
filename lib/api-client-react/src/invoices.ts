@@ -5,7 +5,7 @@ export type WhatsAppLogEntry = {
   id: number;
   invoiceId: number;
   clientId: number | null;
-  messageType: "invoice" | "reminder";
+  messageType: "invoice" | "reminder" | "receipt";
   phone: string;
   messageBody: string;
   status: "sent" | "failed";
@@ -18,6 +18,17 @@ export type WhatsAppSendResponse = {
   success: boolean;
   twilioSid: string | null;
   messageBody: string;
+};
+
+export type InvoiceItem = {
+  id: number;
+  invoiceId: number;
+  containerId: number | null;
+  description: string;
+  amount: number;
+  sortOrder: number;
+  containerNumber: string | null;
+  blNumber: string | null;
 };
 
 export type InvoicePayment = {
@@ -35,7 +46,7 @@ export type Invoice = {
   id: number;
   invoiceNumber: string;
   status: "draft" | "sent" | "paid" | "partial" | "overdue";
-  containerId: number;
+  containerId: number | null;
   containerNumber: string | null;
   blNumber: string | null;
   clientId: number | null;
@@ -50,11 +61,12 @@ export type Invoice = {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  items: InvoiceItem[];
   payments: InvoicePayment[];
 };
 
 export type CreateInvoiceBody = {
-  containerId: number;
+  containerIds: number[];
   vatRate?: number;
   dueDate?: string;
   notes?: string;

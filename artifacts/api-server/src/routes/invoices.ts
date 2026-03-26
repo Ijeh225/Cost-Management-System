@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, invoicesTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable } from "@workspace/db";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio } from "../lib/whatsapp.js";
 
@@ -29,7 +29,42 @@ async function generateInvoiceNumber(): Promise<string> {
   return `${prefix}${pad(seq + 1)}`;
 }
 
-async function formatInvoice(inv: any, payments: any[]) {
+async function fetchItemsForInvoices(invoiceIds: number[]) {
+  if (invoiceIds.length === 0) return new Map<number, any[]>();
+  const allItems = await db
+    .select({
+      id: invoiceItemsTable.id,
+      invoiceId: invoiceItemsTable.invoiceId,
+      containerId: invoiceItemsTable.containerId,
+      description: invoiceItemsTable.description,
+      amount: invoiceItemsTable.amount,
+      sortOrder: invoiceItemsTable.sortOrder,
+      containerNumber: containersTable.containerNumber,
+      blNumber: containersTable.blNumber,
+    })
+    .from(invoiceItemsTable)
+    .leftJoin(containersTable, eq(invoiceItemsTable.containerId, containersTable.id))
+    .where(inArray(invoiceItemsTable.invoiceId, invoiceIds))
+    .orderBy(invoiceItemsTable.sortOrder);
+
+  const map = new Map<number, any[]>();
+  for (const item of allItems) {
+    if (!map.has(item.invoiceId)) map.set(item.invoiceId, []);
+    map.get(item.invoiceId)!.push({
+      id: item.id,
+      invoiceId: item.invoiceId,
+      containerId: item.containerId,
+      description: item.description,
+      amount: parseFloat(item.amount ?? "0"),
+      sortOrder: item.sortOrder,
+      containerNumber: item.containerNumber ?? null,
+      blNumber: item.blNumber ?? null,
+    });
+  }
+  return map;
+}
+
+async function formatInvoice(inv: any, payments: any[], items?: any[]) {
   const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
   const total = parseFloat(inv.total ?? "0");
   const outstanding = Math.max(0, total - totalPaid);
@@ -38,7 +73,7 @@ async function formatInvoice(inv: any, payments: any[]) {
     id: inv.id,
     invoiceNumber: inv.invoiceNumber,
     status: inv.status,
-    containerId: inv.containerId,
+    containerId: inv.containerId ?? null,
     containerNumber: inv.containerNumber ?? null,
     blNumber: inv.blNumber ?? null,
     clientId: inv.clientId ?? null,
@@ -53,6 +88,16 @@ async function formatInvoice(inv: any, payments: any[]) {
     notes: inv.notes ?? "",
     createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : inv.createdAt,
     updatedAt: inv.updatedAt instanceof Date ? inv.updatedAt.toISOString() : inv.updatedAt,
+    items: (items ?? []).map(it => ({
+      id: it.id,
+      invoiceId: it.invoiceId,
+      containerId: it.containerId,
+      description: it.description,
+      amount: typeof it.amount === "string" ? parseFloat(it.amount) : it.amount,
+      sortOrder: it.sortOrder,
+      containerNumber: it.containerNumber ?? null,
+      blNumber: it.blNumber ?? null,
+    })),
     payments: payments.map(p => ({
       id: p.id,
       invoiceId: p.invoiceId,
@@ -99,8 +144,11 @@ router.get("/invoices", requireAuth, async (req, res) => {
       paymentsByInvoice.get(p.invoiceId)!.push(p);
     }
 
+    const invoiceIds = rows.map(r => r.id);
+    const itemsByInvoice = await fetchItemsForInvoices(invoiceIds);
+
     const invoices = await Promise.all(
-      rows.map(r => formatInvoice(r, paymentsByInvoice.get(r.id) ?? []))
+      rows.map(r => formatInvoice(r, paymentsByInvoice.get(r.id) ?? [], itemsByInvoice.get(r.id) ?? []))
     );
 
     res.json(invoices);
@@ -112,31 +160,44 @@ router.get("/invoices", requireAuth, async (req, res) => {
 
 router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const { containerId, vatRate, dueDate, notes } = req.body as {
-      containerId: number;
+    const { containerIds, vatRate, dueDate, notes } = req.body as {
+      containerIds: number[];
       vatRate?: number;
       dueDate?: string;
       notes?: string;
     };
 
-    if (!containerId) return res.status(400).json({ error: "containerId is required" });
+    if (!containerIds || !Array.isArray(containerIds) || containerIds.length === 0) {
+      return res.status(400).json({ error: "containerIds array is required and must not be empty" });
+    }
 
-    const [container] = await db
+    const containers = await db
       .select()
       .from(containersTable)
-      .where(eq(containersTable.id, containerId));
+      .where(inArray(containersTable.id, containerIds));
 
-    if (!container) return res.status(404).json({ error: "Container not found" });
+    if (containers.length !== containerIds.length) {
+      return res.status(404).json({ error: "One or more containers not found" });
+    }
 
-    const subtotal = parseFloat(container.clearingCharges ?? "0");
+    const clientIds = [...new Set(containers.map(c => c.clientId))];
+    if (clientIds.length > 1) {
+      return res.status(400).json({ error: "All containers must belong to the same client" });
+    }
+
+    const clientId = containers[0].clientId ?? null;
+
+    const subtotal = containers.reduce((s, c) => s + parseFloat(c.clearingCharges ?? "0"), 0);
     const vat = vatRate ? subtotal * (vatRate / 100) : 0;
     const total = subtotal + vat;
 
     const invoiceNumber = await generateInvoiceNumber();
 
+    const singleContainerId = containers.length === 1 ? containers[0].id : null;
+
     const [inv] = await db.insert(invoicesTable).values({
-      containerId,
-      clientId: container.clientId ?? null,
+      containerId: singleContainerId,
+      clientId,
       invoiceNumber,
       status: "draft",
       subtotal: String(subtotal),
@@ -146,13 +207,41 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
       notes: notes ?? "",
     }).returning();
 
+    const itemRows = containers.map((c, idx) => ({
+      invoiceId: inv.id,
+      containerId: c.id,
+      description: "Clearing Charges",
+      amount: c.clearingCharges ?? "0",
+      sortOrder: idx,
+    }));
+    await db.insert(invoiceItemsTable).values(itemRows);
+
+    const items = containers.map((c, idx) => ({
+      id: 0,
+      invoiceId: inv.id,
+      containerId: c.id,
+      description: "Clearing Charges",
+      amount: parseFloat(c.clearingCharges ?? "0"),
+      sortOrder: idx,
+      containerNumber: c.containerNumber,
+      blNumber: c.blNumber,
+    }));
+
+    let clientName: string | null = null;
+    let clientPhone: string | null = null;
+    if (clientId) {
+      const [cl] = await db.select({ name: clientsTable.name, phone: clientsTable.contactPhone }).from(clientsTable).where(eq(clientsTable.id, clientId));
+      clientName = cl?.name ?? null;
+      clientPhone = cl?.phone ?? null;
+    }
+
     const formatted = await formatInvoice({
       ...inv,
-      containerNumber: container.containerNumber,
-      blNumber: container.blNumber,
-      clientName: null,
-      clientPhone: null,
-    }, []);
+      containerNumber: containers.length === 1 ? containers[0].containerNumber : null,
+      blNumber: containers.length === 1 ? containers[0].blNumber : null,
+      clientName,
+      clientPhone,
+    }, [], items);
 
     res.status(201).json(formatted);
   } catch (err) {
@@ -196,7 +285,10 @@ router.get("/invoices/:id", requireAuth, async (req, res) => {
       .where(eq(invoicePaymentsTable.invoiceId, id))
       .orderBy(invoicePaymentsTable.paidAt);
 
-    res.json(await formatInvoice(row, payments));
+    const itemsMap = await fetchItemsForInvoices([id]);
+    const items = itemsMap.get(id) ?? [];
+
+    res.json(await formatInvoice(row, payments, items));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch invoice" });
@@ -255,7 +347,10 @@ router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
     const payments = await db.select().from(invoicePaymentsTable)
       .where(eq(invoicePaymentsTable.invoiceId, id));
 
-    res.json(await formatInvoice(row, payments));
+    const itemsMap = await fetchItemsForInvoices([id]);
+    const items = itemsMap.get(id) ?? [];
+
+    res.json(await formatInvoice(row, payments, items));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update invoice" });
@@ -355,6 +450,13 @@ router.delete("/invoices/:id/payments/:paymentId", requireAdmin, async (req, res
   }
 });
 
+function containerListLine(items: { containerNumber: string | null }[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0].containerNumber ? `📦 Container: *${items[0].containerNumber}*` : "";
+  const nums = items.map(it => it.containerNumber ?? "?").join(", ");
+  return `📦 Containers: *${nums}*`;
+}
+
 function buildInvoiceMessage(inv: {
   invoiceNumber: string;
   clientName: string | null;
@@ -363,6 +465,7 @@ function buildInvoiceMessage(inv: {
   total: number;
   outstanding: number;
   dueDate: string | null;
+  items?: { containerNumber: string | null }[];
 }): string {
   const lines: string[] = [
     `Hello ${inv.clientName ?? ""},`,
@@ -371,8 +474,10 @@ function buildInvoiceMessage(inv: {
     ``,
     `📄 Invoice No: *${inv.invoiceNumber}*`,
   ];
-  if (inv.containerNumber) lines.push(`📦 Container: *${inv.containerNumber}*`);
-  if (inv.blNumber) lines.push(`📋 B/L No: *${inv.blNumber}*`);
+  const itemsToUse = inv.items && inv.items.length > 0 ? inv.items : (inv.containerNumber ? [{ containerNumber: inv.containerNumber }] : []);
+  const contLine = containerListLine(itemsToUse);
+  if (contLine) lines.push(contLine);
+  if (inv.items && inv.items.length === 1 && inv.blNumber) lines.push(`📋 B/L No: *${inv.blNumber}*`);
   lines.push(``);
   lines.push(`💰 Invoice Total: *₦${Number(inv.total).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`);
   if (inv.dueDate) lines.push(`📅 Due Date: *${inv.dueDate}*`);
@@ -389,6 +494,7 @@ function buildReminderMessage(inv: {
   total: number;
   outstanding: number;
   dueDate: string | null;
+  items?: { containerNumber: string | null }[];
 }): string {
   let overdueLine = "";
   if (inv.dueDate) {
@@ -404,7 +510,9 @@ function buildReminderMessage(inv: {
     ``,
     `📄 Invoice No: *${inv.invoiceNumber}*`,
   ];
-  if (inv.containerNumber) lines.push(`📦 Container: *${inv.containerNumber}*`);
+  const itemsToUse = inv.items && inv.items.length > 0 ? inv.items : (inv.containerNumber ? [{ containerNumber: inv.containerNumber }] : []);
+  const contLine = containerListLine(itemsToUse);
+  if (contLine) lines.push(contLine);
   lines.push(``);
   lines.push(`💰 Invoice Total: *₦${Number(inv.total).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`);
   lines.push(`⏳ Outstanding: *₦${Number(inv.outstanding).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`);
@@ -446,6 +554,9 @@ router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req, res) => {
     if (!row) return res.status(404).json({ error: "Invoice not found" });
     if (!row.clientPhone) return res.status(400).json({ error: "Client has no phone number" });
 
+    const itemsMap = await fetchItemsForInvoices([id]);
+    const items = itemsMap.get(id) ?? [];
+
     const phone = toE164Nigerian(row.clientPhone);
     const messageBody = buildInvoiceMessage({
       invoiceNumber: row.invoiceNumber,
@@ -455,6 +566,7 @@ router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req, res) => {
       total: parseFloat(row.total as unknown as string ?? "0"),
       outstanding: Number(row.outstanding ?? 0),
       dueDate: row.dueDate ?? null,
+      items,
     });
 
     const twilioResult = await sendViaTwilio(phone, messageBody);
@@ -517,6 +629,9 @@ router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "Invoice is fully paid — no reminder needed" });
     }
 
+    const itemsMap = await fetchItemsForInvoices([id]);
+    const items = itemsMap.get(id) ?? [];
+
     const phone = toE164Nigerian(row.clientPhone);
     const messageBody = buildReminderMessage({
       invoiceNumber: row.invoiceNumber,
@@ -525,6 +640,7 @@ router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
       total: parseFloat(row.total as unknown as string ?? "0"),
       outstanding,
       dueDate: row.dueDate ?? null,
+      items,
     });
 
     const twilioResult = await sendViaTwilio(phone, messageBody);

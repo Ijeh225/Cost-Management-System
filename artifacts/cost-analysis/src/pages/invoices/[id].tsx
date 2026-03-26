@@ -253,23 +253,62 @@ export default function InvoiceDetailPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Invoice Info</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Box className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-muted-foreground">Container:</span>
-              {invoice.containerId ? (
-                <Link href={`/containers/${invoice.containerId}`}>
-                  <span className="text-primary hover:underline font-mono">
-                    {invoice.containerNumber ?? `#${invoice.containerId}`}
-                  </span>
-                </Link>
-              ) : <span className="text-foreground">—</span>}
-            </div>
-            {invoice.blNumber && (
-              <div className="flex items-center gap-2 text-sm">
-                <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span className="text-muted-foreground">B/L Number:</span>
-                <span className="text-foreground font-mono">{invoice.blNumber}</span>
+            {invoice.items && invoice.items.length > 1 ? (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-sm mb-2">
+                  <Box className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground font-medium">Containers ({invoice.items.length})</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border/50">
+                        <th className="text-left text-muted-foreground font-medium pb-1.5 pr-3">Container #</th>
+                        <th className="text-left text-muted-foreground font-medium pb-1.5 pr-3">B/L Number</th>
+                        <th className="text-left text-muted-foreground font-medium pb-1.5 pr-3">Description</th>
+                        <th className="text-right text-muted-foreground font-medium pb-1.5">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoice.items.map(item => (
+                        <tr key={item.id} className="border-b border-border/30 last:border-0">
+                          <td className="py-1.5 pr-3">
+                            {item.containerId ? (
+                              <Link href={`/containers/${item.containerId}`}>
+                                <span className="text-primary hover:underline font-mono">{item.containerNumber ?? `#${item.containerId}`}</span>
+                              </Link>
+                            ) : <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="py-1.5 pr-3 font-mono text-muted-foreground">{item.blNumber ?? "—"}</td>
+                          <td className="py-1.5 pr-3 text-foreground">{item.description}</td>
+                          <td className="py-1.5 text-right font-mono font-semibold text-foreground">{formatCurrency(item.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-sm">
+                  <Box className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Container:</span>
+                  {invoice.containerId ? (
+                    <Link href={`/containers/${invoice.containerId}`}>
+                      <span className="text-primary hover:underline font-mono">
+                        {invoice.containerNumber ?? `#${invoice.containerId}`}
+                      </span>
+                    </Link>
+                  ) : <span className="text-foreground">—</span>}
+                </div>
+                {invoice.blNumber && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">B/L Number:</span>
+                    <span className="text-foreground font-mono">{invoice.blNumber}</span>
+                  </div>
+                )}
+              </>
             )}
             <div className="flex items-center gap-2 text-sm">
               <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />

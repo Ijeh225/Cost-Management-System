@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
 import {
   FileText, Search, Loader2, Trash2, ChevronRight, Plus,
-  CheckCircle2, Clock, AlertTriangle, XCircle, CreditCard,
+  CheckCircle2, Clock, AlertTriangle, XCircle, CreditCard, Package,
 } from "lucide-react";
 
 function statusConfig(status: string) {
@@ -29,11 +30,20 @@ function statusConfig(status: string) {
   }
 }
 
+function containerSummary(invoice: Invoice): string {
+  if (invoice.items && invoice.items.length > 1) {
+    const nums = invoice.items.map(it => it.containerNumber ?? "?").join(", ");
+    return nums;
+  }
+  return invoice.containerNumber ?? "—";
+}
+
 function InvoiceRow({ invoice, isAdmin }: { invoice: Invoice; isAdmin: boolean }) {
   const { toast } = useToast();
   const deleteMutation = useDeleteInvoice();
   const cfg = statusConfig(invoice.status);
   const StatusIcon = cfg.icon;
+  const isMulti = invoice.items && invoice.items.length > 1;
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -61,7 +71,17 @@ function InvoiceRow({ invoice, isAdmin }: { invoice: Invoice; isAdmin: boolean }
         <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-5 gap-1 sm:gap-4 items-center">
           <div className="sm:col-span-1">
             <p className="text-sm font-mono font-semibold text-foreground">{invoice.invoiceNumber}</p>
-            <p className="text-xs text-muted-foreground truncate">{invoice.containerNumber ?? "—"}</p>
+            <div className="flex items-center gap-1 flex-wrap">
+              {isMulti && (
+                <Badge className="text-[10px] px-1.5 py-0 bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center gap-0.5">
+                  <Package className="w-2.5 h-2.5" />
+                  {invoice.items.length}
+                </Badge>
+              )}
+              <p className="text-xs text-muted-foreground truncate max-w-[120px]">
+                {containerSummary(invoice)}
+              </p>
+            </div>
           </div>
           <div className="sm:col-span-1">
             <p className="text-sm text-foreground truncate">{invoice.clientName ?? "No client"}</p>
@@ -114,13 +134,15 @@ export default function InvoicesPage() {
   const { isAdmin } = useAuth();
   const { data: invoices, isLoading } = useListInvoices();
   const [search, setSearch] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
 
   const filtered = (invoices ?? []).filter(inv => {
     const q = search.toLowerCase();
+    const containerNums = inv.items?.map(it => it.containerNumber ?? "").join(" ") ?? (inv.containerNumber ?? "");
     return (
       inv.invoiceNumber.toLowerCase().includes(q) ||
       (inv.clientName ?? "").toLowerCase().includes(q) ||
-      (inv.containerNumber ?? "").toLowerCase().includes(q)
+      containerNums.toLowerCase().includes(q)
     );
   });
 
@@ -141,12 +163,12 @@ export default function InvoicesPage() {
             Track client invoices and payments
           </p>
         </div>
-        <Link href="/containers">
-          <Button size="sm" className="gap-2">
+        {isAdmin && (
+          <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4" />
             New Invoice
           </Button>
-        </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -183,7 +205,7 @@ export default function InvoicesPage() {
         <div className="text-center py-16 text-muted-foreground space-y-2">
           <FileText className="w-10 h-10 mx-auto opacity-30" />
           <p className="text-sm">
-            {search ? "No invoices match your search." : "No invoices yet — create one from a container page."}
+            {search ? "No invoices match your search." : "No invoices yet — create one using the New Invoice button."}
           </p>
         </div>
       ) : (
@@ -193,6 +215,11 @@ export default function InvoicesPage() {
           ))}
         </div>
       )}
+
+      <CreateInvoiceDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+      />
     </div>
   );
 }

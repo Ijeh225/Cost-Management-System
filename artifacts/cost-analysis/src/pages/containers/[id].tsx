@@ -46,7 +46,8 @@ import { TasksTab } from "@/components/containers/TasksTab";
 import { DocumentsTab } from "@/components/containers/DocumentsTab";
 import { EditSectionsTab } from "@/components/containers/EditSectionsTab";
 import { EditContainerDetailsDialog } from "@/components/containers/edit-container-details-dialog";
-import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY, useCreateInvoice, useListInvoices } from "@workspace/api-client-react";
+import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY, useListInvoices } from "@workspace/api-client-react";
+import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
@@ -559,9 +560,6 @@ export default function ContainerDetail() {
   const [linkingClient, setLinkingClient] = useState(false);
   const [editSectionsOpen, setEditSectionsOpen] = useState(false);
   const [invoiceDialog, setInvoiceDialog] = useState(false);
-  const [invoiceDueDate, setInvoiceDueDate] = useState("");
-  const [invoiceVatRate, setInvoiceVatRate] = useState("");
-  const [invoiceNotes, setInvoiceNotes] = useState("");
   const [showEditDetails, setShowEditDetails] = useState(false);
   const [, setLocation] = useLocation();
   const [trackingOpen, setTrackingOpen] = useState(false);
@@ -580,9 +578,12 @@ export default function ContainerDetail() {
   const unlockSectionMutation = useUnlockSection();
   const { data: clientsList } = useListClients();
   const linkContainerMutation = useLinkContainerToClient();
-  const createInvoiceMutation = useCreateInvoice();
   const { data: allInvoices } = useListInvoices();
-  const containerInvoices = (allInvoices ?? []).filter(inv => inv.containerId === containerId);
+  const containerInvoices = (allInvoices ?? []).filter(inv => {
+    if (inv.containerId === containerId) return true;
+    if (inv.items && inv.items.some(it => it.containerId === containerId)) return true;
+    return false;
+  });
   const addTimelineEvent = useAddTimelineEvent();
   const { data: customSectionsRaw } = useGetCustomSections(containerId);
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
@@ -843,25 +844,6 @@ export default function ContainerDetail() {
       toast({ title: "ETA saved", description: `ETA ${etaDate} recorded on the container timeline.` });
     } catch {
       toast({ variant: "destructive", title: "Could not save ETA" });
-    }
-  };
-
-  const handleCreateInvoice = async () => {
-    try {
-      const inv = await createInvoiceMutation.mutateAsync({
-        containerId,
-        vatRate: invoiceVatRate ? parseFloat(invoiceVatRate) : undefined,
-        dueDate: invoiceDueDate || undefined,
-        notes: invoiceNotes || undefined,
-      });
-      toast({ title: "Invoice created", description: inv.invoiceNumber });
-      setInvoiceDialog(false);
-      setInvoiceDueDate("");
-      setInvoiceVatRate("");
-      setInvoiceNotes("");
-      setLocation(`/invoices/${inv.id}`);
-    } catch {
-      toast({ variant: "destructive", title: "Failed to create invoice" });
     }
   };
 
@@ -1621,62 +1603,12 @@ export default function ContainerDetail() {
       </Dialog>
 
       {/* Create Invoice dialog */}
-      <Dialog open={invoiceDialog} onOpenChange={v => { if (!v) setInvoiceDialog(false); }}>
-        <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PlusCircle className="w-4 h-4 text-primary" /> Create Invoice
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
-              Invoice will be created from the clearing charges of <span className="font-semibold text-foreground">{formatCurrency(charges.clearingCharges)}</span>.
-            </div>
-            <div>
-              <Label htmlFor="inv-due">Due Date (optional)</Label>
-              <Input
-                id="inv-due"
-                type="date"
-                value={invoiceDueDate}
-                onChange={e => setInvoiceDueDate(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="inv-vat">VAT Rate % (optional, e.g. 7.5)</Label>
-              <Input
-                id="inv-vat"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                placeholder="0"
-                value={invoiceVatRate}
-                onChange={e => setInvoiceVatRate(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="inv-notes">Notes (optional)</Label>
-              <Textarea
-                id="inv-notes"
-                rows={2}
-                placeholder="Any additional notes for the invoice..."
-                value={invoiceNotes}
-                onChange={e => setInvoiceNotes(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button variant="outline" onClick={() => setInvoiceDialog(false)}>Cancel</Button>
-              <Button onClick={handleCreateInvoice} disabled={createInvoiceMutation.isPending} className="gap-2">
-                {createInvoiceMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
-                Create Invoice
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CreateInvoiceDialog
+        open={invoiceDialog}
+        onClose={() => setInvoiceDialog(false)}
+        preselectedClientId={(data as any)?.clientId ?? null}
+        preselectedContainerId={containerId}
+      />
     </div>
   );
 }
