@@ -194,6 +194,7 @@ export const CreateContainerBody = zod.object({
   size: zod.string(),
   vessel: zod.string(),
   clearingCharges: zod.number().optional(),
+  clientId: zod.number().nullish(),
 });
 
 /**
@@ -211,6 +212,7 @@ export const UploadContainersBody = zod.object({
       clearingCharges: zod.number().optional(),
     }),
   ),
+  clientId: zod.number().nullish(),
 });
 
 export const UploadContainersResponse = zod.object({
@@ -1328,6 +1330,13 @@ export const SaveCustomFieldValuesBody = zod.object({
 /**
  * @summary List custom sections with fields
  */
+export const GetCustomSectionsQueryParams = zod.object({
+  containerId: zod.coerce
+    .number()
+    .optional()
+    .describe("Filter sections by container ID"),
+});
+
 export const GetCustomSectionsResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
@@ -1372,6 +1381,7 @@ export const CreateCustomSectionBody = zod.object({
   color: zod.string().optional(),
   icon: zod.string().optional(),
   isRequired: zod.boolean().optional(),
+  containerId: zod.number().nullish(),
 });
 
 /**

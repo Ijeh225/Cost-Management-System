@@ -136,6 +136,7 @@ export interface CreateContainerRequest {
   size: string;
   vessel: string;
   clearingCharges?: number;
+  clientId?: number | null;
 }
 
 export interface UpdateContainerRequest {
@@ -163,6 +164,7 @@ export interface UploadRow {
 
 export interface UploadContainersRequest {
   rows: UploadRow[];
+  clientId?: number | null;
 }
 
 export interface UploadContainersResponse {
@@ -616,6 +618,7 @@ export interface CreateCustomSectionRequest {
   color?: string;
   icon?: string;
   isRequired?: boolean;
+  containerId?: number | null;
 }
 
 export interface UpdateCustomSectionRequest {
@@ -676,4 +679,11 @@ export type ExportContainersCSVParams = {
   status?: string;
   from?: string;
   to?: string;
+};
+
+export type GetCustomSectionsParams = {
+  /**
+   * Filter sections by container ID
+   */
+  containerId?: number;
 };

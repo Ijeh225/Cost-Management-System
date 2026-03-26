@@ -825,8 +825,8 @@ function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, o
 export function EditSectionsTab({ containerId, isAdmin }: { containerId: number; isAdmin: boolean }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const SECTIONS_QUERY_KEY = getGetCustomSectionsQueryKey(containerId);
-  const { data: sections = [], isLoading } = useGetCustomSections(containerId);
+  const SECTIONS_QUERY_KEY = getGetCustomSectionsQueryKey({ containerId });
+  const { data: sections = [], isLoading } = useGetCustomSections({ containerId });
   const { data: settings = {} } = useGetSettings();
   const updateSettingsMutation = useUpdateSettings();
   const createMutation = useCreateCustomSection();

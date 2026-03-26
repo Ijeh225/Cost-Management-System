@@ -11,7 +11,7 @@ import {
   type CustomSectionWithFields, type CustomField,
   useGetSettings, BUILT_IN_SECTION_DEFAULTS,
   getBuiltInFieldLabel, isBuiltInFieldHidden,
-  useAddTimelineEvent,
+  useAddTimelineEvent, useUpdateDeliveredAt,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -587,7 +587,8 @@ export default function ContainerDetail() {
     return false;
   });
   const addTimelineEvent = useAddTimelineEvent();
-  const { data: customSectionsRaw } = useGetCustomSections(containerId);
+  const updateDeliveredAt = useUpdateDeliveredAt();
+  const { data: customSectionsRaw } = useGetCustomSections({ containerId });
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
   const { data: sectionSettings } = useGetSettings();
 
@@ -757,25 +758,21 @@ export default function ContainerDetail() {
     );
   };
 
-  const handleSaveDeliveredAt = async () => {
-    try {
-      const res = await fetch(`/api/containers/${containerId}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deliveredAt: deliveredAtInput || null }),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        throw new Error(json.error ?? "Update failed");
+  const handleSaveDeliveredAt = () => {
+    updateDeliveredAt.mutate(
+      { id: containerId, deliveredAt: deliveredAtInput || null },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          queryClient.invalidateQueries({ queryKey: ["/api/analytics/deliveries"] });
+          toast({ title: "Delivery date saved." });
+          setEditingDeliveredAt(false);
+        },
+        onError: (err) => {
+          toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Could not save delivery date" });
+        },
       }
-      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
-      queryClient.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
-      toast({ title: "Delivery date saved." });
-      setEditingDeliveredAt(false);
-    } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Could not save delivery date" });
-    }
+    );
   };
 
   const handleToggleSectionLock = (section: string, lock: boolean) => {

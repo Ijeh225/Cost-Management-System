@@ -5,9 +5,10 @@
  * Cost Analysis Per Container API
  * OpenAPI spec version: 0.1.0
  */
-import type { UploadRow } from "./uploadRow";
 
-export interface UploadContainersRequest {
-  rows: UploadRow[];
-  clientId?: number | null;
-}
+export type GetCustomSectionsParams = {
+  /**
+   * Filter sections by container ID
+   */
+  containerId?: number;
+};

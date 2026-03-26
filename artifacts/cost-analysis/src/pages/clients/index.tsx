@@ -281,7 +281,7 @@ function BulkUploadDialog({ open, onClose }: { open: boolean; onClose: () => voi
   };
 
   const handleUpload = () => {
-    bulkMutation.mutate({ data: { rows } }, {
+    bulkMutation.mutate({ rows }, {
       onSuccess: (res) => {
         setResult(res);
         qc.invalidateQueries({ queryKey: ["/api/clients"] });

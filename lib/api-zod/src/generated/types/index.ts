@@ -46,6 +46,7 @@ export * from "./deliveryCharges";
 export * from "./errorResponse";
 export * from "./exportContainersCSVParams";
 export * from "./getContainerReportParams";
+export * from "./getCustomSectionsParams";
 export * from "./healthStatus";
 export * from "./intelligenceAlert";
 export * from "./intelligenceInsight";

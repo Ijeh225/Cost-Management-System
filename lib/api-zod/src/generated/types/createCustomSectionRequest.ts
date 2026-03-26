@@ -11,4 +11,5 @@ export interface CreateCustomSectionRequest {
   color?: string;
   icon?: string;
   isRequired?: boolean;
+  containerId?: number | null;
 }

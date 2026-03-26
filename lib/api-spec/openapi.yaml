@@ -850,6 +850,12 @@ paths:
       operationId: getCustomSections
       tags: [Sections]
       security: [{cookieAuth: []}]
+      parameters:
+        - in: query
+          name: containerId
+          required: false
+          schema: {type: integer}
+          description: Filter sections by container ID
       responses:
         "200":
           description: Sections
@@ -1188,6 +1194,9 @@ components:
           type: string
         clearingCharges:
           type: number
+        clientId:
+          type: integer
+          nullable: true
       required: [customerName, containerNumber, blNumber, declaration, size, vessel]
 
     UpdateContainerRequest:
@@ -1223,6 +1232,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UploadRow"
+        clientId:
+          type: integer
+          nullable: true
       required: [rows]
 
     UploadRow:
@@ -1919,6 +1931,7 @@ components:
         color: {type: string}
         icon: {type: string}
         isRequired: {type: boolean}
+        containerId: {type: integer, nullable: true}
       required: [name]
 
     UpdateCustomSectionRequest:

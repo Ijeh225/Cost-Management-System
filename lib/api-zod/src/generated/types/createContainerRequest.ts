@@ -14,4 +14,5 @@ export interface CreateContainerRequest {
   size: string;
   vessel: string;
   clearingCharges?: number;
+  clientId?: number | null;
 }
