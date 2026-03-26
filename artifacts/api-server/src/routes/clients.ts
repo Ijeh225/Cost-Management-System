@@ -53,7 +53,12 @@ clientsRouter.post("/clients", requireAuth, async (req: AuthRequest, res) => {
     if (!name || typeof name !== "string" || name.trim() === "") {
       return res.status(400).json({ error: "Client name is required" });
     }
-    const rate = agreedClearingRate != null && agreedClearingRate !== "" ? String(agreedClearingRate) : null;
+    let rate: string | null = null;
+    if (agreedClearingRate != null && agreedClearingRate !== "") {
+      const parsed = parseFloat(String(agreedClearingRate));
+      if (isNaN(parsed) || parsed < 0) return res.status(400).json({ error: "Agreed clearing rate must be a non-negative number" });
+      rate = String(parsed);
+    }
     const [client] = await db.insert(clientsTable).values({
       name: name.trim(), contactName, contactEmail, contactPhone, address, notes,
       agreedClearingRate: rate,
@@ -109,7 +114,13 @@ clientsRouter.patch("/clients/:id", requireAuth, async (req: AuthRequest, res) =
     if (address !== undefined) updates.address = address;
     if (notes !== undefined) updates.notes = notes;
     if (agreedClearingRate !== undefined) {
-      updates.agreedClearingRate = (agreedClearingRate === "" || agreedClearingRate === null) ? null : String(agreedClearingRate);
+      if (agreedClearingRate === "" || agreedClearingRate === null) {
+        updates.agreedClearingRate = null;
+      } else {
+        const parsed = parseFloat(String(agreedClearingRate));
+        if (isNaN(parsed) || parsed < 0) return res.status(400).json({ error: "Agreed clearing rate must be a non-negative number" });
+        updates.agreedClearingRate = String(parsed);
+      }
     }
     const [updated] = await db
       .update(clientsTable)
