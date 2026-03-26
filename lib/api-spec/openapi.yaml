@@ -549,7 +549,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/DashboardStats"
 
-  /api/analytics:
+  /analytics:
     get:
       summary: Get analytics data
       operationId: getAnalytics
@@ -563,7 +563,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AnalyticsResponse"
 
-  /api/reports/containers:
+  /reports/containers:
     get:
       summary: Get container report data
       operationId: getContainerReport
@@ -587,7 +587,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ContainerReportResponse"
 
-  /api/reports/export:
+  /reports/export:
     get:
       summary: Export containers as CSV
       operationId: exportContainersCSV
@@ -611,7 +611,7 @@ paths:
               schema:
                 type: string
 
-  /api/containers/{id}/timeline:
+  /containers/{id}/timeline:
     get:
       summary: Get container timeline
       operationId: getContainerTimeline
@@ -655,7 +655,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/TimelineEvent"
 
-  /api/containers/{id}/timeline/{eventId}:
+  /containers/{id}/timeline/{eventId}:
     delete:
       summary: Delete timeline event
       operationId: deleteTimelineEvent
@@ -674,7 +674,7 @@ paths:
         "200":
           description: Deleted
 
-  /api/containers/{id}/tasks:
+  /containers/{id}/tasks:
     get:
       summary: Get container tasks
       operationId: getContainerTasks
@@ -718,7 +718,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ContainerTask"
 
-  /api/containers/{id}/tasks/{taskId}:
+  /containers/{id}/tasks/{taskId}:
     patch:
       summary: Update task
       operationId: updateContainerTask
@@ -764,7 +764,7 @@ paths:
         "200":
           description: Deleted
 
-  /api/containers/{id}/documents:
+  /containers/{id}/documents:
     get:
       summary: Get container documents
       operationId: getContainerDocuments
@@ -785,7 +785,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/ContainerDocument"
 
-  /api/containers/{id}/documents/{docId}:
+  /containers/{id}/documents/{docId}:
     delete:
       summary: Delete document
       operationId: deleteContainerDocument
@@ -804,7 +804,7 @@ paths:
         "200":
           description: Deleted
 
-  /api/containers/{containerId}/custom-values:
+  /containers/{containerId}/custom-values:
     get:
       summary: Get custom field values for container
       operationId: getCustomFieldValues
@@ -844,7 +844,7 @@ paths:
         "200":
           description: Saved
 
-  /api/custom-sections:
+  /custom-sections:
     get:
       summary: List custom sections with fields
       operationId: getCustomSections
@@ -878,7 +878,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CustomSectionWithFields"
 
-  /api/custom-sections/{id}:
+  /custom-sections/{id}:
     patch:
       summary: Update custom section
       operationId: updateCustomSection
@@ -912,7 +912,7 @@ paths:
         "200":
           description: Deleted
 
-  /api/custom-sections/{id}/fields:
+  /custom-sections/{id}/fields:
     post:
       summary: Add field to section
       operationId: addCustomField
@@ -937,7 +937,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CustomField"
 
-  /api/custom-sections/{id}/fields/{fieldId}:
+  /custom-sections/{id}/fields/{fieldId}:
     patch:
       summary: Update custom field
       operationId: updateCustomField
@@ -979,7 +979,7 @@ paths:
         "200":
           description: Deleted
 
-  /api/intelligence/alerts:
+  /intelligence/alerts:
     get:
       summary: Get profit intelligence and delay alerts
       operationId: getIntelligenceAlerts
