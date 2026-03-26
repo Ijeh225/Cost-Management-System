@@ -435,7 +435,7 @@ function DeliveryReportSection() {
               <Input type="date" value={drTo} onChange={e => setDrTo(e.target.value)} className="h-8 text-xs w-40" />
             </div>
             <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setApplied({ from: drFrom, to: drTo })}>
-              <Filter className="w-3 h-3" /> Apply
+              <Filter className="w-3 h-3" /> Generate Report
             </Button>
             <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setDrFrom(""); setDrTo(""); setApplied({ from: "", to: "" }); }}>Reset</Button>
             {data && (

@@ -1073,7 +1073,7 @@ export default function ContainerDetail() {
                         )}
                       </>
                     ) : (
-                      <span className="text-sm text-muted-foreground">Not yet delivered</span>
+                      <span className="text-sm text-muted-foreground">Not yet recorded</span>
                     )}
                   </div>
                 )}
