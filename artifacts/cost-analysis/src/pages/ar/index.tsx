@@ -238,7 +238,7 @@ export default function AccountsReceivablePage() {
           variant="outline"
           size="sm"
           className="ml-auto gap-1.5 text-xs h-8"
-          onClick={() => exportCsv(filtered, fromDate, toDate)}
+          onClick={() => exportCsv(clients, fromDate, toDate)}
         >
           <Download className="w-3.5 h-3.5" />
           Export CSV

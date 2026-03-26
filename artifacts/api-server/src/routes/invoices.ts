@@ -388,7 +388,7 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
     }
 
     const clients = [...clientMap.values()].sort((a, b) => b.outstanding - a.outstanding);
-    const totalOutstanding = Math.max(0, summaryInvoiced - summaryCollected);
+    const totalOutstanding = clients.reduce((s, c) => s + c.outstanding, 0);
     const totalOverdue = summaryAging.days31to60 + summaryAging.days61to90 + summaryAging.days90plus;
 
     res.json({
