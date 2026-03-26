@@ -12,3 +12,4 @@ export * from "./settings";
 export * from "./notifications";
 export * from "./invoices";
 export * from "./whatsapp";
+export * from "./migrations";
