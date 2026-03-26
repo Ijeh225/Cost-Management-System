@@ -6,7 +6,7 @@ import {
   useAddInvoiceItem, useEditInvoiceItem, useRemoveInvoiceItem,
   type RecordPaymentBody, type InvoiceItem,
 } from "@workspace/api-client-react";
-import { useListContainers } from "@workspace/api-client-react";
+import { useListContainers, getListContainersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -174,7 +174,7 @@ function AddItemDialog({
   const addMutation = useAddInvoiceItem();
   const { data: allContainersData, isLoading: containersLoading } = useListContainers(
     { limit: 1000 },
-    { query: { enabled: open } },
+    { query: { queryKey: getListContainersQueryKey({ limit: 1000 }), enabled: open } },
   );
   const allContainers = allContainersData?.containers ?? [];
   const available = allContainers.filter(c => !existingContainerIds.includes(c.id));

@@ -41,6 +41,7 @@ export * from "./dashboardStats";
 export * from "./dashboardStatsAlerts";
 export * from "./dashboardStatsContainersByStatusItem";
 export * from "./dashboardStatsCostByVesselItem";
+export * from "./dashboardStatsMonthlyTrendItem";
 export * from "./dashboardStatsProfitByCustomerItem";
 export * from "./deliveryCharges";
 export * from "./deliveryReportItem";

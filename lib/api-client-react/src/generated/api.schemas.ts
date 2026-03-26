@@ -132,9 +132,9 @@ export interface CreateContainerRequest {
   customerName: string;
   containerNumber: string;
   blNumber: string;
-  declaration: string;
-  size: string;
-  vessel: string;
+  declaration?: string;
+  size?: string;
+  vessel?: string;
   clearingCharges?: number;
   clientId?: number | null;
 }
@@ -351,6 +351,14 @@ export type DashboardStatsAlerts = {
   delayedContainers: number;
 };
 
+export type DashboardStatsMonthlyTrendItem = {
+  month: string;
+  label: string;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+};
+
 export interface DashboardStats {
   totalContainers: number;
   inProgress: number;
@@ -368,6 +376,10 @@ export interface DashboardStats {
   pendingApprovals: number;
   myPendingSections: number;
   mySections?: string[];
+  totalInvoiced?: number;
+  totalCollected?: number;
+  totalOutstanding?: number;
+  monthlyTrend?: DashboardStatsMonthlyTrendItem[];
 }
 
 export type ApprovalQueueItemStatus =

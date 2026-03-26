@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { useGetCurrentUser } from "@workspace/api-client-react";
+import { useGetCurrentUser, getGetCurrentUserQueryKey } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const { data: user, isLoading: userLoading, isError, isFetching, error } = useGetCurrentUser({
     query: {
+      queryKey: getGetCurrentUserQueryKey(),
       retry: 1,
       staleTime: Infinity,
       enabled: setupStatus ? !setupStatus.required : false,

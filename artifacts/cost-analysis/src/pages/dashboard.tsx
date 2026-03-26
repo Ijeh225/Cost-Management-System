@@ -270,8 +270,7 @@ export default function Dashboard() {
   const { data: stats, isLoading, isError } = useGetDashboardStats();
   const { data: arData } = useGetArLedger();
   const { data: recentData, isLoading: recentLoading } = useListContainers(
-    { page: 1, limit: 5 },
-    { query: { staleTime: 30000 } }
+    { page: 1, limit: 5 }
   );
 
   const handleSearch = (e: React.FormEvent) => {

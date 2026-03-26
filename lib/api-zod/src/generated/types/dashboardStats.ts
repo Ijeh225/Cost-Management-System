@@ -9,6 +9,7 @@ import type { AuditEntry } from "./auditEntry";
 import type { DashboardStatsAlerts } from "./dashboardStatsAlerts";
 import type { DashboardStatsContainersByStatusItem } from "./dashboardStatsContainersByStatusItem";
 import type { DashboardStatsCostByVesselItem } from "./dashboardStatsCostByVesselItem";
+import type { DashboardStatsMonthlyTrendItem } from "./dashboardStatsMonthlyTrendItem";
 import type { DashboardStatsProfitByCustomerItem } from "./dashboardStatsProfitByCustomerItem";
 
 export interface DashboardStats {
@@ -28,4 +29,8 @@ export interface DashboardStats {
   pendingApprovals: number;
   myPendingSections: number;
   mySections?: string[];
+  totalInvoiced?: number;
+  totalCollected?: number;
+  totalOutstanding?: number;
+  monthlyTrend?: DashboardStatsMonthlyTrendItem[];
 }

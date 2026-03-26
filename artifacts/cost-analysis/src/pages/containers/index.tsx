@@ -82,7 +82,7 @@ export default function Containers() {
 
   const { data, isLoading, isError } = useListContainers(
     { page, limit, ...(debouncedSearch ? { search: debouncedSearch } : {}), ...(status !== "all" ? { status } : {}) },
-    { query: { keepPreviousData: true } }
+    {}
   );
 
   const hasActiveFilters = status !== "all" || profitFilter !== "all" || dateFrom || dateTo;

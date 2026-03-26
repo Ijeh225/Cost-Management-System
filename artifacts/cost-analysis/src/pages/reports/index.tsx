@@ -662,8 +662,7 @@ export default function ReportsPage() {
   const printRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, isError, refetch } = useGetContainerReport(
-    { status: applied.status || undefined, from: applied.from || undefined, to: applied.to || undefined },
-    { query: { enabled: true } }
+    { status: applied.status || undefined, from: applied.from || undefined, to: applied.to || undefined }
   );
 
   const allRows = ((data as any)?.containers ?? []) as ReportRow[];

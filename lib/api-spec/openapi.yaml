@@ -1222,7 +1222,7 @@ components:
         clientId:
           type: integer
           nullable: true
-      required: [customerName, containerNumber, blNumber, declaration, size, vessel]
+      required: [customerName, containerNumber, blNumber]
 
     UpdateContainerRequest:
       type: object
@@ -1602,6 +1602,28 @@ components:
           type: array
           items:
             type: string
+        totalInvoiced:
+          type: number
+        totalCollected:
+          type: number
+        totalOutstanding:
+          type: number
+        monthlyTrend:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+              label:
+                type: string
+              revenue:
+                type: number
+              cost:
+                type: number
+              grossProfit:
+                type: number
+            required: [month, label, revenue, cost, grossProfit]
       required: [totalContainers, inProgress, completed, closed, totalCost, totalClearingCharges, totalGrossProfit, totalDutyNotPaid, containersByStatus, profitByCustomer, costByVessel, recentActivity, alerts, pendingApprovals, myPendingSections]
 
     SectionApproval:

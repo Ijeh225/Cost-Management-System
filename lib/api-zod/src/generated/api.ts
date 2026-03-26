@@ -190,9 +190,9 @@ export const CreateContainerBody = zod.object({
   customerName: zod.string(),
   containerNumber: zod.string(),
   blNumber: zod.string(),
-  declaration: zod.string(),
-  size: zod.string(),
-  vessel: zod.string(),
+  declaration: zod.string().optional(),
+  size: zod.string().optional(),
+  vessel: zod.string().optional(),
   clearingCharges: zod.number().optional(),
   clientId: zod.number().nullish(),
 });
@@ -1021,6 +1021,20 @@ export const GetDashboardStatsResponse = zod.object({
   pendingApprovals: zod.number(),
   myPendingSections: zod.number(),
   mySections: zod.array(zod.string()).optional(),
+  totalInvoiced: zod.number().optional(),
+  totalCollected: zod.number().optional(),
+  totalOutstanding: zod.number().optional(),
+  monthlyTrend: zod
+    .array(
+      zod.object({
+        month: zod.string(),
+        label: zod.string(),
+        revenue: zod.number(),
+        cost: zod.number(),
+        grossProfit: zod.number(),
+      }),
+    )
+    .optional(),
 });
 
 /**
