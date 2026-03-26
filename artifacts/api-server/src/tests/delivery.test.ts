@@ -228,6 +228,31 @@ describe("API contract: backfill — deliveredAtEstimated flag", () => {
     expect(item.deliveredAtEstimated).toBe(false);
   });
 
+  it("to-date boundary is inclusive — delivery on the 'to' date is included", async () => {
+    const [boundary] = await db
+      .insert(containersTable)
+      .values({
+        containerNumber: "TEST-BOUNDARY-001",
+        blNumber: "BL-BOUND-001",
+        customerName: "Boundary Client",
+        status: "completed",
+        deliveredAt: new Date("2025-08-31T23:00:00.000Z"),
+        deliveredAtEstimated: false,
+      })
+      .returning({ id: containersTable.id });
+
+    try {
+      const res = await request(app)
+        .get("/api/analytics/deliveries?to=2025-08-31")
+        .set("Cookie", ADMIN_COOKIE);
+      expect(res.status).toBe(200);
+      const found = res.body.items.find((i: { id: number }) => i.id === boundary.id);
+      expect(found).toBeDefined();
+    } finally {
+      await db.delete(containersTable).where(eq(containersTable.id, boundary.id));
+    }
+  });
+
   it("same-day delivery yields daysToComplete=0, never negative", async () => {
     const [sameDay] = await db
       .insert(containersTable)

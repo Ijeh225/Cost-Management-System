@@ -12,12 +12,18 @@ async function ensureMigrationsTable() {
 }
 
 async function runMigration(name: string, fn: () => Promise<void>) {
-  const result = await pool.query(
+  const check = await pool.query(
+    `SELECT 1 FROM app_migrations WHERE name = $1`,
+    [name]
+  );
+  if ((check as { rowCount: number | null }).rowCount !== 0) {
+    return;
+  }
+  await fn();
+  await pool.query(
     `INSERT INTO app_migrations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
     [name]
   );
-  if ((result as { rowCount: number | null }).rowCount === 0) return;
-  await fn();
   console.log(`[migration] Ran: ${name}`);
 }
 
