@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
+import type { DeliveryReportResponse } from "./generated/api.schemas";
 
 export type PipelineContainer = {
   id: number;
@@ -14,26 +15,6 @@ export type PipelineContainer = {
 export type PipelineResponse = {
   stages: Record<string, PipelineContainer[]>;
   total: number;
-};
-
-export type DeliveryReportItem = {
-  id: number;
-  containerNumber: string;
-  blNumber: string;
-  clientName: string;
-  status: string;
-  deliveredAt: string;
-  deliveredAtEstimated: boolean;
-  clearingCharges: number;
-  daysToComplete: number | null;
-  createdAt: string;
-};
-
-export type DeliveryReportResponse = {
-  count: number;
-  totalRevenue: number;
-  avgDays: number | null;
-  items: DeliveryReportItem[];
 };
 
 export function useGetPipeline(options?: { query?: { refetchInterval?: number; enabled?: boolean } }) {

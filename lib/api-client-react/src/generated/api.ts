@@ -37,10 +37,12 @@ import type {
   CustomFieldValue,
   CustomSectionWithFields,
   DashboardStats,
+  DeliveryReportResponse,
   ErrorResponse,
   ExportContainersCSVParams,
   GetContainerReportParams,
   GetCustomSectionsParams,
+  GetDeliveryAnalyticsParams,
   HealthStatus,
   IntelligenceResponse,
   ListContainersParams,
@@ -2299,6 +2301,109 @@ export function useGetAnalytics<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetAnalyticsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get delivery tracking report data
+ */
+export const getGetDeliveryAnalyticsUrl = (
+  params?: GetDeliveryAnalyticsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/analytics/deliveries?${stringifiedParams}`
+    : `/api/analytics/deliveries`;
+};
+
+export const getDeliveryAnalytics = async (
+  params?: GetDeliveryAnalyticsParams,
+  options?: RequestInit,
+): Promise<DeliveryReportResponse> => {
+  return customFetch<DeliveryReportResponse>(
+    getGetDeliveryAnalyticsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetDeliveryAnalyticsQueryKey = (
+  params?: GetDeliveryAnalyticsParams,
+) => {
+  return [`/api/analytics/deliveries`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetDeliveryAnalyticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDeliveryAnalytics>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetDeliveryAnalyticsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDeliveryAnalytics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetDeliveryAnalyticsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDeliveryAnalytics>>
+  > = ({ signal }) =>
+    getDeliveryAnalytics(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDeliveryAnalytics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDeliveryAnalyticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDeliveryAnalytics>>
+>;
+export type GetDeliveryAnalyticsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get delivery tracking report data
+ */
+
+export function useGetDeliveryAnalytics<
+  TData = Awaited<ReturnType<typeof getDeliveryAnalytics>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetDeliveryAnalyticsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDeliveryAnalytics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDeliveryAnalyticsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

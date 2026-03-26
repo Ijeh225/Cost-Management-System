@@ -403,6 +403,26 @@ export interface RejectSectionRequest {
   reason: string;
 }
 
+export interface DeliveryReportItem {
+  id: number;
+  containerNumber: string;
+  blNumber: string;
+  clientName: string;
+  status: string;
+  deliveredAt: string;
+  deliveredAtEstimated: boolean;
+  clearingCharges: number;
+  daysToComplete?: number | null;
+  createdAt: string;
+}
+
+export interface DeliveryReportResponse {
+  count: number;
+  totalRevenue: number;
+  avgDays?: number | null;
+  items: DeliveryReportItem[];
+}
+
 export type AnalyticsResponseSummary = {
   totalRevenue: number;
   totalCost: number;
@@ -667,6 +687,17 @@ export type ListContainersParams = {
   status?: string;
   page?: number;
   limit?: number;
+};
+
+export type GetDeliveryAnalyticsParams = {
+  /**
+   * Filter deliveries from this date (inclusive)
+   */
+  from?: string;
+  /**
+   * Filter deliveries up to this date (inclusive)
+   */
+  to?: string;
 };
 
 export type GetContainerReportParams = {

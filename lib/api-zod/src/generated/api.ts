@@ -1094,6 +1094,40 @@ export const GetAnalyticsResponse = zod.object({
 });
 
 /**
+ * @summary Get delivery tracking report data
+ */
+export const GetDeliveryAnalyticsQueryParams = zod.object({
+  from: zod
+    .date()
+    .optional()
+    .describe("Filter deliveries from this date (inclusive)"),
+  to: zod
+    .date()
+    .optional()
+    .describe("Filter deliveries up to this date (inclusive)"),
+});
+
+export const GetDeliveryAnalyticsResponse = zod.object({
+  count: zod.number(),
+  totalRevenue: zod.number(),
+  avgDays: zod.number().nullish(),
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      containerNumber: zod.string(),
+      blNumber: zod.string(),
+      clientName: zod.string(),
+      status: zod.string(),
+      deliveredAt: zod.date(),
+      deliveredAtEstimated: zod.boolean(),
+      clearingCharges: zod.number(),
+      daysToComplete: zod.number().nullish(),
+      createdAt: zod.date(),
+    }),
+  ),
+});
+
+/**
  * @summary Get container report data
  */
 export const GetContainerReportQueryParams = zod.object({
