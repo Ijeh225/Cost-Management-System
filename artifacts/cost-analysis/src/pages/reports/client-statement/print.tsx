@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useGetClientStatement, type ClientStatementResponse } from "@workspace/api-client-react";
+import { Fragment } from "react";
+import { useGetClientStatement } from "@workspace/api-client-react";
 
 const fmt = (n: number) =>
   "\u20a6" + Number(n).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -154,8 +154,8 @@ export default function ClientStatementPrint() {
             </thead>
             <tbody>
               {invoices.map(inv => (
-                <>
-                  <tr key={inv.id}>
+                <Fragment key={inv.id}>
+                  <tr>
                     <td className="mono">{inv.invoiceNumber}</td>
                     <td>{fmtDate(inv.createdAt)}</td>
                     <td>{fmtDate(inv.dueDate)}</td>
@@ -177,7 +177,7 @@ export default function ClientStatementPrint() {
                       <td></td>
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
