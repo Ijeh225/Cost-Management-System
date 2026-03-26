@@ -574,7 +574,16 @@ router.post("/invoices/:id/items", requireAuth, async (req: AuthRequest, res) =>
     if (containerId) {
       const [container] = await db.select().from(containersTable).where(eq(containersTable.id, containerId));
       if (!container) return res.status(404).json({ error: "Container not found" });
-      if (resolvedAmount === undefined) resolvedAmount = parseFloat(container.clearingCharges ?? "0");
+      if (resolvedAmount === undefined) {
+        // Prefer client's agreed clearing rate over container's own rate
+        let agreedRate: number | null = null;
+        const clientId = inv.clientId;
+        if (clientId) {
+          const [cl] = await db.select({ agreedClearingRate: clientsTable.agreedClearingRate }).from(clientsTable).where(eq(clientsTable.id, clientId));
+          if (cl?.agreedClearingRate != null) agreedRate = parseFloat(cl.agreedClearingRate);
+        }
+        resolvedAmount = agreedRate != null ? agreedRate : parseFloat(container.clearingCharges ?? "0");
+      }
     }
     if (resolvedAmount === undefined || isNaN(resolvedAmount)) resolvedAmount = 0;
 
