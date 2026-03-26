@@ -194,39 +194,43 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
     const invoiceNumber = await generateInvoiceNumber();
 
     const singleContainerId = containers.length === 1 ? containers[0].id : null;
-
-    const [inv] = await db.insert(invoicesTable).values({
-      containerId: singleContainerId,
-      clientId,
-      invoiceNumber,
-      status: "draft",
-      subtotal: String(subtotal),
-      vatAmount: String(vat),
-      total: String(total),
-      dueDate: dueDate ?? null,
-      notes: notes ?? "",
-    }).returning();
-
-    const itemRows = containers.map((c, idx) => ({
-      invoiceId: inv.id,
-      containerId: c.id,
-      description: "Clearing Charges",
-      amount: c.clearingCharges ?? "0",
-      sortOrder: idx,
-    }));
-    const insertedItems = await db.insert(invoiceItemsTable).values(itemRows).returning();
-
     const containerMap = Object.fromEntries(containers.map(c => [c.id, c]));
-    const items = insertedItems.map(item => ({
-      id: item.id,
-      invoiceId: item.invoiceId,
-      containerId: item.containerId,
-      description: item.description,
-      amount: parseFloat(String(item.amount)),
-      sortOrder: item.sortOrder,
-      containerNumber: containerMap[item.containerId!]?.containerNumber ?? null,
-      blNumber: containerMap[item.containerId!]?.blNumber ?? null,
-    }));
+
+    const { inv, items } = await db.transaction(async (tx) => {
+      const [inv] = await tx.insert(invoicesTable).values({
+        containerId: singleContainerId,
+        clientId,
+        invoiceNumber,
+        status: "draft",
+        subtotal: String(subtotal),
+        vatAmount: String(vat),
+        total: String(total),
+        dueDate: dueDate ?? null,
+        notes: notes ?? "",
+      }).returning();
+
+      const itemRows = containers.map((c, idx) => ({
+        invoiceId: inv.id,
+        containerId: c.id,
+        description: "Clearing Charges",
+        amount: c.clearingCharges ?? "0",
+        sortOrder: idx,
+      }));
+      const insertedItems = await tx.insert(invoiceItemsTable).values(itemRows).returning();
+
+      const items = insertedItems.map(item => ({
+        id: item.id,
+        invoiceId: item.invoiceId,
+        containerId: item.containerId,
+        description: item.description,
+        amount: parseFloat(String(item.amount)),
+        sortOrder: item.sortOrder,
+        containerNumber: containerMap[item.containerId!]?.containerNumber ?? null,
+        blNumber: containerMap[item.containerId!]?.blNumber ?? null,
+      }));
+
+      return { inv, items };
+    });
 
     let clientName: string | null = null;
     let clientPhone: string | null = null;

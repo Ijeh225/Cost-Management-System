@@ -253,7 +253,7 @@ export default function InvoiceDetailPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Invoice Info</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {invoice.items && invoice.items.length > 1 ? (
+            {invoice.items && invoice.items.length > 0 ? (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-sm mb-2">
                   <Box className="w-4 h-4 text-muted-foreground shrink-0" />
