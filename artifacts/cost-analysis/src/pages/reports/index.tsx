@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useGetContainerReport } from "@workspace/api-client-react";
+import { useGetContainerReport, useListClients } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   Loader2, FileDown, Filter, AlertTriangle, RefreshCw,
   TrendingDown, TrendingUp, DollarSign, CheckCircle2,
   Users, BarChart3, PieChart, CalendarRange, FileSpreadsheet, Printer,
+  FileText, Receipt, Clock, ExternalLink,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
@@ -397,6 +398,131 @@ function MonthlySummary({ rows }: { rows: ReportRow[] }) {
   );
 }
 
+function PrintableReportsSection() {
+  const { data: clients = [] } = useListClients();
+  const [csClientId, setCsClientId] = useState("");
+  const [csFrom, setCsFrom] = useState("");
+  const [csTo, setCsTo] = useState("");
+  const [vatFrom, setVatFrom] = useState("");
+  const [vatTo, setVatTo] = useState("");
+
+  const openReport = (path: string, params: Record<string, string>) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v); });
+    const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+    window.open(`${base}${path}?${qs}`, "_blank", "noopener");
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-bold text-foreground flex items-center gap-2 mb-1">
+          <Printer className="w-4 h-4 text-primary" /> Printable Reports
+        </h2>
+        <p className="text-xs text-muted-foreground">Generate formatted documents that open in a new tab, ready to print or save as PDF.</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Client Statement */}
+        <Card className="border-border/50 bg-card/40">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary" /> Client Statement
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">All invoices & payments for a client in a period, with closing balance.</p>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Client *</Label>
+              <Select value={csClientId} onValueChange={setCsClientId}>
+                <SelectTrigger className="h-8 text-xs border-border/50">
+                  <SelectValue placeholder={clients.length === 0 ? "No clients yet" : "Select client…"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map(c => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">From</Label>
+                <Input type="date" value={csFrom} onChange={e => setCsFrom(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">To</Label>
+                <Input type="date" value={csTo} onChange={e => setCsTo(e.target.value)} className="h-8 text-xs" />
+              </div>
+            </div>
+            <Button
+              size="sm"
+              className="w-full gap-2 text-xs h-8"
+              disabled={!csClientId}
+              onClick={() => openReport("/reports/client-statement/print", { clientId: csClientId, from: csFrom, to: csTo })}
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Generate Statement
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* VAT Summary */}
+        <Card className="border-border/50 bg-card/40">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-blue-400" /> VAT Summary
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">Total VAT collected for a period — formatted for FIRS filing.</p>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">From</Label>
+                <Input type="date" value={vatFrom} onChange={e => setVatFrom(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">To</Label>
+                <Input type="date" value={vatTo} onChange={e => setVatTo(e.target.value)} className="h-8 text-xs" />
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground pt-1">
+              Leave blank to include all invoices across all time.
+            </div>
+            <Button
+              size="sm"
+              className="w-full gap-2 text-xs h-8"
+              onClick={() => openReport("/reports/vat-summary/print", { from: vatFrom, to: vatTo })}
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Generate VAT Summary
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Invoice Aging */}
+        <Card className="border-border/50 bg-card/40">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-400" /> Invoice Aging Report
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">All unpaid invoices grouped by overdue bucket (0-30 / 31-60 / 61-90 / 90+).</p>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <div className="rounded-lg bg-secondary/40 border border-border/40 p-3 text-xs text-muted-foreground leading-relaxed">
+              This report is always a live snapshot — it shows the current outstanding balance on all unpaid invoices as of today, sorted by days overdue.
+            </div>
+            <Button
+              size="sm"
+              className="w-full gap-2 text-xs h-8"
+              onClick={() => openReport("/reports/invoice-aging/print", {})}
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Generate Aging Report
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export default function ReportsPage() {
   const { toast } = useToast();
   const [status, setStatus] = useState("");
@@ -722,6 +848,10 @@ export default function ReportsPage() {
             </Tabs>
           </div>
         )}
+        {/* Printable Reports Section */}
+        <div className="border-t border-border/40 pt-6">
+          <PrintableReportsSection />
+        </div>
       </motion.div>
     </>
   );

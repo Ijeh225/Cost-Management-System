@@ -32,6 +32,9 @@ import InvoiceDetailPage from "@/pages/invoices/[id]";
 import InvoicePrintPage from "@/pages/invoices/print/[id]";
 import PipelinePage from "@/pages/pipeline/index";
 import ArPage from "@/pages/ar/index";
+import ClientStatementPrint from "@/pages/reports/client-statement/print";
+import VatSummaryPrint from "@/pages/reports/vat-summary/print";
+import InvoiceAgingPrint from "@/pages/reports/invoice-aging/print";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -128,6 +131,9 @@ function Router() {
       <Route path="/setup" component={Setup} />
       <Route path="/containers/:id/print" component={ContainerPrintPage} />
       <Route path="/invoices/:id/print" component={InvoicePrintPage} />
+      <Route path="/reports/client-statement/print" component={ClientStatementPrint} />
+      <Route path="/reports/vat-summary/print" component={VatSummaryPrint} />
+      <Route path="/reports/invoice-aging/print" component={InvoiceAgingPrint} />
       <Route>
         <AppLayout>
           <PageErrorBoundary>
