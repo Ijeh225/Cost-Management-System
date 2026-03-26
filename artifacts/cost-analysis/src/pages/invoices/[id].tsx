@@ -222,6 +222,7 @@ function AddItemDialog({
                   variant="outline"
                   role="combobox"
                   aria-expanded={comboOpen}
+                  disabled={available.length === 0 && !containersLoading}
                   className="w-full justify-between font-normal"
                 >
                   {selected ? (
