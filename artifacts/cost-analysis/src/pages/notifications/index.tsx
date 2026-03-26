@@ -107,7 +107,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!isLoading && notifications.length > 0) {
       markViewed.mutate(undefined, {
-        onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/notifications"] }),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
       });
     }
   }, [isLoading]);
@@ -122,7 +122,7 @@ export default function NotificationsPage() {
   const handleMarkAll = () => {
     markAll.mutate(undefined, {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+        qc.invalidateQueries({ queryKey: ["notifications"] });
         toast({ title: "All notifications marked as read" });
       },
       onError: () => toast({ variant: "destructive", title: "Failed to mark all as read" }),
