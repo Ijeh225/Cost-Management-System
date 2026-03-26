@@ -256,6 +256,85 @@ router.post("/containers/upload", requireAdmin, async (req: AuthRequest, res) =>
   }
 });
 
+router.get("/containers/pipeline", requireAuth, async (req, res) => {
+  try {
+    const now = new Date();
+    const rows = await db.select({
+      id: containersTable.id,
+      containerNumber: containersTable.containerNumber,
+      blNumber: containersTable.blNumber,
+      customerName: containersTable.customerName,
+      status: containersTable.status,
+      updatedAt: containersTable.updatedAt,
+    }).from(containersTable);
+
+    const stages: Record<string, Array<{
+      id: number;
+      containerNumber: string;
+      blNumber: string;
+      customerName: string;
+      status: string;
+      updatedAt: string;
+      daysInStage: number;
+    }>> = {};
+
+    for (const c of rows) {
+      const daysInStage = Math.floor(
+        (now.getTime() - new Date(c.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (!stages[c.status]) stages[c.status] = [];
+      stages[c.status].push({
+        id: c.id,
+        containerNumber: c.containerNumber,
+        blNumber: c.blNumber,
+        customerName: c.customerName,
+        status: c.status,
+        updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : String(c.updatedAt),
+        daysInStage,
+      });
+    }
+
+    for (const status of Object.keys(stages)) {
+      stages[status].sort((a, b) => b.daysInStage - a.daysInStage);
+    }
+
+    res.json({ stages, total: rows.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.patch("/containers/:id/status", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { status } = req.body;
+    if (!status) {
+      res.status(400).json({ error: "status is required" });
+      return;
+    }
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Container not found" });
+      return;
+    }
+    const [updated] = await db.update(containersTable)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(containersTable.id, id))
+      .returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "status_advanced",
+      section: "basic_info",
+    });
+    res.json(formatContainer(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 router.get("/containers/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);

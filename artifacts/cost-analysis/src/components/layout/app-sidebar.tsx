@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
-  ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText,
+  ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, GitBranch,
 } from "lucide-react";
 
 function NotificationsBadge({ count }: { count: number }) {
@@ -38,6 +38,7 @@ export function AppSidebar() {
 
   const mainNav = [
     { title: "Dashboard",     url: "/",            icon: LayoutDashboard },
+    { title: "Pipeline",      url: "/pipeline",    icon: GitBranch        },
     { title: "Clients",       url: "/clients",     icon: Building2        },
     { title: "Containers",    url: "/containers",  icon: Box              },
     { title: "Invoices",      url: "/invoices",    icon: FileText         },
