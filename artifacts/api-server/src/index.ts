@@ -1,6 +1,15 @@
 import app from "./app";
-import { db, containersTable, appMigrationsTable } from "@workspace/db";
+import { db, pool, containersTable, appMigrationsTable } from "@workspace/db";
 import { and, eq, inArray, isNull } from "drizzle-orm";
+
+async function ensureMigrationsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_migrations (
+      name VARCHAR(255) PRIMARY KEY,
+      ran_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
+}
 
 async function runMigration(name: string, fn: () => Promise<void>) {
   const existing = await db.select().from(appMigrationsTable).where(eq(appMigrationsTable.name, name));
@@ -12,6 +21,7 @@ async function runMigration(name: string, fn: () => Promise<void>) {
 
 async function runStartupMigrations() {
   try {
+    await ensureMigrationsTable();
     await runMigration("backfill_delivered_at_for_completed_containers", async () => {
       const rows = await db.select({ id: containersTable.id, updatedAt: containersTable.updatedAt })
         .from(containersTable)
@@ -30,6 +40,7 @@ async function runStartupMigrations() {
     });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
+    process.exit(1);
   }
 }
 
