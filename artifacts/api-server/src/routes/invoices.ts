@@ -187,7 +187,19 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
 
     const clientId = containers[0].clientId ?? null;
 
-    const subtotal = containers.reduce((s, c) => s + parseFloat(c.clearingCharges ?? "0"), 0);
+    // If client has an agreed clearing rate, use it per container instead of the container's own rate
+    let agreedRate: number | null = null;
+    if (clientId) {
+      const [cl] = await db.select({ agreedClearingRate: clientsTable.agreedClearingRate }).from(clientsTable).where(eq(clientsTable.id, clientId));
+      if (cl?.agreedClearingRate != null) {
+        agreedRate = parseFloat(cl.agreedClearingRate);
+      }
+    }
+
+    const itemAmountFor = (c: typeof containers[number]) =>
+      agreedRate != null ? agreedRate : parseFloat(c.clearingCharges ?? "0");
+
+    const subtotal = containers.reduce((s, c) => s + itemAmountFor(c), 0);
     const vat = vatRate ? subtotal * (vatRate / 100) : 0;
     const total = subtotal + vat;
 
@@ -213,7 +225,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
         invoiceId: inv.id,
         containerId: c.id,
         description: "Clearing Charges",
-        amount: c.clearingCharges ?? "0",
+        amount: String(itemAmountFor(c)),
         sortOrder: idx,
       }));
       const insertedItems = await tx.insert(invoiceItemsTable).values(itemRows).returning();

@@ -124,7 +124,7 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
   const { toast } = useToast();
   const createMutation = useCreateClient();
   const [form, setForm] = useState({
-    name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "",
+    name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "", agreedClearingRate: "",
   });
 
   const set = (patch: Partial<typeof form>) => setForm(f => ({ ...f, ...patch }));
@@ -132,9 +132,13 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
   const handleSubmit = async () => {
     if (!form.name.trim()) return;
     try {
-      await createMutation.mutateAsync(form);
+      const payload = {
+        ...form,
+        agreedClearingRate: form.agreedClearingRate !== "" ? parseFloat(form.agreedClearingRate) : undefined,
+      };
+      await createMutation.mutateAsync(payload);
       toast({ title: "Client created" });
-      setForm({ name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "" });
+      setForm({ name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "", agreedClearingRate: "" });
       onClose();
     } catch {
       toast({ variant: "destructive", title: "Failed to create client" });
@@ -171,6 +175,18 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
           <div className="space-y-1">
             <Label className="text-xs">Address</Label>
             <Input value={form.address} onChange={e => set({ address: e.target.value })} placeholder="Lagos, Nigeria" className="h-9" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Agreed Clearing Rate (₦) <span className="text-muted-foreground font-normal">— optional</span></Label>
+            <Input
+              type="number"
+              min="0"
+              value={form.agreedClearingRate}
+              onChange={e => set({ agreedClearingRate: e.target.value })}
+              placeholder="e.g. 450000"
+              className="h-9"
+            />
+            <p className="text-[11px] text-muted-foreground">When set, this rate auto-fills container clearing charges on new invoices.</p>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Notes</Label>

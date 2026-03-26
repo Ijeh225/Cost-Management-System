@@ -48,14 +48,19 @@ clientsRouter.get("/clients", requireAuth, async (req: AuthRequest, res) => {
 
 clientsRouter.post("/clients", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const { name, contactName = "", contactEmail = "", contactPhone = "", address = "", notes = "" } = req.body;
+    const { name, contactName = "", contactEmail = "", contactPhone = "", address = "", notes = "", agreedClearingRate } = req.body;
     if (!name || typeof name !== "string" || name.trim() === "") {
       return res.status(400).json({ error: "Client name is required" });
     }
+    const rate = agreedClearingRate != null && agreedClearingRate !== "" ? String(agreedClearingRate) : null;
     const [client] = await db.insert(clientsTable).values({
       name: name.trim(), contactName, contactEmail, contactPhone, address, notes,
+      agreedClearingRate: rate,
     }).returning();
-    return res.status(201).json(client);
+    return res.status(201).json({
+      ...client,
+      agreedClearingRate: client.agreedClearingRate != null ? parseFloat(client.agreedClearingRate) : null,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -66,8 +71,9 @@ clientsRouter.get("/clients/:id", requireAuth, async (req: AuthRequest, res) => 
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
-    const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
-    if (!client) return res.status(404).json({ error: "Client not found" });
+    const [raw] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
+    if (!raw) return res.status(404).json({ error: "Client not found" });
+    const client = { ...raw, agreedClearingRate: raw.agreedClearingRate != null ? parseFloat(raw.agreedClearingRate) : null };
     const containers = await db.select({
       id: containersTable.id,
       containerNumber: containersTable.containerNumber,
@@ -90,7 +96,7 @@ clientsRouter.patch("/clients/:id", requireAuth, async (req: AuthRequest, res) =
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
-    const { name, contactName, contactEmail, contactPhone, address, notes } = req.body;
+    const { name, contactName, contactEmail, contactPhone, address, notes, agreedClearingRate } = req.body;
     if (name !== undefined && (typeof name !== "string" || name.trim() === "")) {
       return res.status(400).json({ error: "Client name cannot be empty" });
     }
@@ -101,13 +107,19 @@ clientsRouter.patch("/clients/:id", requireAuth, async (req: AuthRequest, res) =
     if (contactPhone !== undefined) updates.contactPhone = contactPhone;
     if (address !== undefined) updates.address = address;
     if (notes !== undefined) updates.notes = notes;
+    if (agreedClearingRate !== undefined) {
+      updates.agreedClearingRate = (agreedClearingRate === "" || agreedClearingRate === null) ? null : String(agreedClearingRate);
+    }
     const [updated] = await db
       .update(clientsTable)
       .set(updates)
       .where(eq(clientsTable.id, id))
       .returning();
     if (!updated) return res.status(404).json({ error: "Client not found" });
-    return res.json(updated);
+    return res.json({
+      ...updated,
+      agreedClearingRate: updated.agreedClearingRate != null ? parseFloat(updated.agreedClearingRate) : null,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });

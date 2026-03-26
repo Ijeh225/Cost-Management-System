@@ -11,8 +11,11 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   FileText, Search, Loader2, Trash2, ChevronRight, Plus,
-  CheckCircle2, Clock, AlertTriangle, XCircle, CreditCard, Package,
+  CheckCircle2, Clock, AlertTriangle, CreditCard, Package,
 } from "lucide-react";
 
 function statusConfig(status: string) {
@@ -38,12 +41,29 @@ function containerSummary(invoice: Invoice): string {
   return invoice.containerNumber ?? "—";
 }
 
+function agingBadge(invoice: Invoice): { days: number; color: string } | null {
+  if (invoice.outstanding <= 0 || !invoice.dueDate) return null;
+  const due = new Date(invoice.dueDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  const days = Math.floor((today.getTime() - due.getTime()) / 86400000);
+  if (days <= 0) return null;
+  return {
+    days,
+    color: days > 30
+      ? "bg-red-500/20 text-red-400 border-red-500/40"
+      : "bg-amber-500/20 text-amber-400 border-amber-500/40",
+  };
+}
+
 function InvoiceRow({ invoice, isAdmin }: { invoice: Invoice; isAdmin: boolean }) {
   const { toast } = useToast();
   const deleteMutation = useDeleteInvoice();
   const cfg = statusConfig(invoice.status);
   const StatusIcon = cfg.icon;
   const isMulti = invoice.items && invoice.items.length > 1;
+  const aging = agingBadge(invoice);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -104,11 +124,16 @@ function InvoiceRow({ invoice, isAdmin }: { invoice: Invoice; isAdmin: boolean }
               </>
             )}
           </div>
-          <div className="sm:col-span-1 flex items-center justify-between sm:justify-start gap-2">
+          <div className="sm:col-span-1 flex items-center flex-wrap gap-1.5">
             <Badge className={`text-xs border px-2 py-0.5 flex items-center gap-1 w-fit ${cfg.color}`}>
               <StatusIcon className="w-3 h-3" />
               {cfg.label}
             </Badge>
+            {aging && (
+              <Badge className={`text-[10px] border px-1.5 py-0 w-fit ${aging.color}`}>
+                {aging.days}d overdue
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -134,16 +159,19 @@ export default function InvoicesPage() {
   const { isAdmin } = useAuth();
   const { data: invoices, isLoading } = useListInvoices();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
 
   const filtered = (invoices ?? []).filter(inv => {
     const q = search.toLowerCase();
     const containerNums = inv.items?.map(it => it.containerNumber ?? "").join(" ") ?? (inv.containerNumber ?? "");
-    return (
+    const matchesSearch = (
       inv.invoiceNumber.toLowerCase().includes(q) ||
       (inv.clientName ?? "").toLowerCase().includes(q) ||
       containerNums.toLowerCase().includes(q)
     );
+    const matchesStatus = statusFilter === "all" || inv.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
   const totalOutstanding = (invoices ?? []).reduce((s, i) => s + i.outstanding, 0);
@@ -187,14 +215,29 @@ export default function InvoicesPage() {
         ))}
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by invoice number, client or container..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by invoice number, client or container..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-36 shrink-0">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="sent">Sent</SelectItem>
+            <SelectItem value="partial">Part Paid</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (

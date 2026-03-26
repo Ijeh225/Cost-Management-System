@@ -9,6 +9,7 @@ export type Client = {
   contactPhone: string;
   address: string;
   notes: string;
+  agreedClearingRate?: number | null;
   totalOutstanding?: number;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +36,7 @@ export type CreateClientBody = {
   contactPhone?: string;
   address?: string;
   notes?: string;
+  agreedClearingRate?: number | null;
 };
 
 export type ClientReceivablesInvoice = {

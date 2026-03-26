@@ -42,7 +42,7 @@ export default function ClientDetailPage() {
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
-    name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "",
+    name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "", agreedClearingRate: "",
   });
 
   const startEdit = () => {
@@ -54,6 +54,7 @@ export default function ClientDetailPage() {
       contactPhone: client.contactPhone,
       address: client.address,
       notes: client.notes,
+      agreedClearingRate: client.agreedClearingRate != null ? String(client.agreedClearingRate) : "",
     });
     setEditing(true);
   };
@@ -61,7 +62,11 @@ export default function ClientDetailPage() {
   const handleSave = async () => {
     if (!form.name.trim()) return;
     try {
-      await updateMutation.mutateAsync({ id: clientId, data: form });
+      const payload = {
+        ...form,
+        agreedClearingRate: form.agreedClearingRate !== "" ? parseFloat(form.agreedClearingRate) : null,
+      };
+      await updateMutation.mutateAsync({ id: clientId, data: payload });
       toast({ title: "Client updated" });
       setEditing(false);
     } catch {
@@ -294,6 +299,17 @@ export default function ClientDetailPage() {
                   <Input value={form.address} onChange={e => set({ address: e.target.value })} className="h-8 text-sm" />
                 </div>
                 <div className="space-y-1">
+                  <Label className="text-xs">Agreed Clearing Rate (₦)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={form.agreedClearingRate}
+                    onChange={e => set({ agreedClearingRate: e.target.value })}
+                    placeholder="Leave blank to use container rate"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
                   <Label className="text-xs">Notes</Label>
                   <Textarea value={form.notes} onChange={e => set({ notes: e.target.value })} rows={2} className="resize-none text-sm" />
                 </div>
@@ -332,12 +348,19 @@ export default function ClientDetailPage() {
                     <span>{client.address}</span>
                   </div>
                 )}
+                {client.agreedClearingRate != null && (
+                  <div className="pt-2 border-t border-border/40">
+                    <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-0.5">Agreed Clearing Rate</p>
+                    <p className="text-sm font-mono font-semibold text-primary">{formatCurrency(client.agreedClearingRate)}</p>
+                    <p className="text-[10px] text-muted-foreground">Auto-applied on new invoices</p>
+                  </div>
+                )}
                 {client.notes && (
                   <div className="pt-2 border-t border-border/40">
                     <p className="text-xs text-muted-foreground italic">{client.notes}</p>
                   </div>
                 )}
-                {!client.contactName && !client.contactPhone && !client.contactEmail && !client.address && !client.notes && (
+                {!client.contactName && !client.contactPhone && !client.contactEmail && !client.address && !client.notes && client.agreedClearingRate == null && (
                   <p className="text-sm text-muted-foreground italic">No contact details. Click Edit to add them.</p>
                 )}
               </div>
