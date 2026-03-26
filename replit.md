@@ -14,6 +14,8 @@ Key capabilities include:
 - Full invoice and payment tracking, including multi-container invoicing and WhatsApp integration for client communication.
 - Client management with financial summaries and receivables tracking.
 - Custom section and field builder for administrative flexibility.
+- Delivery tracking: admins can record/edit physical delivery dates per container; estimated flag shown for auto-backfilled dates.
+- Delivery Report: `/reports` page shows an interactive delivery tracking section with date-range filtering, stat cards (count, revenue, avg days), breakdown table, and a printable report at `/reports/delivery-report/print`.
 
 The project's vision is to offer a complete solution for logistics companies to manage their container clearing operations efficiently, gain insights into profitability, and improve client communication.
 

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, sectionApprovalsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, gte, lte, and, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
@@ -181,6 +181,77 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
       monthlyTrend,
       negativeProfitContainers,
       staffProductivity,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const fromStr = req.query.from as string | undefined;
+    const toStr = req.query.to as string | undefined;
+
+    const conditions: any[] = [isNotNull(containersTable.deliveredAt)];
+    if (fromStr) conditions.push(gte(containersTable.deliveredAt, new Date(fromStr)));
+    if (toStr) {
+      const toDate = new Date(toStr);
+      toDate.setHours(23, 59, 59, 999);
+      conditions.push(lte(containersTable.deliveredAt, toDate));
+    }
+    const where = conditions.length === 1 ? conditions[0] : and(...conditions);
+
+    const rows = await db.select({
+      id: containersTable.id,
+      containerNumber: containersTable.containerNumber,
+      blNumber: containersTable.blNumber,
+      customerName: containersTable.customerName,
+      status: containersTable.status,
+      deliveredAt: containersTable.deliveredAt,
+      deliveredAtEstimated: containersTable.deliveredAtEstimated,
+      clearingCharges: containersTable.clearingCharges,
+      createdAt: containersTable.createdAt,
+    }).from(containersTable).where(where);
+
+    let totalRevenue = 0;
+    let totalDays = 0;
+    let countWithDays = 0;
+
+    const items = rows.map(c => {
+      const revenue = parseFloat(c.clearingCharges ?? "0");
+      totalRevenue += revenue;
+      const delivDate = c.deliveredAt instanceof Date ? c.deliveredAt : c.deliveredAt ? new Date(c.deliveredAt as any) : null;
+      const createDate = c.createdAt instanceof Date ? c.createdAt : new Date(c.createdAt as any);
+      let daysToDeliver: number | null = null;
+      if (delivDate) {
+        daysToDeliver = Math.floor((delivDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysToDeliver >= 0) {
+          totalDays += daysToDeliver;
+          countWithDays++;
+        }
+      }
+      return {
+        id: c.id,
+        containerNumber: c.containerNumber,
+        blNumber: c.blNumber,
+        customerName: c.customerName,
+        status: c.status,
+        deliveredAt: delivDate ? delivDate.toISOString() : "",
+        deliveredAtEstimated: c.deliveredAtEstimated ?? false,
+        clearingCharges: revenue,
+        daysToDeliver,
+        createdAt: createDate.toISOString(),
+      };
+    });
+
+    items.sort((a, b) => new Date(b.deliveredAt).getTime() - new Date(a.deliveredAt).getTime());
+
+    return res.json({
+      count: items.length,
+      totalRevenue,
+      avgDays: countWithDays > 0 ? Math.round(totalDays / countWithDays) : null,
+      items,
     });
   } catch (err) {
     console.error(err);

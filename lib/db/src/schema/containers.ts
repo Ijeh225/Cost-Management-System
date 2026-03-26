@@ -18,6 +18,8 @@ export const containersTable = pgTable("containers", {
   clientId: integer("client_id").references(() => clientsTable.id),
   assignedStaffId: integer("assigned_staff_id").references(() => usersTable.id),
   clearingCharges: numeric("clearing_charges", { precision: 15, scale: 2 }).notNull().default("0"),
+  deliveredAt: timestamp("delivered_at"),
+  deliveredAtEstimated: boolean("delivered_at_estimated").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

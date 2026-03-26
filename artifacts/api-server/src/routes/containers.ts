@@ -28,6 +28,8 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     clearingCharges: parseFloat(c.clearingCharges ?? "0"),
     grossProfit: parseFloat(c.clearingCharges ?? "0") - parseFloat(c.totalCost ?? "0"),
     dutyNotPaid: 0,
+    deliveredAt: c.deliveredAt instanceof Date ? c.deliveredAt.toISOString() : (c.deliveredAt ?? null),
+    deliveredAtEstimated: c.deliveredAtEstimated ?? false,
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
   };
@@ -412,7 +414,7 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       res.status(403).json({ error: "Container is locked" });
       return;
     }
-    const { customerName, containerNumber, blNumber, declaration, size, vessel, status, assignedStaffId, clearingCharges } = req.body;
+    const { customerName, containerNumber, blNumber, declaration, size, vessel, status, assignedStaffId, clearingCharges, deliveredAt } = req.body;
     const updates: any = { updatedAt: new Date() };
     if (customerName !== undefined) updates.customerName = customerName;
     if (containerNumber !== undefined) updates.containerNumber = containerNumber;
@@ -423,6 +425,10 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (status !== undefined) updates.status = status;
     if (assignedStaffId !== undefined) updates.assignedStaffId = assignedStaffId;
     if (clearingCharges !== undefined) updates.clearingCharges = String(clearingCharges);
+    if (deliveredAt !== undefined) {
+      updates.deliveredAt = deliveredAt ? new Date(deliveredAt) : null;
+      updates.deliveredAtEstimated = false;
+    }
 
     const [updated] = await db.update(containersTable).set(updates).where(eq(containersTable.id, id)).returning();
 

@@ -39,7 +39,7 @@ import {
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
   Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink, X,
-  ClipboardCheck, ArrowRightCircle, PlusCircle,
+  ClipboardCheck, ArrowRightCircle, PlusCircle, Truck,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
@@ -558,6 +558,8 @@ export default function ContainerDetail() {
   const [linkClientDialog, setLinkClientDialog] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [linkingClient, setLinkingClient] = useState(false);
+  const [editingDeliveredAt, setEditingDeliveredAt] = useState(false);
+  const [deliveredAtInput, setDeliveredAtInput] = useState("");
   const [editSectionsOpen, setEditSectionsOpen] = useState(false);
   const [invoiceDialog, setInvoiceDialog] = useState(false);
   const [showEditDetails, setShowEditDetails] = useState(false);
@@ -749,6 +751,21 @@ export default function ContainerDetail() {
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
           toast({ title: "Clearing charges updated." });
           setEditingClearing(false);
+        },
+        onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err?.message }),
+      }
+    );
+  };
+
+  const handleSaveDeliveredAt = () => {
+    updateMutation.mutate(
+      { id: containerId, data: { deliveredAt: deliveredAtInput || null } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          queryClient.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
+          toast({ title: "Delivery date saved." });
+          setEditingDeliveredAt(false);
         },
         onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err?.message }),
       }
@@ -1019,6 +1036,61 @@ export default function ContainerDetail() {
               </p>
             </div>
           </div>
+          {/* Delivery Date Row */}
+          <div className="border-t border-border/30 pt-4 mb-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Truck className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs font-mono text-muted-foreground uppercase mb-0.5">Date Delivered</p>
+                {editingDeliveredAt ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      type="date"
+                      value={deliveredAtInput}
+                      onChange={e => setDeliveredAtInput(e.target.value)}
+                      className="h-7 text-xs w-40 border-border/60"
+                    />
+                    <Button size="sm" className="h-7 text-xs px-2 gap-1" onClick={handleSaveDeliveredAt} disabled={updateMutation.isPending}>
+                      {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditingDeliveredAt(false)}>Cancel</Button>
+                    {deliveredAtInput && (
+                      <Button size="sm" variant="ghost" className="h-7 text-xs px-2 text-destructive" onClick={() => setDeliveredAtInput("")}>Clear</Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {container.deliveredAt ? (
+                      <>
+                        <span className="text-sm font-semibold text-emerald-400">
+                          {new Date(container.deliveredAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                        </span>
+                        {container.deliveredAtEstimated && (
+                          <span className="text-[10px] text-amber-400 border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">estimated</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Not yet delivered</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            {isAdmin && !container.isLocked && !editingDeliveredAt && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => {
+                  setDeliveredAtInput(container.deliveredAt ? container.deliveredAt.slice(0, 10) : "");
+                  setEditingDeliveredAt(true);
+                }}
+              >
+                <Pencil className="w-3 h-3" /> {container.deliveredAt ? "Edit Date" : "Set Delivery Date"}
+              </Button>
+            )}
+          </div>
+
           <div className="border-t border-border/30 pt-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Users className="w-4 h-4 text-muted-foreground shrink-0" />

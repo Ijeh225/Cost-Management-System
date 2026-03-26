@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useGetContainerReport, useListClients } from "@workspace/api-client-react";
+import { useGetContainerReport, useListClients, useGetDeliveryReport } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import {
   Loader2, FileDown, Filter, AlertTriangle, RefreshCw,
   TrendingDown, TrendingUp, DollarSign, CheckCircle2,
   Users, BarChart3, PieChart, CalendarRange, FileSpreadsheet, Printer,
-  FileText, Receipt, Clock, ExternalLink,
+  FileText, Receipt, Clock, ExternalLink, Truck,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
@@ -394,6 +394,133 @@ function MonthlySummary({ rows }: { rows: ReportRow[] }) {
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function DeliveryReportSection() {
+  const [drFrom, setDrFrom] = useState("");
+  const [drTo, setDrTo] = useState("");
+  const [applied, setApplied] = useState<{ from: string; to: string }>({ from: "", to: "" });
+
+  const { data, isLoading } = useGetDeliveryReport(applied.from || undefined, applied.to || undefined);
+
+  const openReport = (path: string, params: Record<string, string>) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v); });
+    const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+    window.open(`${base}${path}?${qs}`, "_blank", "noopener");
+  };
+
+  const items = data?.items ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-bold text-foreground flex items-center gap-2 mb-1">
+          <Truck className="w-4 h-4 text-emerald-400" /> Delivery Tracking Report
+        </h2>
+        <p className="text-xs text-muted-foreground">Track containers that have been physically delivered. Filter by delivery date range.</p>
+      </div>
+      <Card className="border-border/50 bg-card/40">
+        <CardContent className="p-4 space-y-4">
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">Delivered From</Label>
+              <Input type="date" value={drFrom} onChange={e => setDrFrom(e.target.value)} className="h-8 text-xs w-40" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Delivered To</Label>
+              <Input type="date" value={drTo} onChange={e => setDrTo(e.target.value)} className="h-8 text-xs w-40" />
+            </div>
+            <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setApplied({ from: drFrom, to: drTo })}>
+              <Filter className="w-3 h-3" /> Apply
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setDrFrom(""); setDrTo(""); setApplied({ from: "", to: "" }); }}>Reset</Button>
+            {data && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs gap-1.5 ml-auto"
+                onClick={() => openReport("/reports/delivery-report/print", { from: applied.from, to: applied.to })}
+              >
+                <ExternalLink className="w-3 h-3" /> Print Report
+              </Button>
+            )}
+          </div>
+
+          {/* Summary Stats */}
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+          ) : data ? (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-card/40 border border-border/40 rounded-lg px-4 py-3">
+                  <div className="text-xs text-muted-foreground mb-1">Total Deliveries</div>
+                  <div className="font-bold text-xl">{data.count}</div>
+                </div>
+                <div className="bg-card/40 border border-border/40 rounded-lg px-4 py-3">
+                  <div className="text-xs text-muted-foreground mb-1">Total Revenue</div>
+                  <div className="font-bold font-mono text-lg text-primary">{formatCurrency(data.totalRevenue)}</div>
+                </div>
+                <div className="bg-card/40 border border-border/40 rounded-lg px-4 py-3">
+                  <div className="text-xs text-muted-foreground mb-1">Avg. Days to Deliver</div>
+                  <div className="font-bold text-xl">{data.avgDays !== null ? `${data.avgDays} days` : "N/A"}</div>
+                </div>
+              </div>
+
+              {/* Breakdown table */}
+              {items.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground text-sm">No deliveries found for the selected period.</div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-border/40">
+                  <table className="w-full text-sm min-w-[700px]">
+                    <thead className="border-b border-border/50 bg-secondary/20 text-xs text-muted-foreground uppercase tracking-wider">
+                      <tr>
+                        <th className="px-4 py-2.5 text-left font-medium">Container / BL</th>
+                        <th className="px-4 py-2.5 text-left font-medium">Customer</th>
+                        <th className="px-4 py-2.5 text-left font-medium">Delivered</th>
+                        <th className="px-4 py-2.5 text-right font-medium">Days</th>
+                        <th className="px-4 py-2.5 text-right font-medium">Revenue (₦)</th>
+                        <th className="px-4 py-2.5 text-left font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {items.map(item => (
+                        <tr key={item.id} className="hover:bg-accent/20 transition-colors">
+                          <td className="px-4 py-2.5">
+                            <div className="font-mono font-medium text-primary text-xs">{item.containerNumber}</div>
+                            <div className="text-[11px] text-muted-foreground">{item.blNumber}</div>
+                          </td>
+                          <td className="px-4 py-2.5 font-medium">{item.customerName}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="text-xs font-semibold text-emerald-400">
+                              {new Date(item.deliveredAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                            </div>
+                            {item.deliveredAtEstimated && (
+                              <span className="text-[10px] text-amber-400 border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">estimated</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono text-xs">
+                            {item.daysToDeliver !== null ? item.daysToDeliver : "—"}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono text-xs text-primary">{formatCurrency(item.clearingCharges)}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${getStatusColor(item.status)}`}>
+                              {getStatusLabel(item.status)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -848,6 +975,11 @@ export default function ReportsPage() {
             </Tabs>
           </div>
         )}
+        {/* Delivery Tracking Report */}
+        <div className="border-t border-border/40 pt-6">
+          <DeliveryReportSection />
+        </div>
+
         {/* Printable Reports Section */}
         <div className="border-t border-border/40 pt-6">
           <PrintableReportsSection />
