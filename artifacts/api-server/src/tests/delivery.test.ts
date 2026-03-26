@@ -227,4 +227,31 @@ describe("API contract: backfill — deliveredAtEstimated flag", () => {
     expect(item).toBeDefined();
     expect(item.deliveredAtEstimated).toBe(false);
   });
+
+  it("same-day delivery yields daysToComplete=0, never negative", async () => {
+    const [sameDay] = await db
+      .insert(containersTable)
+      .values({
+        containerNumber: "TEST-SAMEDAY-001",
+        blNumber: "BL-SAME-001",
+        customerName: "Same Day Client",
+        status: "completed",
+        deliveredAt: new Date("2025-09-10"),
+        deliveredAtEstimated: false,
+        createdAt: new Date("2025-09-10T23:59:59.000Z"),
+      })
+      .returning({ id: containersTable.id });
+
+    try {
+      const res = await request(app)
+        .get("/api/analytics/deliveries")
+        .set("Cookie", ADMIN_COOKIE);
+      expect(res.status).toBe(200);
+      const item = res.body.items.find((i: { id: number }) => i.id === sameDay.id);
+      expect(item).toBeDefined();
+      expect(item.daysToComplete).toBe(0);
+    } finally {
+      await db.delete(containersTable).where(eq(containersTable.id, sameDay.id));
+    }
+  });
 });

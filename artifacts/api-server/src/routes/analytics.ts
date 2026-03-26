@@ -236,6 +236,11 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
     let totalDays = 0;
     let countWithDays = 0;
 
+    const toCalendarDay = (d: Date): number => {
+      return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    };
+    const DAY_MS = 1000 * 60 * 60 * 24;
+
     const items = rows.map(c => {
       const revenue = parseFloat(c.clearingCharges ?? "0");
       totalRevenue += revenue;
@@ -243,11 +248,10 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
       const createDate = c.createdAt instanceof Date ? c.createdAt : new Date(String(c.createdAt));
       let daysToComplete: number | null = null;
       if (delivDate) {
-        daysToComplete = Math.floor((delivDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysToComplete >= 0) {
-          totalDays += daysToComplete;
-          countWithDays++;
-        }
+        const rawDays = Math.round((toCalendarDay(delivDate) - toCalendarDay(createDate)) / DAY_MS);
+        daysToComplete = Math.max(0, rawDays);
+        totalDays += daysToComplete;
+        countWithDays++;
       }
       return {
         id: c.id,
