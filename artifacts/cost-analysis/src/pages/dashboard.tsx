@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts } from "@workspace/api-client-react";
+import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -268,6 +268,7 @@ export default function Dashboard() {
   const { isAdmin } = useAuth();
 
   const { data: stats, isLoading, isError } = useGetDashboardStats();
+  const { data: arData } = useGetArLedger();
   const { data: recentData, isLoading: recentLoading } = useListContainers(
     { page: 1, limit: 5 },
     { query: { staleTime: 30000 } }
@@ -395,6 +396,37 @@ export default function Dashboard() {
           </Link>
         )}
       </div>
+
+      {/* AR Aging Widget */}
+      {arData && (
+        <Link href="/accounts-receivable" className="block">
+          <Card className="border-border/40 bg-card/40 backdrop-blur-sm hover:bg-card/60 transition-colors cursor-pointer group">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-primary" /> Receivables Aging
+              </CardTitle>
+              <span className="text-xs text-muted-foreground group-hover:text-primary flex items-center gap-1 transition-colors">
+                View full ledger <ArrowRight className="w-3 h-3" />
+              </span>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-4 gap-3">
+                {[
+                  { label: "Current",  value: arData.aging.current,    color: "text-foreground",  bg: "bg-muted/40" },
+                  { label: "1–30 days",value: arData.aging.days1to30,  color: "text-amber-400",   bg: "bg-amber-500/10" },
+                  { label: "31–60 days",value: arData.aging.days31to60,color: "text-orange-400",  bg: "bg-orange-500/10" },
+                  { label: "60+ days", value: arData.aging.days61to90 + arData.aging.days90plus, color: "text-red-500", bg: "bg-red-500/15" },
+                ].map(b => (
+                  <div key={b.label} className={`rounded-lg p-3 ${b.bg} border border-border/20`}>
+                    <div className="text-[10px] text-muted-foreground font-medium mb-1 truncate">{b.label}</div>
+                    <div className={`text-sm font-bold ${b.color}`}>{formatCurrency(b.value)}</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       {/* Monthly Revenue vs Cost Trend */}
       {(stats.monthlyTrend ?? []).length > 0 && (

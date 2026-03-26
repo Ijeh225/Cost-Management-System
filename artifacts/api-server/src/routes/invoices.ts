@@ -255,6 +255,147 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const rows = await db
+      .select({
+        id: invoicesTable.id,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        status: invoicesTable.status,
+        clientId: invoicesTable.clientId,
+        clientName: clientsTable.name,
+        total: invoicesTable.total,
+        dueDate: invoicesTable.dueDate,
+        createdAt: invoicesTable.createdAt,
+      })
+      .from(invoicesTable)
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .orderBy(desc(invoicesTable.createdAt));
+
+    const allPayments = await db.select({
+      id: invoicePaymentsTable.id,
+      invoiceId: invoicePaymentsTable.invoiceId,
+      amount: invoicePaymentsTable.amount,
+      paidAt: invoicePaymentsTable.paidAt,
+    }).from(invoicePaymentsTable);
+
+    const paymentsByInvoice = new Map<number, typeof allPayments>();
+    let collectedThisMonth = 0;
+    for (const p of allPayments) {
+      if (!paymentsByInvoice.has(p.invoiceId)) paymentsByInvoice.set(p.invoiceId, []);
+      paymentsByInvoice.get(p.invoiceId)!.push(p);
+      const paidAt = p.paidAt instanceof Date ? p.paidAt : new Date(p.paidAt);
+      if (paidAt >= monthStart) {
+        collectedThisMonth += parseFloat(p.amount ?? "0");
+      }
+    }
+
+    type AgingBuckets = { current: number; days1to30: number; days31to60: number; days61to90: number; days90plus: number };
+    type UnpaidInvoice = { id: number; invoiceNumber: string; status: string; total: number; totalPaid: number; outstanding: number; dueDate: string | null; createdAt: string };
+    type ClientRow = {
+      clientId: number | null;
+      clientName: string;
+      invoiceCount: number;
+      totalInvoiced: number;
+      totalCollected: number;
+      outstanding: number;
+      aging: AgingBuckets;
+      unpaidInvoices: UnpaidInvoice[];
+    };
+
+    const clientMap = new Map<string, ClientRow>();
+    const summaryAging: AgingBuckets = { current: 0, days1to30: 0, days31to60: 0, days61to90: 0, days90plus: 0 };
+    let summaryInvoiced = 0;
+    let summaryCollected = 0;
+    let openInvoiceCount = 0;
+
+    function agingKey(dueDate: string | null, outstanding: number): keyof AgingBuckets | null {
+      if (outstanding <= 0) return null;
+      if (!dueDate) return "current";
+      const due = new Date(dueDate);
+      const overdueDays = Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+      if (overdueDays <= 0) return "current";
+      if (overdueDays <= 30) return "days1to30";
+      if (overdueDays <= 60) return "days31to60";
+      if (overdueDays <= 90) return "days61to90";
+      return "days90plus";
+    }
+
+    for (const inv of rows) {
+      const payments = paymentsByInvoice.get(inv.id) ?? [];
+      const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+      const total = parseFloat(inv.total ?? "0");
+      const outstanding = Math.max(0, total - totalPaid);
+
+      const key = String(inv.clientId ?? "unknown");
+      const label = inv.clientName ?? "Unknown Client";
+      if (!clientMap.has(key)) {
+        clientMap.set(key, {
+          clientId: inv.clientId ?? null,
+          clientName: label,
+          invoiceCount: 0,
+          totalInvoiced: 0,
+          totalCollected: 0,
+          outstanding: 0,
+          aging: { current: 0, days1to30: 0, days31to60: 0, days61to90: 0, days90plus: 0 },
+          unpaidInvoices: [],
+        });
+      }
+      const row = clientMap.get(key)!;
+      row.invoiceCount += 1;
+      row.totalInvoiced += total;
+      row.totalCollected += totalPaid;
+      row.outstanding += outstanding;
+      summaryInvoiced += total;
+      summaryCollected += totalPaid;
+
+      const dueDateStr = inv.dueDate ?? null;
+      const bucket = agingKey(dueDateStr, outstanding);
+      if (bucket) {
+        row.aging[bucket] += outstanding;
+        summaryAging[bucket] += outstanding;
+      }
+
+      if (outstanding > 0) {
+        openInvoiceCount += 1;
+        row.unpaidInvoices.push({
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          status: inv.status,
+          total,
+          totalPaid,
+          outstanding,
+          dueDate: dueDateStr,
+          createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : String(inv.createdAt),
+        });
+      }
+    }
+
+    const clients = [...clientMap.values()].sort((a, b) => b.outstanding - a.outstanding);
+    const totalOutstanding = summaryInvoiced - summaryCollected;
+    const totalOverdue = summaryAging.days1to30 + summaryAging.days31to60 + summaryAging.days61to90 + summaryAging.days90plus;
+
+    res.json({
+      summary: {
+        totalInvoiced: summaryInvoiced,
+        totalCollected: summaryCollected,
+        totalOutstanding: Math.max(0, totalOutstanding),
+        collectedThisMonth,
+        openInvoiceCount,
+        totalOverdue,
+      },
+      aging: summaryAging,
+      clients,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch accounts receivable" });
+  }
+});
+
 router.get("/invoices/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);

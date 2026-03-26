@@ -224,6 +224,58 @@ export function useSendInvoiceReceipt() {
   });
 }
 
+export type ArAgingBuckets = {
+  current: number;
+  days1to30: number;
+  days31to60: number;
+  days61to90: number;
+  days90plus: number;
+};
+
+export type ArUnpaidInvoice = {
+  id: number;
+  invoiceNumber: string;
+  status: string;
+  total: number;
+  totalPaid: number;
+  outstanding: number;
+  dueDate: string | null;
+  createdAt: string;
+};
+
+export type ArClientRow = {
+  clientId: number | null;
+  clientName: string;
+  invoiceCount: number;
+  totalInvoiced: number;
+  totalCollected: number;
+  outstanding: number;
+  aging: ArAgingBuckets;
+  unpaidInvoices: ArUnpaidInvoice[];
+};
+
+export type ArLedgerResponse = {
+  summary: {
+    totalInvoiced: number;
+    totalCollected: number;
+    totalOutstanding: number;
+    collectedThisMonth: number;
+    openInvoiceCount: number;
+    totalOverdue: number;
+  };
+  aging: ArAgingBuckets;
+  clients: ArClientRow[];
+};
+
+export const AR_QUERY_KEY = ["/api/invoices/accounts-receivable"];
+
+export function useGetArLedger() {
+  return useQuery<ArLedgerResponse>({
+    queryKey: AR_QUERY_KEY,
+    queryFn: () => customFetch<ArLedgerResponse>("/api/invoices/accounts-receivable"),
+  });
+}
+
 export type AddInvoiceItemBody = {
   containerId?: number;
   description?: string;
