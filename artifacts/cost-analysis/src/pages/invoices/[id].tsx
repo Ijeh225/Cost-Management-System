@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -25,7 +27,7 @@ import {
   FileText, ArrowLeft, Phone, Loader2, Trash2, CheckCircle2,
   Clock, AlertTriangle, CreditCard, Send, PlusCircle, Building2,
   Box, Calendar, StickyNote, MessageCircle, Bell, ChevronDown, ChevronUp, Printer, Receipt,
-  Pencil,
+  Pencil, ChevronsUpDown, Check,
 } from "lucide-react";
 
 function statusConfig(status: string) {
@@ -170,14 +172,18 @@ function AddItemDialog({
 }) {
   const { toast } = useToast();
   const addMutation = useAddInvoiceItem();
-  const { data: allContainersData } = useListContainers(undefined, { query: { enabled: open } });
+  const { data: allContainersData, isLoading: containersLoading } = useListContainers(
+    { limit: 1000 },
+    { query: { enabled: open } },
+  );
   const allContainers = allContainersData?.containers ?? [];
   const available = allContainers.filter(c => !existingContainerIds.includes(c.id));
 
   const [containerId, setContainerId] = useState<string>("");
+  const [comboOpen, setComboOpen] = useState(false);
   const selected = available.find(c => String(c.id) === containerId);
 
-  const handleClose = () => { setContainerId(""); onClose(); };
+  const handleClose = () => { setContainerId(""); setComboOpen(false); onClose(); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,23 +215,71 @@ function AddItemDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
-            <Label>Select Container</Label>
-            <Select value={containerId} onValueChange={setContainerId}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder={available.length === 0 ? "No available containers" : "Select container…"} />
-              </SelectTrigger>
-              <SelectContent>
-                {available.map(c => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    <span className="font-mono">{c.containerNumber}</span>
-                    {c.customerName && <span className="text-muted-foreground ml-2 text-xs">· {c.customerName}</span>}
-                  </SelectItem>
-                ))}
-                {available.length === 0 && (
-                  <SelectItem value="__none" disabled>All containers are already on this invoice</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+            <Label className="mb-1.5 block">Search Container</Label>
+            <Popover open={comboOpen} onOpenChange={setComboOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={comboOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  {selected ? (
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono font-medium truncate">{selected.containerNumber}</span>
+                      {selected.blNumber && (
+                        <span className="text-muted-foreground text-xs truncate">· {selected.blNumber}</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      {containersLoading ? "Loading containers…" : "Search by container # or B/L…"}
+                    </span>
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[420px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Type container # or B/L number…" />
+                  <CommandList className="max-h-60">
+                    <CommandEmpty>
+                      {containersLoading ? "Loading…" : "No containers found."}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {available.map(c => (
+                        <CommandItem
+                          key={c.id}
+                          value={`${c.containerNumber ?? ""} ${c.blNumber ?? ""} ${c.customerName ?? ""}`}
+                          onSelect={() => {
+                            setContainerId(String(c.id));
+                            setComboOpen(false);
+                          }}
+                          className="flex items-center gap-2 py-2"
+                        >
+                          <Check
+                            className={`h-3.5 w-3.5 shrink-0 ${containerId === String(c.id) ? "opacity-100" : "opacity-0"}`}
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-mono font-medium text-sm">{c.containerNumber}</span>
+                            <span className="text-xs text-muted-foreground flex gap-2">
+                              {c.blNumber && <span>B/L: {c.blNumber}</span>}
+                              {c.customerName && <span>· {c.customerName}</span>}
+                            </span>
+                          </div>
+                          <span className="ml-auto font-mono text-xs text-muted-foreground shrink-0">
+                            {formatCurrency(c.clearingCharges ?? 0)}
+                          </span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {available.length === 0 && !containersLoading && (
+              <p className="text-xs text-muted-foreground mt-1.5">All containers are already on this invoice.</p>
+            )}
           </div>
 
           {selected && (

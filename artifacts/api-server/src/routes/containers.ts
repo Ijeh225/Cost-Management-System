@@ -103,7 +103,7 @@ router.get("/containers", requireAuth, async (req, res) => {
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
     const page = parseInt((req.query.page as string) ?? "1");
-    const limit = Math.min(parseInt((req.query.limit as string) ?? "20"), 100);
+    const limit = Math.min(parseInt((req.query.limit as string) ?? "20"), 1000);
     const offset = (page - 1) * limit;
 
     let query = db.select().from(containersTable).$dynamic();
