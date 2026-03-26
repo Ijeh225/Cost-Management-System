@@ -1053,8 +1053,8 @@ export default function ContainerDetail() {
                       onChange={e => setDeliveredAtInput(e.target.value)}
                       className="h-7 text-xs w-40 border-border/60"
                     />
-                    <Button size="sm" className="h-7 text-xs px-2 gap-1" onClick={handleSaveDeliveredAt} disabled={updateMutation.isPending}>
-                      {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
+                    <Button size="sm" className="h-7 text-xs px-2 gap-1" onClick={handleSaveDeliveredAt} disabled={updateDeliveredAt.isPending}>
+                      {updateDeliveredAt.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
                     </Button>
                     <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditingDeliveredAt(false)}>Cancel</Button>
                     {deliveredAtInput && (
