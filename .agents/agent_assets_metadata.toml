@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "OnlYLxgbBqS-rE6hd0qmw"
+uri = "file://Cost_Analysis_App_User_Guide.pdf"
+type = "pdf"
+title = "Cost Analysis Per Container — Complete User Guide"
