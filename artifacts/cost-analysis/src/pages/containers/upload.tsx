@@ -60,17 +60,13 @@ function RowStatusBadge({ status }: { status: RowStatus }) {
   if (status === "file-dup") {
     return (
       <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30 text-[10px] px-1.5 py-0 font-medium">
-        Dup in file
+        Duplicate in file
       </Badge>
     );
   }
-  const label =
-    status === "db-both" ? "Both exist"
-    : status === "db-con" ? "CON exists"
-    : "B/L exists";
   return (
     <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0 font-medium">
-      {label}
+      Exists in system
     </Badge>
   );
 }
@@ -101,6 +97,7 @@ export default function UploadPage() {
 
   const [checkResult, setCheckResult] = useState<CheckDuplicatesResult | null>(null);
   const [isCheckingDups, setIsCheckingDups] = useState(false);
+  const [checkFailed, setCheckFailed] = useState(false);
   const [includedConflicts, setIncludedConflicts] = useState<Set<number>>(new Set());
 
   const uploadMutation = useUploadContainers();
@@ -139,6 +136,7 @@ export default function UploadPage() {
     setErrors([]);
     setParsedData([]);
     setCheckResult(null);
+    setCheckFailed(false);
     setIncludedConflicts(new Set());
 
     try {
@@ -213,6 +211,7 @@ export default function UploadPage() {
             },
             onError: () => {
               setIsCheckingDups(false);
+              setCheckFailed(true);
             },
           }
         );
@@ -229,6 +228,7 @@ export default function UploadPage() {
     setParsedData([]);
     setErrors([]);
     setCheckResult(null);
+    setCheckFailed(false);
     setIncludedConflicts(new Set());
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -615,6 +615,15 @@ export default function UploadPage() {
                       </div>
                     )}
 
+                    {checkFailed && (
+                      <div className="px-5 py-3 bg-amber-500/10 border-b border-amber-500/20 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                          Could not check for duplicates — duplicate detection is unavailable. Existing records will <strong>not</strong> be flagged. You may still import, but conflicts will be caught by the database.
+                        </p>
+                      </div>
+                    )}
+
                     {parsedData.length > 0 && (
                       <div className="max-h-[360px] overflow-auto">
                         <table className="w-full text-xs text-left">
@@ -686,7 +695,7 @@ export default function UploadPage() {
                               </span>
                             </div>
                             <p className="text-xs text-muted-foreground mb-3">
-                              These records already exist in the system. By default they will be <strong>skipped</strong>. Toggle each one to import it anyway.
+                              Some records already exist in the system or appear more than once in this file. By default they will be <strong>skipped</strong>. Toggle each one to import it anyway.
                             </p>
                             <div className="space-y-2">
                               {conflictIndices.map(idx => {
