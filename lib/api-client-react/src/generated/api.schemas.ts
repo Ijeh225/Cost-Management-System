@@ -36,6 +36,7 @@ export interface User {
   role: UserRole;
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
+  canUpload?: boolean;
   isActive: boolean;
   createdAt: string;
 }

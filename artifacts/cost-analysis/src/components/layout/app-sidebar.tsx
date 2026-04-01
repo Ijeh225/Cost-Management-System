@@ -29,12 +29,14 @@ function NotificationsBadge({ count }: { count: number }) {
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { isAdmin, isAuthenticated } = useAuth();
+  const { isAdmin, isAuthenticated, user } = useAuth();
 
   const { data: notifData } = useGetNotifications<NotificationsResponse>({
     query: { refetchInterval: 60_000, enabled: !!isAuthenticated },
   });
   const unreadCount: number = notifData?.unreadCount ?? 0;
+
+  const staffCanUpload = !isAdmin && (user?.canUpload ?? false);
 
   const mainNav = [
     { title: "Dashboard",     url: "/",            icon: LayoutDashboard },
@@ -45,6 +47,7 @@ export function AppSidebar() {
     { title: "Accounts Receivable", url: "/accounts-receivable", icon: BookOpen },
     { title: "My Tasks",      url: "/my-tasks",    icon: ListTodo         },
     { title: "Notifications", url: "/notifications", icon: Bell, badge: unreadCount },
+    ...(staffCanUpload ? [{ title: "Upload Data", url: "/upload", icon: UploadCloud }] : []),
   ];
 
   const adminNav = [

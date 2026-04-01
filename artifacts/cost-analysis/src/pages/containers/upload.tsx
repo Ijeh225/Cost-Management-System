@@ -80,7 +80,7 @@ function getConflictReason(status: RowStatus): string {
 }
 
 export default function UploadPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -104,7 +104,7 @@ export default function UploadPage() {
   const checkDupsMutation = useCheckContainerDuplicates();
   const { data: clients = [] } = useListClients();
 
-  if (!isAdmin) {
+  if (!isAdmin && !(user?.canUpload ?? false)) {
     setLocation("/");
     return null;
   }

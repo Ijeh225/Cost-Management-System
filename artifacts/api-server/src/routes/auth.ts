@@ -94,6 +94,8 @@ router.get("/auth/me", requireAuth, (req: AuthRequest, res) => {
       name: u.name,
       role: u.role,
       sectionPermission: u.sectionPermission ?? null,
+      sectionPermissions: u.sectionPermissions ?? null,
+      canUpload: u.role === "admin" ? true : (u.canUpload ?? false),
       isActive: u.isActive,
       createdAt: u.createdAt.toISOString(),
     });

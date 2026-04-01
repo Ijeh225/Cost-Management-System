@@ -243,7 +243,10 @@ router.post("/containers/check-duplicates", requireAuth, async (_req, res) => {
   }
 });
 
-router.post("/containers/upload", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => {
+  if (!req.user!.canUpload) {
+    return res.status(403).json({ error: "You don't have permission to upload data." });
+  }
   try {
     const { rows, clientId } = req.body;
     if (!Array.isArray(rows)) {

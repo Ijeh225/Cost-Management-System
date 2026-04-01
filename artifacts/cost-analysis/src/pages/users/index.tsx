@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Shield, User as UserIcon, Pencil, PowerOff, Power } from "lucide-react";
+import { Loader2, Plus, Shield, User as UserIcon, Pencil, PowerOff, Power, UploadCloud } from "lucide-react";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -17,6 +17,7 @@ import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { SECTION_LABELS, CHARGE_SECTIONS, parseSectionPermissions, type SectionPermLevel } from "@/lib/format";
+import { Switch } from "@/components/ui/switch";
 
 type SectionPermissionsMap = Record<string, SectionPermLevel>;
 
@@ -98,6 +99,7 @@ type UserRow = {
   id: number; name: string; email: string; role: string;
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
+  canUpload?: boolean;
   isActive: boolean; createdAt: string;
 };
 
@@ -119,6 +121,7 @@ function formatPermissionsSummary(user: UserRow): string {
 function CreateUserDialog() {
   const [open, setOpen] = useState(false);
   const [sectionPerms, setSectionPerms] = useState<SectionPermissionsMap>({});
+  const [canUpload, setCanUpload] = useState(false);
   const createMutation = useCreateUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -134,6 +137,7 @@ function CreateUserDialog() {
     const payload: any = { name: data.name, email: data.email, password: data.password, role: data.role };
     if (data.role === "staff") {
       payload.sectionPermissions = JSON.stringify(sectionPerms);
+      payload.canUpload = canUpload;
     }
     createMutation.mutate({ data: payload }, {
       onSuccess: () => {
@@ -142,6 +146,7 @@ function CreateUserDialog() {
         setOpen(false);
         form.reset();
         setSectionPerms({});
+        setCanUpload(false);
       },
       onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
     });
@@ -181,7 +186,19 @@ function CreateUserDialog() {
               </FormItem>
             )} />
             {watchedRole === "staff" && (
-              <GranularPermissionsEditor value={sectionPerms} onChange={setSectionPerms} />
+              <>
+                <GranularPermissionsEditor value={sectionPerms} onChange={setSectionPerms} />
+                <div className="flex items-center justify-between rounded-lg border border-border/50 bg-secondary/20 px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <UploadCloud className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Upload Access</p>
+                      <p className="text-xs text-muted-foreground">Allow this user to bulk-upload container data files</p>
+                    </div>
+                  </div>
+                  <Switch checked={canUpload} onCheckedChange={setCanUpload} />
+                </div>
+              </>
             )}
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
@@ -204,6 +221,7 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
 
   const initialPerms = parseSectionPermissions(user.sectionPermissions);
   const [sectionPerms, setSectionPerms] = useState<SectionPermissionsMap>(initialPerms);
+  const [canUpload, setCanUpload] = useState(user.canUpload ?? false);
 
   const form = useForm({
     resolver: zodResolver(editSchema),
@@ -217,8 +235,10 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
     if (data.password) payload.password = data.password;
     if (data.role === "staff") {
       payload.sectionPermissions = JSON.stringify(sectionPerms);
+      payload.canUpload = canUpload;
     } else {
       payload.sectionPermissions = null;
+      payload.canUpload = true;
     }
     updateMutation.mutate({ id: user.id, data: payload }, {
       onSuccess: () => {
@@ -255,7 +275,19 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
             </FormItem>
           )} />
           {watchedRole === "staff" && (
-            <GranularPermissionsEditor value={sectionPerms} onChange={setSectionPerms} />
+            <>
+              <GranularPermissionsEditor value={sectionPerms} onChange={setSectionPerms} />
+              <div className="flex items-center justify-between rounded-lg border border-border/50 bg-secondary/20 px-4 py-3">
+                <div className="flex items-center gap-2.5">
+                  <UploadCloud className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Upload Access</p>
+                    <p className="text-xs text-muted-foreground">Allow this user to bulk-upload container data files</p>
+                  </div>
+                </div>
+                <Switch checked={canUpload} onCheckedChange={setCanUpload} />
+              </div>
+            </>
           )}
           <FormField control={form.control} name="password" render={({ field }) => (
             <FormItem>

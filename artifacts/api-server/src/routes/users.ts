@@ -12,6 +12,7 @@ const userFields = {
   role: usersTable.role,
   sectionPermission: usersTable.sectionPermission,
   sectionPermissions: usersTable.sectionPermissions,
+  canUpload: usersTable.canUpload,
   isActive: usersTable.isActive,
   createdAt: usersTable.createdAt,
 };
@@ -23,6 +24,7 @@ type UserRow = {
   role: string;
   sectionPermission: string | null;
   sectionPermissions: string | null;
+  canUpload: boolean;
   isActive: boolean;
   createdAt: Date;
 };
@@ -31,6 +33,7 @@ const formatUser = (u: UserRow) => ({
   ...u,
   sectionPermission: u.sectionPermission ?? null,
   sectionPermissions: u.sectionPermissions ?? null,
+  canUpload: u.role === "admin" ? true : (u.canUpload ?? false),
   createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
 });
 
@@ -46,7 +49,7 @@ router.get("/users", requireAdmin, async (_req, res) => {
 
 router.post("/users", requireAdmin, async (req, res) => {
   try {
-    const { email, name, password, role, sectionPermission, sectionPermissions } = req.body;
+    const { email, name, password, role, sectionPermission, sectionPermissions, canUpload } = req.body;
     if (!email || !name || !password || !role) {
       res.status(400).json({ error: "All fields required" });
       return;
@@ -60,6 +63,7 @@ router.post("/users", requireAdmin, async (req, res) => {
       email, name, passwordHash, role,
       sectionPermission: sectionPermission ?? null,
       sectionPermissions: sectionPermissions ?? null,
+      canUpload: role === "admin" ? true : (canUpload === true),
       isActive: true,
     }).returning();
     res.status(201).json(formatUser(user));
@@ -92,7 +96,7 @@ router.put("/users/:id", requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
-    const { name, role, isActive, password, sectionPermission, sectionPermissions } = req.body;
+    const { name, role, isActive, password, sectionPermission, sectionPermissions, canUpload } = req.body;
     if (password !== undefined && (typeof password !== "string" || password.length < 8)) {
       res.status(400).json({ error: "Password must be at least 8 characters" });
       return;
@@ -106,6 +110,7 @@ router.put("/users/:id", requireAdmin, async (req, res) => {
     if (password) updates.passwordHash = await hashPassword(password);
     if (sectionPermission !== undefined) updates.sectionPermission = sectionPermission || null;
     if (sectionPermissions !== undefined) updates.sectionPermissions = sectionPermissions || null;
+    if (canUpload !== undefined) updates.canUpload = updates.role === "admin" ? true : (canUpload === true);
     const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     res.json(formatUser(user));

@@ -896,7 +896,7 @@ export default function ContainerDetail() {
     <div className="space-y-6 max-w-6xl mx-auto pb-24">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/containers">
+        <Link href={typeof window !== "undefined" ? (new URLSearchParams(window.location.search).get("from") ?? "/containers") : "/containers"}>
           <Button variant="ghost" size="icon" className="hover:bg-accent rounded-full"><ArrowLeft className="w-5 h-5" /></Button>
         </Link>
         <div>

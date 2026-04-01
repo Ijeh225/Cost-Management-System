@@ -53,7 +53,7 @@ export function clearAuthCookie(res: Response) {
 }
 
 export interface AuthRequest extends Request {
-  user?: { id: number; email: string; name: string; role: string; sectionPermission: string | null; sectionPermissions: string | null };
+  user?: { id: number; email: string; name: string; role: string; sectionPermission: string | null; sectionPermissions: string | null; canUpload: boolean };
 }
 
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
@@ -81,6 +81,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       role: user.role,
       sectionPermission: user.sectionPermission ?? null,
       sectionPermissions: user.sectionPermissions ?? null,
+      canUpload: user.role === "admin" ? true : (user.canUpload ?? false),
     };
     next();
   } catch {

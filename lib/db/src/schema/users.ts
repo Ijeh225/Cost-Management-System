@@ -10,6 +10,7 @@ export const usersTable = pgTable("users", {
   role: text("role").notNull().default("staff"),
   sectionPermission: text("section_permission"),
   sectionPermissions: text("section_permissions"),
+  canUpload: boolean("can_upload").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   sessionToken: text("session_token"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

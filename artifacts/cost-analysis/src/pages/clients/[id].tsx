@@ -387,7 +387,7 @@ export default function ClientDetailPage() {
             ) : (
               <div className="divide-y divide-border/30">
                 {containers.map(c => (
-                  <Link key={c.id} href={`/containers/${c.id}`}>
+                  <Link key={c.id} href={`/containers/${c.id}?from=/clients/${clientId}`}>
                     <div className="flex items-center justify-between px-4 py-3 hover:bg-accent/10 transition-colors cursor-pointer group">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-accent/30 flex items-center justify-center flex-shrink-0">
