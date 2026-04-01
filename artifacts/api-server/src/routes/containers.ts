@@ -211,6 +211,38 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+router.post("/containers/check-duplicates", requireAuth, async (_req, res) => {
+  const req = _req as AuthRequest;
+  const { containerNumbers, blNumbers } = req.body;
+  if (!Array.isArray(containerNumbers) || !Array.isArray(blNumbers)) {
+    res.status(400).json({ error: "containerNumbers and blNumbers must be arrays" });
+    return;
+  }
+  try {
+    const [existingCons, existingBls] = await Promise.all([
+      containerNumbers.length > 0
+        ? db
+            .select({ containerNumber: containersTable.containerNumber })
+            .from(containersTable)
+            .where(inArray(containersTable.containerNumber, containerNumbers))
+        : Promise.resolve([]),
+      blNumbers.length > 0
+        ? db
+            .select({ blNumber: containersTable.blNumber })
+            .from(containersTable)
+            .where(inArray(containersTable.blNumber, blNumbers))
+        : Promise.resolve([]),
+    ]);
+    res.json({
+      existingContainerNumbers: existingCons.map((r) => r.containerNumber),
+      existingBlNumbers: existingBls.map((r) => r.blNumber),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 router.post("/containers/upload", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { rows, clientId } = req.body;

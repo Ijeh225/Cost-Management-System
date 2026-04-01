@@ -1,7 +1,12 @@
 import { useState, useRef } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { useUploadContainers, useListClients } from "@workspace/api-client-react";
+import {
+  useUploadContainers,
+  useListClients,
+  useCheckContainerDuplicates,
+} from "@workspace/api-client-react";
+import type { CheckDuplicatesResult, UploadRow } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -13,9 +18,8 @@ import {
 } from "@/components/ui/select";
 import {
   UploadCloud, FileType, CheckCircle2, AlertTriangle, Loader2, X,
-  Download, Globe, Building2, ChevronDown, ChevronUp,
+  Download, Globe, Building2, ChevronDown, ChevronUp, ShieldAlert,
 } from "lucide-react";
-import type { UploadRow } from "@workspace/api-client-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const SAMPLE_ROWS = [
@@ -35,6 +39,7 @@ function downloadTemplate() {
 }
 
 type UploadMode = "general" | "client";
+type RowStatus = "new" | "db-con" | "db-bl" | "db-both" | "file-dup";
 
 function StepBadge({ n }: { n: string }) {
   return (
@@ -42,6 +47,40 @@ function StepBadge({ n }: { n: string }) {
       {n}
     </span>
   );
+}
+
+function RowStatusBadge({ status }: { status: RowStatus }) {
+  if (status === "new") {
+    return (
+      <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30 text-[10px] px-1.5 py-0 font-medium">
+        New
+      </Badge>
+    );
+  }
+  if (status === "file-dup") {
+    return (
+      <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30 text-[10px] px-1.5 py-0 font-medium">
+        Dup in file
+      </Badge>
+    );
+  }
+  const label =
+    status === "db-both" ? "Both exist"
+    : status === "db-con" ? "CON exists"
+    : "B/L exists";
+  return (
+    <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0 font-medium">
+      {label}
+    </Badge>
+  );
+}
+
+function getConflictReason(status: RowStatus): string {
+  if (status === "db-both") return "Container number and B/L number already exist in system";
+  if (status === "db-con") return "Container number already exists in system";
+  if (status === "db-bl") return "B/L number already exists in system";
+  if (status === "file-dup") return "Duplicate within this file";
+  return "";
 }
 
 export default function UploadPage() {
@@ -60,7 +99,12 @@ export default function UploadPage() {
   const [isParsing, setIsParsing] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
+  const [checkResult, setCheckResult] = useState<CheckDuplicatesResult | null>(null);
+  const [isCheckingDups, setIsCheckingDups] = useState(false);
+  const [includedConflicts, setIncludedConflicts] = useState<Set<number>>(new Set());
+
   const uploadMutation = useUploadContainers();
+  const checkDupsMutation = useCheckContainerDuplicates();
   const { data: clients = [] } = useListClients();
 
   if (!isAdmin) {
@@ -94,20 +138,22 @@ export default function UploadPage() {
     setIsParsing(true);
     setErrors([]);
     setParsedData([]);
+    setCheckResult(null);
+    setIncludedConflicts(new Set());
 
     try {
       const ext = f.name.split(".").pop()?.toLowerCase();
-      let rawData: any[] = [];
+      let rawData: Record<string, unknown>[] = [];
 
       if (ext === "csv") {
         const text = await f.text();
-        const result = Papa.parse(text, { header: true, skipEmptyLines: true });
-        rawData = result.data as any[];
+        const result = Papa.parse<Record<string, unknown>>(text, { header: true, skipEmptyLines: true });
+        rawData = result.data;
       } else if (ext === "xlsx" || ext === "xls") {
         const buffer = await f.arrayBuffer();
         const workbook = XLSX.read(buffer);
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        rawData = XLSX.utils.sheet_to_json(sheet);
+        rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
       } else {
         throw new Error("Unsupported file type. Please upload CSV or Excel.");
       }
@@ -152,6 +198,25 @@ export default function UploadPage() {
 
       setParsedData(mapped);
       if (errs.length > 0) setErrors(errs.slice(0, 10));
+
+      if (mapped.length > 0) {
+        setIsCheckingDups(true);
+        checkDupsMutation.mutate(
+          {
+            containerNumbers: mapped.map(r => r.containerNumber),
+            blNumbers: mapped.map(r => r.blNumber),
+          },
+          {
+            onSuccess: (result) => {
+              setCheckResult(result);
+              setIsCheckingDups(false);
+            },
+            onError: () => {
+              setIsCheckingDups(false);
+            },
+          }
+        );
+      }
     } catch (err) {
       setErrors([err instanceof Error ? err.message : "Failed to parse file."]);
     } finally {
@@ -163,17 +228,63 @@ export default function UploadPage() {
     setFile(null);
     setParsedData([]);
     setErrors([]);
+    setCheckResult(null);
+    setIncludedConflicts(new Set());
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const seenCons = new Map<string, number[]>();
+  const seenBls  = new Map<string, number[]>();
+  parsedData.forEach((row, idx) => {
+    if (!seenCons.has(row.containerNumber)) seenCons.set(row.containerNumber, []);
+    seenCons.get(row.containerNumber)!.push(idx);
+    if (!seenBls.has(row.blNumber)) seenBls.set(row.blNumber, []);
+    seenBls.get(row.blNumber)!.push(idx);
+  });
+
+  const getRowStatus = (row: UploadRow): RowStatus => {
+    const fileDup =
+      (seenCons.get(row.containerNumber)?.length ?? 0) > 1 ||
+      (seenBls.get(row.blNumber)?.length ?? 0) > 1;
+    if (fileDup) return "file-dup";
+    if (!checkResult) return "new";
+    const existsCon = checkResult.existingContainerNumbers.includes(row.containerNumber);
+    const existsBl  = checkResult.existingBlNumbers.includes(row.blNumber);
+    if (existsCon && existsBl) return "db-both";
+    if (existsCon) return "db-con";
+    if (existsBl)  return "db-bl";
+    return "new";
+  };
+
+  const rowStatuses: RowStatus[] = parsedData.map(row => getRowStatus(row));
+  const conflictIndices = rowStatuses
+    .map((s, i) => (s !== "new" ? i : -1))
+    .filter(i => i !== -1);
+  const newCount       = rowStatuses.filter(s => s === "new").length;
+  const conflictCount  = conflictIndices.length;
+
+  const approvedRows = parsedData.filter((_, idx) => {
+    const s = rowStatuses[idx];
+    return s === "new" || includedConflicts.has(idx);
+  });
+
+  const toggleConflict = (idx: number) => {
+    setIncludedConflicts(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
   const handleUpload = () => {
-    if (parsedData.length === 0) return;
+    if (approvedRows.length === 0) return;
     const clientId = mode === "client" && selectedClientId ? Number(selectedClientId) : undefined;
-    uploadMutation.mutate({ data: { rows: parsedData, clientId } }, {
+    uploadMutation.mutate({ data: { rows: approvedRows, clientId } }, {
       onSuccess: (res) => {
         toast({
           title: "Upload Complete",
-          description: `Created ${res.created} records.${res.duplicates.length > 0 ? ` Skipped ${res.duplicates.length} duplicates.` : ""}`,
+          description: `Created ${res.created} record${res.created !== 1 ? "s" : ""}.${res.duplicates.length > 0 ? ` Skipped ${res.duplicates.length} duplicate${res.duplicates.length !== 1 ? "s" : ""}.` : ""}`,
         });
         if (res.errors && res.errors.length > 0) {
           setErrors(res.errors);
@@ -190,6 +301,9 @@ export default function UploadPage() {
       },
     });
   };
+
+  const hasChecked = !!checkResult && !isCheckingDups;
+  const showConflictsPanel = hasChecked && conflictCount > 0;
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -353,6 +467,7 @@ export default function UploadPage() {
                       {(file.size / 1024).toFixed(1)} KB
                       {!isParsing && parsedData.length > 0 && ` · ${parsedData.length} rows parsed`}
                       {isParsing && " · Parsing…"}
+                      {isCheckingDups && " · Checking for duplicates…"}
                     </p>
                   </div>
                   <Button
@@ -443,7 +558,7 @@ export default function UploadPage() {
         </CardContent>
       </Card>
 
-      {/* ── Preview & import card (appears after file is loaded) ─────────── */}
+      {/* ── Preview & import card ─────────────────────────────────────────── */}
       <AnimatePresence>
         {file && (
           <motion.div
@@ -464,9 +579,19 @@ export default function UploadPage() {
                     )}
                   </CardTitle>
                   <CardDescription className="text-xs mt-0.5">
-                    {isParsing ? "Reading your file…" : `${parsedData.length} records ready · ${errors.length > 0 ? `${errors.length} error(s)` : "no errors"}`}
+                    {isParsing
+                      ? "Reading your file…"
+                      : isCheckingDups
+                        ? `${parsedData.length} records parsed · Checking for duplicates…`
+                        : hasChecked && conflictCount > 0
+                          ? `${newCount} new · ${conflictCount} duplicate${conflictCount !== 1 ? "s" : ""} detected`
+                          : `${parsedData.length} records ready · ${errors.length > 0 ? `${errors.length} error(s)` : "no errors"}`
+                    }
                   </CardDescription>
                 </div>
+                {isCheckingDups && (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+                )}
               </CardHeader>
 
               <CardContent className="p-0">
@@ -502,20 +627,35 @@ export default function UploadPage() {
                               <th className="px-4 py-3 font-medium">Declaration</th>
                               <th className="px-4 py-3 font-medium">Size</th>
                               <th className="px-4 py-3 font-medium">Vessel</th>
+                              <th className="px-4 py-3 font-medium">Status</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border/50">
-                            {parsedData.slice(0, 100).map((row, i) => (
-                              <tr key={i} className="hover:bg-accent/30 transition-colors">
-                                <td className="px-4 py-2.5 text-muted-foreground/50 font-mono">{i + 1}</td>
-                                <td className="px-4 py-2.5 font-medium text-foreground">{row.customerName || "—"}</td>
-                                <td className="px-4 py-2.5 font-mono text-primary">{row.containerNumber}</td>
-                                <td className="px-4 py-2.5 font-mono">{row.blNumber}</td>
-                                <td className="px-4 py-2.5 text-muted-foreground">{row.declaration || "—"}</td>
-                                <td className="px-4 py-2.5 text-muted-foreground">{row.size || "—"}</td>
-                                <td className="px-4 py-2.5 text-muted-foreground">{row.vessel || "—"}</td>
-                              </tr>
-                            ))}
+                            {parsedData.slice(0, 100).map((row, i) => {
+                              const status = isCheckingDups || !file ? "new" : rowStatuses[i];
+                              const isConflict = status !== "new";
+                              return (
+                                <tr
+                                  key={i}
+                                  className={`hover:bg-accent/30 transition-colors ${isConflict ? "bg-amber-500/5" : ""}`}
+                                >
+                                  <td className="px-4 py-2.5 text-muted-foreground/50 font-mono">{i + 1}</td>
+                                  <td className="px-4 py-2.5 font-medium text-foreground">{row.customerName || "—"}</td>
+                                  <td className="px-4 py-2.5 font-mono text-primary">{row.containerNumber}</td>
+                                  <td className="px-4 py-2.5 font-mono">{row.blNumber}</td>
+                                  <td className="px-4 py-2.5 text-muted-foreground">{row.declaration || "—"}</td>
+                                  <td className="px-4 py-2.5 text-muted-foreground">{row.size || "—"}</td>
+                                  <td className="px-4 py-2.5 text-muted-foreground">{row.vessel || "—"}</td>
+                                  <td className="px-4 py-2.5">
+                                    {isCheckingDups ? (
+                                      <span className="inline-block w-10 h-4 bg-muted/40 rounded animate-pulse" />
+                                    ) : (
+                                      <RowStatusBadge status={status} />
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                         {parsedData.length > 100 && (
@@ -525,13 +665,80 @@ export default function UploadPage() {
                         )}
                       </div>
                     )}
+
+                    {/* ── Conflicts panel ──────────────────────────────────── */}
+                    <AnimatePresence>
+                      {showConflictsPanel && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden border-t border-amber-500/30"
+                        >
+                          <div className="px-5 py-4 bg-amber-500/5">
+                            <div className="flex items-center gap-2 mb-3">
+                              <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                                {conflictCount} duplicate{conflictCount !== 1 ? "s" : ""} detected
+                              </span>
+                              <span className="text-xs text-muted-foreground ml-auto">
+                                {newCount} new · {includedConflicts.size} duplicate{includedConflicts.size !== 1 ? "s" : ""} approved
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-3">
+                              These records already exist in the system. By default they will be <strong>skipped</strong>. Toggle each one to import it anyway.
+                            </p>
+                            <div className="space-y-2">
+                              {conflictIndices.map(idx => {
+                                const row = parsedData[idx];
+                                const status = rowStatuses[idx];
+                                const included = includedConflicts.has(idx);
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-xs transition-colors ${
+                                      included
+                                        ? "border-amber-500/50 bg-amber-500/10"
+                                        : "border-border/50 bg-card/40"
+                                    }`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-mono font-semibold text-primary">{row.containerNumber}</span>
+                                        <span className="text-muted-foreground">·</span>
+                                        <span className="font-mono text-muted-foreground">{row.blNumber}</span>
+                                        <RowStatusBadge status={status} />
+                                      </div>
+                                      <p className="text-muted-foreground/70 mt-0.5">{getConflictReason(status)}</p>
+                                    </div>
+                                    <button
+                                      onClick={() => toggleConflict(idx)}
+                                      className={`shrink-0 px-3 py-1.5 rounded-md text-[11px] font-semibold border transition-all ${
+                                        included
+                                          ? "bg-amber-500/20 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/30"
+                                          : "bg-muted/50 border-border/50 text-muted-foreground hover:bg-muted"
+                                      }`}
+                                    >
+                                      {included ? "Import anyway ✓" : "Skip"}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </>
                 )}
               </CardContent>
 
               <CardFooter className="px-5 py-3 border-t border-border/50 flex items-center justify-between bg-secondary/10 gap-3">
                 <p className="text-xs text-muted-foreground">
-                  {parsedData.length} record{parsedData.length !== 1 ? "s" : ""} ready to import
+                  {showConflictsPanel
+                    ? `${approvedRows.length} of ${parsedData.length} record${parsedData.length !== 1 ? "s" : ""} will be imported`
+                    : `${parsedData.length} record${parsedData.length !== 1 ? "s" : ""} ready to import`
+                  }
                   {mode === "client" && selectedClient && ` → ${selectedClient.name}`}
                 </p>
                 <div className="flex gap-2 shrink-0">
@@ -541,13 +748,15 @@ export default function UploadPage() {
                   <Button
                     size="sm"
                     onClick={handleUpload}
-                    disabled={parsedData.length === 0 || uploadMutation.isPending}
+                    disabled={approvedRows.length === 0 || uploadMutation.isPending || isCheckingDups}
                     className="shadow-sm"
                   >
                     {uploadMutation.isPending ? (
                       <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Importing…</>
+                    ) : isCheckingDups ? (
+                      <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Checking…</>
                     ) : (
-                      <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Import {parsedData.length} Records</>
+                      <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Import {approvedRows.length} Record{approvedRows.length !== 1 ? "s" : ""}</>
                     )}
                   </Button>
                 </div>

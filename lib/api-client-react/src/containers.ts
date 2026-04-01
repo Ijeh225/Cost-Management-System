@@ -65,6 +65,27 @@ export function useUpdateDeliveredAt() {
   });
 }
 
+export type CheckDuplicatesRequest = {
+  containerNumbers: string[];
+  blNumbers: string[];
+};
+
+export type CheckDuplicatesResult = {
+  existingContainerNumbers: string[];
+  existingBlNumbers: string[];
+};
+
+export function useCheckContainerDuplicates() {
+  return useMutation<CheckDuplicatesResult, Error, CheckDuplicatesRequest>({
+    mutationFn: (data) =>
+      customFetch<CheckDuplicatesResult>("/api/containers/check-duplicates", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      }),
+  });
+}
+
 export function useGetDeliveryReport(
   from?: string,
   to?: string,
