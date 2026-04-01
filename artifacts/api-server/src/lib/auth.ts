@@ -1,10 +1,26 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 import { Request, Response, NextFunction } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
-const JWT_SECRET = process.env.JWT_SECRET || "cost-analysis-secret-key-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "JWT_SECRET environment variable must be set in production. " +
+      "Generate one with: node -e \"console.log(require('crypto').randomBytes(64).toString('hex'))\""
+    );
+  }
+  console.warn(
+    "[auth] WARNING: JWT_SECRET is not set. Using an insecure dev fallback. " +
+    "Set JWT_SECRET as an environment secret before deploying to production."
+  );
+}
+
+const SECRET = JWT_SECRET ?? "cost-analysis-dev-only-secret-never-use-in-production";
 const COOKIE_NAME = "cost_analysis_session";
 
 export async function hashPassword(password: string): Promise<string> {
@@ -15,8 +31,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-export function signToken(userId: number): string {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
+export function generateSessionToken(): string {
+  return randomUUID();
+}
+
+export function signToken(userId: number, sessionToken: string): string {
+  return jwt.sign({ userId, sessionToken }, SECRET, { expiresIn: "7d" });
 }
 
 export function setAuthCookie(res: Response, token: string) {
@@ -43,11 +63,15 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+    const decoded = jwt.verify(token, SECRET) as { userId: number; sessionToken: string };
     const users = await db.select().from(usersTable).where(eq(usersTable.id, decoded.userId)).limit(1);
     const user = users[0];
     if (!user || !user.isActive) {
       res.status(401).json({ error: "Not authenticated" });
+      return;
+    }
+    if (!decoded.sessionToken || user.sessionToken !== decoded.sessionToken) {
+      res.status(401).json({ error: "Session expired. Please log in again." });
       return;
     }
     req.user = {

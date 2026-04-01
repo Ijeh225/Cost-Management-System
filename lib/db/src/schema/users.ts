@@ -11,6 +11,7 @@ export const usersTable = pgTable("users", {
   sectionPermission: text("section_permission"),
   sectionPermissions: text("section_permissions"),
   isActive: boolean("is_active").notNull().default(true),
+  sessionToken: text("session_token"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

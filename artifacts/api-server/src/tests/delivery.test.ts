@@ -1,19 +1,23 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import jwt from "jsonwebtoken";
 import app from "../app";
 import { db, containersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
-const JWT_SECRET =
-  process.env.JWT_SECRET ?? "cost-analysis-secret-key-change-in-production";
+let ADMIN_COOKIE = "";
 
-function makeAdminCookie(userId: number) {
-  const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: "1h" });
-  return `cost_analysis_session=${token}`;
-}
-
-const ADMIN_COOKIE = makeAdminCookie(2);
+beforeAll(async () => {
+  const res = await request(app)
+    .post("/api/auth/login")
+    .send({ email: "ijehifeany@gmail.com", password: "TestPass123!" });
+  if (res.status !== 200) {
+    throw new Error(
+      `Test login failed (${res.status}): ${JSON.stringify(res.body)}`
+    );
+  }
+  const raw = res.headers["set-cookie"];
+  ADMIN_COOKIE = Array.isArray(raw) ? raw[0] : raw;
+});
 
 describe("GET /api/analytics/deliveries", () => {
   it("returns 401 when unauthenticated", async () => {

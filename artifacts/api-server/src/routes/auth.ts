@@ -1,10 +1,12 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { db, usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import {
   hashPassword,
   verifyPassword,
   signToken,
+  generateSessionToken,
   setAuthCookie,
   clearAuthCookie,
   requireAuth,
@@ -13,7 +15,16 @@ import {
 
 const router = Router();
 
-router.post("/auth/login", async (req, res) => {
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  message: { error: "Too many login attempts. Please try again in 15 minutes." },
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+});
+
+router.post("/auth/login", loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -31,7 +42,12 @@ router.post("/auth/login", async (req, res) => {
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }
-    const token = signToken(user.id);
+    const sessionToken = generateSessionToken();
+    await db
+      .update(usersTable)
+      .set({ sessionToken, updatedAt: new Date() })
+      .where(eq(usersTable.id, user.id));
+    const token = signToken(user.id, sessionToken);
     setAuthCookie(res, token);
     res.json({
       user: {
@@ -50,7 +66,17 @@ router.post("/auth/login", async (req, res) => {
   }
 });
 
-router.post("/auth/logout", (req, res) => {
+router.post("/auth/logout", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    if (req.user) {
+      await db
+        .update(usersTable)
+        .set({ sessionToken: null, updatedAt: new Date() })
+        .where(eq(usersTable.id, req.user.id));
+    }
+  } catch (err) {
+    console.error("Logout session clear error:", err);
+  }
   clearAuthCookie(res);
   res.json({ message: "Logged out" });
 });
@@ -74,7 +100,6 @@ router.get("/auth/me", requireAuth, (req: AuthRequest, res) => {
   }).catch(() => res.status(500).json({ error: "Server error" }));
 });
 
-// Check if first-time setup is needed (no users in the system)
 router.get("/auth/setup-required", async (_req, res) => {
   try {
     const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(usersTable);
@@ -84,7 +109,6 @@ router.get("/auth/setup-required", async (_req, res) => {
   }
 });
 
-// Create the first admin account (only works when no users exist)
 router.post("/auth/setup", async (req, res) => {
   try {
     const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(usersTable);
@@ -102,15 +126,17 @@ router.post("/auth/setup", async (req, res) => {
       return;
     }
     const passwordHash = await hashPassword(password);
+    const sessionToken = generateSessionToken();
     const [user] = await db.insert(usersTable).values({
       name,
       email,
       passwordHash,
       role: "admin",
       isActive: true,
+      sessionToken,
     }).returning();
 
-    const token = signToken(user.id);
+    const token = signToken(user.id, sessionToken);
     setAuthCookie(res, token);
     res.status(201).json({
       user: {
@@ -123,8 +149,8 @@ router.post("/auth/setup", async (req, res) => {
       },
       message: "Admin account created successfully",
     });
-  } catch (err: any) {
-    if (err.code === "23505") {
+  } catch (err) {
+    if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "23505") {
       res.status(400).json({ error: "An account with this email already exists" });
       return;
     }

@@ -16,7 +16,18 @@ const userFields = {
   createdAt: usersTable.createdAt,
 };
 
-const formatUser = (u: any) => ({
+type UserRow = {
+  id: number;
+  email: string;
+  name: string;
+  role: string;
+  sectionPermission: string | null;
+  sectionPermissions: string | null;
+  isActive: boolean;
+  createdAt: Date;
+};
+
+const formatUser = (u: UserRow) => ({
   ...u,
   sectionPermission: u.sectionPermission ?? null,
   sectionPermissions: u.sectionPermissions ?? null,
@@ -40,6 +51,10 @@ router.post("/users", requireAdmin, async (req, res) => {
       res.status(400).json({ error: "All fields required" });
       return;
     }
+    if (typeof password !== "string" || password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
     const passwordHash = await hashPassword(password);
     const [user] = await db.insert(usersTable).values({
       email, name, passwordHash, role,
@@ -48,8 +63,8 @@ router.post("/users", requireAdmin, async (req, res) => {
       isActive: true,
     }).returning();
     res.status(201).json(formatUser(user));
-  } catch (err: any) {
-    if (err.code === "23505") {
+  } catch (err) {
+    if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "23505") {
       res.status(400).json({ error: "Email already exists" });
       return;
     }
@@ -57,9 +72,14 @@ router.post("/users", requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/users/:id", requireAuth, async (req, res) => {
+router.get("/users/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
+    if (req.user?.role !== "admin" && req.user?.id !== id) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
     const [user] = await db.select(userFields).from(usersTable).where(eq(usersTable.id, id));
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     res.json(formatUser(user));
@@ -71,8 +91,15 @@ router.get("/users/:id", requireAuth, async (req, res) => {
 router.put("/users/:id", requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
     const { name, role, isActive, password, sectionPermission, sectionPermissions } = req.body;
-    const updates: any = { updatedAt: new Date() };
+    if (password !== undefined && (typeof password !== "string" || password.length < 8)) {
+      res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+    const updates: Partial<typeof usersTable.$inferInsert> & { updatedAt: Date } = {
+      updatedAt: new Date(),
+    };
     if (name !== undefined) updates.name = name;
     if (role !== undefined) updates.role = role;
     if (isActive !== undefined) updates.isActive = isActive;
