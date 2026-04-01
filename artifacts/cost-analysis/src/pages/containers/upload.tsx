@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import { useUploadContainers, useListClients } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -13,30 +13,36 @@ import {
 } from "@/components/ui/select";
 import {
   UploadCloud, FileType, CheckCircle2, AlertTriangle, Loader2, X,
-  Download, TableProperties, Globe, Building2,
+  Download, Globe, Building2, ChevronDown, ChevronUp,
 } from "lucide-react";
 import type { UploadRow } from "@workspace/api-client-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const SAMPLE_ROWS = [
-  { "CUSTOMER NAME": "Dangote Industries Ltd",  "CON": "MSCU1234567", "B/LADING": "MSC0012345", "DECLARATION": "ND20251001", "SIZE": "40FT",  "VESSEL": "MSC ANNA"       },
-  { "CUSTOMER NAME": "Nestlé Nigeria Plc",       "CON": "HLCU8765432", "B/LADING": "HLC0056789", "DECLARATION": "ND20251002", "SIZE": "20FT",  "VESSEL": "HAPAG SPIRIT"   },
-  { "CUSTOMER NAME": "BUA Cement Plc",           "CON": "CMAU5553210", "B/LADING": "CMA0078901", "DECLARATION": "ND20251003", "SIZE": "40FT",  "VESSEL": "CMA KALAHARI"   },
-  { "CUSTOMER NAME": "Guinness Nigeria Plc",     "CON": "MAEU3214567", "B/LADING": "MAE0034567", "DECLARATION": "ND20251004", "SIZE": "40HC",  "VESSEL": "MAERSK ESSEX"   },
+  { "CUSTOMER NAME": "Dangote Industries Ltd",  "CON": "MSCU1234567", "B/LADING": "MSC0012345", "DECLARATION": "ND20251001", "SIZE": "40FT",  "VESSEL": "MSC ANNA"     },
+  { "CUSTOMER NAME": "Nestlé Nigeria Plc",       "CON": "HLCU8765432", "B/LADING": "HLC0056789", "DECLARATION": "ND20251002", "SIZE": "20FT",  "VESSEL": "HAPAG SPIRIT" },
+  { "CUSTOMER NAME": "BUA Cement Plc",           "CON": "CMAU5553210", "B/LADING": "CMA0078901", "DECLARATION": "ND20251003", "SIZE": "40FT",  "VESSEL": "CMA KALAHARI"},
+  { "CUSTOMER NAME": "Guinness Nigeria Plc",     "CON": "MAEU3214567", "B/LADING": "MAE0034567", "DECLARATION": "ND20251004", "SIZE": "40HC",  "VESSEL": "MAERSK ESSEX"},
 ];
-
 const COLUMNS = ["CUSTOMER NAME", "CON", "B/LADING", "DECLARATION", "SIZE", "VESSEL"];
 
 function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(SAMPLE_ROWS, { header: COLUMNS });
-  const colWidths = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 20 }];
-  ws["!cols"] = colWidths;
+  ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 20 }];
   XLSX.utils.book_append_sheet(wb, ws, "Containers");
   XLSX.writeFile(wb, "container_upload_template.xlsx");
 }
 
 type UploadMode = "general" | "client";
+
+function StepBadge({ n }: { n: string }) {
+  return (
+    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/15 text-primary text-[10px] font-bold shrink-0">
+      {n}
+    </span>
+  );
+}
 
 export default function UploadPage() {
   const { isAdmin } = useAuth();
@@ -46,6 +52,8 @@ export default function UploadPage() {
 
   const [mode, setMode] = useState<UploadMode>("general");
   const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [formatOpen, setFormatOpen] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<UploadRow[]>([]);
@@ -61,18 +69,24 @@ export default function UploadPage() {
   }
 
   const selectedClient = clients.find(c => String(c.id) === selectedClientId);
+  const canUpload = mode === "general" || (mode === "client" && !!selectedClientId);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (selected) processFile(selected);
   };
 
-  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+  const handleDragLeave = () => setDragOver(false);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setDragOver(false);
     const dropped = e.dataTransfer.files?.[0];
-    if (dropped) processFile(dropped);
+    if (dropped && canUpload) processFile(dropped);
   };
 
   const processFile = async (f: File) => {
@@ -138,8 +152,8 @@ export default function UploadPage() {
 
       setParsedData(mapped);
       if (errs.length > 0) setErrors(errs.slice(0, 10));
-    } catch (err: any) {
-      setErrors([err.message || "Failed to parse file."]);
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : "Failed to parse file."]);
     } finally {
       setIsParsing(false);
     }
@@ -167,249 +181,304 @@ export default function UploadPage() {
           setTimeout(() => setLocation("/containers"), 1500);
         }
       },
-      onError: (err: any) => {
-        toast({ variant: "destructive", title: "Upload Failed", description: err.message || "An unexpected error occurred." });
+      onError: (err) => {
+        toast({
+          variant: "destructive",
+          title: "Upload Failed",
+          description: err instanceof Error ? err.message : "An unexpected error occurred.",
+        });
       },
     });
   };
 
-  const canUpload = mode === "general" || (mode === "client" && !!selectedClientId);
-
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Upload Containers</h1>
-          <p className="text-muted-foreground text-sm mt-1">Batch import container records via CSV or Excel file.</p>
-        </div>
-        <Button variant="outline" onClick={downloadTemplate} className="hover-elevate shrink-0">
-          <Download className="w-4 h-4 mr-2" /> Download Template
-        </Button>
-      </div>
+    <div className="max-w-2xl mx-auto space-y-4">
 
-      {/* Mode Selector */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <button
-          onClick={() => setMode("general")}
-          className={`flex items-start gap-4 p-4 rounded-xl border text-left transition-all ${
-            mode === "general"
-              ? "border-primary/50 bg-primary/5 shadow-sm"
-              : "border-border/50 bg-card/40 hover:bg-card/70 hover:border-border"
-          }`}
-        >
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${mode === "general" ? "bg-primary/20" : "bg-secondary"}`}>
-            <Globe className={`w-4 h-4 ${mode === "general" ? "text-primary" : "text-muted-foreground"}`} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <p className={`text-sm font-semibold ${mode === "general" ? "text-foreground" : "text-muted-foreground"}`}>
-                General Upload
-              </p>
-              {mode === "general" && <Badge className="text-[10px] px-1.5 py-0 bg-primary/20 text-primary border border-primary/30">Selected</Badge>}
+      {/* ── Setup card (steps 1 – 3) ─────────────────────────────────────── */}
+      <Card className="border-border/50 bg-card/60 backdrop-blur-sm shadow-sm overflow-hidden">
+        <CardHeader className="pb-4 border-b border-border/40">
+          <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <UploadCloud className="w-5 h-5 text-primary" />
+            Upload Containers
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Batch-import container records from a CSV or Excel file.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="pt-5 space-y-5">
+
+          {/* ── Step 1: Mode ─────────────────────────────────────────────── */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <StepBadge n="1" /> Upload mode
+            </p>
+            <div className="inline-flex rounded-lg border border-border/50 bg-muted/30 p-0.5 gap-0.5">
+              <button
+                onClick={() => { setMode("general"); setSelectedClientId(""); }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  mode === "general"
+                    ? "bg-card shadow-sm text-foreground border border-border/50"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                General
+              </button>
+              <button
+                onClick={() => setMode("client")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  mode === "client"
+                    ? "bg-card shadow-sm text-foreground border border-border/50"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                Customer-Linked
+              </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Import containers from any customer. Customer names come from the file.
+            <p className="text-xs text-muted-foreground pl-0.5">
+              {mode === "general"
+                ? "Customer names are read from the file."
+                : "All containers will be linked to one client you choose."}
             </p>
           </div>
-        </button>
 
-        <button
-          onClick={() => setMode("client")}
-          className={`flex items-start gap-4 p-4 rounded-xl border text-left transition-all ${
-            mode === "client"
-              ? "border-primary/50 bg-primary/5 shadow-sm"
-              : "border-border/50 bg-card/40 hover:bg-card/70 hover:border-border"
-          }`}
-        >
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${mode === "client" ? "bg-primary/20" : "bg-secondary"}`}>
-            <Building2 className={`w-4 h-4 ${mode === "client" ? "text-primary" : "text-muted-foreground"}`} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <p className={`text-sm font-semibold ${mode === "client" ? "text-foreground" : "text-muted-foreground"}`}>
-                Customer-Linked Upload
-              </p>
-              {mode === "client" && <Badge className="text-[10px] px-1.5 py-0 bg-primary/20 text-primary border border-primary/30">Selected</Badge>}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              All containers in the file are linked to one specific client.
-            </p>
-          </div>
-        </button>
-      </div>
-
-      {/* Client Picker (mode = client) */}
-      <AnimatePresence>
-        {mode === "client" && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <Card className="border-border/50 bg-card/40">
-              <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground mb-1">Select Customer</p>
-                  <p className="text-xs text-muted-foreground">All containers will be auto-linked to this client and the customer name taken from their profile.</p>
-                </div>
-                <div className="w-full sm:w-72">
+          {/* ── Step 2: Client picker (client mode only) ──────────────────── */}
+          <AnimatePresence>
+            {mode === "client" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <StepBadge n="2" /> Select customer
+                  </p>
                   <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                    <SelectTrigger className="h-9 text-sm border-border/50 bg-background/50">
+                    <SelectTrigger className="h-9 text-sm border-border/50 bg-background/50 max-w-xs">
                       <SelectValue placeholder={clients.length === 0 ? "No clients yet" : "Choose a client…"} />
                     </SelectTrigger>
                     <SelectContent>
                       {clients.map(c => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.name}
-                        </SelectItem>
+                        <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      {/* Sample Format Card */}
-      <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
-        <CardHeader className="pb-3 flex flex-row items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <TableProperties className="w-4 h-4 text-primary" />
+          {/* ── Step 3: Drop zone ─────────────────────────────────────────── */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <StepBadge n={mode === "client" ? "3" : "2"} /> Upload file
+            </p>
+
+            <AnimatePresence mode="wait">
+              {!file ? (
+                <motion.div
+                  key="dropzone"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                >
+                  <div
+                    onClick={() => canUpload && fileInputRef.current?.click()}
+                    onDragOver={canUpload ? handleDragOver : undefined}
+                    onDragLeave={canUpload ? handleDragLeave : undefined}
+                    onDrop={canUpload ? handleDrop : undefined}
+                    className={`relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-10 text-center transition-all
+                      ${!canUpload
+                        ? "opacity-50 cursor-not-allowed border-border/40 bg-muted/10"
+                        : dragOver
+                          ? "border-primary bg-primary/5 cursor-pointer scale-[1.01]"
+                          : "border-border/50 bg-card/20 cursor-pointer hover:border-primary/40 hover:bg-card/40"
+                      }`}
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${dragOver ? "bg-primary/20" : "bg-primary/10"}`}>
+                      <UploadCloud className={`w-6 h-6 transition-colors ${dragOver ? "text-primary" : "text-primary/70"}`} />
+                    </div>
+
+                    {!canUpload ? (
+                      <>
+                        <p className="text-sm font-medium text-muted-foreground">Select a customer first</p>
+                        <p className="text-xs text-muted-foreground/70">Pick a client in Step 2 before uploading.</p>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            {dragOver ? "Drop to upload" : "Click or drag your file here"}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Supports .csv and .xlsx — max 10 MB
+                            {mode === "client" && selectedClient && (
+                              <> · Links to <span className="text-primary font-medium">{selectedClient.name}</span></>
+                            )}
+                          </p>
+                        </div>
+                        <Button variant="outline" size="sm" className="pointer-events-none mt-1">
+                          Select File
+                        </Button>
+                      </>
+                    )}
+
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                    />
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="selected"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3"
+                >
+                  <FileType className="w-8 h-8 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024).toFixed(1)} KB
+                      {!isParsing && parsedData.length > 0 && ` · ${parsedData.length} rows parsed`}
+                      {isParsing && " · Parsing…"}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost" size="icon"
+                    onClick={clearFile}
+                    disabled={uploadMutation.isPending}
+                    className="hover:bg-destructive/20 hover:text-destructive shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          <div>
-            <CardTitle className="text-sm font-semibold">Required File Format</CardTitle>
-            <CardDescription className="text-xs">
-              {mode === "client"
-                ? "CUSTOMER NAME column is optional — it will be overridden by the selected client's name."
-                : "Your file must contain these columns (order does not matter). Highlighted columns are required."}
-            </CardDescription>
+
+          {/* ── Format guide (collapsible) ────────────────────────────────── */}
+          <div className="border border-border/40 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setFormatOpen(o => !o)}
+              className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-muted/30 transition-colors"
+            >
+              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                File format guide &amp; template
+              </span>
+              <span className="flex items-center gap-2">
+                {formatOpen && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs gap-1.5 text-primary hover:bg-primary/10 pointer-events-auto"
+                    onClick={e => { e.stopPropagation(); downloadTemplate(); }}
+                  >
+                    <Download className="w-3 h-3" />
+                    Download Template
+                  </Button>
+                )}
+                {formatOpen
+                  ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+                  : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                }
+              </span>
+            </button>
+
+            <AnimatePresence>
+              {formatOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="border-t border-border/40 px-4 py-3 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      {mode === "client"
+                        ? "CON and B/LADING are required. CUSTOMER NAME is optional — it will be replaced by the selected client."
+                        : "Your file must include these columns (order doesn't matter). Required columns are highlighted."}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {COLUMNS.map(col => {
+                        const required = mode === "general"
+                          ? ["CUSTOMER NAME", "CON", "B/LADING"].includes(col)
+                          : ["CON", "B/LADING"].includes(col);
+                        const ignored = col === "CUSTOMER NAME" && mode === "client";
+                        return (
+                          <span
+                            key={col}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-mono text-[11px] font-semibold border
+                              ${required
+                                ? "bg-primary/10 text-primary border-primary/30"
+                                : ignored
+                                  ? "bg-muted/50 text-muted-foreground/50 border-border/30 line-through"
+                                  : "bg-muted/30 text-muted-foreground border-border/40"
+                              }`}
+                          >
+                            {col}
+                            {required && <span className="text-[9px] font-normal opacity-70">req</span>}
+                            {ignored && <span className="text-[9px] font-normal">ignored</span>}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="border-y border-border/50 bg-secondary/20">
-                <tr>
-                  {COLUMNS.map((col) => {
-                    const required = mode === "general"
-                      ? ["CUSTOMER NAME", "CON", "B/LADING"].includes(col)
-                      : ["CON", "B/LADING"].includes(col);
-                    return (
-                      <th key={col} className={`px-4 py-2.5 font-mono font-semibold tracking-wider ${required ? "text-primary" : "text-muted-foreground"}`}>
-                        {col}
-                        {required && <span className="ml-1 text-[10px] bg-primary/10 text-primary px-1 rounded">required</span>}
-                        {col === "CUSTOMER NAME" && mode === "client" && (
-                          <span className="ml-1 text-[10px] bg-secondary text-muted-foreground px-1 rounded">ignored</span>
-                        )}
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-            </table>
-          </div>
+
         </CardContent>
       </Card>
 
-      {/* Upload Area */}
-      <AnimatePresence mode="wait">
-        {!file ? (
+      {/* ── Preview & import card (appears after file is loaded) ─────────── */}
+      <AnimatePresence>
+        {file && (
           <motion.div
-            key="dropzone"
+            key="preview-card"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            exit={{ opacity: 0, y: -6 }}
           >
-            <Card className={`border-border/50 border-dashed border-2 bg-card/20 transition-colors ${canUpload ? "hover:bg-card/40 cursor-pointer" : "opacity-60 cursor-not-allowed"}`}>
-              <CardContent className="p-12">
-                <div
-                  className="flex flex-col items-center justify-center text-center"
-                  onDragOver={canUpload ? handleDragOver : undefined}
-                  onDrop={canUpload ? handleDrop : undefined}
-                  onClick={() => canUpload && fileInputRef.current?.click()}
-                >
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <UploadCloud className="w-8 h-8 text-primary" />
-                  </div>
-                  {!canUpload ? (
-                    <>
-                      <h3 className="text-lg font-semibold mb-1">Select a customer first</h3>
-                      <p className="text-sm text-muted-foreground">Choose a client from the dropdown above before uploading.</p>
-                    </>
-                  ) : (
-                    <>
-                      <h3 className="text-lg font-semibold mb-1">Click or drag your file here</h3>
-                      <p className="text-sm text-muted-foreground mb-6">
-                        Supports .csv and .xlsx — max 10MB
-                        {mode === "client" && selectedClient && (
-                          <> · Will link to <span className="text-primary font-semibold">{selectedClient.name}</span></>
-                        )}
-                      </p>
-                      <Button variant="outline" className="hover-elevate pointer-events-none">
-                        Select File
-                      </Button>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                  />
+            <Card className="border-border/50 bg-card/40 shadow-lg overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between bg-secondary/20 border-b border-border/50 py-3 px-5">
+                <div>
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    Preview
+                    {mode === "client" && selectedClient && (
+                      <Badge variant="outline" className="text-[10px] font-normal border-primary/30 text-primary bg-primary/10">
+                        → {selectedClient.name}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    {isParsing ? "Reading your file…" : `${parsedData.length} records ready · ${errors.length > 0 ? `${errors.length} error(s)` : "no errors"}`}
+                  </CardDescription>
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="preview"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-          >
-            <Card className="border-border/50 bg-card/40 shadow-lg">
-              <CardHeader className="flex flex-row items-start justify-between bg-secondary/20 border-b border-border/50 pb-4">
-                <div className="flex items-center gap-3">
-                  <FileType className="w-8 h-8 text-primary" />
-                  <div>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      {file.name}
-                      {mode === "client" && selectedClient && (
-                        <Badge variant="outline" className="text-xs font-normal border-primary/30 text-primary bg-primary/10">
-                          → {selectedClient.name}
-                        </Badge>
-                      )}
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      {(file.size / 1024).toFixed(1)} KB &bull; {parsedData.length} valid rows detected
-                    </CardDescription>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost" size="icon"
-                  onClick={clearFile}
-                  disabled={uploadMutation.isPending}
-                  className="hover:bg-destructive/20 hover:text-destructive"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
               </CardHeader>
 
               <CardContent className="p-0">
                 {isParsing ? (
-                  <div className="p-12 flex flex-col items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-                    <p className="text-sm text-muted-foreground">Parsing your file...</p>
+                  <div className="p-10 flex flex-col items-center justify-center gap-3">
+                    <Loader2 className="w-7 h-7 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">Parsing your file…</p>
                   </div>
                 ) : (
                   <>
                     {errors.length > 0 && (
-                      <div className="p-5 bg-destructive/10 border-b border-destructive/20">
+                      <div className="px-5 py-4 bg-destructive/10 border-b border-destructive/20">
                         <h4 className="flex items-center gap-2 text-sm font-semibold text-destructive mb-2">
-                          <AlertTriangle className="w-4 h-4" /> {errors.length} issue(s) found — rows with errors will be skipped
+                          <AlertTriangle className="w-4 h-4" />
+                          {errors.length} issue(s) found — affected rows will be skipped
                         </h4>
                         <ul className="text-xs text-destructive/80 space-y-1 list-disc pl-5">
                           {errors.map((err, i) => <li key={i}>{err}</li>)}
@@ -419,12 +488,12 @@ export default function UploadPage() {
                     )}
 
                     {parsedData.length > 0 && (
-                      <div className="max-h-[420px] overflow-auto">
+                      <div className="max-h-[360px] overflow-auto">
                         <table className="w-full text-xs text-left">
                           <thead className="sticky top-0 bg-card/95 backdrop-blur border-b border-border text-muted-foreground uppercase font-mono">
                             <tr>
                               <th className="px-4 py-3 font-medium">#</th>
-                              <th className="px-4 py-3 font-medium">Customer Name</th>
+                              <th className="px-4 py-3 font-medium">Customer</th>
                               <th className="px-4 py-3 font-medium">Container #</th>
                               <th className="px-4 py-3 font-medium">B/L Number</th>
                               <th className="px-4 py-3 font-medium">Declaration</th>
@@ -457,24 +526,25 @@ export default function UploadPage() {
                 )}
               </CardContent>
 
-              <CardFooter className="p-4 border-t border-border/50 flex items-center justify-between bg-secondary/10">
+              <CardFooter className="px-5 py-3 border-t border-border/50 flex items-center justify-between bg-secondary/10 gap-3">
                 <p className="text-xs text-muted-foreground">
-                  {parsedData.length} records ready to import
+                  {parsedData.length} record{parsedData.length !== 1 ? "s" : ""} ready to import
                   {mode === "client" && selectedClient && ` → ${selectedClient.name}`}
                 </p>
-                <div className="flex gap-3">
-                  <Button variant="outline" onClick={clearFile} disabled={uploadMutation.isPending}>
-                    Choose Different File
+                <div className="flex gap-2 shrink-0">
+                  <Button variant="outline" size="sm" onClick={clearFile} disabled={uploadMutation.isPending}>
+                    Change file
                   </Button>
                   <Button
+                    size="sm"
                     onClick={handleUpload}
                     disabled={parsedData.length === 0 || uploadMutation.isPending}
-                    className="shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
+                    className="shadow-sm"
                   >
                     {uploadMutation.isPending ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing...</>
+                      <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Importing…</>
                     ) : (
-                      <><CheckCircle2 className="w-4 h-4 mr-2" /> Import {parsedData.length} Records</>
+                      <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Import {parsedData.length} Records</>
                     )}
                   </Button>
                 </div>
@@ -483,6 +553,7 @@ export default function UploadPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }
