@@ -244,19 +244,22 @@ export default function UploadPage() {
             </p>
           </div>
 
-          {/* ── Step 2: Client picker (client mode only) ──────────────────── */}
-          <AnimatePresence>
-            {mode === "client" && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <StepBadge n="2" /> Select customer
-                  </p>
+          {/* ── Step 2: Client picker ─────────────────────────────────────── */}
+          <div className="space-y-2">
+            <p className={`text-xs font-medium flex items-center gap-1.5 ${mode === "client" ? "text-muted-foreground" : "text-muted-foreground/40"}`}>
+              <StepBadge n="2" /> Select customer
+              {mode === "general" && (
+                <span className="text-[10px] text-muted-foreground/40 font-normal">— not needed for General upload</span>
+              )}
+            </p>
+            <AnimatePresence>
+              {mode === "client" && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
                   <Select value={selectedClientId} onValueChange={setSelectedClientId}>
                     <SelectTrigger className="h-9 text-sm border-border/50 bg-background/50 max-w-xs">
                       <SelectValue placeholder={clients.length === 0 ? "No clients yet" : "Choose a client…"} />
@@ -267,15 +270,15 @@ export default function UploadPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* ── Step 3: Drop zone ─────────────────────────────────────────── */}
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <StepBadge n={mode === "client" ? "3" : "2"} /> Upload file
+              <StepBadge n="3" /> Upload file
             </p>
 
             <AnimatePresence mode="wait">
@@ -367,31 +370,31 @@ export default function UploadPage() {
 
           {/* ── Format guide (collapsible) ────────────────────────────────── */}
           <div className="border border-border/40 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setFormatOpen(o => !o)}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-muted/30 transition-colors"
-            >
-              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                File format guide &amp; template
-              </span>
-              <span className="flex items-center gap-2">
-                {formatOpen && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs gap-1.5 text-primary hover:bg-primary/10 pointer-events-auto"
-                    onClick={e => { e.stopPropagation(); downloadTemplate(); }}
-                  >
-                    <Download className="w-3 h-3" />
-                    Download Template
-                  </Button>
-                )}
+            <div className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/30 transition-colors">
+              <button
+                onClick={() => setFormatOpen(o => !o)}
+                className="flex-1 flex items-center gap-2 text-left"
+              >
+                <span className="text-xs font-medium text-muted-foreground">
+                  File format guide &amp; template
+                </span>
                 {formatOpen
                   ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
                   : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
                 }
-              </span>
-            </button>
+              </button>
+              {formatOpen && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs gap-1.5 text-primary hover:bg-primary/10 shrink-0"
+                  onClick={downloadTemplate}
+                >
+                  <Download className="w-3 h-3" />
+                  Download Template
+                </Button>
+              )}
+            </div>
 
             <AnimatePresence>
               {formatOpen && (
