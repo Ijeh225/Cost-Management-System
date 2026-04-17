@@ -256,7 +256,7 @@ export default function ClientDetailPage() {
       to.setHours(23, 59, 59, 999);
       list = list.filter(c => new Date(c.createdAt) <= to);
     }
-    return list;
+    return [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [containers, activeTab, searchTerm, statusFilter, dateFrom, dateTo]);
 
   const hasActiveFilters = searchTerm.trim() || statusFilter !== "all" || dateFrom || dateTo;
