@@ -593,6 +593,10 @@ router.post("/containers/:id/extra-charges", requireAuth, async (req: AuthReques
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
+    // Authorization: admin or the staff member assigned to this container
+    if (req.user!.role !== "admin" && container.assignedStaffId !== req.user!.id) {
+      return res.status(403).json({ error: "Not authorized to modify this container" });
+    }
     const { section, label, amount } = req.body;
     if (!section || !VALID_SECTIONS.has(section)) return res.status(400).json({ error: "Invalid section" });
     // Enforce section-level lock (same rule as PUT /charges — covers manual locks and approvals)
@@ -622,6 +626,10 @@ router.put("/containers/:id/extra-charges/:rowId", requireAuth, async (req: Auth
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
+    // Authorization: admin or the staff member assigned to this container
+    if (req.user!.role !== "admin" && container.assignedStaffId !== req.user!.id) {
+      return res.status(403).json({ error: "Not authorized to modify this container" });
+    }
     const [existing] = await db.select().from(containerExtraChargesTable)
       .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
     if (!existing) return res.status(404).json({ error: "Extra charge not found" });
@@ -630,7 +638,11 @@ router.put("/containers/:id/extra-charges/:rowId", requireAuth, async (req: Auth
     try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
     if (lockedSections.includes(existing.section)) return res.status(403).json({ error: `The ${existing.section} section is locked.` });
     const updates: { label?: string; amount?: string } = {};
-    if (req.body.label !== undefined) updates.label = String(req.body.label).trim();
+    if (req.body.label !== undefined) {
+      const trimmed = String(req.body.label).trim();
+      if (!trimmed) return res.status(400).json({ error: "Label cannot be empty" });
+      updates.label = trimmed;
+    }
     if (req.body.amount !== undefined) updates.amount = (parseFloat(String(req.body.amount ?? 0)) || 0).toFixed(2);
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: "Nothing to update" });
     const [row] = await db.update(containerExtraChargesTable).set(updates)
@@ -653,6 +665,10 @@ router.delete("/containers/:id/extra-charges/:rowId", requireAuth, async (req: A
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
+    // Authorization: admin or the staff member assigned to this container
+    if (req.user!.role !== "admin" && container.assignedStaffId !== req.user!.id) {
+      return res.status(403).json({ error: "Not authorized to modify this container" });
+    }
     // Fetch the row to know its section for lock check
     const [existing] = await db.select().from(containerExtraChargesTable)
       .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
@@ -775,7 +791,9 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
     // Recalculate and return
     const charges = await getOrCreateCharges(id);
     const [updated] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations);
+    const extraRows = await db.select().from(containerExtraChargesTable).where(eq(containerExtraChargesTable.containerId, id));
+    const extraTotal = extraRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
+    const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations) + extraTotal;
     res.json({
       containerId: id,
       shipping: numericToObj(charges.shipping),
