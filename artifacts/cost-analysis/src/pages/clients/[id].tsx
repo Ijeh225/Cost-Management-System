@@ -32,7 +32,7 @@ import {
   PlusCircle, Trash2, TrendingDown, TrendingUp, AlertTriangle,
 } from "lucide-react";
 
-const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque", "Online Transfer", "Other"];
+const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque"];
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -312,7 +312,7 @@ export default function ClientDetailPage() {
               <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
                 <CreditCard className="w-3 h-3" /> Current Balance
               </p>
-              <p className={`font-mono font-bold text-lg ${isOverdrawn ? "text-red-400" : "text-primary"}`}>
+              <p className={`font-mono font-bold text-lg ${isOverdrawn ? "text-red-400" : "text-emerald-400"}`}>
                 {formatCurrency(Math.abs(balance))}
                 {isOverdrawn ? " (Overdrawn)" : ""}
               </p>

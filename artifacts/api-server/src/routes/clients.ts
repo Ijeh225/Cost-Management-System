@@ -343,6 +343,8 @@ clientsRouter.get("/clients/:id/deposits", requireAuth, async (req: AuthRequest,
   }
 });
 
+const ALLOWED_PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque"] as const;
+
 clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const clientId = parseInt(req.params.id);
@@ -351,8 +353,8 @@ clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthReques
     if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
       return res.status(400).json({ error: "Amount must be a positive number" });
     }
-    if (!paymentMethod || typeof paymentMethod !== "string") {
-      return res.status(400).json({ error: "Payment method is required" });
+    if (!paymentMethod || !ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
+      return res.status(400).json({ error: `Payment method must be one of: ${ALLOWED_PAYMENT_METHODS.join(", ")}` });
     }
     const [deposit] = await db.insert(clientDepositsTable).values({
       clientId,
