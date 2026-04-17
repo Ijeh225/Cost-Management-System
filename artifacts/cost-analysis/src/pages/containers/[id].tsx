@@ -358,10 +358,10 @@ function ExtraLineItems({
                     onFocus={e => e.target.select()}
                   />
                 </div>
-                <Button type="button" size="sm" className="h-8 text-xs px-3" onClick={() => handleUpdate(row.id)} disabled={updateMutation.isPending}>
+                <Button type="button" size="sm" aria-label="Save extra charge" className="h-8 text-xs px-3" onClick={() => handleUpdate(row.id)} disabled={updateMutation.isPending}>
                   {updateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 </Button>
-                <Button type="button" variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => setEditingId(null)}>
+                <Button type="button" variant="ghost" size="sm" aria-label="Cancel edit" className="h-8 text-xs px-2" onClick={() => setEditingId(null)}>
                   <X className="w-3.5 h-3.5" />
                 </Button>
               </>
@@ -371,11 +371,11 @@ function ExtraLineItems({
                 <span className="font-mono text-sm text-primary">{formatCurrency(row.amount)}</span>
                 {canEdit && (
                   <>
-                    <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                    <Button type="button" variant="ghost" size="sm" aria-label={`Edit ${row.label}`} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                       onClick={() => { setEditingId(row.id); setEditLabel(row.label); setEditAmount(String(row.amount)); }}>
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
-                    <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                    <Button type="button" variant="ghost" size="sm" aria-label={`Delete ${row.label}`} className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                       onClick={() => handleDelete(row.id)} disabled={deleteMutation.isPending}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>

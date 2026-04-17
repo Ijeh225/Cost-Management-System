@@ -590,11 +590,15 @@ const VALID_SECTIONS = new Set(["shipping", "customs", "terminal", "delivery", "
 router.post("/containers/:id/extra-charges", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [container] = await db.select({ isLocked: containersTable.isLocked }).from(containersTable).where(eq(containersTable.id, id));
+    const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container) return res.status(404).json({ error: "Container not found" });
-    if (container.isLocked && !req.user!.isAdmin) return res.status(403).json({ error: "Container is locked" });
+    if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
     const { section, label, amount } = req.body;
     if (!section || !VALID_SECTIONS.has(section)) return res.status(400).json({ error: "Invalid section" });
+    // Enforce section-level lock (same rule as PUT /charges — covers manual locks and approvals)
+    let lockedSections: string[] = [];
+    try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
+    if (lockedSections.includes(section)) return res.status(403).json({ error: `The ${section} section is locked.` });
     if (!label || typeof label !== "string" || !label.trim()) return res.status(400).json({ error: "Label is required" });
     const parsedAmount = parseFloat(String(amount ?? 0)) || 0;
     const [row] = await db.insert(containerExtraChargesTable)
@@ -615,12 +619,16 @@ router.put("/containers/:id/extra-charges/:rowId", requireAuth, async (req: Auth
   try {
     const id = parseInt(req.params.id);
     const rowId = parseInt(req.params.rowId);
-    const [container] = await db.select({ isLocked: containersTable.isLocked }).from(containersTable).where(eq(containersTable.id, id));
+    const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container) return res.status(404).json({ error: "Container not found" });
-    if (container.isLocked && !req.user!.isAdmin) return res.status(403).json({ error: "Container is locked" });
+    if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
     const [existing] = await db.select().from(containerExtraChargesTable)
       .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
     if (!existing) return res.status(404).json({ error: "Extra charge not found" });
+    // Enforce section-level lock (covers manual locks and approvals)
+    let lockedSections: string[] = [];
+    try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
+    if (lockedSections.includes(existing.section)) return res.status(403).json({ error: `The ${existing.section} section is locked.` });
     const updates: { label?: string; amount?: string } = {};
     if (req.body.label !== undefined) updates.label = String(req.body.label).trim();
     if (req.body.amount !== undefined) updates.amount = (parseFloat(String(req.body.amount ?? 0)) || 0).toFixed(2);
@@ -642,9 +650,17 @@ router.delete("/containers/:id/extra-charges/:rowId", requireAuth, async (req: A
   try {
     const id = parseInt(req.params.id);
     const rowId = parseInt(req.params.rowId);
-    const [container] = await db.select({ isLocked: containersTable.isLocked }).from(containersTable).where(eq(containersTable.id, id));
+    const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container) return res.status(404).json({ error: "Container not found" });
-    if (container.isLocked && !req.user!.isAdmin) return res.status(403).json({ error: "Container is locked" });
+    if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
+    // Fetch the row to know its section for lock check
+    const [existing] = await db.select().from(containerExtraChargesTable)
+      .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
+    if (!existing) return res.status(404).json({ error: "Extra charge not found" });
+    // Enforce section-level lock (covers manual locks and approvals)
+    let lockedSections: string[] = [];
+    try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
+    if (lockedSections.includes(existing.section)) return res.status(403).json({ error: `The ${existing.section} section is locked.` });
     await db.delete(containerExtraChargesTable)
       .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
     return res.json({ success: true });
@@ -663,7 +679,11 @@ router.get("/containers/:id/charges", requireAuth, async (req, res) => {
       return;
     }
     const charges = await getOrCreateCharges(id);
-    const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations);
+    const extraRows = await db.select().from(containerExtraChargesTable)
+      .where(eq(containerExtraChargesTable.containerId, id));
+    const extraTotal = extraRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
+    const baseTotal = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations);
+    const totalCost = baseTotal + extraTotal;
     res.json({
       containerId: id,
       shipping: numericToObj(charges.shipping),
