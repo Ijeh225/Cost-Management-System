@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import {
   useGetClient, useUpdateClient, useGetClientReceivables,
@@ -6,7 +6,7 @@ import {
   useCreateClientDeposit, useDeleteClientDeposit,
   type ClientWithContainers,
 } from "@workspace/api-client-react";
-import { formatCurrency, getStatusColor, getStatusLabel } from "@/lib/format";
+import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,13 +26,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft, Building2, Phone, Mail, MapPin, FileText,
-  Pencil, Check, X, Loader2, Box, Calendar,
+  ArrowLeft, Building2, Phone, Mail, MapPin,
+  Pencil, Check, X, Loader2, Box, Search,
   ReceiptText, Wallet, CreditCard, ChevronDown, ChevronUp, History,
-  PlusCircle, Trash2, TrendingDown, TrendingUp, AlertTriangle,
+  PlusCircle, Trash2, TrendingDown, TrendingUp, AlertTriangle, SlidersHorizontal,
 } from "lucide-react";
 
 const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque"];
+const DONE_STATUSES = new Set(["completed", "closed"]);
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -218,6 +219,48 @@ export default function ClientDetailPage() {
 
   const set = (patch: Partial<typeof form>) => setForm(f => ({ ...f, ...patch }));
 
+  // ─── Container filter state ──────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<"active" | "all">("active");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const containers = client?.containers ?? [];
+  const totalRevenue = containers.reduce((s, c) => s + parseFloat(c.clearingCharges ?? "0"), 0);
+  const totalContainers = containers.length;
+  const sizes: Record<string, number> = {};
+  containers.forEach(c => { if (c.size) sizes[c.size] = (sizes[c.size] ?? 0) + 1; });
+
+  const filteredContainers = useMemo(() => {
+    let list = containers;
+    if (activeTab === "active") {
+      list = list.filter(c => !DONE_STATUSES.has(c.status));
+    }
+    if (searchTerm.trim()) {
+      const term = searchTerm.trim().toLowerCase();
+      list = list.filter(c =>
+        c.containerNumber.toLowerCase().includes(term) ||
+        c.blNumber.toLowerCase().includes(term)
+      );
+    }
+    if (statusFilter !== "all") {
+      list = list.filter(c => c.status === statusFilter);
+    }
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      list = list.filter(c => new Date(c.createdAt) >= from);
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      list = list.filter(c => new Date(c.createdAt) <= to);
+    }
+    return list;
+  }, [containers, activeTab, searchTerm, statusFilter, dateFrom, dateTo]);
+
+  const hasActiveFilters = searchTerm.trim() || statusFilter !== "all" || dateFrom || dateTo;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -235,12 +278,6 @@ export default function ClientDetailPage() {
       </div>
     );
   }
-
-  const containers = client.containers ?? [];
-  const totalRevenue = containers.reduce((s, c) => s + parseFloat(c.clearingCharges ?? "0"), 0);
-  const totalContainers = containers.length;
-  const sizes: Record<string, number> = {};
-  containers.forEach(c => { if (c.size) sizes[c.size] = (sizes[c.size] ?? 0) + 1; });
 
   const balance = walletSummary?.balance ?? 0;
   const isOverdrawn = balance < 0;
@@ -633,57 +670,147 @@ export default function ClientDetailPage() {
         {/* Containers */}
         <Card className="border-border/50 bg-card/50 lg:col-span-2">
           <CardHeader className="border-b border-border/40 pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Box className="w-4 h-4 text-primary" /> Containers ({totalContainers})
-            </CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Box className="w-4 h-4 text-primary" /> Containers ({totalContainers})
+              </CardTitle>
+              {/* Active / All tabs */}
+              <div className="flex items-center gap-1 bg-secondary/40 rounded-lg p-0.5">
+                {(["active", "all"] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-3 py-1 text-xs rounded-md font-medium transition-all ${
+                      activeTab === tab
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {tab === "active" ? "Active" : "All"}
+                  </button>
+                ))}
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="p-0">
-            {containers.length === 0 ? (
+
+          {containers.length === 0 ? (
+            <CardContent className="p-0">
               <div className="px-6 py-10 text-center text-muted-foreground">
                 <Box className="w-8 h-8 mx-auto mb-2 opacity-20" />
                 <p className="text-sm font-medium">No containers linked</p>
-                <p className="text-xs mt-1">
-                  Open a container and link it to this client from the container details.
+                <p className="text-xs mt-1">Open a container and link it to this client from the container details.</p>
+              </div>
+            </CardContent>
+          ) : (
+            <>
+              {/* Filter bar */}
+              <div className="px-4 py-3 border-b border-border/40 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Search */}
+                  <div className="relative flex-1 min-w-[180px]">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    <Input
+                      placeholder="Search container # or BL…"
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      className="h-8 pl-8 text-xs"
+                    />
+                  </div>
+                  {/* Status */}
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-8 text-xs w-[160px]">
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      {WORKFLOW_STAGES.map(s => (
+                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* Date range */}
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={e => setDateFrom(e.target.value)}
+                    className="h-8 text-xs w-[140px]"
+                    title="From date"
+                  />
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={e => setDateTo(e.target.value)}
+                    className="h-8 text-xs w-[140px]"
+                    title="To date"
+                  />
+                  {hasActiveFilters && (
+                    <button
+                      onClick={() => { setSearchTerm(""); setStatusFilter("all"); setDateFrom(""); setDateTo(""); }}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 whitespace-nowrap"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {/* Results count */}
+                <p className="text-[11px] text-muted-foreground font-mono">
+                  {filteredContainers.length} container{filteredContainers.length !== 1 ? "s" : ""}
+                  {activeTab === "active" ? " (active)" : ""}
+                  {hasActiveFilters ? " matching filters" : ""}
                 </p>
               </div>
-            ) : (
-              <div className="divide-y divide-border/30">
-                {containers.map(c => (
-                  <Link key={c.id} href={`/containers/${c.id}?from=/clients/${clientId}`}>
-                    <div className="flex items-center justify-between px-4 py-3 hover:bg-accent/10 transition-colors cursor-pointer group">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-accent/30 flex items-center justify-center flex-shrink-0">
-                          <Box className="w-3.5 h-3.5 text-muted-foreground" />
+
+              <CardContent className="p-0">
+                {filteredContainers.length === 0 ? (
+                  <div className="px-6 py-10 text-center text-muted-foreground">
+                    <SlidersHorizontal className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                    <p className="text-sm font-medium">No containers match your filters</p>
+                    <p className="text-xs mt-1">
+                      {activeTab === "active"
+                        ? "Try switching to 'All' or adjusting your search."
+                        : "Try adjusting the search or date range."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/30">
+                    {filteredContainers.map(c => (
+                      <Link key={c.id} href={`/containers/${c.id}?from=/clients/${clientId}`}>
+                        <div className="flex items-center justify-between px-4 py-3 hover:bg-accent/10 transition-colors cursor-pointer group">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-accent/30 flex items-center justify-center flex-shrink-0">
+                              <Box className="w-3.5 h-3.5 text-muted-foreground" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-mono font-medium truncate group-hover:text-primary transition-colors">
+                                {c.containerNumber}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{c.blNumber}</p>
+                            </div>
+                            {c.size && (
+                              <Badge variant="outline" className="text-[10px] py-0 px-1.5 hidden sm:flex">{c.size}</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase border ${getStatusColor(c.status)}`}>
+                              {getStatusLabel(c.status)}
+                            </span>
+                            <div className="text-right hidden sm:block">
+                              <p className="text-xs font-mono font-semibold text-primary">
+                                {formatCurrency(parseFloat(c.clearingCharges ?? "0"))}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {new Date(c.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-mono font-medium truncate group-hover:text-primary transition-colors">
-                            {c.containerNumber}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{c.blNumber}</p>
-                        </div>
-                        {c.size && (
-                          <Badge variant="outline" className="text-[10px] py-0 px-1.5 hidden sm:flex">{c.size}</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase border ${getStatusColor(c.status)}`}>
-                          {getStatusLabel(c.status)}
-                        </span>
-                        <div className="text-right hidden sm:block">
-                          <p className="text-xs font-mono font-semibold text-primary">
-                            {formatCurrency(parseFloat(c.clearingCharges ?? "0"))}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {new Date(c.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </>
+          )}
         </Card>
       </div>
 
