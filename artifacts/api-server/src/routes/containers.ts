@@ -593,10 +593,6 @@ router.post("/containers/:id/extra-charges", requireAuth, async (req: AuthReques
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
-    // Authorization: admin or the staff member assigned to this container
-    if (req.user!.role !== "admin" && container.assignedStaffId !== req.user!.id) {
-      return res.status(403).json({ error: "Not authorized to modify this container" });
-    }
     const { section, label, amount } = req.body;
     if (!section || !VALID_SECTIONS.has(section)) return res.status(400).json({ error: "Invalid section" });
     // Enforce section-level lock (same rule as PUT /charges — covers manual locks and approvals)
@@ -626,10 +622,6 @@ router.put("/containers/:id/extra-charges/:rowId", requireAuth, async (req: Auth
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
-    // Authorization: admin or the staff member assigned to this container
-    if (req.user!.role !== "admin" && container.assignedStaffId !== req.user!.id) {
-      return res.status(403).json({ error: "Not authorized to modify this container" });
-    }
     const [existing] = await db.select().from(containerExtraChargesTable)
       .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
     if (!existing) return res.status(404).json({ error: "Extra charge not found" });
@@ -665,10 +657,6 @@ router.delete("/containers/:id/extra-charges/:rowId", requireAuth, async (req: A
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
-    // Authorization: admin or the staff member assigned to this container
-    if (req.user!.role !== "admin" && container.assignedStaffId !== req.user!.id) {
-      return res.status(403).json({ error: "Not authorized to modify this container" });
-    }
     // Fetch the row to know its section for lock check
     const [existing] = await db.select().from(containerExtraChargesTable)
       .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
