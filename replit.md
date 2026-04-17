@@ -5,7 +5,7 @@
 This project is an enterprise-grade web application designed for Nigerian port clearing and logistics companies. Its primary purpose is to provide comprehensive cost analysis and operations management for container clearing processes. The application tracks all associated costs in Nigerian Naira (₦) and aims to streamline financial and operational workflows.
 
 Key capabilities include:
-- Management of container records and associated charges across five distinct sections (Shipping, Customs, Terminal, Delivery, Operations).
+- Management of container records and associated charges across five distinct sections (Shipping, Customs, Terminal, Delivery, Operations), each with unlimited custom line items (extra charges).
 - Automated calculation of total costs, clearing charges, and gross profit.
 - Robust user and role management with granular, section-level permissions.
 - Workflow engine for section approvals and task management.

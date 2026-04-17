@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable } from "@workspace/db";
+import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
@@ -163,8 +163,15 @@ router.get("/containers", requireAuth, async (req, res) => {
       const dMap = indexBy(deliveryRows);
       const oMap = indexBy(opsRows);
 
+      const extraRows = await db.select({ containerId: containerExtraChargesTable.containerId, amount: containerExtraChargesTable.amount })
+        .from(containerExtraChargesTable).where(inArray(containerExtraChargesTable.containerId, containerIds));
+      const extraTotalsMap: Record<number, number> = {};
+      for (const r of extraRows) {
+        extraTotalsMap[r.containerId] = (extraTotalsMap[r.containerId] ?? 0) + parseFloat(r.amount ?? "0");
+      }
+
       for (const id of containerIds) {
-        totalsMap[id] = calcTotalCost(sMap[id] ?? {}, cMap[id] ?? {}, tMap[id] ?? {}, dMap[id] ?? {}, oMap[id] ?? {});
+        totalsMap[id] = calcTotalCost(sMap[id] ?? {}, cMap[id] ?? {}, tMap[id] ?? {}, dMap[id] ?? {}, oMap[id] ?? {}) + (extraTotalsMap[id] ?? 0);
         dutyMap[id] = parseFloat(cMap[id]?.dutyNotPaid ?? "0");
       }
     }
@@ -402,7 +409,11 @@ router.get("/containers/:id", requireAuth, async (req, res) => {
       clientName = client?.name ?? null;
     }
     const charges = await getOrCreateCharges(id);
-    const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations);
+    const extraChargeRows = await db.select().from(containerExtraChargesTable)
+      .where(eq(containerExtraChargesTable.containerId, id))
+      .orderBy(containerExtraChargesTable.sortOrder, containerExtraChargesTable.createdAt);
+    const extraTotal = extraChargeRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
+    const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations) + extraTotal;
     const dutyNotPaid = parseFloat(charges.customs.dutyNotPaid ?? "0");
 
     const containerFormatted = {
@@ -416,6 +427,16 @@ router.get("/containers/:id", requireAuth, async (req, res) => {
       .where(eq(sectionApprovalsTable.containerId, id));
     const sectionApprovals = await Promise.all(sectionApprovalRows.map(formatSectionApproval));
 
+    const extraCharges = extraChargeRows.map(r => ({
+      id: r.id,
+      containerId: r.containerId,
+      section: r.section,
+      label: r.label,
+      amount: parseFloat(r.amount ?? "0"),
+      sortOrder: r.sortOrder,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+    }));
+
     res.json({
       container: containerFormatted,
       charges: {
@@ -428,6 +449,7 @@ router.get("/containers/:id", requireAuth, async (req, res) => {
         totalCost,
         clearingCharges: parseFloat(c.clearingCharges ?? "0"),
         grossProfit: parseFloat(c.clearingCharges ?? "0") - totalCost,
+        extraCharges,
       },
       sectionApprovals,
     });
@@ -543,6 +565,92 @@ router.post("/containers/:id/lock", requireAdmin, async (req: AuthRequest, res) 
     res.json(formatContainer(updated));
   } catch (err) {
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/containers/:id/extra-charges", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const rows = await db.select().from(containerExtraChargesTable)
+      .where(eq(containerExtraChargesTable.containerId, id))
+      .orderBy(containerExtraChargesTable.sortOrder, containerExtraChargesTable.createdAt);
+    return res.json(rows.map(r => ({
+      id: r.id, containerId: r.containerId, section: r.section, label: r.label,
+      amount: parseFloat(r.amount ?? "0"), sortOrder: r.sortOrder,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+    })));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+const VALID_SECTIONS = new Set(["shipping", "customs", "terminal", "delivery", "operations"]);
+
+router.post("/containers/:id/extra-charges", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [container] = await db.select({ isLocked: containersTable.isLocked }).from(containersTable).where(eq(containersTable.id, id));
+    if (!container) return res.status(404).json({ error: "Container not found" });
+    if (container.isLocked && !req.user!.isAdmin) return res.status(403).json({ error: "Container is locked" });
+    const { section, label, amount } = req.body;
+    if (!section || !VALID_SECTIONS.has(section)) return res.status(400).json({ error: "Invalid section" });
+    if (!label || typeof label !== "string" || !label.trim()) return res.status(400).json({ error: "Label is required" });
+    const parsedAmount = parseFloat(String(amount ?? 0)) || 0;
+    const [row] = await db.insert(containerExtraChargesTable)
+      .values({ containerId: id, section, label: label.trim(), amount: parsedAmount.toFixed(2) })
+      .returning();
+    return res.status(201).json({
+      id: row.id, containerId: row.containerId, section: row.section, label: row.label,
+      amount: parseFloat(row.amount ?? "0"), sortOrder: row.sortOrder,
+      createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.put("/containers/:id/extra-charges/:rowId", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const rowId = parseInt(req.params.rowId);
+    const [container] = await db.select({ isLocked: containersTable.isLocked }).from(containersTable).where(eq(containersTable.id, id));
+    if (!container) return res.status(404).json({ error: "Container not found" });
+    if (container.isLocked && !req.user!.isAdmin) return res.status(403).json({ error: "Container is locked" });
+    const [existing] = await db.select().from(containerExtraChargesTable)
+      .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
+    if (!existing) return res.status(404).json({ error: "Extra charge not found" });
+    const updates: { label?: string; amount?: string } = {};
+    if (req.body.label !== undefined) updates.label = String(req.body.label).trim();
+    if (req.body.amount !== undefined) updates.amount = (parseFloat(String(req.body.amount ?? 0)) || 0).toFixed(2);
+    if (Object.keys(updates).length === 0) return res.status(400).json({ error: "Nothing to update" });
+    const [row] = await db.update(containerExtraChargesTable).set(updates)
+      .where(eq(containerExtraChargesTable.id, rowId)).returning();
+    return res.json({
+      id: row.id, containerId: row.containerId, section: row.section, label: row.label,
+      amount: parseFloat(row.amount ?? "0"), sortOrder: row.sortOrder,
+      createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.delete("/containers/:id/extra-charges/:rowId", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const rowId = parseInt(req.params.rowId);
+    const [container] = await db.select({ isLocked: containersTable.isLocked }).from(containersTable).where(eq(containersTable.id, id));
+    if (!container) return res.status(404).json({ error: "Container not found" });
+    if (container.isLocked && !req.user!.isAdmin) return res.status(403).json({ error: "Container is locked" });
+    await db.delete(containerExtraChargesTable)
+      .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
+    return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

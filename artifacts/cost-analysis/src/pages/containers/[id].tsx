@@ -12,6 +12,9 @@ import {
   useGetSettings, BUILT_IN_SECTION_DEFAULTS,
   getBuiltInFieldLabel, isBuiltInFieldHidden,
   useAddTimelineEvent, useUpdateDeliveredAt,
+  useGetContainerExtraCharges, useCreateContainerExtraCharge,
+  useUpdateContainerExtraCharge, useDeleteContainerExtraCharge,
+  type ContainerExtraCharge,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -39,7 +42,7 @@ import {
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
   Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink, X,
-  ClipboardCheck, ArrowRightCircle, PlusCircle, Truck,
+  ClipboardCheck, ArrowRightCircle, PlusCircle, Truck, Plus, Trash2,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
@@ -268,6 +271,165 @@ function RejectSectionDialog({
   );
 }
 
+function ExtraLineItems({
+  containerId, sectionKey, canEdit,
+}: {
+  containerId: number;
+  sectionKey: string;
+  canEdit: boolean;
+}) {
+  const { toast } = useToast();
+  const { data: allExtra = [] } = useGetContainerExtraCharges(containerId);
+  const createMutation = useCreateContainerExtraCharge(containerId);
+  const updateMutation = useUpdateContainerExtraCharge(containerId);
+  const deleteMutation = useDeleteContainerExtraCharge(containerId);
+
+  const rows = allExtra.filter(r => r.section === sectionKey);
+
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+
+  const handleAdd = () => {
+    if (!newLabel.trim()) { toast({ variant: "destructive", title: "Label is required" }); return; }
+    createMutation.mutate(
+      { section: sectionKey, label: newLabel.trim(), amount: parseFloat(newAmount) || 0 },
+      {
+        onSuccess: () => { setAdding(false); setNewLabel(""); setNewAmount(""); },
+        onError: (err) => toast({ variant: "destructive", title: "Failed to add", description: err instanceof Error ? err.message : "Error" }),
+      }
+    );
+  };
+
+  const handleUpdate = (id: number) => {
+    updateMutation.mutate(
+      { rowId: id, label: editLabel.trim(), amount: parseFloat(editAmount) || 0 },
+      {
+        onSuccess: () => setEditingId(null),
+        onError: (err) => toast({ variant: "destructive", title: "Failed to update", description: err instanceof Error ? err.message : "Error" }),
+      }
+    );
+  };
+
+  const handleDelete = (id: number) => {
+    deleteMutation.mutate(id, {
+      onError: (err) => toast({ variant: "destructive", title: "Failed to delete", description: err instanceof Error ? err.message : "Error" }),
+    });
+  };
+
+  if (rows.length === 0 && !adding && !canEdit) return null;
+
+  return (
+    <div className="mt-4 border-t border-border/30 pt-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Custom Line Items</span>
+        {canEdit && !adding && (
+          <Button type="button" variant="ghost" size="sm" className="h-7 text-xs gap-1 text-primary hover:text-primary"
+            onClick={() => { setAdding(true); setNewLabel(""); setNewAmount(""); }}>
+            <Plus className="w-3.5 h-3.5" /> Add Line Item
+          </Button>
+        )}
+      </div>
+      <div className="space-y-2">
+        {rows.map(row => (
+          <div key={row.id} className="flex items-center gap-2">
+            {editingId === row.id ? (
+              <>
+                <Input
+                  aria-label="Extra charge label"
+                  value={editLabel}
+                  onChange={e => setEditLabel(e.target.value)}
+                  placeholder="Label"
+                  className="flex-1 h-8 text-xs bg-background/50 border-border/60"
+                />
+                <div className="relative w-36">
+                  <span className="absolute left-2.5 top-1.5 text-muted-foreground text-xs font-mono pointer-events-none">₦</span>
+                  <Input
+                    aria-label="Extra charge amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={editAmount}
+                    onChange={e => setEditAmount(e.target.value)}
+                    placeholder="0"
+                    className="pl-6 h-8 text-xs font-mono bg-background/50 border-border/60"
+                    onFocus={e => e.target.select()}
+                  />
+                </div>
+                <Button type="button" size="sm" className="h-8 text-xs px-3" onClick={() => handleUpdate(row.id)} disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => setEditingId(null)}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-sm text-foreground/90">{row.label}</span>
+                <span className="font-mono text-sm text-primary">{formatCurrency(row.amount)}</span>
+                {canEdit && (
+                  <>
+                    <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => { setEditingId(row.id); setEditLabel(row.label); setEditAmount(String(row.amount)); }}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDelete(row.id)} disabled={deleteMutation.isPending}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+        {adding && (
+          <div className="flex items-center gap-2 pt-1">
+            <Input
+              aria-label="New extra charge label"
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              placeholder="Label (e.g. Demurrage fee)"
+              className="flex-1 h-8 text-xs bg-background/50 border-border/60"
+              autoFocus
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } if (e.key === "Escape") { setAdding(false); } }}
+            />
+            <div className="relative w-36">
+              <span className="absolute left-2.5 top-1.5 text-muted-foreground text-xs font-mono pointer-events-none">₦</span>
+              <Input
+                aria-label="New extra charge amount"
+                type="text"
+                inputMode="decimal"
+                value={newAmount}
+                onChange={e => setNewAmount(e.target.value)}
+                placeholder="0"
+                className="pl-6 h-8 text-xs font-mono bg-background/50 border-border/60"
+                onFocus={e => e.target.select()}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } if (e.key === "Escape") { setAdding(false); } }}
+              />
+            </div>
+            <Button type="button" size="sm" className="h-8 text-xs px-3 gap-1" onClick={handleAdd} disabled={createMutation.isPending}>
+              {createMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add
+            </Button>
+            <Button type="button" variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => { setAdding(false); setNewLabel(""); setNewAmount(""); }}>
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+      {rows.length > 0 && (
+        <div className="flex justify-end mt-3">
+          <span className="text-xs text-muted-foreground font-mono">
+            Extras: {formatCurrency(rows.reduce((s, r) => s + r.amount, 0))}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChargeSectionForm({
   containerId, sectionKey, title, schema, initialData, isRecordLocked, isSectionLocked, isEditable, isAdmin,
   approval, onSubmitSection, onApproveSection, onRejectSection, onToggleSectionLock, sectionSettings,
@@ -309,7 +471,10 @@ function ChargeSectionForm({
 
   const allFields = Object.keys(schema.shape);
   const fields = allFields.filter(f => !isBuiltInFieldHidden(sectionSettings, sectionKey, f));
-  const total = fields.reduce((sum, field) => sum + Number(initialData?.[field] || 0), 0);
+  const baseTotal = fields.reduce((sum, field) => sum + Number(initialData?.[field] || 0), 0);
+  const { data: allExtraCharges = [] } = useGetContainerExtraCharges(containerId);
+  const extraTotal = allExtraCharges.filter(r => r.section === sectionKey).reduce((s, r) => s + r.amount, 0);
+  const total = baseTotal + extraTotal;
 
   const approvalStatus = approval?.status ?? "draft";
   const effectivelyLocked = isRecordLocked || isSectionLocked;
@@ -396,6 +561,7 @@ function ChargeSectionForm({
                   )} />
                 ))}
               </div>
+              <ExtraLineItems containerId={containerId} sectionKey={sectionKey} canEdit={canEdit} />
               <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border/40 mt-6">
                 <div className="flex items-center gap-2">
                   {/* Admin: approve/reject when submitted */}

@@ -86,6 +86,72 @@ export function useCheckContainerDuplicates() {
   });
 }
 
+export type ContainerExtraCharge = {
+  id: number;
+  containerId: number;
+  section: string;
+  label: string;
+  amount: number;
+  sortOrder: number;
+  createdAt: string;
+};
+
+const EXTRA_CHARGES_KEY = (containerId: number) => [`/api/containers/${containerId}/extra-charges`] as const;
+
+export function useGetContainerExtraCharges(containerId: number | null) {
+  return useQuery<ContainerExtraCharge[]>({
+    queryKey: containerId ? EXTRA_CHARGES_KEY(containerId) : [],
+    queryFn: () => customFetch<ContainerExtraCharge[]>(`/api/containers/${containerId}/extra-charges`),
+    enabled: !!containerId,
+  });
+}
+
+export function useCreateContainerExtraCharge(containerId: number) {
+  const qc = useQueryClient();
+  return useMutation<ContainerExtraCharge, Error, { section: string; label: string; amount: number }>({
+    mutationFn: (data) =>
+      customFetch<ContainerExtraCharge>(`/api/containers/${containerId}/extra-charges`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: EXTRA_CHARGES_KEY(containerId) });
+      qc.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+    },
+  });
+}
+
+export function useUpdateContainerExtraCharge(containerId: number) {
+  const qc = useQueryClient();
+  return useMutation<ContainerExtraCharge, Error, { rowId: number; label?: string; amount?: number }>({
+    mutationFn: ({ rowId, ...data }) =>
+      customFetch<ContainerExtraCharge>(`/api/containers/${containerId}/extra-charges/${rowId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: EXTRA_CHARGES_KEY(containerId) });
+      qc.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+    },
+  });
+}
+
+export function useDeleteContainerExtraCharge(containerId: number) {
+  const qc = useQueryClient();
+  return useMutation<{ success: boolean }, Error, number>({
+    mutationFn: (rowId) =>
+      customFetch<{ success: boolean }>(`/api/containers/${containerId}/extra-charges/${rowId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: EXTRA_CHARGES_KEY(containerId) });
+      qc.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+    },
+  });
+}
+
 export function useGetDeliveryReport(
   from?: string,
   to?: string,

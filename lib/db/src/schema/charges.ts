@@ -1,7 +1,22 @@
-import { pgTable, serial, integer, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { containersTable } from "./containers";
+
+export const EXTRA_CHARGE_SECTIONS = ["shipping", "customs", "terminal", "delivery", "operations"] as const;
+export type ExtraChargeSection = typeof EXTRA_CHARGE_SECTIONS[number];
+
+export const containerExtraChargesTable = pgTable("container_extra_charges", {
+  id: serial("id").primaryKey(),
+  containerId: integer("container_id").notNull().references(() => containersTable.id, { onDelete: "cascade" }),
+  section: text("section").notNull(),
+  label: text("label").notNull(),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull().default("0"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ContainerExtraCharge = typeof containerExtraChargesTable.$inferSelect;
 
 const numericField = () => numeric({ precision: 15, scale: 2 }).notNull().default("0");
 
