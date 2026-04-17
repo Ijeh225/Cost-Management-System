@@ -188,6 +188,75 @@ export function useCreateClientsBulk() {
   });
 }
 
+export type ClientDeposit = {
+  id: number;
+  clientId: number;
+  amount: number;
+  paymentMethod: string;
+  reference: string | null;
+  notes: string | null;
+  createdAt: string;
+};
+
+export type CreateDepositBody = {
+  amount: number;
+  paymentMethod: string;
+  reference?: string;
+  notes?: string;
+};
+
+export type ClientWalletSummary = {
+  totalDeposited: number;
+  totalExpenses: number;
+  balance: number;
+};
+
+export function useGetClientDeposits(clientId: number | null) {
+  return useQuery({
+    queryKey: [...CLIENTS_QUERY_KEY, clientId, "deposits"],
+    queryFn: async () => customFetch<ClientDeposit[]>(`/api/clients/${clientId}/deposits`),
+    enabled: !!clientId,
+  });
+}
+
+export function useGetClientWalletSummary(clientId: number | null) {
+  return useQuery({
+    queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"],
+    queryFn: async () => customFetch<ClientWalletSummary>(`/api/clients/${clientId}/wallet-summary`),
+    enabled: !!clientId,
+  });
+}
+
+export function useCreateClientDeposit(clientId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateDepositBody) =>
+      customFetch<ClientDeposit>(`/api/clients/${clientId}/deposits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "deposits"] });
+      qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"] });
+    },
+  });
+}
+
+export function useDeleteClientDeposit(clientId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (depositId: number) =>
+      customFetch<{ success: boolean }>(`/api/clients/${clientId}/deposits/${depositId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "deposits"] });
+      qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"] });
+    },
+  });
+}
+
 export function useLinkContainerToClient() {
   const qc = useQueryClient();
   return useMutation({

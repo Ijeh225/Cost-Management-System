@@ -1,7 +1,12 @@
 import { Router } from "express";
-import { db, clientsTable, containersTable, invoicesTable, invoicePaymentsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import {
+  db, clientsTable, containersTable, invoicesTable, invoicePaymentsTable,
+  clientDepositsTable, shippingChargesTable, customsChargesTable,
+  terminalChargesTable, deliveryChargesTable, operationsChargesTable,
+} from "@workspace/db";
+import { eq, desc, sum, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { calcTotalCost } from "../lib/calculations.js";
 
 export const clientsRouter = Router();
 
@@ -306,6 +311,133 @@ clientsRouter.post("/clients/bulk", requireAuth, async (req: AuthRequest, res) =
       }
     }
     return res.json({ created, duplicates, errors });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Wallet / Deposits ─────────────────────────────────────────────────────
+
+clientsRouter.get("/clients/:id/deposits", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const clientId = parseInt(req.params.id);
+    if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
+    const deposits = await db
+      .select()
+      .from(clientDepositsTable)
+      .where(eq(clientDepositsTable.clientId, clientId))
+      .orderBy(desc(clientDepositsTable.createdAt));
+    return res.json(deposits.map(d => ({
+      id: d.id,
+      clientId: d.clientId,
+      amount: parseFloat(d.amount),
+      paymentMethod: d.paymentMethod,
+      reference: d.reference ?? null,
+      notes: d.notes ?? null,
+      createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : d.createdAt,
+    })));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const clientId = parseInt(req.params.id);
+    if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
+    const { amount, paymentMethod, reference, notes } = req.body;
+    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+    if (!paymentMethod || typeof paymentMethod !== "string") {
+      return res.status(400).json({ error: "Payment method is required" });
+    }
+    const [deposit] = await db.insert(clientDepositsTable).values({
+      clientId,
+      amount: String(parseFloat(amount)),
+      paymentMethod,
+      reference: reference ?? null,
+      notes: notes ?? null,
+    }).returning();
+    return res.status(201).json({
+      id: deposit.id,
+      clientId: deposit.clientId,
+      amount: parseFloat(deposit.amount),
+      paymentMethod: deposit.paymentMethod,
+      reference: deposit.reference ?? null,
+      notes: deposit.notes ?? null,
+      createdAt: deposit.createdAt instanceof Date ? deposit.createdAt.toISOString() : deposit.createdAt,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+clientsRouter.delete("/clients/:id/deposits/:depositId", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const clientId = parseInt(req.params.id);
+    const depositId = parseInt(req.params.depositId);
+    if (isNaN(clientId) || isNaN(depositId)) return res.status(400).json({ error: "Invalid ID" });
+    const [existing] = await db.select().from(clientDepositsTable)
+      .where(eq(clientDepositsTable.id, depositId));
+    if (!existing || existing.clientId !== clientId) return res.status(404).json({ error: "Deposit not found" });
+    await db.delete(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
+    return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+clientsRouter.get("/clients/:id/wallet-summary", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const clientId = parseInt(req.params.id);
+    if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
+
+    const [depositSumRow] = await db
+      .select({ total: sum(clientDepositsTable.amount) })
+      .from(clientDepositsTable)
+      .where(eq(clientDepositsTable.clientId, clientId));
+    const totalDeposited = parseFloat(depositSumRow?.total ?? "0");
+
+    const clientContainers = await db
+      .select({ id: containersTable.id })
+      .from(containersTable)
+      .where(eq(containersTable.clientId, clientId));
+    const containerIds = clientContainers.map(c => c.id);
+
+    let totalExpenses = 0;
+    if (containerIds.length > 0) {
+      const [shippingRows, customsRows, terminalRows, deliveryRows, opsRows] = await Promise.all([
+        db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, containerIds)),
+        db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, containerIds)),
+        db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, containerIds)),
+        db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, containerIds)),
+        db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, containerIds)),
+      ]);
+      const indexBy = (arr: { containerId: number }[]) => {
+        const m: Record<number, any> = {};
+        arr.forEach(r => { m[r.containerId] = r; });
+        return m;
+      };
+      const sMap = indexBy(shippingRows);
+      const cMap = indexBy(customsRows);
+      const tMap = indexBy(terminalRows);
+      const dMap = indexBy(deliveryRows);
+      const oMap = indexBy(opsRows);
+      for (const cId of containerIds) {
+        totalExpenses += calcTotalCost(sMap[cId] ?? {}, cMap[cId] ?? {}, tMap[cId] ?? {}, dMap[cId] ?? {}, oMap[cId] ?? {});
+      }
+    }
+
+    return res.json({
+      totalDeposited,
+      totalExpenses,
+      balance: totalDeposited - totalExpenses,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });

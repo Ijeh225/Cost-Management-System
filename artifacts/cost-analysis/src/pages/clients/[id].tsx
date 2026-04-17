@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
 import {
-  useGetClient, useUpdateClient, useGetClientReceivables, type ClientWithContainers,
+  useGetClient, useUpdateClient, useGetClientReceivables,
+  useGetClientWalletSummary, useGetClientDeposits,
+  useCreateClientDeposit, useDeleteClientDeposit,
+  type ClientWithContainers,
 } from "@workspace/api-client-react";
 import { formatCurrency, getStatusColor, getStatusLabel } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,13 +13,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Building2, Phone, Mail, MapPin, FileText,
   Pencil, Check, X, Loader2, Box, Calendar,
   ReceiptText, Wallet, CreditCard, ChevronDown, ChevronUp, History,
+  PlusCircle, Trash2, TrendingDown, TrendingUp, AlertTriangle,
 } from "lucide-react";
+
+const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque", "Online Transfer", "Other"];
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -30,15 +46,129 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
+function RecordDepositDialog({
+  open, onOpenChange, clientId,
+}: { open: boolean; onOpenChange: (v: boolean) => void; clientId: number }) {
+  const { toast } = useToast();
+  const createDeposit = useCreateClientDeposit(clientId);
+  const [form, setForm] = useState({
+    amount: "",
+    paymentMethod: "",
+    reference: "",
+    notes: "",
+  });
+
+  const handleSubmit = async () => {
+    const amount = parseFloat(form.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ variant: "destructive", title: "Enter a valid amount" });
+      return;
+    }
+    if (!form.paymentMethod) {
+      toast({ variant: "destructive", title: "Select a payment method" });
+      return;
+    }
+    try {
+      await createDeposit.mutateAsync({
+        amount,
+        paymentMethod: form.paymentMethod,
+        reference: form.reference || undefined,
+        notes: form.notes || undefined,
+      });
+      toast({ title: "Deposit recorded successfully" });
+      setForm({ amount: "", paymentMethod: "", reference: "", notes: "" });
+      onOpenChange(false);
+    } catch {
+      toast({ variant: "destructive", title: "Failed to record deposit" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-primary" /> Record Deposit
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Amount (₦) *</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 100000000"
+              value={form.amount}
+              onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+              className="font-mono"
+            />
+            {form.amount && !isNaN(parseFloat(form.amount)) && parseFloat(form.amount) > 0 && (
+              <p className="text-xs text-muted-foreground font-mono">
+                = {formatCurrency(parseFloat(form.amount))}
+              </p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Payment Method *</Label>
+            <Select value={form.paymentMethod} onValueChange={v => setForm(f => ({ ...f, paymentMethod: v }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select method..." />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYMENT_METHODS.map(m => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Reference / Receipt No.</Label>
+            <Input
+              placeholder="e.g. TRX-2024-001"
+              value={form.reference}
+              onChange={e => setForm(f => ({ ...f, reference: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Notes</Label>
+            <Textarea
+              placeholder="Optional notes..."
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              rows={2}
+              className="resize-none"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={createDeposit.isPending} className="gap-2">
+            {createDeposit.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Record Deposit
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const clientId = parseInt(id ?? "");
   const { toast } = useToast();
   const { data: client, isLoading } = useGetClient(isNaN(clientId) ? null : clientId);
   const { data: receivables } = useGetClientReceivables(isNaN(clientId) ? null : clientId);
+  const { data: walletSummary } = useGetClientWalletSummary(isNaN(clientId) ? null : clientId);
+  const { data: deposits } = useGetClientDeposits(isNaN(clientId) ? null : clientId);
+  const deleteDeposit = useDeleteClientDeposit(isNaN(clientId) ? 0 : clientId);
   const updateMutation = useUpdateClient();
+
   const [showInvoices, setShowInvoices] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+  const [showDepositHistory, setShowDepositHistory] = useState(false);
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [deleteDepositId, setDeleteDepositId] = useState<number | null>(null);
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -74,6 +204,18 @@ export default function ClientDetailPage() {
     }
   };
 
+  const handleDeleteDeposit = async () => {
+    if (!deleteDepositId) return;
+    try {
+      await deleteDeposit.mutateAsync(deleteDepositId);
+      toast({ title: "Deposit removed" });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to remove deposit" });
+    } finally {
+      setDeleteDepositId(null);
+    }
+  };
+
   const set = (patch: Partial<typeof form>) => setForm(f => ({ ...f, ...patch }));
 
   if (isLoading) {
@@ -99,6 +241,9 @@ export default function ClientDetailPage() {
   const totalContainers = containers.length;
   const sizes: Record<string, number> = {};
   containers.forEach(c => { if (c.size) sizes[c.size] = (sizes[c.size] ?? 0) + 1; });
+
+  const balance = walletSummary?.balance ?? 0;
+  const isOverdrawn = balance < 0;
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -130,7 +275,124 @@ export default function ClientDetailPage() {
         <StatCard label="Since" value={new Date(client.createdAt).toLocaleDateString("en-NG", { month: "short", year: "numeric" })} />
       </div>
 
-      {/* Receivables Summary */}
+      {/* ─── Wallet ─────────────────────────────────────────────────────────── */}
+      <Card className="border-border/50 bg-card/50">
+        <CardHeader className="border-b border-border/40 pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-primary" /> Client Wallet
+            </CardTitle>
+            <Button size="sm" onClick={() => setDepositDialogOpen(true)} className="h-7 text-xs gap-1.5">
+              <PlusCircle className="w-3.5 h-3.5" /> Record Deposit
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            {/* Total Deposited */}
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                <TrendingUp className="w-3 h-3 text-emerald-400" /> Total Deposited
+              </p>
+              <p className="font-mono font-bold text-lg text-emerald-400">
+                {formatCurrency(walletSummary?.totalDeposited ?? 0)}
+              </p>
+            </div>
+            {/* Total Expenses */}
+            <div className="text-center border-x border-border/40">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                <TrendingDown className="w-3 h-3 text-amber-400" /> Total Expenses
+              </p>
+              <p className="font-mono font-bold text-lg text-amber-400">
+                {formatCurrency(walletSummary?.totalExpenses ?? 0)}
+              </p>
+            </div>
+            {/* Balance */}
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                <CreditCard className="w-3 h-3" /> Current Balance
+              </p>
+              <p className={`font-mono font-bold text-lg ${isOverdrawn ? "text-red-400" : "text-primary"}`}>
+                {formatCurrency(Math.abs(balance))}
+                {isOverdrawn ? " (Overdrawn)" : ""}
+              </p>
+            </div>
+          </div>
+
+          {isOverdrawn && (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 mb-4 text-xs text-red-400">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+              Outstanding liability of {formatCurrency(Math.abs(balance))} — expenses exceed deposited funds.
+            </div>
+          )}
+
+          {/* Deposit History Toggle */}
+          <div className="border-t border-border/40 pt-3">
+            <button
+              onClick={() => setShowDepositHistory(v => !v)}
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <History className="w-3.5 h-3.5" />
+              {showDepositHistory ? "Hide" : "Show"} deposit history
+              ({deposits?.length ?? 0} deposit{(deposits?.length ?? 0) !== 1 ? "s" : ""})
+              {showDepositHistory ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+
+            {showDepositHistory && (
+              <div className="mt-3">
+                {!deposits || deposits.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic py-4 text-center">
+                    No deposits recorded yet.
+                  </p>
+                ) : (
+                  <div className="border border-border/40 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-secondary/30 border-b border-border/40">
+                        <tr className="text-muted-foreground font-mono uppercase tracking-wider">
+                          <th className="px-3 py-2 text-left font-medium">Date</th>
+                          <th className="px-3 py-2 text-right font-medium">Amount</th>
+                          <th className="px-3 py-2 text-left font-medium">Method</th>
+                          <th className="px-3 py-2 text-left font-medium">Reference</th>
+                          <th className="px-3 py-2 text-left font-medium">Notes</th>
+                          <th className="px-3 py-2 text-center font-medium">Remove</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {deposits.map(d => (
+                          <tr key={d.id} className="hover:bg-accent/10 transition-colors">
+                            <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                              {new Date(d.createdAt).toLocaleDateString("en-NG", {
+                                day: "numeric", month: "short", year: "numeric",
+                              })}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono text-emerald-400 font-semibold">
+                              {formatCurrency(d.amount)}
+                            </td>
+                            <td className="px-3 py-2 text-muted-foreground capitalize">{d.paymentMethod}</td>
+                            <td className="px-3 py-2 text-muted-foreground font-mono">{d.reference ?? "—"}</td>
+                            <td className="px-3 py-2 text-muted-foreground max-w-[160px] truncate">{d.notes ?? "—"}</td>
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                onClick={() => setDeleteDepositId(d.id)}
+                                className="text-muted-foreground hover:text-red-400 transition-colors p-0.5 rounded"
+                                title="Remove deposit"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ─── Accounts Receivable ─────────────────────────────────────────────── */}
       {receivables && (receivables.totalInvoiced > 0) && (
         <Card className="border-border/50 bg-card/50">
           <CardHeader className="border-b border-border/40 pb-3">
@@ -424,6 +686,31 @@ export default function ClientDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Record Deposit Dialog */}
+      <RecordDepositDialog
+        open={depositDialogOpen}
+        onOpenChange={setDepositDialogOpen}
+        clientId={clientId}
+      />
+
+      {/* Delete Deposit Confirmation */}
+      <AlertDialog open={!!deleteDepositId} onOpenChange={open => !open && setDeleteDepositId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this deposit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the deposit record and update the wallet balance. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteDeposit} className="bg-red-600 hover:bg-red-700">
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }

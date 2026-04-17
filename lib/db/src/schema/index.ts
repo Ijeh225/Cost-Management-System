@@ -1,5 +1,6 @@
 export * from "./users";
 export * from "./clients";
+export * from "./client-deposits";
 export * from "./containers";
 export * from "./charges";
 export * from "./audit";
