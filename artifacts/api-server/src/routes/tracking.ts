@@ -118,7 +118,7 @@ function extractTrackingData(data: any, containerNumber: string) {
   };
 }
 
-router.get("/api/tracking/:containerNumber", requireAuth, async (req, res) => {
+router.get("/tracking/:containerNumber", requireAuth, async (req, res) => {
   const { containerNumber } = req.params;
 
   if (!containerNumber || containerNumber.length < 4) {
