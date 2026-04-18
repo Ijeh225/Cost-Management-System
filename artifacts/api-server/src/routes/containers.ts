@@ -571,6 +571,8 @@ router.post("/containers/:id/lock", requireAdmin, async (req: AuthRequest, res) 
 router.get("/containers/:id/extra-charges", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const [container] = await db.select({ id: containersTable.id }).from(containersTable).where(eq(containersTable.id, id));
+    if (!container) return res.status(404).json({ error: "Container not found" });
     const rows = await db.select().from(containerExtraChargesTable)
       .where(eq(containerExtraChargesTable.containerId, id))
       .orderBy(containerExtraChargesTable.sortOrder, containerExtraChargesTable.createdAt);
