@@ -24,9 +24,7 @@ export default function ContainerPrintPage() {
       a.sortOrder !== b.sortOrder ? a.sortOrder - b.sortOrder : a.id - b.id
     );
 
-  const extraChargesTotal = extraCharges.reduce((sum, ch) => sum + Number(ch.amount), 0);
-  const fixedTotalCost = charges.totalCost ?? 0;
-  const totalCost = fixedTotalCost + extraChargesTotal;
+  const totalCost = charges.totalCost ?? 0;
   const clearingCharges = charges.clearingCharges ?? parseFloat(c.clearingCharges ?? "0");
   const grossProfit = clearingCharges - totalCost;
 
