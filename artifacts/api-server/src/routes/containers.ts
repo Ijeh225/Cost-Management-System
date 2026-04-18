@@ -6,6 +6,25 @@ import { calcTotalCost } from "../lib/calculations.js";
 
 const router = Router();
 
+function canUserEditSection(
+  user: { role: string; sectionPermission: string | null; sectionPermissions: string | null },
+  section: string
+): boolean {
+  if (user.role === "admin") return true;
+  if (user.sectionPermissions) {
+    try {
+      const perms = JSON.parse(user.sectionPermissions) as Record<string, string>;
+      if (Object.keys(perms).length > 0) {
+        return (perms[section] ?? "no_access") !== "no_access";
+      }
+    } catch {}
+  }
+  if (user.sectionPermission) {
+    return user.sectionPermission === section;
+  }
+  return true;
+}
+
 function formatContainer(c: any, staffName?: string | null, clientName?: string | null) {
   let lockedSections: string[] = [];
   try { lockedSections = JSON.parse(c.lockedSections ?? "[]"); } catch {}
@@ -597,6 +616,7 @@ router.post("/containers/:id/extra-charges", requireAuth, async (req: AuthReques
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
     const { section, label, amount } = req.body;
     if (!section || !VALID_SECTIONS.has(section)) return res.status(400).json({ error: "Invalid section" });
+    if (!canUserEditSection(req.user!, section)) return res.status(403).json({ error: "You do not have permission to edit this section" });
     // Enforce section-level lock (same rule as PUT /charges — covers manual locks and approvals)
     let lockedSections: string[] = [];
     try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
@@ -627,6 +647,7 @@ router.put("/containers/:id/extra-charges/:rowId", requireAuth, async (req: Auth
     const [existing] = await db.select().from(containerExtraChargesTable)
       .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
     if (!existing) return res.status(404).json({ error: "Extra charge not found" });
+    if (!canUserEditSection(req.user!, existing.section)) return res.status(403).json({ error: "You do not have permission to edit this section" });
     // Enforce section-level lock (covers manual locks and approvals)
     let lockedSections: string[] = [];
     try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
@@ -663,6 +684,7 @@ router.delete("/containers/:id/extra-charges/:rowId", requireAuth, async (req: A
     const [existing] = await db.select().from(containerExtraChargesTable)
       .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
     if (!existing) return res.status(404).json({ error: "Extra charge not found" });
+    if (!canUserEditSection(req.user!, existing.section)) return res.status(403).json({ error: "You do not have permission to edit this section" });
     // Enforce section-level lock (covers manual locks and approvals)
     let lockedSections: string[] = [];
     try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
