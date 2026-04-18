@@ -209,6 +209,7 @@ export type ClientWalletSummary = {
   totalDeposited: number;
   totalExpenses: number;
   balance: number;
+  walletResetAt: string | null;
 };
 
 export function useGetClientDeposits(clientId: number | null) {
@@ -253,6 +254,22 @@ export function useDeleteClientDeposit(clientId: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "deposits"] });
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"] });
+    },
+  });
+}
+
+export function useResetClientWallet(clientId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (adminPassword: string) =>
+      customFetch<{ success: boolean; walletResetAt: string }>(`/api/clients/${clientId}/wallet/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminPassword }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"] });
+      qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "deposits"] });
     },
   });
 }

@@ -3,10 +3,11 @@ import { useParams, Link } from "wouter";
 import {
   useGetClient, useUpdateClient, useGetClientReceivables,
   useGetClientWalletSummary, useGetClientDeposits,
-  useCreateClientDeposit, useDeleteClientDeposit,
+  useCreateClientDeposit, useDeleteClientDeposit, useResetClientWallet,
   type ClientWithContainers,
 } from "@workspace/api-client-react";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
+import { useAuth } from "@/components/layout/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ import {
   Pencil, Check, X, Loader2, Box, Search,
   ReceiptText, Wallet, CreditCard, ChevronDown, ChevronUp, History,
   PlusCircle, Trash2, TrendingDown, TrendingUp, AlertTriangle, SlidersHorizontal,
+  RotateCcw, ShieldAlert, Eye, EyeOff,
 } from "lucide-react";
 
 const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque"];
@@ -158,11 +160,13 @@ export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const clientId = parseInt(id ?? "");
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const { data: client, isLoading } = useGetClient(isNaN(clientId) ? null : clientId);
   const { data: receivables } = useGetClientReceivables(isNaN(clientId) ? null : clientId);
   const { data: walletSummary } = useGetClientWalletSummary(isNaN(clientId) ? null : clientId);
   const { data: deposits } = useGetClientDeposits(isNaN(clientId) ? null : clientId);
   const deleteDeposit = useDeleteClientDeposit(isNaN(clientId) ? 0 : clientId);
+  const resetWallet = useResetClientWallet(isNaN(clientId) ? 0 : clientId);
   const updateMutation = useUpdateClient();
 
   const [showInvoices, setShowInvoices] = useState(false);
@@ -170,6 +174,12 @@ export default function ClientDetailPage() {
   const [showDepositHistory, setShowDepositHistory] = useState(false);
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [deleteDepositId, setDeleteDepositId] = useState<number | null>(null);
+
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordVisible, setResetPasswordVisible] = useState(false);
+  const [resetError, setResetError] = useState("");
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -214,6 +224,28 @@ export default function ClientDetailPage() {
       toast({ variant: "destructive", title: "Failed to remove deposit" });
     } finally {
       setDeleteDepositId(null);
+    }
+  };
+
+  const handleWalletReset = async () => {
+    if (resetConfirmText !== "RESET") {
+      setResetError('Type "RESET" to confirm.');
+      return;
+    }
+    if (!resetPassword.trim()) {
+      setResetError("Admin password is required.");
+      return;
+    }
+    setResetError("");
+    try {
+      await resetWallet.mutateAsync(resetPassword);
+      toast({ title: "Wallet reset successfully", description: "The wallet balance has been reset. New deposits and invoices will be tracked from now." });
+      setResetDialogOpen(false);
+      setResetConfirmText("");
+      setResetPassword("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to reset wallet";
+      setResetError(msg.includes("Incorrect") ? "Incorrect admin password." : "Reset failed. Try again.");
     }
   };
 
@@ -316,12 +348,32 @@ export default function ClientDetailPage() {
       <Card className="border-border/50 bg-card/50">
         <CardHeader className="border-b border-border/40 pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-primary" /> Client Wallet
-            </CardTitle>
-            <Button size="sm" onClick={() => setDepositDialogOpen(true)} className="h-7 text-xs gap-1.5">
-              <PlusCircle className="w-3.5 h-3.5" /> Record Deposit
-            </Button>
+            <div>
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-primary" /> Client Wallet
+              </CardTitle>
+              {walletSummary?.walletResetAt && (
+                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                  <RotateCcw className="w-3 h-3" />
+                  Last reset: {new Date(walletSummary.walletResetAt).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setResetDialogOpen(true); setResetConfirmText(""); setResetPassword(""); setResetError(""); }}
+                  className="h-7 text-xs gap-1.5 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset Wallet
+                </Button>
+              )}
+              <Button size="sm" onClick={() => setDepositDialogOpen(true)} className="h-7 text-xs gap-1.5">
+                <PlusCircle className="w-3.5 h-3.5" /> Record Deposit
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-4">
@@ -338,11 +390,12 @@ export default function ClientDetailPage() {
             {/* Total Expenses */}
             <div className="text-center border-x border-border/40">
               <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
-                <TrendingDown className="w-3 h-3 text-amber-400" /> Total Expenses
+                <TrendingDown className="w-3 h-3 text-amber-400" /> Total Invoiced
               </p>
               <p className="font-mono font-bold text-lg text-amber-400">
                 {formatCurrency(walletSummary?.totalExpenses ?? 0)}
               </p>
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5">From invoices issued</p>
             </div>
             {/* Balance */}
             <div className="text-center">
@@ -838,6 +891,84 @@ export default function ClientDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ─── Reset Wallet Dialog ──────────────────────────────────────────────── */}
+      <Dialog open={resetDialogOpen} onOpenChange={v => { if (!resetWallet.isPending) setResetDialogOpen(v); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <ShieldAlert className="w-5 h-5" /> Reset Client Wallet
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 space-y-1.5">
+              <p className="text-sm font-semibold text-red-400">This is a destructive action</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Resetting the wallet will set a new starting point. All deposits and invoices before this moment
+                will be excluded from the balance calculation going forward. The historical records are preserved
+                but will no longer affect the current wallet balance.
+              </p>
+              {walletSummary && (
+                <p className="text-xs text-muted-foreground pt-1">
+                  Current balance of <span className="text-foreground font-semibold">{formatCurrency(walletSummary.balance)}</span> will be zeroed out.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Type <span className="font-mono font-bold text-red-400">RESET</span> to confirm</Label>
+              <Input
+                value={resetConfirmText}
+                onChange={e => { setResetConfirmText(e.target.value); setResetError(""); }}
+                placeholder="RESET"
+                className={`font-mono ${resetConfirmText && resetConfirmText !== "RESET" ? "border-red-500/50" : ""}`}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Admin password (your login password)</Label>
+              <div className="relative">
+                <Input
+                  type={resetPasswordVisible ? "text" : "password"}
+                  value={resetPassword}
+                  onChange={e => { setResetPassword(e.target.value); setResetError(""); }}
+                  placeholder="Enter your admin password"
+                  className="pr-10"
+                  onKeyDown={e => e.key === "Enter" && handleWalletReset()}
+                />
+                <button
+                  type="button"
+                  onClick={() => setResetPasswordVisible(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {resetPasswordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {resetError && (
+              <p className="text-xs text-red-400 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {resetError}
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetDialogOpen(false)} disabled={resetWallet.isPending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleWalletReset}
+              disabled={resetWallet.isPending || resetConfirmText !== "RESET" || !resetPassword.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white gap-2"
+            >
+              {resetWallet.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+              Reset Wallet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

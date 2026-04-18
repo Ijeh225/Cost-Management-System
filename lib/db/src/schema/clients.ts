@@ -11,6 +11,7 @@ export const clientsTable = pgTable("clients", {
   address: text("address").notNull().default(""),
   notes: text("notes").notNull().default(""),
   agreedClearingRate: numeric("agreed_clearing_rate"),
+  walletResetAt: timestamp("wallet_reset_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

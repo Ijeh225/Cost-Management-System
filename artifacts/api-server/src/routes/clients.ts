@@ -3,9 +3,10 @@ import {
   db, clientsTable, containersTable, invoicesTable, invoicePaymentsTable,
   clientDepositsTable, shippingChargesTable, customsChargesTable,
   terminalChargesTable, deliveryChargesTable, operationsChargesTable,
+  usersTable,
 } from "@workspace/db";
-import { eq, desc, sum, inArray } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { eq, desc, sum, inArray, gte, and } from "drizzle-orm";
+import { requireAuth, requireAdmin, AuthRequest, verifyPassword } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
 export const clientsRouter = Router();
@@ -408,47 +409,72 @@ clientsRouter.get("/clients/:id/wallet-summary", requireAuth, async (req: AuthRe
     const clientId = parseInt(req.params.id);
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
 
+    const [clientRow] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
+    if (!clientRow) return res.status(404).json({ error: "Client not found" });
+
+    const resetAt: Date | null = clientRow.walletResetAt ?? null;
+
+    const depositFilter = resetAt
+      ? and(eq(clientDepositsTable.clientId, clientId), gte(clientDepositsTable.createdAt, resetAt))
+      : eq(clientDepositsTable.clientId, clientId);
+
     const [depositSumRow] = await db
       .select({ total: sum(clientDepositsTable.amount) })
       .from(clientDepositsTable)
-      .where(eq(clientDepositsTable.clientId, clientId));
+      .where(depositFilter);
     const totalDeposited = parseFloat(depositSumRow?.total ?? "0");
 
-    const clientContainers = await db
-      .select({ id: containersTable.id })
-      .from(containersTable)
-      .where(eq(containersTable.clientId, clientId));
-    const containerIds = clientContainers.map(c => c.id);
+    const invoiceFilter = resetAt
+      ? and(eq(invoicesTable.clientId, clientId), gte(invoicesTable.createdAt, resetAt))
+      : eq(invoicesTable.clientId, clientId);
 
-    let totalExpenses = 0;
-    if (containerIds.length > 0) {
-      const [shippingRows, customsRows, terminalRows, deliveryRows, opsRows] = await Promise.all([
-        db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, containerIds)),
-        db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, containerIds)),
-        db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, containerIds)),
-        db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, containerIds)),
-        db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, containerIds)),
-      ]);
-      const indexBy = (arr: { containerId: number }[]) => {
-        const m: Record<number, any> = {};
-        arr.forEach(r => { m[r.containerId] = r; });
-        return m;
-      };
-      const sMap = indexBy(shippingRows);
-      const cMap = indexBy(customsRows);
-      const tMap = indexBy(terminalRows);
-      const dMap = indexBy(deliveryRows);
-      const oMap = indexBy(opsRows);
-      for (const cId of containerIds) {
-        totalExpenses += calcTotalCost(sMap[cId] ?? {}, cMap[cId] ?? {}, tMap[cId] ?? {}, dMap[cId] ?? {}, oMap[cId] ?? {});
-      }
-    }
+    const [invoiceSumRow] = await db
+      .select({ total: sum(invoicesTable.total) })
+      .from(invoicesTable)
+      .where(invoiceFilter);
+    const totalExpenses = parseFloat(invoiceSumRow?.total ?? "0");
 
     return res.json({
       totalDeposited,
       totalExpenses,
       balance: totalDeposited - totalExpenses,
+      walletResetAt: resetAt ? resetAt.toISOString() : null,
     });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+clientsRouter.post("/clients/:id/wallet/reset", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const clientId = parseInt(req.params.id);
+    if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
+
+    const [clientRow] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
+    if (!clientRow) return res.status(404).json({ error: "Client not found" });
+
+    const { adminPassword } = req.body as { adminPassword?: string };
+    if (!adminPassword || adminPassword.trim() === "") {
+      return res.status(400).json({ error: "Admin password is required to reset wallet" });
+    }
+
+    const adminUser = req.user;
+    if (!adminUser) return res.status(401).json({ error: "Not authenticated" });
+
+    const [userRow] = await db.select().from(usersTable).where(eq(usersTable.id, adminUser.id));
+
+    if (!userRow) return res.status(401).json({ error: "User not found" });
+
+    const passwordMatch = await verifyPassword(adminPassword, userRow.passwordHash);
+    if (!passwordMatch) return res.status(403).json({ error: "Incorrect password" });
+
+    const now = new Date();
+    await db.update(clientsTable)
+      .set({ walletResetAt: now })
+      .where(eq(clientsTable.id, clientId));
+
+    return res.json({ success: true, walletResetAt: now.toISOString() });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
