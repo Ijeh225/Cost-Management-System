@@ -33,7 +33,7 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
   try { lockedSections = JSON.parse(c.lockedSections ?? "[]"); } catch {}
   return {
     id: c.id,
-    customerName: c.customerName,
+    customerName: clientName ?? c.customerName,
     containerNumber: c.containerNumber,
     blNumber: c.blNumber,
     declaration: c.declaration ?? "",
@@ -163,6 +163,16 @@ router.get("/containers", requireAuth, async (req, res) => {
       staffRows.forEach(s => { staffMap[s.id] = s.name; });
     }
 
+    // Fetch linked client names (preferred over stored customerName)
+    const clientIds = [...new Set(rows.map(r => r.clientId).filter(Boolean))];
+    const clientMap: Record<number, string> = {};
+    if (clientIds.length > 0) {
+      const clientRows = await db.select({ id: clientsTable.id, name: clientsTable.name })
+        .from(clientsTable)
+        .where(inArray(clientsTable.id, clientIds as number[]));
+      clientRows.forEach(cl => { clientMap[cl.id] = cl.name; });
+    }
+
     // For each container we need total cost from charges
     const containerIds = rows.map(r => r.id);
     const totalsMap: Record<number, number> = {};
@@ -199,7 +209,7 @@ router.get("/containers", requireAuth, async (req, res) => {
     }
 
     const containers = rows.map(c => ({
-      ...formatContainer(c, c.assignedStaffId ? staffMap[c.assignedStaffId] ?? null : null),
+      ...formatContainer(c, c.assignedStaffId ? staffMap[c.assignedStaffId] ?? null : null, c.clientId ? clientMap[c.clientId] ?? null : null),
       totalCost: totalsMap[c.id] ?? 0,
       grossProfit: parseFloat(c.clearingCharges ?? "0") - (totalsMap[c.id] ?? 0),
       dutyNotPaid: dutyMap[c.id] ?? 0,

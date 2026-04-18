@@ -133,6 +133,11 @@ clientsRouter.patch("/clients/:id", requireAuth, async (req: AuthRequest, res) =
       .where(eq(clientsTable.id, id))
       .returning();
     if (!updated) return res.status(404).json({ error: "Client not found" });
+    if (name !== undefined) {
+      await db.update(containersTable)
+        .set({ customerName: updated.name, updatedAt: new Date() })
+        .where(eq(containersTable.clientId, id));
+    }
     return res.json({
       ...updated,
       agreedClearingRate: updated.agreedClearingRate != null ? parseFloat(updated.agreedClearingRate) : null,
@@ -161,7 +166,11 @@ clientsRouter.patch("/clients/:id/link-container", requireAuth, requireAdmin, as
     const clientId = parseInt(req.params.id);
     const { containerId } = req.body as { containerId: number };
     if (isNaN(clientId) || !containerId) return res.status(400).json({ error: "Invalid IDs" });
-    await db.update(containersTable).set({ clientId, updatedAt: new Date() }).where(eq(containersTable.id, containerId));
+    const [client] = await db.select({ name: clientsTable.name }).from(clientsTable).where(eq(clientsTable.id, clientId));
+    if (!client) return res.status(404).json({ error: "Client not found" });
+    await db.update(containersTable)
+      .set({ clientId, customerName: client.name, updatedAt: new Date() })
+      .where(eq(containersTable.id, containerId));
     return res.json({ success: true });
   } catch (err) {
     console.error(err);
