@@ -342,7 +342,10 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       customerName: containersTable.customerName,
       status: containersTable.status,
       updatedAt: containersTable.updatedAt,
-    }).from(containersTable);
+      assignedStaffName: usersTable.name,
+    })
+      .from(containersTable)
+      .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id));
 
     const stages: Record<string, Array<{
       id: number;
@@ -352,6 +355,7 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       status: string;
       updatedAt: string;
       daysInStage: number;
+      assignedStaffName: string | null;
     }>> = {};
 
     for (const c of rows) {
@@ -367,6 +371,7 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
         status: c.status,
         updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : String(c.updatedAt),
         daysInStage,
+        assignedStaffName: c.assignedStaffName ?? null,
       });
     }
 

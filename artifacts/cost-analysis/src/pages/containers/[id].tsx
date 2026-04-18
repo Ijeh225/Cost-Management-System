@@ -22,7 +22,7 @@ import {
 import { useAuth } from "@/components/layout/auth-provider";
 import {
   formatCurrency, getStatusColor, getStatusLabel,
-  WORKFLOW_STAGES, getNextStage, getStageIndex, STAGE_SECTION,
+  getNextStage, STAGE_SECTION,
   getApprovalStatusColor, getApprovalStatusLabel, canEditSectionGranular,
 } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +46,7 @@ import {
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
   Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink, X,
   ClipboardCheck, ArrowRightCircle, PlusCircle, Truck, Plus, Trash2,
-  ChevronUp, ChevronDown,
+  ChevronUp, ChevronDown, Activity,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
@@ -791,30 +791,6 @@ function ChargeSectionForm({
   );
 }
 
-function WorkflowProgress({ currentStatus }: { currentStatus: string }) {
-  const currentIdx = getStageIndex(currentStatus);
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Workflow Progress</span>
-        <span className="text-xs font-semibold text-foreground">{currentIdx + 1} / {WORKFLOW_STAGES.length}</span>
-      </div>
-      <div className="flex gap-1">
-        {WORKFLOW_STAGES.map((stage, idx) => (
-          <div key={stage.value} title={stage.label}
-            className={`h-2 flex-1 rounded-full transition-all duration-300 ${idx < currentIdx ? "bg-primary/60" : idx === currentIdx ? "bg-primary" : "bg-border/40"}`}
-          />
-        ))}
-      </div>
-      <div className="flex justify-between text-[10px] text-muted-foreground/60">
-        <span>{WORKFLOW_STAGES[0].short}</span>
-        <span className="font-medium text-primary">{getStatusLabel(currentStatus)}</span>
-        <span>{WORKFLOW_STAGES[WORKFLOW_STAGES.length - 1].short}</span>
-      </div>
-    </div>
-  );
-}
-
 function AuditTrail({ containerId }: { containerId: number }) {
   const { data: entries, isLoading } = useGetContainerAuditLog(containerId);
   if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
@@ -1242,6 +1218,12 @@ export default function ContainerDetail() {
           <span className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider border ${getStatusColor(container.status)}`}>
             {getStatusLabel(container.status)}
           </span>
+          <Link href="/operations">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-primary h-7 px-2">
+              <Activity className="w-3.5 h-3.5" />
+              Operations
+            </Button>
+          </Link>
           {isMaerskContainer(container.containerNumber) && (
             <Button
               variant="outline"
@@ -1454,7 +1436,6 @@ export default function ContainerDetail() {
               </div>
             )}
           </div>
-          <WorkflowProgress currentStatus={container.status} />
         </CardContent>
       </Card>
 

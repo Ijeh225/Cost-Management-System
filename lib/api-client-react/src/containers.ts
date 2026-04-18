@@ -9,6 +9,7 @@ export type PipelineContainer = {
   status: string;
   updatedAt: string;
   daysInStage: number;
+  assignedStaffName: string | null;
 };
 
 export type PipelineResponse = {
