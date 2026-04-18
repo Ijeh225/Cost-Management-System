@@ -118,3 +118,45 @@ export function useGetInvoiceAging() {
     queryFn: async () => customFetch("/api/reports/invoice-aging"),
   });
 }
+
+export type DeliveryAnalyticsItem = {
+  id: number;
+  containerNumber: string;
+  blNumber: string | null;
+  clientName: string | null;
+  status: string;
+  deliveredAt: string;
+  deliveredAtEstimated: boolean;
+  clearingCharges: number;
+  daysToComplete: number | null;
+  createdAt: string;
+  truckNumber: string | null;
+  driverName: string | null;
+  dispatchOfficer: string | null;
+  deliveryStatus: string;
+  deliveryLocation: string | null;
+  offloadingConfirmed: boolean;
+  emptyReturnDate: string | null;
+};
+
+export type DeliveryAnalyticsResponse = {
+  count: number;
+  totalRevenue: number;
+  avgDays: number | null;
+  items: DeliveryAnalyticsItem[];
+};
+
+export function useDeliveryAnalyticsReport(
+  params: { from?: string; to?: string },
+  options?: { enabled?: boolean }
+) {
+  const { enabled = true } = options ?? {};
+  const qs = new URLSearchParams();
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  return useQuery<DeliveryAnalyticsResponse>({
+    queryKey: ["/api/analytics/deliveries", params.from, params.to],
+    enabled,
+    queryFn: async () => customFetch(`/api/analytics/deliveries?${qs}`),
+  });
+}

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useGetContainerReport, useListClients, useGetDeliveryAnalytics } from "@workspace/api-client-react";
+import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, type DeliveryAnalyticsResponse } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -404,9 +404,9 @@ function DeliveryReportSection() {
   const [applied, setApplied] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [generated, setGenerated] = useState(false);
 
-  const { data, isLoading } = useGetDeliveryAnalytics(
-    generated ? { from: applied.from || undefined, to: applied.to || undefined } : undefined,
-    { query: { enabled: generated } }
+  const { data, isLoading } = useDeliveryAnalyticsReport(
+    { from: applied.from || undefined, to: applied.to || undefined },
+    { enabled: generated }
   );
 
   const openReport = (path: string, params: Record<string, string>) => {
@@ -479,11 +479,13 @@ function DeliveryReportSection() {
                 <div className="py-8 text-center text-muted-foreground text-sm">No deliveries found for the selected period.</div>
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-border/40">
-                  <table className="w-full text-sm min-w-[700px]">
+                  <table className="w-full text-sm min-w-[900px]">
                     <thead className="border-b border-border/50 bg-secondary/20 text-xs text-muted-foreground uppercase tracking-wider">
                       <tr>
                         <th className="px-4 py-2.5 text-left font-medium">Container / BL</th>
                         <th className="px-4 py-2.5 text-left font-medium">Customer</th>
+                        <th className="px-4 py-2.5 text-left font-medium">Truck / Driver</th>
+                        <th className="px-4 py-2.5 text-left font-medium">Dispatch</th>
                         <th className="px-4 py-2.5 text-left font-medium">Delivered</th>
                         <th className="px-4 py-2.5 text-right font-medium">Days</th>
                         <th className="px-4 py-2.5 text-right font-medium">Revenue (₦)</th>
@@ -498,6 +500,15 @@ function DeliveryReportSection() {
                             <div className="text-[11px] text-muted-foreground">{item.blNumber}</div>
                           </td>
                           <td className="px-4 py-2.5 font-medium">{item.clientName}</td>
+                          <td className="px-4 py-2.5">
+                            {item.truckNumber
+                              ? <div className="font-semibold text-xs">{item.truckNumber}</div>
+                              : <span className="text-muted-foreground/40">—</span>}
+                            {item.driverName && <div className="text-[11px] text-muted-foreground">{item.driverName}</div>}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs">
+                            {item.dispatchOfficer ?? <span className="text-muted-foreground/40">—</span>}
+                          </td>
                           <td className="px-4 py-2.5">
                             <div className="text-xs font-semibold text-emerald-400">
                               {new Date(item.deliveredAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}

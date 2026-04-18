@@ -1,4 +1,4 @@
-import { useGetDeliveryAnalytics } from "@workspace/api-client-react";
+import { useGetDeliveryAnalytics, type DeliveryAnalyticsResponse } from "@workspace/api-client-react";
 
 const fmt = (n: number) =>
   "\u20a6" + Number(n).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -17,7 +17,7 @@ function useQueryParams() {
 
 export default function DeliveryReportPrint() {
   const { from, to } = useQueryParams();
-  const { data, isLoading, isError } = useGetDeliveryAnalytics({ from, to });
+  const { data, isLoading, isError } = useGetDeliveryAnalytics<DeliveryAnalyticsResponse>({ from, to });
 
   if (isLoading) {
     return (
@@ -104,7 +104,7 @@ export default function DeliveryReportPrint() {
               </tr>
             </thead>
             <tbody>
-              {data.items.map((item: any, i: number) => (
+              {data.items.map((item, i) => (
                 <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 === 0 ? "#fff" : "#fafbfc" }}>
                   <td style={{ padding: "7px 10px", color: "#94a3b8" }}>{i + 1}</td>
                   <td style={{ padding: "7px 10px" }}>
