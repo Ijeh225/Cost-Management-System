@@ -105,6 +105,11 @@ function ContainerCard({
           </div>
         )}
 
+        <div className="mt-1.5 flex items-center gap-1 opacity-40">
+          <Clock className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />
+          <span className="text-[10px] text-muted-foreground/60 italic truncate">No next action set</span>
+        </div>
+
         {isAdmin && nextStage && (
           <div className="mt-2 flex justify-end">
             <Tooltip>

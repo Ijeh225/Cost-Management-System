@@ -962,24 +962,6 @@ export default function ContainerDetail() {
   const activeSection = STAGE_SECTION[container.status] ?? null;
   const lockedSections: string[] = container.lockedSections ?? [];
 
-  const canAdvance = !container.isLocked && nextStage !== null && isAdmin;
-
-  const handleAdvance = () => {
-    if (!nextStage) return;
-    updateMutation.mutate(
-      { id: containerId, data: { status: nextStage } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
-          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-          toast({ title: "Stage Advanced", description: `Container moved to "${getStatusLabel(nextStage)}".` });
-        },
-        onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err?.message }),
-      }
-    );
-  };
-
   const handleSaveAndAdvance = () => {
     if (!nextStage) return;
     updateMutation.mutate(
@@ -1249,17 +1231,6 @@ export default function ContainerDetail() {
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setInvoiceDialog(true)}>
               <PlusCircle className="w-3.5 h-3.5" />
               Create Invoice
-            </Button>
-          )}
-          {canAdvance && (
-            <Button
-              size="sm"
-              onClick={handleAdvance}
-              disabled={updateMutation.isPending}
-              className="active:scale-95 transition-transform shadow-md shadow-primary/20 gap-1.5"
-            >
-              {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
-              Advance to {getStatusLabel(nextStage!)}
             </Button>
           )}
           {isAdmin && !container.isLocked && (
