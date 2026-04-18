@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, customSectionsTable, customFieldsTable, customFieldValuesTable } from "@workspace/db";
-import { eq, asc, and, isNull } from "drizzle-orm";
+import { eq, asc, and, isNull, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 
 export const sectionsRouter = Router();
@@ -13,7 +13,7 @@ sectionsRouter.get("/custom-sections", requireAuth, async (req, res) => {
       ? eq(customSectionsTable.containerId, containerId)
       : isNull(customSectionsTable.containerId);
     const sections = await db.select().from(customSectionsTable).where(whereClause).orderBy(asc(customSectionsTable.sectionOrder));
-    const fields = await db.select().from(customFieldsTable).orderBy(asc(customFieldsTable.fieldOrder));
+    const fields = await db.select().from(customFieldsTable).where(isNotNull(customFieldsTable.sectionId)).orderBy(asc(customFieldsTable.fieldOrder));
     const result = sections.map(s => ({
       ...s,
       fields: fields.filter(f => f.sectionId === s.id),
@@ -150,15 +150,93 @@ sectionsRouter.post("/containers/:containerId/custom-values", requireAuth, async
   try {
     for (const { fieldId, value } of values) {
       const existing = await db.select().from(customFieldValuesTable)
-        .where(eq(customFieldValuesTable.fieldId, fieldId));
-      const containerExisting = existing.filter(v => v.containerId === containerId);
-      if (containerExisting.length > 0) {
+        .where(and(eq(customFieldValuesTable.fieldId, fieldId), eq(customFieldValuesTable.containerId, containerId)));
+      if (existing.length > 0) {
         await db.update(customFieldValuesTable).set({ value, updatedById: req.user!.id, updatedAt: new Date() })
-          .where(eq(customFieldValuesTable.id, containerExisting[0].id));
+          .where(eq(customFieldValuesTable.id, existing[0].id));
       } else {
         await db.insert(customFieldValuesTable).values({ containerId, fieldId, value, updatedById: req.user!.id });
       }
     }
+    return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Builtin Section Extra Fields ─────────────────────────────────────────────
+
+// GET all extra fields for builtin sections, grouped by sectionKey
+sectionsRouter.get("/builtin-extras", requireAuth, async (_req, res) => {
+  try {
+    const fields = await db.select().from(customFieldsTable)
+      .where(isNotNull(customFieldsTable.builtinSectionKey))
+      .orderBy(asc(customFieldsTable.fieldOrder));
+    const grouped: Record<string, typeof fields> = {};
+    for (const f of fields) {
+      const key = f.builtinSectionKey!;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(f);
+    }
+    return res.json(grouped);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST create extra field for a builtin section
+sectionsRouter.post("/builtin-extras", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  const { builtinSectionKey, name, fieldType = "number", placeholder = "", helpText = "", defaultValue = "", isRequired = false, includeInTotal = true, visibleByRole = "all", editableByRole = "all", dropdownOptions = "[]" } = req.body;
+  if (!builtinSectionKey) return res.status(400).json({ error: "builtinSectionKey required" });
+  if (!name) return res.status(400).json({ error: "name required" });
+  try {
+    const existing = await db.select({ fieldOrder: customFieldsTable.fieldOrder })
+      .from(customFieldsTable)
+      .where(eq(customFieldsTable.builtinSectionKey, builtinSectionKey))
+      .orderBy(asc(customFieldsTable.fieldOrder));
+    const nextOrder = existing.length > 0 ? (existing[existing.length - 1].fieldOrder + 1) : 0;
+    const [field] = await db.insert(customFieldsTable).values({
+      builtinSectionKey, name, fieldType, placeholder, helpText, defaultValue,
+      isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions, fieldOrder: nextOrder,
+    }).returning();
+    return res.status(201).json(field);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// PATCH update extra field
+sectionsRouter.patch("/builtin-extras/:fieldId", requireAuth, requireAdmin, async (req, res) => {
+  const fieldId = parseInt(req.params.fieldId);
+  const { name, fieldType, placeholder, helpText, defaultValue, isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions } = req.body;
+  const updates: Record<string, any> = {};
+  if (name !== undefined) updates.name = name;
+  if (fieldType !== undefined) updates.fieldType = fieldType;
+  if (placeholder !== undefined) updates.placeholder = placeholder;
+  if (helpText !== undefined) updates.helpText = helpText;
+  if (defaultValue !== undefined) updates.defaultValue = defaultValue;
+  if (isRequired !== undefined) updates.isRequired = isRequired;
+  if (includeInTotal !== undefined) updates.includeInTotal = includeInTotal;
+  if (visibleByRole !== undefined) updates.visibleByRole = visibleByRole;
+  if (editableByRole !== undefined) updates.editableByRole = editableByRole;
+  if (dropdownOptions !== undefined) updates.dropdownOptions = dropdownOptions;
+  try {
+    const [field] = await db.update(customFieldsTable).set(updates).where(eq(customFieldsTable.id, fieldId)).returning();
+    return res.json(field);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// DELETE extra field
+sectionsRouter.delete("/builtin-extras/:fieldId", requireAuth, requireAdmin, async (req, res) => {
+  const fieldId = parseInt(req.params.fieldId);
+  try {
+    await db.delete(customFieldsTable).where(eq(customFieldsTable.id, fieldId));
     return res.json({ success: true });
   } catch (err) {
     console.error(err);

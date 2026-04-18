@@ -16,6 +16,8 @@ import {
   useUpdateContainerExtraCharge, useDeleteContainerExtraCharge,
   useReorderContainerExtraCharges,
   type ContainerExtraCharge,
+  useGetBuiltinExtras,
+  type BuiltinExtraField,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -463,10 +465,116 @@ function ExtraLineItems({
   );
 }
 
+function ExtraBuiltinFieldsSection({
+  containerId, extraFields, customValuesMap, canEdit,
+}: {
+  containerId: number;
+  extraFields: BuiltinExtraField[];
+  customValuesMap: Record<number, string>;
+  canEdit: boolean;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const saveMutation = useSaveCustomFieldValues();
+  const [localValues, setLocalValues] = useState<Record<number, string>>(() => {
+    const init: Record<number, string> = {};
+    for (const f of extraFields) init[f.id] = customValuesMap[f.id] ?? "";
+    return init;
+  });
+  const [isDirty, setIsDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const init: Record<number, string> = {};
+    for (const f of extraFields) init[f.id] = customValuesMap[f.id] ?? "";
+    setLocalValues(init);
+    setIsDirty(false);
+  }, [JSON.stringify(extraFields.map(f => f.id)), JSON.stringify(customValuesMap)]);
+
+  if (extraFields.length === 0) return null;
+
+  const handleChange = (fieldId: number, value: string) => {
+    setLocalValues(prev => ({ ...prev, [fieldId]: value }));
+    setIsDirty(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveMutation.mutateAsync({
+        containerId,
+        data: { values: extraFields.map(f => ({ fieldId: f.id, value: localValues[f.id] ?? "" })) },
+      });
+      queryClient.invalidateQueries({ queryKey: getGetCustomFieldValuesQueryKey(containerId) });
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      toast({ title: "Extra fields saved" });
+      setIsDirty(false);
+    } catch {
+      toast({ variant: "destructive", title: "Failed to save extra fields" });
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="pt-4 border-t border-border/30 mt-2">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Extra Fields</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+        {extraFields.map(field => {
+          const value = localValues[field.id] ?? "";
+          return (
+            <div key={field.id} className="space-y-1">
+              <label className="text-xs text-muted-foreground">{field.name}</label>
+              {field.fieldType === "number" ? (
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
+                  <Input
+                    type="number"
+                    disabled={!canEdit || saving}
+                    value={value}
+                    onChange={e => handleChange(field.id, e.target.value)}
+                    className="pl-7 font-mono text-sm bg-background/50 border-border/60 disabled:opacity-70 h-10"
+                    onFocus={e => e.target.select()}
+                    placeholder={field.placeholder || "0"}
+                  />
+                </div>
+              ) : field.fieldType === "textarea" ? (
+                <Textarea
+                  disabled={!canEdit || saving}
+                  value={value}
+                  onChange={e => handleChange(field.id, e.target.value)}
+                  placeholder={field.placeholder}
+                  className="text-sm bg-background/50 border-border/60 disabled:opacity-70 resize-none h-20"
+                />
+              ) : (
+                <Input
+                  type={field.fieldType === "date" ? "date" : "text"}
+                  disabled={!canEdit || saving}
+                  value={value}
+                  onChange={e => handleChange(field.id, e.target.value)}
+                  placeholder={field.placeholder}
+                  className="text-sm bg-background/50 border-border/60 disabled:opacity-70 h-10"
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {canEdit && isDirty && (
+        <div className="flex justify-end mt-3">
+          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5 h-8 text-xs">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            Save Extra Fields
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChargeSectionForm({
   containerId, sectionKey, title, schema, initialData, isRecordLocked, isSectionLocked, isEditable, isAdmin,
   approval, onSubmitSection, onApproveSection, onRejectSection, onToggleSectionLock, sectionSettings,
-  isActiveSection, nextStageLabel, onAdvanceAfterSave,
+  isActiveSection, nextStageLabel, onAdvanceAfterSave, extraFields, customValuesMap,
 }: {
   containerId: number;
   sectionKey: string;
@@ -486,6 +594,8 @@ function ChargeSectionForm({
   isActiveSection?: boolean;
   nextStageLabel?: string | null;
   onAdvanceAfterSave?: () => void;
+  extraFields?: BuiltinExtraField[];
+  customValuesMap?: Record<number, string>;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -507,7 +617,10 @@ function ChargeSectionForm({
   const baseTotal = fields.reduce((sum, field) => sum + Number(initialData?.[field] || 0), 0);
   const { data: allExtraCharges = [] } = useGetContainerExtraCharges(containerId);
   const extraTotal = allExtraCharges.filter(r => r.section === sectionKey).reduce((s, r) => s + r.amount, 0);
-  const total = baseTotal + extraTotal;
+  const extraBuiltinTotal = (extraFields ?? [])
+    .filter(f => f.fieldType === "number" && f.includeInTotal)
+    .reduce((s, f) => s + (parseFloat(customValuesMap?.[f.id] ?? "0") || 0), 0);
+  const total = baseTotal + extraTotal + extraBuiltinTotal;
 
   const approvalStatus = approval?.status ?? "draft";
   const effectivelyLocked = isRecordLocked || isSectionLocked;
@@ -595,6 +708,14 @@ function ChargeSectionForm({
                 ))}
               </div>
               <ExtraLineItems containerId={containerId} sectionKey={sectionKey} canEdit={canEdit} />
+              {(extraFields?.length ?? 0) > 0 && (
+                <ExtraBuiltinFieldsSection
+                  containerId={containerId}
+                  extraFields={extraFields!}
+                  customValuesMap={customValuesMap ?? {}}
+                  canEdit={canEdit}
+                />
+              )}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border/40 mt-6">
                 <div className="flex items-center gap-2">
                   {/* Admin: approve/reject when submitted */}
@@ -790,6 +911,7 @@ export default function ContainerDetail() {
   const { data: customSectionsRaw } = useGetCustomSections({ containerId });
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
   const { data: sectionSettings } = useGetSettings();
+  const { data: builtinExtrasMap = {} } = useGetBuiltinExtras();
 
   const handleLinkClient = () => {
     if (!selectedClientId) return;
@@ -1538,6 +1660,8 @@ export default function ContainerDetail() {
                       onApproveSection={handleApproveSection}
                       onRejectSection={(section) => setRejectTargetSection(section)}
                       onToggleSectionLock={handleToggleSectionLock}
+                      extraFields={builtinExtrasMap[s.key] ?? []}
+                      customValuesMap={customValuesMap}
                       sectionSettings={sn}
                       isActiveSection={isActiveSec}
                       nextStageLabel={sectionNextStage ? getStatusLabel(sectionNextStage) : null}

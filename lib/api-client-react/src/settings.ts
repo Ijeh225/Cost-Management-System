@@ -125,3 +125,111 @@ export function useUpdateSettings() {
     onSuccess: () => qc.invalidateQueries({ queryKey: SETTINGS_QUERY_KEY }),
   });
 }
+
+// ─── Builtin Extra Fields ─────────────────────────────────────────────────────
+
+export type BuiltinExtraField = {
+  id: number;
+  builtinSectionKey: string;
+  name: string;
+  fieldType: string;
+  placeholder: string;
+  helpText: string;
+  defaultValue: string;
+  isRequired: boolean;
+  includeInTotal: boolean;
+  visibleByRole: string;
+  editableByRole: string;
+  dropdownOptions: string;
+  fieldOrder: number;
+};
+
+export type BuiltinExtraFieldValue = {
+  id: number;
+  containerId: number;
+  fieldId: number;
+  value: string;
+};
+
+export const BUILTIN_EXTRAS_QUERY_KEY = ["/api/builtin-extras"];
+
+export function useGetBuiltinExtras() {
+  return useQuery({
+    queryKey: BUILTIN_EXTRAS_QUERY_KEY,
+    queryFn: () => customFetch<Record<string, BuiltinExtraField[]>>("/api/builtin-extras"),
+  });
+}
+
+export function useAddBuiltinExtra() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      builtinSectionKey: string;
+      name: string;
+      fieldType?: string;
+      placeholder?: string;
+      helpText?: string;
+      defaultValue?: string;
+      isRequired?: boolean;
+      includeInTotal?: boolean;
+      visibleByRole?: string;
+      editableByRole?: string;
+      dropdownOptions?: string;
+    }) =>
+      customFetch<BuiltinExtraField>("/api/builtin-extras", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: BUILTIN_EXTRAS_QUERY_KEY }),
+  });
+}
+
+export function useUpdateBuiltinExtra() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fieldId, data }: {
+      fieldId: number;
+      data: Partial<Omit<BuiltinExtraField, "id" | "builtinSectionKey" | "fieldOrder">>;
+    }) =>
+      customFetch<BuiltinExtraField>(`/api/builtin-extras/${fieldId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: BUILTIN_EXTRAS_QUERY_KEY }),
+  });
+}
+
+export function useDeleteBuiltinExtra() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fieldId: number) =>
+      customFetch<{ success: boolean }>(`/api/builtin-extras/${fieldId}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: BUILTIN_EXTRAS_QUERY_KEY }),
+  });
+}
+
+export function useGetContainerBuiltinExtraValues(containerId: number) {
+  return useQuery({
+    queryKey: [`/api/containers/${containerId}/custom-values`],
+    queryFn: () => customFetch<BuiltinExtraFieldValue[]>(`/api/containers/${containerId}/custom-values`),
+    enabled: containerId > 0,
+  });
+}
+
+export function useSaveContainerBuiltinExtraValues(containerId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (values: Array<{ fieldId: number; value: string }>) =>
+      customFetch<{ success: boolean }>(`/api/containers/${containerId}/custom-values`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ values }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${containerId}/custom-values`] });
+      qc.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+    },
+  });
+}

@@ -22,7 +22,8 @@ export const customSectionsTable = pgTable("custom_sections", {
 
 export const customFieldsTable = pgTable("custom_fields", {
   id: serial("id").primaryKey(),
-  sectionId: integer("section_id").notNull().references(() => customSectionsTable.id, { onDelete: "cascade" }),
+  sectionId: integer("section_id").references(() => customSectionsTable.id, { onDelete: "cascade" }),
+  builtinSectionKey: text("builtin_section_key"),
   name: text("name").notNull(),
   fieldType: text("field_type").notNull().default("text"),
   placeholder: text("placeholder").notNull().default(""),

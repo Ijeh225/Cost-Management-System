@@ -15,6 +15,11 @@ import {
   builtInFieldLabelKey,
   builtInFieldHiddenKey,
   isBuiltInFieldHidden,
+  useGetBuiltinExtras,
+  useAddBuiltinExtra,
+  useUpdateBuiltinExtra,
+  useDeleteBuiltinExtra,
+  type BuiltinExtraField,
 } from "@workspace/api-client-react";
 import type { CustomSectionWithFields, CustomField } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -638,6 +643,100 @@ function SectionCard({ section, sectionsQueryKey, isAdmin }: { section: CustomSe
   );
 }
 
+function ExtraFieldRow({
+  field,
+  onDeleted,
+}: {
+  field: BuiltinExtraField;
+  onDeleted: () => void;
+}) {
+  const { toast } = useToast();
+  const updateMutation = useUpdateBuiltinExtra();
+  const deleteMutation = useDeleteBuiltinExtra();
+  const [isEditing, setIsEditing] = useState(false);
+  const [form, setForm] = useState<FieldForm>({
+    name: field.name,
+    fieldType: field.fieldType,
+    placeholder: field.placeholder,
+    helpText: field.helpText,
+    defaultValue: field.defaultValue,
+    isRequired: field.isRequired,
+    includeInTotal: field.includeInTotal,
+    visibleByRole: field.visibleByRole,
+    editableByRole: field.editableByRole,
+    dropdownOptions: (() => {
+      try { const p = JSON.parse(field.dropdownOptions || "[]"); return Array.isArray(p) ? p.join("\n") : ""; } catch { return ""; }
+    })(),
+  });
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return;
+    try {
+      await updateMutation.mutateAsync({
+        fieldId: field.id,
+        data: { ...form, dropdownOptions: serializeDropdownOptions(form.dropdownOptions) },
+      });
+      toast({ title: "Field updated" });
+      setIsEditing(false);
+    } catch {
+      toast({ variant: "destructive", title: "Failed to update field" });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete field "${field.name}"? This will also remove all saved values for this field.`)) return;
+    try {
+      await deleteMutation.mutateAsync(field.id);
+      toast({ title: "Field deleted" });
+      onDeleted();
+    } catch {
+      toast({ variant: "destructive", title: "Failed to delete field" });
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="px-3 py-2">
+        <InlineFieldForm
+          form={form}
+          onChange={setForm}
+          onSave={handleSave}
+          onCancel={() => setIsEditing(false)}
+          saving={updateMutation.isPending}
+          saveLabel="Save Changes"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/10 group/extrafield transition-colors">
+      <div className="flex items-center gap-1.5 text-muted-foreground w-14 flex-shrink-0">
+        <FieldTypeIcon type={field.fieldType} />
+        <span className="text-xs capitalize truncate">{field.fieldType}</span>
+      </div>
+      <span className="text-sm flex-1 min-w-0 truncate font-medium">{field.name}</span>
+      <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/extrafield:opacity-100 transition-opacity">
+        <button
+          onClick={() => setIsEditing(true)}
+          className="p-1 text-muted-foreground hover:text-primary transition-colors rounded"
+          title="Edit field"
+        >
+          <Pencil className="w-3 h-3" />
+        </button>
+        <button
+          onClick={handleDelete}
+          disabled={deleteMutation.isPending}
+          className="p-1 text-muted-foreground hover:text-destructive transition-colors rounded"
+          title="Delete field"
+        >
+          {deleteMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, onSaveMany }: {
   sectionKey: string;
   defaultTitle: string;
@@ -645,6 +744,10 @@ function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, o
   settings: Record<string, string>;
   onSaveMany: (updates: Record<string, string>) => Promise<void>;
 }) {
+  const { toast } = useToast();
+  const { data: extrasMap = {}, refetch: refetchExtras } = useGetBuiltinExtras();
+  const addExtraMutation = useAddBuiltinExtra();
+
   const [expanded, setExpanded] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(currentTitle);
@@ -653,9 +756,15 @@ function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, o
   const [fieldLabelValue, setFieldLabelValue] = useState("");
   const [savingField, setSavingField] = useState(false);
   const [togglingField, setTogglingField] = useState<string | null>(null);
+  const [showAddField, setShowAddField] = useState(false);
+  const [newFieldForm, setNewFieldForm] = useState<FieldForm>(EMPTY_FIELD);
+  const [addingSaved, setAddingSaved] = useState(false);
 
   const fieldDefs = Object.entries(BUILT_IN_FIELD_DEFAULTS[sectionKey] ?? {});
-  const visibleCount = fieldDefs.filter(([k]) => !isBuiltInFieldHidden(settings, sectionKey, k)).length;
+  const extraFields: BuiltinExtraField[] = extrasMap[sectionKey] ?? [];
+  const visibleBuiltinCount = fieldDefs.filter(([k]) => !isBuiltInFieldHidden(settings, sectionKey, k)).length;
+  const totalFieldCount = visibleBuiltinCount + extraFields.length;
+  const allFieldCount = fieldDefs.length + extraFields.length;
 
   const handleSaveName = async () => {
     if (!nameValue.trim()) return;
@@ -688,6 +797,25 @@ function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, o
     await onSaveMany({ [labelKey]: "" });
     setSavingField(false);
     setEditingFieldKey(null);
+  };
+
+  const handleAddExtraField = async () => {
+    if (!newFieldForm.name.trim()) return;
+    setAddingSaved(true);
+    try {
+      await addExtraMutation.mutateAsync({
+        builtinSectionKey: sectionKey,
+        ...newFieldForm,
+        dropdownOptions: serializeDropdownOptions(newFieldForm.dropdownOptions),
+      });
+      toast({ title: "Field added" });
+      setNewFieldForm(EMPTY_FIELD);
+      setShowAddField(false);
+      refetchExtras();
+    } catch {
+      toast({ variant: "destructive", title: "Failed to add field" });
+    }
+    setAddingSaved(false);
   };
 
   return (
@@ -724,7 +852,7 @@ function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, o
               )}
             </div>
             <span className="text-xs text-muted-foreground flex-shrink-0">
-              {visibleCount}/{fieldDefs.length} fields
+              {totalFieldCount}/{allFieldCount} fields
             </span>
             <button
               onClick={e => { e.stopPropagation(); setNameValue(currentTitle); setEditingName(true); }}
@@ -751,6 +879,7 @@ function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, o
             className="overflow-hidden"
           >
             <div className="ml-7 border-l border-border/40 pl-3 pb-2 pt-1">
+              {/* Built-in default fields */}
               {fieldDefs.map(([fieldKey, defaultLabel]) => {
                 const hidden = isBuiltInFieldHidden(settings, sectionKey, fieldKey);
                 const customLabel = settings[builtInFieldLabelKey(sectionKey, fieldKey)];
@@ -762,18 +891,6 @@ function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, o
                     key={fieldKey}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/10 group/field transition-colors ${hidden ? "opacity-40" : ""}`}
                   >
-                    <button
-                      onClick={() => handleToggleField(fieldKey)}
-                      className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
-                      title={hidden ? "Show this field" : "Hide this field"}
-                    >
-                      {togglingField === fieldKey
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : hidden
-                          ? <EyeOff className="w-3.5 h-3.5" />
-                          : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-
                     {isEditingThis ? (
                       <div className="flex items-center gap-2 flex-1">
                         <Input
@@ -802,18 +919,71 @@ function BuiltInSectionRow({ sectionKey, defaultTitle, currentTitle, settings, o
                         {customLabel && (
                           <span className="text-xs text-muted-foreground flex-shrink-0 truncate max-w-[120px]">({defaultLabel})</span>
                         )}
-                        <button
-                          onClick={() => { setFieldLabelValue(displayLabel); setEditingFieldKey(fieldKey); }}
-                          className="p-1 text-muted-foreground hover:text-primary transition-colors rounded flex-shrink-0 opacity-0 group-hover/field:opacity-100"
-                          title="Rename field"
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </button>
+                        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/field:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => { setFieldLabelValue(displayLabel); setEditingFieldKey(fieldKey); }}
+                            className="p-1 text-muted-foreground hover:text-primary transition-colors rounded"
+                            title="Rename field"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleToggleField(fieldKey)}
+                            disabled={togglingField === fieldKey}
+                            className={`p-1 transition-colors rounded ${hidden ? "text-muted-foreground hover:text-emerald-500" : "text-muted-foreground hover:text-destructive"}`}
+                            title={hidden ? "Restore this field" : "Remove this field"}
+                          >
+                            {togglingField === fieldKey
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : hidden
+                                ? <Eye className="w-3 h-3" />
+                                : <Trash2 className="w-3 h-3" />}
+                          </button>
+                        </div>
                       </>
+                    )}
+                    {!isEditingThis && hidden && (
+                      <span className="text-[10px] text-muted-foreground italic flex-shrink-0">hidden</span>
                     )}
                   </div>
                 );
               })}
+
+              {/* Extra custom fields added to this section */}
+              {extraFields.length > 0 && (
+                <div className="mt-1 pt-1 border-t border-border/30">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 pb-1">Added fields</p>
+                  {extraFields.map(ef => (
+                    <ExtraFieldRow
+                      key={ef.id}
+                      field={ef}
+                      onDeleted={() => refetchExtras()}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Add field button / form */}
+              {showAddField ? (
+                <div className="mt-2 px-1">
+                  <InlineFieldForm
+                    form={newFieldForm}
+                    onChange={setNewFieldForm}
+                    onSave={handleAddExtraField}
+                    onCancel={() => { setShowAddField(false); setNewFieldForm(EMPTY_FIELD); }}
+                    saving={addingSaved}
+                    saveLabel="Add Field"
+                  />
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAddField(true)}
+                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-primary transition-colors rounded-md hover:bg-accent/10 w-full"
+                >
+                  <Plus className="w-3 h-3" />
+                  Add field to this section
+                </button>
+              )}
             </div>
           </motion.div>
         )}
