@@ -35,7 +35,9 @@ intelligenceRouter.get("/intelligence/alerts", requireAuth, async (req: AuthRequ
       const terminalCost = sumTerminal(t);
       const deliveryCost = sumDelivery(d);
       const dutyNotPaid = parseFloat(cu.dutyNotPaid ?? "0");
-      return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt };
+      const nextActionDueDate = c.nextActionDueDate ? new Date(c.nextActionDueDate) : null;
+      const isActionOverdue = nextActionDueDate !== null && nextActionDueDate < new Date() && !["completed", "closed"].includes(c.status);
+      return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue };
     });
 
     const totals = containerData.reduce((acc, c) => ({ revenue: acc.revenue + c.revenue, cost: acc.cost + c.totalCost, terminal: acc.terminal + c.terminalCost, delivery: acc.delivery + c.deliveryCost }), { revenue: 0, cost: 0, terminal: 0, delivery: 0 });
@@ -68,6 +70,14 @@ intelligenceRouter.get("/intelligence/alerts", requireAuth, async (req: AuthRequ
     for (const c of containerData) {
       if (!["completed", "closed"].includes(c.status) && new Date(c.createdAt) < thirtyDaysAgo) {
         alerts.push({ type: "delayed", severity: "warning", message: `Delayed container: ${c.containerNumber} has been in '${c.status}' for over 30 days`, containerId: c.id, containerNumber: c.containerNumber });
+      }
+    }
+
+    // Action overdue alerts
+    for (const c of containerData) {
+      if (c.isActionOverdue && c.nextActionDueDate) {
+        const overdueDays = Math.floor((Date.now() - c.nextActionDueDate.getTime()) / (1000 * 60 * 60 * 24));
+        alerts.push({ type: "action_overdue", severity: "warning", message: `Next action overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}: ${c.containerNumber} (${c.customerName})${c.stageOwner ? ` — owner: ${c.stageOwner}` : ""}`, containerId: c.id, containerNumber: c.containerNumber });
       }
     }
 

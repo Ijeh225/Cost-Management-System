@@ -33,6 +33,7 @@ const ALERT_CONFIG: Record<string, { icon: any; color: string; bg: string; borde
   overdue_task:     { icon: ListTodo,     color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Overdue Task"      },
   stale_approval:   { icon: ShieldAlert,  color: "text-violet-400", bg: "bg-violet-400/10", border: "border-violet-400/20", label: "Stale Approval"    },
   rejected_section: { icon: XCircle,      color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Section Rejected"  },
+  action_overdue:   { icon: ShieldAlert,  color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Action Overdue"    },
 };
 
 const SEVERITY_CONFIG: Record<string, { label: string; className: string }> = {

@@ -40,8 +40,9 @@ const ALERT_CONFIG: Record<string, AlertCfg> = {
   low_profit:     { icon: AlertTriangle, color: "text-orange-400", accent: "border-l-orange-500", label: "Low Margin",       severity: "warning"  },
   overdue_duty:   { icon: DollarSign,    color: "text-amber-400",  accent: "border-l-amber-500",  label: "Outstanding Duty", severity: "warning"  },
   delayed:        { icon: Clock,         color: "text-blue-400",   accent: "border-l-blue-500",   label: "Possible Delay",   severity: "info"     },
-  stale_approval: { icon: ShieldAlert,   color: "text-violet-400", accent: "border-l-violet-500", label: "Stale Approval",   severity: "warning"  },
-  overdue_task:   { icon: ListTodo,      color: "text-rose-400",   accent: "border-l-rose-500",   label: "Overdue Task",     severity: "warning"  },
+  stale_approval:  { icon: ShieldAlert,   color: "text-violet-400", accent: "border-l-violet-500", label: "Stale Approval",   severity: "warning"  },
+  overdue_task:    { icon: ListTodo,      color: "text-rose-400",   accent: "border-l-rose-500",   label: "Overdue Task",     severity: "warning"  },
+  action_overdue:  { icon: ShieldAlert,   color: "text-rose-400",   accent: "border-l-rose-500",   label: "Action Overdue",   severity: "warning"  },
 };
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
