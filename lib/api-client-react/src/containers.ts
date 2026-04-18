@@ -91,6 +91,36 @@ export function useUpdateDeliveredAt() {
   });
 }
 
+export type DeliveryExecutionFields = {
+  deliveryTime?: string | null;
+  deliveryLocation?: string | null;
+  truckNumber?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  dispatchOfficer?: string | null;
+  deliveryStatus?: "pending" | "in_transit" | "delivered";
+  offloadingConfirmed?: boolean;
+  emptyReturnDueDate?: string | null;
+  emptyReturnDate?: string | null;
+};
+
+export function useUpdateDeliveryExecution() {
+  const qc = useQueryClient();
+  return useMutation<Record<string, unknown>, Error, { id: number } & DeliveryExecutionFields>({
+    mutationFn: ({ id, ...fields }) =>
+      customFetch(`/api/containers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(fields),
+        headers: { "Content-Type": "application/json" },
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
 export type CheckDuplicatesRequest = {
   containerNumbers: string[];
   blNumbers: string[];

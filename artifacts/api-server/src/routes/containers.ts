@@ -56,6 +56,16 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     nextAction: c.nextAction ?? null,
     nextActionDueDate: c.nextActionDueDate instanceof Date ? c.nextActionDueDate.toISOString() : (c.nextActionDueDate ?? null),
     delayReason: c.delayReason ?? null,
+    deliveryTime: c.deliveryTime ?? null,
+    deliveryLocation: c.deliveryLocation ?? null,
+    truckNumber: c.truckNumber ?? null,
+    driverName: c.driverName ?? null,
+    driverPhone: c.driverPhone ?? null,
+    dispatchOfficer: c.dispatchOfficer ?? null,
+    deliveryStatus: c.deliveryStatus ?? "pending",
+    offloadingConfirmed: c.offloadingConfirmed ?? false,
+    emptyReturnDueDate: c.emptyReturnDueDate instanceof Date ? c.emptyReturnDueDate.toISOString() : (c.emptyReturnDueDate ?? null),
+    emptyReturnDate: c.emptyReturnDate instanceof Date ? c.emptyReturnDate.toISOString() : (c.emptyReturnDate ?? null),
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
   };
@@ -559,11 +569,28 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       res.status(404).json({ error: "Container not found" });
       return;
     }
-    const { deliveredAt, stageOwner, nextAction, nextActionDueDate, delayReason } = req.body;
+    const {
+      deliveredAt, stageOwner, nextAction, nextActionDueDate, delayReason,
+      deliveryTime, deliveryLocation, truckNumber, driverName, driverPhone,
+      dispatchOfficer, deliveryStatus, offloadingConfirmed, emptyReturnDueDate, emptyReturnDate,
+    } = req.body;
     if (deliveredAt !== undefined && deliveredAt !== null) {
       if (typeof deliveredAt !== "string" || !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(deliveredAt) || isNaN(new Date(deliveredAt).getTime())) {
         res.status(400).json({ error: "Invalid deliveredAt — expected YYYY-MM-DD format" });
         return;
+      }
+    }
+    const VALID_DELIVERY_STATUSES = ["pending", "in_transit", "delivered"];
+    if (deliveryStatus !== undefined && !VALID_DELIVERY_STATUSES.includes(deliveryStatus)) {
+      res.status(400).json({ error: `Invalid deliveryStatus — must be one of: ${VALID_DELIVERY_STATUSES.join(", ")}` });
+      return;
+    }
+    for (const [field, val] of [["emptyReturnDueDate", emptyReturnDueDate], ["emptyReturnDate", emptyReturnDate]] as [string, unknown][]) {
+      if (val !== undefined && val !== null && val !== "") {
+        if (typeof val !== "string" || isNaN(new Date(val as string).getTime())) {
+          res.status(400).json({ error: `Invalid ${field} — expected ISO 8601 date format` });
+          return;
+        }
       }
     }
     const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -571,6 +598,16 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       updates.deliveredAt = deliveredAt ? new Date(deliveredAt as string) : null;
       updates.deliveredAtEstimated = false;
     }
+    if (deliveryTime !== undefined) updates.deliveryTime = deliveryTime || null;
+    if (deliveryLocation !== undefined) updates.deliveryLocation = deliveryLocation || null;
+    if (truckNumber !== undefined) updates.truckNumber = truckNumber || null;
+    if (driverName !== undefined) updates.driverName = driverName || null;
+    if (driverPhone !== undefined) updates.driverPhone = driverPhone || null;
+    if (dispatchOfficer !== undefined) updates.dispatchOfficer = dispatchOfficer || null;
+    if (deliveryStatus !== undefined) updates.deliveryStatus = deliveryStatus;
+    if (offloadingConfirmed !== undefined) updates.offloadingConfirmed = !!offloadingConfirmed;
+    if (emptyReturnDueDate !== undefined) updates.emptyReturnDueDate = emptyReturnDueDate ? new Date(emptyReturnDueDate as string) : null;
+    if (emptyReturnDate !== undefined) updates.emptyReturnDate = emptyReturnDate ? new Date(emptyReturnDate as string) : null;
     const changed: string[] = [];
     if (stageOwner !== undefined) {
       const prev = existing.stageOwner ?? null;
@@ -616,6 +653,10 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     const [updated] = await db.update(containersTable).set(updates).where(eq(containersTable.id, id)).returning();
     const reasons: string[] = [];
     if (deliveredAt !== undefined) reasons.push(deliveredAt ? `Delivery date set to ${deliveredAt}` : "Delivery date cleared");
+    if (truckNumber !== undefined && (existing.truckNumber ?? null) !== (truckNumber || null)) reasons.push(`Truck: ${truckNumber || "cleared"}`);
+    if (driverName !== undefined && (existing.driverName ?? null) !== (driverName || null)) reasons.push(`Driver: ${driverName || "cleared"}`);
+    if (dispatchOfficer !== undefined && (existing.dispatchOfficer ?? null) !== (dispatchOfficer || null)) reasons.push(`Dispatch Officer: ${dispatchOfficer || "cleared"}`);
+    if (deliveryStatus !== undefined && existing.deliveryStatus !== deliveryStatus) reasons.push(`Delivery status changed to "${deliveryStatus}"`);
     reasons.push(...changed);
     await db.insert(auditLogTable).values({
       containerId: id,
@@ -624,8 +665,19 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       section: "basic_info",
       reason: reasons.join("; ") || "Container updated",
     });
+    const timelineEntries = [];
+    if (deliveryStatus !== undefined && existing.deliveryStatus !== deliveryStatus) {
+      const statusLabel: Record<string, string> = { pending: "Pending", in_transit: "In Transit", delivered: "Delivered" };
+      timelineEntries.push({
+        containerId: id,
+        userId: req.user!.id,
+        title: `Delivery status changed to "${statusLabel[deliveryStatus] ?? deliveryStatus}"`,
+        eventType: "delivery",
+        description: `Delivery execution status updated from "${statusLabel[existing.deliveryStatus] ?? existing.deliveryStatus}" to "${statusLabel[deliveryStatus] ?? deliveryStatus}"`,
+        status: "completed" as const,
+      });
+    }
     if (changed.length > 0) {
-      const timelineEntries = [];
       if (stageOwner !== undefined && (existing.stageOwner ?? null) !== (stageOwner || null)) {
         timelineEntries.push({
           containerId: id,
@@ -656,9 +708,9 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
           status: "completed" as const,
         });
       }
-      if (timelineEntries.length > 0) {
-        await db.insert(containerTimelineTable).values(timelineEntries);
-      }
+    }
+    if (timelineEntries.length > 0) {
+      await db.insert(containerTimelineTable).values(timelineEntries);
     }
     res.json(formatContainer(updated));
   } catch (err) {

@@ -49,7 +49,9 @@ async function computeAlerts(userId?: number) {
     const nextActionDueDate = c.nextActionDueDate ? new Date(c.nextActionDueDate) : null;
     const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
     const isActionOverdue = nextActionDueDate !== null && nextActionDueDate.getTime() < startOfToday.getTime() && !["completed", "closed"].includes(c.status);
-    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue };
+    const emptyReturnDueDate = c.emptyReturnDueDate ? new Date(c.emptyReturnDueDate) : null;
+    const emptyReturnDate = c.emptyReturnDate ? new Date(c.emptyReturnDate) : null;
+    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue, emptyReturnDueDate, emptyReturnDate };
   });
 
   const totals = containerData.reduce((acc, c) => ({ terminal: acc.terminal + c.terminalCost, delivery: acc.delivery + c.deliveryCost }), { terminal: 0, delivery: 0 });
@@ -120,6 +122,21 @@ async function computeAlerts(userId?: number) {
         containerNumber: c.containerNumber,
         generatedAt: now,
       });
+    }
+    if (c.emptyReturnDueDate && !c.emptyReturnDate) {
+      const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
+      if (c.emptyReturnDueDate.getTime() < startOfToday.getTime()) {
+        const overdueDays = Math.floor((startOfToday.getTime() - c.emptyReturnDueDate.getTime()) / (1000 * 60 * 60 * 24));
+        alerts.push({
+          alertKey: `empty_return_overdue_${c.id}`,
+          type: "empty_return_overdue",
+          severity: "warning",
+          message: `Empty container return overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}: ${c.containerNumber} (${c.customerName}) — empty return not yet recorded`,
+          containerId: c.id,
+          containerNumber: c.containerNumber,
+          generatedAt: now,
+        });
+      }
     }
   }
 

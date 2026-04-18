@@ -230,6 +230,13 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
       deliveredAtEstimated: containersTable.deliveredAtEstimated,
       clearingCharges: containersTable.clearingCharges,
       createdAt: containersTable.createdAt,
+      truckNumber: containersTable.truckNumber,
+      driverName: containersTable.driverName,
+      dispatchOfficer: containersTable.dispatchOfficer,
+      deliveryStatus: containersTable.deliveryStatus,
+      deliveryLocation: containersTable.deliveryLocation,
+      offloadingConfirmed: containersTable.offloadingConfirmed,
+      emptyReturnDate: containersTable.emptyReturnDate,
     }).from(containersTable).where(where);
 
     let totalRevenue = 0;
@@ -264,6 +271,13 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
         clearingCharges: revenue,
         daysToComplete,
         createdAt: createDate.toISOString(),
+        truckNumber: c.truckNumber ?? null,
+        driverName: c.driverName ?? null,
+        dispatchOfficer: c.dispatchOfficer ?? null,
+        deliveryStatus: c.deliveryStatus ?? "pending",
+        deliveryLocation: c.deliveryLocation ?? null,
+        offloadingConfirmed: c.offloadingConfirmed ?? false,
+        emptyReturnDate: c.emptyReturnDate instanceof Date ? c.emptyReturnDate.toISOString() : (c.emptyReturnDate ?? null),
       };
     });
 

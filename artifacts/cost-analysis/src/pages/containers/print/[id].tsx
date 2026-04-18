@@ -157,6 +157,25 @@ export default function ContainerPrintPage() {
           );
         })}
 
+        {/* Delivery Execution */}
+        {(c.truckNumber || c.driverName || c.dispatchOfficer || c.deliveryLocation || c.emptyReturnDueDate) && (
+          <div>
+            <div className="section-title">Delivery Execution</div>
+            <table className="charge-table">
+              <tbody>
+                {c.deliveryStatus && <tr><td>Delivery Status</td><td style={{ textTransform: "capitalize" }}>{(c.deliveryStatus as string).replace("_", " ")}</td></tr>}
+                {c.truckNumber && <tr><td>Truck Number</td><td>{c.truckNumber}</td></tr>}
+                {c.driverName && <tr><td>Driver</td><td>{c.driverName}{c.driverPhone ? ` · ${c.driverPhone}` : ""}</td></tr>}
+                {c.dispatchOfficer && <tr><td>Dispatch Officer</td><td>{c.dispatchOfficer}</td></tr>}
+                {c.deliveryLocation && <tr><td>Delivery Location</td><td>{c.deliveryLocation}{c.deliveryTime ? ` · ${c.deliveryTime}` : ""}</td></tr>}
+                {c.offloadingConfirmed && <tr><td>Offloading</td><td>Confirmed ✓</td></tr>}
+                {c.emptyReturnDueDate && <tr><td>Empty Return Due</td><td>{new Date(c.emptyReturnDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</td></tr>}
+                {c.emptyReturnDate && <tr><td>Empty Return Date</td><td>{new Date(c.emptyReturnDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Approval Status */}
         {c.sectionApprovals?.length > 0 && (
           <div>

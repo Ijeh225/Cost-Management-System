@@ -98,13 +98,13 @@ export default function DeliveryReportPrint() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ background: "#f1f5f9", borderBottom: "2px solid #e2e8f0" }}>
-                {["#", "Container / BL", "Customer", "Date Delivered", "Days", "Revenue (₦)", "Status"].map(h => (
+                {["#", "Container / BL", "Customer", "Truck / Driver", "Date Delivered", "Days", "Revenue (₦)", "Status"].map(h => (
                   <th key={h} style={{ padding: "8px 10px", textAlign: h === "Revenue (₦)" || h === "Days" ? "right" : "left", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8, color: "#64748b" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {data.items.map((item, i) => (
+              {data.items.map((item: any, i: number) => (
                 <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 === 0 ? "#fff" : "#fafbfc" }}>
                   <td style={{ padding: "7px 10px", color: "#94a3b8" }}>{i + 1}</td>
                   <td style={{ padding: "7px 10px" }}>
@@ -112,6 +112,11 @@ export default function DeliveryReportPrint() {
                     <div style={{ color: "#94a3b8", fontSize: 11 }}>{item.blNumber}</div>
                   </td>
                   <td style={{ padding: "7px 10px", fontWeight: 500 }}>{item.clientName}</td>
+                  <td style={{ padding: "7px 10px" }}>
+                    {item.truckNumber ? <div style={{ fontWeight: 600, color: "#374151" }}>{item.truckNumber}</div> : <span style={{ color: "#cbd5e1" }}>—</span>}
+                    {item.driverName && <div style={{ color: "#64748b", fontSize: 11 }}>{item.driverName}</div>}
+                    {item.dispatchOfficer && <div style={{ color: "#94a3b8", fontSize: 10 }}>Dispatch: {item.dispatchOfficer}</div>}
+                  </td>
                   <td style={{ padding: "7px 10px" }}>
                     <div style={{ fontWeight: 500 }}>{fmtShort(item.deliveredAt)}</div>
                     {item.deliveredAtEstimated && (
@@ -130,7 +135,7 @@ export default function DeliveryReportPrint() {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: "2px solid #e2e8f0", background: "#f8fafc", fontWeight: 700 }}>
-                <td colSpan={5} style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, color: "#475569" }}>Total Revenue</td>
+                <td colSpan={6} style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, color: "#475569" }}>Total Revenue</td>
                 <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: "monospace", color: "#1e40af" }}>{fmt(data.totalRevenue)}</td>
                 <td></td>
               </tr>
