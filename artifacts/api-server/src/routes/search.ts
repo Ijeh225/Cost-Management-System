@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, containersTable, clientsTable, invoicesTable } from "@workspace/db";
-import { ilike, or, desc } from "drizzle-orm";
+import { ilike, or, desc, eq } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 
 const router = Router();
@@ -59,10 +59,15 @@ router.get("/search", requireAuth, async (req, res) => {
           status: invoicesTable.status,
           total: invoicesTable.total,
           clientId: invoicesTable.clientId,
+          clientName: clientsTable.name,
         })
         .from(invoicesTable)
+        .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
         .where(
-          ilike(invoicesTable.invoiceNumber, pattern)
+          or(
+            ilike(invoicesTable.invoiceNumber, pattern),
+            ilike(clientsTable.name, pattern),
+          )
         )
         .orderBy(desc(invoicesTable.createdAt))
         .limit(5),

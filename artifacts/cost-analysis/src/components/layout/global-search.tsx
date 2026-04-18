@@ -59,7 +59,7 @@ export function GlobalSearch() {
       type: "invoice" as const,
       id: inv.id,
       label: inv.invoiceNumber,
-      sub: [STATUS_LABEL[inv.status] ?? inv.status, formatCurrency(inv.total)].filter(Boolean).join(" · "),
+      sub: [inv.clientName, STATUS_LABEL[inv.status] ?? inv.status, formatCurrency(inv.total)].filter(Boolean).join(" · "),
       href: `/invoices/${inv.id}`,
     })),
   ];

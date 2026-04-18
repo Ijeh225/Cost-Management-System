@@ -22,6 +22,7 @@ export type SearchInvoiceResult = {
   status: string;
   total: string;
   clientId: number | null;
+  clientName: string | null;
 };
 
 export type SearchResponse = {
