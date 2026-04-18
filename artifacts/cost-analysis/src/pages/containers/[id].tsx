@@ -45,7 +45,7 @@ import {
   Save, AlertCircle, Loader2, DollarSign, Calculator, ChevronRight,
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
   Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink, X,
-  ClipboardCheck, ArrowRightCircle, PlusCircle, Truck, Plus, Trash2,
+  ClipboardCheck, PlusCircle, Truck, Plus, Trash2,
   ChevronUp, ChevronDown, Activity,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
@@ -574,7 +574,7 @@ function ExtraBuiltinFieldsSection({
 function ChargeSectionForm({
   containerId, sectionKey, title, schema, initialData, isRecordLocked, isSectionLocked, isEditable, isAdmin,
   approval, onSubmitSection, onApproveSection, onRejectSection, onToggleSectionLock, sectionSettings,
-  isActiveSection, nextStageLabel, onAdvanceAfterSave, extraFields, customValuesMap,
+  extraFields, customValuesMap,
 }: {
   containerId: number;
   sectionKey: string;
@@ -591,16 +591,12 @@ function ChargeSectionForm({
   onApproveSection: (section: string) => void;
   onRejectSection: (section: string) => void;
   onToggleSectionLock: (section: string, lock: boolean) => void;
-  isActiveSection?: boolean;
-  nextStageLabel?: string | null;
-  onAdvanceAfterSave?: () => void;
   extraFields?: BuiltinExtraField[];
   customValuesMap?: Record<number, string>;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const updateMutation = useUpdateContainerCharges();
-  const shouldAdvanceRef = useRef(false);
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: initialData || {},
@@ -628,8 +624,6 @@ function ChargeSectionForm({
   const canSubmit = isEditable && !effectivelyLocked && (approvalStatus === "draft" || approvalStatus === "rejected");
 
   const onSubmit = (data: any) => {
-    const willAdvance = shouldAdvanceRef.current;
-    shouldAdvanceRef.current = false;
     updateMutation.mutate(
       { id: containerId, data: { section: sectionKey as UpdateContainerChargesRequestSection, [sectionKey]: data, reason: "Manual UI update" } },
       {
@@ -638,11 +632,7 @@ function ChargeSectionForm({
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
           form.reset(data);
-          if (willAdvance && onAdvanceAfterSave) {
-            onAdvanceAfterSave();
-          } else {
-            toast({ title: "Charges Updated", description: `${title} section saved.` });
-          }
+          toast({ title: "Charges Updated", description: `${title} section saved.` });
         },
         onError: (err: any) => toast({ variant: "destructive", title: "Update Failed", description: err?.message ?? "Something went wrong" }),
       }
@@ -760,21 +750,9 @@ function ChargeSectionForm({
                       Discard
                     </Button>
                     <Button type="submit" size="sm" variant="outline" className="h-8 text-xs active:scale-95 transition-transform" disabled={updateMutation.isPending}>
-                      {updateMutation.isPending && !shouldAdvanceRef.current ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                      {updateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
                       Save Changes
                     </Button>
-                    {isActiveSection && onAdvanceAfterSave && nextStageLabel && (
-                      <Button
-                        type="submit"
-                        size="sm"
-                        className="h-8 text-xs active:scale-95 transition-transform shadow-md shadow-primary/20 gap-1.5"
-                        disabled={updateMutation.isPending}
-                        onClick={() => { shouldAdvanceRef.current = true; }}
-                      >
-                        {updateMutation.isPending && shouldAdvanceRef.current ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRightCircle className="w-3.5 h-3.5" />}
-                        Save & Advance to {nextStageLabel}
-                      </Button>
-                    )}
                   </div>
                 )}
                 {!canEdit && approvalStatus !== "submitted" && (
@@ -961,22 +939,6 @@ export default function ContainerDetail() {
   const userSectionPermissions: string | null = (user as any)?.sectionPermissions ?? null;
   const activeSection = STAGE_SECTION[container.status] ?? null;
   const lockedSections: string[] = container.lockedSections ?? [];
-
-  const handleSaveAndAdvance = () => {
-    if (!nextStage) return;
-    updateMutation.mutate(
-      { id: containerId, data: { status: nextStage } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
-          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-          toast({ title: "Saved & Advanced", description: `Charges saved. Moved to "${getStatusLabel(nextStage)}".` });
-        },
-        onError: (err: any) => toast({ variant: "destructive", title: "Error advancing stage", description: err?.message }),
-      }
-    );
-  };
 
   const handleLockToggle = () => {
     lockMutation.mutate(
@@ -1592,35 +1554,28 @@ export default function ContainerDetail() {
                 </div>
               )}
               <Accordion type="single" collapsible className="w-full">
-                {CHARGE_SECTIONS.map(s => {
-                  const isActiveSec = STAGE_SECTION[container.status] === s.key;
-                  const sectionNextStage = isActiveSec ? getNextStage(container.status) : null;
-                  return (
-                    <ChargeSectionForm
-                      key={s.key}
-                      containerId={containerId}
-                      sectionKey={s.key}
-                      title={s.title}
-                      schema={s.schema}
-                      initialData={s.data}
-                      isRecordLocked={container.isLocked}
-                      isSectionLocked={lockedSections.includes(s.key)}
-                      isEditable={isSectionEditable(s.key)}
-                      isAdmin={isAdmin}
-                      approval={getSectionApproval(s.key)}
-                      onSubmitSection={handleSubmitSection}
-                      onApproveSection={handleApproveSection}
-                      onRejectSection={(section) => setRejectTargetSection(section)}
-                      onToggleSectionLock={handleToggleSectionLock}
-                      extraFields={builtinExtrasMap[s.key] ?? []}
-                      customValuesMap={customValuesMap}
-                      sectionSettings={sn}
-                      isActiveSection={isActiveSec}
-                      nextStageLabel={sectionNextStage ? getStatusLabel(sectionNextStage) : null}
-                      onAdvanceAfterSave={isActiveSec && !container.isLocked && sectionNextStage ? handleSaveAndAdvance : undefined}
-                    />
-                  );
-                })}
+                {CHARGE_SECTIONS.map(s => (
+                  <ChargeSectionForm
+                    key={s.key}
+                    containerId={containerId}
+                    sectionKey={s.key}
+                    title={s.title}
+                    schema={s.schema}
+                    initialData={s.data}
+                    isRecordLocked={container.isLocked}
+                    isSectionLocked={lockedSections.includes(s.key)}
+                    isEditable={isSectionEditable(s.key)}
+                    isAdmin={isAdmin}
+                    approval={getSectionApproval(s.key)}
+                    onSubmitSection={handleSubmitSection}
+                    onApproveSection={handleApproveSection}
+                    onRejectSection={(section) => setRejectTargetSection(section)}
+                    onToggleSectionLock={handleToggleSectionLock}
+                    extraFields={builtinExtrasMap[s.key] ?? []}
+                    customValuesMap={customValuesMap}
+                    sectionSettings={sn}
+                  />
+                ))}
                 {customSections.map(section => (
                   <CustomSectionForm
                     key={section.id}
