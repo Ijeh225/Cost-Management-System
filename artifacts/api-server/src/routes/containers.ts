@@ -606,6 +606,42 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       section: "basic_info",
       reason: reasons.join("; ") || "Container updated",
     });
+    if (changed.length > 0) {
+      const timelineEntries = [];
+      if (stageOwner !== undefined && (existing.stageOwner ?? null) !== (stageOwner || null)) {
+        timelineEntries.push({
+          containerId: id,
+          userId: req.user!.id,
+          title: stageOwner ? `Stage owner set to "${stageOwner}"` : "Stage owner cleared",
+          eventType: "stage_control",
+          description: stageOwner ? `Responsibility assigned to ${stageOwner}` : "Stage owner removed",
+          status: "completed" as const,
+        });
+      }
+      if (nextAction !== undefined && (existing.nextAction ?? null) !== (nextAction || null)) {
+        timelineEntries.push({
+          containerId: id,
+          userId: req.user!.id,
+          title: nextAction ? `Next action set: "${nextAction}"` : "Next action cleared",
+          eventType: "stage_control",
+          description: nextAction || "Next action removed",
+          status: "completed" as const,
+        });
+      }
+      if (delayReason !== undefined && (existing.delayReason ?? null) !== (delayReason || null)) {
+        timelineEntries.push({
+          containerId: id,
+          userId: req.user!.id,
+          title: delayReason ? `Delay reason recorded` : "Delay reason cleared",
+          eventType: "stage_control",
+          description: delayReason || "Delay reason removed",
+          status: "completed" as const,
+        });
+      }
+      if (timelineEntries.length > 0) {
+        await db.insert(containerTimelineTable).values(timelineEntries);
+      }
+    }
     res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);

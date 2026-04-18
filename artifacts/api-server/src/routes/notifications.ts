@@ -107,6 +107,21 @@ async function computeAlerts(userId?: number) {
     }
   }
 
+  for (const c of containerData) {
+    if (c.isActionOverdue && c.nextActionDueDate) {
+      const overdueDays = Math.floor((Date.now() - c.nextActionDueDate.getTime()) / (1000 * 60 * 60 * 24));
+      alerts.push({
+        alertKey: `action_overdue_${c.id}`,
+        type: "action_overdue",
+        severity: "warning",
+        message: `Next action overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}: ${c.containerNumber} (${c.customerName})${c.stageOwner ? ` — owner: ${c.stageOwner}` : ""}`,
+        containerId: c.id,
+        containerNumber: c.containerNumber,
+        generatedAt: now,
+      });
+    }
+  }
+
   const overdueTasks = await db.select({ id: containerTasksTable.id, containerId: containerTasksTable.containerId, title: containerTasksTable.title })
     .from(containerTasksTable).where(lt(containerTasksTable.dueDate, new Date()));
   for (const t of overdueTasks) {
