@@ -52,6 +52,10 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     dutyNotPaid: 0,
     deliveredAt: c.deliveredAt instanceof Date ? c.deliveredAt.toISOString() : (c.deliveredAt ?? null),
     deliveredAtEstimated: c.deliveredAtEstimated ?? false,
+    stageOwner: c.stageOwner ?? null,
+    nextAction: c.nextAction ?? null,
+    nextActionDueDate: c.nextActionDueDate instanceof Date ? c.nextActionDueDate.toISOString() : (c.nextActionDueDate ?? null),
+    delayReason: c.delayReason ?? null,
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
   };

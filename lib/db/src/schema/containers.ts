@@ -20,6 +20,10 @@ export const containersTable = pgTable("containers", {
   clearingCharges: numeric("clearing_charges", { precision: 15, scale: 2 }).notNull().default("0"),
   deliveredAt: timestamp("delivered_at"),
   deliveredAtEstimated: boolean("delivered_at_estimated").notNull().default(false),
+  stageOwner: text("stage_owner"),
+  nextAction: text("next_action"),
+  nextActionDueDate: timestamp("next_action_due_date"),
+  delayReason: text("delay_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
