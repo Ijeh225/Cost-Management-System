@@ -47,14 +47,14 @@ export function AppSidebar() {
     { title: "Accounts Receivable", url: "/accounts-receivable", icon: BookOpen },
     { title: "My Tasks",      url: "/my-tasks",    icon: ListTodo         },
     { title: "Notifications", url: "/notifications", icon: Bell, badge: unreadCount },
-    ...(staffCanUpload ? [{ title: "Upload Data", url: "/upload", icon: UploadCloud }] : []),
+    ...(staffCanUpload ? [{ title: "Upload Data", url: "/containers/upload", icon: UploadCloud }] : []),
   ];
 
   const adminNav = [
     { title: "Approval Queue",   url: "/approvals",  icon: ClipboardCheck },
     { title: "Analytics",        url: "/analytics",  icon: BarChart2       },
     { title: "Reports",          url: "/reports",    icon: FileDown        },
-    { title: "Upload Data",      url: "/upload",     icon: UploadCloud     },
+    { title: "Upload Data",      url: "/containers/upload", icon: UploadCloud },
     { title: "User Management",  url: "/users",      icon: Users           },
     { title: "Settings",         url: "/settings",   icon: Settings        },
   ];
