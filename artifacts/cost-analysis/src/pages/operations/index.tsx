@@ -96,18 +96,39 @@ function ContainerCard({
           </div>
         </div>
 
-        {container.assignedStaffName && (
-          <div className="mt-1.5 flex items-center gap-1">
+        <div className="mt-2 space-y-1">
+          <div className="flex items-center gap-1">
             <User className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />
+            <span className="text-[10px] text-muted-foreground/50 shrink-0 mr-0.5">Assigned:</span>
             <span className="text-[10px] text-muted-foreground/70 truncate">
-              {container.assignedStaffName}
+              {container.assignedStaffName ?? "—"}
             </span>
           </div>
-        )}
-
-        <div className="mt-1.5 flex items-center gap-1 opacity-40">
-          <Clock className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />
-          <span className="text-[10px] text-muted-foreground/60 italic truncate">No next action set</span>
+          {/* Stage owner slot — populated by Task #43 Stage Control Engine */}
+          <div className="flex items-center gap-1 opacity-50">
+            <User className="w-2.5 h-2.5 text-muted-foreground/40 shrink-0" />
+            <span className="text-[10px] text-muted-foreground/40 shrink-0 mr-0.5">Owner:</span>
+            <span className="text-[10px] text-muted-foreground/50 italic truncate">
+              {(container as any).stageOwnerName ?? "—"}
+            </span>
+          </div>
+          {/* Next action slot — populated by Task #43; shows overdue state when past due date */}
+          {(() => {
+            const nextActionDueAt: string | null = (container as any).nextActionDueAt ?? null;
+            const isOverdue = nextActionDueAt ? new Date(nextActionDueAt) < new Date() : false;
+            return (
+              <div className={`flex items-center gap-1 ${nextActionDueAt ? "" : "opacity-40"}`}>
+                <Clock className={`w-2.5 h-2.5 shrink-0 ${isOverdue ? "text-red-400" : "text-muted-foreground/50"}`} />
+                <span className={`text-[10px] truncate ${isOverdue ? "text-red-400 font-medium" : "text-muted-foreground/60 italic"}`}>
+                  {nextActionDueAt
+                    ? isOverdue
+                      ? `Overdue: ${new Date(nextActionDueAt).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}`
+                      : `Due: ${new Date(nextActionDueAt).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}`
+                    : "No next action set"}
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {isAdmin && nextStage && (
