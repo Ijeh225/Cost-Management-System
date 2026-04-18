@@ -6,3 +6,9 @@ id = "OnlYLxgbBqS-rE6hd0qmw"
 uri = "file://Cost_Analysis_App_User_Guide.pdf"
 type = "pdf"
 title = "Cost Analysis Per Container — Complete User Guide"
+
+[[outputs]]
+id = "5opPWsMBvwe_IBMbqwQU4"
+uri = "file://Cost_Analysis_Per_Container_Full_Guide.pdf"
+type = "pdf"
+title = "Cost Analysis Per Container — Full System Guide"
