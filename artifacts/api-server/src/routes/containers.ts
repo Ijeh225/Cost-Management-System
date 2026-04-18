@@ -595,6 +595,17 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       res.status(400).json({ error: "No valid fields to update" });
       return;
     }
+    const finalDueDate = "nextActionDueDate" in updates
+      ? (updates.nextActionDueDate as Date | null)
+      : existing.nextActionDueDate;
+    const finalDelayReason = "delayReason" in updates
+      ? (updates.delayReason as string | null)
+      : existing.delayReason;
+    const isActiveStatus = !["completed", "closed"].includes(existing.status);
+    if (isActiveStatus && finalDueDate instanceof Date && finalDueDate < new Date() && !finalDelayReason) {
+      res.status(400).json({ error: "Delay Reason is required when the Next Action Due Date is overdue" });
+      return;
+    }
     const [updated] = await db.update(containersTable).set(updates).where(eq(containersTable.id, id)).returning();
     const reasons: string[] = [];
     if (deliveredAt !== undefined) reasons.push(deliveredAt ? `Delivery date set to ${deliveredAt}` : "Delivery date cleared");

@@ -1031,6 +1031,12 @@ export default function ContainerDetail() {
   };
 
   const handleSaveStageControl = () => {
+    const dueDateObj = scDueDate ? new Date(scDueDate) : null;
+    const isOverdueInput = dueDateObj !== null && dueDateObj < new Date() && !["completed", "closed"].includes(container.status);
+    if (isOverdueInput && !scDelayReason.trim()) {
+      toast({ variant: "destructive", title: "Delay Reason required", description: "Please explain why this action is overdue before saving." });
+      return;
+    }
     updateStageControl.mutate(
       {
         id: containerId,
@@ -1448,13 +1454,23 @@ export default function ContainerDetail() {
                           />
                         </div>
                         <div>
-                          <Label className="text-[10px] text-muted-foreground mb-1 block">Delay Reason</Label>
-                          <Input
-                            value={scDelayReason}
-                            onChange={e => setScDelayReason(e.target.value)}
-                            placeholder="e.g. Awaiting customs valuation"
-                            className="h-7 text-xs border-border/60"
-                          />
+                          {(() => {
+                            const d = scDueDate ? new Date(scDueDate) : null;
+                            const needsReason = d !== null && d < new Date() && !["completed", "closed"].includes(container.status);
+                            return (
+                              <>
+                                <Label className={`text-[10px] mb-1 block ${needsReason ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+                                  Delay Reason{needsReason ? " *required (overdue)" : ""}
+                                </Label>
+                                <Input
+                                  value={scDelayReason}
+                                  onChange={e => setScDelayReason(e.target.value)}
+                                  placeholder="e.g. Awaiting customs valuation"
+                                  className={`h-7 text-xs ${needsReason && !scDelayReason.trim() ? "border-destructive" : "border-border/60"}`}
+                                />
+                              </>
+                            );
+                          })()}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <Button size="sm" className="h-7 text-xs px-2 gap-1" onClick={handleSaveStageControl} disabled={updateStageControl.isPending}>

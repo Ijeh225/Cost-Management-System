@@ -61,7 +61,7 @@ export function useUpdateStageControl() {
     onSuccess: (_data, { id }) => {
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
-      qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
