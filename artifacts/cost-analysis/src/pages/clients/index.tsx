@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -152,6 +152,9 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="w-5 h-5 text-primary" /> New Client
           </DialogTitle>
+          <DialogDescription>
+            Enter the client company details below. Fields marked with * are required.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 pt-2">
           <div className="space-y-1">
@@ -300,6 +303,9 @@ function BulkUploadDialog({ open, onClose }: { open: boolean; onClose: () => voi
           <DialogTitle className="flex items-center gap-2">
             <Upload className="w-5 h-5 text-primary" /> Bulk Upload Clients
           </DialogTitle>
+          <DialogDescription>
+            Upload an Excel file with multiple client records. Download the template for the correct format.
+          </DialogDescription>
         </DialogHeader>
 
         {result ? (

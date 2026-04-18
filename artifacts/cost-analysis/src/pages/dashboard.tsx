@@ -3,8 +3,6 @@ import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useG
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -12,12 +10,12 @@ import {
 } from "recharts";
 import {
   Box, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity,
-  FileText, Search, CheckCircle2, ArrowRight, ClipboardCheck, ListTodo,
+  FileText, CheckCircle2, ArrowRight, ClipboardCheck, ListTodo,
   Brain, ShieldAlert, Clock, ExternalLink, X, ChevronDown, ChevronUp,
   Wallet, CreditCard, ReceiptText,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 
 const COLORS = [
@@ -264,8 +262,6 @@ function StatCard({ title, value, icon: Icon, isCurrency = false, colorClass = "
 }
 
 export default function Dashboard() {
-  const [, setLocation] = useLocation();
-  const [searchInput, setSearchInput] = useState("");
   const { isAdmin } = useAuth();
 
   const { data: stats, isLoading, isError } = useGetDashboardStats();
@@ -273,14 +269,6 @@ export default function Dashboard() {
   const { data: recentData, isLoading: recentLoading } = useListContainers(
     { page: 1, limit: 5 }
   );
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchInput.trim()) {
-      sessionStorage.setItem("containerSearch", searchInput.trim());
-      setLocation("/containers");
-    }
-  };
 
   if (isLoading) {
     return (
@@ -324,20 +312,6 @@ export default function Dashboard() {
           <AlertBeacon />
         </div>
 
-        <form onSubmit={handleSearch} className="flex items-center gap-2 w-full sm:max-w-sm">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Quick search containers…"
-              className="pl-9 bg-background border-border/60"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-          </div>
-          <Button type="submit" variant="secondary" size="sm" className="shrink-0 hover-elevate">
-            Search
-          </Button>
-        </form>
       </div>
 
       {/* 9 KPI Cards */}

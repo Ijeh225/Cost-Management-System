@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { GlobalSearch } from "./global-search";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -54,7 +55,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </h2>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <GlobalSearch />
+              <div className="h-6 w-px bg-border/50"></div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:ring-2 ring-primary/50 transition-all">

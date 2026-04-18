@@ -6,3 +6,4 @@ export * from "./invoices";
 export * from "./containers";
 export * from "./reports";
 export * from "./notifications";
+export * from "./search";
