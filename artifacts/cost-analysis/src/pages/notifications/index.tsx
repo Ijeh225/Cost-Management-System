@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import {
-  useGetNotifications, useMarkAllNotificationsRead, useMarkNotificationsViewed,
+  useGetNotifications, useMarkAllNotificationsRead, useMarkNotificationRead,
   type Notification,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,24 +16,24 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Bell, BellOff, AlertTriangle, TrendingDown, DollarSign,
   Clock, ShieldAlert, ListTodo, Activity, CheckCheck,
-  ExternalLink, Loader2, RefreshCw, XCircle,
+  ExternalLink, Loader2, RefreshCw, XCircle, Check,
 } from "lucide-react";
 
 const ALERT_CONFIG: Record<string, { icon: any; color: string; bg: string; border: string; label: string }> = {
-  negative_profit:  { icon: TrendingDown, color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Negative Profit"   },
-  low_margin:       { icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Low Profit Margin" },
-  high_terminal:    { icon: DollarSign,   color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "High Terminal Cost"},
-  high_delivery:    { icon: DollarSign,   color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "High Delivery Cost"},
-  unpaid_duty:      { icon: DollarSign,   color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20", label: "Unpaid Duty"       },
-  delayed:          { icon: Clock,        color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "Delayed Container" },
-  aging_warn:       { icon: Clock,        color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "Clearing Delay"    },
-  aging_high:       { icon: Clock,        color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Long Delay"        },
-  aging_critical:   { icon: Clock,        color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Critical Delay"    },
-  inactive:         { icon: Activity,     color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "No Activity"       },
-  overdue_task:     { icon: ListTodo,     color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Overdue Task"      },
-  stale_approval:   { icon: ShieldAlert,  color: "text-violet-400", bg: "bg-violet-400/10", border: "border-violet-400/20", label: "Stale Approval"    },
-  rejected_section: { icon: XCircle,      color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Section Rejected"  },
-  action_overdue:   { icon: ShieldAlert,  color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Action Overdue"    },
+  negative_profit:  { icon: TrendingDown,  color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Negative Profit"    },
+  low_margin:       { icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Low Profit Margin"  },
+  high_terminal:    { icon: DollarSign,    color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "High Terminal Cost" },
+  high_delivery:    { icon: DollarSign,    color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "High Delivery Cost" },
+  unpaid_duty:      { icon: DollarSign,    color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20", label: "Unpaid Duty"        },
+  delayed:          { icon: Clock,         color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "Delayed Container"  },
+  aging_warn:       { icon: Clock,         color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "Clearing Delay"     },
+  aging_high:       { icon: Clock,         color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Long Delay"         },
+  aging_critical:   { icon: Clock,         color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Critical Delay"     },
+  inactive:         { icon: Activity,      color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "No Activity"        },
+  overdue_task:     { icon: ListTodo,      color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Overdue Task"       },
+  stale_approval:   { icon: ShieldAlert,   color: "text-violet-400", bg: "bg-violet-400/10", border: "border-violet-400/20", label: "Stale Approval"     },
+  rejected_section: { icon: XCircle,       color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Section Rejected"   },
+  action_overdue:   { icon: ShieldAlert,   color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Action Overdue"     },
 };
 
 const SEVERITY_CONFIG: Record<string, { label: string; className: string }> = {
@@ -51,13 +51,24 @@ function NotificationRow({ notif }: { notif: Notification }) {
   const cfg = ALERT_CONFIG[notif.type] ?? ALERT_CONFIG.low_margin;
   const sev = SEVERITY_CONFIG[notif.severity] ?? SEVERITY_CONFIG.info;
   const Icon = cfg.icon;
+  const markRead = useMarkNotificationRead();
+
+  const handleMarkRead = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!notif.isRead) {
+      markRead.mutate({ alertKey: notif.alertKey });
+    }
+  };
 
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors ${notif.isRead ? "opacity-60" : "bg-primary/[0.02]"}`}
+      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors ${
+        notif.isRead ? "opacity-55 hover:opacity-70" : "bg-primary/[0.025] hover:bg-primary/[0.04]"
+      }`}
     >
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border} border`}>
         <Icon className={`w-4 h-4 ${cfg.color}`} />
@@ -68,10 +79,26 @@ function NotificationRow({ notif }: { notif: Notification }) {
             <span className="text-xs font-semibold text-foreground">{cfg.label}</span>
             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${sev.className}`}>{sev.label}</Badge>
             {!notif.isRead && (
-              <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-primary shrink-0" aria-label="Unread" />
             )}
           </div>
-          <span className="text-[11px] text-muted-foreground shrink-0">{formatTime(notif.generatedAt)}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] text-muted-foreground">{formatTime(notif.generatedAt)}</span>
+            {!notif.isRead && (
+              <button
+                onClick={handleMarkRead}
+                disabled={markRead.isPending}
+                title="Mark as read"
+                className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground"
+              >
+                {markRead.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Check className="w-3 h-3" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
         {notif.containerId && (
@@ -99,19 +126,10 @@ export default function NotificationsPage() {
     query: { refetchInterval: 60_000 },
   });
 
-  const markViewed = useMarkNotificationsViewed();
   const markAll = useMarkAllNotificationsRead();
 
   const notifications: Notification[] = data?.notifications ?? [];
   const unreadCount: number = data?.unreadCount ?? 0;
-
-  useEffect(() => {
-    if (!isLoading && notifications.length > 0) {
-      markViewed.mutate(undefined, {
-        onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
-      });
-    }
-  }, [isLoading]);
 
   const filtered = notifications.filter(n => {
     if (filter === "unread" && n.isRead) return false;
@@ -173,7 +191,6 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
           {(["all", "unread", "read"] as const).map(f => (
@@ -202,7 +219,6 @@ export default function NotificationsPage() {
         </Select>
       </div>
 
-      {/* List */}
       <Card className="border-border/50 bg-card/40 overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">

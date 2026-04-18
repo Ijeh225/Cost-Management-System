@@ -36,7 +36,8 @@ intelligenceRouter.get("/intelligence/alerts", requireAuth, async (req: AuthRequ
       const deliveryCost = sumDelivery(d);
       const dutyNotPaid = parseFloat(cu.dutyNotPaid ?? "0");
       const nextActionDueDate = c.nextActionDueDate ? new Date(c.nextActionDueDate) : null;
-      const isActionOverdue = nextActionDueDate !== null && nextActionDueDate < new Date() && !["completed", "closed"].includes(c.status);
+      const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
+      const isActionOverdue = nextActionDueDate !== null && nextActionDueDate.getTime() < startOfToday.getTime() && !["completed", "closed"].includes(c.status);
       return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue };
     });
 

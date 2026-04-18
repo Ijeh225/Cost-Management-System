@@ -1032,7 +1032,8 @@ export default function ContainerDetail() {
 
   const handleSaveStageControl = () => {
     const dueDateObj = scDueDate ? new Date(scDueDate) : null;
-    const isOverdueInput = dueDateObj !== null && dueDateObj < new Date() && !["completed", "closed"].includes(container.status);
+    const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
+    const isOverdueInput = dueDateObj !== null && dueDateObj.getTime() < startOfToday.getTime() && !["completed", "closed"].includes(container.status);
     if (isOverdueInput && !scDelayReason.trim()) {
       toast({ variant: "destructive", title: "Delay Reason required", description: "Please explain why this action is overdue before saving." });
       return;
@@ -1413,9 +1414,9 @@ export default function ContainerDetail() {
 
           {/* Stage Control */}
           {(() => {
-            const now = new Date();
+            const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
             const dueDate = container.nextActionDueDate ? new Date(container.nextActionDueDate) : null;
-            const isOverdue = dueDate !== null && dueDate < now && !["completed", "closed"].includes(container.status);
+            const isOverdue = dueDate !== null && dueDate.getTime() < startOfToday.getTime() && !["completed", "closed"].includes(container.status);
             return (
               <div className="border-t border-border/30 pt-4 flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 flex-1 min-w-0">

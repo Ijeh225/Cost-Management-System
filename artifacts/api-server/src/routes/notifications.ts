@@ -47,7 +47,8 @@ async function computeAlerts(userId?: number) {
     const dutyNotPaid = parseFloat(cu.dutyNotPaid ?? "0");
     const ageDays = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24));
     const nextActionDueDate = c.nextActionDueDate ? new Date(c.nextActionDueDate) : null;
-    const isActionOverdue = nextActionDueDate !== null && nextActionDueDate < new Date() && !["completed", "closed"].includes(c.status);
+    const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
+    const isActionOverdue = nextActionDueDate !== null && nextActionDueDate.getTime() < startOfToday.getTime() && !["completed", "closed"].includes(c.status);
     return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue };
   });
 

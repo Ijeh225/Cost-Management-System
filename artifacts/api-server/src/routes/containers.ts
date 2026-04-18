@@ -583,6 +583,12 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       if (prev !== (nextAction || null)) changed.push(`Next Action: "${prev ?? "—"}" → "${nextAction || "—"}"`);
     }
     if (nextActionDueDate !== undefined) {
+      if (nextActionDueDate !== null && nextActionDueDate !== "") {
+        if (typeof nextActionDueDate !== "string" || isNaN(new Date(nextActionDueDate as string).getTime())) {
+          res.status(400).json({ error: "Invalid nextActionDueDate — expected ISO 8601 date format" });
+          return;
+        }
+      }
       updates.nextActionDueDate = nextActionDueDate ? new Date(nextActionDueDate as string) : null;
       changed.push("Next Action Due Date updated");
     }
@@ -602,7 +608,8 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       ? (updates.delayReason as string | null)
       : existing.delayReason;
     const isActiveStatus = !["completed", "closed"].includes(existing.status);
-    if (isActiveStatus && finalDueDate instanceof Date && finalDueDate < new Date() && !finalDelayReason) {
+    const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
+    if (isActiveStatus && finalDueDate instanceof Date && finalDueDate.getTime() < startOfToday.getTime() && !finalDelayReason) {
       res.status(400).json({ error: "Delay Reason is required when the Next Action Due Date is overdue" });
       return;
     }
