@@ -46,7 +46,9 @@ async function computeAlerts(userId?: number) {
     const deliveryCost = sumDelivery(d);
     const dutyNotPaid = parseFloat(cu.dutyNotPaid ?? "0");
     const ageDays = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays };
+    const nextActionDueDate = c.nextActionDueDate ? new Date(c.nextActionDueDate) : null;
+    const isActionOverdue = nextActionDueDate !== null && nextActionDueDate < new Date() && !["completed", "closed"].includes(c.status);
+    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue };
   });
 
   const totals = containerData.reduce((acc, c) => ({ terminal: acc.terminal + c.terminalCost, delivery: acc.delivery + c.deliveryCost }), { terminal: 0, delivery: 0 });

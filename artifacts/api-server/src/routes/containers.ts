@@ -347,6 +347,8 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       status: containersTable.status,
       updatedAt: containersTable.updatedAt,
       assignedStaffName: usersTable.name,
+      stageOwner: containersTable.stageOwner,
+      nextActionDueDate: containersTable.nextActionDueDate,
     })
       .from(containersTable)
       .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id));
@@ -360,6 +362,8 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       updatedAt: string;
       daysInStage: number;
       assignedStaffName: string | null;
+      stageOwnerName: string | null;
+      nextActionDueAt: string | null;
     }>> = {};
 
     for (const c of rows) {
@@ -376,6 +380,8 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
         updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : String(c.updatedAt),
         daysInStage,
         assignedStaffName: c.assignedStaffName ?? null,
+        stageOwnerName: c.stageOwner ?? null,
+        nextActionDueAt: c.nextActionDueDate instanceof Date ? c.nextActionDueDate.toISOString() : (c.nextActionDueDate ?? null),
       });
     }
 
@@ -415,7 +421,7 @@ router.patch("/containers/:id/status", requireAdmin, async (req: AuthRequest, re
     }
     const nextStatus = PIPELINE_STAGE_ORDER[currentIdx + 1];
     const [updated] = await db.update(containersTable)
-      .set({ status: nextStatus, updatedAt: new Date() })
+      .set({ status: nextStatus, updatedAt: new Date(), nextAction: null, nextActionDueDate: null })
       .where(eq(containersTable.id, id))
       .returning();
     await db.insert(auditLogTable).values({
@@ -553,7 +559,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       res.status(404).json({ error: "Container not found" });
       return;
     }
-    const { deliveredAt } = req.body;
+    const { deliveredAt, stageOwner, nextAction, nextActionDueDate, delayReason } = req.body;
     if (deliveredAt !== undefined && deliveredAt !== null) {
       if (typeof deliveredAt !== "string" || !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(deliveredAt) || isNaN(new Date(deliveredAt).getTime())) {
         res.status(400).json({ error: "Invalid deliveredAt — expected YYYY-MM-DD format" });
@@ -565,17 +571,40 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       updates.deliveredAt = deliveredAt ? new Date(deliveredAt as string) : null;
       updates.deliveredAtEstimated = false;
     }
+    const changed: string[] = [];
+    if (stageOwner !== undefined) {
+      const prev = existing.stageOwner ?? null;
+      updates.stageOwner = stageOwner || null;
+      if (prev !== (stageOwner || null)) changed.push(`Stage Owner: "${prev ?? "—"}" → "${stageOwner || "—"}"`);
+    }
+    if (nextAction !== undefined) {
+      const prev = existing.nextAction ?? null;
+      updates.nextAction = nextAction || null;
+      if (prev !== (nextAction || null)) changed.push(`Next Action: "${prev ?? "—"}" → "${nextAction || "—"}"`);
+    }
+    if (nextActionDueDate !== undefined) {
+      updates.nextActionDueDate = nextActionDueDate ? new Date(nextActionDueDate as string) : null;
+      changed.push("Next Action Due Date updated");
+    }
+    if (delayReason !== undefined) {
+      const prev = existing.delayReason ?? null;
+      updates.delayReason = delayReason || null;
+      if (prev !== (delayReason || null)) changed.push(`Delay Reason: "${prev ?? "—"}" → "${delayReason || "—"}"`);
+    }
     if (Object.keys(updates).length === 1) {
       res.status(400).json({ error: "No valid fields to update" });
       return;
     }
     const [updated] = await db.update(containersTable).set(updates).where(eq(containersTable.id, id)).returning();
+    const reasons: string[] = [];
+    if (deliveredAt !== undefined) reasons.push(deliveredAt ? `Delivery date set to ${deliveredAt}` : "Delivery date cleared");
+    reasons.push(...changed);
     await db.insert(auditLogTable).values({
       containerId: id,
       userId: req.user!.id,
       action: "update_container",
       section: "basic_info",
-      reason: deliveredAt ? `Delivery date set to ${deliveredAt}` : "Delivery date cleared",
+      reason: reasons.join("; ") || "Container updated",
     });
     res.json(formatContainer(updated));
   } catch (err) {

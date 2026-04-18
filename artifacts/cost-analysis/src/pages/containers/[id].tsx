@@ -11,7 +11,7 @@ import {
   type CustomSectionWithFields, type CustomField,
   useGetSettings, BUILT_IN_SECTION_DEFAULTS,
   getBuiltInFieldLabel, isBuiltInFieldHidden,
-  useAddTimelineEvent, useUpdateDeliveredAt,
+  useAddTimelineEvent, useUpdateDeliveredAt, useUpdateStageControl,
   useGetContainerExtraCharges, useCreateContainerExtraCharge,
   useUpdateContainerExtraCharge, useDeleteContainerExtraCharge,
   useReorderContainerExtraCharges,
@@ -834,6 +834,11 @@ export default function ContainerDetail() {
   const [linkingClient, setLinkingClient] = useState(false);
   const [editingDeliveredAt, setEditingDeliveredAt] = useState(false);
   const [deliveredAtInput, setDeliveredAtInput] = useState("");
+  const [editingStageControl, setEditingStageControl] = useState(false);
+  const [scOwner, setScOwner] = useState("");
+  const [scNextAction, setScNextAction] = useState("");
+  const [scDueDate, setScDueDate] = useState("");
+  const [scDelayReason, setScDelayReason] = useState("");
   const [editSectionsOpen, setEditSectionsOpen] = useState(false);
   const [invoiceDialog, setInvoiceDialog] = useState(false);
   const [showEditDetails, setShowEditDetails] = useState(false);
@@ -862,6 +867,7 @@ export default function ContainerDetail() {
   });
   const addTimelineEvent = useAddTimelineEvent();
   const updateDeliveredAt = useUpdateDeliveredAt();
+  const updateStageControl = useUpdateStageControl();
   const { data: customSectionsRaw } = useGetCustomSections({ containerId });
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
   const { data: sectionSettings } = useGetSettings();
@@ -1011,6 +1017,35 @@ export default function ContainerDetail() {
         },
         onError: (err) => {
           toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Could not save delivery date" });
+        },
+      }
+    );
+  };
+
+  const handleOpenStageControl = () => {
+    setScOwner(container.stageOwner ?? "");
+    setScNextAction(container.nextAction ?? "");
+    setScDueDate(container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : "");
+    setScDelayReason(container.delayReason ?? "");
+    setEditingStageControl(true);
+  };
+
+  const handleSaveStageControl = () => {
+    updateStageControl.mutate(
+      {
+        id: containerId,
+        stageOwner: scOwner || null,
+        nextAction: scNextAction || null,
+        nextActionDueDate: scDueDate || null,
+        delayReason: scDelayReason || null,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Stage control saved." });
+          setEditingStageControl(false);
+        },
+        onError: (err: Error) => {
+          toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Could not save stage control" });
         },
       }
     );
@@ -1369,6 +1404,111 @@ export default function ContainerDetail() {
               </div>
             )}
           </div>
+
+          {/* Stage Control */}
+          {(() => {
+            const now = new Date();
+            const dueDate = container.nextActionDueDate ? new Date(container.nextActionDueDate) : null;
+            const isOverdue = dueDate !== null && dueDate < now && !["completed", "closed"].includes(container.status);
+            return (
+              <div className="border-t border-border/30 pt-4 flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <ShieldCheck className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-mono text-muted-foreground uppercase mb-2">Stage Control</p>
+                    {editingStageControl ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground mb-1 block">Stage Owner</Label>
+                            <Input
+                              value={scOwner}
+                              onChange={e => setScOwner(e.target.value)}
+                              placeholder="e.g. John Doe"
+                              className="h-7 text-xs border-border/60"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground mb-1 block">Next Action Due Date</Label>
+                            <Input
+                              type="date"
+                              value={scDueDate}
+                              onChange={e => setScDueDate(e.target.value)}
+                              className="h-7 text-xs border-border/60"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground mb-1 block">Next Action</Label>
+                          <Input
+                            value={scNextAction}
+                            onChange={e => setScNextAction(e.target.value)}
+                            placeholder="e.g. Submit SON certificate to terminal"
+                            className="h-7 text-xs border-border/60"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground mb-1 block">Delay Reason</Label>
+                          <Input
+                            value={scDelayReason}
+                            onChange={e => setScDelayReason(e.target.value)}
+                            placeholder="e.g. Awaiting customs valuation"
+                            className="h-7 text-xs border-border/60"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Button size="sm" className="h-7 text-xs px-2 gap-1" onClick={handleSaveStageControl} disabled={updateStageControl.isPending}>
+                            {updateStageControl.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditingStageControl(false)}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                        <div>
+                          <span className="text-[10px] text-muted-foreground/70 block">Owner</span>
+                          <span className={container.stageOwner ? "text-foreground font-medium" : "text-muted-foreground/50 italic text-xs"}>
+                            {container.stageOwner || "Not assigned"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground/70 block">Due Date</span>
+                          <span className={`font-medium ${isOverdue ? "text-destructive" : dueDate ? "text-amber-400" : "text-muted-foreground/50 italic text-xs"}`}>
+                            {dueDate
+                              ? dueDate.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })
+                              : "Not set"}
+                            {isOverdue && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wider">OVERDUE</span>}
+                          </span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-[10px] text-muted-foreground/70 block">Next Action</span>
+                          <span className={container.nextAction ? "text-foreground" : "text-muted-foreground/50 italic text-xs"}>
+                            {container.nextAction || "None recorded"}
+                          </span>
+                        </div>
+                        {container.delayReason && (
+                          <div className="col-span-2">
+                            <span className="text-[10px] text-muted-foreground/70 block">Delay Reason</span>
+                            <span className="text-amber-400 text-xs">{container.delayReason}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {!editingStageControl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs shrink-0"
+                    onClick={handleOpenStageControl}
+                  >
+                    <Pencil className="w-3 h-3" /> Edit Control
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

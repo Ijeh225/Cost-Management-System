@@ -118,6 +118,10 @@ export interface Container {
   clientName?: string | null;
   deliveredAt?: string | null;
   deliveredAtEstimated?: boolean;
+  stageOwner?: string | null;
+  nextAction?: string | null;
+  nextActionDueDate?: string | null;
+  delayReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -151,6 +155,10 @@ export interface UpdateContainerRequest {
   assignedStaffId?: number | null;
   clearingCharges?: number;
   deliveredAt?: string | null;
+  stageOwner?: string | null;
+  nextAction?: string | null;
+  nextActionDueDate?: string | null;
+  delayReason?: string | null;
 }
 
 export interface UploadRow {

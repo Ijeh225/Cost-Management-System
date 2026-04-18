@@ -168,7 +168,7 @@ export default function Containers() {
     </th>
   );
 
-  const colSpan = isAdmin ? 10 : 9;
+  const colSpan = isAdmin ? 11 : 10;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -300,6 +300,7 @@ export default function Containers() {
                 <th className="px-4 py-3 font-medium text-left">Vessel / Size</th>
                 <th className="px-4 py-3 font-medium text-left">Shipping Line</th>
                 <Th field="status"          label="Status" />
+                <th className="px-4 py-3 font-medium text-left">Control</th>
                 <Th field="clearingCharges" label="Clearing Charges" right />
                 <Th field="totalCost"       label="Total Cost" right />
                 <Th field="grossProfit"     label="Gross Profit" right />
@@ -401,6 +402,28 @@ export default function Containers() {
                           </span>
                           <AgingBadge createdAt={container.createdAt} status={container.status} />
                         </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {(() => {
+                          const dueDate = container.nextActionDueDate ? new Date(container.nextActionDueDate) : null;
+                          const isOverdue = dueDate !== null && dueDate < new Date() && !["completed", "closed"].includes(container.status);
+                          return (
+                            <div className="space-y-1">
+                              {container.stageOwner ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-primary/10 text-primary border border-primary/20 max-w-[120px] truncate block">
+                                  {container.stageOwner}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground/40 text-xs italic">—</span>
+                              )}
+                              {dueDate && (
+                                <span className={`text-[10px] font-mono ${isOverdue ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+                                  {isOverdue ? "⚠ " : ""}{dueDate.toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-4 text-right">
                         <span className="font-mono text-sm text-foreground">{formatCurrency(container.clearingCharges)}</span>

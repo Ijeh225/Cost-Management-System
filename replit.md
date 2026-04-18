@@ -12,10 +12,13 @@ Key capabilities include:
 - Detailed audit trails with field-level change tracking.
 - Advanced reporting and analytics features, including profit intelligence alerts.
 - Full invoice and payment tracking, including multi-container invoicing and WhatsApp integration for client communication.
-- Client management with financial summaries and receivables tracking.
+- Client management with financial summaries and receivables tracking. Clients page supports Add One / Bulk Upload (Excel) / Download Template.
 - Custom section and field builder for administrative flexibility.
 - Delivery tracking: admins can record/edit physical delivery dates per container; estimated flag shown for auto-backfilled dates.
 - Delivery Report: `/reports` page shows an interactive delivery tracking section with date-range filtering, stat cards (count, revenue, avg days), breakdown table, and a printable report at `/reports/delivery-report/print`.
+- Notifications page (`/notifications`): persistent smart alerts with unread/read tracking (notificationsReadTable), Bell icon in sidebar with live unread badge; alerts for negative profit, low margin, high terminal/delivery cost, unpaid duty, aging delays, inactivity, overdue tasks, and overdue next actions.
+- Stage Control Engine: four accountability fields added to each container — Stage Owner, Next Action, Next Action Due Date, Delay Reason. Editable from the container detail Hero card (ShieldCheck icon). Containers list shows a "Control" column with owner badge + overdue date warning. Operations pipeline board shows stageOwnerName and nextActionDueAt on each card. When a container advances stage, nextAction and nextActionDueDate are automatically cleared. Overdue next actions generate `action_overdue` notifications.
+- Upload page: supports two modes — general upload (no client link) and customer-linked upload (passes clientId to associate containers with a client on creation).
 
 The project's vision is to offer a complete solution for logistics companies to manage their container clearing operations efficiently, gain insights into profitability, and improve client communication.
 
