@@ -11,17 +11,20 @@ function canUserEditSection(
   section: string
 ): boolean {
   if (user.role === "admin") return true;
+  // Granular permissions: only explicit "edit" level grants write access ("view" and "no_access" do not)
   if (user.sectionPermissions) {
     try {
       const perms = JSON.parse(user.sectionPermissions) as Record<string, string>;
       if (Object.keys(perms).length > 0) {
-        return (perms[section] ?? "no_access") !== "no_access";
+        return perms[section] === "edit";
       }
     } catch {}
   }
+  // Legacy single-section permission: staff can only edit their assigned section
   if (user.sectionPermission) {
     return user.sectionPermission === section;
   }
+  // No permission restrictions configured: allow (matches PUT /charges behavior for unrestricted staff)
   return true;
 }
 
