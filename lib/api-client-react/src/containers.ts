@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
-import type { DeliveryReportResponse } from "./generated/api.schemas";
 
 export type PipelineContainer = {
   id: number;
@@ -172,18 +171,3 @@ export function useDeleteContainerExtraCharge(containerId: number) {
   });
 }
 
-export function useGetDeliveryReport(
-  from?: string,
-  to?: string,
-  options?: { query?: { enabled?: boolean } }
-) {
-  const params = new URLSearchParams();
-  if (from) params.set("from", from);
-  if (to) params.set("to", to);
-  const qs = params.toString();
-  return useQuery<DeliveryReportResponse>({
-    queryKey: ["analytics", "deliveries", from, to],
-    queryFn: () => customFetch<DeliveryReportResponse>(`/api/analytics/deliveries${qs ? `?${qs}` : ""}`),
-    enabled: options?.query?.enabled,
-  });
-}

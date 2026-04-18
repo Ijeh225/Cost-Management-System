@@ -1,4 +1,4 @@
-import { useGetDeliveryReport } from "@workspace/api-client-react";
+import { useGetDeliveryAnalytics } from "@workspace/api-client-react";
 
 const fmt = (n: number) =>
   "\u20a6" + Number(n).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -17,7 +17,7 @@ function useQueryParams() {
 
 export default function DeliveryReportPrint() {
   const { from, to } = useQueryParams();
-  const { data, isLoading, isError } = useGetDeliveryReport(from, to);
+  const { data, isLoading, isError } = useGetDeliveryAnalytics({ from, to });
 
   if (isLoading) {
     return (

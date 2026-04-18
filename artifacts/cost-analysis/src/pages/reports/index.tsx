@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useGetContainerReport, useListClients, useGetDeliveryReport } from "@workspace/api-client-react";
+import { useGetContainerReport, useListClients, useGetDeliveryAnalytics } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -404,9 +404,8 @@ function DeliveryReportSection() {
   const [applied, setApplied] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [generated, setGenerated] = useState(false);
 
-  const { data, isLoading } = useGetDeliveryReport(
-    generated ? applied.from || undefined : undefined,
-    generated ? applied.to || undefined : undefined,
+  const { data, isLoading } = useGetDeliveryAnalytics(
+    generated ? { from: applied.from || undefined, to: applied.to || undefined } : undefined,
     { query: { enabled: generated } }
   );
 

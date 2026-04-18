@@ -145,7 +145,6 @@ function Router() {
               <Route path="/containers/upload" component={UploadPage} />
               <Route path="/containers/:id" component={ContainerDetail} />
               <Route path="/users" component={Users} />
-              <Route path="/upload" component={UploadPage} />
               <Route path="/approvals" component={ApprovalsPage} />
               <Route path="/my-tasks" component={MyTasksPage} />
               <Route path="/analytics">
