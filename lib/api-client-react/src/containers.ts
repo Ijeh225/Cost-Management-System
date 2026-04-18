@@ -102,6 +102,8 @@ export type DeliveryExecutionFields = {
   offloadingConfirmed?: boolean;
   emptyReturnDueDate?: string | null;
   emptyReturnDate?: string | null;
+  deliveredAt?: string | null;
+  deliveredAtEstimated?: boolean;
 };
 
 export function useUpdateDeliveryExecution() {

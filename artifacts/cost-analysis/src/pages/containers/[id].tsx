@@ -846,6 +846,7 @@ export default function ContainerDetail() {
     deliveryTime: "", deliveryLocation: "", truckNumber: "", driverName: "",
     driverPhone: "", dispatchOfficer: "", deliveryStatus: "pending" as "pending" | "in_transit" | "delivered",
     offloadingConfirmed: false, emptyReturnDueDate: "", emptyReturnDate: "",
+    deliveredAt: "", deliveredAtEstimated: false,
   });
   const [editSectionsOpen, setEditSectionsOpen] = useState(false);
   const [invoiceDialog, setInvoiceDialog] = useState(false);
@@ -1079,6 +1080,8 @@ export default function ContainerDetail() {
       offloadingConfirmed: container.offloadingConfirmed ?? false,
       emptyReturnDueDate: container.emptyReturnDueDate ? container.emptyReturnDueDate.slice(0, 10) : "",
       emptyReturnDate: container.emptyReturnDate ? container.emptyReturnDate.slice(0, 10) : "",
+      deliveredAt: container.deliveredAt ? container.deliveredAt.slice(0, 10) : "",
+      deliveredAtEstimated: container.deliveredAtEstimated ?? false,
     });
     setEditingDeliveryExec(true);
   };
@@ -1097,6 +1100,8 @@ export default function ContainerDetail() {
         offloadingConfirmed: dex.offloadingConfirmed,
         emptyReturnDueDate: dex.emptyReturnDueDate || null,
         emptyReturnDate: dex.emptyReturnDate || null,
+        deliveredAt: dex.deliveredAt || null,
+        deliveredAtEstimated: dex.deliveredAtEstimated,
       },
       {
         onSuccess: () => {
@@ -1673,6 +1678,17 @@ export default function ContainerDetail() {
                 <Switch checked={dex.offloadingConfirmed} onCheckedChange={v => setDex(d => ({ ...d, offloadingConfirmed: v }))} id="offloading-switch" />
                 <Label htmlFor="offloading-switch" className="text-xs cursor-pointer">Offloading Confirmed</Label>
               </div>
+              {/* Row 7: Delivery Date */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3" /> Delivery Date (Actual)</Label>
+                  <Input type="date" value={dex.deliveredAt} onChange={e => setDex(d => ({ ...d, deliveredAt: e.target.value }))} className="h-8 text-xs" />
+                </div>
+                <div className="flex items-center gap-3 pt-6">
+                  <Switch checked={dex.deliveredAtEstimated} onCheckedChange={v => setDex(d => ({ ...d, deliveredAtEstimated: v }))} id="delivered-estimated-switch" />
+                  <Label htmlFor="delivered-estimated-switch" className="text-xs cursor-pointer">Date is estimated</Label>
+                </div>
+              </div>
             </div>
           ) : (
             (() => {
@@ -1684,7 +1700,7 @@ export default function ContainerDetail() {
               };
               const statusLabel: Record<string, string> = { pending: "Pending", in_transit: "In Transit", delivered: "Delivered" };
               const ds = c.deliveryStatus ?? "pending";
-              const hasData = c.truckNumber || c.driverName || c.driverPhone || c.dispatchOfficer || c.deliveryLocation || c.deliveryTime || c.emptyReturnDueDate;
+              const hasData = c.truckNumber || c.driverName || c.driverPhone || c.dispatchOfficer || c.deliveryLocation || c.deliveryTime || c.emptyReturnDueDate || c.deliveredAt;
               return (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
@@ -1732,6 +1748,13 @@ export default function ContainerDetail() {
                           <Package className="w-3 h-3 shrink-0" />
                           <span>Empty return due: <span className={`font-medium ${c.emptyReturnDate ? "text-green-400" : new Date(c.emptyReturnDueDate) < new Date() ? "text-orange-400" : "text-foreground"}`}>{new Date(c.emptyReturnDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
                           {c.emptyReturnDate && <span className="text-green-400 font-medium">· Returned {new Date(c.emptyReturnDate).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</span>}
+                        </div>
+                      )}
+                      {c.deliveredAt && (
+                        <div className="col-span-2 flex items-center gap-1.5 text-muted-foreground">
+                          <CheckCircle2 className="w-3 h-3 shrink-0 text-green-400" />
+                          <span>Delivery date: <span className="font-medium text-foreground">{new Date(c.deliveredAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
+                          {c.deliveredAtEstimated && <span className="text-amber-400 text-[10px] border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">estimated</span>}
                         </div>
                       )}
                     </div>
