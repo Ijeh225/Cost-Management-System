@@ -10,6 +10,8 @@ export type PipelineContainer = {
   updatedAt: string;
   daysInStage: number;
   assignedStaffName: string | null;
+  stageOwnerName?: string | null;
+  nextActionDueAt?: string | null;
 };
 
 export type PipelineResponse = {
