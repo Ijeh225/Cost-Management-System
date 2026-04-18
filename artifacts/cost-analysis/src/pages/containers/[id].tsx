@@ -14,6 +14,7 @@ import {
   useAddTimelineEvent, useUpdateDeliveredAt,
   useGetContainerExtraCharges, useCreateContainerExtraCharge,
   useUpdateContainerExtraCharge, useDeleteContainerExtraCharge,
+  useReorderContainerExtraCharges,
   type ContainerExtraCharge,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -43,6 +44,7 @@ import {
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
   Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink, X,
   ClipboardCheck, ArrowRightCircle, PlusCircle, Truck, Plus, Trash2,
+  ChevronUp, ChevronDown,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
@@ -283,8 +285,17 @@ function ExtraLineItems({
   const createMutation = useCreateContainerExtraCharge(containerId);
   const updateMutation = useUpdateContainerExtraCharge(containerId);
   const deleteMutation = useDeleteContainerExtraCharge(containerId);
+  const reorderMutation = useReorderContainerExtraCharges(containerId);
 
   const rows = allExtra.filter(r => r.section === sectionKey);
+
+  const handleMove = (idx: number, dir: -1 | 1) => {
+    const newRows = [...rows];
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= newRows.length) return;
+    [newRows[idx], newRows[swapIdx]] = [newRows[swapIdx], newRows[idx]];
+    reorderMutation.mutate(newRows.map((r, i) => ({ id: r.id, sortOrder: i })));
+  };
 
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -334,7 +345,7 @@ function ExtraLineItems({
         )}
       </div>
       <div className="space-y-2">
-        {rows.map(row => (
+        {rows.map((row, idx) => (
           <div key={row.id} className="flex items-center gap-2">
             {editingId === row.id ? (
               <>
@@ -367,6 +378,28 @@ function ExtraLineItems({
               </>
             ) : (
               <>
+                {canEdit && rows.length > 1 && (
+                  <div className="flex flex-col gap-0.5 shrink-0">
+                    <button
+                      type="button"
+                      aria-label={`Move ${row.label} up`}
+                      disabled={idx === 0 || reorderMutation.isPending}
+                      onClick={() => handleMove(idx, -1)}
+                      className="h-4 w-4 flex items-center justify-center rounded text-muted-foreground/50 hover:text-muted-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${row.label} down`}
+                      disabled={idx === rows.length - 1 || reorderMutation.isPending}
+                      onClick={() => handleMove(idx, 1)}
+                      className="h-4 w-4 flex items-center justify-center rounded text-muted-foreground/50 hover:text-muted-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
                 <span className="flex-1 text-sm text-foreground/90">{row.label}</span>
                 <span className="font-mono text-sm text-primary">{formatCurrency(row.amount)}</span>
                 {canEdit && (

@@ -22,12 +22,17 @@ export default function ContainerPrintPage() {
   const clearingCharges = charges.clearingCharges ?? parseFloat(c.clearingCharges ?? "0");
   const grossProfit = charges.grossProfit ?? (clearingCharges - totalCost);
 
+  const extraCharges: Array<{ id: number; section: string; label: string; amount: number; sortOrder: number }> =
+    (c.extraCharges ?? []).slice().sort((a: any, b: any) =>
+      a.sortOrder !== b.sortOrder ? a.sortOrder - b.sortOrder : a.id - b.id
+    );
+
   const sectionData = [
-    { title: "Shipping Charges", data: charges.shipping ?? {} },
-    { title: "Customs Charges", data: charges.customs ?? {} },
-    { title: "Terminal Charges", data: charges.terminal ?? {} },
-    { title: "Delivery Charges", data: charges.delivery ?? {} },
-    { title: "Operations Charges", data: charges.operations ?? {} },
+    { title: "Shipping Charges",   key: "shipping",   data: charges.shipping   ?? {} },
+    { title: "Customs Charges",    key: "customs",    data: charges.customs    ?? {} },
+    { title: "Terminal Charges",   key: "terminal",   data: charges.terminal   ?? {} },
+    { title: "Delivery Charges",   key: "delivery",   data: charges.delivery   ?? {} },
+    { title: "Operations Charges", key: "operations", data: charges.operations ?? {} },
   ];
 
   const formatKey = (k: string) =>
@@ -122,11 +127,12 @@ export default function ContainerPrintPage() {
         </div>
 
         {/* Detailed Charges */}
-        {sectionData.map(({ title, data }) => {
+        {sectionData.map(({ title, key, data }) => {
           const entries = Object.entries(data).filter(([k, v]) =>
             !["id","containerId","updatedAt","createdAt"].includes(k) && v !== null && Number(v) !== 0
           );
-          if (entries.length === 0) return null;
+          const sectionExtras = extraCharges.filter(e => e.section === key);
+          if (entries.length === 0 && sectionExtras.length === 0) return null;
           return (
             <div key={title}>
               <div className="section-title">{title}</div>
@@ -136,6 +142,12 @@ export default function ContainerPrintPage() {
                     <tr key={k}>
                       <td>{formatKey(k)}</td>
                       <td>{formatCurrency(Number(v))}</td>
+                    </tr>
+                  ))}
+                  {sectionExtras.map(e => (
+                    <tr key={`extra-${e.id}`} style={{ borderTop: entries.length > 0 ? undefined : "none" }}>
+                      <td style={{ color: "#6366f1", fontStyle: "italic" }}>{e.label}</td>
+                      <td>{formatCurrency(e.amount)}</td>
                     </tr>
                   ))}
                 </tbody>

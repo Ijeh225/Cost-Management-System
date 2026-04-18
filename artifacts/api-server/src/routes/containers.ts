@@ -655,13 +655,14 @@ router.put("/containers/:id/extra-charges/:rowId", requireAuth, async (req: Auth
     let lockedSections: string[] = [];
     try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
     if (lockedSections.includes(existing.section)) return res.status(403).json({ error: `The ${existing.section} section is locked.` });
-    const updates: { label?: string; amount?: string } = {};
+    const updates: { label?: string; amount?: string; sortOrder?: number } = {};
     if (req.body.label !== undefined) {
       const trimmed = String(req.body.label).trim();
       if (!trimmed) return res.status(400).json({ error: "Label cannot be empty" });
       updates.label = trimmed;
     }
     if (req.body.amount !== undefined) updates.amount = (parseFloat(String(req.body.amount ?? 0)) || 0).toFixed(2);
+    if (req.body.sortOrder !== undefined) updates.sortOrder = parseInt(String(req.body.sortOrder));
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: "Nothing to update" });
     const [row] = await db.update(containerExtraChargesTable).set(updates)
       .where(eq(containerExtraChargesTable.id, rowId)).returning();

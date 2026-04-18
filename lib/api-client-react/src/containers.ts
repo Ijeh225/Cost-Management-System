@@ -124,7 +124,7 @@ export function useCreateContainerExtraCharge(containerId: number) {
 
 export function useUpdateContainerExtraCharge(containerId: number) {
   const qc = useQueryClient();
-  return useMutation<ContainerExtraCharge, Error, { rowId: number; label?: string; amount?: number }>({
+  return useMutation<ContainerExtraCharge, Error, { rowId: number; label?: string; amount?: number; sortOrder?: number }>({
     mutationFn: ({ rowId, ...data }) =>
       customFetch<ContainerExtraCharge>(`/api/containers/${containerId}/extra-charges/${rowId}`, {
         method: "PUT",
@@ -134,6 +134,26 @@ export function useUpdateContainerExtraCharge(containerId: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: EXTRA_CHARGES_KEY(containerId) });
       qc.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+    },
+  });
+}
+
+export function useReorderContainerExtraCharges(containerId: number) {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { id: number; sortOrder: number }[]>({
+    mutationFn: async (items) => {
+      await Promise.all(
+        items.map(({ id, sortOrder }) =>
+          customFetch(`/api/containers/${containerId}/extra-charges/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sortOrder }),
+          })
+        )
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: EXTRA_CHARGES_KEY(containerId) });
     },
   });
 }
