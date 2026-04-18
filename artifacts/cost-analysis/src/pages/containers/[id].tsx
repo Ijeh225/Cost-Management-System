@@ -1165,7 +1165,7 @@ export default function ContainerDetail() {
           <Link href="/operations">
             <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-primary h-7 px-2">
               <Activity className="w-3.5 h-3.5" />
-              Operations
+              Manage in Operations →
             </Button>
           </Link>
           {isMaerskContainer(container.containerNumber) && (
