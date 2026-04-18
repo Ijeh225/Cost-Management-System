@@ -22,7 +22,7 @@ import {
 import { useAuth } from "@/components/layout/auth-provider";
 import {
   formatCurrency, getStatusColor, getStatusLabel,
-  getNextStage, STAGE_SECTION,
+  STAGE_SECTION,
   getApprovalStatusColor, getApprovalStatusLabel, canEditSectionGranular,
 } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -934,7 +934,7 @@ export default function ContainerDetail() {
   if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
 
   const { container, charges, sectionApprovals = [] } = data as any;
-  const nextStage = getNextStage(container.status);
+
   const userSectionPermission: string | null = (user as any)?.sectionPermission ?? null;
   const userSectionPermissions: string | null = (user as any)?.sectionPermissions ?? null;
   const activeSection = STAGE_SECTION[container.status] ?? null;
