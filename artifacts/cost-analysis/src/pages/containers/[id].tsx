@@ -19,6 +19,7 @@ import {
   useGetBuiltinExtras,
   type BuiltinExtraField,
   useUpdateDeliveryExecution,
+  useVerifyContainer,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -878,6 +879,7 @@ export default function ContainerDetail() {
   const updateDeliveredAt = useUpdateDeliveredAt();
   const updateStageControl = useUpdateStageControl();
   const updateDeliveryExecution = useUpdateDeliveryExecution();
+  const verifyContainerMutation = useVerifyContainer();
   const { data: customSectionsRaw } = useGetCustomSections({ containerId });
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
   const { data: sectionSettings } = useGetSettings();
@@ -1043,7 +1045,7 @@ export default function ContainerDetail() {
   const handleSaveStageControl = () => {
     const dueDateObj = scDueDate ? new Date(scDueDate) : null;
     const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
-    const isOverdueInput = dueDateObj !== null && dueDateObj.getTime() < startOfToday.getTime() && !["completed", "closed"].includes(container.status);
+    const isOverdueInput = dueDateObj !== null && dueDateObj.getTime() < startOfToday.getTime() && container.status !== "closed";
     if (isOverdueInput && !scDelayReason.trim()) {
       toast({ variant: "destructive", title: "Delay Reason required", description: "Please explain why this action is overdue before saving." });
       return;
@@ -1337,6 +1339,37 @@ export default function ContainerDetail() {
         />
       )}
 
+      {container.status === "pending_verification" && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center gap-4">
+          <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
+          <div className="flex-1">
+            <h4 className="font-semibold text-amber-400 text-sm">Awaiting Verification</h4>
+            <p className="text-xs text-amber-300/70 mt-0.5">
+              This container must be verified by an admin before it enters the operational pipeline.
+            </p>
+          </div>
+          {isAdmin && (
+            <Button
+              size="sm"
+              className="bg-amber-500 hover:bg-amber-600 text-white shrink-0 gap-1.5"
+              disabled={verifyContainerMutation.isPending}
+              onClick={async () => {
+                try {
+                  await verifyContainerMutation.mutateAsync({ id: containerId });
+                  toast({ title: "Container Verified", description: "Container has been verified and moved to Registered stage." });
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : "Verification failed";
+                  toast({ variant: "destructive", title: "Verification Failed", description: msg });
+                }
+              }}
+            >
+              {verifyContainerMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+              Verify Container
+            </Button>
+          )}
+        </div>
+      )}
+
       {container.isLocked && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
@@ -1473,7 +1506,7 @@ export default function ContainerDetail() {
           {(() => {
             const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
             const dueDate = container.nextActionDueDate ? new Date(container.nextActionDueDate) : null;
-            const isOverdue = dueDate !== null && dueDate.getTime() < startOfToday.getTime() && !["completed", "closed"].includes(container.status);
+            const isOverdue = dueDate !== null && dueDate.getTime() < startOfToday.getTime() && container.status !== "closed";
             return (
               <div className="border-t border-border/30 pt-4 flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -1514,7 +1547,7 @@ export default function ContainerDetail() {
                         <div>
                           {(() => {
                             const d = scDueDate ? new Date(scDueDate) : null;
-                            const needsReason = d !== null && d < new Date() && !["completed", "closed"].includes(container.status);
+                            const needsReason = d !== null && d < new Date() && container.status !== "closed";
                             return (
                               <>
                                 <Label className={`text-[10px] mb-1 block ${needsReason ? "text-destructive font-semibold" : "text-muted-foreground"}`}>

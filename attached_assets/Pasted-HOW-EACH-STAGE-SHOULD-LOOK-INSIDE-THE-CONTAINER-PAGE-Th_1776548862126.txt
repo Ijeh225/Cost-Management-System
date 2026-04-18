@@ -1,0 +1,215 @@
+HOW EACH STAGE SHOULD LOOK INSIDE THE CONTAINER PAGE
+
+This is where your app becomes powerful.
+
+For every stage, your container page should show a stage card or workflow block with the same structure.
+
+Standard stage block structure
+
+Each stage should contain:
+
+Stage Name
+Status: Not Started / In Progress / Completed / Delayed / Blocked
+Current Stage Owner
+Department
+Next Action Required
+Planned Due Date
+Completed Date
+Delay Reason
+Internal Note
+Key Documents
+Action Buttons
+What each stage should contain
+1) Registered
+
+Fields:
+
+Registered date
+Registered by
+Assigned staff
+Linked client
+Initial remarks
+
+Actions:
+
+Mark complete
+Move to Documentation
+2) Documentation
+
+Fields:
+
+B/L received
+Invoice received
+Packing list received
+Form M status
+PAAR status
+SON/NAFDAC required
+Documentation note
+
+Actions:
+
+Mark docs complete
+Move to Duty Assessment
+3) Duty Assessment
+
+Fields:
+
+Declaration number
+Assessment date
+Duty amount assessed
+Assessment note
+Assessment document upload
+
+Actions:
+
+Confirm assessment
+Move to Duty Payment
+4) Duty Payment
+
+Fields:
+
+Duty amount payable
+Amount paid
+Payment date
+Payment reference
+Paid by
+Funding source: Client / Company
+Unpaid balance
+
+Actions:
+
+Mark duty paid
+Move to Transire Processing
+5) Transire Processing
+
+Fields:
+
+Transire filed date
+Transire approval status
+Transire approval date
+Customs officer/desk note
+Delay reason if pending
+
+Actions:
+
+Mark transire approved
+Move to Shipping / Terminal Payment
+6) Shipping / Terminal Payment
+
+Fields:
+
+Shipping line charges
+Terminal charges
+Debit note received date
+Debit note paid date
+DO/TDO status
+DO/TDO date
+
+Actions:
+
+Mark payment complete
+Move to Pull-Out
+7) Pull-Out
+
+Fields:
+
+Truck assigned
+Driver assigned
+Pull-out date
+Port gate-out date/time
+Pull-out note
+
+Actions:
+
+Confirm pulled out
+Move to Gate-In at Bonded Terminal
+8) Gate-In at Bonded Terminal
+
+Fields:
+
+Arrival date
+Arrival time
+Bonded terminal receiving officer
+Container received condition
+Gate-in remarks
+
+Actions:
+
+Confirm gate-in
+Move to Examination
+9) Examination
+
+Fields:
+
+Examination date
+Customs officer/team
+Examination result
+Query raised? yes/no
+Query note
+Supporting document/photo
+
+Actions:
+
+Mark examination complete
+Move to Final Release
+10) Final Release
+
+Fields:
+
+Final release date
+Release approval reference
+Release note
+Delivery cleared? yes/no
+
+Actions:
+
+Approve release
+Move to Delivery
+11) Delivery
+
+Fields:
+
+Delivery date
+Delivery time
+Delivery location
+Truck number
+Driver name
+Dispatch officer
+Delivered by
+Offloading confirmation
+POD/confirmation document
+Delivery remarks
+
+Actions:
+
+Mark delivered
+Move to Empty Return
+12) Empty Return
+
+Fields:
+
+Empty return due date
+Empty return date
+Returned to which shipping line/terminal
+Return confirmation
+Delay charge if any
+Remark
+
+Actions:
+
+Mark empty returned
+Move to Closed
+13) Closed
+
+Fields:
+
+Closed date
+Closed by
+Invoice status
+Payment completed? yes/no
+Closure note
+
+Actions:
+
+Close job
+Lock workflow

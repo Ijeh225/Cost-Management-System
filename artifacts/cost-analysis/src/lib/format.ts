@@ -14,16 +14,20 @@ export function formatNumber(amount: number | null | undefined): string {
 }
 
 export const WORKFLOW_STAGES = [
-  { value: "new_upload",          label: "New Upload",          short: "New" },
-  { value: "documentation_review",label: "Documentation Review",short: "Docs" },
-  { value: "shipping_entry",      label: "Shipping Entry",      short: "Shipping" },
-  { value: "customs_entry",       label: "Customs Entry",       short: "Customs" },
-  { value: "terminal_entry",      label: "Terminal Entry",      short: "Terminal" },
-  { value: "delivery_entry",      label: "Delivery Entry",      short: "Delivery" },
-  { value: "accounting_review",   label: "Accounting Review",   short: "Accounting" },
-  { value: "management_approval", label: "Management Approval", short: "Mgmt" },
-  { value: "completed",           label: "Completed",           short: "Done" },
-  { value: "closed",              label: "Closed",              short: "Closed" },
+  { value: "pending_verification",      label: "Pending Verification",      short: "Pending" },
+  { value: "registered",               label: "Registered",                short: "Registered" },
+  { value: "documentation",            label: "Documentation",             short: "Docs" },
+  { value: "duty_assessment",          label: "Duty Assessment",           short: "Assessment" },
+  { value: "duty_payment",             label: "Duty Payment",              short: "Duty Pmt" },
+  { value: "transire_processing",      label: "Transire Processing",       short: "Transire" },
+  { value: "shipping_terminal_payment",label: "Shipping/Terminal Payment", short: "Shpg/Term" },
+  { value: "pull_out",                 label: "Pull-Out",                  short: "Pull-Out" },
+  { value: "gate_in",                  label: "Gate-In (Bonded Terminal)", short: "Gate-In" },
+  { value: "examination",              label: "Examination",               short: "Exam" },
+  { value: "final_release",            label: "Final Release",             short: "Release" },
+  { value: "delivery",                 label: "Delivery",                  short: "Delivery" },
+  { value: "empty_return",             label: "Empty Return",              short: "Empty Ret." },
+  { value: "closed",                   label: "Closed",                    short: "Closed" },
 ];
 
 export function getNextStage(current: string): string | null {
@@ -37,10 +41,10 @@ export function getStageIndex(status: string): number {
 }
 
 export const STAGE_SECTION: Record<string, string> = {
-  shipping_entry: "shipping",
-  customs_entry:  "customs",
-  terminal_entry: "terminal",
-  delivery_entry: "delivery",
+  shipping_terminal_payment: "shipping",
+  examination:               "customs",
+  gate_in:                   "terminal",
+  delivery:                  "delivery",
 };
 
 export function canEditSection(
@@ -60,17 +64,21 @@ export function canEditSection(
 
 export function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
-    new_upload:           "bg-slate-500/20 text-slate-300 border-slate-500/50",
-    documentation_review: "bg-yellow-500/20 text-yellow-400 border-yellow-500/50",
-    shipping_entry:       "bg-blue-500/20 text-blue-400 border-blue-500/50",
-    customs_entry:        "bg-purple-500/20 text-purple-400 border-purple-500/50",
-    terminal_entry:       "bg-orange-500/20 text-orange-400 border-orange-500/50",
-    delivery_entry:       "bg-cyan-500/20 text-cyan-400 border-cyan-500/50",
-    accounting_review:    "bg-amber-500/20 text-amber-400 border-amber-500/50",
-    management_approval:  "bg-indigo-500/20 text-indigo-400 border-indigo-500/50",
-    completed:            "bg-emerald-500/20 text-emerald-400 border-emerald-500/50",
-    closed:               "bg-slate-800 text-slate-400 border-slate-700",
-    in_progress:          "bg-blue-500/20 text-blue-400 border-blue-500/50",
+    pending_verification:      "bg-slate-500/20 text-slate-300 border-slate-500/50",
+    registered:                "bg-slate-400/20 text-slate-300 border-slate-400/50",
+    documentation:             "bg-yellow-500/20 text-yellow-400 border-yellow-500/50",
+    duty_assessment:           "bg-amber-500/20 text-amber-400 border-amber-500/50",
+    duty_payment:              "bg-orange-500/20 text-orange-400 border-orange-500/50",
+    transire_processing:       "bg-rose-500/20 text-rose-400 border-rose-500/50",
+    shipping_terminal_payment: "bg-blue-500/20 text-blue-400 border-blue-500/50",
+    pull_out:                  "bg-sky-500/20 text-sky-400 border-sky-500/50",
+    gate_in:                   "bg-cyan-500/20 text-cyan-400 border-cyan-500/50",
+    examination:               "bg-purple-500/20 text-purple-400 border-purple-500/50",
+    final_release:             "bg-violet-500/20 text-violet-400 border-violet-500/50",
+    delivery:                  "bg-teal-500/20 text-teal-400 border-teal-500/50",
+    empty_return:              "bg-indigo-500/20 text-indigo-400 border-indigo-500/50",
+    closed:                    "bg-emerald-500/20 text-emerald-400 border-emerald-500/50",
+    in_progress:               "bg-blue-500/20 text-blue-400 border-blue-500/50",
   };
   return colors[status] || "bg-slate-800 text-slate-300";
 }

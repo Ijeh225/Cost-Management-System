@@ -37,7 +37,7 @@ intelligenceRouter.get("/intelligence/alerts", requireAuth, async (req: AuthRequ
       const dutyNotPaid = parseFloat(cu.dutyNotPaid ?? "0");
       const nextActionDueDate = c.nextActionDueDate ? new Date(c.nextActionDueDate) : null;
       const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
-      const isActionOverdue = nextActionDueDate !== null && nextActionDueDate.getTime() < startOfToday.getTime() && !["completed", "closed"].includes(c.status);
+      const isActionOverdue = nextActionDueDate !== null && nextActionDueDate.getTime() < startOfToday.getTime() && c.status !== "closed";
       return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue };
     });
 
@@ -61,7 +61,7 @@ intelligenceRouter.get("/intelligence/alerts", requireAuth, async (req: AuthRequ
       if (avgDelivery > 0 && c.deliveryCost > avgDelivery * AVG_THRESHOLD) {
         alerts.push({ type: "high_delivery", severity: "warning", message: `High delivery cost: ${c.containerNumber} — ₦${c.deliveryCost.toLocaleString("en-NG", { minimumFractionDigits: 2 })} (avg ₦${avgDelivery.toFixed(0)})`, containerId: c.id, containerNumber: c.containerNumber });
       }
-      if (c.dutyNotPaid > 0 && !["closed", "completed"].includes(c.status)) {
+      if (c.dutyNotPaid > 0 && c.status !== "closed") {
         alerts.push({ type: "unpaid_duty", severity: "warning", message: `Unpaid duty: ${c.containerNumber} — ₦${c.dutyNotPaid.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`, containerId: c.id, containerNumber: c.containerNumber });
       }
     }
@@ -69,7 +69,7 @@ intelligenceRouter.get("/intelligence/alerts", requireAuth, async (req: AuthRequ
     // Delay alerts: containers in early stages older than 30 days
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     for (const c of containerData) {
-      if (!["completed", "closed"].includes(c.status) && new Date(c.createdAt) < thirtyDaysAgo) {
+      if (c.status !== "closed" && new Date(c.createdAt) < thirtyDaysAgo) {
         alerts.push({ type: "delayed", severity: "warning", message: `Delayed container: ${c.containerNumber} has been in '${c.status}' for over 30 days`, containerId: c.id, containerNumber: c.containerNumber });
       }
     }

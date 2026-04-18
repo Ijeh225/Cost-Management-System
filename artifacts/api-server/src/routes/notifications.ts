@@ -48,7 +48,7 @@ async function computeAlerts(userId?: number) {
     const ageDays = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24));
     const nextActionDueDate = c.nextActionDueDate ? new Date(c.nextActionDueDate) : null;
     const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
-    const isActionOverdue = nextActionDueDate !== null && nextActionDueDate.getTime() < startOfToday.getTime() && !["completed", "closed"].includes(c.status);
+    const isActionOverdue = nextActionDueDate !== null && nextActionDueDate.getTime() < startOfToday.getTime() && c.status !== "closed";
     const emptyReturnDueDate = c.emptyReturnDueDate ? new Date(c.emptyReturnDueDate) : null;
     const emptyReturnDate = c.emptyReturnDate ? new Date(c.emptyReturnDate) : null;
     return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue, emptyReturnDueDate, emptyReturnDate };
@@ -89,11 +89,11 @@ async function computeAlerts(userId?: number) {
     if (avgDelivery > 0 && c.deliveryCost > avgDelivery * AVG_THRESHOLD) {
       alerts.push({ alertKey: `high_delivery_${c.id}`, type: "high_delivery", severity: "warning", message: `High delivery cost: ${c.containerNumber} — ₦${c.deliveryCost.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`, containerId: c.id, containerNumber: c.containerNumber, generatedAt: now });
     }
-    if (c.dutyNotPaid > 0 && !["closed", "completed"].includes(c.status)) {
+    if (c.dutyNotPaid > 0 && c.status !== "closed") {
       alerts.push({ alertKey: `unpaid_duty_${c.id}`, type: "unpaid_duty", severity: "warning", message: `Unpaid duty: ${c.containerNumber} — ₦${c.dutyNotPaid.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`, containerId: c.id, containerNumber: c.containerNumber, generatedAt: now });
     }
 
-    if (!["completed", "closed"].includes(c.status)) {
+    if (c.status !== "closed") {
       if (c.ageDays >= thresholds.days3) {
         alerts.push({ alertKey: `aging_critical_${c.id}`, type: "aging_critical", severity: "critical", message: `Critical delay: ${c.containerNumber} (${c.customerName}) has been clearing for ${c.ageDays} days — immediate attention required`, containerId: c.id, containerNumber: c.containerNumber, generatedAt: now });
       } else if (c.ageDays >= thresholds.days2) {

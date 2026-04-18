@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable } from "@workspace/db";
-import { eq, ilike, or, sql, desc, and, inArray } from "drizzle-orm";
+import { eq, ilike, or, sql, desc, and, inArray, ne } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
@@ -361,7 +361,8 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       nextActionDueDate: containersTable.nextActionDueDate,
     })
       .from(containersTable)
-      .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id));
+      .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id))
+      .where(ne(containersTable.status, "pending_verification"));
 
     const stages: Record<string, Array<{
       id: number;
@@ -407,9 +408,19 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
 });
 
 const PIPELINE_STAGE_ORDER = [
-  "new_upload", "documentation_review", "shipping_entry", "customs_entry",
-  "terminal_entry", "delivery_entry", "accounting_review", "management_approval",
-  "completed", "closed",
+  "registered",
+  "documentation",
+  "duty_assessment",
+  "duty_payment",
+  "transire_processing",
+  "shipping_terminal_payment",
+  "pull_out",
+  "gate_in",
+  "examination",
+  "final_release",
+  "delivery",
+  "empty_return",
+  "closed",
 ];
 
 router.patch("/containers/:id/status", requireAdmin, async (req: AuthRequest, res) => {
@@ -439,6 +450,36 @@ router.patch("/containers/:id/status", requireAdmin, async (req: AuthRequest, re
       userId: req.user!.id,
       action: "status_advanced",
       section: "basic_info",
+    });
+    res.json(formatContainer(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/containers/:id/verify", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Container not found" });
+      return;
+    }
+    if (existing.status !== "pending_verification") {
+      res.status(400).json({ error: "Container is not in pending verification state" });
+      return;
+    }
+    const [updated] = await db.update(containersTable)
+      .set({ status: "registered", verifiedAt: new Date(), verifiedBy: req.user!.id, updatedAt: new Date() })
+      .where(eq(containersTable.id, id))
+      .returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "container_verified",
+      section: "basic_info",
+      reason: "Container verified and moved to Registered stage",
     });
     res.json(formatContainer(updated));
   } catch (err) {
@@ -644,7 +685,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     const finalDelayReason = "delayReason" in updates
       ? (updates.delayReason as string | null)
       : existing.delayReason;
-    const isActiveStatus = !["completed", "closed"].includes(existing.status);
+    const isActiveStatus = existing.status !== "closed";
     const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
     if (isActiveStatus && finalDueDate instanceof Date && finalDueDate.getTime() < startOfToday.getTime() && !finalDelayReason) {
       res.status(400).json({ error: "Delay Reason is required when the Next Action Due Date is overdue" });
@@ -1019,9 +1060,9 @@ router.post("/containers/:id/sections/:section/approve", requireAdmin, async (re
       .returning();
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (section === "container_review") {
-      // Full container review approval — advance status to completed
-      if (container && container.status !== "completed" && container.status !== "closed") {
-        await db.update(containersTable).set({ status: "completed", updatedAt: new Date() }).where(eq(containersTable.id, id));
+      // Full container review approval — advance status to closed
+      if (container && container.status !== "closed") {
+        await db.update(containersTable).set({ status: "closed", updatedAt: new Date() }).where(eq(containersTable.id, id));
       }
     } else {
       // Auto-lock the section after approval
@@ -1157,10 +1198,8 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
   try {
     const allContainers = await db.select().from(containersTable);
     const totalContainers = allContainers.length;
-    const inProgress = allContainers.filter(c =>
-      !["completed", "closed"].includes(c.status)
-    ).length;
-    const completed = allContainers.filter(c => c.status === "completed").length;
+    const inProgress = allContainers.filter(c => c.status !== "closed").length;
+    const completed = 0;
     const closed = allContainers.filter(c => c.status === "closed").length;
 
     const containerIds = allContainers.map(c => c.id);

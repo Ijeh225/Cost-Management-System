@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 
 const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque"];
-const DONE_STATUSES = new Set(["completed", "closed"]);
+const DONE_STATUSES = new Set(["closed"]);
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (

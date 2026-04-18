@@ -37,7 +37,7 @@ async function runStartupMigrations() {
           deliveredAtEstimated: true,
         })
         .where(and(
-          inArray(containersTable.status, ["completed", "closed"]),
+          inArray(containersTable.status, ["closed"]),
           isNull(containersTable.deliveredAt)
         ))
         .returning({ id: containersTable.id });

@@ -1,0 +1,47 @@
+The attached file explains the full operational workflow of a clearing and forwarding company, and it will serve as the foundation for how we design and implement the Operations module in our system. It is important that this file is studied carefully so we can accurately replicate and synchronize real-life processes within the platform.
+
+Current Issue
+
+At the moment, the system flow is not properly structured. When a user clicks on “Operations,” it leads to “Containers,” and then redirects to the Financial Records section. This is incorrect, as Financial Records should be completely separate from Operations.
+
+Expected System Structure
+
+The Operations module must function independently. When a user clicks on “Operations” and then selects a container, it should open a dedicated operational workflow interface where users can begin entering and managing all operational activities based on the processes outlined in the file.
+
+Key Identifiers
+
+Although documents like the Bill of Lading are important, the system will primarily rely on:
+
+Container Number
+Bill of Lading Number
+
+These will serve as the main references for tracking each job.
+
+Container Verification Process (New Addition)
+
+A verification layer must be introduced before any operation begins:
+
+Once a container is entered into the system, it should not immediately appear in the Operations module.
+A designated user (or assigned role) must first verify that the container belongs to us (Ox).
+This verification acts as a control gate.
+Post-Verification Workflow (Access Control)
+
+Once the assigned user confirms the container:
+
+The container becomes active in the system.
+It is then made available across both Operations and Financial modules simultaneously.
+At this point, all relevant users (Operations team and Finance team) can begin working on the job.
+
+In other words, verification unlocks the job, giving access to:
+
+Operational processes (documentation, clearance steps, etc.)
+Financial processes (billing, charges, payments, etc.)
+Overall Objective
+
+The goal is to create a synchronized system where:
+
+Containers are first entered
+Containers are verified by an authorized user
+Verification activates the job
+Both Operations and Finance teams can then work in parallel
+All workflows follow the real-life clearing process defined in the file

@@ -1,0 +1,93 @@
+I’m mapping your bonded-terminal flow directly into the app structure you already have, so it fits what you’ve built instead of forcing a fresh redesign.
+
+Thought for 6s
+
+Yes — let’s do all 3 properly.
+
+I’ll give you:
+
+Fixed pipeline stages for a bonded terminal
+How each stage should look on the container page
+Database fields you need to support it
+1. FIXED PIPELINE FOR YOUR APP
+
+Your current pipeline is good, but it needs to reflect bonded terminal reality more accurately. Right now, stages like “Customs Examination” and “Terminal Processing” are a bit too broad for the bonded-terminal flow described in your strategic document and system spec.
+
+Recommended bonded-terminal pipeline
+1) Registered
+
+Container has been created in the system.
+
+2) Documentation
+
+B/L, invoice, packing list, Form M, PAAR prep, and related document checks are in progress.
+
+3) Duty Assessment
+
+Assessment/SGD/declaration is being processed and duty amount is being confirmed.
+
+4) Duty Payment
+
+Duty is ready and must be paid or has just been paid.
+
+5) Transire Processing
+
+Transire application and customs approval to move to bonded terminal.
+
+6) Shipping / Terminal Payment
+
+Shipping line and terminal debit note payments, DO/TDO release process.
+
+7) Pull-Out
+
+Container is being pulled out from port and assigned to a truck.
+
+8) Gate-In at Bonded Terminal
+
+Container has arrived at your bonded terminal.
+
+9) Examination
+
+Physical customs examination at bonded terminal.
+
+10) Final Release
+
+Final customs release/approval after examination.
+
+11) Delivery
+
+Truck assigned, container moved to client destination, delivery in progress or completed.
+
+12) Empty Return
+
+Empty container return process to shipping line/terminal.
+
+13) Closed
+
+Job fully completed and closed financially/operationally.
+
+Mapping from your current pipeline to the corrected one
+
+Your current documented stages are: Registered, Documentation, Customs Examination, Duty Assessment, Duty Payment, Terminal Processing, Awaiting Delivery, In Transit, Completed, Closed.
+
+Here is the better mapping:
+
+Registered → keep
+Documentation → keep
+Customs Examination → move later and rename to Examination
+Duty Assessment → keep
+Duty Payment → keep
+Terminal Processing → split into:
+Transire Processing
+Shipping / Terminal Payment
+Pull-Out
+Gate-In at Bonded Terminal
+Final Release
+Awaiting Delivery + In Transit + Completed → replace with:
+Delivery
+Empty Return
+Closed
+
+So the biggest correction is this:
+
+👉 Your current “Terminal Processing” stage is carrying too much work. It should be broken into separate operational stages so delays can be traced properly.

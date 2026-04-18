@@ -1,0 +1,667 @@
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
+import {
+  useGetContainer,
+  useUpdateContainer,
+  useAdvanceContainerStatus,
+  useGetContainerAuditLog,
+  type Container,
+} from "@workspace/api-client-react";
+import { useAuth } from "@/components/layout/auth-provider";
+import { useToast } from "@/hooks/use-toast";
+import {
+  WORKFLOW_STAGES,
+  getStatusLabel,
+  getStatusColor,
+  getNextStage,
+} from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  ArrowLeft,
+  ChevronRight,
+  ExternalLink,
+  Loader2,
+  Clock,
+  User,
+  Calendar,
+  AlertTriangle,
+  CheckCircle2,
+  Circle,
+  Activity,
+  FileText,
+  Save,
+  RotateCcw,
+  Container as ContainerIcon,
+  Ship,
+} from "lucide-react";
+
+const PIPELINE_STAGES = WORKFLOW_STAGES.filter(
+  (s) => s.value !== "pending_verification"
+);
+
+function daysAgo(dateStr: string): number {
+  const ms = Date.now() - new Date(dateStr).getTime();
+  return Math.floor(ms / 86_400_000);
+}
+
+function StageRail({ currentStatus }: { currentStatus: string }) {
+  const currentIdx = PIPELINE_STAGES.findIndex((s) => s.value === currentStatus);
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-0 overflow-x-auto pb-2">
+        {PIPELINE_STAGES.map((stage, idx) => {
+          const isPast = idx < currentIdx;
+          const isCurrent = idx === currentIdx;
+          const isFuture = idx > currentIdx;
+
+          return (
+            <div key={stage.value} className="flex items-center shrink-0">
+              <div className="flex flex-col items-center gap-1">
+                <div
+                  className={`
+                    w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all
+                    ${isPast ? "bg-primary border-primary" : ""}
+                    ${isCurrent ? "bg-primary/20 border-primary ring-2 ring-primary/30" : ""}
+                    ${isFuture ? "bg-muted/30 border-border/40" : ""}
+                  `}
+                >
+                  {isPast ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary-foreground" />
+                  ) : isCurrent ? (
+                    <Activity className="w-3 h-3 text-primary animate-pulse" />
+                  ) : (
+                    <Circle className="w-3 h-3 text-border/40" />
+                  )}
+                </div>
+                <span
+                  className={`text-[9px] font-medium text-center max-w-[52px] leading-tight
+                    ${isCurrent ? "text-primary" : isPast ? "text-muted-foreground" : "text-muted-foreground/40"}
+                  `}
+                >
+                  {stage.short}
+                </span>
+              </div>
+              {idx < PIPELINE_STAGES.length - 1 && (
+                <div
+                  className={`h-0.5 w-6 mx-0.5 mb-4 rounded-full transition-all
+                    ${idx < currentIdx ? "bg-primary" : "bg-border/30"}
+                  `}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function OperationalForm({
+  container,
+  isAdmin,
+}: {
+  container: Container;
+  isAdmin: boolean;
+}) {
+  const { toast } = useToast();
+  const updateMutation = useUpdateContainer();
+  const advanceMutation = useAdvanceContainerStatus();
+
+  const [stageOwner, setStageOwner] = useState(container.stageOwner ?? "");
+  const [nextAction, setNextAction] = useState(container.nextAction ?? "");
+  const [nextActionDueDate, setNextActionDueDate] = useState(
+    container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
+  );
+  const [delayReason, setDelayReason] = useState(container.delayReason ?? "");
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    setStageOwner(container.stageOwner ?? "");
+    setNextAction(container.nextAction ?? "");
+    setNextActionDueDate(
+      container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
+    );
+    setDelayReason(container.delayReason ?? "");
+    setIsDirty(false);
+  }, [container.id, container.updatedAt]);
+
+  const markDirty = () => setIsDirty(true);
+
+  const handleSave = async () => {
+    try {
+      await updateMutation.mutateAsync({
+        id: container.id,
+        updateContainerRequest: {
+          stageOwner: stageOwner || null,
+          nextAction: nextAction || null,
+          nextActionDueDate: nextActionDueDate || null,
+          delayReason: delayReason || null,
+        },
+      });
+      setIsDirty(false);
+      toast({ title: "Workflow updated" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to update";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
+
+  const handleReset = () => {
+    setStageOwner(container.stageOwner ?? "");
+    setNextAction(container.nextAction ?? "");
+    setNextActionDueDate(
+      container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
+    );
+    setDelayReason(container.delayReason ?? "");
+    setIsDirty(false);
+  };
+
+  const nextStage = getNextStage(container.status);
+  const nextStageLabel = nextStage ? getStatusLabel(nextStage) : null;
+
+  const handleAdvance = async () => {
+    if (!nextStage) return;
+    try {
+      await advanceMutation.mutateAsync({ id: container.id, status: nextStage });
+      toast({ title: `Advanced to ${nextStageLabel}` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to advance";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
+
+  const daysInStage = daysAgo(container.updatedAt);
+  const isOverdue =
+    nextActionDueDate && new Date(nextActionDueDate) < new Date();
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold">
+              Current Stage Actions
+            </CardTitle>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="w-3 h-3" />
+              <span
+                className={
+                  daysInStage > 14
+                    ? "text-red-400 font-semibold"
+                    : daysInStage > 7
+                    ? "text-amber-400 font-semibold"
+                    : ""
+                }
+              >
+                {daysInStage}d in stage
+              </span>
+              {daysInStage > 7 && (
+                <AlertTriangle
+                  className={`w-3 h-3 ${daysInStage > 14 ? "text-red-400" : "text-amber-400"}`}
+                />
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <User className="w-3 h-3" />
+                Stage Owner
+              </Label>
+              <Input
+                value={stageOwner}
+                onChange={(e) => {
+                  setStageOwner(e.target.value);
+                  markDirty();
+                }}
+                placeholder="Person responsible for this stage"
+                className="h-8 text-sm bg-background border-border/60"
+                disabled={!isAdmin}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="w-3 h-3" />
+                Next Action Due Date
+              </Label>
+              <Input
+                type="date"
+                value={nextActionDueDate}
+                onChange={(e) => {
+                  setNextActionDueDate(e.target.value);
+                  markDirty();
+                }}
+                className={`h-8 text-sm bg-background border-border/60 ${
+                  isOverdue ? "border-red-500/50 text-red-400" : ""
+                }`}
+                disabled={!isAdmin}
+              />
+              {isOverdue && (
+                <p className="text-[10px] text-red-400 flex items-center gap-1">
+                  <AlertTriangle className="w-2.5 h-2.5" />
+                  Overdue
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Activity className="w-3 h-3" />
+              Next Action
+            </Label>
+            <Input
+              value={nextAction}
+              onChange={(e) => {
+                setNextAction(e.target.value);
+                markDirty();
+              }}
+              placeholder="Describe the next required action"
+              className="h-8 text-sm bg-background border-border/60"
+              disabled={!isAdmin}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <AlertTriangle className="w-3 h-3" />
+              Delay Reason
+              <span className="text-muted-foreground/50">(optional)</span>
+            </Label>
+            <Textarea
+              value={delayReason}
+              onChange={(e) => {
+                setDelayReason(e.target.value);
+                markDirty();
+              }}
+              placeholder="Document any delays or blockers"
+              rows={2}
+              className={`text-sm bg-background border-border/60 resize-none ${
+                delayReason ? "border-amber-500/40 bg-amber-500/5" : ""
+              }`}
+              disabled={!isAdmin}
+            />
+          </div>
+
+          {isAdmin && (
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={!isDirty || updateMutation.isPending}
+                className="h-7 gap-1.5 text-xs"
+              >
+                {updateMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Save className="w-3 h-3" />
+                )}
+                Save Changes
+              </Button>
+              {isDirty && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleReset}
+                  className="h-7 gap-1.5 text-xs text-muted-foreground"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Reset
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {isAdmin && nextStage && (
+        <Card className="border-primary/20 bg-primary/5 backdrop-blur-sm">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Advance to Next Stage
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Move this container from{" "}
+                  <span className="font-medium text-foreground/70">
+                    {getStatusLabel(container.status)}
+                  </span>{" "}
+                  →{" "}
+                  <span className="font-medium text-primary">
+                    {nextStageLabel}
+                  </span>
+                </p>
+              </div>
+              <Button
+                onClick={handleAdvance}
+                disabled={advanceMutation.isPending}
+                className="gap-2 shrink-0"
+              >
+                {advanceMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+                {nextStageLabel}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {container.status === "closed" && (
+        <Card className="border-emerald-500/20 bg-emerald-500/5">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-emerald-400">
+                  Container Closed
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  This container has completed all stages and is closed.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function AuditLog({ containerId }: { containerId: number }) {
+  const { data: log, isLoading } = useGetContainerAuditLog(containerId);
+
+  const stageEntries = (log ?? [])
+    .filter((e) => e.action === "stage_change" || e.action === "stage_control" || e.fieldChanged === "status")
+    .slice(0, 10);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (stageEntries.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground text-center py-6">
+        No stage history recorded yet.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {stageEntries.map((entry) => (
+        <div
+          key={entry.id}
+          className="flex items-start gap-3 py-2 border-b border-border/30 last:border-0"
+        >
+          <div className="w-6 h-6 rounded-full bg-muted/40 border border-border/40 flex items-center justify-center shrink-0 mt-0.5">
+            <Activity className="w-3 h-3 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-foreground">
+              {entry.action === "stage_change" || entry.fieldChanged === "status" ? (
+                <>
+                  <span className="font-medium">{entry.userName}</span> moved to{" "}
+                  <span className="font-medium text-primary">
+                    {entry.newValue ? getStatusLabel(entry.newValue) : entry.newValue}
+                  </span>
+                </>
+              ) : (
+                <span>
+                  <span className="font-medium">{entry.userName}</span>{" "}
+                  {entry.action}
+                </span>
+              )}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {new Date(entry.createdAt).toLocaleString("en-NG", {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function OperationDetailPage({ params }: { params: { id: string } }) {
+  const containerId = parseInt(params.id, 10);
+  const { isAdmin } = useAuth();
+  const [, navigate] = useLocation();
+
+  const { data, isLoading, isError } = useGetContainer(containerId, {
+    query: { refetchInterval: 30_000 },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-muted-foreground text-sm">Container not found.</p>
+        <Button variant="outline" size="sm" onClick={() => navigate("/operations")}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Operations
+        </Button>
+      </div>
+    );
+  }
+
+  const container: Container = data.container;
+  const statusColorClass = getStatusColor(container.status);
+  const currentStageLabel = getStatusLabel(container.status);
+  const isPipeline = container.status !== "pending_verification";
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="flex items-center gap-3">
+        <Link href="/operations">
+          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground h-8 px-2">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Operations Board
+          </Button>
+        </Link>
+        <span className="text-border/40">/</span>
+        <span className="text-sm text-muted-foreground font-mono">
+          {container.containerNumber}
+        </span>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+              <ContainerIcon className="w-5 h-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold font-mono text-foreground tracking-tight">
+                {container.containerNumber}
+              </h1>
+              {container.blNumber && (
+                <p className="text-sm text-muted-foreground font-mono">
+                  BL: {container.blNumber}
+                </p>
+              )}
+            </div>
+            <Badge className={`border text-xs ${statusColorClass}`}>
+              {currentStageLabel}
+            </Badge>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+            {container.customerName && (
+              <span className="flex items-center gap-1.5">
+                <User className="w-3 h-3" />
+                {container.customerName}
+              </span>
+            )}
+            {container.vessel && (
+              <span className="flex items-center gap-1.5">
+                <Ship className="w-3 h-3" />
+                {container.vessel}
+              </span>
+            )}
+            {container.size && (
+              <span className="flex items-center gap-1.5">
+                <ContainerIcon className="w-3 h-3" />
+                {container.size}
+              </span>
+            )}
+            {container.assignedStaffName && (
+              <span className="flex items-center gap-1.5">
+                <User className="w-3 h-3 text-primary/60" />
+                <span className="text-foreground/70">
+                  {container.assignedStaffName}
+                </span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        <Link href={`/containers/${container.id}`}>
+          <Button variant="outline" size="sm" className="gap-2 shrink-0 h-8">
+            <FileText className="w-3.5 h-3.5" />
+            Financial Records
+            <ExternalLink className="w-3 h-3 text-muted-foreground" />
+          </Button>
+        </Link>
+      </div>
+
+      {isPipeline && (
+        <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Pipeline Progress
+            </p>
+            <StageRail currentStatus={container.status} />
+          </CardContent>
+        </Card>
+      )}
+
+      {!isPipeline && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center gap-3">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <p className="text-sm text-amber-300">
+            This container is pending verification and has not entered the pipeline.
+          </p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <OperationalForm
+            container={container}
+            isAdmin={isAdmin ?? false}
+          />
+        </div>
+
+        <div className="space-y-4">
+          <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Activity className="w-4 h-4 text-muted-foreground" />
+                Stage History
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AuditLog containerId={container.id} />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-xs">
+              {container.declaration && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Declaration</span>
+                  <span className="font-mono text-foreground/80">{container.declaration}</span>
+                </div>
+              )}
+              <Separator className="my-1 bg-border/30" />
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Created</span>
+                <span className="text-foreground/80">
+                  {new Date(container.createdAt).toLocaleDateString("en-NG", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+              {container.stageOwner && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Stage Owner</span>
+                  <span className="text-foreground/80 truncate max-w-[120px] text-right">
+                    {container.stageOwner}
+                  </span>
+                </div>
+              )}
+              {container.nextActionDueDate && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Action Due</span>
+                  <span
+                    className={
+                      new Date(container.nextActionDueDate) < new Date()
+                        ? "text-red-400 font-medium"
+                        : "text-foreground/80"
+                    }
+                  >
+                    {new Date(container.nextActionDueDate).toLocaleDateString(
+                      "en-NG",
+                      { day: "numeric", month: "short" }
+                    )}
+                  </span>
+                </div>
+              )}
+              {container.delayReason && (
+                <>
+                  <Separator className="my-1 bg-border/30" />
+                  <div>
+                    <span className="text-amber-400 text-[10px] font-medium flex items-center gap-1 mb-1">
+                      <AlertTriangle className="w-2.5 h-2.5" />
+                      Delay Noted
+                    </span>
+                    <p className="text-muted-foreground text-[10px] leading-relaxed">
+                      {container.delayReason}
+                    </p>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

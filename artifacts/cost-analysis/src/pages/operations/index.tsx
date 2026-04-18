@@ -88,7 +88,7 @@ function ContainerCard({
   };
 
   return (
-    <Link href={`/containers/${container.id}`}>
+    <Link href={`/operations/${container.id}`}>
       <div
         className={`
           group relative border border-l-4 rounded-lg p-3 cursor-pointer transition-all duration-150

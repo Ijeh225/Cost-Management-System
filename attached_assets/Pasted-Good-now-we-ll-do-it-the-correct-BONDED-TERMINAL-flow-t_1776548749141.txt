@@ -1,0 +1,225 @@
+Good — now we’ll do it the correct BONDED TERMINAL flow (this is different from normal port clearing).
+
+I’ll give you the REAL step-by-step process used in bonded terminals like Onne/Lagos, from start → delivery → empty return, in a way you can plug directly into your app.
+
+🚢 BONDED TERMINAL CLEARING FLOW (REAL OPERATION)
+🟢 STAGE 1: JOB INTAKE (REGISTER CONTAINER)
+What happens:
+Client gives you:
+B/L (Bill of Lading)
+Invoice
+Packing List
+What you do:
+Open job in system
+Create container record
+Assign staff
+Stage Owner:
+
+👉 Documentation / Ops
+
+🟡 STAGE 2: DOCUMENTATION & PAAR PROCESS
+What happens:
+Prepare all customs documents
+Includes:
+Form M validation
+PAAR processing
+SON / NAFDAC (if needed)
+Goal:
+
+👉 Get PAAR BEFORE vessel arrival
+
+Stage Owner:
+
+👉 Documentation Team
+
+🔵 STAGE 3: DUTY ASSESSMENT (SGD / DECLARATION)
+What happens:
+Customs calculates duty
+What you do:
+Check assessment
+Confirm duty amount
+Stage Owner:
+
+👉 Documentation / Customs Desk
+
+🟠 STAGE 4: DUTY PAYMENT
+What happens:
+Duty must be paid
+What you do:
+Collect funds OR use company funds
+Pay through bank
+⚠️ IMPORTANT:
+
+👉 This must be done before or immediately after arrival
+
+Stage Owner:
+
+👉 Accounts
+
+🔴 STAGE 5: TRANSIRE PROCESS (CORE OF BONDED TERMINAL)
+What happens:
+Container is approved to move from port → bonded terminal
+What you do:
+Apply for transire
+Get customs approval
+⚠️ VERY IMPORTANT:
+
+👉 Without transire = no movement
+
+Stage Owner:
+
+👉 Operations / Transire Team
+
+🟣 STAGE 6: SHIPPING LINE & TERMINAL PAYMENTS
+What happens:
+Pay:
+Shipping line charges
+Terminal charges
+Obtain:
+Delivery Order (DO / TDO)
+What you do:
+Pay debit note
+Secure release documents
+Stage Owner:
+
+👉 Accounts + Ops
+
+🟤 STAGE 7: PULL-OUT FROM PORT
+What happens:
+Container leaves seaport to bonded terminal
+What you do:
+Assign truck
+Process gate-out
+Move container
+Timing:
+
+👉 Usually Day 2–3 after arrival
+
+Stage Owner:
+
+👉 Transport / Ops
+
+⚫ STAGE 8: ARRIVAL AT BONDED TERMINAL (GATE-IN)
+What happens:
+Container enters your bonded terminal
+What you do:
+Record arrival
+Prepare for examination
+Stage Owner:
+
+👉 Terminal Team
+
+⚪ STAGE 9: CUSTOMS EXAMINATION (AT BONDED TERMINAL)
+What happens:
+Physical inspection happens at YOUR terminal
+What you do:
+Arrange customs inspection
+Present goods
+Resolve any issues
+⚠️ KEY DIFFERENCE:
+
+👉 In bonded terminal, examination happens HERE (not main port)
+
+Stage Owner:
+
+👉 Operations
+
+🟢 STAGE 10: FINAL CUSTOMS RELEASE
+What happens:
+Customs gives final clearance
+What you do:
+Secure release approval
+Complete documentation
+Stage Owner:
+
+👉 Operations / Customs Desk
+
+🚚 STAGE 11: DELIVERY TO CLIENT
+What happens:
+Container is delivered to customer
+What you do:
+Assign truck
+Deliver goods
+Confirm delivery
+Timing:
+
+👉 Must be FAST to avoid extra cost
+
+Stage Owner:
+
+👉 Transport Team
+
+🔄 STAGE 12: EMPTY RETURN
+What happens:
+Empty container returned to shipping line
+What you do:
+Arrange return immediately
+Avoid demurrage
+⚠️ VERY IMPORTANT:
+
+👉 Delay here = extra charges
+
+Stage Owner:
+
+👉 Transport
+
+🧾 STAGE 13: JOB CLOSURE
+What happens:
+Close the job financially and operationally
+What you do:
+Confirm payments
+Issue final invoice
+Close container
+Stage Owner:
+
+👉 Accounts / Admin
+
+🧠 SIMPLE FLOW (BONDED TERMINAL)
+
+👉 In one clean line:
+
+Register → Documentation → Duty Assessment → Duty Payment → Transire → Pay Shipping/Terminal → Pull-Out → Gate-In (Bonded Terminal) → Examination → Final Release → Delivery → Empty Return → Close
+
+🔥 KEY DIFFERENCE (VERY IMPORTANT)
+
+Compared to normal clearing:
+
+👉 BONDED TERMINAL adds:
+
+Transire (movement approval)
+Gate-in at bonded terminal
+Examination at bonded terminal
+⚡ HOW THIS SHOULD LOOK IN YOUR APP
+
+Your pipeline should be:
+
+Registered
+Documentation
+Duty Assessment
+Duty Payment
+Transire
+Shipping/Terminal Payment
+Pull-Out
+Gate-In (Terminal Arrival)
+Examination
+Final Release
+Delivery
+Empty Return
+Closed
+🎯 WHAT MAKES YOUR APP POWERFUL
+
+For EACH stage, you must have:
+
+Stage Owner
+Next Action
+Due Date
+Delay Status
+🚀 FINAL TRUTH
+
+If your app follows THIS exact bonded terminal flow:
+
+👉 You now have a real operational system
+
+If not:
+
+👉 It remains just a record-keeping app

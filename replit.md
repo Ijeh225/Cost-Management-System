@@ -53,7 +53,7 @@ The application is built as a monorepo using pnpm workspaces, separating the fro
 -   **System Design:**
     -   **Monorepo Structure:** Clearly defined workspaces for `api-server`, `cost-analysis`, and shared `lib` components (`api-spec`, `api-client-react`, `api-zod`, `db`).
     -   **Granular Permissions:** A section-level permission system controls user access to specific parts of container data.
-    -   **Workflow Engine:** A 10-stage workflow with approval queues facilitates operational processes.
+    -   **Workflow Engine:** A 13-stage bonded terminal pipeline (registered → documentation → duty_assessment → duty_payment → transire_processing → shipping_terminal_payment → pull_out → gate_in → examination → final_release → delivery → empty_return → closed) with a pre-pipeline verification gate (`pending_verification`), approval queues, and dedicated operational workflow views.
     -   **Audit Trail:** Comprehensive logging captures field-level changes for all critical data.
     -   **Customization:** An admin-only Section Builder allows for dynamic creation of custom sections and fields, enhancing flexibility.
     -   **Financials:** Invoice creation accounts for clearing charges, VAT, and tracks payment statuses. Receivables tracking provides client-specific financial summaries.

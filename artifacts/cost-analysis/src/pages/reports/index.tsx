@@ -177,7 +177,7 @@ function OperationsReport({ rows }: { rows: ReportRow[] }) {
   if (rows.length === 0) return <div className="py-12 text-center text-muted-foreground text-sm">No data available.</div>;
 
   const totalContainers = rows.length;
-  const completedCount = rows.filter(r => r.status === "completed").length;
+  const completedCount = rows.filter(r => r.status === "closed").length;
   const lockedCount = rows.filter(r => r.isLocked).length;
 
   return (
@@ -690,7 +690,7 @@ export default function ReportsPage() {
     if (containerTab === "loss") return c.grossProfit < 0;
     if (containerTab === "profitable") return c.grossProfit > 0;
     if (containerTab === "duty") return c.dutyNotPaid > 0;
-    if (containerTab === "completed") return c.status === "completed";
+    if (containerTab === "completed") return c.status === "closed";
     return true;
   });
 
@@ -925,7 +925,7 @@ export default function ReportsPage() {
                       <DollarSign className="w-3 h-3" /> Outstanding Duty
                     </TabsTrigger>
                     <TabsTrigger value="completed" className="gap-1.5 text-xs">
-                      <CheckCircle2 className="w-3 h-3" /> Completed
+                      <CheckCircle2 className="w-3 h-3" /> Closed
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>

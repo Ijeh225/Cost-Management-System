@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Search, ChevronLeft, ChevronRight,
   AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown,
-  X, Filter, Trash2, Loader2, Plus,
+  X, Filter, Trash2, Loader2, Plus, ShieldCheck,
 } from "lucide-react";
 import { getShippingLine } from "@/lib/tracking";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,7 +24,7 @@ type SortField = "containerNumber" | "customerName" | "declaration" | "status" |
 type SortDir = "asc" | "desc";
 
 function AgingBadge({ createdAt, status }: { createdAt: string; status: string }) {
-  if (["completed", "closed"].includes(status)) return null;
+  if (status === "closed") return null;
   const ageDays = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24));
   if (ageDays >= 90) return <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/20 text-red-400 border border-red-500/30">{ageDays}d</span>;
   if (ageDays >= 60) return <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-500/20 text-orange-400 border border-orange-500/30">{ageDays}d</span>;
@@ -84,6 +84,12 @@ export default function Containers() {
     { page, limit, ...(debouncedSearch ? { search: debouncedSearch } : {}), ...(status !== "all" ? { status } : {}) },
     {}
   );
+
+  const { data: pendingData } = useListContainers(
+    { page: 1, limit: 100, status: "pending_verification" },
+    { query: { enabled: isAdmin } }
+  );
+  const pendingCount = pendingData?.total ?? 0;
 
   const hasActiveFilters = status !== "all" || profitFilter !== "all" || dateFrom || dateTo;
 
@@ -186,6 +192,28 @@ export default function Containers() {
           </Button>
         )}
       </div>
+
+      {isAdmin && pendingCount > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center gap-4">
+          <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
+          <div className="flex-1">
+            <h4 className="font-semibold text-amber-400 text-sm">
+              {pendingCount} Container{pendingCount !== 1 ? "s" : ""} Awaiting Verification
+            </h4>
+            <p className="text-xs text-amber-300/70 mt-0.5">
+              New containers must be verified before they enter the operational pipeline.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 shrink-0"
+            onClick={() => { setStatus("pending_verification"); setPage(1); }}
+          >
+            View Pending ({pendingCount})
+          </Button>
+        </div>
+      )}
 
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm shadow-lg overflow-hidden">
         {/* Search + filter bar */}
@@ -406,7 +434,7 @@ export default function Containers() {
                       <td className="px-4 py-4">
                         {(() => {
                           const dueDate = container.nextActionDueDate ? new Date(container.nextActionDueDate) : null;
-                          const isOverdue = dueDate !== null && dueDate < new Date() && !["completed", "closed"].includes(container.status);
+                          const isOverdue = dueDate !== null && dueDate < new Date() && container.status !== "closed";
                           return (
                             <div className="space-y-1">
                               {container.stageOwner ? (

@@ -123,6 +123,22 @@ export function useUpdateDeliveryExecution() {
   });
 }
 
+export function useVerifyContainer() {
+  const qc = useQueryClient();
+  return useMutation<Record<string, unknown>, Error, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch(`/api/containers/${id}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["/api/containers"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
 export type CheckDuplicatesRequest = {
   containerNumbers: string[];
   blNumbers: string[];
