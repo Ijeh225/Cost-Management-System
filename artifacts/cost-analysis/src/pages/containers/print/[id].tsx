@@ -18,14 +18,17 @@ export default function ContainerPrintPage() {
 
   const c = container as any;
   const charges = c.charges ?? {};
-  const totalCost = charges.totalCost ?? 0;
-  const clearingCharges = charges.clearingCharges ?? parseFloat(c.clearingCharges ?? "0");
-  const grossProfit = charges.grossProfit ?? (clearingCharges - totalCost);
 
   const extraCharges: Array<{ id: number; section: string; label: string; amount: number; sortOrder: number }> =
     (c.extraCharges ?? []).slice().sort((a: any, b: any) =>
       a.sortOrder !== b.sortOrder ? a.sortOrder - b.sortOrder : a.id - b.id
     );
+
+  const extraChargesTotal = extraCharges.reduce((sum, ch) => sum + Number(ch.amount), 0);
+  const fixedTotalCost = charges.totalCost ?? 0;
+  const totalCost = fixedTotalCost + extraChargesTotal;
+  const clearingCharges = charges.clearingCharges ?? parseFloat(c.clearingCharges ?? "0");
+  const grossProfit = clearingCharges - totalCost;
 
   const sectionData = [
     { title: "Shipping Charges",   key: "shipping",   data: charges.shipping   ?? {} },
@@ -147,7 +150,7 @@ export default function ContainerPrintPage() {
                   {sectionExtras.map(e => (
                     <tr key={`extra-${e.id}`} style={{ borderTop: entries.length > 0 ? undefined : "none" }}>
                       <td style={{ color: "#6366f1", fontStyle: "italic" }}>{e.label}</td>
-                      <td>{formatCurrency(e.amount)}</td>
+                      <td>{formatCurrency(Number(e.amount))}</td>
                     </tr>
                   ))}
                 </tbody>
