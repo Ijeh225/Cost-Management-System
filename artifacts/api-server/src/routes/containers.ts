@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable } from "@workspace/db";
-import { eq, ilike, or, sql, desc, and, inArray, ne } from "drizzle-orm";
+import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
@@ -364,7 +364,7 @@ router.get("/containers/paar-status", requireAuth, async (req, res) => {
         createdAt: containersTable.createdAt,
       })
       .from(containersTable)
-      .where(ne(containersTable.status, "pending_verification"))
+      .where(isNotNull(containersTable.verifiedAt))
       .orderBy(desc(containersTable.createdAt));
 
     const items = rows.map(r => ({
@@ -401,7 +401,7 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
     })
       .from(containersTable)
       .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id))
-      .where(ne(containersTable.status, "pending_verification"));
+      .where(isNotNull(containersTable.verifiedAt));
 
     const stages: Record<string, Array<{
       id: number;

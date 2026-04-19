@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "wouter";
 import { useGetPipeline, useAdvanceContainerStatus, type PipelineContainer } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Loader2, Activity, RefreshCw, Clock, AlertTriangle, ChevronRight, User,
+  Loader2, Activity, RefreshCw, Clock, AlertTriangle, ChevronRight, User, Target,
 } from "lucide-react";
+
+const PIPELINE_STAGES = WORKFLOW_STAGES.filter(s => s.value !== "pending_verification");
 
 function daysColor(days: number): string {
   if (days > 14) return "border-l-red-500 bg-red-500/5";
@@ -214,7 +216,7 @@ function StageColumn({
               key={c.id}
               container={c}
               isAdmin={isAdmin}
-              isLast={stage.value === WORKFLOW_STAGES[WORKFLOW_STAGES.length - 1].value}
+              isLast={stage.value === PIPELINE_STAGES[PIPELINE_STAGES.length - 1].value}
             />
           ))
         )}
@@ -230,14 +232,26 @@ export default function OperationsPage() {
     query: { refetchInterval: 60_000 },
   });
 
-  const lastRefreshed = dataUpdatedAt ? new Date(dataUpdatedAt) : new Date();
+  const scrollRef = useRef<HTMLDivElement>(null);
 
+  const lastRefreshed = dataUpdatedAt ? new Date(dataUpdatedAt) : new Date();
   const handleManualRefresh = () => { refetch(); };
 
   const stages = data?.stages ?? {};
   const total = data?.total ?? 0;
-
   const totalStuck = Object.values(stages).flat().filter(c => c.daysInStage > 7).length;
+
+  const activeStages = PIPELINE_STAGES.filter(s => (stages[s.value] ?? []).length > 0);
+
+  const jumpToStage = (stageValue: string) => {
+    const container = scrollRef.current;
+    if (container) {
+      const idx = PIPELINE_STAGES.findIndex(s => s.value === stageValue);
+      if (idx >= 0) {
+        container.scrollTo({ left: idx * 248, behavior: "smooth" });
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -250,7 +264,7 @@ export default function OperationsPage() {
           <p className="text-sm text-muted-foreground">
             {isLoading
               ? "Loading…"
-              : `${total} container${total !== 1 ? "s" : ""} across all stages${totalStuck > 0 ? ` · ${totalStuck} need attention` : ""}`}
+              : `${total} approved job${total !== 1 ? "s" : ""} in pipeline${totalStuck > 0 ? ` · ${totalStuck} need attention` : ""}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -276,14 +290,45 @@ export default function OperationsPage() {
         </div>
       </div>
 
+      {/* Active stage jump bar */}
+      {!isLoading && (
+        <div className="px-6 py-2 border-b border-border/30 shrink-0 flex items-center gap-2 flex-wrap bg-secondary/10">
+          <Target className="w-3 h-3 text-muted-foreground shrink-0" />
+          <span className="text-[11px] text-muted-foreground shrink-0">Active:</span>
+          {activeStages.length === 0 ? (
+            <span className="text-[11px] text-muted-foreground/50 italic">No approved jobs in pipeline yet</span>
+          ) : (
+            activeStages.map(s => {
+              const count = (stages[s.value] ?? []).length;
+              const stuck = (stages[s.value] ?? []).filter(c => c.daysInStage > 7).length;
+              return (
+                <button
+                  key={s.value}
+                  onClick={() => jumpToStage(s.value)}
+                  className={`inline-flex items-center gap-1.5 text-[11px] font-medium rounded-full px-2.5 py-0.5 border transition-colors cursor-pointer
+                    ${stuck > 0
+                      ? "text-amber-400 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20"
+                      : "text-primary bg-primary/10 border-primary/20 hover:bg-primary/20"
+                    }`}
+                >
+                  {s.label}
+                  <span className="font-mono">{count}</span>
+                  {stuck > 0 && <AlertTriangle className="w-2.5 h-2.5" />}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex items-center justify-center flex-1">
           <Loader2 className="w-7 h-7 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="flex-1 overflow-x-auto">
-          <div className="flex gap-4 p-6 h-full" style={{ minWidth: `${WORKFLOW_STAGES.length * 232}px` }}>
-            {WORKFLOW_STAGES.map(stage => (
+        <div className="flex-1 overflow-x-auto" ref={scrollRef}>
+          <div className="flex gap-4 p-6 h-full" style={{ minWidth: `${PIPELINE_STAGES.length * 232}px` }}>
+            {PIPELINE_STAGES.map(stage => (
               <StageColumn
                 key={stage.value}
                 stage={stage}
