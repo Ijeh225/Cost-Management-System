@@ -139,6 +139,53 @@ export function useVerifyContainer() {
   });
 }
 
+export type PaarStatusItem = {
+  id: number;
+  containerNumber: string;
+  blNumber: string;
+  customerName: string;
+  status: string;
+  paarOfficer: string | null;
+  paarReleasedAt: string | null;
+  paarDelayReason: string | null;
+  createdAt: string;
+};
+
+export type PaarStatusResponse = {
+  containers: PaarStatusItem[];
+  total: number;
+};
+
+export function useGetPaarStatus(options?: { query?: { refetchInterval?: number; enabled?: boolean } }) {
+  return useQuery<PaarStatusResponse>({
+    queryKey: ["containers", "paar-status"],
+    queryFn: () => customFetch<PaarStatusResponse>("/api/containers/paar-status"),
+    ...(options?.query ?? {}),
+  });
+}
+
+export type PaarFields = {
+  paarOfficer?: string | null;
+  paarReleasedAt?: string | null;
+  paarDelayReason?: string | null;
+};
+
+export function useUpdatePaar() {
+  const qc = useQueryClient();
+  return useMutation<Record<string, unknown>, Error, { id: number } & PaarFields>({
+    mutationFn: ({ id, ...fields }) =>
+      customFetch(`/api/containers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(fields),
+        headers: { "Content-Type": "application/json" },
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["containers", "paar-status"] });
+    },
+  });
+}
+
 export type CheckDuplicatesRequest = {
   containerNumbers: string[];
   blNumbers: string[];

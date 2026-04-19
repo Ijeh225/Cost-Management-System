@@ -5,6 +5,7 @@ import {
   useUpdateContainer,
   useAdvanceContainerStatus,
   useGetContainerAuditLog,
+  useUpdatePaar,
   type Container,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -39,6 +40,7 @@ import {
   RotateCcw,
   Container as ContainerIcon,
   Ship,
+  FileCheck2,
 } from "lucide-react";
 
 const PIPELINE_STAGES = WORKFLOW_STAGES.filter(
@@ -380,6 +382,154 @@ function OperationalForm({
   );
 }
 
+function PaarPanel({
+  container,
+  isAdmin,
+}: {
+  container: Container;
+  isAdmin: boolean;
+}) {
+  const { toast } = useToast();
+  const updatePaar = useUpdatePaar();
+  const [editing, setEditing] = useState(false);
+  const [officer, setOfficer] = useState(container.paarOfficer ?? "");
+  const [releasedAt, setReleasedAt] = useState(
+    container.paarReleasedAt ? container.paarReleasedAt.slice(0, 10) : ""
+  );
+  const [delayReason, setDelayReason] = useState(container.paarDelayReason ?? "");
+
+  useEffect(() => {
+    setOfficer(container.paarOfficer ?? "");
+    setReleasedAt(container.paarReleasedAt ? container.paarReleasedAt.slice(0, 10) : "");
+    setDelayReason(container.paarDelayReason ?? "");
+    setEditing(false);
+  }, [container.id, container.updatedAt]);
+
+  const handleSave = async () => {
+    try {
+      await updatePaar.mutateAsync({
+        id: container.id,
+        paarOfficer: officer || null,
+        paarReleasedAt: releasedAt || null,
+        paarDelayReason: delayReason || null,
+      });
+      toast({ title: "PAAR status updated" });
+      setEditing(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
+
+  const isReleased = !!container.paarReleasedAt;
+
+  return (
+    <Card className={`border backdrop-blur-sm ${isReleased ? "border-emerald-500/20 bg-emerald-500/5" : container.paarDelayReason ? "border-amber-500/20 bg-amber-500/5" : "border-border/50 bg-card/40"}`}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <FileCheck2 className={`w-4 h-4 ${isReleased ? "text-emerald-400" : container.paarDelayReason ? "text-amber-400" : "text-muted-foreground"}`} />
+            Documentation / PAAR Status
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            {isReleased ? (
+              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 py-0.5">
+                <CheckCircle2 className="w-2.5 h-2.5" />
+                Released
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5">
+                <Clock className="w-2.5 h-2.5" />
+                {container.paarDelayReason ? "Delayed" : "Pending"}
+              </span>
+            )}
+            {isAdmin && !editing && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditing(true)}
+                className="h-6 text-[10px] px-2"
+              >
+                Update
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 text-xs">
+        {!editing ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <User className="w-3 h-3 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Officer:</span>
+              <span className="text-foreground/80">{container.paarOfficer ?? "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3 h-3 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Released:</span>
+              <span className={container.paarReleasedAt ? "text-emerald-400 font-medium" : "text-muted-foreground/50"}>
+                {container.paarReleasedAt
+                  ? new Date(container.paarReleasedAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })
+                  : "Not yet released"}
+              </span>
+            </div>
+            {container.paarDelayReason && (
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                <span className="text-amber-400/80 leading-relaxed">{container.paarDelayReason}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Documentation Officer</Label>
+                <Input
+                  value={officer}
+                  onChange={(e) => setOfficer(e.target.value)}
+                  placeholder="Officer name"
+                  className="h-7 text-xs bg-background border-border/60"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">PAAR Release Date</Label>
+                <Input
+                  type="date"
+                  value={releasedAt}
+                  onChange={(e) => setReleasedAt(e.target.value)}
+                  className="h-7 text-xs bg-background border-border/60"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">
+                Delay Reason <span className="text-muted-foreground/50">(if PAAR not ready)</span>
+              </Label>
+              <Textarea
+                value={delayReason}
+                onChange={(e) => setDelayReason(e.target.value)}
+                placeholder="State why PAAR is delayed"
+                rows={2}
+                className="text-xs bg-background border-border/60 resize-none"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSave} disabled={updatePaar.isPending} className="h-7 gap-1 text-xs">
+                {updatePaar.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)} className="h-7 text-xs text-muted-foreground">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function AuditLog({ containerId }: { containerId: number }) {
   const { data: log, isLoading } = useGetContainerAuditLog(containerId);
 
@@ -574,8 +724,12 @@ export default function OperationDetailPage({ params }: { params: { id: string }
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-4">
           <OperationalForm
+            container={container}
+            isAdmin={isAdmin ?? false}
+          />
+          <PaarPanel
             container={container}
             isAdmin={isAdmin ?? false}
           />

@@ -36,6 +36,9 @@ export const containersTable = pgTable("containers", {
   offloadingConfirmed: boolean("offloading_confirmed").notNull().default(false),
   emptyReturnDueDate: timestamp("empty_return_due_date"),
   emptyReturnDate: timestamp("empty_return_date"),
+  paarOfficer: text("paar_officer"),
+  paarReleasedAt: timestamp("paar_released_at"),
+  paarDelayReason: text("paar_delay_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

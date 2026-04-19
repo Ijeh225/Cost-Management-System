@@ -126,6 +126,9 @@ export interface Container {
   nextAction?: string | null;
   nextActionDueDate?: string | null;
   delayReason?: string | null;
+  paarOfficer?: string | null;
+  paarReleasedAt?: string | null;
+  paarDelayReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -163,6 +166,9 @@ export interface UpdateContainerRequest {
   nextAction?: string | null;
   nextActionDueDate?: string | null;
   delayReason?: string | null;
+  paarOfficer?: string | null;
+  paarReleasedAt?: string | null;
+  paarDelayReason?: string | null;
 }
 
 export interface UploadRow {

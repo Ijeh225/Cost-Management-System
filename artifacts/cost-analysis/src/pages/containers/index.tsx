@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Search, ChevronLeft, ChevronRight,
   AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown,
-  X, Filter, Trash2, Loader2, Plus, ShieldCheck,
+  X, Filter, Trash2, Loader2, Plus, ShieldCheck, FileCheck2, Clock,
 } from "lucide-react";
 import { getShippingLine } from "@/lib/tracking";
 import { motion, AnimatePresence } from "framer-motion";
@@ -429,6 +429,15 @@ export default function Containers() {
                             {getStatusLabel(container.status)}
                           </span>
                           <AgingBadge createdAt={container.createdAt} status={container.status} />
+                          {container.paarReleasedAt ? (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-1.5 py-0.5">
+                              <FileCheck2 className="w-2.5 h-2.5" /> PAAR
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-400/70 bg-amber-500/5 border border-amber-500/20 rounded-full px-1.5 py-0.5">
+                              <Clock className="w-2.5 h-2.5" /> PAAR
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-4">

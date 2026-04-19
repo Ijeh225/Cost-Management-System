@@ -66,6 +66,9 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     offloadingConfirmed: c.offloadingConfirmed ?? false,
     emptyReturnDueDate: c.emptyReturnDueDate instanceof Date ? c.emptyReturnDueDate.toISOString() : (c.emptyReturnDueDate ?? null),
     emptyReturnDate: c.emptyReturnDate instanceof Date ? c.emptyReturnDate.toISOString() : (c.emptyReturnDate ?? null),
+    paarOfficer: c.paarOfficer ?? null,
+    paarReleasedAt: c.paarReleasedAt instanceof Date ? c.paarReleasedAt.toISOString() : (c.paarReleasedAt ?? null),
+    paarDelayReason: c.paarDelayReason ?? null,
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
   };
@@ -346,6 +349,42 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
   }
 });
 
+router.get("/containers/paar-status", requireAuth, async (req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: containersTable.id,
+        containerNumber: containersTable.containerNumber,
+        blNumber: containersTable.blNumber,
+        customerName: containersTable.customerName,
+        status: containersTable.status,
+        paarOfficer: containersTable.paarOfficer,
+        paarReleasedAt: containersTable.paarReleasedAt,
+        paarDelayReason: containersTable.paarDelayReason,
+        createdAt: containersTable.createdAt,
+      })
+      .from(containersTable)
+      .where(ne(containersTable.status, "pending_verification"))
+      .orderBy(desc(containersTable.createdAt));
+
+    const items = rows.map(r => ({
+      id: r.id,
+      containerNumber: r.containerNumber,
+      blNumber: r.blNumber,
+      customerName: r.customerName,
+      status: r.status,
+      paarOfficer: r.paarOfficer ?? null,
+      paarReleasedAt: r.paarReleasedAt instanceof Date ? r.paarReleasedAt.toISOString() : (r.paarReleasedAt ?? null),
+      paarDelayReason: r.paarDelayReason ?? null,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+    }));
+
+    res.json({ containers: items, total: items.length });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 router.get("/containers/pipeline", requireAuth, async (req, res) => {
   try {
     const now = new Date();
@@ -614,6 +653,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       deliveredAt, stageOwner, nextAction, nextActionDueDate, delayReason,
       deliveryTime, deliveryLocation, truckNumber, driverName, driverPhone,
       dispatchOfficer, deliveryStatus, offloadingConfirmed, emptyReturnDueDate, emptyReturnDate,
+      paarOfficer, paarReleasedAt, paarDelayReason,
     } = req.body;
     if (deliveredAt !== undefined && deliveredAt !== null) {
       if (typeof deliveredAt !== "string" || !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(deliveredAt) || isNaN(new Date(deliveredAt).getTime())) {
@@ -674,6 +714,26 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       const prev = existing.delayReason ?? null;
       updates.delayReason = delayReason || null;
       if (prev !== (delayReason || null)) changed.push(`Delay Reason: "${prev ?? "—"}" → "${delayReason || "—"}"`);
+    }
+    if (paarOfficer !== undefined) {
+      updates.paarOfficer = paarOfficer || null;
+      changed.push(`PAAR Officer: "${paarOfficer || "—"}"`);
+    }
+    if (paarReleasedAt !== undefined) {
+      if (paarReleasedAt !== null && paarReleasedAt !== "") {
+        if (typeof paarReleasedAt !== "string" || isNaN(new Date(paarReleasedAt as string).getTime())) {
+          res.status(400).json({ error: "Invalid paarReleasedAt — expected ISO 8601 date format" });
+          return;
+        }
+        updates.paarReleasedAt = new Date(paarReleasedAt as string);
+        changed.push(`PAAR Released: ${paarReleasedAt}`);
+      } else {
+        updates.paarReleasedAt = null;
+      }
+    }
+    if (paarDelayReason !== undefined) {
+      updates.paarDelayReason = paarDelayReason || null;
+      if (paarDelayReason) changed.push(`PAAR Delay: "${paarDelayReason}"`);
     }
     if (Object.keys(updates).length === 1) {
       res.status(400).json({ error: "No valid fields to update" });

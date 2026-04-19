@@ -33,6 +33,7 @@ import InvoicePrintPage from "@/pages/invoices/print/[id]";
 import PipelinePage from "@/pages/pipeline/index";
 import OperationsPage from "@/pages/operations/index";
 import OperationDetailPage from "@/pages/operations/[id]";
+import DocumentationPage from "@/pages/documentation/index";
 import ArPage from "@/pages/ar/index";
 import ClientStatementPrint from "@/pages/reports/client-statement/print";
 import VatSummaryPrint from "@/pages/reports/vat-summary/print";
@@ -160,6 +161,7 @@ function Router() {
               <Route path="/notifications" component={NotificationsPage} />
               <Route path="/operations" component={OperationsPage} />
               <Route path="/operations/:id" component={OperationDetailPage} />
+              <Route path="/documentation" component={DocumentationPage} />
               <Route path="/pipeline" component={PipelinePage} />
               <Route path="/accounts-receivable" component={ArPage} />
               <Route path="/invoices" component={InvoicesPage} />
