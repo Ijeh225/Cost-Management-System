@@ -1,0 +1,97 @@
+I would like us to refine the Operations module to improve usability and workflow efficiency.
+1. Navigation in Job Pipeline
+Currently, when navigating through a job’s pipeline stages (e.g., Shipping/Terminal to Trailers), there is no option to move backward.
+We should introduce a back navigation feature (such as an arrow or button) that allows users to easily return to previous stages—for example, from Shipping back to Duty Payment or Documentation. This will make the workflow more flexible and user-friendly.
+
+2. Search Functionality in Operations Page
+On the Operations page, the current search behavior is not appropriate.
+
+
+At the moment, when a user searches for a job, it redirects to the container financial details page, which is not expected.
+
+
+The search should instead work within the Operations page itself.
+
+
+What we need:
+
+
+The search bar should display relevant jobs directly within the Operations page
+
+
+Users should be able to view and filter jobs under Operations without being redirected elsewhere
+
+
+Filters should include job stages such as:
+
+
+Documentation
+
+
+Duty Assessment
+
+
+Duty Payment
+
+
+Trailer Stage
+
+
+Completed/Closed Jobs
+
+
+
+
+
+3. Filter Issues
+The current filtering system is not functioning correctly.
+
+
+Selecting filters like:
+
+
+Pending Verification
+
+
+Registered Jobs
+
+
+Duty Assessment
+
+
+Documentation
+returns “no container file matching your criteria”, even when such jobs exist
+
+
+
+
+Only the Closed Jobs filter appears to return results correctly
+
+
+This needs to be fixed so that all filters return accurate and consistent results.
+
+4. Search Behavior on Container Page
+The same issue exists on the container page.
+
+
+When using the search function, it redirects to the financial status page, which is incorrect
+
+
+Searches should remain within the current page context and return relevant results there
+
+
+In general, search functionality across the system should be context-based, not redirecting users away from their current workflow.
+
+5. Separation of Shipping and Terminal
+In the Operations workflow, Shipping and Terminal are currently merged, but they represent different stages.
+We need to:
+
+
+Separate Shipping and Terminal into distinct stages
+
+
+Ensure each stage is independently tracked and managed
+
+
+
+Overall, these improvements will make the Operations module more intuitive, flexible, and aligned with real operational processes.

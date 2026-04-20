@@ -46,7 +46,7 @@ export function GlobalSearch() {
       id: c.id,
       label: c.containerNumber,
       sub: [c.customerName, STATUS_LABEL[c.status] ?? c.status].filter(Boolean).join(" · "),
-      href: `/containers/${c.id}`,
+      href: `/operations/${c.id}`,
     })),
     ...(data?.clients ?? []).map(cl => ({
       type: "client" as const,

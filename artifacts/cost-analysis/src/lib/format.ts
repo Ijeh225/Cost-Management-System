@@ -14,20 +14,21 @@ export function formatNumber(amount: number | null | undefined): string {
 }
 
 export const WORKFLOW_STAGES = [
-  { value: "pending_verification",      label: "Pending Verification",      short: "Pending" },
-  { value: "registered",               label: "Registered",                short: "Registered" },
-  { value: "documentation",            label: "Documentation",             short: "Docs" },
-  { value: "duty_assessment",          label: "Duty Assessment",           short: "Assessment" },
-  { value: "duty_payment",             label: "Duty Payment",              short: "Duty Pmt" },
-  { value: "transire_processing",      label: "Transire Processing",       short: "Transire" },
-  { value: "shipping_terminal_payment",label: "Shipping/Terminal Payment", short: "Shpg/Term" },
-  { value: "pull_out",                 label: "Pull-Out",                  short: "Pull-Out" },
-  { value: "gate_in",                  label: "Gate-In (Bonded Terminal)", short: "Gate-In" },
-  { value: "examination",              label: "Examination",               short: "Exam" },
-  { value: "final_release",            label: "Final Release",             short: "Release" },
-  { value: "delivery",                 label: "Delivery",                  short: "Delivery" },
-  { value: "empty_return",             label: "Empty Return",              short: "Empty Ret." },
-  { value: "closed",                   label: "Closed",                    short: "Closed" },
+  { value: "pending_verification", label: "Pending Verification",      short: "Pending" },
+  { value: "registered",          label: "Registered",                short: "Registered" },
+  { value: "documentation",       label: "Documentation",             short: "Docs" },
+  { value: "duty_assessment",     label: "Duty Assessment",           short: "Assessment" },
+  { value: "duty_payment",        label: "Duty Payment",              short: "Duty Pmt" },
+  { value: "transire_processing", label: "Transire Processing",       short: "Transire" },
+  { value: "shipping_payment",    label: "Shipping Payment",          short: "Shpg. Pmt" },
+  { value: "terminal_payment",    label: "Terminal Payment",          short: "Term. Pmt" },
+  { value: "pull_out",            label: "Pull-Out",                  short: "Pull-Out" },
+  { value: "gate_in",             label: "Gate-In (Bonded Terminal)", short: "Gate-In" },
+  { value: "examination",         label: "Examination",               short: "Exam" },
+  { value: "final_release",       label: "Final Release",             short: "Release" },
+  { value: "delivery",            label: "Delivery",                  short: "Delivery" },
+  { value: "empty_return",        label: "Empty Return",              short: "Empty Ret." },
+  { value: "closed",              label: "Closed",                    short: "Closed" },
 ];
 
 export function getNextStage(current: string): string | null {
@@ -36,15 +37,22 @@ export function getNextStage(current: string): string | null {
   return WORKFLOW_STAGES[idx + 1].value;
 }
 
+export function getPreviousStage(current: string): string | null {
+  const idx = WORKFLOW_STAGES.findIndex(s => s.value === current);
+  if (idx <= 1) return null;
+  return WORKFLOW_STAGES[idx - 1].value;
+}
+
 export function getStageIndex(status: string): number {
   return WORKFLOW_STAGES.findIndex(s => s.value === status);
 }
 
 export const STAGE_SECTION: Record<string, string> = {
-  shipping_terminal_payment: "shipping",
-  examination:               "customs",
-  gate_in:                   "terminal",
-  delivery:                  "delivery",
+  shipping_payment: "shipping",
+  terminal_payment: "terminal",
+  examination:      "customs",
+  gate_in:          "terminal",
+  delivery:         "delivery",
 };
 
 export function canEditSection(
@@ -70,7 +78,8 @@ export function getStatusColor(status: string): string {
     duty_assessment:           "bg-amber-500/20 text-amber-400 border-amber-500/50",
     duty_payment:              "bg-orange-500/20 text-orange-400 border-orange-500/50",
     transire_processing:       "bg-rose-500/20 text-rose-400 border-rose-500/50",
-    shipping_terminal_payment: "bg-blue-500/20 text-blue-400 border-blue-500/50",
+    shipping_payment:          "bg-blue-500/20 text-blue-400 border-blue-500/50",
+    terminal_payment:          "bg-sky-600/20 text-sky-400 border-sky-600/50",
     pull_out:                  "bg-sky-500/20 text-sky-400 border-sky-500/50",
     gate_in:                   "bg-cyan-500/20 text-cyan-400 border-cyan-500/50",
     examination:               "bg-purple-500/20 text-purple-400 border-purple-500/50",

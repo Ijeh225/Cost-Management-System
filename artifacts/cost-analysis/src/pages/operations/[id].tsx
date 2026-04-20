@@ -15,6 +15,7 @@ import {
   getStatusLabel,
   getStatusColor,
   getNextStage,
+  getPreviousStage,
 } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
+  ChevronLeft,
   ChevronRight,
   ExternalLink,
   Loader2,
@@ -167,6 +169,9 @@ function OperationalForm({
 
   const nextStage = getNextStage(container.status);
   const nextStageLabel = nextStage ? getStatusLabel(nextStage) : null;
+  const prevStage = getPreviousStage(container.status);
+  const prevStageLabel = prevStage ? getStatusLabel(prevStage) : null;
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
 
   const handleAdvance = async () => {
     if (!nextStage) return;
@@ -175,6 +180,18 @@ function OperationalForm({
       toast({ title: `Advanced to ${nextStageLabel}` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to advance";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
+
+  const handleMoveBack = async () => {
+    if (!prevStage) return;
+    try {
+      await advanceMutation.mutateAsync({ id: container.id, status: prevStage });
+      toast({ title: `Moved back to ${prevStageLabel}` });
+      setShowBackConfirm(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to move back";
       toast({ variant: "destructive", title: "Error", description: msg });
     }
   };
@@ -357,6 +374,71 @@ function OperationalForm({
                 {nextStageLabel}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && prevStage && (
+        <Card className="border-border/40 bg-card/30 backdrop-blur-sm">
+          <CardContent className="pt-4">
+            {!showBackConfirm ? (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-foreground/80">Move Back a Stage</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Return to{" "}
+                    <span className="font-medium text-foreground/70">{prevStageLabel}</span>
+                    {" "}if corrections are needed
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBackConfirm(true)}
+                  className="gap-2 shrink-0 border-border/60 text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  {prevStageLabel}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-amber-400 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Confirm move back to{" "}
+                  <span className="font-medium">{prevStageLabel}</span>?
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  This will move the container from{" "}
+                  <span className="font-medium text-foreground/70">{getStatusLabel(container.status)}</span>
+                  {" "}back to{" "}
+                  <span className="font-medium text-amber-400">{prevStageLabel}</span>.
+                  The action is logged and can be reversed.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleMoveBack}
+                    disabled={advanceMutation.isPending}
+                    className="gap-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                  >
+                    {advanceMutation.isPending
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <ChevronLeft className="w-3.5 h-3.5" />}
+                    Confirm Move Back
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowBackConfirm(false)}
+                    className="text-muted-foreground"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

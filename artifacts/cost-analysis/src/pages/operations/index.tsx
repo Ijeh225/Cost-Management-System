@@ -6,9 +6,10 @@ import { useToast } from "@/hooks/use-toast";
 import { WORKFLOW_STAGES, getNextStage, getStatusColor, getStatusLabel } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Loader2, Activity, RefreshCw, Clock, AlertTriangle, ChevronRight, User, Target,
+  Loader2, Activity, RefreshCw, Clock, AlertTriangle, ChevronRight, User, Target, Search, X,
 } from "lucide-react";
 
 const PIPELINE_STAGES = WORKFLOW_STAGES.filter(s => s.value !== "pending_verification");
@@ -233,15 +234,36 @@ export default function OperationsPage() {
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [search, setSearch] = useState("");
+  const [stageFilter, setStageFilter] = useState<string>("all");
 
   const lastRefreshed = dataUpdatedAt ? new Date(dataUpdatedAt) : new Date();
   const handleManualRefresh = () => { refetch(); };
 
-  const stages = data?.stages ?? {};
+  const rawStages = data?.stages ?? {};
   const total = data?.total ?? 0;
-  const totalStuck = Object.values(stages).flat().filter(c => c.daysInStage > 7).length;
+  const totalStuck = Object.values(rawStages).flat().filter(c => c.daysInStage > 7).length;
 
-  const activeStages = PIPELINE_STAGES.filter(s => (stages[s.value] ?? []).length > 0);
+  const searchLower = search.toLowerCase();
+  const stages: typeof rawStages = {};
+  for (const [key, containers] of Object.entries(rawStages)) {
+    let filtered = containers;
+    if (search) {
+      filtered = filtered.filter(c =>
+        c.containerNumber.toLowerCase().includes(searchLower) ||
+        c.blNumber.toLowerCase().includes(searchLower) ||
+        (c.customerName ?? "").toLowerCase().includes(searchLower) ||
+        (c.stageOwner ?? "").toLowerCase().includes(searchLower)
+      );
+    }
+    stages[key] = filtered;
+  }
+
+  const visiblePipelineStages = stageFilter === "all"
+    ? PIPELINE_STAGES
+    : PIPELINE_STAGES.filter(s => s.value === stageFilter);
+
+  const activeStages = PIPELINE_STAGES.filter(s => (rawStages[s.value] ?? []).length > 0);
 
   const jumpToStage = (stageValue: string) => {
     const container = scrollRef.current;
@@ -290,6 +312,46 @@ export default function OperationsPage() {
         </div>
       </div>
 
+      {/* Search + Stage filter bar */}
+      {!isLoading && (
+        <div className="px-6 py-2.5 border-b border-border/30 shrink-0 flex items-center gap-3 bg-background/40">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search container, BL, customer…"
+              className="pl-8 h-7 text-xs bg-background border-border/60"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-1 flex-wrap">
+            <button
+              onClick={() => setStageFilter("all")}
+              className={`text-[11px] px-2.5 py-0.5 rounded-full border transition-colors ${stageFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground border-border/50 hover:border-border"}`}
+            >
+              All Stages
+            </button>
+            {PIPELINE_STAGES.filter(s => s.value !== "closed").map(s => (
+              <button
+                key={s.value}
+                onClick={() => setStageFilter(s.value === stageFilter ? "all" : s.value)}
+                className={`text-[11px] px-2.5 py-0.5 rounded-full border transition-colors ${stageFilter === s.value ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground border-border/50 hover:border-border"}`}
+              >
+                {s.short}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Active stage jump bar */}
       {!isLoading && (
         <div className="px-6 py-2 border-b border-border/30 shrink-0 flex items-center gap-2 flex-wrap bg-secondary/10">
@@ -327,8 +389,8 @@ export default function OperationsPage() {
         </div>
       ) : (
         <div className="flex-1 overflow-x-auto" ref={scrollRef}>
-          <div className="flex gap-4 p-6 h-full" style={{ minWidth: `${PIPELINE_STAGES.length * 232}px` }}>
-            {PIPELINE_STAGES.map(stage => (
+          <div className="flex gap-4 p-6 h-full" style={{ minWidth: `${visiblePipelineStages.length * 232}px` }}>
+            {visiblePipelineStages.map(stage => (
               <StageColumn
                 key={stage.value}
                 stage={stage}
