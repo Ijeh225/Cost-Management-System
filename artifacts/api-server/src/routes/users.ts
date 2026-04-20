@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, clientsTable, userClientAssignmentsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest, hashPassword } from "../lib/auth.js";
 
 const router = Router();
@@ -114,6 +114,53 @@ router.put("/users/:id", requireAdmin, async (req, res) => {
     const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     res.json(formatUser(user));
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/users/:id/client-assignments", requireAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
+    const rows = await db
+      .select({ id: clientsTable.id, name: clientsTable.name })
+      .from(userClientAssignmentsTable)
+      .innerJoin(clientsTable, eq(userClientAssignmentsTable.clientId, clientsTable.id))
+      .where(eq(userClientAssignmentsTable.userId, userId));
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/users/:id/client-assignments", requireAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
+    const { clientId } = req.body;
+    if (!clientId) { res.status(400).json({ error: "clientId required" }); return; }
+    const existing = await db
+      .select()
+      .from(userClientAssignmentsTable)
+      .where(and(eq(userClientAssignmentsTable.userId, userId), eq(userClientAssignmentsTable.clientId, clientId)));
+    if (existing.length > 0) { res.status(409).json({ error: "Already assigned" }); return; }
+    const [row] = await db.insert(userClientAssignmentsTable).values({ userId, clientId }).returning();
+    res.status(201).json(row);
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.delete("/users/:id/client-assignments/:clientId", requireAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const clientId = parseInt(req.params.clientId);
+    if (isNaN(userId) || isNaN(clientId)) { res.status(400).json({ error: "Invalid IDs" }); return; }
+    await db
+      .delete(userClientAssignmentsTable)
+      .where(and(eq(userClientAssignmentsTable.userId, userId), eq(userClientAssignmentsTable.clientId, clientId)));
+    res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Server error" });
   }

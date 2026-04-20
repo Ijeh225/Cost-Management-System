@@ -49,6 +49,7 @@ export default function Containers() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [profitFilter, setProfitFilter] = useState<string>("all");
+  const [paarFilter, setPaarFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -91,7 +92,7 @@ export default function Containers() {
   );
   const pendingCount = pendingData?.total ?? 0;
 
-  const hasActiveFilters = status !== "all" || profitFilter !== "all" || dateFrom || dateTo;
+  const hasActiveFilters = status !== "all" || profitFilter !== "all" || paarFilter !== "all" || dateFrom || dateTo;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -102,6 +103,8 @@ export default function Containers() {
     if (profitFilter === "profitable" && (c.grossProfit ?? 0) <= 0) return false;
     if (profitFilter === "loss" && (c.grossProfit ?? 0) > 0) return false;
     if (profitFilter === "low" && ((c.grossProfit ?? 0) <= 0 || (c.grossProfit / (c.clearingCharges || 1)) > 0.1)) return false;
+    if (paarFilter === "with_paar" && !c.paarReleasedAt) return false;
+    if (paarFilter === "without_paar" && c.paarReleasedAt) return false;
     if (dateFrom && new Date(c.createdAt) < new Date(dateFrom)) return false;
     if (dateTo && new Date(c.createdAt) > new Date(dateTo + "T23:59:59")) return false;
     return true;
@@ -271,7 +274,7 @@ export default function Containers() {
                 exit={{ opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-border/40 mt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1 border-t border-border/40 mt-1">
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground font-medium">Profit Status</label>
                     <Select value={profitFilter} onValueChange={(v) => { setProfitFilter(v); setPage(1); }}>
@@ -281,6 +284,17 @@ export default function Containers() {
                         <SelectItem value="profitable">Profitable Only</SelectItem>
                         <SelectItem value="low">Low Margin (&lt;10%)</SelectItem>
                         <SelectItem value="loss">Loss-Making</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground font-medium">PAAR Status</label>
+                    <Select value={paarFilter} onValueChange={(v) => { setPaarFilter(v); setPage(1); }}>
+                      <SelectTrigger className="h-8 text-xs bg-background border-border/60"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Jobs</SelectItem>
+                        <SelectItem value="with_paar">Has PAAR</SelectItem>
+                        <SelectItem value="without_paar">No PAAR</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -295,7 +309,7 @@ export default function Containers() {
                 </div>
                 {hasActiveFilters && (
                   <button
-                    onClick={() => { setStatus("all"); setProfitFilter("all"); setDateFrom(""); setDateTo(""); setPage(1); }}
+                    onClick={() => { setStatus("all"); setProfitFilter("all"); setPaarFilter("all"); setDateFrom(""); setDateTo(""); setPage(1); }}
                     className="mt-2 text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
                   >
                     <X className="w-3 h-3" /> Clear all filters

@@ -15,7 +15,6 @@ import {
   getStatusLabel,
   getStatusColor,
   getNextStage,
-  getPreviousStage,
 } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
-  ChevronLeft,
   ChevronRight,
   ExternalLink,
   Loader2,
@@ -54,7 +52,15 @@ function daysAgo(dateStr: string): number {
   return Math.floor(ms / 86_400_000);
 }
 
-function StageRail({ currentStatus }: { currentStatus: string }) {
+function StageRail({
+  currentStatus,
+  onNavigate,
+  isAdmin,
+}: {
+  currentStatus: string;
+  onNavigate?: (stage: string) => void;
+  isAdmin?: boolean;
+}) {
   const currentIdx = PIPELINE_STAGES.findIndex((s) => s.value === currentStatus);
 
   return (
@@ -64,30 +70,40 @@ function StageRail({ currentStatus }: { currentStatus: string }) {
           const isPast = idx < currentIdx;
           const isCurrent = idx === currentIdx;
           const isFuture = idx > currentIdx;
+          const isClickable = isAdmin && !isCurrent && !isFuture;
+
+          const dot = (
+            <div
+              className={`
+                w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all
+                ${isPast ? "bg-primary border-primary" : ""}
+                ${isCurrent ? "bg-primary/20 border-primary ring-2 ring-primary/30" : ""}
+                ${isFuture ? "bg-muted/30 border-border/40" : ""}
+                ${isClickable ? "cursor-pointer hover:scale-110 hover:ring-2 hover:ring-amber-400/50" : ""}
+              `}
+              onClick={isClickable ? () => onNavigate?.(stage.value) : undefined}
+              title={isClickable ? `Navigate to ${stage.label}` : undefined}
+            >
+              {isPast ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-primary-foreground" />
+              ) : isCurrent ? (
+                <Activity className="w-3 h-3 text-primary animate-pulse" />
+              ) : (
+                <Circle className="w-3 h-3 text-border/40" />
+              )}
+            </div>
+          );
 
           return (
             <div key={stage.value} className="flex items-center shrink-0">
               <div className="flex flex-col items-center gap-1">
-                <div
-                  className={`
-                    w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all
-                    ${isPast ? "bg-primary border-primary" : ""}
-                    ${isCurrent ? "bg-primary/20 border-primary ring-2 ring-primary/30" : ""}
-                    ${isFuture ? "bg-muted/30 border-border/40" : ""}
-                  `}
-                >
-                  {isPast ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-primary-foreground" />
-                  ) : isCurrent ? (
-                    <Activity className="w-3 h-3 text-primary animate-pulse" />
-                  ) : (
-                    <Circle className="w-3 h-3 text-border/40" />
-                  )}
-                </div>
+                {dot}
                 <span
                   className={`text-[9px] font-medium text-center max-w-[52px] leading-tight
                     ${isCurrent ? "text-primary" : isPast ? "text-muted-foreground" : "text-muted-foreground/40"}
+                    ${isClickable ? "cursor-pointer hover:text-amber-400" : ""}
                   `}
+                  onClick={isClickable ? () => onNavigate?.(stage.value) : undefined}
                 >
                   {stage.short}
                 </span>
@@ -103,6 +119,11 @@ function StageRail({ currentStatus }: { currentStatus: string }) {
           );
         })}
       </div>
+      {isAdmin && (
+        <p className="text-[9px] text-muted-foreground/50 mt-0.5">
+          Click any completed stage to navigate back to it
+        </p>
+      )}
     </div>
   );
 }
@@ -169,9 +190,6 @@ function OperationalForm({
 
   const nextStage = getNextStage(container.status);
   const nextStageLabel = nextStage ? getStatusLabel(nextStage) : null;
-  const prevStage = getPreviousStage(container.status);
-  const prevStageLabel = prevStage ? getStatusLabel(prevStage) : null;
-  const [showBackConfirm, setShowBackConfirm] = useState(false);
 
   const handleAdvance = async () => {
     if (!nextStage) return;
@@ -184,14 +202,12 @@ function OperationalForm({
     }
   };
 
-  const handleMoveBack = async () => {
-    if (!prevStage) return;
+  const handleNavigateStage = async (targetStage: string) => {
     try {
-      await advanceMutation.mutateAsync({ id: container.id, status: prevStage });
-      toast({ title: `Moved back to ${prevStageLabel}` });
-      setShowBackConfirm(false);
+      await advanceMutation.mutateAsync({ id: container.id, status: targetStage });
+      toast({ title: `Moved to ${getStatusLabel(targetStage)}` });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to move back";
+      const msg = err instanceof Error ? err.message : "Failed to change stage";
       toast({ variant: "destructive", title: "Error", description: msg });
     }
   };
@@ -374,71 +390,6 @@ function OperationalForm({
                 {nextStageLabel}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {isAdmin && prevStage && (
-        <Card className="border-border/40 bg-card/30 backdrop-blur-sm">
-          <CardContent className="pt-4">
-            {!showBackConfirm ? (
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-foreground/80">Move Back a Stage</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Return to{" "}
-                    <span className="font-medium text-foreground/70">{prevStageLabel}</span>
-                    {" "}if corrections are needed
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowBackConfirm(true)}
-                  className="gap-2 shrink-0 border-border/60 text-muted-foreground hover:text-foreground"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  {prevStageLabel}
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-amber-400 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  Confirm move back to{" "}
-                  <span className="font-medium">{prevStageLabel}</span>?
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  This will move the container from{" "}
-                  <span className="font-medium text-foreground/70">{getStatusLabel(container.status)}</span>
-                  {" "}back to{" "}
-                  <span className="font-medium text-amber-400">{prevStageLabel}</span>.
-                  The action is logged and can be reversed.
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleMoveBack}
-                    disabled={advanceMutation.isPending}
-                    className="gap-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
-                  >
-                    {advanceMutation.isPending
-                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      : <ChevronLeft className="w-3.5 h-3.5" />}
-                    Confirm Move Back
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setShowBackConfirm(false)}
-                    className="text-muted-foreground"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
@@ -680,6 +631,8 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   const containerId = parseInt(params.id, 10);
   const { isAdmin } = useAuth();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const navMutation = useAdvanceContainerStatus();
 
   const { data, isLoading, isError } = useGetContainer(containerId, {
     query: { refetchInterval: 30_000 },
@@ -709,6 +662,16 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   const statusColorClass = getStatusColor(container.status);
   const currentStageLabel = getStatusLabel(container.status);
   const isPipeline = container.status !== "pending_verification";
+
+  const handleStageNavigate = async (targetStage: string) => {
+    try {
+      await navMutation.mutateAsync({ id: container.id, status: targetStage });
+      toast({ title: `Moved to ${getStatusLabel(targetStage)}` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to change stage";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -791,7 +754,11 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               Pipeline Progress
             </p>
-            <StageRail currentStatus={container.status} />
+            <StageRail
+              currentStatus={container.status}
+              onNavigate={isAdmin ? handleStageNavigate : undefined}
+              isAdmin={isAdmin ?? false}
+            />
           </CardContent>
         </Card>
       )}

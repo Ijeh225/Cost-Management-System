@@ -7,3 +7,4 @@ export * from "./containers";
 export * from "./reports";
 export * from "./notifications";
 export * from "./search";
+export * from "./user-client-assignments";

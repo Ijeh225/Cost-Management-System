@@ -36,8 +36,38 @@ export function useAdvanceContainerStatus() {
         body: JSON.stringify({ status }),
         headers: { "Content-Type": "application/json" },
       }),
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: [`/api/containers/${id}`] });
+      const prev = qc.getQueryData([`/api/containers/${id}`]);
+      qc.setQueryData([`/api/containers/${id}`], (old: any) => {
+        if (!old?.container) return old;
+        return { ...old, container: { ...old.container, status, updatedAt: new Date().toISOString() } };
+      });
+      qc.setQueryData(["containers", "pipeline"], (old: any) => {
+        if (!old?.stages) return old;
+        const prevStatus = (prev as any)?.container?.status;
+        const stages = { ...old.stages };
+        if (prevStatus && stages[prevStatus]) {
+          stages[prevStatus] = stages[prevStatus].filter((c: any) => c.id !== id);
+        }
+        if (!stages[status]) stages[status] = [];
+        const container = Object.values(old.stages).flat().find((c: any) => (c as any).id === id);
+        if (container) stages[status] = [...stages[status], { ...(container as any), status }];
+        return { ...old, stages };
+      });
+      return { prev, id };
+    },
+    onError: (_err, { id }, context: any) => {
+      if (context?.prev !== undefined) {
+        qc.setQueryData([`/api/containers/${id}`], context.prev);
+      }
+      qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
+    },
+    onSettled: (_data, _err, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
     },
   });
 }

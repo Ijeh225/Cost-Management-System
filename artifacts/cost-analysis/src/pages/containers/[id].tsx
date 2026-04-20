@@ -1209,8 +1209,10 @@ export default function ContainerDetail() {
     }
   };
 
-  const isSectionEditable = (sectionKey: string) =>
-    canEditSectionGranular(sectionKey, isAdmin, userSectionPermissions, userSectionPermission);
+  const isSectionEditable = (sectionKey: string) => {
+    if (!container.verifiedAt) return false;
+    return canEditSectionGranular(sectionKey, isAdmin, userSectionPermissions, userSectionPermission);
+  };
 
   const sn = (sectionSettings ?? {}) as Record<string, string>;
   const CHARGE_SECTIONS = [

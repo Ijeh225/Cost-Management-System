@@ -14,3 +14,4 @@ export * from "./notifications";
 export * from "./invoices";
 export * from "./whatsapp";
 export * from "./migrations";
+export * from "./user-client-assignments";

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable } from "@workspace/db";
+import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
@@ -139,7 +139,7 @@ function numericToObj(row: any, exclude = ["id", "containerId", "updatedAt"]) {
   return obj;
 }
 
-router.get("/containers", requireAuth, async (req, res) => {
+router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
   try {
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
@@ -151,6 +151,18 @@ router.get("/containers", requireAuth, async (req, res) => {
     let countQuery = db.select({ count: sql<number>`count(*)` }).from(containersTable).$dynamic();
 
     const conditions: any[] = [];
+
+    // If non-admin user has client assignments, restrict to assigned clients only
+    if (req.user && req.user.role !== "admin") {
+      const assignments = await db
+        .select({ clientId: userClientAssignmentsTable.clientId })
+        .from(userClientAssignmentsTable)
+        .where(eq(userClientAssignmentsTable.userId, req.user.id));
+      if (assignments.length > 0) {
+        const assignedClientIds = assignments.map(a => a.clientId);
+        conditions.push(inArray(containersTable.clientId, assignedClientIds));
+      }
+    }
     if (search) {
       conditions.push(or(
         ilike(containersTable.customerName, `%${search}%`),
