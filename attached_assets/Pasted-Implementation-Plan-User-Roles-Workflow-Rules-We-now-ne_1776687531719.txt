@@ -1,0 +1,108 @@
+Implementation Plan: User Roles & Workflow Rules
+
+We now need to move into the implementation phase, specifically focusing on defining user roles and operational rules across the system.
+
+The goal is to create a structured, stage-by-stage workflow, where each department has a dedicated interface (page) and clearly defined responsibilities.
+
+1. Operations Team Page
+
+The Operations team should have a simple, focused interface:
+
+A smart search bar (centered) where users can input:
+Container number
+Bill ID
+Once searched, the user gains access to the job and can perform:
+Transire
+Shipping payment
+Terminal payment
+Pull-out
+Gate-out
+After completing their tasks, the job is submitted to the Terminal/Examination stage
+2. Terminal Management (TM) Page
+
+This page is handled by the Terminal Managers (TM).
+
+Responsibilities include:
+
+Monitoring containers that have been pulled out from the port
+Receiving notifications when a container is on the way to the terminal
+Tracking when the container arrives at the terminal (Gate-In stage)
+Recording:
+Date of arrival
+Status updates
+Handling:
+Examination
+Release
+
+Once completed, the TM submits the job to the Delivery Department
+
+3. Delivery / Transport Page
+
+The delivery process should be moved to a separate, dedicated page (not inside the container page).
+
+Handled by the Transport/Delivery team, this page will manage:
+
+Delivery execution
+Vehicle assignment
+Empty container returns
+
+This ensures delivery is treated as a full operational module, not just a sub-section.
+
+4. Documentation Department
+
+The Documentation team should have their own page and responsibilities:
+
+Once a job is approved, they can:
+Register the job
+Process documentation
+Perform assessments
+After completion, they click Submit, which sends the job to:
+→ Accounts (Duty Payment stage)
+5. Accounts / Duty Payment
+
+Handled by the Accounts team:
+
+Responsible for:
+Duty payments
+Financial confirmation
+Once completed, they click Submit, and the job moves to:
+→ Operations (Transire → Shipping → Terminal process)
+6. Workflow Logic (End-to-End Flow)
+
+The system should follow a strict stage-by-stage progression, such as:
+
+Job Approval
+→ Documentation (Register & Assessment)
+→ Accounts (Duty Payment)
+→ Operations (Transire, Shipping, Terminal, Pull-out)
+→ Terminal Managers (Gate-In, Examination, Release)
+→ Delivery Team (Delivery & Empty Return)
+
+Each stage should:
+
+Be controlled by assigned user roles
+Require a “Submit” action to move to the next stage
+Be locked to unauthorized roles
+7. Role-Based Access Control
+
+We are now defining User Roles (Rules) such as:
+
+Documentation User
+Accounts User
+Operations User
+Terminal Manager
+Delivery/Transport User
+
+Each role will:
+
+Have access only to their assigned page/module
+Perform only their specific tasks
+Pass the job forward through controlled submission
+Overall Objective
+
+The aim is to build a structured, role-driven workflow system that:
+
+Reflects real operational processes
+Improves accountability across departments
+Eliminates confusion and overlap
+Ensures every job follows a clear, traceable lifecycle

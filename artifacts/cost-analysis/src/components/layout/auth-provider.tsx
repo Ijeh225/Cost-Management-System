@@ -5,16 +5,30 @@ import { useQuery } from "@tanstack/react-query";
 import type { User } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
 
-type AuthContextType = {
+export type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  userRole: string | null;
+  isDepartmentUser: boolean;
+  isDocumentationUser: boolean;
+  isAccountsUser: boolean;
+  isOperationsUser: boolean;
+  isTerminalManager: boolean;
+  isDeliveryUser: boolean;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
+  userRole: null,
+  isDepartmentUser: false,
+  isDocumentationUser: false,
+  isAccountsUser: false,
+  isOperationsUser: false,
+  isTerminalManager: false,
+  isDeliveryUser: false,
   isAuthenticated: false,
   isAdmin: false,
 });
@@ -101,6 +115,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: !!isLoading,
         isAuthenticated: !!effectiveUser,
         isAdmin: effectiveUser?.role === "admin",
+        userRole: effectiveUser?.role ?? null,
+        isDocumentationUser: effectiveUser?.role === "documentation_user",
+        isAccountsUser: effectiveUser?.role === "accounts_user",
+        isOperationsUser: effectiveUser?.role === "operations_user",
+        isTerminalManager: effectiveUser?.role === "terminal_manager",
+        isDeliveryUser: effectiveUser?.role === "delivery_user",
+        isDepartmentUser: ["documentation_user","accounts_user","operations_user","terminal_manager","delivery_user"].includes(effectiveUser?.role ?? ""),
       }}
     >
       {children}

@@ -82,16 +82,28 @@ function GranularPermissionsEditor({
   );
 }
 
+const ALL_ROLES = ["admin", "staff", "documentation_user", "accounts_user", "operations_user", "terminal_manager", "delivery_user"] as const;
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Administrator",
+  staff: "Staff",
+  documentation_user: "Documentation",
+  accounts_user: "Accounts",
+  operations_user: "Operations",
+  terminal_manager: "Terminal Manager",
+  delivery_user: "Delivery / Transport",
+};
+
 const createSchema = z.object({
   name:     z.string().min(2, "Name required"),
   email:    z.string().email("Valid email required"),
   password: z.string().min(6, "Min 6 characters"),
-  role:     z.enum(["admin", "staff"]),
+  role:     z.enum(ALL_ROLES),
 });
 
 const editSchema = z.object({
   name:     z.string().min(2, "Name required"),
-  role:     z.enum(["admin", "staff"]),
+  role:     z.enum(ALL_ROLES),
   password: z.string().optional(),
 });
 
@@ -103,8 +115,11 @@ type UserRow = {
   isActive: boolean; createdAt: string;
 };
 
+const DEPT_ROLES = ["documentation_user", "accounts_user", "operations_user", "terminal_manager", "delivery_user"];
+
 function formatPermissionsSummary(user: UserRow): string {
   if (user.role === "admin") return "All sections";
+  if (DEPT_ROLES.includes(user.role)) return `${ROLE_LABELS[user.role] ?? user.role} department access`;
   if (user.sectionPermissions) {
     const perms = parseSectionPermissions(user.sectionPermissions);
     const editSections = Object.entries(perms).filter(([, v]) => v === "edit").map(([k]) => SECTION_LABELS[k] ?? k);
@@ -180,6 +195,11 @@ function CreateUserDialog() {
                   <SelectContent>
                     <SelectItem value="staff">Staff</SelectItem>
                     <SelectItem value="admin">Administrator</SelectItem>
+                    <SelectItem value="documentation_user">Documentation</SelectItem>
+                    <SelectItem value="accounts_user">Accounts</SelectItem>
+                    <SelectItem value="operations_user">Operations</SelectItem>
+                    <SelectItem value="terminal_manager">Terminal Manager</SelectItem>
+                    <SelectItem value="delivery_user">Delivery / Transport</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -225,7 +245,7 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
 
   const form = useForm({
     resolver: zodResolver(editSchema),
-    defaultValues: { name: user.name, role: user.role as "admin" | "staff", password: "" },
+    defaultValues: { name: user.name, role: user.role as typeof ALL_ROLES[number], password: "" },
   });
 
   const watchedRole = form.watch("role");
@@ -269,6 +289,11 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
                 <SelectContent>
                   <SelectItem value="staff">Staff</SelectItem>
                   <SelectItem value="admin">Administrator</SelectItem>
+                  <SelectItem value="documentation_user">Documentation</SelectItem>
+                  <SelectItem value="accounts_user">Accounts</SelectItem>
+                  <SelectItem value="operations_user">Operations</SelectItem>
+                  <SelectItem value="terminal_manager">Terminal Manager</SelectItem>
+                  <SelectItem value="delivery_user">Delivery / Transport</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -469,7 +494,7 @@ export default function Users() {
                         ? "border-primary text-primary bg-primary/10"
                         : "border-border text-muted-foreground"}>
                         {u.role === "admin" ? <Shield className="w-3 h-3 mr-1" /> : <UserIcon className="w-3 h-3 mr-1" />}
-                        {u.role === "admin" ? "Administrator" : "Staff"}
+                        {ROLE_LABELS[u.role] ?? u.role}
                       </Badge>
                     </td>
                     <td className="px-6 py-4 max-w-xs">

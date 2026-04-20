@@ -475,14 +475,34 @@ const PIPELINE_STAGE_ORDER = [
   "closed",
 ];
 
-router.patch("/containers/:id/status", requireAdmin, async (req: AuthRequest, res) => {
+const DEPT_OWNED_STAGES: Record<string, string[]> = {
+  documentation_user: ["registered", "documentation", "duty_assessment"],
+  accounts_user: ["duty_payment"],
+  operations_user: ["transire_processing", "shipping_payment", "terminal_payment", "pull_out"],
+  terminal_manager: ["gate_in", "examination", "final_release"],
+  delivery_user: ["delivery", "empty_return"],
+};
+
+router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
+    const userRole = req.user!.role;
+    const isAdmin = userRole === "admin";
+
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing) {
       res.status(404).json({ error: "Container not found" });
       return;
     }
+
+    if (!isAdmin) {
+      const allowedStages = DEPT_OWNED_STAGES[userRole] ?? [];
+      if (!allowedStages.includes(existing.status)) {
+        res.status(403).json({ error: "You don't have permission to advance this container from its current stage" });
+        return;
+      }
+    }
+
     const currentIdx = PIPELINE_STAGE_ORDER.indexOf(existing.status);
     if (currentIdx === -1) {
       res.status(400).json({ error: `Unknown current status: ${existing.status}` });

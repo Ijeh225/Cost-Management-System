@@ -16,7 +16,15 @@ import {
 import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
   ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, Activity, BookOpen, FileCheck2,
+  Truck,
 } from "lucide-react";
+
+type NavItem = {
+  title: string;
+  url: string;
+  icon: React.ElementType;
+  badge?: number;
+};
 
 function NotificationsBadge({ count }: { count: number }) {
   if (count === 0) return null;
@@ -29,36 +37,70 @@ function NotificationsBadge({ count }: { count: number }) {
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { isAdmin, isAuthenticated, user } = useAuth();
+  const { isAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTerminalManager, isDeliveryUser, isDepartmentUser } = useAuth();
 
   const { data: notifData } = useGetNotifications<NotificationsResponse>({
     query: { refetchInterval: 60_000, enabled: !!isAuthenticated },
   });
   const unreadCount: number = notifData?.unreadCount ?? 0;
 
-  const staffCanUpload = !isAdmin && (user?.canUpload ?? false);
+  const staffCanUpload = !isAdmin && !isDepartmentUser && (user?.canUpload ?? false);
 
-  const mainNav = [
+  const mainNav: NavItem[] = [
     { title: "Dashboard",       url: "/",               icon: LayoutDashboard },
     { title: "Operations",      url: "/operations",     icon: Activity         },
     { title: "Documentation",   url: "/documentation",  icon: FileCheck2       },
     { title: "Containers",      url: "/containers",     icon: Box              },
     { title: "Clients",         url: "/clients",        icon: Building2        },
-    { title: "Invoices",      url: "/invoices",    icon: FileText         },
+    { title: "Invoices",        url: "/invoices",       icon: FileText         },
     { title: "Accounts Receivable", url: "/accounts-receivable", icon: BookOpen },
-    { title: "My Tasks",      url: "/my-tasks",    icon: ListTodo         },
-    { title: "Notifications", url: "/notifications", icon: Bell, badge: unreadCount },
+    { title: "My Tasks",        url: "/my-tasks",       icon: ListTodo         },
+    { title: "Notifications",   url: "/notifications",  icon: Bell, badge: unreadCount },
     ...(staffCanUpload ? [{ title: "Upload Data", url: "/containers/upload", icon: UploadCloud }] : []),
   ];
 
-  const adminNav = [
-    { title: "Approval Queue",   url: "/approvals",  icon: ClipboardCheck },
-    { title: "Analytics",        url: "/analytics",  icon: BarChart2       },
-    { title: "Reports",          url: "/reports",    icon: FileDown        },
-    { title: "Upload Data",      url: "/containers/upload", icon: UploadCloud },
-    { title: "User Management",  url: "/users",      icon: Users           },
-    { title: "Settings",         url: "/settings",   icon: Settings        },
+  const adminNav: NavItem[] = [
+    { title: "Approval Queue",   url: "/approvals",          icon: ClipboardCheck },
+    { title: "Analytics",        url: "/analytics",          icon: BarChart2       },
+    { title: "Reports",          url: "/reports",            icon: FileDown        },
+    { title: "Upload Data",      url: "/containers/upload",  icon: UploadCloud     },
+    { title: "User Management",  url: "/users",              icon: Users           },
+    { title: "Settings",         url: "/settings",           icon: Settings        },
   ];
+
+  const deptNav: NavItem[] = isDocumentationUser
+    ? [
+        { title: "Dashboard",          url: "/",                        icon: LayoutDashboard },
+        { title: "My Jobs",            url: "/workspace/documentation", icon: FileCheck2      },
+        { title: "Notifications",      url: "/notifications",           icon: Bell, badge: unreadCount },
+      ]
+    : isAccountsUser
+    ? [
+        { title: "Dashboard",          url: "/",                        icon: LayoutDashboard },
+        { title: "Duty Payments",      url: "/workspace/accounts",      icon: BookOpen        },
+        { title: "Notifications",      url: "/notifications",           icon: Bell, badge: unreadCount },
+      ]
+    : isOperationsUser
+    ? [
+        { title: "Dashboard",          url: "/",                        icon: LayoutDashboard },
+        { title: "My Jobs",            url: "/workspace/operations",    icon: Activity        },
+        { title: "Notifications",      url: "/notifications",           icon: Bell, badge: unreadCount },
+      ]
+    : isTerminalManager
+    ? [
+        { title: "Dashboard",          url: "/",                        icon: LayoutDashboard },
+        { title: "Terminal Workspace", url: "/workspace/terminal",      icon: Building2       },
+        { title: "Notifications",      url: "/notifications",           icon: Bell, badge: unreadCount },
+      ]
+    : isDeliveryUser
+    ? [
+        { title: "Dashboard",          url: "/",                        icon: LayoutDashboard },
+        { title: "Deliveries",         url: "/workspace/delivery",      icon: Truck           },
+        { title: "Notifications",      url: "/notifications",           icon: Bell, badge: unreadCount },
+      ]
+    : [];
+
+  const navItems = isDepartmentUser ? deptNav : mainNav;
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" className="border-r border-border/50">
@@ -72,11 +114,11 @@ export function AppSidebar() {
       <SidebarContent className="py-4">
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">
-            Operations
+            {isDepartmentUser ? "My Workspace" : "Operations"}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => {
+              {navItems.map((item) => {
                 const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url));
                 return (
                   <SidebarMenuItem key={item.title}>

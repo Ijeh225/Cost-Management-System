@@ -35,6 +35,11 @@ import OperationsPage from "@/pages/operations/index";
 import OperationDetailPage from "@/pages/operations/[id]";
 import DocumentationPage from "@/pages/documentation/index";
 import ArPage from "@/pages/ar/index";
+import DocumentationWorkspace from "@/pages/workspace/documentation";
+import AccountsWorkspace from "@/pages/workspace/accounts";
+import OperationsWorkspace from "@/pages/workspace/operations";
+import TerminalWorkspace from "@/pages/workspace/terminal";
+import DeliveryWorkspace from "@/pages/workspace/delivery";
 import ClientStatementPrint from "@/pages/reports/client-statement/print";
 import VatSummaryPrint from "@/pages/reports/vat-summary/print";
 import InvoiceAgingPrint from "@/pages/reports/invoice-aging/print";
@@ -164,6 +169,11 @@ function Router() {
               <Route path="/documentation" component={DocumentationPage} />
               <Route path="/pipeline" component={PipelinePage} />
               <Route path="/accounts-receivable" component={ArPage} />
+              <Route path="/workspace/documentation" component={DocumentationWorkspace} />
+              <Route path="/workspace/accounts" component={AccountsWorkspace} />
+              <Route path="/workspace/operations" component={OperationsWorkspace} />
+              <Route path="/workspace/terminal" component={TerminalWorkspace} />
+              <Route path="/workspace/delivery" component={DeliveryWorkspace} />
               <Route path="/invoices" component={InvoicesPage} />
               <Route path="/invoices/:id" component={InvoiceDetailPage} />
               <Route path="/settings">
