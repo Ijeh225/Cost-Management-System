@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2 } from "lucide-react";
 
 const DEFAULTS = {
   agingInactivityDays: "7",
@@ -16,6 +17,8 @@ const DEFAULTS = {
   agingDays3: "90",
   agingEmailEnabled: "false",
   agingEmailTo: "",
+  digestFrequency: "none",
+  digestTime: "08:00",
 };
 
 export default function SettingsPage() {
@@ -31,6 +34,9 @@ export default function SettingsPage() {
   const [days3, setDays3] = useState(DEFAULTS.agingDays3);
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailTo, setEmailTo] = useState("");
+  const [digestFrequency, setDigestFrequency] = useState<"none" | "daily" | "weekly">("none");
+  const [digestTime, setDigestTime] = useState("08:00");
+  const [digestLastSentAt, setDigestLastSentAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -43,6 +49,9 @@ export default function SettingsPage() {
       setDays3(s["agingDays3"] ?? DEFAULTS.agingDays3);
       setEmailEnabled(s["agingEmailEnabled"] === "true");
       setEmailTo(s["agingEmailTo"] ?? "");
+      setDigestFrequency((s["digestFrequency"] as "none" | "daily" | "weekly") ?? "none");
+      setDigestTime(s["digestTime"] ?? "08:00");
+      setDigestLastSentAt(s["digestLastSentAt"] ?? null);
     }
   }, [isLoading]);
 
@@ -72,6 +81,8 @@ export default function SettingsPage() {
         agingDays3: days3,
         agingEmailEnabled: emailEnabled ? "true" : "false",
         agingEmailTo: emailTo.trim(),
+        digestFrequency,
+        digestTime,
       });
       toast({ title: "Settings saved" });
       setDirty(false);
@@ -91,11 +102,21 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/notifications/send-email-digest", { method: "POST", credentials: "include" });
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Server error"); }
+      const now = new Date().toISOString();
+      setDigestLastSentAt(now);
       toast({ title: "Email digest sent", description: `Alert summary sent to ${emailTo}` });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed to send email", description: err?.message ?? "Check that email settings are configured correctly" });
     } finally {
       setSendingEmail(false);
+    }
+  };
+
+  const formatLastSent = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" });
+    } catch {
+      return iso;
     }
   };
 
@@ -246,6 +267,55 @@ export default function SettingsPage() {
               disabled={!emailEnabled}
             />
             <p className="text-[11px] text-muted-foreground">Separate multiple addresses with commas</p>
+          </div>
+
+          {/* Auto-send Schedule */}
+          <div className="p-4 rounded-lg border border-border/40 bg-background/30 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <CalendarClock className="w-4 h-4 text-primary" />
+              Automatic Schedule
+            </div>
+            <p className="text-xs text-muted-foreground -mt-2">
+              The server will automatically send the digest on the configured schedule. Runs every 60 seconds on the server clock.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Frequency</Label>
+                <Select
+                  value={digestFrequency}
+                  onValueChange={(v) => { setDigestFrequency(v as "none" | "daily" | "weekly"); mark(); }}
+                  disabled={!emailEnabled}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Off — manual only</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly (Mondays)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Send at (server time)</Label>
+                <Input
+                  type="time"
+                  value={digestTime}
+                  onChange={(e) => { setDigestTime(e.target.value); mark(); }}
+                  className="h-9 text-sm"
+                  disabled={!emailEnabled || digestFrequency === "none"}
+                />
+              </div>
+            </div>
+
+            {digestLastSentAt && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                Last sent: {formatLastSent(digestLastSentAt)}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between pt-1">

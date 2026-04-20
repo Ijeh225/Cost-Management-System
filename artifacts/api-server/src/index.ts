@@ -1,6 +1,7 @@
 import app from "./app";
 import { db, pool, containersTable, appMigrationsTable, usersTable } from "@workspace/db";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { runScheduledDigest } from "./routes/notifications";
 
 async function ensureMigrationsTable() {
   await pool.query(`
@@ -89,4 +90,5 @@ runStartupMigrations().then(() => {
   app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
   });
+  setInterval(() => { runScheduledDigest().catch(console.error); }, 60_000);
 });

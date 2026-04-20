@@ -34,13 +34,21 @@ type AlertCfg = {
 };
 
 const ALERT_CONFIG: Record<string, AlertCfg> = {
-  loss_making:    { icon: TrendingDown,  color: "text-red-400",    accent: "border-l-red-500",    label: "Loss-Making",      severity: "critical" },
-  low_profit:     { icon: AlertTriangle, color: "text-orange-400", accent: "border-l-orange-500", label: "Low Margin",       severity: "warning"  },
-  overdue_duty:   { icon: DollarSign,    color: "text-amber-400",  accent: "border-l-amber-500",  label: "Outstanding Duty", severity: "warning"  },
-  delayed:        { icon: Clock,         color: "text-blue-400",   accent: "border-l-blue-500",   label: "Possible Delay",   severity: "info"     },
-  stale_approval:  { icon: ShieldAlert,   color: "text-violet-400", accent: "border-l-violet-500", label: "Stale Approval",   severity: "warning"  },
-  overdue_task:    { icon: ListTodo,      color: "text-rose-400",   accent: "border-l-rose-500",   label: "Overdue Task",     severity: "warning"  },
-  action_overdue:  { icon: ShieldAlert,   color: "text-rose-400",   accent: "border-l-rose-500",   label: "Action Overdue",   severity: "warning"  },
+  negative_profit:      { icon: TrendingDown,  color: "text-red-400",    accent: "border-l-red-500",    label: "Loss-Making",         severity: "critical" },
+  low_margin:           { icon: AlertTriangle, color: "text-orange-400", accent: "border-l-orange-500", label: "Low Margin",          severity: "warning"  },
+  high_terminal:        { icon: AlertTriangle, color: "text-amber-400",  accent: "border-l-amber-500",  label: "High Terminal Cost",  severity: "warning"  },
+  high_delivery:        { icon: AlertTriangle, color: "text-amber-400",  accent: "border-l-amber-500",  label: "High Delivery Cost",  severity: "warning"  },
+  unpaid_duty:          { icon: DollarSign,    color: "text-amber-400",  accent: "border-l-amber-500",  label: "Outstanding Duty",    severity: "warning"  },
+  delayed:              { icon: Clock,         color: "text-blue-400",   accent: "border-l-blue-500",   label: "Possible Delay",      severity: "info"     },
+  stale_approval:       { icon: ShieldAlert,   color: "text-violet-400", accent: "border-l-violet-500", label: "Stale Approval",      severity: "warning"  },
+  overdue_task:         { icon: ListTodo,      color: "text-rose-400",   accent: "border-l-rose-500",   label: "Overdue Task",        severity: "warning"  },
+  action_overdue:       { icon: ShieldAlert,   color: "text-rose-400",   accent: "border-l-rose-500",   label: "Action Overdue",      severity: "warning"  },
+  empty_return_overdue: { icon: AlertTriangle, color: "text-red-400",    accent: "border-l-red-500",    label: "Empty Return Overdue", severity: "critical" },
+};
+
+const ALERT_ACTIONS: Record<string, { label: string; href: string }> = {
+  stale_approval: { label: "Review Queue", href: "/approvals" },
+  overdue_task:   { label: "My Tasks",     href: "/my-tasks"  },
 };
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
@@ -191,8 +199,9 @@ function AlertBeacon() {
 
             <div className="max-h-80 overflow-y-auto divide-y divide-border/30">
               {sorted.map((alert) => {
-                const cfg = ALERT_CONFIG[alert.type] ?? ALERT_CONFIG.low_profit;
+                const cfg = ALERT_CONFIG[alert.type] ?? { icon: AlertTriangle, color: "text-amber-400", accent: "border-l-amber-500", label: alert.type, severity: "warning" as const };
                 const Icon = cfg.icon;
+                const action = !alert.containerNumber ? ALERT_ACTIONS[alert.type] : null;
                 return (
                   <div
                     key={alertKey(alert)}
@@ -218,6 +227,16 @@ function AlertBeacon() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{alert.message}</p>
+                      {action && (
+                        <Link
+                          href={action.href}
+                          onClick={() => setOpen(false)}
+                          className={`inline-flex items-center gap-1 mt-1.5 text-[11px] font-medium ${cfg.color} hover:underline`}
+                        >
+                          {action.label}
+                          <ArrowRight className="w-2.5 h-2.5" />
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );

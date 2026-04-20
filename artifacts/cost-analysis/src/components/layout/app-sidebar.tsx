@@ -16,7 +16,7 @@ import {
 import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
   ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, Activity, BookOpen, FileCheck2,
-  Truck,
+  Truck, Kanban,
 } from "lucide-react";
 
 type NavItem = {
@@ -61,6 +61,7 @@ export function AppSidebar() {
 
   const adminNav: NavItem[] = [
     { title: "Approval Queue",   url: "/approvals",          icon: ClipboardCheck },
+    { title: "Pipeline Board",   url: "/pipeline",           icon: Kanban          },
     { title: "Analytics",        url: "/analytics",          icon: BarChart2       },
     { title: "Reports",          url: "/reports",            icon: FileDown        },
     { title: "Upload Data",      url: "/containers/upload",  icon: UploadCloud     },

@@ -320,6 +320,11 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
       return res.status(502).json({ error: "Failed to send email via Resend. Check your API key and sender domain." });
     }
 
+    const nowSent = new Date();
+    await db.insert(settingsTable)
+      .values({ key: "digestLastSentAt", value: nowSent.toISOString(), updatedAt: nowSent })
+      .onConflictDoUpdate({ target: settingsTable.key, set: { value: nowSent.toISOString(), updatedAt: nowSent } });
+
     return res.json({ success: true, sent: to.length, alertCount: relevant.length });
   } catch (err) {
     console.error(err);
@@ -346,3 +351,72 @@ notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, 
     return res.status(500).json({ error: "Server error" });
   }
 });
+
+export async function runScheduledDigest(): Promise<void> {
+  try {
+    const rows = await db.select().from(settingsTable);
+    const s: Record<string, string> = {};
+    for (const r of rows) s[r.key] = r.value;
+
+    const freq = s["digestFrequency"] ?? "none";
+    if (freq === "none") return;
+
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) return;
+
+    const emailTo = s["agingEmailTo"] ?? "";
+    if (!emailTo.trim()) return;
+
+    const [hhStr, mmStr] = (s["digestTime"] ?? "08:00").split(":");
+    const hh = parseInt(hhStr ?? "8");
+    const mm = parseInt(mmStr ?? "0");
+
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const targetMins = (isNaN(hh) ? 8 : hh) * 60 + (isNaN(mm) ? 0 : mm);
+    if (nowMins < targetMins) return;
+
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const lastSentStr = s["digestLastSentAt"];
+    if (lastSentStr) {
+      const lastSent = new Date(lastSentStr);
+      if (freq === "daily" && lastSent >= startOfToday) return;
+      if (freq === "weekly") {
+        if (now.getDay() !== 1) return;
+        const monday = new Date(startOfToday);
+        monday.setDate(startOfToday.getDate() - ((startOfToday.getDay() + 6) % 7));
+        if (lastSent >= monday) return;
+      }
+    }
+
+    const to = emailTo.split(",").map((e: string) => e.trim()).filter(Boolean);
+    const allAlerts = await computeAlerts();
+    const agingTypes = ["aging_warn", "aging_high", "aging_critical", "inactive", "negative_profit"];
+    const relevant = allAlerts.filter((a: any) => agingTypes.includes(a.type));
+
+    const emailRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: "Cost Analysis <alerts@updates.costanalysis.app>",
+        to,
+        subject: `[Scheduled] Container Alert Digest — ${relevant.filter((a: any) => a.severity === "critical").length} critical`,
+        html: `<p>Scheduled digest: ${relevant.length} alerts. Log in to Cost Analysis to review.</p>`,
+      }),
+    });
+
+    if (emailRes.ok) {
+      const sent = new Date();
+      await db.insert(settingsTable)
+        .values({ key: "digestLastSentAt", value: sent.toISOString(), updatedAt: sent })
+        .onConflictDoUpdate({ target: settingsTable.key, set: { value: sent.toISOString(), updatedAt: sent } });
+      console.log(`[digest-scheduler] Sent to ${to.length} recipients, ${relevant.length} alerts`);
+    } else {
+      console.error("[digest-scheduler] Resend error:", await emailRes.text().catch(() => "unknown"));
+    }
+  } catch (err) {
+    console.error("[digest-scheduler] Error:", err);
+  }
+}
