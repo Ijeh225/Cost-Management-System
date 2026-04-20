@@ -1,0 +1,126 @@
+User Access Matrix (Roles & Permissions)
+1. Super Admin
+
+Access Level: Full Control
+
+Create/Edit/Delete users
+Assign roles to users
+Assign customers to users (optional restriction feature)
+View and manage all clients, jobs, and financials
+Override or edit any stage
+Configure system rules and workflow
+2. Admin
+
+Access Level: High Control (Operational + Assignment)
+
+View all customers and jobs
+Assign customers to specific users
+Monitor all departments
+Approve jobs
+View reports and financial summaries
+Cannot override system-level configurations (reserved for Super Admin)
+3. Documentation Team
+
+Access Level: Documentation Stage Only
+
+Can:
+
+Access only approved jobs
+Register jobs
+Handle documentation
+Perform assessments
+Submit job to Accounts
+
+Cannot:
+
+Access operations, delivery, or financial edits
+Modify other stages
+4. Accounts Team (Duty Payment)
+
+Access Level: Financial Stage
+
+Can:
+
+View jobs from Documentation
+Process duty payments
+Record financial transactions
+Submit job to Operations
+
+Cannot:
+
+Modify documentation entries
+Access delivery or terminal operations
+5. Operations Team
+
+Access Level: Execution Stage (Port Operations)
+
+Interface: Smart search page (Container No / Bill ID)
+
+Can:
+
+Access jobs assigned to Operations
+Perform:
+Transire
+Shipping payment
+Terminal payment
+Pull-out
+Gate-out
+Submit job to Terminal Managers
+
+Cannot:
+
+Access financial edits
+Modify documentation or delivery
+6. Terminal Manager (TM)
+
+Access Level: Terminal Control
+
+Can:
+
+Receive jobs from Operations
+Track container movement to terminal
+Record Gate-In (arrival at terminal)
+Handle:
+Examination
+Release
+Monitor timelines and delays
+Submit job to Delivery
+
+Cannot:
+
+Modify financial records
+Perform operations tasks
+7. Delivery / Transport Team
+
+Access Level: Delivery Execution
+
+Can:
+
+Receive jobs from Terminal
+Assign vehicles
+Execute delivery
+Handle empty container returns
+Update delivery status
+
+Cannot:
+
+Access documentation, accounts, or operations
+8. Customer Access Restriction (Optional Feature)
+
+This applies across roles (except Super Admin).
+
+Modes:
+
+Full Access Mode: User can see all customers (default system)
+Restricted Mode: User can only see assigned customers
+
+Controlled by Admin:
+
+Admin selects which customers a user can manage
+Example: User A → only 2–3 assigned clients
+Workflow Control Rules
+Each role can only access their stage
+Jobs move forward only via Submit action
+No backward editing unless by Admin/Super Admin
+Actions are locked until previous stage is completed
+Verification must be completed before any stage becomes active
