@@ -100,7 +100,7 @@ function StageRail({
           const isCurrent = idx === currentIdx;
           const isFuture = idx > currentIdx;
           const isClickable = isAdmin
-            ? !isCurrent && !isFuture
+            ? !isCurrent
             : isDeptUser
             ? !isCurrent
             : false;
@@ -154,9 +154,9 @@ function StageRail({
       </div>
       {(isAdmin || isDeptUser) && (
         <p className="text-[9px] text-muted-foreground/50 mt-0.5">
-          {isDeptUser
-            ? "Click any stage to navigate back or forward within your stages"
-            : "Click any completed stage to navigate back to it"}
+          {isAdmin
+            ? "Click any stage to move this job to that stage"
+            : "Click any stage to navigate back or forward within your stages"}
         </p>
       )}
     </div>
