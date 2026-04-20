@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, clientsTable, userClientAssignmentsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, hashPassword } from "../lib/auth.js";
+import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest, hashPassword } from "../lib/auth.js";
 
 const router = Router();
 
@@ -29,11 +29,13 @@ type UserRow = {
   createdAt: Date;
 };
 
+const ELEVATED_ROLES = new Set(["admin", "super_admin"]);
+
 const formatUser = (u: UserRow) => ({
   ...u,
   sectionPermission: u.sectionPermission ?? null,
   sectionPermissions: u.sectionPermissions ?? null,
-  canUpload: u.role === "admin" ? true : (u.canUpload ?? false),
+  canUpload: ELEVATED_ROLES.has(u.role) ? true : (u.canUpload ?? false),
   createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
 });
 
@@ -47,7 +49,7 @@ router.get("/users", requireAdmin, async (_req, res) => {
   }
 });
 
-router.post("/users", requireAdmin, async (req, res) => {
+router.post("/users", requireSuperAdmin, async (req, res) => {
   try {
     const { email, name, password, role, sectionPermission, sectionPermissions, canUpload } = req.body;
     if (!email || !name || !password || !role) {
@@ -63,7 +65,7 @@ router.post("/users", requireAdmin, async (req, res) => {
       email, name, passwordHash, role,
       sectionPermission: sectionPermission ?? null,
       sectionPermissions: sectionPermissions ?? null,
-      canUpload: role === "admin" ? true : (canUpload === true),
+      canUpload: ELEVATED_ROLES.has(role) ? true : (canUpload === true),
       isActive: true,
     }).returning();
     res.status(201).json(formatUser(user));
@@ -80,7 +82,7 @@ router.get("/users/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
-    if (req.user?.role !== "admin" && req.user?.id !== id) {
+    if (!ELEVATED_ROLES.has(req.user?.role ?? "") && req.user?.id !== id) {
       res.status(403).json({ error: "Access denied" });
       return;
     }
@@ -92,7 +94,7 @@ router.get("/users/:id", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.put("/users/:id", requireAdmin, async (req, res) => {
+router.put("/users/:id", requireSuperAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
@@ -110,7 +112,7 @@ router.put("/users/:id", requireAdmin, async (req, res) => {
     if (password) updates.passwordHash = await hashPassword(password);
     if (sectionPermission !== undefined) updates.sectionPermission = sectionPermission || null;
     if (sectionPermissions !== undefined) updates.sectionPermissions = sectionPermissions || null;
-    if (canUpload !== undefined) updates.canUpload = updates.role === "admin" ? true : (canUpload === true);
+    if (canUpload !== undefined) updates.canUpload = ELEVATED_ROLES.has(updates.role ?? "") ? true : (canUpload === true);
     const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     res.json(formatUser(user));

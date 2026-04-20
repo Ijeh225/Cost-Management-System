@@ -10,7 +10,7 @@ function canUserEditSection(
   user: { role: string; sectionPermission: string | null; sectionPermissions: string | null },
   section: string
 ): boolean {
-  if (user.role === "admin") return true;
+  if (user.role === "admin" || user.role === "super_admin") return true;
   // Granular permissions: only explicit "edit" level grants write access ("view" and "no_access" do not)
   if (user.sectionPermissions) {
     try {
@@ -153,7 +153,7 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     const conditions: any[] = [];
 
     // If non-admin user has client assignments, restrict to assigned clients only
-    if (req.user && req.user.role !== "admin") {
+    if (req.user && req.user.role !== "admin" && req.user.role !== "super_admin") {
       const assignments = await db
         .select({ clientId: userClientAssignmentsTable.clientId })
         .from(userClientAssignmentsTable)
@@ -487,7 +487,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
   try {
     const id = parseInt(req.params.id);
     const userRole = req.user!.role;
-    const isAdmin = userRole === "admin";
+    const isAdmin = userRole === "admin" || userRole === "super_admin";
 
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing) {
@@ -1431,7 +1431,7 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     const allApprovals = await db.select().from(sectionApprovalsTable);
     pendingApprovals = allApprovals.filter(a => a.status === "submitted").length;
 
-    if (user.role !== "admin") {
+    if (user.role !== "admin" && user.role !== "super_admin") {
       let permsObj: Record<string, string> = {};
       try { if (user.sectionPermissions) permsObj = JSON.parse(user.sectionPermissions as string); } catch {}
       mySections = Object.keys(permsObj).length > 0

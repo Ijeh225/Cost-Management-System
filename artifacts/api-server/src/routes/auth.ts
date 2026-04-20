@@ -95,7 +95,7 @@ router.get("/auth/me", requireAuth, (req: AuthRequest, res) => {
       role: u.role,
       sectionPermission: u.sectionPermission ?? null,
       sectionPermissions: u.sectionPermissions ?? null,
-      canUpload: u.role === "admin" ? true : (u.canUpload ?? false),
+      canUpload: (u.role === "admin" || u.role === "super_admin") ? true : (u.canUpload ?? false),
       isActive: u.isActive,
       createdAt: u.createdAt.toISOString(),
     });
@@ -133,7 +133,7 @@ router.post("/auth/setup", async (req, res) => {
       name,
       email,
       passwordHash,
-      role: "admin",
+      role: "super_admin",
       isActive: true,
       sessionToken,
     }).returning();

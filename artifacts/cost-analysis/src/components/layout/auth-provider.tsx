@@ -10,6 +10,7 @@ export type AuthContextType = {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   userRole: string | null;
   isDepartmentUser: boolean;
   isDocumentationUser: boolean;
@@ -31,6 +32,7 @@ const AuthContext = createContext<AuthContextType>({
   isDeliveryUser: false,
   isAuthenticated: false,
   isAdmin: false,
+  isSuperAdmin: false,
 });
 
 async function checkSetupRequired(): Promise<{ required: boolean }> {
@@ -114,7 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: effectiveUser,
         isLoading: !!isLoading,
         isAuthenticated: !!effectiveUser,
-        isAdmin: effectiveUser?.role === "admin",
+        isSuperAdmin: effectiveUser?.role === "super_admin",
+        isAdmin: effectiveUser?.role === "admin" || effectiveUser?.role === "super_admin",
         userRole: effectiveUser?.role ?? null,
         isDocumentationUser: effectiveUser?.role === "documentation_user",
         isAccountsUser: effectiveUser?.role === "accounts_user",

@@ -37,7 +37,7 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
 
     // Determine which sections this user can see
     let mySections: string[] = [];
-    if (user.role === "admin") {
+    if (user.role === "admin" || user.role === "super_admin") {
       mySections = ["shipping", "customs", "terminal", "delivery", "operations"];
     } else {
       if (user.sectionPermissions) {
@@ -54,7 +54,7 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Get containers assigned to this user
-    const assignedContainerRows = user.role === "admin"
+    const assignedContainerRows = (user.role === "admin" || user.role === "super_admin")
       ? await db.select().from(containersTable).limit(50)
       : await db.select().from(containersTable).where(eq(containersTable.assignedStaffId, user.id));
 

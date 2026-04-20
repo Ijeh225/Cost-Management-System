@@ -74,6 +74,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       res.status(401).json({ error: "Session expired. Please log in again." });
       return;
     }
+    const isElevated = user.role === "admin" || user.role === "super_admin";
     req.user = {
       id: user.id,
       email: user.email,
@@ -81,7 +82,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       role: user.role,
       sectionPermission: user.sectionPermission ?? null,
       sectionPermissions: user.sectionPermissions ?? null,
-      canUpload: user.role === "admin" ? true : (user.canUpload ?? false),
+      canUpload: isElevated ? true : (user.canUpload ?? false),
     };
     next();
   } catch {
@@ -91,8 +92,19 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
 
 export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {
-    if (req.user?.role !== "admin") {
+    const role = req.user?.role;
+    if (role !== "admin" && role !== "super_admin") {
       res.status(403).json({ error: "Admin access required" });
+      return;
+    }
+    next();
+  });
+}
+
+export async function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  await requireAuth(req, res, () => {
+    if (req.user?.role !== "super_admin") {
+      res.status(403).json({ error: "Super Admin access required" });
       return;
     }
     next();

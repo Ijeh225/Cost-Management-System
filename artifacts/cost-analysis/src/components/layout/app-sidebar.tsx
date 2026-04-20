@@ -37,7 +37,7 @@ function NotificationsBadge({ count }: { count: number }) {
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { isAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTerminalManager, isDeliveryUser, isDepartmentUser } = useAuth();
+  const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTerminalManager, isDeliveryUser, isDepartmentUser } = useAuth();
 
   const { data: notifData } = useGetNotifications<NotificationsResponse>({
     query: { refetchInterval: 60_000, enabled: !!isAuthenticated },
@@ -65,7 +65,7 @@ export function AppSidebar() {
     { title: "Reports",          url: "/reports",            icon: FileDown        },
     { title: "Upload Data",      url: "/containers/upload",  icon: UploadCloud     },
     { title: "User Management",  url: "/users",              icon: Users           },
-    { title: "Settings",         url: "/settings",           icon: Settings        },
+    ...(isSuperAdmin ? [{ title: "Settings", url: "/settings", icon: Settings }] : []),
   ];
 
   const deptNav: NavItem[] = isDocumentationUser

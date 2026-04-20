@@ -7,7 +7,7 @@ This project is an enterprise-grade web application designed for Nigerian port c
 Key capabilities include:
 - Management of container records and associated charges across five distinct sections (Shipping, Customs, Terminal, Delivery, Operations), each with unlimited custom line items (extra charges).
 - Automated calculation of total costs, clearing charges, and gross profit.
-- Robust user and role management with granular, section-level permissions and 5 dedicated department roles (Documentation, Accounts, Operations, Terminal Manager, Delivery/Transport).
+- Robust user and role management with a complete 8-role hierarchy: Super Admin (full system control), Admin (operational oversight), Staff (granular section permissions), and 5 department roles (Documentation, Accounts, Operations, Terminal Manager, Delivery/Transport).
 - Workflow engine for section approvals and task management.
 - Detailed audit trails with field-level change tracking.
 - Advanced reporting and analytics features, including profit intelligence alerts.
@@ -52,6 +52,7 @@ The application is built as a monorepo using pnpm workspaces, separating the fro
 -   **Core Logic:** Financial calculations are centralized in `artifacts/api-server/src/lib/calculations.ts`.
 -   **System Design:**
     -   **Monorepo Structure:** Clearly defined workspaces for `api-server`, `cost-analysis`, and shared `lib` components (`api-spec`, `api-client-react`, `api-zod`, `db`).
+    -   **Role Hierarchy:** `super_admin` (create/delete users, system settings, full control) > `admin` (operations, approvals, reports, assign clients, view users) > `staff` (section-level) > 5 department roles. Backend: `requireAdmin` accepts both admin+super_admin; `requireSuperAdmin` is super_admin only. Existing setup creates the first user as super_admin. Setup command upgrade: all existing `admin` accounts in DB are upgraded to `super_admin`.
     -   **Role-Based Workflow System:** 5 dedicated department roles (`documentation_user`, `accounts_user`, `operations_user`, `terminal_manager`, `delivery_user`) each get a focused workspace page showing only their stage's containers with submit buttons to advance jobs. Department roles also get a simplified sidebar showing only their workspace. Stage advancement permissions are enforced on the backend by `DEPT_OWNED_STAGES` mapping.
     -   **Department Workspace Pages:** `/workspace/documentation` (registered→duty_assessment), `/workspace/accounts` (duty_payment), `/workspace/operations` (transire→pull_out), `/workspace/terminal` (gate_in→final_release), `/workspace/delivery` (delivery→empty_return).
     -   **Granular Permissions:** A section-level permission system controls user access to specific parts of container data (for `staff` role).

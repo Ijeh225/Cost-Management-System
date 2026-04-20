@@ -25,6 +25,7 @@ export interface LoginRequest {
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 export const UserRole = {
+  super_admin: "super_admin",
   admin: "admin",
   staff: "staff",
   documentation_user: "documentation_user",

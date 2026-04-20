@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest } from "../lib/auth.js";
 
 export const settingsRouter = Router();
 
@@ -28,7 +28,7 @@ settingsRouter.get("/settings", requireAuth, async (_req, res) => {
   }
 });
 
-settingsRouter.patch("/settings", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+settingsRouter.patch("/settings", requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const updates = req.body as Record<string, string>;
     for (const [key, value] of Object.entries(updates)) {

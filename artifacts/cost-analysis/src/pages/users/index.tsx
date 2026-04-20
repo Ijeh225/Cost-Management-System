@@ -82,9 +82,10 @@ function GranularPermissionsEditor({
   );
 }
 
-const ALL_ROLES = ["admin", "staff", "documentation_user", "accounts_user", "operations_user", "terminal_manager", "delivery_user"] as const;
+const ALL_ROLES = ["super_admin", "admin", "staff", "documentation_user", "accounts_user", "operations_user", "terminal_manager", "delivery_user"] as const;
 
 const ROLE_LABELS: Record<string, string> = {
+  super_admin: "Super Admin",
   admin: "Administrator",
   staff: "Staff",
   documentation_user: "Documentation",
@@ -118,6 +119,7 @@ type UserRow = {
 const DEPT_ROLES = ["documentation_user", "accounts_user", "operations_user", "terminal_manager", "delivery_user"];
 
 function formatPermissionsSummary(user: UserRow): string {
+  if (user.role === "super_admin") return "Full system control";
   if (user.role === "admin") return "All sections";
   if (DEPT_ROLES.includes(user.role)) return `${ROLE_LABELS[user.role] ?? user.role} department access`;
   if (user.sectionPermissions) {
@@ -193,8 +195,9 @@ function CreateUserDialog() {
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                   <SelectContent>
-                    <SelectItem value="staff">Staff</SelectItem>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
                     <SelectItem value="admin">Administrator</SelectItem>
+                    <SelectItem value="staff">Staff</SelectItem>
                     <SelectItem value="documentation_user">Documentation</SelectItem>
                     <SelectItem value="accounts_user">Accounts</SelectItem>
                     <SelectItem value="operations_user">Operations</SelectItem>
@@ -287,8 +290,9 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                 <SelectContent>
-                  <SelectItem value="staff">Staff</SelectItem>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
                   <SelectItem value="admin">Administrator</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
                   <SelectItem value="documentation_user">Documentation</SelectItem>
                   <SelectItem value="accounts_user">Accounts</SelectItem>
                   <SelectItem value="operations_user">Operations</SelectItem>
@@ -426,7 +430,7 @@ function AssignClientsDialog({ user, onClose }: { user: UserRow; onClose: () => 
 }
 
 export default function Users() {
-  const { isAdmin, user: currentUser } = useAuth();
+  const { isAdmin, isSuperAdmin, user: currentUser } = useAuth();
   const [, setLocation] = useLocation();
   const { data: users, isLoading } = useListUsers();
   const updateMutation = useUpdateUser();
@@ -461,7 +465,7 @@ export default function Users() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">User Management</h1>
           <p className="text-muted-foreground text-sm mt-1">Manage system access, roles, and section permissions.</p>
         </div>
-        <CreateUserDialog />
+        {isSuperAdmin && <CreateUserDialog />}
       </div>
 
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm shadow-lg overflow-hidden">
@@ -490,10 +494,14 @@ export default function Users() {
                       <div className="text-xs text-muted-foreground mt-0.5">{u.email}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant="outline" className={u.role === "admin"
-                        ? "border-primary text-primary bg-primary/10"
-                        : "border-border text-muted-foreground"}>
-                        {u.role === "admin" ? <Shield className="w-3 h-3 mr-1" /> : <UserIcon className="w-3 h-3 mr-1" />}
+                      <Badge variant="outline" className={
+                        u.role === "super_admin"
+                          ? "border-yellow-500 text-yellow-400 bg-yellow-500/10"
+                          : u.role === "admin"
+                          ? "border-primary text-primary bg-primary/10"
+                          : "border-border text-muted-foreground"
+                      }>
+                        {u.role === "super_admin" ? <Shield className="w-3 h-3 mr-1" /> : u.role === "admin" ? <Shield className="w-3 h-3 mr-1" /> : <UserIcon className="w-3 h-3 mr-1" />}
                         {ROLE_LABELS[u.role] ?? u.role}
                       </Badge>
                     </td>
@@ -516,18 +524,20 @@ export default function Users() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Dialog open={editingUser?.id === u.id} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="sm" onClick={() => setEditingUser(u as UserRow)}
-                              className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary">
-                              <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
-                            </Button>
-                          </DialogTrigger>
-                          {editingUser?.id === u.id && (
-                            <EditUserDialog user={editingUser} onClose={() => setEditingUser(null)} />
-                          )}
-                        </Dialog>
-                        {u.role !== "admin" && (
+                        {isSuperAdmin && (
+                          <Dialog open={editingUser?.id === u.id} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="sm" onClick={() => setEditingUser(u as UserRow)}
+                                className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary">
+                                <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                              </Button>
+                            </DialogTrigger>
+                            {editingUser?.id === u.id && (
+                              <EditUserDialog user={editingUser} onClose={() => setEditingUser(null)} />
+                            )}
+                          </Dialog>
+                        )}
+                        {u.role !== "super_admin" && (
                           <Dialog open={assigningUser?.id === u.id} onOpenChange={(open) => { if (!open) setAssigningUser(null); }}>
                             <DialogTrigger asChild>
                               <Button variant="ghost" size="sm" onClick={() => setAssigningUser(u as UserRow)}
@@ -540,11 +550,13 @@ export default function Users() {
                             )}
                           </Dialog>
                         )}
-                        <Button variant="ghost" size="sm" onClick={() => handleToggleActive(u as UserRow)}
-                          disabled={updateMutation.isPending || u.id === currentUser?.id}
-                          className={`h-8 px-3 text-xs ${u.isActive ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-emerald-500/10 hover:text-emerald-500"}`}>
-                          {u.isActive ? <><PowerOff className="w-3.5 h-3.5 mr-1" /> Disable</> : <><Power className="w-3.5 h-3.5 mr-1" /> Enable</>}
-                        </Button>
+                        {isSuperAdmin && (
+                          <Button variant="ghost" size="sm" onClick={() => handleToggleActive(u as UserRow)}
+                            disabled={updateMutation.isPending || u.id === currentUser?.id}
+                            className={`h-8 px-3 text-xs ${u.isActive ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-emerald-500/10 hover:text-emerald-500"}`}>
+                            {u.isActive ? <><PowerOff className="w-3.5 h-3.5 mr-1" /> Disable</> : <><Power className="w-3.5 h-3.5 mr-1" /> Enable</>}
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
