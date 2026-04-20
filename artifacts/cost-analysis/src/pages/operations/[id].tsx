@@ -47,6 +47,8 @@ const PIPELINE_STAGES = WORKFLOW_STAGES.filter(
   (s) => s.value !== "pending_verification"
 );
 
+const OPS_STAGES = ["transire_processing", "shipping_payment", "terminal_payment", "pull_out"];
+
 function daysAgo(dateStr: string): number {
   const ms = Date.now() - new Date(dateStr).getTime();
   return Math.floor(ms / 86_400_000);
@@ -56,21 +58,31 @@ function StageRail({
   currentStatus,
   onNavigate,
   isAdmin,
+  isOperationsUser,
 }: {
   currentStatus: string;
   onNavigate?: (stage: string) => void;
   isAdmin?: boolean;
+  isOperationsUser?: boolean;
 }) {
-  const currentIdx = PIPELINE_STAGES.findIndex((s) => s.value === currentStatus);
+  const stages = isOperationsUser
+    ? WORKFLOW_STAGES.filter(s => OPS_STAGES.includes(s.value))
+    : PIPELINE_STAGES;
+
+  const currentIdx = stages.findIndex((s) => s.value === currentStatus);
 
   return (
     <div className="relative">
       <div className="flex items-center gap-0 overflow-x-auto pb-2">
-        {PIPELINE_STAGES.map((stage, idx) => {
+        {stages.map((stage, idx) => {
           const isPast = idx < currentIdx;
           const isCurrent = idx === currentIdx;
           const isFuture = idx > currentIdx;
-          const isClickable = isAdmin && !isCurrent && !isFuture;
+          const isClickable = isAdmin
+            ? !isCurrent && !isFuture
+            : isOperationsUser
+            ? !isCurrent
+            : false;
 
           const dot = (
             <div
@@ -82,7 +94,7 @@ function StageRail({
                 ${isClickable ? "cursor-pointer hover:scale-110 hover:ring-2 hover:ring-amber-400/50" : ""}
               `}
               onClick={isClickable ? () => onNavigate?.(stage.value) : undefined}
-              title={isClickable ? `Navigate to ${stage.label}` : undefined}
+              title={isClickable ? `Go to ${stage.label}` : undefined}
             >
               {isPast ? (
                 <CheckCircle2 className="w-3.5 h-3.5 text-primary-foreground" />
@@ -108,7 +120,7 @@ function StageRail({
                   {stage.short}
                 </span>
               </div>
-              {idx < PIPELINE_STAGES.length - 1 && (
+              {idx < stages.length - 1 && (
                 <div
                   className={`h-0.5 w-6 mx-0.5 mb-4 rounded-full transition-all
                     ${idx < currentIdx ? "bg-primary" : "bg-border/30"}
@@ -119,9 +131,11 @@ function StageRail({
           );
         })}
       </div>
-      {isAdmin && (
+      {(isAdmin || isOperationsUser) && (
         <p className="text-[9px] text-muted-foreground/50 mt-0.5">
-          Click any completed stage to navigate back to it
+          {isOperationsUser
+            ? "Click any stage to navigate back or forward within your stages"
+            : "Click any completed stage to navigate back to it"}
         </p>
       )}
     </div>
@@ -131,9 +145,11 @@ function StageRail({
 function OperationalForm({
   container,
   isAdmin,
+  isOperationsUser,
 }: {
   container: Container;
   isAdmin: boolean;
+  isOperationsUser: boolean;
 }) {
   const { toast } = useToast();
   const updateMutation = useUpdateContainer();
@@ -212,6 +228,7 @@ function OperationalForm({
     }
   };
 
+  const isEditable = isAdmin || isOperationsUser;
   const daysInStage = daysAgo(container.updatedAt);
   const isOverdue =
     nextActionDueDate && new Date(nextActionDueDate) < new Date();
@@ -260,7 +277,7 @@ function OperationalForm({
                 }}
                 placeholder="Person responsible for this stage"
                 className="h-8 text-sm bg-background border-border/60"
-                disabled={!isAdmin}
+                disabled={!isEditable}
               />
             </div>
             <div className="space-y-1.5">
@@ -278,7 +295,7 @@ function OperationalForm({
                 className={`h-8 text-sm bg-background border-border/60 ${
                   isOverdue ? "border-red-500/50 text-red-400" : ""
                 }`}
-                disabled={!isAdmin}
+                disabled={!isEditable}
               />
               {isOverdue && (
                 <p className="text-[10px] text-red-400 flex items-center gap-1">
@@ -302,7 +319,7 @@ function OperationalForm({
               }}
               placeholder="Describe the next required action"
               className="h-8 text-sm bg-background border-border/60"
-              disabled={!isAdmin}
+              disabled={!isEditable}
             />
           </div>
 
@@ -323,11 +340,11 @@ function OperationalForm({
               className={`text-sm bg-background border-border/60 resize-none ${
                 delayReason ? "border-amber-500/40 bg-amber-500/5" : ""
               }`}
-              disabled={!isAdmin}
+              disabled={!isEditable}
             />
           </div>
 
-          {isAdmin && (
+          {isEditable && (
             <div className="flex items-center gap-2 pt-1">
               <Button
                 size="sm"
@@ -358,36 +375,53 @@ function OperationalForm({
         </CardContent>
       </Card>
 
-      {isAdmin && nextStage && (
-        <Card className="border-primary/20 bg-primary/5 backdrop-blur-sm">
+      {isEditable && nextStage && (
+        <Card className={`backdrop-blur-sm ${
+          isOperationsUser && container.status === "pull_out"
+            ? "border-emerald-500/30 bg-emerald-500/5"
+            : "border-primary/20 bg-primary/5"
+        }`}>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-foreground">
-                  Advance to Next Stage
+                  {isOperationsUser && container.status === "pull_out"
+                    ? "Submit to Terminal Manager"
+                    : "Advance to Next Stage"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Move this container from{" "}
-                  <span className="font-medium text-foreground/70">
-                    {getStatusLabel(container.status)}
-                  </span>{" "}
-                  →{" "}
-                  <span className="font-medium text-primary">
-                    {nextStageLabel}
-                  </span>
+                  {isOperationsUser && container.status === "pull_out"
+                    ? "This job is ready. Submit it to the Terminal Manager for gate-in and examination."
+                    : <>
+                        Move this container from{" "}
+                        <span className="font-medium text-foreground/70">
+                          {getStatusLabel(container.status)}
+                        </span>{" "}
+                        →{" "}
+                        <span className="font-medium text-primary">
+                          {nextStageLabel}
+                        </span>
+                      </>
+                  }
                 </p>
               </div>
               <Button
                 onClick={handleAdvance}
                 disabled={advanceMutation.isPending}
-                className="gap-2 shrink-0"
+                className={`gap-2 shrink-0 ${
+                  isOperationsUser && container.status === "pull_out"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : ""
+                }`}
               >
                 {advanceMutation.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <ChevronRight className="w-4 h-4" />
                 )}
-                {nextStageLabel}
+                {isOperationsUser && container.status === "pull_out"
+                  ? "Submit to Terminal Manager"
+                  : nextStageLabel}
               </Button>
             </div>
           </CardContent>
@@ -629,7 +663,7 @@ function AuditLog({ containerId }: { containerId: number }) {
 
 export default function OperationDetailPage({ params }: { params: { id: string } }) {
   const containerId = parseInt(params.id, 10);
-  const { isAdmin } = useAuth();
+  const { isAdmin, isOperationsUser } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const navMutation = useAdvanceContainerStatus();
@@ -676,10 +710,10 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/operations">
+        <Link href={isOperationsUser ? "/workspace/operations" : "/operations"}>
           <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground h-8 px-2">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Operations Board
+            {isOperationsUser ? "My Jobs" : "Operations Board"}
           </Button>
         </Link>
         <span className="text-border/40">/</span>
@@ -739,13 +773,15 @@ export default function OperationDetailPage({ params }: { params: { id: string }
           </div>
         </div>
 
-        <Link href={`/containers/${container.id}`}>
-          <Button variant="outline" size="sm" className="gap-2 shrink-0 h-8">
-            <FileText className="w-3.5 h-3.5" />
-            Financial Records
-            <ExternalLink className="w-3 h-3 text-muted-foreground" />
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link href={`/containers/${container.id}`}>
+            <Button variant="outline" size="sm" className="gap-2 shrink-0 h-8">
+              <FileText className="w-3.5 h-3.5" />
+              Financial Records
+              <ExternalLink className="w-3 h-3 text-muted-foreground" />
+            </Button>
+          </Link>
+        )}
       </div>
 
       {isPipeline && (
@@ -756,8 +792,9 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             </p>
             <StageRail
               currentStatus={container.status}
-              onNavigate={isAdmin ? handleStageNavigate : undefined}
+              onNavigate={(isAdmin || isOperationsUser) ? handleStageNavigate : undefined}
               isAdmin={isAdmin ?? false}
+              isOperationsUser={isOperationsUser ?? false}
             />
           </CardContent>
         </Card>
@@ -777,6 +814,7 @@ export default function OperationDetailPage({ params }: { params: { id: string }
           <OperationalForm
             container={container}
             isAdmin={isAdmin ?? false}
+            isOperationsUser={isOperationsUser ?? false}
           />
           <PaarPanel
             container={container}

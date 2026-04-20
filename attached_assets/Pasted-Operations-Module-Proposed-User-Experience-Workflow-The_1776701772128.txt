@@ -1,0 +1,76 @@
+Operations Module – Proposed User Experience & Workflow
+
+The Operations module should be simple, focused, and task-driven, without unnecessary distractions.
+
+1. No Dashboard for Operations Users
+
+There is no need for a traditional dashboard for the Operations team.
+
+Operations users should not see analytics, summaries, or notifications
+Their interface should be limited to what they actually need: their jobs
+2. “My Jobs” Page with Smart Search
+
+The main page for Operations users should be a “My Jobs” page.
+
+The page should contain:
+A central search bar
+Users can search using:
+Container number
+Bill of Lading
+
+Once a user inputs any of these, they should be able to:
+
+Instantly retrieve the job
+View job details
+3. Job View & Editing
+
+When the user clicks “View Job”:
+
+The job should be fully editable (currently it is not, which needs to be fixed)
+The user should be able to:
+Work on the job directly
+Update operational stages
+4. Flexible Navigation Within Job
+
+Inside the job:
+
+Users should be able to navigate freely between stages, such as:
+Transire
+Shipping Payment
+Terminal Payment
+Pull-out
+Clicking on any stage should allow movement back and forth easily, without restrictions
+5. Remove Financial Data from Operations View
+
+The Operations page should not include financial records.
+
+Financial details are not relevant to the Operations team
+Removing them will:
+Reduce clutter
+Improve focus
+Avoid unnecessary confusion
+6. Submission to Next Stage
+
+After completing all required operational steps (Transire → Shipping → Terminal → Pull-out):
+
+The user clicks “Submit”
+Once submitted:
+The job is automatically transferred to the Terminal Manager (TM)
+It becomes visible on the Terminal Manager’s dashboard/page
+7. Terminal Manager Handoff
+
+For the Terminal Manager:
+
+The submitted job will now appear in their queue
+They will handle:
+Gate-In
+Examination
+Release
+Overall Goal
+
+This approach ensures that:
+
+Each user sees only what is relevant to their role
+The interface remains clean and distraction-free
+The workflow is fast, simple, and efficient
+Jobs move smoothly from one department to another without confusion

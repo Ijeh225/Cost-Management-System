@@ -94,7 +94,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!effectiveUser) {
         if (!isAuthPage && !isSetupPage) setLocation("/login");
       } else if (isAuthPage || isSetupPage) {
-        setLocation("/");
+        const role = (effectiveUser as any)?.role ?? "";
+        const deptHomeMap: Record<string, string> = {
+          operations_user:   "/workspace/operations",
+          documentation_user: "/workspace/documentation",
+          accounts_user:     "/workspace/accounts",
+          terminal_manager:  "/workspace/terminal",
+          delivery_user:     "/workspace/delivery",
+        };
+        setLocation(deptHomeMap[role] ?? "/");
       }
     }
   }, [effectiveUser, userLoading, isFetching, isAuthPage, isSetupPage, setupStatus, setupLoading, setLocation]);

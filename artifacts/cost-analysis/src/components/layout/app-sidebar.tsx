@@ -82,9 +82,7 @@ export function AppSidebar() {
       ]
     : isOperationsUser
     ? [
-        { title: "Dashboard",          url: "/",                        icon: LayoutDashboard },
         { title: "My Jobs",            url: "/workspace/operations",    icon: Activity        },
-        { title: "Notifications",      url: "/notifications",           icon: Bell, badge: unreadCount },
       ]
     : isTerminalManager
     ? [
