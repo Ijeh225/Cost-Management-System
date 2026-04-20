@@ -488,6 +488,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
     const id = parseInt(req.params.id);
     const userRole = req.user!.role;
     const isAdmin = userRole === "admin" || userRole === "super_admin";
+    const requestedStatus: string | undefined = req.body?.status;
 
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing) {
@@ -495,24 +496,45 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
       return;
     }
 
-    if (!isAdmin) {
-      const allowedStages = DEPT_OWNED_STAGES[userRole] ?? [];
-      if (!allowedStages.includes(existing.status)) {
-        res.status(403).json({ error: "You don't have permission to advance this container from its current stage" });
-        return;
-      }
-    }
-
     const currentIdx = PIPELINE_STAGE_ORDER.indexOf(existing.status);
     if (currentIdx === -1) {
       res.status(400).json({ error: `Unknown current status: ${existing.status}` });
       return;
     }
-    if (currentIdx >= PIPELINE_STAGE_ORDER.length - 1) {
+
+    // Determine whether this is a navigation (jump to a specific stage) or a forward advance.
+    // If the requested status is the natural next stage, treat it as a forward advance so that
+    // the "Submit" / "Advance" buttons still work with the usual permission checks.
+    const naturalNext = PIPELINE_STAGE_ORDER[currentIdx + 1];
+    const isNavigation = !!(
+      requestedStatus &&
+      PIPELINE_STAGE_ORDER.includes(requestedStatus) &&
+      requestedStatus !== existing.status &&
+      requestedStatus !== naturalNext
+    );
+    const nextStatus = isNavigation ? requestedStatus : naturalNext;
+
+    if (!nextStatus) {
       res.status(400).json({ error: "Container is already at the final stage" });
       return;
     }
-    const nextStatus = PIPELINE_STAGE_ORDER[currentIdx + 1];
+
+    if (!isAdmin) {
+      const allowedStages = DEPT_OWNED_STAGES[userRole] ?? [];
+      if (isNavigation) {
+        // For navigation, check that the TARGET stage is within the user's allowed stages
+        if (!allowedStages.includes(requestedStatus!)) {
+          res.status(403).json({ error: "You don't have permission to navigate this container to that stage" });
+          return;
+        }
+      } else {
+        // For forward advance, check that the CURRENT stage is within the user's allowed stages
+        if (!allowedStages.includes(existing.status)) {
+          res.status(403).json({ error: "You don't have permission to advance this container from its current stage" });
+          return;
+        }
+      }
+    }
     const [updated] = await db.update(containersTable)
       .set({ status: nextStatus, updatedAt: new Date(), nextAction: null, nextActionDueDate: null })
       .where(eq(containersTable.id, id))
