@@ -1,5 +1,5 @@
 import app from "./app";
-import { db, pool, containersTable, appMigrationsTable } from "@workspace/db";
+import { db, pool, containersTable, appMigrationsTable, usersTable } from "@workspace/db";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 async function ensureMigrationsTable() {
@@ -37,6 +37,16 @@ async function runStartupMigrations() {
         .returning({ id: containersTable.id });
       if (updated.length > 0) {
         console.log(`[migration] Renamed shipping_terminal_payment → shipping_payment for ${updated.length} container(s).`);
+      }
+    });
+
+    await runMigration("upgrade_admin_role_to_super_admin", async () => {
+      const updated = await pool.query(
+        `UPDATE users SET role = 'super_admin' WHERE role = 'admin'`
+      );
+      const count = (updated as { rowCount: number | null }).rowCount ?? 0;
+      if (count > 0) {
+        console.log(`[migration] Upgraded ${count} admin user(s) to super_admin.`);
       }
     });
 
