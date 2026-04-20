@@ -70,15 +70,11 @@ export function AppSidebar() {
 
   const deptNav: NavItem[] = isDocumentationUser
     ? [
-        { title: "Dashboard",          url: "/",                        icon: LayoutDashboard },
         { title: "My Jobs",            url: "/workspace/documentation", icon: FileCheck2      },
-        { title: "Notifications",      url: "/notifications",           icon: Bell, badge: unreadCount },
       ]
     : isAccountsUser
     ? [
-        { title: "Dashboard",          url: "/",                        icon: LayoutDashboard },
         { title: "Duty Payments",      url: "/workspace/accounts",      icon: BookOpen        },
-        { title: "Notifications",      url: "/notifications",           icon: Bell, badge: unreadCount },
       ]
     : isOperationsUser
     ? [
@@ -86,15 +82,11 @@ export function AppSidebar() {
       ]
     : isTerminalManager
     ? [
-        { title: "Dashboard",          url: "/",                        icon: LayoutDashboard },
         { title: "Terminal Workspace", url: "/workspace/terminal",      icon: Building2       },
-        { title: "Notifications",      url: "/notifications",           icon: Bell, badge: unreadCount },
       ]
     : isDeliveryUser
     ? [
-        { title: "Dashboard",          url: "/",                        icon: LayoutDashboard },
         { title: "Deliveries",         url: "/workspace/delivery",      icon: Truck           },
-        { title: "Notifications",      url: "/notifications",           icon: Bell, badge: unreadCount },
       ]
     : [];
 

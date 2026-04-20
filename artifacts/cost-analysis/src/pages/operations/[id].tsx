@@ -47,7 +47,11 @@ const PIPELINE_STAGES = WORKFLOW_STAGES.filter(
   (s) => s.value !== "pending_verification"
 );
 
-const OPS_STAGES = ["transire_processing", "shipping_payment", "terminal_payment", "pull_out"];
+const OPS_STAGES      = ["transire_processing", "shipping_payment", "terminal_payment", "pull_out"];
+const DOCS_STAGES     = ["registered", "documentation", "duty_assessment"];
+const ACCOUNTS_STAGES = ["duty_payment"];
+const TERMINAL_STAGES = ["gate_in", "examination", "final_release"];
+const DELIVERY_STAGES = ["delivery", "empty_return"];
 
 function daysAgo(dateStr: string): number {
   const ms = Date.now() - new Date(dateStr).getTime();
@@ -59,14 +63,31 @@ function StageRail({
   onNavigate,
   isAdmin,
   isOperationsUser,
+  isDocumentationUser,
+  isAccountsUser,
+  isTerminalManager,
+  isDeliveryUser,
 }: {
   currentStatus: string;
   onNavigate?: (stage: string) => void;
   isAdmin?: boolean;
   isOperationsUser?: boolean;
+  isDocumentationUser?: boolean;
+  isAccountsUser?: boolean;
+  isTerminalManager?: boolean;
+  isDeliveryUser?: boolean;
 }) {
-  const stages = isOperationsUser
-    ? WORKFLOW_STAGES.filter(s => OPS_STAGES.includes(s.value))
+  const isDeptUser = isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser;
+
+  const deptStageValues = isDocumentationUser ? DOCS_STAGES
+    : isAccountsUser     ? ACCOUNTS_STAGES
+    : isTerminalManager  ? TERMINAL_STAGES
+    : isDeliveryUser     ? DELIVERY_STAGES
+    : isOperationsUser   ? OPS_STAGES
+    : null;
+
+  const stages = deptStageValues
+    ? WORKFLOW_STAGES.filter(s => deptStageValues.includes(s.value))
     : PIPELINE_STAGES;
 
   const currentIdx = stages.findIndex((s) => s.value === currentStatus);
@@ -80,7 +101,7 @@ function StageRail({
           const isFuture = idx > currentIdx;
           const isClickable = isAdmin
             ? !isCurrent && !isFuture
-            : isOperationsUser
+            : isDeptUser
             ? !isCurrent
             : false;
 
@@ -131,9 +152,9 @@ function StageRail({
           );
         })}
       </div>
-      {(isAdmin || isOperationsUser) && (
+      {(isAdmin || isDeptUser) && (
         <p className="text-[9px] text-muted-foreground/50 mt-0.5">
-          {isOperationsUser
+          {isDeptUser
             ? "Click any stage to navigate back or forward within your stages"
             : "Click any completed stage to navigate back to it"}
         </p>
@@ -142,14 +163,45 @@ function StageRail({
   );
 }
 
+const DEPT_SUBMIT_LABELS: Record<string, Record<string, string>> = {
+  documentation_user: {
+    registered:      "Submit to Documentation",
+    documentation:   "Submit to Duty Assessment",
+    duty_assessment: "Submit to Accounts",
+  },
+  accounts_user: {
+    duty_payment: "Submit to Operations",
+  },
+  terminal_manager: {
+    gate_in:       "Submit to Examination",
+    examination:   "Submit to Final Release",
+    final_release: "Submit to Delivery",
+  },
+  delivery_user: {
+    delivery:     "Submit to Empty Return",
+    empty_return: "Mark as Closed",
+  },
+  operations_user: {
+    pull_out: "Submit to Terminal Manager",
+  },
+};
+
 function OperationalForm({
   container,
   isAdmin,
   isOperationsUser,
+  isDocumentationUser,
+  isAccountsUser,
+  isTerminalManager,
+  isDeliveryUser,
 }: {
   container: Container;
   isAdmin: boolean;
   isOperationsUser: boolean;
+  isDocumentationUser: boolean;
+  isAccountsUser: boolean;
+  isTerminalManager: boolean;
+  isDeliveryUser: boolean;
 }) {
   const { toast } = useToast();
   const updateMutation = useUpdateContainer();
@@ -228,7 +280,8 @@ function OperationalForm({
     }
   };
 
-  const isEditable = isAdmin || isOperationsUser;
+  const isDeptUser = isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser;
+  const isEditable = isAdmin || isDeptUser;
   const daysInStage = daysAgo(container.updatedAt);
   const isOverdue =
     nextActionDueDate && new Date(nextActionDueDate) < new Date();
@@ -375,58 +428,69 @@ function OperationalForm({
         </CardContent>
       </Card>
 
-      {isEditable && nextStage && (
-        <Card className={`backdrop-blur-sm ${
-          isOperationsUser && container.status === "pull_out"
-            ? "border-emerald-500/30 bg-emerald-500/5"
-            : "border-primary/20 bg-primary/5"
-        }`}>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-foreground">
-                  {isOperationsUser && container.status === "pull_out"
-                    ? "Submit to Terminal Manager"
-                    : "Advance to Next Stage"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {isOperationsUser && container.status === "pull_out"
-                    ? "This job is ready. Submit it to the Terminal Manager for gate-in and examination."
-                    : <>
-                        Move this container from{" "}
-                        <span className="font-medium text-foreground/70">
-                          {getStatusLabel(container.status)}
-                        </span>{" "}
-                        →{" "}
-                        <span className="font-medium text-primary">
-                          {nextStageLabel}
-                        </span>
-                      </>
-                  }
-                </p>
+      {isEditable && nextStage && (() => {
+        const deptRole = isDocumentationUser ? "documentation_user"
+          : isAccountsUser    ? "accounts_user"
+          : isTerminalManager ? "terminal_manager"
+          : isDeliveryUser    ? "delivery_user"
+          : isOperationsUser  ? "operations_user"
+          : null;
+        const deptLabel = deptRole
+          ? DEPT_SUBMIT_LABELS[deptRole]?.[container.status]
+          : undefined;
+        const isClose = container.status === "empty_return";
+        const isFinalDept = !!deptLabel;
+        const cardBorder = isClose
+          ? "border-emerald-500/30 bg-emerald-500/5"
+          : isFinalDept
+          ? "border-amber-500/20 bg-amber-500/5"
+          : "border-primary/20 bg-primary/5";
+        const btnClass = isClose
+          ? "bg-emerald-600 hover:bg-emerald-700"
+          : isFinalDept
+          ? "bg-amber-600 hover:bg-amber-700"
+          : "";
+        const buttonLabel = deptLabel ?? nextStageLabel;
+        const cardTitle = deptLabel ?? "Advance to Next Stage";
+        const cardDesc = deptLabel
+          ? `This job is ready. Confirm to send it to the next department.`
+          : (
+            <>
+              Move this container from{" "}
+              <span className="font-medium text-foreground/70">
+                {getStatusLabel(container.status)}
+              </span>{" "}
+              →{" "}
+              <span className="font-medium text-primary">
+                {nextStageLabel}
+              </span>
+            </>
+          );
+        return (
+          <Card className={`backdrop-blur-sm ${cardBorder}`}>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{cardTitle}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{cardDesc}</p>
+                </div>
+                <Button
+                  onClick={handleAdvance}
+                  disabled={advanceMutation.isPending}
+                  className={`gap-2 shrink-0 ${btnClass}`}
+                >
+                  {advanceMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                  {buttonLabel}
+                </Button>
               </div>
-              <Button
-                onClick={handleAdvance}
-                disabled={advanceMutation.isPending}
-                className={`gap-2 shrink-0 ${
-                  isOperationsUser && container.status === "pull_out"
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : ""
-                }`}
-              >
-                {advanceMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
-                {isOperationsUser && container.status === "pull_out"
-                  ? "Submit to Terminal Manager"
-                  : nextStageLabel}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {container.status === "closed" && (
         <Card className="border-emerald-500/20 bg-emerald-500/5">
@@ -663,7 +727,7 @@ function AuditLog({ containerId }: { containerId: number }) {
 
 export default function OperationDetailPage({ params }: { params: { id: string } }) {
   const containerId = parseInt(params.id, 10);
-  const { isAdmin, isOperationsUser } = useAuth();
+  const { isAdmin, isOperationsUser, isDocumentationUser, isAccountsUser, isTerminalManager, isDeliveryUser } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const navMutation = useAdvanceContainerStatus();
@@ -710,10 +774,22 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={isOperationsUser ? "/workspace/operations" : "/operations"}>
+        <Link href={
+          isDocumentationUser ? "/workspace/documentation"
+          : isAccountsUser    ? "/workspace/accounts"
+          : isTerminalManager ? "/workspace/terminal"
+          : isDeliveryUser    ? "/workspace/delivery"
+          : isOperationsUser  ? "/workspace/operations"
+          : "/operations"
+        }>
           <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground h-8 px-2">
             <ArrowLeft className="w-3.5 h-3.5" />
-            {isOperationsUser ? "My Jobs" : "Operations Board"}
+            {isDocumentationUser ? "My Jobs"
+              : isAccountsUser    ? "Duty Payments"
+              : isTerminalManager ? "Terminal Workspace"
+              : isDeliveryUser    ? "Deliveries"
+              : isOperationsUser  ? "My Jobs"
+              : "Operations Board"}
           </Button>
         </Link>
         <span className="text-border/40">/</span>
@@ -792,9 +868,13 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             </p>
             <StageRail
               currentStatus={container.status}
-              onNavigate={(isAdmin || isOperationsUser) ? handleStageNavigate : undefined}
+              onNavigate={(isAdmin || isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser) ? handleStageNavigate : undefined}
               isAdmin={isAdmin ?? false}
               isOperationsUser={isOperationsUser ?? false}
+              isDocumentationUser={isDocumentationUser ?? false}
+              isAccountsUser={isAccountsUser ?? false}
+              isTerminalManager={isTerminalManager ?? false}
+              isDeliveryUser={isDeliveryUser ?? false}
             />
           </CardContent>
         </Card>
@@ -815,6 +895,10 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             container={container}
             isAdmin={isAdmin ?? false}
             isOperationsUser={isOperationsUser ?? false}
+            isDocumentationUser={isDocumentationUser ?? false}
+            isAccountsUser={isAccountsUser ?? false}
+            isTerminalManager={isTerminalManager ?? false}
+            isDeliveryUser={isDeliveryUser ?? false}
           />
           <PaarPanel
             container={container}

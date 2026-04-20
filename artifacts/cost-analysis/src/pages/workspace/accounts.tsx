@@ -1,16 +1,21 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { useGetPipeline, useAdvanceContainerStatus } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { Input } from "@/components/ui/input";
+import { getStatusColor, WORKFLOW_STAGES } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, Search, BookOpen, ChevronRight, Clock, SendHorizonal } from "lucide-react";
+import { Loader2, Search, BookOpen, ChevronRight, Clock, SendHorizonal, Inbox } from "lucide-react";
 
 const DEPT_STAGES = ["duty_payment"];
 
 function DaysChip({ days }: { days: number }) {
-  const color = days >= 7 ? "text-red-400 bg-red-500/10 border-red-500/30" : days >= 3 ? "text-amber-400 bg-amber-500/10 border-amber-500/30" : "text-emerald-400 bg-emerald-500/10 border-emerald-500/30";
+  const color =
+    days >= 7  ? "text-red-400 bg-red-500/10 border-red-500/30"
+    : days >= 3 ? "text-amber-400 bg-amber-500/10 border-amber-500/30"
+                : "text-emerald-400 bg-emerald-500/10 border-emerald-500/30";
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-2 py-0.5 ${color}`}>
       <Clock className="w-2.5 h-2.5" />{days}d
@@ -21,92 +26,133 @@ function DaysChip({ days }: { days: number }) {
 export default function AccountsWorkspace() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const { data, isLoading } = useGetPipeline({ query: { refetchInterval: 30_000 } });
   const advance = useAdvanceContainerStatus();
 
-  const containers = (data?.stages?.["duty_payment"] ?? []).filter(c =>
-    !search.trim() ||
-    c.containerNumber.toLowerCase().includes(search.toLowerCase()) ||
-    c.blNumber?.toLowerCase().includes(search.toLowerCase()) ||
-    c.customerName?.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => { searchRef.current?.focus(); }, []);
+
+  const allContainers = DEPT_STAGES.flatMap(s =>
+    (data?.stages?.[s] ?? []).map(c => ({ ...c, stage: s }))
   );
 
-  const handleSubmit = (id: number, containerNumber: string) => {
-    advance.mutate({ id, status: "duty_payment" }, {
-      onSuccess: () => toast({ title: `Job ${containerNumber} submitted to Operations.` }),
-      onError: (e) => toast({ title: "Error", description: (e as Error).message, variant: "destructive" }),
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? allContainers.filter(c =>
+        c.containerNumber.toLowerCase().includes(q) ||
+        c.blNumber?.toLowerCase().includes(q)
+      )
+    : allContainers;
+
+  const byStage = DEPT_STAGES.reduce<Record<string, typeof filtered>>((acc, s) => {
+    acc[s] = filtered.filter(c => c.stage === s);
+    return acc;
+  }, {});
+
+  const handleSubmit = (container: (typeof filtered)[0]) => {
+    advance.mutate({ id: container.id, status: container.stage }, {
+      onSuccess: () => toast({ title: `Job ${container.containerNumber} submitted to Operations.` }),
+      onError:   (e) => toast({ title: "Error", description: (e as Error).message, variant: "destructive" }),
     });
   };
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center shrink-0">
-          <BookOpen className="w-6 h-6 text-orange-400" />
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center shrink-0">
+            <BookOpen className="w-6 h-6 text-orange-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Duty Payments</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">Accounts Department</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">Accounts Department</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            Confirm duty payments and submit jobs to Operations.
-          </p>
-        </div>
+        {!isLoading && (
+          <div className="text-right shrink-0">
+            <p className="text-2xl font-bold text-foreground">{allContainers.length}</p>
+            <p className="text-xs text-muted-foreground">active jobs</p>
+          </div>
+        )}
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search by container number, BL number, or client…"
-          className="pl-9"
+          ref={searchRef}
+          placeholder="Search by container number or BL number…"
+          className="pl-11 h-12 text-base"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
       </div>
 
-      <div>
-        <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Duty Payment</h2>
-          <span className="text-xs bg-muted rounded-full px-2 py-0.5">{containers.length}</span>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      ) : allContainers.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+          <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center">
+            <Inbox className="w-7 h-7 text-muted-foreground/50" />
           </div>
-        ) : containers.length === 0 ? (
-          <p className="text-sm text-muted-foreground/60 italic pl-1">No jobs awaiting duty payment.</p>
-        ) : (
-          <div className="space-y-2">
-            {containers.map(c => (
-              <Card key={c.id} className="p-4 flex items-center gap-4 hover:bg-accent/30 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm">{c.containerNumber}</span>
-                    <span className="text-muted-foreground text-xs">BL: {c.blNumber}</span>
-                    <DaysChip days={c.daysInStage} />
+          <p className="text-sm font-medium text-muted-foreground">No jobs awaiting duty payment</p>
+          <p className="text-xs text-muted-foreground/60">Jobs will appear here once they reach the Duty Payment stage.</p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {DEPT_STAGES.map(stage => {
+            const containers = byStage[stage] ?? [];
+            const stageInfo = WORKFLOW_STAGES.find(s => s.value === stage);
+            return (
+              <div key={stage}>
+                <div className="flex items-center gap-3 mb-3">
+                  <Badge variant="outline" className={`text-xs ${getStatusColor(stage)}`}>
+                    {stageInfo?.label ?? stage}
+                  </Badge>
+                  <span className="text-xs bg-muted rounded-full px-2 py-0.5 font-medium">{containers.length}</span>
+                </div>
+                {containers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground/50 italic pl-1">
+                    {q ? "No results matching your search." : "No jobs at this stage."}
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {containers.map(c => (
+                      <Card key={c.id} className="p-4 flex items-center gap-4 hover:bg-accent/30 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm font-mono">{c.containerNumber}</span>
+                            <span className="text-muted-foreground text-xs font-mono">BL: {c.blNumber}</span>
+                            <DaysChip days={c.daysInStage} />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">{c.customerName}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Link href={`/operations/${c.id}`}>
+                            <Button size="sm" variant="ghost" className="gap-1 text-xs">
+                              View Job <ChevronRight className="w-3 h-3" />
+                            </Button>
+                          </Link>
+                          <Button
+                            size="sm"
+                            className="gap-1 text-xs bg-orange-600 hover:bg-orange-700"
+                            onClick={() => handleSubmit(c)}
+                            disabled={advance.isPending}
+                          >
+                            <SendHorizonal className="w-3 h-3" />
+                            Confirm &amp; Submit to Operations
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{c.customerName}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link href={`/operations/${c.id}`}>
-                    <Button size="sm" variant="ghost" className="gap-1 text-xs">
-                      View Job <ChevronRight className="w-3 h-3" />
-                    </Button>
-                  </Link>
-                  <Button
-                    size="sm"
-                    className="gap-1 text-xs bg-orange-600 hover:bg-orange-700"
-                    onClick={() => handleSubmit(c.id, c.containerNumber)}
-                    disabled={advance.isPending}
-                  >
-                    <SendHorizonal className="w-3 h-3" />
-                    Confirm & Submit to Operations
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
