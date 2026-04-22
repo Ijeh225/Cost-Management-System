@@ -51,6 +51,8 @@ import {
   Navigation,
   Pencil,
   CheckSquare,
+  Lock,
+  ClipboardList,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
@@ -198,6 +200,357 @@ const DEPT_SUBMIT_LABELS: Record<string, Record<string, string>> = {
     pull_out:                  "Submit to Terminal Manager",
   },
 };
+
+const STAGE_DEPT_LABEL: Record<string, string> = {
+  registered:                "Documentation",
+  documentation:             "Documentation",
+  duty_assessment:           "Documentation",
+  duty_payment:              "Accounts",
+  transire_processing:       "Operations",
+  shipping_terminal_payment: "Operations",
+  pull_out:                  "Operations",
+  gate_in:                   "Terminal",
+  examination:               "Terminal",
+  final_release:             "Terminal",
+  delivery:                  "Delivery",
+  empty_return:              "Delivery",
+  closed:                    "Closed",
+};
+
+function StageBlock({
+  stage,
+  state,
+  container,
+  isAdmin,
+  isEditable,
+  deptRole,
+}: {
+  stage: { value: string; label: string; short: string };
+  state: "completed" | "active" | "future";
+  container: Container;
+  isAdmin: boolean;
+  isEditable: boolean;
+  deptRole: string | null;
+}) {
+  const { toast } = useToast();
+  const updateMutation = useUpdateContainer();
+  const advanceMutation = useAdvanceContainerStatus();
+
+  const [stageOwner, setStageOwner] = useState(container.stageOwner ?? "");
+  const [nextAction, setNextAction] = useState(container.nextAction ?? "");
+  const [nextActionDueDate, setNextActionDueDate] = useState(
+    container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
+  );
+  const [delayReason, setDelayReason] = useState(container.delayReason ?? "");
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    if (state === "active") {
+      setStageOwner(container.stageOwner ?? "");
+      setNextAction(container.nextAction ?? "");
+      setNextActionDueDate(
+        container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
+      );
+      setDelayReason(container.delayReason ?? "");
+      setIsDirty(false);
+    }
+  }, [container.id, container.updatedAt, state]);
+
+  const handleSave = async () => {
+    try {
+      await updateMutation.mutateAsync({
+        id: container.id,
+        data: {
+          stageOwner: stageOwner || null,
+          nextAction: nextAction || null,
+          nextActionDueDate: nextActionDueDate || null,
+          delayReason: delayReason || null,
+        },
+      });
+      setIsDirty(false);
+      toast({ title: "Stage notes saved" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
+
+  const nextStage = getNextStage(stage.value);
+  const nextStageLabel = nextStage ? getStatusLabel(nextStage) : null;
+
+  const handleAdvance = async () => {
+    if (!nextStage) return;
+    try {
+      await advanceMutation.mutateAsync({ id: container.id, status: nextStage });
+      toast({ title: `Advanced to ${nextStageLabel}` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to advance";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
+
+  const deptLabel = deptRole ? DEPT_SUBMIT_LABELS[deptRole]?.[stage.value] : undefined;
+  const advanceLabel = deptLabel ?? (nextStageLabel ? `Mark Complete → ${nextStageLabel}` : "Close Container");
+  const isClose = stage.value === "empty_return";
+
+  const deptDeptLabel = STAGE_DEPT_LABEL[stage.value];
+
+  if (state === "future") {
+    return (
+      <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border/25 bg-muted/10">
+        <Lock className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0" />
+        <span className="text-xs text-muted-foreground/40 font-medium">{stage.label}</span>
+        {deptDeptLabel && (
+          <span className="ml-auto text-[9px] text-muted-foreground/30">{deptDeptLabel}</span>
+        )}
+      </div>
+    );
+  }
+
+  if (state === "completed") {
+    return (
+      <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <span className="text-xs text-emerald-400/80 font-medium flex-1">{stage.label}</span>
+        {deptDeptLabel && (
+          <span className="text-[9px] text-muted-foreground/50">{deptDeptLabel}</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Card className="border-primary/25 bg-card/60 backdrop-blur-sm">
+      <CardHeader className="pb-2 pt-3 px-4">
+        <div className="flex items-center gap-2">
+          <Activity className="w-3.5 h-3.5 text-primary animate-pulse shrink-0" />
+          <span className="text-sm font-semibold text-primary flex-1">{stage.label}</span>
+          {deptDeptLabel && (
+            <span className="text-[9px] font-medium text-muted-foreground border border-border/40 rounded-full px-2 py-0.5">{deptDeptLabel}</span>
+          )}
+          {delayReason && (
+            <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5 font-medium">
+              <AlertTriangle className="w-2.5 h-2.5" /> Delayed
+            </span>
+          )}
+        </div>
+        {container.updatedAt && (
+          <p className="text-[10px] text-muted-foreground ml-5.5">
+            <Clock className="w-2.5 h-2.5 inline mr-1" />
+            {daysAgo(container.updatedAt)}d in this stage
+          </p>
+        )}
+      </CardHeader>
+      <CardContent className="px-4 pb-4 space-y-3">
+        {isEditable ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><User className="w-2.5 h-2.5" /> Stage Owner</Label>
+                <input
+                  value={stageOwner}
+                  onChange={e => { setStageOwner(e.target.value); setIsDirty(true); }}
+                  placeholder="Assign to staff member"
+                  className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><Calendar className="w-2.5 h-2.5" /> Due Date</Label>
+                <input
+                  type="date"
+                  value={nextActionDueDate}
+                  onChange={e => { setNextActionDueDate(e.target.value); setIsDirty(true); }}
+                  className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><ClipboardList className="w-2.5 h-2.5" /> Next Action</Label>
+              <input
+                value={nextAction}
+                onChange={e => { setNextAction(e.target.value); setIsDirty(true); }}
+                placeholder="What needs to happen next?"
+                className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5" /> Delay Reason <span className="text-muted-foreground/50">(leave blank if on track)</span></Label>
+              <Textarea
+                value={delayReason}
+                onChange={e => { setDelayReason(e.target.value); setIsDirty(true); }}
+                placeholder="Document any blockers or delays"
+                rows={2}
+                className={`text-xs bg-background border-border/60 resize-none ${delayReason ? "border-amber-500/40 bg-amber-500/5" : ""}`}
+              />
+            </div>
+            {isDirty && (
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="h-7 gap-1 text-xs">
+                  {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  Save Notes
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  setStageOwner(container.stageOwner ?? "");
+                  setNextAction(container.nextAction ?? "");
+                  setNextActionDueDate(container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : "");
+                  setDelayReason(container.delayReason ?? "");
+                  setIsDirty(false);
+                }} className="h-7 text-xs text-muted-foreground gap-1">
+                  <RotateCcw className="w-3 h-3" /> Reset
+                </Button>
+              </div>
+            )}
+            {(isEditable || isAdmin) && nextStage && (
+              <div className={`border rounded-lg p-3 flex items-center justify-between gap-4 ${
+                isClose ? "border-emerald-500/30 bg-emerald-500/5" : deptLabel ? "border-amber-500/20 bg-amber-500/5" : "border-primary/20 bg-primary/5"
+              }`}>
+                <div>
+                  <p className="text-xs font-semibold text-foreground">{isClose ? "Close Container" : deptLabel ?? "Advance to Next Stage"}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {stage.label} → <span className="text-foreground/70 font-medium">{nextStageLabel}</span>
+                  </p>
+                </div>
+                <Button
+                  onClick={handleAdvance}
+                  disabled={advanceMutation.isPending}
+                  className={`gap-1.5 shrink-0 text-xs h-8 ${isClose ? "bg-emerald-600 hover:bg-emerald-700" : deptLabel ? "bg-amber-600 hover:bg-amber-700" : ""}`}
+                >
+                  {advanceMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  {advanceLabel}
+                </Button>
+              </div>
+            )}
+            {stage.value === "closed" && (
+              <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-lg p-3 flex items-center gap-3">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-emerald-400">Container Closed</p>
+                  <p className="text-[10px] text-muted-foreground">All stages complete.</p>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="space-y-2 text-xs">
+            {container.stageOwner && (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <User className="w-3 h-3 shrink-0" />
+                <span>Owner:</span>
+                <span className="text-foreground font-medium">{container.stageOwner}</span>
+              </div>
+            )}
+            {container.nextAction && (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <ClipboardList className="w-3 h-3 shrink-0" />
+                <span>Next:</span>
+                <span className="text-foreground">{container.nextAction}</span>
+              </div>
+            )}
+            {container.nextActionDueDate && (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Calendar className="w-3 h-3 shrink-0" />
+                <span>Due:</span>
+                <span className={new Date(container.nextActionDueDate) < new Date() ? "text-red-400 font-medium" : "text-foreground"}>
+                  {new Date(container.nextActionDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              </div>
+            )}
+            {container.delayReason && (
+              <div className="flex items-start gap-1.5 text-amber-400/80">
+                <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                <span>{container.delayReason}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StageWorkflowBlocks({
+  container,
+  isAdmin,
+  isOperationsUser,
+  isDocumentationUser,
+  isAccountsUser,
+  isTerminalManager,
+  isDeliveryUser,
+}: {
+  container: Container;
+  isAdmin: boolean;
+  isOperationsUser: boolean;
+  isDocumentationUser: boolean;
+  isAccountsUser: boolean;
+  isTerminalManager: boolean;
+  isDeliveryUser: boolean;
+}) {
+  const isDeptUser = isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser;
+
+  const deptStageValues = isDocumentationUser ? DOCS_STAGES
+    : isAccountsUser     ? ACCOUNTS_STAGES
+    : isTerminalManager  ? TERMINAL_STAGES
+    : isDeliveryUser     ? DELIVERY_STAGES
+    : isOperationsUser   ? OPS_STAGES
+    : null;
+
+  const visibleStages = deptStageValues
+    ? WORKFLOW_STAGES.filter(s => deptStageValues.includes(s.value))
+    : PIPELINE_STAGES;
+
+  const currentIdx = WORKFLOW_STAGES.findIndex(s => s.value === container.status);
+
+  const isEditable = isAdmin || isDeptUser;
+
+  const deptRole = isDocumentationUser ? "documentation_user"
+    : isAccountsUser    ? "accounts_user"
+    : isTerminalManager ? "terminal_manager"
+    : isDeliveryUser    ? "delivery_user"
+    : isOperationsUser  ? "operations_user"
+    : null;
+
+  return (
+    <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <ClipboardList className="w-4 h-4 text-muted-foreground" />
+          Stage Workflow
+          {isAdmin && (
+            <span className="text-[10px] text-muted-foreground/60 font-normal ml-1">
+              ({visibleStages.length} stages)
+            </span>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1.5 pb-4">
+        {visibleStages.map(stage => {
+          const stageIdx = WORKFLOW_STAGES.findIndex(s => s.value === stage.value);
+          const state: "completed" | "active" | "future" =
+            stageIdx < currentIdx ? "completed"
+            : stageIdx === currentIdx ? "active"
+            : "future";
+
+          const stageIsCurrentDept = deptStageValues ? deptStageValues.includes(stage.value) : true;
+          const canEdit = isAdmin
+            ? true
+            : isDeptUser && stage.value === container.status && stageIsCurrentDept;
+
+          return (
+            <StageBlock
+              key={stage.value}
+              stage={stage}
+              state={state}
+              container={container}
+              isAdmin={isAdmin}
+              isEditable={canEdit}
+              deptRole={deptRole}
+            />
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
 
 function OperationalForm({
   container,
@@ -980,15 +1333,13 @@ export default function OperationDetailPage({ params }: { params: { id: string }
           </div>
         </div>
 
-        {isAdmin && (
-          <Link href={`/containers/${container.id}`}>
-            <Button variant="outline" size="sm" className="gap-2 shrink-0 h-8">
-              <FileText className="w-3.5 h-3.5" />
-              Financial Records
-              <ExternalLink className="w-3 h-3 text-muted-foreground" />
-            </Button>
-          </Link>
-        )}
+        <Link href={`/containers/${container.id}`}>
+          <Button variant="outline" size="sm" className="gap-2 shrink-0 h-8">
+            <FileText className="w-3.5 h-3.5" />
+            Financial Records
+            <ExternalLink className="w-3 h-3 text-muted-foreground" />
+          </Button>
+        </Link>
       </div>
 
       {isPipeline && (
@@ -1236,7 +1587,7 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             </Card>
           )}
 
-          <OperationalForm
+          <StageWorkflowBlocks
             container={container}
             isAdmin={isAdmin ?? false}
             isOperationsUser={isOperationsUser ?? false}
