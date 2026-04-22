@@ -17,6 +17,7 @@ import {
   getStatusLabel,
   getStatusColor,
   getNextStage,
+  getStageIndex,
 } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -188,11 +189,13 @@ const DEPT_SUBMIT_LABELS: Record<string, Record<string, string>> = {
     final_release: "Submit to Delivery",
   },
   delivery_user: {
-    delivery:     "Submit to Empty Return",
+    delivery:     "Proceed to Empty Return",
     empty_return: "Mark as Closed",
   },
   operations_user: {
-    pull_out: "Submit to Terminal Manager",
+    transire_processing:       "Submit to Shipping",
+    shipping_terminal_payment: "Submit to Pull-Out",
+    pull_out:                  "Submit to Terminal Manager",
   },
 };
 
@@ -217,20 +220,10 @@ function OperationalForm({
   const updateMutation = useUpdateContainer();
   const advanceMutation = useAdvanceContainerStatus();
 
-  const [stageOwner, setStageOwner] = useState(container.stageOwner ?? "");
-  const [nextAction, setNextAction] = useState(container.nextAction ?? "");
-  const [nextActionDueDate, setNextActionDueDate] = useState(
-    container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
-  );
   const [delayReason, setDelayReason] = useState(container.delayReason ?? "");
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
-    setStageOwner(container.stageOwner ?? "");
-    setNextAction(container.nextAction ?? "");
-    setNextActionDueDate(
-      container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
-    );
     setDelayReason(container.delayReason ?? "");
     setIsDirty(false);
   }, [container.id, container.updatedAt]);
@@ -242,14 +235,11 @@ function OperationalForm({
       await updateMutation.mutateAsync({
         id: container.id,
         data: {
-          stageOwner: stageOwner || null,
-          nextAction: nextAction || null,
-          nextActionDueDate: nextActionDueDate || null,
           delayReason: delayReason || null,
         },
       });
       setIsDirty(false);
-      toast({ title: "Workflow updated" });
+      toast({ title: "Stage notes updated" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to update";
       toast({ variant: "destructive", title: "Error", description: msg });
@@ -257,11 +247,6 @@ function OperationalForm({
   };
 
   const handleReset = () => {
-    setStageOwner(container.stageOwner ?? "");
-    setNextAction(container.nextAction ?? "");
-    setNextActionDueDate(
-      container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
-    );
     setDelayReason(container.delayReason ?? "");
     setIsDirty(false);
   };
@@ -293,8 +278,6 @@ function OperationalForm({
   const isDeptUser = isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser;
   const isEditable = isAdmin || isDeptUser;
   const daysInStage = daysAgo(container.updatedAt);
-  const isOverdue =
-    nextActionDueDate && new Date(nextActionDueDate) < new Date();
 
   return (
     <div className="space-y-4">
@@ -326,66 +309,6 @@ function OperationalForm({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <User className="w-3 h-3" />
-                Stage Owner
-              </Label>
-              <Input
-                value={stageOwner}
-                onChange={(e) => {
-                  setStageOwner(e.target.value);
-                  markDirty();
-                }}
-                placeholder="Person responsible for this stage"
-                className="h-8 text-sm bg-background border-border/60"
-                disabled={!isEditable}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Calendar className="w-3 h-3" />
-                Next Action Due Date
-              </Label>
-              <Input
-                type="date"
-                value={nextActionDueDate}
-                onChange={(e) => {
-                  setNextActionDueDate(e.target.value);
-                  markDirty();
-                }}
-                className={`h-8 text-sm bg-background border-border/60 ${
-                  isOverdue ? "border-red-500/50 text-red-400" : ""
-                }`}
-                disabled={!isEditable}
-              />
-              {isOverdue && (
-                <p className="text-[10px] text-red-400 flex items-center gap-1">
-                  <AlertTriangle className="w-2.5 h-2.5" />
-                  Overdue
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Activity className="w-3 h-3" />
-              Next Action
-            </Label>
-            <Input
-              value={nextAction}
-              onChange={(e) => {
-                setNextAction(e.target.value);
-                markDirty();
-              }}
-              placeholder="Describe the next required action"
-              className="h-8 text-sm bg-background border-border/60"
-              disabled={!isEditable}
-            />
-          </div>
-
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
               <AlertTriangle className="w-3 h-3" />
@@ -420,7 +343,7 @@ function OperationalForm({
                 ) : (
                   <Save className="w-3 h-3" />
                 )}
-                Save Changes
+                Save Notes
               </Button>
               {isDirty && (
                 <Button
@@ -735,6 +658,145 @@ function AuditLog({ containerId }: { containerId: number }) {
   );
 }
 
+const SHIPPING_STAGES = ["transire_processing", "shipping_terminal_payment"];
+const TERMINAL_OPS_STAGES = ["gate_in", "examination", "final_release"];
+
+function ShippingSection({ container }: { container: Container }) {
+  const isActive = SHIPPING_STAGES.includes(container.status);
+  const isPast = getStageIndex(container.status) > getStageIndex("shipping_terminal_payment");
+  const stageColor = isActive
+    ? "border-blue-500/30 bg-blue-500/5"
+    : isPast
+    ? "border-emerald-500/20 bg-emerald-500/5"
+    : "border-border/40 bg-card/30";
+  return (
+    <Card className={`backdrop-blur-sm ${stageColor}`}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Ship className={`w-4 h-4 ${isActive ? "text-blue-400" : isPast ? "text-emerald-400" : "text-muted-foreground"}`} />
+            Shipping Operations
+          </CardTitle>
+          <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+            isActive
+              ? "text-blue-400 bg-blue-500/10 border-blue-500/30"
+              : isPast
+              ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
+              : "text-muted-foreground bg-muted/40 border-border/40"
+          }`}>
+            {isActive ? <Activity className="w-2.5 h-2.5 animate-pulse" /> : isPast ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Circle className="w-2.5 h-2.5" />}
+            {isActive ? "Active" : isPast ? "Completed" : "Upcoming"}
+          </span>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-0.5">Transire processing and shipping payment — managed by Operations</p>
+      </CardHeader>
+      <CardContent className="space-y-3 text-xs">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+          {container.vessel && (
+            <div className="flex items-center gap-1.5">
+              <Ship className="w-3 h-3 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Vessel:</span>
+              <span className="text-foreground/80 font-medium truncate">{container.vessel}</span>
+            </div>
+          )}
+          {container.blNumber && (
+            <div className="flex items-center gap-1.5">
+              <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">B/L:</span>
+              <span className="text-foreground/80 font-mono">{container.blNumber}</span>
+            </div>
+          )}
+          {container.size && (
+            <div className="flex items-center gap-1.5">
+              <ContainerIcon className="w-3 h-3 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Size:</span>
+              <span className="text-foreground/80">{container.size}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex gap-1.5 flex-wrap pt-1">
+          {SHIPPING_STAGES.map(s => {
+            const idx = getStageIndex(container.status);
+            const sIdx = getStageIndex(s);
+            const done = idx > sIdx;
+            const curr = idx === sIdx;
+            return (
+              <span key={s} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border font-medium ${
+                done ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                : curr ? "text-blue-400 border-blue-500/30 bg-blue-500/10"
+                : "text-muted-foreground/50 border-border/30 bg-muted/20"
+              }`}>
+                {done ? <CheckCircle2 className="w-2.5 h-2.5" /> : curr ? <Activity className="w-2.5 h-2.5 animate-pulse" /> : <Circle className="w-2.5 h-2.5" />}
+                {getStatusLabel(s)}
+              </span>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TerminalSection({ container }: { container: Container }) {
+  const isActive = TERMINAL_OPS_STAGES.includes(container.status);
+  const isPast = getStageIndex(container.status) > getStageIndex("final_release");
+  const stageColor = isActive
+    ? "border-cyan-500/30 bg-cyan-500/5"
+    : isPast
+    ? "border-emerald-500/20 bg-emerald-500/5"
+    : "border-border/40 bg-card/30";
+  return (
+    <Card className={`backdrop-blur-sm ${stageColor}`}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <ContainerIcon className={`w-4 h-4 ${isActive ? "text-cyan-400" : isPast ? "text-emerald-400" : "text-muted-foreground"}`} />
+            Terminal Operations
+          </CardTitle>
+          <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+            isActive
+              ? "text-cyan-400 bg-cyan-500/10 border-cyan-500/30"
+              : isPast
+              ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
+              : "text-muted-foreground bg-muted/40 border-border/40"
+          }`}>
+            {isActive ? <Activity className="w-2.5 h-2.5 animate-pulse" /> : isPast ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Circle className="w-2.5 h-2.5" />}
+            {isActive ? "Active" : isPast ? "Completed" : "Upcoming"}
+          </span>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-0.5">Bonded terminal gate-in, examination and release — managed by Operations</p>
+      </CardHeader>
+      <CardContent className="space-y-3 text-xs">
+        <div className="flex gap-1.5 flex-wrap">
+          {TERMINAL_OPS_STAGES.map(s => {
+            const idx = getStageIndex(container.status);
+            const sIdx = getStageIndex(s);
+            const done = idx > sIdx;
+            const curr = idx === sIdx;
+            return (
+              <span key={s} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border font-medium ${
+                done ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                : curr ? "text-cyan-400 border-cyan-500/30 bg-cyan-500/10"
+                : "text-muted-foreground/50 border-border/30 bg-muted/20"
+              }`}>
+                {done ? <CheckCircle2 className="w-2.5 h-2.5" /> : curr ? <Activity className="w-2.5 h-2.5 animate-pulse" /> : <Circle className="w-2.5 h-2.5" />}
+                {getStatusLabel(s)}
+              </span>
+            );
+          })}
+        </div>
+        {container.declaration && (
+          <div className="flex items-center gap-1.5">
+            <FileCheck2 className="w-3 h-3 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground">Declaration:</span>
+            <span className="text-foreground/80 font-mono">{container.declaration}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OperationDetailPage({ params }: { params: { id: string } }) {
   const containerId = parseInt(params.id, 10);
   const { isAdmin, isOperationsUser, isDocumentationUser, isAccountsUser, isTerminalManager, isDeliveryUser } = useAuth();
@@ -960,23 +1022,10 @@ export default function OperationDetailPage({ params }: { params: { id: string }
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
-          <OperationalForm
-            container={container}
-            isAdmin={isAdmin ?? false}
-            isOperationsUser={isOperationsUser ?? false}
-            isDocumentationUser={isDocumentationUser ?? false}
-            isAccountsUser={isAccountsUser ?? false}
-            isTerminalManager={isTerminalManager ?? false}
-            isDeliveryUser={isDeliveryUser ?? false}
-          />
-          <PaarPanel
-            container={container}
-            isAdmin={isAdmin ?? false}
-          />
 
-          {/* ── Delivery Execution ─────────────────────────────────────── */}
+          {/* ── Delivery Execution — PRIMARY ────────────────────────────── */}
           {(isDeliveryStage || isAdmin || isDeliveryUser) && (
-            <Card className="border-border/50 bg-card/60">
+            <Card className="border-primary/20 bg-card/60 backdrop-blur-sm">
               <CardHeader className="pb-3 border-b border-border/40">
                 <div className="flex items-center justify-between gap-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -1002,77 +1051,90 @@ export default function OperationDetailPage({ params }: { params: { id: string }
               </CardHeader>
               <CardContent className="pt-4">
                 {editingDeliveryExec ? (
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Navigation className="w-3 h-3" /> Delivery Status</Label>
-                      <div className="flex gap-2 flex-wrap">
-                        {(["pending", "in_transit", "delivered"] as const).map(s => (
-                          <button
-                            key={s}
-                            onClick={() => setDex(d => ({ ...d, deliveryStatus: s }))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                              dex.deliveryStatus === s
-                                ? s === "delivered" ? "bg-green-500/20 border-green-500/40 text-green-400" : s === "in_transit" ? "bg-blue-500/20 border-blue-500/40 text-blue-400" : "bg-muted/70 border-border text-muted-foreground"
-                                : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
-                            }`}
-                          >
-                            {s === "pending" ? "Pending" : s === "in_transit" ? "In Transit" : "Delivered"}
-                          </button>
-                        ))}
+                  <div className="space-y-5">
+                    {/* ─ Delivery Details sub-section ─ */}
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Truck className="w-3 h-3" /> Delivery Details
+                      </p>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Navigation className="w-3 h-3" /> Delivery Status</Label>
+                        <div className="flex gap-2 flex-wrap">
+                          {(["pending", "in_transit", "delivered"] as const).map(s => (
+                            <button
+                              key={s}
+                              onClick={() => setDex(d => ({ ...d, deliveryStatus: s }))}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                                dex.deliveryStatus === s
+                                  ? s === "delivered" ? "bg-green-500/20 border-green-500/40 text-green-400" : s === "in_transit" ? "bg-blue-500/20 border-blue-500/40 text-blue-400" : "bg-muted/70 border-border text-muted-foreground"
+                                  : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
+                              }`}
+                            >
+                              {s === "pending" ? "Pending" : s === "in_transit" ? "In Transit" : "Delivered"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Truck className="w-3 h-3" /> Truck Number</Label>
+                          <input value={dex.truckNumber} onChange={e => setDex(d => ({ ...d, truckNumber: e.target.value }))} placeholder="e.g. LAG-123AB" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><User className="w-3 h-3" /> Driver Name</Label>
+                          <input value={dex.driverName} onChange={e => setDex(d => ({ ...d, driverName: e.target.value }))} placeholder="Driver's full name" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Phone className="w-3 h-3" /> Driver Phone</Label>
+                          <input value={dex.driverPhone} onChange={e => setDex(d => ({ ...d, driverPhone: e.target.value }))} placeholder="+234..." className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><User className="w-3 h-3" /> Dispatch Officer</Label>
+                          <input value={dex.dispatchOfficer} onChange={e => setDex(d => ({ ...d, dispatchOfficer: e.target.value }))} placeholder="Officer name" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Clock className="w-3 h-3" /> Delivery Time</Label>
+                          <input value={dex.deliveryTime} onChange={e => setDex(d => ({ ...d, deliveryTime: e.target.value }))} placeholder="e.g. 09:30" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Delivery Location</Label>
+                          <input value={dex.deliveryLocation} onChange={e => setDex(d => ({ ...d, deliveryLocation: e.target.value }))} placeholder="e.g. Apapa Wharf" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3" /> Delivery Date (Actual)</Label>
+                          <input type="date" value={dex.deliveredAt} onChange={e => setDex(d => ({ ...d, deliveredAt: e.target.value }))} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                        </div>
+                        <div className="flex items-center gap-3 pt-6">
+                          <Switch checked={dex.deliveredAtEstimated} onCheckedChange={v => setDex(d => ({ ...d, deliveredAtEstimated: v }))} id="ops-delivered-estimated-switch" />
+                          <Label htmlFor="ops-delivered-estimated-switch" className="text-xs cursor-pointer">Date is estimated</Label>
+                        </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Truck className="w-3 h-3" /> Truck Number</Label>
-                        <input value={dex.truckNumber} onChange={e => setDex(d => ({ ...d, truckNumber: e.target.value }))} placeholder="e.g. LAG-123AB" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+
+                    {/* ─ Empty Return sub-section ─ */}
+                    <div className="border-t border-border/40 pt-4 space-y-3">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Package className="w-3 h-3" /> Empty Return
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Package className="w-3 h-3" /> Empty Return Due Date</Label>
+                          <input type="date" value={dex.emptyReturnDueDate} onChange={e => setDex(d => ({ ...d, emptyReturnDueDate: e.target.value }))} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Package className="w-3 h-3" /> Actual Return Date</Label>
+                          <input type="date" value={dex.emptyReturnDate} onChange={e => setDex(d => ({ ...d, emptyReturnDate: e.target.value }))} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                        </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><User className="w-3 h-3" /> Driver Name</Label>
-                        <input value={dex.driverName} onChange={e => setDex(d => ({ ...d, driverName: e.target.value }))} placeholder="Driver's full name" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Phone className="w-3 h-3" /> Driver Phone</Label>
-                        <input value={dex.driverPhone} onChange={e => setDex(d => ({ ...d, driverPhone: e.target.value }))} placeholder="+234..." className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><User className="w-3 h-3" /> Dispatch Officer</Label>
-                        <input value={dex.dispatchOfficer} onChange={e => setDex(d => ({ ...d, dispatchOfficer: e.target.value }))} placeholder="Officer name" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Clock className="w-3 h-3" /> Delivery Time</Label>
-                        <input value={dex.deliveryTime} onChange={e => setDex(d => ({ ...d, deliveryTime: e.target.value }))} placeholder="e.g. 09:30" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Delivery Location</Label>
-                        <input value={dex.deliveryLocation} onChange={e => setDex(d => ({ ...d, deliveryLocation: e.target.value }))} placeholder="e.g. Apapa Wharf" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Package className="w-3 h-3" /> Empty Return Due Date</Label>
-                        <input type="date" value={dex.emptyReturnDueDate} onChange={e => setDex(d => ({ ...d, emptyReturnDueDate: e.target.value }))} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Package className="w-3 h-3" /> Empty Return Date</Label>
-                        <input type="date" value={dex.emptyReturnDate} onChange={e => setDex(d => ({ ...d, emptyReturnDate: e.target.value }))} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Switch checked={dex.offloadingConfirmed} onCheckedChange={v => setDex(d => ({ ...d, offloadingConfirmed: v }))} id="ops-offloading-switch" />
-                      <Label htmlFor="ops-offloading-switch" className="text-xs cursor-pointer">Offloading Confirmed</Label>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3" /> Delivery Date (Actual)</Label>
-                        <input type="date" value={dex.deliveredAt} onChange={e => setDex(d => ({ ...d, deliveredAt: e.target.value }))} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                      </div>
-                      <div className="flex items-center gap-3 pt-6">
-                        <Switch checked={dex.deliveredAtEstimated} onCheckedChange={v => setDex(d => ({ ...d, deliveredAtEstimated: v }))} id="ops-delivered-estimated-switch" />
-                        <Label htmlFor="ops-delivered-estimated-switch" className="text-xs cursor-pointer">Date is estimated</Label>
+                      <div className="flex items-center gap-3">
+                        <Switch checked={dex.offloadingConfirmed} onCheckedChange={v => setDex(d => ({ ...d, offloadingConfirmed: v }))} id="ops-offloading-switch" />
+                        <Label htmlFor="ops-offloading-switch" className="text-xs cursor-pointer">Offloading Confirmed</Label>
                       </div>
                     </div>
                   </div>
@@ -1084,72 +1146,119 @@ export default function OperationDetailPage({ params }: { params: { id: string }
                   };
                   const statusLabel: Record<string, string> = { pending: "Pending", in_transit: "In Transit", delivered: "Delivered" };
                   const ds = container.deliveryStatus ?? "pending";
-                  const hasData = container.truckNumber || container.driverName || container.driverPhone || container.dispatchOfficer || container.deliveryLocation || container.deliveryTime || container.emptyReturnDueDate || container.deliveredAt;
+                  const hasDeliveryData = container.truckNumber || container.driverName || container.driverPhone || container.dispatchOfficer || container.deliveryLocation || container.deliveryTime || container.deliveredAt;
+                  const hasReturnData = container.emptyReturnDueDate || container.emptyReturnDate;
                   return (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${statusColor[ds]}`}>
-                          {ds === "in_transit" && <Truck className="w-3 h-3" />}
-                          {ds === "delivered" && <CheckCircle2 className="w-3 h-3" />}
-                          {statusLabel[ds]}
-                        </span>
-                        {container.offloadingConfirmed && (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border text-green-400 bg-green-500/10 border-green-500/30">
-                            <CheckSquare className="w-3 h-3" /> Offloading Confirmed
+                    <div className="space-y-4">
+                      {/* Delivery Details view */}
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <Truck className="w-3 h-3" /> Delivery Details
+                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${statusColor[ds]}`}>
+                            {ds === "in_transit" && <Truck className="w-3 h-3" />}
+                            {ds === "delivered" && <CheckCircle2 className="w-3 h-3" />}
+                            {statusLabel[ds]}
                           </span>
-                        )}
-                      </div>
-                      {hasData ? (
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
-                          {container.truckNumber && (
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <Truck className="w-3 h-3 shrink-0" />
-                              <span className="text-foreground font-medium">{container.truckNumber}</span>
-                            </div>
-                          )}
-                          {container.driverName && (
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <User className="w-3 h-3 shrink-0" />
-                              <span className="text-foreground">{container.driverName}</span>
-                              {container.driverPhone && <span className="text-muted-foreground">· {container.driverPhone}</span>}
-                            </div>
-                          )}
-                          {container.dispatchOfficer && (
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <User className="w-3 h-3 shrink-0" />
-                              <span className="text-foreground">{container.dispatchOfficer}</span>
-                            </div>
-                          )}
-                          {container.deliveryLocation && (
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <MapPin className="w-3 h-3 shrink-0" />
-                              <span className="text-foreground">{container.deliveryLocation}</span>
-                              {container.deliveryTime && <span className="text-muted-foreground">· {container.deliveryTime}</span>}
-                            </div>
-                          )}
-                          {container.emptyReturnDueDate && (
-                            <div className="col-span-2 flex items-center gap-1.5 text-muted-foreground">
-                              <Package className="w-3 h-3 shrink-0" />
-                              <span>Empty return due: <span className={`font-medium ${container.emptyReturnDate ? "text-green-400" : new Date(container.emptyReturnDueDate) < new Date() ? "text-orange-400" : "text-foreground"}`}>{new Date(container.emptyReturnDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
-                              {container.emptyReturnDate && <span className="text-green-400 font-medium">· Returned {new Date(container.emptyReturnDate).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</span>}
-                            </div>
-                          )}
-                          {container.deliveredAt && (
-                            <div className="col-span-2 flex items-center gap-1.5 text-muted-foreground">
-                              <CheckCircle2 className="w-3 h-3 shrink-0 text-green-400" />
-                              <span>Delivery date: <span className="font-medium text-foreground">{new Date(container.deliveredAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
-                              {container.deliveredAtEstimated && <span className="text-amber-400 text-[10px] border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">estimated</span>}
-                            </div>
+                          {container.offloadingConfirmed && (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border text-green-400 bg-green-500/10 border-green-500/30">
+                              <CheckSquare className="w-3 h-3" /> Offloading Confirmed
+                            </span>
                           )}
                         </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground/60">No delivery details recorded yet.{canEditDelivery ? " Click Edit to add truck, driver and dispatch information." : ""}</p>
-                      )}
+                        {hasDeliveryData ? (
+                          <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
+                            {container.truckNumber && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <Truck className="w-3 h-3 shrink-0" />
+                                <span className="text-foreground font-medium">{container.truckNumber}</span>
+                              </div>
+                            )}
+                            {container.driverName && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <User className="w-3 h-3 shrink-0" />
+                                <span className="text-foreground">{container.driverName}</span>
+                                {container.driverPhone && <span className="text-muted-foreground">· {container.driverPhone}</span>}
+                              </div>
+                            )}
+                            {container.dispatchOfficer && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <User className="w-3 h-3 shrink-0" />
+                                <span className="text-foreground">{container.dispatchOfficer}</span>
+                              </div>
+                            )}
+                            {container.deliveryLocation && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <MapPin className="w-3 h-3 shrink-0" />
+                                <span className="text-foreground">{container.deliveryLocation}</span>
+                                {container.deliveryTime && <span className="text-muted-foreground">· {container.deliveryTime}</span>}
+                              </div>
+                            )}
+                            {container.deliveredAt && (
+                              <div className="col-span-2 flex items-center gap-1.5 text-muted-foreground">
+                                <CheckCircle2 className="w-3 h-3 shrink-0 text-green-400" />
+                                <span>Delivered: <span className="font-medium text-foreground">{new Date(container.deliveredAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
+                                {container.deliveredAtEstimated && <span className="text-amber-400 text-[10px] border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">estimated</span>}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/60">{canEditDelivery ? "No delivery details yet — click Edit to add truck, driver and dispatch info." : "No delivery details recorded yet."}</p>
+                        )}
+                      </div>
+
+                      {/* Empty Return view */}
+                      <div className="border-t border-border/40 pt-3 space-y-2">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <Package className="w-3 h-3" /> Empty Return
+                        </p>
+                        {hasReturnData ? (
+                          <div className="space-y-1.5 text-xs">
+                            {container.emptyReturnDueDate && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <Package className="w-3 h-3 shrink-0" />
+                                <span>Due: <span className={`font-medium ${container.emptyReturnDate ? "text-green-400" : new Date(container.emptyReturnDueDate) < new Date() ? "text-orange-400" : "text-foreground"}`}>{new Date(container.emptyReturnDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
+                                {container.emptyReturnDate && (
+                                  <span className="text-green-400 font-medium">· Returned {new Date(container.emptyReturnDate).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/60">{canEditDelivery ? "No empty return dates set yet." : "No empty return data."}</p>
+                        )}
+                      </div>
                     </div>
                   );
                 })()}
               </CardContent>
             </Card>
+          )}
+
+          <OperationalForm
+            container={container}
+            isAdmin={isAdmin ?? false}
+            isOperationsUser={isOperationsUser ?? false}
+            isDocumentationUser={isDocumentationUser ?? false}
+            isAccountsUser={isAccountsUser ?? false}
+            isTerminalManager={isTerminalManager ?? false}
+            isDeliveryUser={isDeliveryUser ?? false}
+          />
+
+          <PaarPanel
+            container={container}
+            isAdmin={isAdmin ?? false}
+          />
+
+          {/* ── Shipping Operations ────────────────────────────────────── */}
+          {(isAdmin || isOperationsUser) && (
+            <ShippingSection container={container} />
+          )}
+
+          {/* ── Terminal Operations ────────────────────────────────────── */}
+          {(isAdmin || isOperationsUser) && (
+            <TerminalSection container={container} />
           )}
         </div>
 
@@ -1191,31 +1300,6 @@ export default function OperationDetailPage({ params }: { params: { id: string }
                   })}
                 </span>
               </div>
-              {container.stageOwner && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Stage Owner</span>
-                  <span className="text-foreground/80 truncate max-w-[120px] text-right">
-                    {container.stageOwner}
-                  </span>
-                </div>
-              )}
-              {container.nextActionDueDate && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Action Due</span>
-                  <span
-                    className={
-                      new Date(container.nextActionDueDate) < new Date()
-                        ? "text-red-400 font-medium"
-                        : "text-foreground/80"
-                    }
-                  >
-                    {new Date(container.nextActionDueDate).toLocaleDateString(
-                      "en-NG",
-                      { day: "numeric", month: "short" }
-                    )}
-                  </span>
-                </div>
-              )}
               {container.delayReason && (
                 <>
                   <Separator className="my-1 bg-border/30" />
