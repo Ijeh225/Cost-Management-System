@@ -24,6 +24,7 @@ export default function ContainerPrintPage() {
       a.sortOrder !== b.sortOrder ? a.sortOrder - b.sortOrder : a.id - b.id
     );
 
+  const extraChargesTotal = extraCharges.reduce((sum, ch) => sum + Number(ch.amount), 0);
   const totalCost = charges.totalCost ?? 0;
   const clearingCharges = charges.clearingCharges ?? parseFloat(c.clearingCharges ?? "0");
   const grossProfit = clearingCharges - totalCost;
@@ -171,6 +172,35 @@ export default function ContainerPrintPage() {
                 {c.offloadingConfirmed && <tr><td>Offloading</td><td>Confirmed ✓</td></tr>}
                 {c.emptyReturnDueDate && <tr><td>Empty Return Due</td><td>{new Date(c.emptyReturnDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</td></tr>}
                 {c.emptyReturnDate && <tr><td>Empty Return Date</td><td>{new Date(c.emptyReturnDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Extra Charges Summary */}
+        {extraCharges.length > 0 && (
+          <div>
+            <div className="section-title" style={{ borderLeftColor: "#8b5cf6" }}>Extra Charges Summary</div>
+            <table className="charge-table">
+              <thead>
+                <tr style={{ background: "#f8fafc" }}>
+                  <th style={{ padding: "6px 10px", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "#94a3b8", textAlign: "left" }}>Description</th>
+                  <th style={{ padding: "6px 10px", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "#94a3b8", textAlign: "left" }}>Section</th>
+                  <th style={{ padding: "6px 10px", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "#94a3b8", textAlign: "right" }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {extraCharges.map(e => (
+                  <tr key={`summary-${e.id}`}>
+                    <td style={{ color: "#6366f1", fontStyle: "italic" }}>{e.label}</td>
+                    <td style={{ color: "#64748b", textTransform: "capitalize" }}>{e.section}</td>
+                    <td style={{ fontWeight: 600, textAlign: "right", fontFamily: "monospace", color: "#1e293b" }}>{formatCurrency(Number(e.amount))}</td>
+                  </tr>
+                ))}
+                <tr style={{ borderTop: "2px solid #e2e8f0", background: "#f8fafc" }}>
+                  <td colSpan={2} style={{ fontWeight: 700, color: "#374151" }}>Total Extra Charges</td>
+                  <td style={{ fontWeight: 800, textAlign: "right", fontFamily: "monospace", color: "#6366f1" }}>{formatCurrency(extraChargesTotal)}</td>
+                </tr>
               </tbody>
             </table>
           </div>
