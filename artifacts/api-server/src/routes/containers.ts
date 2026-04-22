@@ -56,6 +56,7 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     nextAction: c.nextAction ?? null,
     nextActionDueDate: c.nextActionDueDate instanceof Date ? c.nextActionDueDate.toISOString() : (c.nextActionDueDate ?? null),
     delayReason: c.delayReason ?? null,
+    internalNote: c.internalNote ?? null,
     deliveryTime: c.deliveryTime ?? null,
     deliveryLocation: c.deliveryLocation ?? null,
     truckNumber: c.truckNumber ?? null,
@@ -550,6 +551,9 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
       userId: req.user!.id,
       action: "status_advanced",
       section: "basic_info",
+      fieldChanged: "status",
+      oldValue: existing.status,
+      newValue: nextStatus,
     });
     res.json(formatContainer(updated));
   } catch (err) {
@@ -711,7 +715,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
     const {
-      deliveredAt, stageOwner, nextAction, nextActionDueDate, delayReason,
+      deliveredAt, stageOwner, nextAction, nextActionDueDate, delayReason, internalNote,
       deliveryTime, deliveryLocation, truckNumber, driverName, driverPhone,
       dispatchOfficer, deliveryStatus, offloadingConfirmed, emptyReturnDueDate, emptyReturnDate,
       paarOfficer, paarReleasedAt, paarDelayReason,
@@ -775,6 +779,10 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       const prev = existing.delayReason ?? null;
       updates.delayReason = delayReason || null;
       if (prev !== (delayReason || null)) changed.push(`Delay Reason: "${prev ?? "—"}" → "${delayReason || "—"}"`);
+    }
+    if (internalNote !== undefined) {
+      updates.internalNote = internalNote || null;
+      changed.push("Internal note updated");
     }
     if (paarOfficer !== undefined) {
       updates.paarOfficer = paarOfficer || null;

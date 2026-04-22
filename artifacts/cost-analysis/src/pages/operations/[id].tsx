@@ -8,6 +8,7 @@ import {
   useGetContainerAuditLog,
   useUpdatePaar,
   useUpdateDeliveryExecution,
+  useListUsers,
   type Container,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -217,6 +218,20 @@ const STAGE_DEPT_LABEL: Record<string, string> = {
   closed:                    "Closed",
 };
 
+type AuditEntry = {
+  id: number;
+  containerId: number;
+  userId: number;
+  userName: string;
+  action: string;
+  section?: string | null;
+  fieldChanged?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  reason?: string | null;
+  createdAt: string;
+};
+
 function StageBlock({
   stage,
   state,
@@ -224,6 +239,8 @@ function StageBlock({
   isAdmin,
   isEditable,
   deptRole,
+  auditEntries,
+  staffOptions,
 }: {
   stage: { value: string; label: string; short: string };
   state: "completed" | "active" | "future";
@@ -231,6 +248,8 @@ function StageBlock({
   isAdmin: boolean;
   isEditable: boolean;
   deptRole: string | null;
+  auditEntries: AuditEntry[];
+  staffOptions: { id: number; name: string }[];
 }) {
   const { toast } = useToast();
   const updateMutation = useUpdateContainer();
@@ -242,6 +261,7 @@ function StageBlock({
     container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
   );
   const [delayReason, setDelayReason] = useState(container.delayReason ?? "");
+  const [internalNote, setInternalNote] = useState(container.internalNote ?? "");
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
@@ -252,6 +272,7 @@ function StageBlock({
         container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
       );
       setDelayReason(container.delayReason ?? "");
+      setInternalNote(container.internalNote ?? "");
       setIsDirty(false);
     }
   }, [container.id, container.updatedAt, state]);
@@ -265,6 +286,7 @@ function StageBlock({
           nextAction: nextAction || null,
           nextActionDueDate: nextActionDueDate || null,
           delayReason: delayReason || null,
+          internalNote: internalNote || null,
         },
       });
       setIsDirty(false);
@@ -292,8 +314,11 @@ function StageBlock({
   const deptLabel = deptRole ? DEPT_SUBMIT_LABELS[deptRole]?.[stage.value] : undefined;
   const advanceLabel = deptLabel ?? (nextStageLabel ? `Mark Complete → ${nextStageLabel}` : "Close Container");
   const isClose = stage.value === "empty_return";
-
   const deptDeptLabel = STAGE_DEPT_LABEL[stage.value];
+
+  const completionEntry = auditEntries.find(
+    e => e.action === "status_advanced" && e.fieldChanged === "status" && e.oldValue === stage.value
+  );
 
   if (state === "future") {
     return (
@@ -312,9 +337,18 @@ function StageBlock({
       <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
         <span className="text-xs text-emerald-400/80 font-medium flex-1">{stage.label}</span>
-        {deptDeptLabel && (
+        {completionEntry ? (
+          <div className="text-right text-[10px] text-muted-foreground/60 leading-tight">
+            <span>
+              {new Date(completionEntry.createdAt).toLocaleDateString("en-NG", {
+                day: "numeric", month: "short", year: "numeric",
+              })}
+            </span>
+            {" · "}<span>{completionEntry.userName}</span>
+          </div>
+        ) : deptDeptLabel ? (
           <span className="text-[9px] text-muted-foreground/50">{deptDeptLabel}</span>
-        )}
+        ) : null}
       </div>
     );
   }
@@ -347,12 +381,25 @@ function StageBlock({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><User className="w-2.5 h-2.5" /> Stage Owner</Label>
-                <input
-                  value={stageOwner}
-                  onChange={e => { setStageOwner(e.target.value); setIsDirty(true); }}
-                  placeholder="Assign to staff member"
-                  className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
+                {staffOptions.length > 0 ? (
+                  <select
+                    value={stageOwner}
+                    onChange={e => { setStageOwner(e.target.value); setIsDirty(true); }}
+                    className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">— Unassigned —</option>
+                    {staffOptions.map(s => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={stageOwner}
+                    onChange={e => { setStageOwner(e.target.value); setIsDirty(true); }}
+                    placeholder="Assign to staff member"
+                    className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                )}
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><Calendar className="w-2.5 h-2.5" /> Due Date</Label>
@@ -383,6 +430,16 @@ function StageBlock({
                 className={`text-xs bg-background border-border/60 resize-none ${delayReason ? "border-amber-500/40 bg-amber-500/5" : ""}`}
               />
             </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><FileText className="w-2.5 h-2.5" /> Internal Note</Label>
+              <Textarea
+                value={internalNote}
+                onChange={e => { setInternalNote(e.target.value); setIsDirty(true); }}
+                placeholder="Internal notes visible to admin and ops staff"
+                rows={2}
+                className="text-xs bg-background border-border/60 resize-none"
+              />
+            </div>
             {isDirty && (
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="h-7 gap-1 text-xs">
@@ -394,13 +451,14 @@ function StageBlock({
                   setNextAction(container.nextAction ?? "");
                   setNextActionDueDate(container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : "");
                   setDelayReason(container.delayReason ?? "");
+                  setInternalNote(container.internalNote ?? "");
                   setIsDirty(false);
                 }} className="h-7 text-xs text-muted-foreground gap-1">
                   <RotateCcw className="w-3 h-3" /> Reset
                 </Button>
               </div>
             )}
-            {(isEditable || isAdmin) && nextStage && (
+            {nextStage && (
               <div className={`border rounded-lg p-3 flex items-center justify-between gap-4 ${
                 isClose ? "border-emerald-500/30 bg-emerald-500/5" : deptLabel ? "border-amber-500/20 bg-amber-500/5" : "border-primary/20 bg-primary/5"
               }`}>
@@ -461,6 +519,12 @@ function StageBlock({
                 <span>{container.delayReason}</span>
               </div>
             )}
+            {container.internalNote && (
+              <div className="flex items-start gap-1.5 text-muted-foreground">
+                <FileText className="w-3 h-3 shrink-0 mt-0.5" />
+                <span className="text-foreground/80 italic">{container.internalNote}</span>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -494,13 +558,7 @@ function StageWorkflowBlocks({
     : isOperationsUser   ? OPS_STAGES
     : null;
 
-  const visibleStages = deptStageValues
-    ? WORKFLOW_STAGES.filter(s => deptStageValues.includes(s.value))
-    : PIPELINE_STAGES;
-
   const currentIdx = WORKFLOW_STAGES.findIndex(s => s.value === container.status);
-
-  const isEditable = isAdmin || isDeptUser;
 
   const deptRole = isDocumentationUser ? "documentation_user"
     : isAccountsUser    ? "accounts_user"
@@ -509,21 +567,25 @@ function StageWorkflowBlocks({
     : isOperationsUser  ? "operations_user"
     : null;
 
+  const { data: auditLog = [] } = useGetContainerAuditLog(container.id);
+  const { data: usersList = [] } = useListUsers();
+  const staffOptions = (usersList as { id: number; name: string }[])
+    .filter((u: { id: number; name: string; role?: string }) => u.role !== "admin" && u.role !== "super_admin")
+    .map((u: { id: number; name: string }) => ({ id: u.id, name: u.name }));
+
   return (
     <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <ClipboardList className="w-4 h-4 text-muted-foreground" />
           Stage Workflow
-          {isAdmin && (
-            <span className="text-[10px] text-muted-foreground/60 font-normal ml-1">
-              ({visibleStages.length} stages)
-            </span>
-          )}
+          <span className="text-[10px] text-muted-foreground/60 font-normal ml-1">
+            ({PIPELINE_STAGES.length} stages)
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-1.5 pb-4">
-        {visibleStages.map(stage => {
+        {PIPELINE_STAGES.map(stage => {
           const stageIdx = WORKFLOW_STAGES.findIndex(s => s.value === stage.value);
           const state: "completed" | "active" | "future" =
             stageIdx < currentIdx ? "completed"
@@ -544,6 +606,8 @@ function StageWorkflowBlocks({
               isAdmin={isAdmin}
               isEditable={canEdit}
               deptRole={deptRole}
+              auditEntries={auditLog as AuditEntry[]}
+              staffOptions={staffOptions}
             />
           );
         })}
