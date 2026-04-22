@@ -61,6 +61,13 @@ export function canEditSection(
 ): boolean {
   if (isAdmin) return true;
   if (!userSectionPermission) return false;
+  // The combined shipping & terminal payment stage allows editing of both
+  // "shipping" and "terminal" cost sections.
+  if (containerStatus === "shipping_terminal_payment") {
+    if (userSectionPermission === "shipping" || userSectionPermission === "terminal") {
+      return sectionKey === "shipping" || sectionKey === "terminal";
+    }
+  }
   const activeSection = STAGE_SECTION[containerStatus];
   if (activeSection !== userSectionPermission) return false;
   if (sectionKey === userSectionPermission) return true;

@@ -31,6 +31,10 @@ async function runMigration(name: string, fn: () => Promise<void>) {
 async function runStartupMigrations() {
   try {
     await ensureMigrationsTable();
+    // Legacy migration kept for environments that ran it before consolidation.
+    // The 'consolidate_to_shipping_terminal_payment' migration that follows
+    // supersedes the direction of this one. Because migration names are recorded
+    // in the DB, this block is a no-op on any environment that already ran it.
     await runMigration("rename_shipping_terminal_payment_to_shipping_payment", async () => {
       const updated = await db.update(containersTable)
         .set({ status: "shipping_payment" })
