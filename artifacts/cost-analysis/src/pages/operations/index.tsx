@@ -253,7 +253,7 @@ export default function OperationsPage() {
         c.containerNumber.toLowerCase().includes(searchLower) ||
         c.blNumber.toLowerCase().includes(searchLower) ||
         (c.customerName ?? "").toLowerCase().includes(searchLower) ||
-        (c.stageOwner ?? "").toLowerCase().includes(searchLower)
+        (c.stageOwnerName ?? "").toLowerCase().includes(searchLower)
       );
     }
     stages[key] = filtered;

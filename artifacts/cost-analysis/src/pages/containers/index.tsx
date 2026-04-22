@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListContainers } from "@workspace/api-client-react";
+import { useListContainers, getListContainersQueryKey } from "@workspace/api-client-react";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
 import { useLocation } from "wouter";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -86,9 +86,10 @@ export default function Containers() {
     {}
   );
 
+  const pendingListParams = { page: 1, limit: 100, status: "pending_verification" };
   const { data: pendingData } = useListContainers(
-    { page: 1, limit: 100, status: "pending_verification" },
-    { query: { enabled: isAdmin } }
+    pendingListParams,
+    { query: { queryKey: getListContainersQueryKey(pendingListParams), enabled: isAdmin } }
   );
   const pendingCount = pendingData?.total ?? 0;
 

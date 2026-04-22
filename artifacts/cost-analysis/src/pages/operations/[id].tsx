@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   useGetContainer,
+  getGetContainerQueryKey,
   useUpdateContainer,
   useAdvanceContainerStatus,
   useGetContainerAuditLog,
@@ -240,7 +241,7 @@ function OperationalForm({
     try {
       await updateMutation.mutateAsync({
         id: container.id,
-        updateContainerRequest: {
+        data: {
           stageOwner: stageOwner || null,
           nextAction: nextAction || null,
           nextActionDueDate: nextActionDueDate || null,
@@ -751,7 +752,7 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   });
 
   const { data, isLoading, isError } = useGetContainer(containerId, {
-    query: { refetchInterval: 30_000 },
+    query: { queryKey: getGetContainerQueryKey(containerId), refetchInterval: 30_000 },
   });
 
   if (isLoading) {
@@ -790,20 +791,19 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   };
 
   const handleOpenDeliveryExec = () => {
-    const c = container as any;
     setDex({
-      deliveryTime: c.deliveryTime ?? "",
-      deliveryLocation: c.deliveryLocation ?? "",
-      truckNumber: c.truckNumber ?? "",
-      driverName: c.driverName ?? "",
-      driverPhone: c.driverPhone ?? "",
-      dispatchOfficer: c.dispatchOfficer ?? "",
-      deliveryStatus: (c.deliveryStatus as "pending" | "in_transit" | "delivered") ?? "pending",
-      offloadingConfirmed: c.offloadingConfirmed ?? false,
-      emptyReturnDueDate: c.emptyReturnDueDate ? c.emptyReturnDueDate.slice(0, 10) : "",
-      emptyReturnDate: c.emptyReturnDate ? c.emptyReturnDate.slice(0, 10) : "",
-      deliveredAt: c.deliveredAt ? c.deliveredAt.slice(0, 10) : "",
-      deliveredAtEstimated: c.deliveredAtEstimated ?? false,
+      deliveryTime: container.deliveryTime ?? "",
+      deliveryLocation: container.deliveryLocation ?? "",
+      truckNumber: container.truckNumber ?? "",
+      driverName: container.driverName ?? "",
+      driverPhone: container.driverPhone ?? "",
+      dispatchOfficer: container.dispatchOfficer ?? "",
+      deliveryStatus: container.deliveryStatus ?? "pending",
+      offloadingConfirmed: container.offloadingConfirmed ?? false,
+      emptyReturnDueDate: container.emptyReturnDueDate ? container.emptyReturnDueDate.slice(0, 10) : "",
+      emptyReturnDate: container.emptyReturnDate ? container.emptyReturnDate.slice(0, 10) : "",
+      deliveredAt: container.deliveredAt ? container.deliveredAt.slice(0, 10) : "",
+      deliveredAtEstimated: container.deliveredAtEstimated ?? false,
     });
     setEditingDeliveryExec(true);
   };
@@ -1077,15 +1077,14 @@ export default function OperationDetailPage({ params }: { params: { id: string }
                     </div>
                   </div>
                 ) : (() => {
-                  const c = container as any;
                   const statusColor: Record<string, string> = {
                     pending: "text-muted-foreground bg-muted/50 border-border/50",
                     in_transit: "text-blue-400 bg-blue-500/10 border-blue-500/30",
                     delivered: "text-green-400 bg-green-500/10 border-green-500/30",
                   };
                   const statusLabel: Record<string, string> = { pending: "Pending", in_transit: "In Transit", delivered: "Delivered" };
-                  const ds = c.deliveryStatus ?? "pending";
-                  const hasData = c.truckNumber || c.driverName || c.driverPhone || c.dispatchOfficer || c.deliveryLocation || c.deliveryTime || c.emptyReturnDueDate || c.deliveredAt;
+                  const ds = container.deliveryStatus ?? "pending";
+                  const hasData = container.truckNumber || container.driverName || container.driverPhone || container.dispatchOfficer || container.deliveryLocation || container.deliveryTime || container.emptyReturnDueDate || container.deliveredAt;
                   return (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
@@ -1094,7 +1093,7 @@ export default function OperationDetailPage({ params }: { params: { id: string }
                           {ds === "delivered" && <CheckCircle2 className="w-3 h-3" />}
                           {statusLabel[ds]}
                         </span>
-                        {c.offloadingConfirmed && (
+                        {container.offloadingConfirmed && (
                           <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border text-green-400 bg-green-500/10 border-green-500/30">
                             <CheckSquare className="w-3 h-3" /> Offloading Confirmed
                           </span>
@@ -1102,44 +1101,44 @@ export default function OperationDetailPage({ params }: { params: { id: string }
                       </div>
                       {hasData ? (
                         <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
-                          {c.truckNumber && (
+                          {container.truckNumber && (
                             <div className="flex items-center gap-1.5 text-muted-foreground">
                               <Truck className="w-3 h-3 shrink-0" />
-                              <span className="text-foreground font-medium">{c.truckNumber}</span>
+                              <span className="text-foreground font-medium">{container.truckNumber}</span>
                             </div>
                           )}
-                          {c.driverName && (
+                          {container.driverName && (
                             <div className="flex items-center gap-1.5 text-muted-foreground">
                               <User className="w-3 h-3 shrink-0" />
-                              <span className="text-foreground">{c.driverName}</span>
-                              {c.driverPhone && <span className="text-muted-foreground">· {c.driverPhone}</span>}
+                              <span className="text-foreground">{container.driverName}</span>
+                              {container.driverPhone && <span className="text-muted-foreground">· {container.driverPhone}</span>}
                             </div>
                           )}
-                          {c.dispatchOfficer && (
+                          {container.dispatchOfficer && (
                             <div className="flex items-center gap-1.5 text-muted-foreground">
                               <User className="w-3 h-3 shrink-0" />
-                              <span className="text-foreground">{c.dispatchOfficer}</span>
+                              <span className="text-foreground">{container.dispatchOfficer}</span>
                             </div>
                           )}
-                          {c.deliveryLocation && (
+                          {container.deliveryLocation && (
                             <div className="flex items-center gap-1.5 text-muted-foreground">
                               <MapPin className="w-3 h-3 shrink-0" />
-                              <span className="text-foreground">{c.deliveryLocation}</span>
-                              {c.deliveryTime && <span className="text-muted-foreground">· {c.deliveryTime}</span>}
+                              <span className="text-foreground">{container.deliveryLocation}</span>
+                              {container.deliveryTime && <span className="text-muted-foreground">· {container.deliveryTime}</span>}
                             </div>
                           )}
-                          {c.emptyReturnDueDate && (
+                          {container.emptyReturnDueDate && (
                             <div className="col-span-2 flex items-center gap-1.5 text-muted-foreground">
                               <Package className="w-3 h-3 shrink-0" />
-                              <span>Empty return due: <span className={`font-medium ${c.emptyReturnDate ? "text-green-400" : new Date(c.emptyReturnDueDate) < new Date() ? "text-orange-400" : "text-foreground"}`}>{new Date(c.emptyReturnDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
-                              {c.emptyReturnDate && <span className="text-green-400 font-medium">· Returned {new Date(c.emptyReturnDate).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</span>}
+                              <span>Empty return due: <span className={`font-medium ${container.emptyReturnDate ? "text-green-400" : new Date(container.emptyReturnDueDate) < new Date() ? "text-orange-400" : "text-foreground"}`}>{new Date(container.emptyReturnDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
+                              {container.emptyReturnDate && <span className="text-green-400 font-medium">· Returned {new Date(container.emptyReturnDate).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</span>}
                             </div>
                           )}
-                          {c.deliveredAt && (
+                          {container.deliveredAt && (
                             <div className="col-span-2 flex items-center gap-1.5 text-muted-foreground">
                               <CheckCircle2 className="w-3 h-3 shrink-0 text-green-400" />
-                              <span>Delivery date: <span className="font-medium text-foreground">{new Date(c.deliveredAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
-                              {c.deliveredAtEstimated && <span className="text-amber-400 text-[10px] border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">estimated</span>}
+                              <span>Delivery date: <span className="font-medium text-foreground">{new Date(container.deliveredAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
+                              {container.deliveredAtEstimated && <span className="text-amber-400 text-[10px] border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">estimated</span>}
                             </div>
                           )}
                         </div>

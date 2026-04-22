@@ -135,6 +135,16 @@ export interface Container {
   paarOfficer?: string | null;
   paarReleasedAt?: string | null;
   paarDelayReason?: string | null;
+  truckNumber?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  dispatchOfficer?: string | null;
+  deliveryStatus?: "pending" | "in_transit" | "delivered";
+  deliveryTime?: string | null;
+  deliveryLocation?: string | null;
+  emptyReturnDueDate?: string | null;
+  emptyReturnDate?: string | null;
+  offloadingConfirmed?: boolean;
   createdAt: string;
   updatedAt: string;
 }
