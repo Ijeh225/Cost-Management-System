@@ -41,6 +41,47 @@ async function runStartupMigrations() {
       }
     });
 
+    await runMigration("migrate_old_statuses_to_13_stage_pipeline", async () => {
+      const OLD_TO_NEW: Array<[string, string]> = [
+        ["new_upload",           "registered"],
+        ["documentation_review", "documentation"],
+        ["terminal_entry",       "transire_processing"],
+        ["shipping_entry",       "shipping_terminal_payment"],
+        ["customs_entry",        "examination"],
+        ["delivery_entry",       "delivery"],
+        ["accounting_review",    "closed"],
+        ["management_approval",  "closed"],
+        ["completed",            "closed"],
+      ];
+      let total = 0;
+      for (const [oldStatus, newStatus] of OLD_TO_NEW) {
+        const updated = await db.update(containersTable)
+          .set({ status: newStatus })
+          .where(eq(containersTable.status, oldStatus))
+          .returning({ id: containersTable.id });
+        if (updated.length > 0) {
+          console.log(`[migration] ${oldStatus} → ${newStatus}: ${updated.length} container(s)`);
+          total += updated.length;
+        }
+      }
+      if (total > 0) console.log(`[migration] Old-status migration: ${total} total container(s) updated.`);
+    });
+
+    await runMigration("consolidate_to_shipping_terminal_payment", async () => {
+      let total = 0;
+      for (const old of ["shipping_payment", "terminal_payment"]) {
+        const updated = await db.update(containersTable)
+          .set({ status: "shipping_terminal_payment" })
+          .where(eq(containersTable.status, old))
+          .returning({ id: containersTable.id });
+        if (updated.length > 0) {
+          console.log(`[migration] ${old} → shipping_terminal_payment: ${updated.length} container(s)`);
+          total += updated.length;
+        }
+      }
+      if (total > 0) console.log(`[migration] Shipping+terminal consolidation: ${total} total.`);
+    });
+
     await runMigration("upgrade_admin_role_to_super_admin", async () => {
       const updated = await pool.query(
         `UPDATE users SET role = 'super_admin' WHERE role = 'admin'`

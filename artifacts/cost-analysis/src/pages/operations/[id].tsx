@@ -47,7 +47,7 @@ const PIPELINE_STAGES = WORKFLOW_STAGES.filter(
   (s) => s.value !== "pending_verification"
 );
 
-const OPS_STAGES      = ["transire_processing", "shipping_payment", "terminal_payment", "pull_out"];
+const OPS_STAGES      = ["transire_processing", "shipping_terminal_payment", "pull_out"];
 const DOCS_STAGES     = ["registered", "documentation", "duty_assessment"];
 const ACCOUNTS_STAGES = ["duty_payment"];
 const TERMINAL_STAGES = ["gate_in", "examination", "final_release"];

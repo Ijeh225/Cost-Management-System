@@ -9,20 +9,18 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Search, Clock, SendHorizonal, ChevronRight, Briefcase } from "lucide-react";
 
-const DEPT_STAGES = ["transire_processing", "shipping_payment", "terminal_payment", "pull_out"];
+const DEPT_STAGES = ["transire_processing", "shipping_terminal_payment", "pull_out"];
 
 const STAGE_SUBMIT_LABEL: Record<string, string> = {
-  transire_processing: "Submit to Shipping Payment",
-  shipping_payment:    "Submit to Terminal Payment",
-  terminal_payment:    "Submit to Pull-Out",
-  pull_out:            "Submit to Terminal Manager",
+  transire_processing:       "Submit to Shipping & Terminal Payment",
+  shipping_terminal_payment: "Submit to Pull-Out",
+  pull_out:                  "Submit to Terminal Manager",
 };
 
 const STAGE_COLOR: Record<string, string> = {
-  transire_processing: "bg-violet-500/10 text-violet-400 border-violet-500/30",
-  shipping_payment:    "bg-sky-500/10 text-sky-400 border-sky-500/30",
-  terminal_payment:    "bg-amber-500/10 text-amber-400 border-amber-500/30",
-  pull_out:            "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+  transire_processing:       "bg-violet-500/10 text-violet-400 border-violet-500/30",
+  shipping_terminal_payment: "bg-sky-500/10 text-sky-400 border-sky-500/30",
+  pull_out:                  "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
 };
 
 function DaysChip({ days }: { days: number }) {
