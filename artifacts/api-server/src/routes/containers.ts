@@ -172,6 +172,13 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     }
     if (status && status !== "all") {
       conditions.push(eq(containersTable.status, status));
+    } else {
+      // Non-admins never see pending_verification containers — they are pre-pipeline
+      // and must be reviewed by an admin before entering operations.
+      const isAdmin = req.user?.role === "admin" || req.user?.role === "super_admin";
+      if (!isAdmin) {
+        conditions.push(ne(containersTable.status, "pending_verification"));
+      }
     }
     if (conditions.length > 0) {
       const where = conditions.length === 1 ? conditions[0] : and(...conditions);
