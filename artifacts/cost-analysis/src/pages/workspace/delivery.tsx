@@ -9,11 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Loader2, Search, Truck, ChevronRight, Clock, SendHorizonal, CheckCircle2, Inbox } from "lucide-react";
 
-const DEPT_STAGES = ["delivery", "empty_return"];
+const DEPT_STAGES = ["delivery"];
 
 const STAGE_SUBMIT_LABEL: Record<string, string> = {
-  delivery:     "Submit to Empty Return",
-  empty_return: "Mark as Closed",
+  delivery: "Mark as Closed",
 };
 
 function DaysChip({ days }: { days: number }) {
@@ -56,7 +55,7 @@ export default function DeliveryWorkspace() {
 
   const handleSubmit = (container: (typeof filtered)[0]) => {
     advance.mutate({ id: container.id, status: container.stage }, {
-      onSuccess: () => toast({ title: `Job ${container.containerNumber} ${container.stage === "empty_return" ? "marked as closed" : "submitted to Empty Return"}.` }),
+      onSuccess: () => toast({ title: `Job ${container.containerNumber} marked as closed.` }),
       onError:   (e) => toast({ title: "Error", description: (e as Error).message, variant: "destructive" }),
     });
   };
@@ -109,7 +108,7 @@ export default function DeliveryWorkspace() {
           {DEPT_STAGES.map(stage => {
             const containers = byStage[stage] ?? [];
             const stageInfo = WORKFLOW_STAGES.find(s => s.value === stage);
-            const isClose = stage === "empty_return";
+            const isClose = stage === "delivery";
             return (
               <div key={stage}>
                 <div className="flex items-center gap-3 mb-3">

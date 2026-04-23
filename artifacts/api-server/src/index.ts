@@ -96,6 +96,23 @@ async function runStartupMigrations() {
       }
     });
 
+    await runMigration("split_shipping_terminal_and_merge_delivery_empty_v2", async () => {
+      const split = await db.update(containersTable)
+        .set({ status: "shipping" })
+        .where(eq(containersTable.status, "shipping_terminal_payment"))
+        .returning({ id: containersTable.id });
+      if (split.length > 0) {
+        console.log(`[migration] shipping_terminal_payment → shipping: ${split.length} container(s)`);
+      }
+      const merged = await db.update(containersTable)
+        .set({ status: "delivery" })
+        .where(eq(containersTable.status, "empty_return"))
+        .returning({ id: containersTable.id });
+      if (merged.length > 0) {
+        console.log(`[migration] empty_return → delivery: ${merged.length} container(s)`);
+      }
+    });
+
     await runMigration("backfill_delivered_at_for_completed_containers", async () => {
       const updated = await db.update(containersTable)
         .set({

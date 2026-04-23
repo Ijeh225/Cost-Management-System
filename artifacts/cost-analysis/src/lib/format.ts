@@ -19,14 +19,14 @@ export const WORKFLOW_STAGES = [
   { value: "documentation",       label: "Documentation",             short: "Docs" },
   { value: "duty_assessment",     label: "Duty Assessment",           short: "Assessment" },
   { value: "duty_payment",        label: "Duty Payment",              short: "Duty Pmt" },
-  { value: "transire_processing",       label: "Transire Processing",          short: "Transire" },
-  { value: "shipping_terminal_payment", label: "Shipping & Terminal Payment",  short: "Shpg/Term" },
-  { value: "pull_out",                  label: "Pull-Out",                     short: "Pull-Out" },
+  { value: "transire_processing", label: "Transire Processing",       short: "Transire" },
+  { value: "shipping",            label: "Shipping",                  short: "Shipping" },
+  { value: "terminal",            label: "Terminal",                  short: "Terminal" },
+  { value: "pull_out",            label: "Pull-Out",                  short: "Pull-Out" },
   { value: "gate_in",             label: "Gate-In (Bonded Terminal)", short: "Gate-In" },
   { value: "examination",         label: "Examination",               short: "Exam" },
   { value: "final_release",       label: "Final Release",             short: "Release" },
-  { value: "delivery",            label: "Delivery",                  short: "Delivery" },
-  { value: "empty_return",        label: "Empty Return",              short: "Empty Ret." },
+  { value: "delivery",            label: "Delivery & Empty Return",   short: "Delivery" },
   { value: "closed",              label: "Closed",                    short: "Closed" },
 ];
 
@@ -47,10 +47,11 @@ export function getStageIndex(status: string): number {
 }
 
 export const STAGE_SECTION: Record<string, string> = {
-  shipping_terminal_payment: "terminal",
-  examination:               "customs",
-  gate_in:                   "terminal",
-  delivery:                  "delivery",
+  shipping:    "shipping",
+  terminal:    "terminal",
+  examination: "customs",
+  gate_in:     "terminal",
+  delivery:    "delivery",
 };
 
 export function canEditSection(
@@ -61,13 +62,6 @@ export function canEditSection(
 ): boolean {
   if (isAdmin) return true;
   if (!userSectionPermission) return false;
-  // The combined shipping & terminal payment stage allows editing of both
-  // "shipping" and "terminal" cost sections.
-  if (containerStatus === "shipping_terminal_payment") {
-    if (userSectionPermission === "shipping" || userSectionPermission === "terminal") {
-      return sectionKey === "shipping" || sectionKey === "terminal";
-    }
-  }
   const activeSection = STAGE_SECTION[containerStatus];
   if (activeSection !== userSectionPermission) return false;
   if (sectionKey === userSectionPermission) return true;
@@ -83,13 +77,13 @@ export function getStatusColor(status: string): string {
     duty_assessment:           "bg-amber-500/20 text-amber-400 border-amber-500/50",
     duty_payment:              "bg-orange-500/20 text-orange-400 border-orange-500/50",
     transire_processing:       "bg-rose-500/20 text-rose-400 border-rose-500/50",
-    shipping_terminal_payment: "bg-blue-500/20 text-blue-400 border-blue-500/50",
-    pull_out:                  "bg-sky-500/20 text-sky-400 border-sky-500/50",
+    shipping:                  "bg-blue-500/20 text-blue-400 border-blue-500/50",
+    terminal:                  "bg-sky-500/20 text-sky-400 border-sky-500/50",
+    pull_out:                  "bg-indigo-500/20 text-indigo-400 border-indigo-500/50",
     gate_in:                   "bg-cyan-500/20 text-cyan-400 border-cyan-500/50",
     examination:               "bg-purple-500/20 text-purple-400 border-purple-500/50",
     final_release:             "bg-violet-500/20 text-violet-400 border-violet-500/50",
     delivery:                  "bg-teal-500/20 text-teal-400 border-teal-500/50",
-    empty_return:              "bg-indigo-500/20 text-indigo-400 border-indigo-500/50",
     closed:                    "bg-emerald-500/20 text-emerald-400 border-emerald-500/50",
     in_progress:               "bg-blue-500/20 text-blue-400 border-blue-500/50",
   };

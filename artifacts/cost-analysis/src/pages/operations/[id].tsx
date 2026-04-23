@@ -47,11 +47,11 @@ const PIPELINE_STAGES = WORKFLOW_STAGES.filter(
   (s) => s.value !== "pending_verification"
 );
 
-const OPS_STAGES      = ["transire_processing", "shipping_terminal_payment", "pull_out"];
+const OPS_STAGES      = ["transire_processing", "shipping", "terminal", "pull_out"];
 const DOCS_STAGES     = ["registered", "documentation", "duty_assessment"];
 const ACCOUNTS_STAGES = ["duty_payment"];
 const TERMINAL_STAGES = ["gate_in", "examination", "final_release"];
-const DELIVERY_STAGES = ["delivery", "empty_return"];
+const DELIVERY_STAGES = ["delivery"];
 
 function daysAgo(dateStr: string): number {
   const ms = Date.now() - new Date(dateStr).getTime();
@@ -178,11 +178,13 @@ const DEPT_SUBMIT_LABELS: Record<string, Record<string, string>> = {
     final_release: "Submit to Delivery",
   },
   delivery_user: {
-    delivery:     "Submit to Empty Return",
-    empty_return: "Mark as Closed",
+    delivery: "Mark as Closed",
   },
   operations_user: {
-    pull_out: "Submit to Terminal Manager",
+    transire_processing: "Submit to Shipping",
+    shipping:            "Submit to Terminal",
+    terminal:            "Submit to Pull-Out",
+    pull_out:            "Submit to Terminal Manager",
   },
 };
 
@@ -286,8 +288,59 @@ function OperationalForm({
   const isOverdue =
     nextActionDueDate && new Date(nextActionDueDate) < new Date();
 
+  const isDeliveryStage = container.status === "delivery";
+
   return (
     <div className="space-y-4">
+      {isDeliveryStage ? (
+        <Card className="border-teal-500/30 bg-teal-500/5 backdrop-blur-sm">
+          <CardContent className="pt-5 pb-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-teal-500/10 border border-teal-500/30 flex items-center justify-center shrink-0">
+                  <ContainerIcon className="w-5 h-5 text-teal-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Delivery Execution</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Open the full Delivery Execution view for{" "}
+                    <Link href={`/containers/${container.id}`}>
+                      <span className="font-mono font-medium text-teal-400 hover:text-teal-300 cursor-pointer underline-offset-2 hover:underline">
+                        {container.containerNumber}
+                      </span>
+                    </Link>{" "}
+                    to record truck, driver, dispatch officer, delivery status, empty return and offloading details.
+                  </p>
+                </div>
+              </div>
+              <Link href={`/containers/${container.id}`}>
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs shrink-0 border-teal-500/40 text-teal-400 hover:bg-teal-500/10 hover:text-teal-300">
+                  Open <ChevronRight className="w-3 h-3" />
+                </Button>
+              </Link>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-3 pt-3 border-t border-teal-500/20">
+              <Clock className="w-3 h-3" />
+              <span
+                className={
+                  daysInStage > 14
+                    ? "text-red-400 font-semibold"
+                    : daysInStage > 7
+                    ? "text-amber-400 font-semibold"
+                    : ""
+                }
+              >
+                {daysInStage}d in stage
+              </span>
+              {daysInStage > 7 && (
+                <AlertTriangle
+                  className={`w-3 h-3 ${daysInStage > 14 ? "text-red-400" : "text-amber-400"}`}
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -427,6 +480,7 @@ function OperationalForm({
           )}
         </CardContent>
       </Card>
+      )}
 
       {isEditable && nextStage && (() => {
         const deptRole = isDocumentationUser ? "documentation_user"
@@ -438,7 +492,7 @@ function OperationalForm({
         const deptLabel = deptRole
           ? DEPT_SUBMIT_LABELS[deptRole]?.[container.status]
           : undefined;
-        const isClose = container.status === "empty_return";
+        const isClose = container.status === "delivery";
         const isFinalDept = !!deptLabel;
         const cardBorder = isClose
           ? "border-emerald-500/30 bg-emerald-500/5"

@@ -471,22 +471,22 @@ const PIPELINE_STAGE_ORDER = [
   "duty_assessment",
   "duty_payment",
   "transire_processing",
-  "shipping_terminal_payment",
+  "shipping",
+  "terminal",
   "pull_out",
   "gate_in",
   "examination",
   "final_release",
   "delivery",
-  "empty_return",
   "closed",
 ];
 
 const DEPT_OWNED_STAGES: Record<string, string[]> = {
   documentation_user: ["registered", "documentation", "duty_assessment"],
   accounts_user: ["duty_payment"],
-  operations_user: ["transire_processing", "shipping_terminal_payment", "pull_out"],
+  operations_user: ["transire_processing", "shipping", "terminal", "pull_out"],
   terminal_manager: ["gate_in", "examination", "final_release"],
-  delivery_user: ["delivery", "empty_return"],
+  delivery_user: ["delivery"],
 };
 
 router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res) => {
