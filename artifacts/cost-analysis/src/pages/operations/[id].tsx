@@ -2,13 +2,10 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   useGetContainer,
-  getGetContainerQueryKey,
   useUpdateContainer,
   useAdvanceContainerStatus,
   useGetContainerAuditLog,
   useUpdatePaar,
-  useUpdateDeliveryExecution,
-  useListUsers,
   type Container,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -18,7 +15,6 @@ import {
   getStatusLabel,
   getStatusColor,
   getNextStage,
-  getStageIndex,
 } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,17 +41,7 @@ import {
   Container as ContainerIcon,
   Ship,
   FileCheck2,
-  Truck,
-  Phone,
-  MapPin,
-  Package,
-  Navigation,
-  Pencil,
-  CheckSquare,
-  Lock,
-  ClipboardList,
 } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 
 const PIPELINE_STAGES = WORKFLOW_STAGES.filter(
   (s) => s.value !== "pending_verification"
@@ -192,429 +178,13 @@ const DEPT_SUBMIT_LABELS: Record<string, Record<string, string>> = {
     final_release: "Submit to Delivery",
   },
   delivery_user: {
-    delivery:     "Proceed to Empty Return",
+    delivery:     "Submit to Empty Return",
     empty_return: "Mark as Closed",
   },
   operations_user: {
-    transire_processing:       "Submit to Shipping",
-    shipping_terminal_payment: "Submit to Pull-Out",
-    pull_out:                  "Submit to Terminal Manager",
+    pull_out: "Submit to Terminal Manager",
   },
 };
-
-const STAGE_DEPT_LABEL: Record<string, string> = {
-  registered:                "Documentation",
-  documentation:             "Documentation",
-  duty_assessment:           "Documentation",
-  duty_payment:              "Accounts",
-  transire_processing:       "Operations",
-  shipping_terminal_payment: "Operations",
-  pull_out:                  "Operations",
-  gate_in:                   "Terminal",
-  examination:               "Terminal",
-  final_release:             "Terminal",
-  delivery:                  "Delivery",
-  empty_return:              "Delivery",
-  closed:                    "Closed",
-};
-
-type AuditEntry = {
-  id: number;
-  containerId: number;
-  userId: number;
-  userName: string;
-  action: string;
-  section?: string | null;
-  fieldChanged?: string | null;
-  oldValue?: string | null;
-  newValue?: string | null;
-  reason?: string | null;
-  createdAt: string;
-};
-
-function StageBlock({
-  stage,
-  state,
-  container,
-  isAdmin,
-  isEditable,
-  deptRole,
-  auditEntries,
-  staffOptions,
-}: {
-  stage: { value: string; label: string; short: string };
-  state: "completed" | "active" | "future";
-  container: Container;
-  isAdmin: boolean;
-  isEditable: boolean;
-  deptRole: string | null;
-  auditEntries: AuditEntry[];
-  staffOptions: { id: number; name: string }[];
-}) {
-  const { toast } = useToast();
-  const updateMutation = useUpdateContainer();
-  const advanceMutation = useAdvanceContainerStatus();
-
-  const [stageOwner, setStageOwner] = useState(container.stageOwner ?? "");
-  const [nextAction, setNextAction] = useState(container.nextAction ?? "");
-  const [nextActionDueDate, setNextActionDueDate] = useState(
-    container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
-  );
-  const [delayReason, setDelayReason] = useState(container.delayReason ?? "");
-  const [internalNote, setInternalNote] = useState(container.internalNote ?? "");
-  const [isDirty, setIsDirty] = useState(false);
-
-  useEffect(() => {
-    if (state === "active") {
-      setStageOwner(container.stageOwner ?? "");
-      setNextAction(container.nextAction ?? "");
-      setNextActionDueDate(
-        container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
-      );
-      setDelayReason(container.delayReason ?? "");
-      setInternalNote(container.internalNote ?? "");
-      setIsDirty(false);
-    }
-  }, [container.id, container.updatedAt, state]);
-
-  const handleSave = async () => {
-    try {
-      await updateMutation.mutateAsync({
-        id: container.id,
-        data: {
-          stageOwner: stageOwner || null,
-          nextAction: nextAction || null,
-          nextActionDueDate: nextActionDueDate || null,
-          delayReason: delayReason || null,
-          internalNote: internalNote || null,
-        },
-      });
-      setIsDirty(false);
-      toast({ title: "Stage notes saved" });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save";
-      toast({ variant: "destructive", title: "Error", description: msg });
-    }
-  };
-
-  const nextStage = getNextStage(stage.value);
-  const nextStageLabel = nextStage ? getStatusLabel(nextStage) : null;
-
-  const handleAdvance = async () => {
-    if (!nextStage) return;
-    try {
-      await advanceMutation.mutateAsync({ id: container.id, status: nextStage });
-      toast({ title: `Advanced to ${nextStageLabel}` });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to advance";
-      toast({ variant: "destructive", title: "Error", description: msg });
-    }
-  };
-
-  const deptLabel = deptRole ? DEPT_SUBMIT_LABELS[deptRole]?.[stage.value] : undefined;
-  const advanceLabel = deptLabel ?? (nextStageLabel ? `Mark Complete → ${nextStageLabel}` : "Close Container");
-  const isClose = stage.value === "empty_return";
-  const deptDeptLabel = STAGE_DEPT_LABEL[stage.value];
-
-  const completionEntry = auditEntries.find(
-    e => e.action === "status_advanced" && e.fieldChanged === "status" && e.oldValue === stage.value
-  );
-
-  if (state === "future") {
-    return (
-      <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border/25 bg-muted/10">
-        <Lock className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0" />
-        <span className="text-xs text-muted-foreground/40 font-medium">{stage.label}</span>
-        {deptDeptLabel && (
-          <span className="ml-auto text-[9px] text-muted-foreground/30">{deptDeptLabel}</span>
-        )}
-      </div>
-    );
-  }
-
-  if (state === "completed") {
-    return (
-      <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
-        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-        <span className="text-xs text-emerald-400/80 font-medium flex-1">{stage.label}</span>
-        {completionEntry ? (
-          <div className="text-right text-[10px] text-muted-foreground/60 leading-tight">
-            <span>
-              {new Date(completionEntry.createdAt).toLocaleDateString("en-NG", {
-                day: "numeric", month: "short", year: "numeric",
-              })}
-            </span>
-            {" · "}<span>{completionEntry.userName}</span>
-          </div>
-        ) : deptDeptLabel ? (
-          <span className="text-[9px] text-muted-foreground/50">{deptDeptLabel}</span>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <Card className="border-primary/25 bg-card/60 backdrop-blur-sm">
-      <CardHeader className="pb-2 pt-3 px-4">
-        <div className="flex items-center gap-2">
-          <Activity className="w-3.5 h-3.5 text-primary animate-pulse shrink-0" />
-          <span className="text-sm font-semibold text-primary flex-1">{stage.label}</span>
-          {deptDeptLabel && (
-            <span className="text-[9px] font-medium text-muted-foreground border border-border/40 rounded-full px-2 py-0.5">{deptDeptLabel}</span>
-          )}
-          {delayReason && (
-            <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5 font-medium">
-              <AlertTriangle className="w-2.5 h-2.5" /> Delayed
-            </span>
-          )}
-        </div>
-        {container.updatedAt && (
-          <p className="text-[10px] text-muted-foreground ml-5.5">
-            <Clock className="w-2.5 h-2.5 inline mr-1" />
-            {daysAgo(container.updatedAt)}d in this stage
-          </p>
-        )}
-      </CardHeader>
-      <CardContent className="px-4 pb-4 space-y-3">
-        {isEditable ? (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><User className="w-2.5 h-2.5" /> Stage Owner</Label>
-                {staffOptions.length > 0 ? (
-                  <select
-                    value={stageOwner}
-                    onChange={e => { setStageOwner(e.target.value); setIsDirty(true); }}
-                    className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="">— Unassigned —</option>
-                    {staffOptions.map(s => (
-                      <option key={s.id} value={s.name}>{s.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    value={stageOwner}
-                    onChange={e => { setStageOwner(e.target.value); setIsDirty(true); }}
-                    placeholder="Assign to staff member"
-                    className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                )}
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><Calendar className="w-2.5 h-2.5" /> Due Date</Label>
-                <input
-                  type="date"
-                  value={nextActionDueDate}
-                  onChange={e => { setNextActionDueDate(e.target.value); setIsDirty(true); }}
-                  className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><ClipboardList className="w-2.5 h-2.5" /> Next Action</Label>
-              <input
-                value={nextAction}
-                onChange={e => { setNextAction(e.target.value); setIsDirty(true); }}
-                placeholder="What needs to happen next?"
-                className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5" /> Delay Reason <span className="text-muted-foreground/50">(leave blank if on track)</span></Label>
-              <Textarea
-                value={delayReason}
-                onChange={e => { setDelayReason(e.target.value); setIsDirty(true); }}
-                placeholder="Document any blockers or delays"
-                rows={2}
-                className={`text-xs bg-background border-border/60 resize-none ${delayReason ? "border-amber-500/40 bg-amber-500/5" : ""}`}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground flex items-center gap-1"><FileText className="w-2.5 h-2.5" /> Internal Note</Label>
-              <Textarea
-                value={internalNote}
-                onChange={e => { setInternalNote(e.target.value); setIsDirty(true); }}
-                placeholder="Internal notes visible to admin and ops staff"
-                rows={2}
-                className="text-xs bg-background border-border/60 resize-none"
-              />
-            </div>
-            {isDirty && (
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="h-7 gap-1 text-xs">
-                  {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                  Save Notes
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => {
-                  setStageOwner(container.stageOwner ?? "");
-                  setNextAction(container.nextAction ?? "");
-                  setNextActionDueDate(container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : "");
-                  setDelayReason(container.delayReason ?? "");
-                  setInternalNote(container.internalNote ?? "");
-                  setIsDirty(false);
-                }} className="h-7 text-xs text-muted-foreground gap-1">
-                  <RotateCcw className="w-3 h-3" /> Reset
-                </Button>
-              </div>
-            )}
-            {nextStage && (
-              <div className={`border rounded-lg p-3 flex items-center justify-between gap-4 ${
-                isClose ? "border-emerald-500/30 bg-emerald-500/5" : deptLabel ? "border-amber-500/20 bg-amber-500/5" : "border-primary/20 bg-primary/5"
-              }`}>
-                <div>
-                  <p className="text-xs font-semibold text-foreground">{isClose ? "Close Container" : deptLabel ?? "Advance to Next Stage"}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {stage.label} → <span className="text-foreground/70 font-medium">{nextStageLabel}</span>
-                  </p>
-                </div>
-                <Button
-                  onClick={handleAdvance}
-                  disabled={advanceMutation.isPending}
-                  className={`gap-1.5 shrink-0 text-xs h-8 ${isClose ? "bg-emerald-600 hover:bg-emerald-700" : deptLabel ? "bg-amber-600 hover:bg-amber-700" : ""}`}
-                >
-                  {advanceMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                  {advanceLabel}
-                </Button>
-              </div>
-            )}
-            {stage.value === "closed" && (
-              <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-lg p-3 flex items-center gap-3">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <div>
-                  <p className="text-xs font-semibold text-emerald-400">Container Closed</p>
-                  <p className="text-[10px] text-muted-foreground">All stages complete.</p>
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="space-y-2 text-xs">
-            {container.stageOwner && (
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <User className="w-3 h-3 shrink-0" />
-                <span>Owner:</span>
-                <span className="text-foreground font-medium">{container.stageOwner}</span>
-              </div>
-            )}
-            {container.nextAction && (
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <ClipboardList className="w-3 h-3 shrink-0" />
-                <span>Next:</span>
-                <span className="text-foreground">{container.nextAction}</span>
-              </div>
-            )}
-            {container.nextActionDueDate && (
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Calendar className="w-3 h-3 shrink-0" />
-                <span>Due:</span>
-                <span className={new Date(container.nextActionDueDate) < new Date() ? "text-red-400 font-medium" : "text-foreground"}>
-                  {new Date(container.nextActionDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
-                </span>
-              </div>
-            )}
-            {container.delayReason && (
-              <div className="flex items-start gap-1.5 text-amber-400/80">
-                <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                <span>{container.delayReason}</span>
-              </div>
-            )}
-            {container.internalNote && (
-              <div className="flex items-start gap-1.5 text-muted-foreground">
-                <FileText className="w-3 h-3 shrink-0 mt-0.5" />
-                <span className="text-foreground/80 italic">{container.internalNote}</span>
-              </div>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function StageWorkflowBlocks({
-  container,
-  isAdmin,
-  isOperationsUser,
-  isDocumentationUser,
-  isAccountsUser,
-  isTerminalManager,
-  isDeliveryUser,
-}: {
-  container: Container;
-  isAdmin: boolean;
-  isOperationsUser: boolean;
-  isDocumentationUser: boolean;
-  isAccountsUser: boolean;
-  isTerminalManager: boolean;
-  isDeliveryUser: boolean;
-}) {
-  const isDeptUser = isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser;
-
-  const deptStageValues = isDocumentationUser ? DOCS_STAGES
-    : isAccountsUser     ? ACCOUNTS_STAGES
-    : isTerminalManager  ? TERMINAL_STAGES
-    : isDeliveryUser     ? DELIVERY_STAGES
-    : isOperationsUser   ? OPS_STAGES
-    : null;
-
-  const currentIdx = WORKFLOW_STAGES.findIndex(s => s.value === container.status);
-
-  const deptRole = isDocumentationUser ? "documentation_user"
-    : isAccountsUser    ? "accounts_user"
-    : isTerminalManager ? "terminal_manager"
-    : isDeliveryUser    ? "delivery_user"
-    : isOperationsUser  ? "operations_user"
-    : null;
-
-  const { data: auditLog = [] } = useGetContainerAuditLog(container.id);
-  const { data: usersList = [] } = useListUsers();
-  const staffOptions = (usersList as { id: number; name: string }[])
-    .filter((u: { id: number; name: string; role?: string }) => u.role !== "admin" && u.role !== "super_admin")
-    .map((u: { id: number; name: string }) => ({ id: u.id, name: u.name }));
-
-  return (
-    <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <ClipboardList className="w-4 h-4 text-muted-foreground" />
-          Stage Workflow
-          <span className="text-[10px] text-muted-foreground/60 font-normal ml-1">
-            ({PIPELINE_STAGES.length} stages)
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1.5 pb-4">
-        {PIPELINE_STAGES.map(stage => {
-          const stageIdx = WORKFLOW_STAGES.findIndex(s => s.value === stage.value);
-          const state: "completed" | "active" | "future" =
-            stageIdx < currentIdx ? "completed"
-            : stageIdx === currentIdx ? "active"
-            : "future";
-
-          const stageIsCurrentDept = deptStageValues ? deptStageValues.includes(stage.value) : true;
-          const canEdit = isAdmin
-            ? true
-            : isDeptUser && stage.value === container.status && stageIsCurrentDept;
-
-          return (
-            <StageBlock
-              key={stage.value}
-              stage={stage}
-              state={state}
-              container={container}
-              isAdmin={isAdmin}
-              isEditable={canEdit}
-              deptRole={deptRole}
-              auditEntries={auditLog as AuditEntry[]}
-              staffOptions={staffOptions}
-            />
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
-}
 
 function OperationalForm({
   container,
@@ -637,10 +207,20 @@ function OperationalForm({
   const updateMutation = useUpdateContainer();
   const advanceMutation = useAdvanceContainerStatus();
 
+  const [stageOwner, setStageOwner] = useState(container.stageOwner ?? "");
+  const [nextAction, setNextAction] = useState(container.nextAction ?? "");
+  const [nextActionDueDate, setNextActionDueDate] = useState(
+    container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
+  );
   const [delayReason, setDelayReason] = useState(container.delayReason ?? "");
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
+    setStageOwner(container.stageOwner ?? "");
+    setNextAction(container.nextAction ?? "");
+    setNextActionDueDate(
+      container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
+    );
     setDelayReason(container.delayReason ?? "");
     setIsDirty(false);
   }, [container.id, container.updatedAt]);
@@ -651,12 +231,15 @@ function OperationalForm({
     try {
       await updateMutation.mutateAsync({
         id: container.id,
-        data: {
+        updateContainerRequest: {
+          stageOwner: stageOwner || null,
+          nextAction: nextAction || null,
+          nextActionDueDate: nextActionDueDate || null,
           delayReason: delayReason || null,
         },
       });
       setIsDirty(false);
-      toast({ title: "Stage notes updated" });
+      toast({ title: "Workflow updated" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to update";
       toast({ variant: "destructive", title: "Error", description: msg });
@@ -664,6 +247,11 @@ function OperationalForm({
   };
 
   const handleReset = () => {
+    setStageOwner(container.stageOwner ?? "");
+    setNextAction(container.nextAction ?? "");
+    setNextActionDueDate(
+      container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : ""
+    );
     setDelayReason(container.delayReason ?? "");
     setIsDirty(false);
   };
@@ -695,6 +283,8 @@ function OperationalForm({
   const isDeptUser = isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser;
   const isEditable = isAdmin || isDeptUser;
   const daysInStage = daysAgo(container.updatedAt);
+  const isOverdue =
+    nextActionDueDate && new Date(nextActionDueDate) < new Date();
 
   return (
     <div className="space-y-4">
@@ -726,6 +316,66 @@ function OperationalForm({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <User className="w-3 h-3" />
+                Stage Owner
+              </Label>
+              <Input
+                value={stageOwner}
+                onChange={(e) => {
+                  setStageOwner(e.target.value);
+                  markDirty();
+                }}
+                placeholder="Person responsible for this stage"
+                className="h-8 text-sm bg-background border-border/60"
+                disabled={!isEditable}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="w-3 h-3" />
+                Next Action Due Date
+              </Label>
+              <Input
+                type="date"
+                value={nextActionDueDate}
+                onChange={(e) => {
+                  setNextActionDueDate(e.target.value);
+                  markDirty();
+                }}
+                className={`h-8 text-sm bg-background border-border/60 ${
+                  isOverdue ? "border-red-500/50 text-red-400" : ""
+                }`}
+                disabled={!isEditable}
+              />
+              {isOverdue && (
+                <p className="text-[10px] text-red-400 flex items-center gap-1">
+                  <AlertTriangle className="w-2.5 h-2.5" />
+                  Overdue
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Activity className="w-3 h-3" />
+              Next Action
+            </Label>
+            <Input
+              value={nextAction}
+              onChange={(e) => {
+                setNextAction(e.target.value);
+                markDirty();
+              }}
+              placeholder="Describe the next required action"
+              className="h-8 text-sm bg-background border-border/60"
+              disabled={!isEditable}
+            />
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
               <AlertTriangle className="w-3 h-3" />
@@ -760,7 +410,7 @@ function OperationalForm({
                 ) : (
                   <Save className="w-3 h-3" />
                 )}
-                Save Notes
+                Save Changes
               </Button>
               {isDirty && (
                 <Button
@@ -1075,163 +725,15 @@ function AuditLog({ containerId }: { containerId: number }) {
   );
 }
 
-const SHIPPING_STAGES = ["transire_processing", "shipping_terminal_payment"];
-const TERMINAL_OPS_STAGES = ["gate_in", "examination", "final_release"];
-
-function ShippingSection({ container }: { container: Container }) {
-  const isActive = SHIPPING_STAGES.includes(container.status);
-  const isPast = getStageIndex(container.status) > getStageIndex("shipping_terminal_payment");
-  const stageColor = isActive
-    ? "border-blue-500/30 bg-blue-500/5"
-    : isPast
-    ? "border-emerald-500/20 bg-emerald-500/5"
-    : "border-border/40 bg-card/30";
-  return (
-    <Card className={`backdrop-blur-sm ${stageColor}`}>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Ship className={`w-4 h-4 ${isActive ? "text-blue-400" : isPast ? "text-emerald-400" : "text-muted-foreground"}`} />
-            Shipping Operations
-          </CardTitle>
-          <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
-            isActive
-              ? "text-blue-400 bg-blue-500/10 border-blue-500/30"
-              : isPast
-              ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
-              : "text-muted-foreground bg-muted/40 border-border/40"
-          }`}>
-            {isActive ? <Activity className="w-2.5 h-2.5 animate-pulse" /> : isPast ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Circle className="w-2.5 h-2.5" />}
-            {isActive ? "Active" : isPast ? "Completed" : "Upcoming"}
-          </span>
-        </div>
-        <p className="text-[10px] text-muted-foreground mt-0.5">Transire processing and shipping payment — managed by Operations</p>
-      </CardHeader>
-      <CardContent className="space-y-3 text-xs">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-          {container.vessel && (
-            <div className="flex items-center gap-1.5">
-              <Ship className="w-3 h-3 text-muted-foreground shrink-0" />
-              <span className="text-muted-foreground">Vessel:</span>
-              <span className="text-foreground/80 font-medium truncate">{container.vessel}</span>
-            </div>
-          )}
-          {container.blNumber && (
-            <div className="flex items-center gap-1.5">
-              <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
-              <span className="text-muted-foreground">B/L:</span>
-              <span className="text-foreground/80 font-mono">{container.blNumber}</span>
-            </div>
-          )}
-          {container.size && (
-            <div className="flex items-center gap-1.5">
-              <ContainerIcon className="w-3 h-3 text-muted-foreground shrink-0" />
-              <span className="text-muted-foreground">Size:</span>
-              <span className="text-foreground/80">{container.size}</span>
-            </div>
-          )}
-        </div>
-        <div className="flex gap-1.5 flex-wrap pt-1">
-          {SHIPPING_STAGES.map(s => {
-            const idx = getStageIndex(container.status);
-            const sIdx = getStageIndex(s);
-            const done = idx > sIdx;
-            const curr = idx === sIdx;
-            return (
-              <span key={s} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border font-medium ${
-                done ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
-                : curr ? "text-blue-400 border-blue-500/30 bg-blue-500/10"
-                : "text-muted-foreground/50 border-border/30 bg-muted/20"
-              }`}>
-                {done ? <CheckCircle2 className="w-2.5 h-2.5" /> : curr ? <Activity className="w-2.5 h-2.5 animate-pulse" /> : <Circle className="w-2.5 h-2.5" />}
-                {getStatusLabel(s)}
-              </span>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TerminalSection({ container }: { container: Container }) {
-  const isActive = TERMINAL_OPS_STAGES.includes(container.status);
-  const isPast = getStageIndex(container.status) > getStageIndex("final_release");
-  const stageColor = isActive
-    ? "border-cyan-500/30 bg-cyan-500/5"
-    : isPast
-    ? "border-emerald-500/20 bg-emerald-500/5"
-    : "border-border/40 bg-card/30";
-  return (
-    <Card className={`backdrop-blur-sm ${stageColor}`}>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <ContainerIcon className={`w-4 h-4 ${isActive ? "text-cyan-400" : isPast ? "text-emerald-400" : "text-muted-foreground"}`} />
-            Terminal Operations
-          </CardTitle>
-          <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
-            isActive
-              ? "text-cyan-400 bg-cyan-500/10 border-cyan-500/30"
-              : isPast
-              ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
-              : "text-muted-foreground bg-muted/40 border-border/40"
-          }`}>
-            {isActive ? <Activity className="w-2.5 h-2.5 animate-pulse" /> : isPast ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Circle className="w-2.5 h-2.5" />}
-            {isActive ? "Active" : isPast ? "Completed" : "Upcoming"}
-          </span>
-        </div>
-        <p className="text-[10px] text-muted-foreground mt-0.5">Bonded terminal gate-in, examination and release — managed by Operations</p>
-      </CardHeader>
-      <CardContent className="space-y-3 text-xs">
-        <div className="flex gap-1.5 flex-wrap">
-          {TERMINAL_OPS_STAGES.map(s => {
-            const idx = getStageIndex(container.status);
-            const sIdx = getStageIndex(s);
-            const done = idx > sIdx;
-            const curr = idx === sIdx;
-            return (
-              <span key={s} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border font-medium ${
-                done ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
-                : curr ? "text-cyan-400 border-cyan-500/30 bg-cyan-500/10"
-                : "text-muted-foreground/50 border-border/30 bg-muted/20"
-              }`}>
-                {done ? <CheckCircle2 className="w-2.5 h-2.5" /> : curr ? <Activity className="w-2.5 h-2.5 animate-pulse" /> : <Circle className="w-2.5 h-2.5" />}
-                {getStatusLabel(s)}
-              </span>
-            );
-          })}
-        </div>
-        {container.declaration && (
-          <div className="flex items-center gap-1.5">
-            <FileCheck2 className="w-3 h-3 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground">Declaration:</span>
-            <span className="text-foreground/80 font-mono">{container.declaration}</span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function OperationDetailPage({ params }: { params: { id: string } }) {
   const containerId = parseInt(params.id, 10);
   const { isAdmin, isOperationsUser, isDocumentationUser, isAccountsUser, isTerminalManager, isDeliveryUser } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const navMutation = useAdvanceContainerStatus();
-  const updateDeliveryExecution = useUpdateDeliveryExecution();
-
-  const [editingDeliveryExec, setEditingDeliveryExec] = useState(false);
-  const [dex, setDex] = useState({
-    deliveryTime: "", deliveryLocation: "", truckNumber: "", driverName: "",
-    driverPhone: "", dispatchOfficer: "", deliveryStatus: "pending" as "pending" | "in_transit" | "delivered",
-    offloadingConfirmed: false, emptyReturnDueDate: "", emptyReturnDate: "",
-    deliveredAt: "", deliveredAtEstimated: false,
-  });
 
   const { data, isLoading, isError } = useGetContainer(containerId, {
-    query: { queryKey: getGetContainerQueryKey(containerId), refetchInterval: 30_000 },
+    query: { refetchInterval: 30_000 },
   });
 
   if (isLoading) {
@@ -1268,56 +770,6 @@ export default function OperationDetailPage({ params }: { params: { id: string }
       toast({ variant: "destructive", title: "Error", description: msg });
     }
   };
-
-  const handleOpenDeliveryExec = () => {
-    setDex({
-      deliveryTime: container.deliveryTime ?? "",
-      deliveryLocation: container.deliveryLocation ?? "",
-      truckNumber: container.truckNumber ?? "",
-      driverName: container.driverName ?? "",
-      driverPhone: container.driverPhone ?? "",
-      dispatchOfficer: container.dispatchOfficer ?? "",
-      deliveryStatus: container.deliveryStatus ?? "pending",
-      offloadingConfirmed: container.offloadingConfirmed ?? false,
-      emptyReturnDueDate: container.emptyReturnDueDate ? container.emptyReturnDueDate.slice(0, 10) : "",
-      emptyReturnDate: container.emptyReturnDate ? container.emptyReturnDate.slice(0, 10) : "",
-      deliveredAt: container.deliveredAt ? container.deliveredAt.slice(0, 10) : "",
-      deliveredAtEstimated: container.deliveredAtEstimated ?? false,
-    });
-    setEditingDeliveryExec(true);
-  };
-
-  const handleSaveDeliveryExec = () => {
-    updateDeliveryExecution.mutate(
-      {
-        id: container.id,
-        deliveryTime: dex.deliveryTime || null,
-        deliveryLocation: dex.deliveryLocation || null,
-        truckNumber: dex.truckNumber || null,
-        driverName: dex.driverName || null,
-        driverPhone: dex.driverPhone || null,
-        dispatchOfficer: dex.dispatchOfficer || null,
-        deliveryStatus: dex.deliveryStatus,
-        offloadingConfirmed: dex.offloadingConfirmed,
-        emptyReturnDueDate: dex.emptyReturnDueDate || null,
-        emptyReturnDate: dex.emptyReturnDate || null,
-        deliveredAt: dex.deliveredAt || null,
-        deliveredAtEstimated: dex.deliveredAtEstimated,
-      },
-      {
-        onSuccess: () => {
-          toast({ title: "Delivery details saved." });
-          setEditingDeliveryExec(false);
-        },
-        onError: (err: Error) => {
-          toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Could not save delivery details" });
-        },
-      }
-    );
-  };
-
-  const canEditDelivery = isAdmin || isDeliveryUser;
-  const isDeliveryStage = DELIVERY_STAGES.includes(container.status);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -1397,13 +849,15 @@ export default function OperationDetailPage({ params }: { params: { id: string }
           </div>
         </div>
 
-        <Link href={`/containers/${container.id}`}>
-          <Button variant="outline" size="sm" className="gap-2 shrink-0 h-8">
-            <FileText className="w-3.5 h-3.5" />
-            Financial Records
-            <ExternalLink className="w-3 h-3 text-muted-foreground" />
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link href={`/containers/${container.id}`}>
+            <Button variant="outline" size="sm" className="gap-2 shrink-0 h-8">
+              <FileText className="w-3.5 h-3.5" />
+              Financial Records
+              <ExternalLink className="w-3 h-3 text-muted-foreground" />
+            </Button>
+          </Link>
+        )}
       </div>
 
       {isPipeline && (
@@ -1437,221 +891,7 @@ export default function OperationDetailPage({ params }: { params: { id: string }
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
-
-          {/* ── Delivery Execution — PRIMARY ────────────────────────────── */}
-          {(isDeliveryStage || isAdmin || isDeliveryUser) && (
-            <Card className="border-primary/20 bg-card/60 backdrop-blur-sm">
-              <CardHeader className="pb-3 border-b border-border/40">
-                <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <Truck className="w-4 h-4 text-primary" /> Delivery Execution
-                    {!isDeliveryStage && isAdmin && (
-                      <span className="text-[10px] font-normal text-muted-foreground border border-border/50 rounded-full px-2 py-0.5 ml-1">pre-delivery</span>
-                    )}
-                  </CardTitle>
-                  {canEditDelivery && !editingDeliveryExec && (
-                    <Button variant="outline" size="sm" className="gap-1.5 text-xs shrink-0" onClick={handleOpenDeliveryExec}>
-                      <Pencil className="w-3 h-3" /> Edit
-                    </Button>
-                  )}
-                  {editingDeliveryExec && (
-                    <div className="flex gap-2">
-                      <Button size="sm" className="h-7 text-xs px-3 gap-1" onClick={handleSaveDeliveryExec} disabled={updateDeliveryExecution.isPending}>
-                        {updateDeliveryExecution.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditingDeliveryExec(false)}>Cancel</Button>
-                    </div>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                {editingDeliveryExec ? (
-                  <div className="space-y-5">
-                    {/* ─ Delivery Details sub-section ─ */}
-                    <div className="space-y-3">
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Truck className="w-3 h-3" /> Delivery Details
-                      </p>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Navigation className="w-3 h-3" /> Delivery Status</Label>
-                        <div className="flex gap-2 flex-wrap">
-                          {(["pending", "in_transit", "delivered"] as const).map(s => (
-                            <button
-                              key={s}
-                              onClick={() => setDex(d => ({ ...d, deliveryStatus: s }))}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                                dex.deliveryStatus === s
-                                  ? s === "delivered" ? "bg-green-500/20 border-green-500/40 text-green-400" : s === "in_transit" ? "bg-blue-500/20 border-blue-500/40 text-blue-400" : "bg-muted/70 border-border text-muted-foreground"
-                                  : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
-                              }`}
-                            >
-                              {s === "pending" ? "Pending" : s === "in_transit" ? "In Transit" : "Delivered"}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Truck className="w-3 h-3" /> Truck Number</Label>
-                          <input value={dex.truckNumber} onChange={e => setDex(d => ({ ...d, truckNumber: e.target.value }))} placeholder="e.g. LAG-123AB" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><User className="w-3 h-3" /> Driver Name</Label>
-                          <input value={dex.driverName} onChange={e => setDex(d => ({ ...d, driverName: e.target.value }))} placeholder="Driver's full name" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Phone className="w-3 h-3" /> Driver Phone</Label>
-                          <input value={dex.driverPhone} onChange={e => setDex(d => ({ ...d, driverPhone: e.target.value }))} placeholder="+234..." className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><User className="w-3 h-3" /> Dispatch Officer</Label>
-                          <input value={dex.dispatchOfficer} onChange={e => setDex(d => ({ ...d, dispatchOfficer: e.target.value }))} placeholder="Officer name" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Clock className="w-3 h-3" /> Delivery Time</Label>
-                          <input value={dex.deliveryTime} onChange={e => setDex(d => ({ ...d, deliveryTime: e.target.value }))} placeholder="e.g. 09:30" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Delivery Location</Label>
-                          <input value={dex.deliveryLocation} onChange={e => setDex(d => ({ ...d, deliveryLocation: e.target.value }))} placeholder="e.g. Apapa Wharf" className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3" /> Delivery Date (Actual)</Label>
-                          <input type="date" value={dex.deliveredAt} onChange={e => setDex(d => ({ ...d, deliveredAt: e.target.value }))} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        </div>
-                        <div className="flex items-center gap-3 pt-6">
-                          <Switch checked={dex.deliveredAtEstimated} onCheckedChange={v => setDex(d => ({ ...d, deliveredAtEstimated: v }))} id="ops-delivered-estimated-switch" />
-                          <Label htmlFor="ops-delivered-estimated-switch" className="text-xs cursor-pointer">Date is estimated</Label>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* ─ Empty Return sub-section ─ */}
-                    <div className="border-t border-border/40 pt-4 space-y-3">
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Package className="w-3 h-3" /> Empty Return
-                      </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Package className="w-3 h-3" /> Empty Return Due Date</Label>
-                          <input type="date" value={dex.emptyReturnDueDate} onChange={e => setDex(d => ({ ...d, emptyReturnDueDate: e.target.value }))} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Package className="w-3 h-3" /> Actual Return Date</Label>
-                          <input type="date" value={dex.emptyReturnDate} onChange={e => setDex(d => ({ ...d, emptyReturnDate: e.target.value }))} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Switch checked={dex.offloadingConfirmed} onCheckedChange={v => setDex(d => ({ ...d, offloadingConfirmed: v }))} id="ops-offloading-switch" />
-                        <Label htmlFor="ops-offloading-switch" className="text-xs cursor-pointer">Offloading Confirmed</Label>
-                      </div>
-                    </div>
-                  </div>
-                ) : (() => {
-                  const statusColor: Record<string, string> = {
-                    pending: "text-muted-foreground bg-muted/50 border-border/50",
-                    in_transit: "text-blue-400 bg-blue-500/10 border-blue-500/30",
-                    delivered: "text-green-400 bg-green-500/10 border-green-500/30",
-                  };
-                  const statusLabel: Record<string, string> = { pending: "Pending", in_transit: "In Transit", delivered: "Delivered" };
-                  const ds = container.deliveryStatus ?? "pending";
-                  const hasDeliveryData = container.truckNumber || container.driverName || container.driverPhone || container.dispatchOfficer || container.deliveryLocation || container.deliveryTime || container.deliveredAt;
-                  const hasReturnData = container.emptyReturnDueDate || container.emptyReturnDate;
-                  return (
-                    <div className="space-y-4">
-                      {/* Delivery Details view */}
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                          <Truck className="w-3 h-3" /> Delivery Details
-                        </p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${statusColor[ds]}`}>
-                            {ds === "in_transit" && <Truck className="w-3 h-3" />}
-                            {ds === "delivered" && <CheckCircle2 className="w-3 h-3" />}
-                            {statusLabel[ds]}
-                          </span>
-                          {container.offloadingConfirmed && (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border text-green-400 bg-green-500/10 border-green-500/30">
-                              <CheckSquare className="w-3 h-3" /> Offloading Confirmed
-                            </span>
-                          )}
-                        </div>
-                        {hasDeliveryData ? (
-                          <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
-                            {container.truckNumber && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground">
-                                <Truck className="w-3 h-3 shrink-0" />
-                                <span className="text-foreground font-medium">{container.truckNumber}</span>
-                              </div>
-                            )}
-                            {container.driverName && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground">
-                                <User className="w-3 h-3 shrink-0" />
-                                <span className="text-foreground">{container.driverName}</span>
-                                {container.driverPhone && <span className="text-muted-foreground">· {container.driverPhone}</span>}
-                              </div>
-                            )}
-                            {container.dispatchOfficer && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground">
-                                <User className="w-3 h-3 shrink-0" />
-                                <span className="text-foreground">{container.dispatchOfficer}</span>
-                              </div>
-                            )}
-                            {container.deliveryLocation && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground">
-                                <MapPin className="w-3 h-3 shrink-0" />
-                                <span className="text-foreground">{container.deliveryLocation}</span>
-                                {container.deliveryTime && <span className="text-muted-foreground">· {container.deliveryTime}</span>}
-                              </div>
-                            )}
-                            {container.deliveredAt && (
-                              <div className="col-span-2 flex items-center gap-1.5 text-muted-foreground">
-                                <CheckCircle2 className="w-3 h-3 shrink-0 text-green-400" />
-                                <span>Delivered: <span className="font-medium text-foreground">{new Date(container.deliveredAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
-                                {container.deliveredAtEstimated && <span className="text-amber-400 text-[10px] border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">estimated</span>}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground/60">{canEditDelivery ? "No delivery details yet — click Edit to add truck, driver and dispatch info." : "No delivery details recorded yet."}</p>
-                        )}
-                      </div>
-
-                      {/* Empty Return view */}
-                      <div className="border-t border-border/40 pt-3 space-y-2">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                          <Package className="w-3 h-3" /> Empty Return
-                        </p>
-                        {hasReturnData ? (
-                          <div className="space-y-1.5 text-xs">
-                            {container.emptyReturnDueDate && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground">
-                                <Package className="w-3 h-3 shrink-0" />
-                                <span>Due: <span className={`font-medium ${container.emptyReturnDate ? "text-green-400" : new Date(container.emptyReturnDueDate) < new Date() ? "text-orange-400" : "text-foreground"}`}>{new Date(container.emptyReturnDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span></span>
-                                {container.emptyReturnDate && (
-                                  <span className="text-green-400 font-medium">· Returned {new Date(container.emptyReturnDate).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground/60">{canEditDelivery ? "No empty return dates set yet." : "No empty return data."}</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-          )}
-
-          <StageWorkflowBlocks
+          <OperationalForm
             container={container}
             isAdmin={isAdmin ?? false}
             isOperationsUser={isOperationsUser ?? false}
@@ -1660,21 +900,10 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             isTerminalManager={isTerminalManager ?? false}
             isDeliveryUser={isDeliveryUser ?? false}
           />
-
           <PaarPanel
             container={container}
             isAdmin={isAdmin ?? false}
           />
-
-          {/* ── Shipping Operations ────────────────────────────────────── */}
-          {(isAdmin || isOperationsUser) && (
-            <ShippingSection container={container} />
-          )}
-
-          {/* ── Terminal Operations ────────────────────────────────────── */}
-          {(isAdmin || isOperationsUser) && (
-            <TerminalSection container={container} />
-          )}
         </div>
 
         <div className="space-y-4">
@@ -1715,6 +944,31 @@ export default function OperationDetailPage({ params }: { params: { id: string }
                   })}
                 </span>
               </div>
+              {container.stageOwner && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Stage Owner</span>
+                  <span className="text-foreground/80 truncate max-w-[120px] text-right">
+                    {container.stageOwner}
+                  </span>
+                </div>
+              )}
+              {container.nextActionDueDate && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Action Due</span>
+                  <span
+                    className={
+                      new Date(container.nextActionDueDate) < new Date()
+                        ? "text-red-400 font-medium"
+                        : "text-foreground/80"
+                    }
+                  >
+                    {new Date(container.nextActionDueDate).toLocaleDateString(
+                      "en-NG",
+                      { day: "numeric", month: "short" }
+                    )}
+                  </span>
+                </div>
+              )}
               {container.delayReason && (
                 <>
                   <Separator className="my-1 bg-border/30" />

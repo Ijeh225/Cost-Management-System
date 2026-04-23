@@ -26,7 +26,6 @@ export const containersTable = pgTable("containers", {
   nextAction: text("next_action"),
   nextActionDueDate: timestamp("next_action_due_date"),
   delayReason: text("delay_reason"),
-  internalNote: text("internal_note"),
   deliveryTime: text("delivery_time"),
   deliveryLocation: text("delivery_location"),
   truckNumber: text("truck_number"),

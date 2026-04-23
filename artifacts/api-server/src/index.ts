@@ -96,13 +96,6 @@ async function runStartupMigrations() {
       }
     });
 
-    await runMigration("add_internal_note_column_to_containers", async () => {
-      await pool.query(
-        `ALTER TABLE containers ADD COLUMN IF NOT EXISTS internal_note text`
-      );
-      console.log("[migration] Added internal_note column to containers (if not exists).");
-    });
-
     await runMigration("backfill_delivered_at_for_completed_containers", async () => {
       const updated = await db.update(containersTable)
         .set({
