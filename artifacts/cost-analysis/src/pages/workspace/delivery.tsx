@@ -1,13 +1,22 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
-import { useGetPipeline, useAdvanceContainerStatus } from "@workspace/api-client-react";
+import {
+  useGetPipeline, useAdvanceContainerStatus,
+  useGetContainerExtraCharges, useCreateContainerExtraCharge,
+  useUpdateContainerExtraCharge, useDeleteContainerExtraCharge,
+  type ContainerExtraCharge,
+} from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { getStatusColor, WORKFLOW_STAGES } from "@/lib/format";
+import { formatCurrency, getStatusColor, WORKFLOW_STAGES } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, Search, Truck, ChevronRight, Clock, SendHorizonal, CheckCircle2, Inbox } from "lucide-react";
+import {
+  Loader2, Search, Truck, ChevronRight, Clock, SendHorizonal,
+  CheckCircle2, Inbox, ChevronDown, ChevronUp, Plus, Pencil,
+  Trash2, Save, X, Receipt,
+} from "lucide-react";
 
 const DEPT_STAGES = ["delivery"];
 
@@ -24,6 +33,261 @@ function DaysChip({ days }: { days: number }) {
     <span className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-2 py-0.5 ${color}`}>
       <Clock className="w-2.5 h-2.5" />{days}d
     </span>
+  );
+}
+
+function DeliveryExpensesPanel({ containerId }: { containerId: number }) {
+  const { toast } = useToast();
+  const { data: allExtra = [], isLoading } = useGetContainerExtraCharges(containerId);
+  const createMutation = useCreateContainerExtraCharge(containerId);
+  const updateMutation = useUpdateContainerExtraCharge(containerId);
+  const deleteMutation = useDeleteContainerExtraCharge(containerId);
+
+  const rows = allExtra.filter((r: ContainerExtraCharge) => r.section === "delivery");
+  const total = rows.reduce((s: number, r: ContainerExtraCharge) => s + (r.amount ?? 0), 0);
+
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+
+  const handleAdd = () => {
+    if (!newLabel.trim()) {
+      toast({ variant: "destructive", title: "Description is required" });
+      return;
+    }
+    createMutation.mutate(
+      { section: "delivery", label: newLabel.trim(), amount: parseFloat(newAmount) || 0 },
+      {
+        onSuccess: () => { setAdding(false); setNewLabel(""); setNewAmount(""); },
+        onError: (err) => toast({ variant: "destructive", title: "Failed to add expense", description: err instanceof Error ? err.message : "Error" }),
+      }
+    );
+  };
+
+  const handleUpdate = (id: number) => {
+    updateMutation.mutate(
+      { rowId: id, label: editLabel.trim(), amount: parseFloat(editAmount) || 0 },
+      {
+        onSuccess: () => setEditingId(null),
+        onError: (err) => toast({ variant: "destructive", title: "Failed to update", description: err instanceof Error ? err.message : "Error" }),
+      }
+    );
+  };
+
+  const handleDelete = (id: number) => {
+    deleteMutation.mutate(id, {
+      onError: (err) => toast({ variant: "destructive", title: "Failed to delete", description: err instanceof Error ? err.message : "Error" }),
+    });
+  };
+
+  return (
+    <div className="border-t border-border/40 mt-0 pt-4 px-4 pb-4 bg-muted/20">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Receipt className="w-3.5 h-3.5 text-teal-400" />
+          <span className="text-xs font-semibold text-foreground uppercase tracking-wider">Delivery / Transport Expenses</span>
+          {rows.length > 0 && (
+            <span className="text-[10px] bg-teal-500/15 text-teal-400 border border-teal-500/30 rounded-full px-1.5 py-0.5 font-medium">
+              {rows.length} {rows.length === 1 ? "entry" : "entries"}
+            </span>
+          )}
+        </div>
+        {total > 0 && (
+          <span className="text-xs font-semibold text-teal-400 font-mono">{formatCurrency(total)}</span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {rows.length === 0 && !adding && (
+            <p className="text-xs text-muted-foreground/60 italic py-1">No expenses recorded yet. Add one below.</p>
+          )}
+
+          {rows.map((row: ContainerExtraCharge) => (
+            <div key={row.id} className="flex items-center gap-2 text-sm">
+              {editingId === row.id ? (
+                <>
+                  <Input
+                    value={editLabel}
+                    onChange={e => setEditLabel(e.target.value)}
+                    placeholder="Description"
+                    className="h-7 text-xs flex-1 bg-background border-border/60"
+                  />
+                  <Input
+                    value={editAmount}
+                    onChange={e => setEditAmount(e.target.value)}
+                    placeholder="0.00"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="h-7 text-xs w-28 bg-background border-border/60 font-mono"
+                  />
+                  <Button
+                    size="sm"
+                    className="h-7 px-2 gap-1 text-xs"
+                    onClick={() => handleUpdate(row.id)}
+                    disabled={updateMutation.isPending}
+                  >
+                    {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs text-muted-foreground"
+                    onClick={() => setEditingId(null)}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 text-xs text-foreground truncate">{row.label}</span>
+                  <span className="text-xs font-mono text-foreground shrink-0">{formatCurrency(row.amount ?? 0)}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => { setEditingId(row.id); setEditLabel(row.label); setEditAmount(String(row.amount ?? 0)); }}
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(row.id)}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </>
+              )}
+            </div>
+          ))}
+
+          {adding ? (
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/30">
+              <Input
+                value={newLabel}
+                onChange={e => setNewLabel(e.target.value)}
+                placeholder="e.g. Truck hire, Driver allowance…"
+                className="h-7 text-xs flex-1 bg-background border-border/60"
+                onKeyDown={e => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAdding(false); setNewLabel(""); setNewAmount(""); } }}
+                autoFocus
+              />
+              <Input
+                value={newAmount}
+                onChange={e => setNewAmount(e.target.value)}
+                placeholder="0.00"
+                type="number"
+                min="0"
+                step="0.01"
+                className="h-7 text-xs w-28 bg-background border-border/60 font-mono"
+                onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
+              />
+              <Button
+                size="sm"
+                className="h-7 px-2 gap-1 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+                onClick={handleAdd}
+                disabled={createMutation.isPending}
+              >
+                {createMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                Save
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs text-muted-foreground"
+                onClick={() => { setAdding(false); setNewLabel(""); setNewAmount(""); }}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setAdding(true); setNewLabel(""); setNewAmount(""); }}
+              className="mt-2 flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add expense
+            </button>
+          )}
+
+          {rows.length > 0 && (
+            <div className="flex items-center justify-between pt-2 mt-1 border-t border-border/30">
+              <span className="text-xs text-muted-foreground">Total Delivery Expenses</span>
+              <span className="text-xs font-semibold font-mono text-foreground">{formatCurrency(total)}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContainerJobCard({
+  c,
+  isClose,
+  stage,
+  onSubmit,
+  isSubmitting,
+}: {
+  c: { id: number; containerNumber: string; blNumber?: string | null; customerName: string; daysInStage: number };
+  isClose: boolean;
+  stage: string;
+  onSubmit: () => void;
+  isSubmitting: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="overflow-hidden border-border/60">
+      <div className="p-4 flex items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm font-mono">{c.containerNumber}</span>
+            <span className="text-muted-foreground text-xs font-mono">BL: {c.blNumber}</span>
+            <DaysChip days={c.daysInStage} />
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">{c.customerName}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors ${
+              expanded
+                ? "border-teal-500/40 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20"
+                : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
+            }`}
+          >
+            <Receipt className="w-3 h-3" />
+            Expenses
+            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+          <Link href={`/operations/${c.id}`}>
+            <Button size="sm" variant="ghost" className="gap-1 text-xs">
+              View Job <ChevronRight className="w-3 h-3" />
+            </Button>
+          </Link>
+          <Button
+            size="sm"
+            className={`gap-1 text-xs ${isClose ? "bg-emerald-600 hover:bg-emerald-700" : "bg-teal-600 hover:bg-teal-700"}`}
+            onClick={onSubmit}
+            disabled={isSubmitting}
+          >
+            {isClose ? <CheckCircle2 className="w-3 h-3" /> : <SendHorizonal className="w-3 h-3" />}
+            {STAGE_SUBMIT_LABEL[stage]}
+          </Button>
+        </div>
+      </div>
+      {expanded && <DeliveryExpensesPanel containerId={c.id} />}
+    </Card>
   );
 }
 
@@ -124,35 +388,14 @@ export default function DeliveryWorkspace() {
                 ) : (
                   <div className="space-y-2">
                     {containers.map(c => (
-                      <Card key={c.id} className="p-4 flex items-center gap-4 hover:bg-accent/30 transition-colors">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm font-mono">{c.containerNumber}</span>
-                            <span className="text-muted-foreground text-xs font-mono">BL: {c.blNumber}</span>
-                            <DaysChip days={c.daysInStage} />
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">{c.customerName}</p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Link href={`/operations/${c.id}`}>
-                            <Button size="sm" variant="ghost" className="gap-1 text-xs">
-                              View Job <ChevronRight className="w-3 h-3" />
-                            </Button>
-                          </Link>
-                          <Button
-                            size="sm"
-                            className={`gap-1 text-xs ${isClose ? "bg-emerald-600 hover:bg-emerald-700" : "bg-teal-600 hover:bg-teal-700"}`}
-                            onClick={() => handleSubmit(c)}
-                            disabled={advance.isPending}
-                          >
-                            {isClose
-                              ? <CheckCircle2 className="w-3 h-3" />
-                              : <SendHorizonal className="w-3 h-3" />
-                            }
-                            {STAGE_SUBMIT_LABEL[stage]}
-                          </Button>
-                        </div>
-                      </Card>
+                      <ContainerJobCard
+                        key={c.id}
+                        c={c}
+                        isClose={isClose}
+                        stage={stage}
+                        onSubmit={() => handleSubmit(c)}
+                        isSubmitting={advance.isPending}
+                      />
                     ))}
                   </div>
                 )}
