@@ -622,8 +622,9 @@ function ChargeSectionForm({
 
   const approvalStatus = approval?.status ?? "draft";
   const effectivelyLocked = isRecordLocked || isSectionLocked;
-  const canEdit = isEditable && !effectivelyLocked && approvalStatus !== "approved";
-  const canSubmit = isEditable && !effectivelyLocked && (approvalStatus === "draft" || approvalStatus === "rejected");
+  // Admins (admin + super_admin) can always edit regardless of section/record locks or approval status
+  const canEdit = isEditable && (isAdmin || (!effectivelyLocked && approvalStatus !== "approved"));
+  const canSubmit = isEditable && (isAdmin || !effectivelyLocked) && (approvalStatus === "draft" || approvalStatus === "rejected");
 
   const onSubmit = (data: any) => {
     updateMutation.mutate(
