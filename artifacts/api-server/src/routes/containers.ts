@@ -28,7 +28,7 @@ function canUserEditSection(
   return true;
 }
 
-function formatContainer(c: any, staffName?: string | null, clientName?: string | null) {
+function formatContainer(c: any, staffName?: string | null, clientName?: string | null, berthingConfirmedByName?: string | null) {
   let lockedSections: string[] = [];
   try { lockedSections = JSON.parse(c.lockedSections ?? "[]"); } catch {}
   return {
@@ -73,7 +73,8 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     consignee: c.consignee ?? null,
     berthed: c.berthed ?? false,
     berthingConfirmedAt: c.berthingConfirmedAt instanceof Date ? c.berthingConfirmedAt.toISOString() : (c.berthingConfirmedAt ?? null),
-    berthingConfirmedBy: c.berthingConfirmedBy ?? null,
+    berthingConfirmedById: c.berthingConfirmedById ?? null,
+    berthingConfirmedByName: berthingConfirmedByName ?? null,
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
   };
@@ -186,9 +187,9 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     if (status && status !== "all") {
       conditions.push(eq(containersTable.status, status));
     }
-    if (berthedFilter === "berthed") {
+    if (berthedFilter === "true") {
       conditions.push(eq(containersTable.berthed, true));
-    } else if (berthedFilter === "unberthed") {
+    } else if (berthedFilter === "false") {
       conditions.push(eq(containersTable.berthed, false));
     }
     if (conditions.length > 0) {
@@ -353,6 +354,11 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
       }
       const customerName = row.customerName || "";
       try {
+        let etaDate: Date | null = null;
+        if (row.eta) {
+          const parsed = new Date(row.eta);
+          if (!isNaN(parsed.getTime())) etaDate = parsed;
+        }
         const [container] = await db.insert(containersTable).values({
           customerName,
           containerNumber: row.containerNumber,
@@ -362,6 +368,8 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
           vessel: row.vessel ?? "",
           clearingCharges: String(row.clearingCharges ?? 0),
           clientId: linkedClientId,
+          eta: etaDate,
+          consignee: row.consignee ?? null,
         }).returning();
         await getOrCreateCharges(container.id);
         created++;
@@ -601,7 +609,7 @@ router.post("/containers/:id/verify", requireAdmin, async (req: AuthRequest, res
   }
 });
 
-router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthRequest, res) => {
+router.post("/containers/:id/confirm-berthing", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
@@ -609,10 +617,11 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
       res.status(404).json({ error: "Container not found" });
       return;
     }
-    const confirmedBy = req.user!.name ?? req.user!.email ?? "Unknown";
+    const confirmedByUserId = req.user!.id;
+    const confirmedByName = req.user!.name ?? req.user!.email ?? "Unknown";
     const now = new Date();
     const [updated] = await db.update(containersTable)
-      .set({ berthed: true, berthingConfirmedAt: now, berthingConfirmedBy: confirmedBy, updatedAt: now })
+      .set({ berthed: true, berthingConfirmedAt: now, berthingConfirmedById: confirmedByUserId, updatedAt: now })
       .where(eq(containersTable.id, id))
       .returning();
     await db.insert(auditLogTable).values({
@@ -620,7 +629,7 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
       userId: req.user!.id,
       action: "berthing_confirmed",
       section: "basic_info",
-      reason: `Vessel berthing confirmed by ${confirmedBy}`,
+      reason: `Vessel berthing confirmed by ${confirmedByName}`,
     });
     const { sendWhatsApp } = req.body;
     let whatsappResult: { success: boolean; sid?: string; error?: string } | null = null;
@@ -659,6 +668,11 @@ router.get("/containers/:id", requireAuth, async (req, res) => {
       const [client] = await db.select({ name: clientsTable.name }).from(clientsTable).where(eq(clientsTable.id, c.clientId));
       clientName = client?.name ?? null;
     }
+    let berthingConfirmedByName: string | null = null;
+    if (c.berthingConfirmedById) {
+      const [bcu] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, c.berthingConfirmedById));
+      berthingConfirmedByName = bcu?.name ?? null;
+    }
     const charges = await getOrCreateCharges(id);
     const extraChargeRows = await db.select().from(containerExtraChargesTable)
       .where(eq(containerExtraChargesTable.containerId, id))
@@ -668,7 +682,7 @@ router.get("/containers/:id", requireAuth, async (req, res) => {
     const dutyNotPaid = parseFloat(charges.customs.dutyNotPaid ?? "0");
 
     const containerFormatted = {
-      ...formatContainer(c, staffName, clientName),
+      ...formatContainer(c, staffName, clientName, berthingConfirmedByName),
       totalCost,
       grossProfit: parseFloat(c.clearingCharges ?? "0") - totalCost,
       dutyNotPaid,

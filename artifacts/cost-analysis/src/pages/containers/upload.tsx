@@ -23,17 +23,17 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 const SAMPLE_ROWS = [
-  { "CUSTOMER NAME": "Dangote Industries Ltd",  "CON": "MSCU1234567", "B/LADING": "MSC0012345", "DECLARATION": "ND20251001", "SIZE": "40FT",  "VESSEL": "MSC ANNA"     },
-  { "CUSTOMER NAME": "Nestlé Nigeria Plc",       "CON": "HLCU8765432", "B/LADING": "HLC0056789", "DECLARATION": "ND20251002", "SIZE": "20FT",  "VESSEL": "HAPAG SPIRIT" },
-  { "CUSTOMER NAME": "BUA Cement Plc",           "CON": "CMAU5553210", "B/LADING": "CMA0078901", "DECLARATION": "ND20251003", "SIZE": "40FT",  "VESSEL": "CMA KALAHARI"},
-  { "CUSTOMER NAME": "Guinness Nigeria Plc",     "CON": "MAEU3214567", "B/LADING": "MAE0034567", "DECLARATION": "ND20251004", "SIZE": "40HC",  "VESSEL": "MAERSK ESSEX"},
+  { "CUSTOMER NAME": "Dangote Industries Ltd",  "CON": "MSCU1234567", "B/LADING": "MSC0012345", "DECLARATION": "ND20251001", "SIZE": "40FT",  "VESSEL": "MSC ANNA",      "ETA": "2025-06-15", "CONSIGNEE": "Dangote Industries Ltd"  },
+  { "CUSTOMER NAME": "Nestlé Nigeria Plc",       "CON": "HLCU8765432", "B/LADING": "HLC0056789", "DECLARATION": "ND20251002", "SIZE": "20FT",  "VESSEL": "HAPAG SPIRIT",  "ETA": "2025-06-20", "CONSIGNEE": "Nestlé Nigeria Plc"      },
+  { "CUSTOMER NAME": "BUA Cement Plc",           "CON": "CMAU5553210", "B/LADING": "CMA0078901", "DECLARATION": "ND20251003", "SIZE": "40FT",  "VESSEL": "CMA KALAHARI",  "ETA": "",           "CONSIGNEE": ""                        },
+  { "CUSTOMER NAME": "Guinness Nigeria Plc",     "CON": "MAEU3214567", "B/LADING": "MAE0034567", "DECLARATION": "ND20251004", "SIZE": "40HC",  "VESSEL": "MAERSK ESSEX",  "ETA": "2025-07-01", "CONSIGNEE": "Guinness Nigeria Plc"    },
 ];
-const COLUMNS = ["CUSTOMER NAME", "CON", "B/LADING", "DECLARATION", "SIZE", "VESSEL"];
+const COLUMNS = ["CUSTOMER NAME", "CON", "B/LADING", "DECLARATION", "SIZE", "VESSEL", "ETA", "CONSIGNEE"];
 
 function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(SAMPLE_ROWS, { header: COLUMNS });
-  ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 20 }];
+  ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 20 }, { wch: 14 }, { wch: 28 }];
   XLSX.utils.book_append_sheet(wb, ws, "Containers");
   XLSX.writeFile(wb, "container_upload_template.xlsx");
 }
@@ -181,7 +181,7 @@ export default function UploadPage() {
         const customerName =
           mode === "client" && selectedClient
             ? selectedClient.name
-            : getVal(["customername", "customer", "consignee"]);
+            : getVal(["customername", "customer name", "customer"]);
 
         mapped.push({
           customerName: customerName ?? "",
@@ -191,6 +191,8 @@ export default function UploadPage() {
           size:            getVal(["size", "containersize"]),
           vessel:          getVal(["vessel", "ship"]),
           clearingCharges: Number(getVal(["clearingcharges", "agreedclearing"])) || 0,
+          eta:             getVal(["eta", "arrivaldate", "arrival_date"]) ?? undefined,
+          consignee:       getVal(["consignee", "recipient"]) ?? undefined,
         });
       });
 

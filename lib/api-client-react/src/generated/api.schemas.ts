@@ -139,7 +139,8 @@ export interface Container {
   consignee?: string | null;
   berthed?: boolean;
   berthingConfirmedAt?: string | null;
-  berthingConfirmedBy?: string | null;
+  berthingConfirmedById?: number | null;
+  berthingConfirmedByName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -194,6 +195,8 @@ export interface UploadRow {
   size?: string;
   vessel?: string;
   clearingCharges?: number;
+  eta?: string;
+  consignee?: string;
 }
 
 export interface UploadContainersRequest {

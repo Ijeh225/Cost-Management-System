@@ -43,7 +43,7 @@ export const containersTable = pgTable("containers", {
   consignee: text("consignee"),
   berthed: boolean("berthed").notNull().default(false),
   berthingConfirmedAt: timestamp("berthing_confirmed_at"),
-  berthingConfirmedBy: text("berthing_confirmed_by"),
+  berthingConfirmedById: integer("berthing_confirmed_by_id").references(() => usersTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

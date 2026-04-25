@@ -151,9 +151,9 @@ async function computeAlerts(userId?: number) {
           ? `ETA passed ${overdueDays} day${overdueDays === 1 ? "" : "s"} ago — confirm if vessel has berthed: ${c.containerNumber} (${c.customerName})`
           : `Vessel ETA is today — confirm berthing when vessel arrives: ${c.containerNumber} (${c.customerName})`;
         alerts.push({
-          alertKey: `eta_berthing_${c.id}`,
-          type: "eta_berthing",
-          severity: overdueDays > 0 ? "warning" : "info",
+          alertKey: `berthing_${c.id}`,
+          type: "berthing_confirmation_needed",
+          severity: "warning",
           message,
           containerId: c.id,
           containerNumber: c.containerNumber,

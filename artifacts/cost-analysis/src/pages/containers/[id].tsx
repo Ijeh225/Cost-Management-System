@@ -1482,7 +1482,7 @@ export default function ContainerDetail() {
                   <p className="text-xs font-mono text-muted-foreground uppercase mb-1">Berthing Confirmed</p>
                   <p className="text-sm text-green-400">
                     {new Date(container.berthingConfirmedAt).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    {container.berthingConfirmedBy && <span className="text-muted-foreground"> by {container.berthingConfirmedBy}</span>}
+                    {container.berthingConfirmedByName && <span className="text-muted-foreground"> by {container.berthingConfirmedByName}</span>}
                   </p>
                 </div>
               )}

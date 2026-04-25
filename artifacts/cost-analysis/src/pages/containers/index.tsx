@@ -310,8 +310,8 @@ export default function Containers() {
                       <SelectTrigger className="h-8 text-xs bg-background border-border/60"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Containers</SelectItem>
-                        <SelectItem value="berthed">Berthed</SelectItem>
-                        <SelectItem value="unberthed">Not Yet Berthed</SelectItem>
+                        <SelectItem value="true">Berthed</SelectItem>
+                        <SelectItem value="false">Not Yet Berthed</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
