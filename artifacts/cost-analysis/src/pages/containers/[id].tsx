@@ -19,6 +19,7 @@ import {
   useGetBuiltinExtras,
   type BuiltinExtraField,
   useVerifyContainer,
+  useConfirmBerthing,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -843,6 +844,8 @@ export default function ContainerDetail() {
   const [editSectionsOpen, setEditSectionsOpen] = useState(false);
   const [invoiceDialog, setInvoiceDialog] = useState(false);
   const [showEditDetails, setShowEditDetails] = useState(false);
+  const [berthingConfirmStep, setBerthingConfirmStep] = useState<"idle" | "confirm">("idle");
+  const confirmBerthingMutation = useConfirmBerthing();
   const [, setLocation] = useLocation();
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [trackingData, setTrackingData] = useState<TrackingResult | null>(null);
@@ -1279,6 +1282,8 @@ export default function ContainerDetail() {
             size: container.size ?? "",
             declaration: container.declaration ?? "",
             clearingCharges: Number(container.clearingCharges) ?? 0,
+            eta: container.eta ?? null,
+            consignee: container.consignee ?? null,
           }}
           onSaved={() => queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] })}
         />
@@ -1325,13 +1330,106 @@ export default function ContainerDetail() {
         </div>
       )}
 
+      {container.eta && !container.berthed && container.status !== "closed" && (() => {
+        const etaDate = new Date(container.eta);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const etaDay = new Date(etaDate); etaDay.setHours(0, 0, 0, 0);
+        const isEtaArrived = etaDay <= today;
+        if (!isEtaArrived) return null;
+        const overdueDays = Math.floor((today.getTime() - etaDay.getTime()) / (1000 * 60 * 60 * 24));
+        return (
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 flex items-center gap-4">
+            <Anchor className="w-5 h-5 text-blue-400 shrink-0" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-blue-400 text-sm">
+                {overdueDays > 0
+                  ? `ETA passed ${overdueDays} day${overdueDays === 1 ? "" : "s"} ago — Confirm Berthing`
+                  : "Vessel ETA Is Today — Confirm Berthing"}
+              </h4>
+              <p className="text-xs text-blue-300/70 mt-0.5">
+                Has the vessel berthed at the terminal? Confirm to update records
+                {container.clientId ? " and optionally notify the client via WhatsApp." : "."}
+              </p>
+            </div>
+            {berthingConfirmStep === "idle" ? (
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 gap-1.5"
+                onClick={() => setBerthingConfirmStep("confirm")}
+              >
+                <Anchor className="w-3.5 h-3.5" />
+                Confirm Berthing
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-blue-300">
+                  {container.clientId ? "Notify client via WhatsApp?" : "Confirm berthing?"}
+                </span>
+                {container.clientId && (
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+                    disabled={confirmBerthingMutation.isPending}
+                    onClick={async () => {
+                      try {
+                        const res = await confirmBerthingMutation.mutateAsync({ id: containerId, sendWhatsApp: true });
+                        const wa = res.whatsappResult;
+                        toast({
+                          title: "Berthing Confirmed",
+                          description: wa?.success
+                            ? "WhatsApp notification sent to client."
+                            : `Berthing recorded. WhatsApp failed: ${wa?.error ?? "unknown error"}`,
+                        });
+                        setBerthingConfirmStep("idle");
+                      } catch (err) {
+                        toast({ variant: "destructive", title: "Failed", description: err instanceof Error ? err.message : "Could not confirm berthing" });
+                      }
+                    }}
+                  >
+                    {confirmBerthingMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    Yes + Notify
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-blue-500/40 text-blue-400 hover:bg-blue-500/10 gap-1.5"
+                  disabled={confirmBerthingMutation.isPending}
+                  onClick={async () => {
+                    try {
+                      await confirmBerthingMutation.mutateAsync({ id: containerId, sendWhatsApp: false });
+                      toast({ title: "Berthing Confirmed", description: "Berthing recorded without client notification." });
+                      setBerthingConfirmStep("idle");
+                    } catch (err) {
+                      toast({ variant: "destructive", title: "Failed", description: err instanceof Error ? err.message : "Could not confirm berthing" });
+                    }
+                  }}
+                >
+                  {confirmBerthingMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                  {container.clientId ? "Yes, No Notify" : "Confirm"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  onClick={() => setBerthingConfirmStep("idle")}
+                  disabled={confirmBerthingMutation.isPending}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Hero Summary */}
       <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg overflow-hidden relative">
         <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
           <Anchor className="w-48 h-48" />
         </div>
         <CardContent className="p-6 relative z-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4">
             <div>
               <p className="text-xs font-mono text-muted-foreground uppercase mb-1">Customer</p>
               <p className="font-semibold text-foreground text-lg">{container.customerName}</p>
@@ -1352,6 +1450,44 @@ export default function ContainerDetail() {
               </p>
             </div>
           </div>
+          {(container.eta || container.consignee) && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4 pt-4 border-t border-border/20">
+              {container.eta && (
+                <div>
+                  <p className="text-xs font-mono text-muted-foreground uppercase mb-1">ETA</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className={`font-medium text-sm ${container.berthed ? "text-green-400" : "text-foreground"}`}>
+                      {new Date(container.eta).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" })}
+                    </p>
+                    {container.berthed ? (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-green-400 bg-green-500/10 border border-green-500/30 rounded-full px-1.5 py-0.5">
+                        <CheckCircle2 className="w-2.5 h-2.5" /> Berthed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-full px-1.5 py-0.5">
+                        <Anchor className="w-2.5 h-2.5" /> Awaiting
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {container.consignee && (
+                <div>
+                  <p className="text-xs font-mono text-muted-foreground uppercase mb-1">Consignee</p>
+                  <p className="font-medium text-foreground text-sm">{container.consignee}</p>
+                </div>
+              )}
+              {container.berthed && container.berthingConfirmedAt && (
+                <div className="col-span-2">
+                  <p className="text-xs font-mono text-muted-foreground uppercase mb-1">Berthing Confirmed</p>
+                  <p className="text-sm text-green-400">
+                    {new Date(container.berthingConfirmedAt).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    {container.berthingConfirmedBy && <span className="text-muted-foreground"> by {container.berthingConfirmedBy}</span>}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           {/* Delivery Date Row */}
           <div className="border-t border-border/30 pt-4 mb-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">

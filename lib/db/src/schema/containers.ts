@@ -39,6 +39,11 @@ export const containersTable = pgTable("containers", {
   paarOfficer: text("paar_officer"),
   paarReleasedAt: timestamp("paar_released_at"),
   paarDelayReason: text("paar_delay_reason"),
+  eta: timestamp("eta"),
+  consignee: text("consignee"),
+  berthed: boolean("berthed").notNull().default(false),
+  berthingConfirmedAt: timestamp("berthing_confirmed_at"),
+  berthingConfirmedBy: text("berthing_confirmed_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -33,6 +33,8 @@ interface ContainerBasicInfo {
   size: string;
   declaration: string;
   clearingCharges: number;
+  eta?: string | null;
+  consignee?: string | null;
 }
 
 interface EditContainerDetailsDialogProps {
@@ -57,16 +59,23 @@ export function EditContainerDetailsDialog({
     size: "",
     declaration: "",
     clearingCharges: "",
+    eta: "",
+    consignee: "",
   });
 
   useEffect(() => {
     if (open) {
+      const etaVal = container.eta
+        ? new Date(container.eta).toISOString().split("T")[0]
+        : "";
       setForm({
         customerName: container.customerName,
         vessel: container.vessel ?? "",
         size: container.size ?? "",
         declaration: container.declaration ?? "",
         clearingCharges: container.clearingCharges > 0 ? String(container.clearingCharges) : "",
+        eta: etaVal,
+        consignee: container.consignee ?? "",
       });
     }
   }, [open, container]);
@@ -92,6 +101,8 @@ export function EditContainerDetailsDialog({
           size: form.size === NO_SIZE ? "" : form.size,
           declaration: form.declaration.trim(),
           clearingCharges: charges,
+          eta: form.eta || null,
+          consignee: form.consignee.trim() || null,
         },
       });
       toast({ title: "Container details updated" });
@@ -163,6 +174,27 @@ export function EditContainerDetailsDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-eta">ETA (Expected Arrival)</Label>
+              <Input
+                id="edit-eta"
+                type="date"
+                value={form.eta}
+                onChange={(e) => set("eta")(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-consignee">Consignee Name</Label>
+              <Input
+                id="edit-consignee"
+                value={form.consignee}
+                onChange={(e) => set("consignee")(e.target.value)}
+                placeholder="e.g. Dangote Industries Ltd"
+              />
             </div>
           </div>
 

@@ -135,6 +135,11 @@ export interface Container {
   paarOfficer?: string | null;
   paarReleasedAt?: string | null;
   paarDelayReason?: string | null;
+  eta?: string | null;
+  consignee?: string | null;
+  berthed?: boolean;
+  berthingConfirmedAt?: string | null;
+  berthingConfirmedBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -155,6 +160,8 @@ export interface CreateContainerRequest {
   vessel?: string;
   clearingCharges?: number;
   clientId?: number | null;
+  eta?: string | null;
+  consignee?: string | null;
 }
 
 export interface UpdateContainerRequest {
@@ -175,6 +182,8 @@ export interface UpdateContainerRequest {
   paarOfficer?: string | null;
   paarReleasedAt?: string | null;
   paarDelayReason?: string | null;
+  eta?: string | null;
+  consignee?: string | null;
 }
 
 export interface UploadRow {
@@ -722,6 +731,7 @@ export interface IntelligenceResponse {
 export type ListContainersParams = {
   search?: string;
   status?: string;
+  berthed?: string;
   page?: number;
   limit?: number;
 };

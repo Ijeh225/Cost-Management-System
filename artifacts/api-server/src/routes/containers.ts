@@ -69,6 +69,11 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     paarOfficer: c.paarOfficer ?? null,
     paarReleasedAt: c.paarReleasedAt instanceof Date ? c.paarReleasedAt.toISOString() : (c.paarReleasedAt ?? null),
     paarDelayReason: c.paarDelayReason ?? null,
+    eta: c.eta instanceof Date ? c.eta.toISOString() : (c.eta ?? null),
+    consignee: c.consignee ?? null,
+    berthed: c.berthed ?? false,
+    berthingConfirmedAt: c.berthingConfirmedAt instanceof Date ? c.berthingConfirmedAt.toISOString() : (c.berthingConfirmedAt ?? null),
+    berthingConfirmedBy: c.berthingConfirmedBy ?? null,
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
   };
@@ -143,6 +148,7 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
   try {
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
+    const berthedFilter = req.query.berthed as string | undefined;
     const page = parseInt((req.query.page as string) ?? "1");
     const limit = Math.min(parseInt((req.query.limit as string) ?? "20"), 1000);
     const offset = (page - 1) * limit;
@@ -179,6 +185,11 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     }
     if (status && status !== "all") {
       conditions.push(eq(containersTable.status, status));
+    }
+    if (berthedFilter === "berthed") {
+      conditions.push(eq(containersTable.berthed, true));
+    } else if (berthedFilter === "unberthed") {
+      conditions.push(eq(containersTable.berthed, false));
     }
     if (conditions.length > 0) {
       const where = conditions.length === 1 ? conditions[0] : and(...conditions);
@@ -260,7 +271,7 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
 
 router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const { customerName, containerNumber, blNumber, declaration, size, vessel, clearingCharges, clientId } = req.body;
+    const { customerName, containerNumber, blNumber, declaration, size, vessel, clearingCharges, clientId, eta, consignee } = req.body;
     if (!customerName || !containerNumber || !blNumber) {
       res.status(400).json({ error: "customerName, containerNumber, blNumber are required" });
       return;
@@ -274,6 +285,8 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       vessel: vessel ?? "",
       clearingCharges: String(clearingCharges ?? 0),
       clientId: clientId ? Number(clientId) : null,
+      eta: eta ? new Date(eta) : null,
+      consignee: consignee || null,
     }).returning();
     await getOrCreateCharges(container.id);
     res.status(201).json(formatContainer(container));
@@ -588,6 +601,46 @@ router.post("/containers/:id/verify", requireAdmin, async (req: AuthRequest, res
   }
 });
 
+router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Container not found" });
+      return;
+    }
+    const confirmedBy = req.user!.name ?? req.user!.email ?? "Unknown";
+    const now = new Date();
+    const [updated] = await db.update(containersTable)
+      .set({ berthed: true, berthingConfirmedAt: now, berthingConfirmedBy: confirmedBy, updatedAt: now })
+      .where(eq(containersTable.id, id))
+      .returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "berthing_confirmed",
+      section: "basic_info",
+      reason: `Vessel berthing confirmed by ${confirmedBy}`,
+    });
+    const { sendWhatsApp } = req.body;
+    let whatsappResult: { success: boolean; sid?: string; error?: string } | null = null;
+    if (sendWhatsApp && existing.clientId) {
+      const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, existing.clientId));
+      if (client?.phone) {
+        const { toE164Nigerian, sendViaTwilio } = await import("../lib/whatsapp.js");
+        const phone = toE164Nigerian(client.phone);
+        const vesselInfo = existing.vessel ? ` (Vessel: ${existing.vessel})` : "";
+        const message = `Hello! We're pleased to inform you that the vessel carrying your container ${existing.containerNumber}${vesselInfo} has berthed at the terminal. Clearing is now underway. — Cost Analysis Team`;
+        whatsappResult = await sendViaTwilio(phone, message);
+      }
+    }
+    res.json({ container: formatContainer(updated), whatsappResult });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 router.get("/containers/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -669,7 +722,7 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       res.status(403).json({ error: "Container is locked" });
       return;
     }
-    const { customerName, containerNumber, blNumber, declaration, size, vessel, status, assignedStaffId, clearingCharges, deliveredAt } = req.body;
+    const { customerName, containerNumber, blNumber, declaration, size, vessel, status, assignedStaffId, clearingCharges, deliveredAt, eta, consignee } = req.body;
     const updates: any = { updatedAt: new Date() };
     if (customerName !== undefined) updates.customerName = customerName;
     if (containerNumber !== undefined) updates.containerNumber = containerNumber;
@@ -684,6 +737,8 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       updates.deliveredAt = deliveredAt ? new Date(deliveredAt) : null;
       updates.deliveredAtEstimated = false;
     }
+    if (eta !== undefined) updates.eta = eta ? new Date(eta) : null;
+    if (consignee !== undefined) updates.consignee = consignee || null;
 
     const [updated] = await db.update(containersTable).set(updates).where(eq(containersTable.id, id)).returning();
 
@@ -715,6 +770,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       deliveryTime, deliveryLocation, truckNumber, driverName, driverPhone,
       dispatchOfficer, deliveryStatus, offloadingConfirmed, emptyReturnDueDate, emptyReturnDate,
       paarOfficer, paarReleasedAt, paarDelayReason,
+      eta, consignee,
     } = req.body;
     if (deliveredAt !== undefined && deliveredAt !== null) {
       if (typeof deliveredAt !== "string" || !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(deliveredAt) || isNaN(new Date(deliveredAt).getTime())) {
@@ -795,6 +851,14 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (paarDelayReason !== undefined) {
       updates.paarDelayReason = paarDelayReason || null;
       if (paarDelayReason) changed.push(`PAAR Delay: "${paarDelayReason}"`);
+    }
+    if (eta !== undefined) {
+      updates.eta = eta ? new Date(eta as string) : null;
+      changed.push("ETA updated");
+    }
+    if (consignee !== undefined) {
+      updates.consignee = consignee || null;
+      changed.push(`Consignee: "${consignee || "cleared"}"`);
     }
     if (Object.keys(updates).length === 1) {
       res.status(400).json({ error: "No valid fields to update" });

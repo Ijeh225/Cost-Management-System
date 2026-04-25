@@ -45,6 +45,8 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
     vessel: "",
     clearingCharges: "",
     clientId: NO_CLIENT,
+    eta: "",
+    consignee: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -77,6 +79,8 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
           ...(form.vessel.trim() && { vessel: form.vessel.trim() }),
           ...(charges && { clearingCharges: charges }),
           clientId: form.clientId !== NO_CLIENT ? Number(form.clientId) : null,
+          ...(form.eta && { eta: form.eta }),
+          ...(form.consignee.trim() && { consignee: form.consignee.trim() }),
         },
       });
       toast({ title: "Container created", description: `${container.containerNumber} has been added.` });
@@ -99,6 +103,8 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
         vessel: "",
         clearingCharges: "",
         clientId: NO_CLIENT,
+        eta: "",
+        consignee: "",
       });
       setErrors({});
     }
@@ -190,6 +196,26 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="eta">ETA (Expected Arrival)</Label>
+              <Input
+                id="eta"
+                type="date"
+                value={form.eta}
+                onChange={(e) => set("eta")(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="consignee">Consignee Name</Label>
+              <Input
+                id="consignee"
+                placeholder="e.g. Dangote Industries Ltd"
+                value={form.consignee}
+                onChange={(e) => set("consignee")(e.target.value)}
+              />
             </div>
 
             <div className="col-span-2 space-y-1.5">

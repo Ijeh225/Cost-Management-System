@@ -216,6 +216,32 @@ export function useUpdatePaar() {
   });
 }
 
+export type ConfirmBerthingRequest = {
+  sendWhatsApp?: boolean;
+};
+
+export type ConfirmBerthingResponse = {
+  container: import("./generated/api.schemas").Container;
+  whatsappResult: { success: boolean; sid?: string; error?: string } | null;
+};
+
+export function useConfirmBerthing() {
+  const qc = useQueryClient();
+  return useMutation<ConfirmBerthingResponse, Error, { id: number } & ConfirmBerthingRequest>({
+    mutationFn: ({ id, ...data }) =>
+      customFetch<ConfirmBerthingResponse>(`/api/containers/${id}/confirm-berthing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["/api/containers"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
 export type CheckDuplicatesRequest = {
   containerNumbers: string[];
   blNumbers: string[];

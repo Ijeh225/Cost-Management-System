@@ -51,7 +51,9 @@ async function computeAlerts(userId?: number) {
     const isActionOverdue = nextActionDueDate !== null && nextActionDueDate.getTime() < startOfToday.getTime() && c.status !== "closed";
     const emptyReturnDueDate = c.emptyReturnDueDate ? new Date(c.emptyReturnDueDate) : null;
     const emptyReturnDate = c.emptyReturnDate ? new Date(c.emptyReturnDate) : null;
-    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue, emptyReturnDueDate, emptyReturnDate };
+    const eta = c.eta ? new Date(c.eta) : null;
+    const berthed = c.berthed ?? false;
+    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue, emptyReturnDueDate, emptyReturnDate, eta, berthed };
   });
 
   const totals = containerData.reduce((acc, c) => ({ terminal: acc.terminal + c.terminalCost, delivery: acc.delivery + c.deliveryCost }), { terminal: 0, delivery: 0 });
@@ -132,6 +134,27 @@ async function computeAlerts(userId?: number) {
           type: "empty_return_overdue",
           severity: "warning",
           message: `Empty container return overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}: ${c.containerNumber} (${c.customerName}) — empty return not yet recorded`,
+          containerId: c.id,
+          containerNumber: c.containerNumber,
+          generatedAt: now,
+        });
+      }
+    }
+  }
+
+  for (const c of containerData) {
+    if (c.eta && !c.berthed && c.status !== "closed") {
+      const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
+      if (c.eta.getTime() <= startOfToday.getTime() + 24 * 60 * 60 * 1000) {
+        const overdueDays = Math.floor((startOfToday.getTime() - c.eta.getTime()) / (1000 * 60 * 60 * 24));
+        const message = overdueDays > 0
+          ? `ETA passed ${overdueDays} day${overdueDays === 1 ? "" : "s"} ago — confirm if vessel has berthed: ${c.containerNumber} (${c.customerName})`
+          : `Vessel ETA is today — confirm berthing when vessel arrives: ${c.containerNumber} (${c.customerName})`;
+        alerts.push({
+          alertKey: `eta_berthing_${c.id}`,
+          type: "eta_berthing",
+          severity: overdueDays > 0 ? "warning" : "info",
+          message,
           containerId: c.id,
           containerNumber: c.containerNumber,
           generatedAt: now,
