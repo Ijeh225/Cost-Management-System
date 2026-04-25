@@ -609,7 +609,11 @@ router.post("/containers/:id/verify", requireAdmin, async (req: AuthRequest, res
   }
 });
 
-router.post("/containers/:id/confirm-berthing", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthRequest, res) => {
+  const userRole = req.user?.role;
+  if (userRole !== "admin" && userRole !== "super_admin" && userRole !== "operations_user") {
+    return res.status(403).json({ error: "Only admin and operations users can confirm berthing." });
+  }
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));

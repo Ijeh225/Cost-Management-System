@@ -145,8 +145,10 @@ async function computeAlerts(userId?: number) {
   for (const c of containerData) {
     if (c.eta && !c.berthed && c.status !== "closed") {
       const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
-      if (c.eta.getTime() <= startOfToday.getTime() + 24 * 60 * 60 * 1000) {
-        const overdueDays = Math.floor((startOfToday.getTime() - c.eta.getTime()) / (1000 * 60 * 60 * 24));
+      const startOfTomorrow = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+      const etaDay = new Date(c.eta); etaDay.setUTCHours(0, 0, 0, 0);
+      if (etaDay.getTime() < startOfTomorrow.getTime()) {
+        const overdueDays = Math.floor((startOfToday.getTime() - etaDay.getTime()) / (1000 * 60 * 60 * 24));
         const message = overdueDays > 0
           ? `ETA passed ${overdueDays} day${overdueDays === 1 ? "" : "s"} ago — confirm if vessel has berthed: ${c.containerNumber} (${c.customerName})`
           : `Vessel ETA is today — confirm berthing when vessel arrives: ${c.containerNumber} (${c.customerName})`;

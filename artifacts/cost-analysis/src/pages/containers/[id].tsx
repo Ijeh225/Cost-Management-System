@@ -824,7 +824,7 @@ function AuditTrail({ containerId }: { containerId: number }) {
 export default function ContainerDetail() {
   const { id } = useParams();
   const containerId = Number(id);
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isOperationsUser, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("charges");
@@ -1330,7 +1330,7 @@ export default function ContainerDetail() {
         </div>
       )}
 
-      {container.eta && !container.berthed && container.status !== "closed" && (() => {
+      {(isAdmin || isOperationsUser) && container.eta && !container.berthed && container.status !== "closed" && (() => {
         const etaDate = new Date(container.eta);
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const etaDay = new Date(etaDate); etaDay.setHours(0, 0, 0, 0);
