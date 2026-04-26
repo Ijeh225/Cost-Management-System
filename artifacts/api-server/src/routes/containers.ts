@@ -75,6 +75,8 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     berthingConfirmedAt: c.berthingConfirmedAt instanceof Date ? c.berthingConfirmedAt.toISOString() : (c.berthingConfirmedAt ?? null),
     berthingConfirmedById: c.berthingConfirmedById ?? null,
     berthingConfirmedByName: berthingConfirmedByName ?? null,
+    verifiedAt: c.verifiedAt instanceof Date ? c.verifiedAt.toISOString() : (c.verifiedAt ?? null),
+    verifiedBy: c.verifiedBy ?? null,
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
   };

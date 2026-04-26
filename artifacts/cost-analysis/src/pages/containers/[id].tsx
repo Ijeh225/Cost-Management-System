@@ -1157,6 +1157,7 @@ export default function ContainerDetail() {
   };
 
   const isSectionEditable = (sectionKey: string) => {
+    if (isAdmin) return true;
     if (!container.verifiedAt) return false;
     return canEditSectionGranular(sectionKey, isAdmin, userSectionPermissions, userSectionPermission);
   };
