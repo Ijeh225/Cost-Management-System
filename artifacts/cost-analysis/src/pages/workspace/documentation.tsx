@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, Search, FileCheck2, ChevronRight, Clock, SendHorizonal, Inbox } from "lucide-react";
+import { Loader2, Search, FileCheck2, ChevronRight, Clock, SendHorizonal, Inbox, CheckCircle2 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CompletedJobsView } from "@/components/workspace/completed-jobs-view";
 
 const DEPT_STAGES = ["registered", "documentation", "duty_assessment"];
 
@@ -82,6 +84,17 @@ export default function DocumentationWorkspace() {
         )}
       </div>
 
+      <Tabs defaultValue="active" className="w-full">
+        <TabsList className="grid grid-cols-2 w-full sm:w-auto sm:inline-grid">
+          <TabsTrigger value="active" className="gap-1.5">
+            <FileCheck2 className="w-3.5 h-3.5" /> Active
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Submitted
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active" className="space-y-6 mt-6">
       <div className="relative">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
@@ -159,6 +172,16 @@ export default function DocumentationWorkspace() {
           })}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="completed" className="mt-6">
+          <CompletedJobsView
+            deptStages={DEPT_STAGES}
+            emptyTitle="No jobs submitted yet"
+            emptySubtitle="Once you submit a job onward, it will show up here so you can review or update its expenses."
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

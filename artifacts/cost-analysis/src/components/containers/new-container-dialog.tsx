@@ -53,9 +53,38 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
   const set = (field: keyof typeof form) => (value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  const handleClientChange = (clientId: string) => {
+    setForm((prev) => {
+      const next = { ...prev, clientId };
+      if (clientId !== NO_CLIENT) {
+        const picked = (clients ?? []).find((c) => String(c.id) === clientId);
+        if (picked && !prev.customerName.trim()) {
+          next.customerName = picked.name;
+        }
+      }
+      return next;
+    });
+    setErrors((prev) => {
+      if (!prev.customerName) return prev;
+      const { customerName, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const resolveCustomerName = () => {
+    if (form.customerName.trim()) return form.customerName.trim();
+    if (form.clientId !== NO_CLIENT) {
+      const picked = (clients ?? []).find((c) => String(c.id) === form.clientId);
+      if (picked) return picked.name;
+    }
+    return "";
+  };
+
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.customerName.trim()) e.customerName = "Customer name is required";
+    if (!resolveCustomerName()) {
+      e.customerName = "Customer name is required (or pick a client to auto-fill)";
+    }
     if (!form.containerNumber.trim()) e.containerNumber = "Container number is required";
     if (!form.blNumber.trim()) e.blNumber = "B/L number is required";
     setErrors(e);
@@ -67,11 +96,12 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
     if (!validate()) return;
 
     const charges = parseFloat(form.clearingCharges.replace(/,/g, "")) || 0;
+    const customerName = resolveCustomerName();
 
     try {
       const container = await createMutation.mutateAsync({
         data: {
-          customerName: form.customerName.trim(),
+          customerName,
           containerNumber: form.containerNumber.trim().toUpperCase(),
           blNumber: form.blNumber.trim(),
           ...(form.declaration.trim() && { declaration: form.declaration.trim() }),
@@ -244,7 +274,7 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
 
             <div className="space-y-1.5">
               <Label htmlFor="client">Link to Client</Label>
-              <Select value={form.clientId} onValueChange={set("clientId")}>
+              <Select value={form.clientId} onValueChange={handleClientChange}>
                 <SelectTrigger id="client">
                   <SelectValue placeholder="None (optional)" />
                 </SelectTrigger>

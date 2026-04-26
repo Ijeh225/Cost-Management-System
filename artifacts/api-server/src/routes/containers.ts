@@ -187,7 +187,12 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
       conditions.push(ne(containersTable.status, "pending_verification"));
     }
     if (status && status !== "all") {
-      conditions.push(eq(containersTable.status, status));
+      const parts = status.split(",").map(s => s.trim()).filter(Boolean);
+      if (parts.length > 1) {
+        conditions.push(inArray(containersTable.status, parts));
+      } else if (parts.length === 1) {
+        conditions.push(eq(containersTable.status, parts[0]));
+      }
     }
     if (berthedFilter === "true") {
       conditions.push(eq(containersTable.berthed, true));
@@ -275,19 +280,35 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
 router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { customerName, containerNumber, blNumber, declaration, size, vessel, clearingCharges, clientId, eta, consignee } = req.body;
-    if (!customerName || !containerNumber || !blNumber) {
-      res.status(400).json({ error: "customerName, containerNumber, blNumber are required" });
+    const trimmedCustomer = typeof customerName === "string" ? customerName.trim() : "";
+    const parsedClientId = clientId ? Number(clientId) : null;
+    if (!containerNumber || !blNumber) {
+      res.status(400).json({ error: "containerNumber and blNumber are required" });
+      return;
+    }
+    let resolvedCustomerName = trimmedCustomer;
+    if (!resolvedCustomerName && parsedClientId) {
+      const [linkedClient] = await db
+        .select({ name: clientsTable.name })
+        .from(clientsTable)
+        .where(eq(clientsTable.id, parsedClientId));
+      if (linkedClient?.name) {
+        resolvedCustomerName = linkedClient.name;
+      }
+    }
+    if (!resolvedCustomerName) {
+      res.status(400).json({ error: "customerName is required (or pick a client to auto-fill)" });
       return;
     }
     const [container] = await db.insert(containersTable).values({
-      customerName,
+      customerName: resolvedCustomerName,
       containerNumber,
       blNumber,
       declaration: declaration ?? "",
       size: size ?? "",
       vessel: vessel ?? "",
       clearingCharges: String(clearingCharges ?? 0),
-      clientId: clientId ? Number(clientId) : null,
+      clientId: parsedClientId,
       eta: eta ? new Date(eta) : null,
       consignee: consignee || null,
     }).returning();

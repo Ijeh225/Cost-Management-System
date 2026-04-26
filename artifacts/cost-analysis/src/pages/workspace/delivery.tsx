@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CompletedJobsView } from "@/components/workspace/completed-jobs-view";
 import {
   Loader2, Search, Truck, ChevronRight, Clock, SendHorizonal,
   CheckCircle2, Inbox, ChevronDown, ChevronUp, Plus, Pencil,
@@ -439,6 +441,17 @@ export default function DeliveryWorkspace() {
         )}
       </div>
 
+      <Tabs defaultValue="active" className="w-full">
+        <TabsList className="grid grid-cols-2 w-full sm:w-auto sm:inline-grid">
+          <TabsTrigger value="active" className="gap-1.5">
+            <Truck className="w-3.5 h-3.5" /> Active
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Closed Jobs
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active" className="space-y-6 mt-6">
       <div className="relative">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
@@ -499,6 +512,16 @@ export default function DeliveryWorkspace() {
           })}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="completed" className="mt-6">
+          <CompletedJobsView
+            deptStages={DEPT_STAGES}
+            emptyTitle="No closed deliveries yet"
+            emptySubtitle="Once you mark a delivery as closed, it will appear here. You can still update its expenses anytime."
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

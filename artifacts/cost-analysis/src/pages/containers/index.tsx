@@ -15,10 +15,20 @@ import {
   Search, ChevronLeft, ChevronRight,
   AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown,
   X, Filter, Trash2, Loader2, Plus, ShieldCheck, FileCheck2, Clock,
+  Download, FileText,
 } from "lucide-react";
 import { getShippingLine } from "@/lib/tracking";
 import { motion, AnimatePresence } from "framer-motion";
 import { NewContainerDialog } from "@/components/containers/new-container-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportContainersToExcel, exportContainersToPdf } from "@/lib/exportContainers";
 
 type SortField = "containerNumber" | "customerName" | "declaration" | "status" | "clearingCharges" | "totalCost" | "grossProfit";
 type SortDir = "asc" | "desc";
@@ -269,6 +279,60 @@ export default function Containers() {
                 Filters
                 {hasActiveFilters && <Badge className="ml-0.5 h-4 px-1 text-[10px] leading-none bg-primary/30 text-primary border-0">!</Badge>}
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 shrink-0"
+                    disabled={sorted.length === 0}
+                    title={sorted.length === 0 ? "No rows to export" : `Download ${sorted.length} row${sorted.length === 1 ? "" : "s"}`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Download
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                    Export {sorted.length} filtered row{sorted.length === 1 ? "" : "s"}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      try {
+                        exportContainersToExcel(sorted, "containers");
+                        toast({ title: `Exported ${sorted.length} container${sorted.length === 1 ? "" : "s"} to Excel` });
+                      } catch (err: any) {
+                        toast({ variant: "destructive", title: "Export failed", description: err?.message ?? "Unknown error" });
+                      }
+                    }}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+                    <div className="flex-1">
+                      <div className="text-sm">Excel (.xlsx)</div>
+                      <div className="text-[10px] text-muted-foreground">Spreadsheet with all columns</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      try {
+                        exportContainersToPdf(sorted, "containers");
+                        toast({ title: `Exported ${sorted.length} container${sorted.length === 1 ? "" : "s"} to PDF` });
+                      } catch (err: any) {
+                        toast({ variant: "destructive", title: "Export failed", description: err?.message ?? "Unknown error" });
+                      }
+                    }}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <FileText className="w-4 h-4 text-red-500" />
+                    <div className="flex-1">
+                      <div className="text-sm">PDF (.pdf)</div>
+                      <div className="text-[10px] text-muted-foreground">Printable document</div>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
