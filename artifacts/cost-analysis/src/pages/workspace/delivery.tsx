@@ -1,21 +1,31 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   useGetPipeline, useAdvanceContainerStatus,
+  useGetContainer, useUpdateContainerCharges,
   useGetContainerExtraCharges, useCreateContainerExtraCharge,
   useUpdateContainerExtraCharge, useDeleteContainerExtraCharge,
+  useGetSettings, BUILT_IN_SECTION_DEFAULTS,
+  getBuiltInFieldLabel, isBuiltInFieldHidden,
   type ContainerExtraCharge,
+  type UpdateContainerChargesRequestSection,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/layout/auth-provider";
+import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, getStatusColor, WORKFLOW_STAGES } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import {
   Loader2, Search, Truck, ChevronRight, Clock, SendHorizonal,
   CheckCircle2, Inbox, ChevronDown, ChevronUp, Plus, Pencil,
-  Trash2, Save, X, Receipt,
+  Trash2, Save, X, Receipt, Lock,
 } from "lucide-react";
 
 const DEPT_STAGES = ["delivery"];
@@ -23,6 +33,29 @@ const DEPT_STAGES = ["delivery"];
 const STAGE_SUBMIT_LABEL: Record<string, string> = {
   delivery: "Mark as Closed",
 };
+
+const DELIVERY_FIELDS = [
+  "passingOfTruck",
+  "passingOfTruckForEmptyReturn",
+  "parkingForPullout",
+  "pullout",
+  "delivery",
+  "emptyReturn",
+  "unchainingTruck",
+  "emptyCallUp",
+  "pulloutExpenses",
+  "transferToIkorodu",
+  "transportAllowance",
+] as const;
+
+const deliverySchema = z.object(
+  Object.fromEntries(
+    DELIVERY_FIELDS.map((f) => [
+      f,
+      z.coerce.number({ invalid_type_error: "Must be a number" }).min(0, "Must be ≥ 0").default(0),
+    ])
+  ) as Record<string, z.ZodTypeAny>
+);
 
 function DaysChip({ days }: { days: number }) {
   const color =
@@ -36,15 +69,14 @@ function DaysChip({ days }: { days: number }) {
   );
 }
 
-function DeliveryExpensesPanel({ containerId }: { containerId: number }) {
+function CustomLineItems({ containerId, canEdit }: { containerId: number; canEdit: boolean }) {
   const { toast } = useToast();
-  const { data: allExtra = [], isLoading } = useGetContainerExtraCharges(containerId);
+  const { data: allExtra = [] } = useGetContainerExtraCharges(containerId);
   const createMutation = useCreateContainerExtraCharge(containerId);
   const updateMutation = useUpdateContainerExtraCharge(containerId);
   const deleteMutation = useDeleteContainerExtraCharge(containerId);
 
   const rows = allExtra.filter((r: ContainerExtraCharge) => r.section === "delivery");
-  const total = rows.reduce((s: number, r: ContainerExtraCharge) => s + (r.amount ?? 0), 0);
 
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -62,7 +94,7 @@ function DeliveryExpensesPanel({ containerId }: { containerId: number }) {
       { section: "delivery", label: newLabel.trim(), amount: parseFloat(newAmount) || 0 },
       {
         onSuccess: () => { setAdding(false); setNewLabel(""); setNewAmount(""); },
-        onError: (err) => toast({ variant: "destructive", title: "Failed to add expense", description: err instanceof Error ? err.message : "Error" }),
+        onError: (err) => toast({ variant: "destructive", title: "Failed to add", description: err instanceof Error ? err.message : "Error" }),
       }
     );
   };
@@ -84,149 +116,212 @@ function DeliveryExpensesPanel({ containerId }: { containerId: number }) {
   };
 
   return (
-    <div className="border-t border-border/40 mt-0 pt-4 px-4 pb-4 bg-muted/20">
+    <div className="pt-4 border-t border-border/40">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Receipt className="w-3.5 h-3.5 text-teal-400" />
-          <span className="text-xs font-semibold text-foreground uppercase tracking-wider">Delivery / Transport Expenses</span>
-          {rows.length > 0 && (
-            <span className="text-[10px] bg-teal-500/15 text-teal-400 border border-teal-500/30 rounded-full px-1.5 py-0.5 font-medium">
-              {rows.length} {rows.length === 1 ? "entry" : "entries"}
-            </span>
-          )}
-        </div>
-        {total > 0 && (
-          <span className="text-xs font-semibold text-teal-400 font-mono">{formatCurrency(total)}</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Custom Line Items</span>
+        {canEdit && !adding && (
+          <button
+            onClick={() => { setAdding(true); setNewLabel(""); setNewAmount(""); }}
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Line Item
+          </button>
         )}
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-4">
-          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {rows.length === 0 && !adding && (
-            <p className="text-xs text-muted-foreground/60 italic py-1">No expenses recorded yet. Add one below.</p>
-          )}
+      <div className="space-y-1.5">
+        {rows.length === 0 && !adding && (
+          <p className="text-xs text-muted-foreground/60 italic py-1">No custom line items.</p>
+        )}
 
-          {rows.map((row: ContainerExtraCharge) => (
-            <div key={row.id} className="flex items-center gap-2 text-sm">
-              {editingId === row.id ? (
-                <>
-                  <Input
-                    value={editLabel}
-                    onChange={e => setEditLabel(e.target.value)}
-                    placeholder="Description"
-                    className="h-7 text-xs flex-1 bg-background border-border/60"
-                  />
-                  <Input
-                    value={editAmount}
-                    onChange={e => setEditAmount(e.target.value)}
-                    placeholder="0.00"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="h-7 text-xs w-28 bg-background border-border/60 font-mono"
-                  />
-                  <Button
-                    size="sm"
-                    className="h-7 px-2 gap-1 text-xs"
-                    onClick={() => handleUpdate(row.id)}
-                    disabled={updateMutation.isPending}
-                  >
-                    {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-xs text-muted-foreground"
-                    onClick={() => setEditingId(null)}
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <span className="flex-1 text-xs text-foreground truncate">{row.label}</span>
-                  <span className="text-xs font-mono text-foreground shrink-0">{formatCurrency(row.amount ?? 0)}</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => { setEditingId(row.id); setEditLabel(row.label); setEditAmount(String(row.amount ?? 0)); }}
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(row.id)}
-                    disabled={deleteMutation.isPending}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </>
+        {rows.map((row: ContainerExtraCharge) => (
+          <div key={row.id} className="flex items-center gap-2 text-sm">
+            {editingId === row.id ? (
+              <>
+                <Input value={editLabel} onChange={e => setEditLabel(e.target.value)} placeholder="Description" className="h-8 text-xs flex-1 bg-background border-border/60" />
+                <Input value={editAmount} onChange={e => setEditAmount(e.target.value)} placeholder="0.00" type="number" min="0" step="0.01" className="h-8 text-xs w-32 bg-background border-border/60 font-mono" />
+                <Button size="sm" className="h-8 px-2 gap-1 text-xs" onClick={() => handleUpdate(row.id)} disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-muted-foreground" onClick={() => setEditingId(null)}>
+                  <X className="w-3 h-3" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-xs text-foreground truncate">{row.label}</span>
+                <span className="text-xs font-mono text-foreground shrink-0">{formatCurrency(row.amount ?? 0)}</span>
+                {canEdit && (
+                  <>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => { setEditingId(row.id); setEditLabel(row.label); setEditAmount(String(row.amount ?? 0)); }}>
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(row.id)} disabled={deleteMutation.isPending}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+
+        {adding && (
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/30">
+            <Input
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              placeholder="e.g. Truck hire, Driver allowance…"
+              className="h-8 text-xs flex-1 bg-background border-border/60"
+              onKeyDown={e => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAdding(false); setNewLabel(""); setNewAmount(""); } }}
+              autoFocus
+            />
+            <Input value={newAmount} onChange={e => setNewAmount(e.target.value)} placeholder="0.00" type="number" min="0" step="0.01" className="h-8 text-xs w-32 bg-background border-border/60 font-mono" onKeyDown={e => { if (e.key === "Enter") handleAdd(); }} />
+            <Button size="sm" className="h-8 px-2 gap-1 text-xs bg-teal-600 hover:bg-teal-700 text-white" onClick={handleAdd} disabled={createMutation.isPending}>
+              {createMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-muted-foreground" onClick={() => { setAdding(false); setNewLabel(""); setNewAmount(""); }}>
+              <X className="w-3 h-3" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DeliveryChargesPanel({ containerId }: { containerId: number }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
+  const { data: containerData, isLoading } = useGetContainer(containerId);
+  const { data: settings } = useGetSettings();
+  const { data: allExtra = [] } = useGetContainerExtraCharges(containerId);
+  const updateMutation = useUpdateContainerCharges();
+
+  const container = containerData?.container;
+  const charges = containerData?.charges;
+  const sectionApprovals = (containerData?.sectionApprovals ?? []) as Array<{ section: string; status: string }>;
+  const deliveryApproval = sectionApprovals.find((a) => a.section === "delivery");
+  const approvalStatus = deliveryApproval?.status ?? "draft";
+
+  const lockedSections: string[] = (container?.lockedSections as string[] | undefined) ?? [];
+  const isSectionLocked = lockedSections.includes("delivery");
+  const isRecordLocked = !!container?.isLocked;
+  const effectivelyLocked = isRecordLocked || isSectionLocked;
+  const canEdit = isAdmin || (!effectivelyLocked && approvalStatus !== "approved");
+
+  const sectionSettings = (settings ?? {}) as Record<string, string>;
+  const initialData = (charges?.delivery ?? {}) as Record<string, number>;
+
+  const form = useForm({
+    resolver: zodResolver(deliverySchema),
+    defaultValues: Object.fromEntries(DELIVERY_FIELDS.map((f) => [f, Number(initialData[f] ?? 0)])),
+  });
+
+  useEffect(() => {
+    form.reset(Object.fromEntries(DELIVERY_FIELDS.map((f) => [f, Number(initialData[f] ?? 0)])));
+  }, [JSON.stringify(initialData)]);
+
+  const visibleFields = DELIVERY_FIELDS.filter((f) => !isBuiltInFieldHidden(sectionSettings, "delivery", f));
+
+  const baseTotal = visibleFields.reduce((sum, f) => sum + Number(initialData[f] ?? 0), 0);
+  const extraTotal = allExtra.filter((r: ContainerExtraCharge) => r.section === "delivery").reduce((s: number, r: ContainerExtraCharge) => s + (r.amount ?? 0), 0);
+  const total = baseTotal + extraTotal;
+
+  const onSubmit = (data: Record<string, number>) => {
+    updateMutation.mutate(
+      { id: containerId, data: { section: "delivery" as UpdateContainerChargesRequestSection, delivery: data, reason: "Updated from Deliveries workspace" } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+          form.reset(data);
+          toast({ title: "Delivery & Transport saved", description: "Changes are now reflected in the Account Summary." });
+        },
+        onError: (err: any) => toast({ variant: "destructive", title: "Save failed", description: err?.message ?? "Something went wrong" }),
+      }
+    );
+  };
+
+  if (isLoading || !container || !charges) {
+    return (
+      <div className="border-t border-border/40 px-4 py-6 bg-muted/20 flex items-center justify-center">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const isDirty = form.formState.isDirty;
+
+  return (
+    <div className="border-t border-border/40 px-4 pt-4 pb-5 bg-muted/20">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Receipt className="w-4 h-4 text-teal-400" />
+          <span className="text-sm font-semibold text-foreground">{sectionSettings.delivery ?? BUILT_IN_SECTION_DEFAULTS.delivery ?? "Delivery & Transport"}</span>
+          {effectivelyLocked && (
+            <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px] py-0 px-1.5">
+              <Lock className="w-3 h-3 mr-1" /> Locked
+            </Badge>
+          )}
+        </div>
+        <span className="text-sm font-semibold text-teal-400 font-mono">{formatCurrency(total)}</span>
+      </div>
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-3">
+            {visibleFields.map((field) => (
+              <FormField key={field} control={form.control} name={field} render={({ field: ff }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-muted-foreground">
+                    {getBuiltInFieldLabel(sectionSettings, "delivery", field)}
+                  </FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
+                      <Input
+                        type="number"
+                        {...ff}
+                        disabled={!canEdit || updateMutation.isPending}
+                        className="pl-7 font-mono text-sm bg-background/50 border-border/60 disabled:opacity-70 h-9"
+                        onFocus={(e) => e.target.select()}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            ))}
+          </div>
+
+          <CustomLineItems containerId={containerId} canEdit={canEdit} />
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/40">
+            <div className="text-xs text-muted-foreground">
+              {!canEdit && (
+                <span className="italic">
+                  {approvalStatus === "approved" ? "Approved — section locked" : effectivelyLocked ? "Section locked" : "Read-only"}
+                </span>
               )}
             </div>
-          ))}
-
-          {adding ? (
-            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/30">
-              <Input
-                value={newLabel}
-                onChange={e => setNewLabel(e.target.value)}
-                placeholder="e.g. Truck hire, Driver allowance…"
-                className="h-7 text-xs flex-1 bg-background border-border/60"
-                onKeyDown={e => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAdding(false); setNewLabel(""); setNewAmount(""); } }}
-                autoFocus
-              />
-              <Input
-                value={newAmount}
-                onChange={e => setNewAmount(e.target.value)}
-                placeholder="0.00"
-                type="number"
-                min="0"
-                step="0.01"
-                className="h-7 text-xs w-28 bg-background border-border/60 font-mono"
-                onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
-              />
-              <Button
-                size="sm"
-                className="h-7 px-2 gap-1 text-xs bg-teal-600 hover:bg-teal-700 text-white"
-                onClick={handleAdd}
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                Save
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-xs text-muted-foreground"
-                onClick={() => { setAdding(false); setNewLabel(""); setNewAmount(""); }}
-              >
-                <X className="w-3 h-3" />
-              </Button>
-            </div>
-          ) : (
-            <button
-              onClick={() => { setAdding(true); setNewLabel(""); setNewAmount(""); }}
-              className="mt-2 flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add expense
-            </button>
-          )}
-
-          {rows.length > 0 && (
-            <div className="flex items-center justify-between pt-2 mt-1 border-t border-border/30">
-              <span className="text-xs text-muted-foreground">Total Delivery Expenses</span>
-              <span className="text-xs font-semibold font-mono text-foreground">{formatCurrency(total)}</span>
-            </div>
-          )}
-        </div>
-      )}
+            {canEdit && isDirty && (
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => form.reset()} disabled={updateMutation.isPending}>
+                  Discard
+                </Button>
+                <Button type="submit" size="sm" className="h-8 text-xs bg-teal-600 hover:bg-teal-700 text-white" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                  Save Changes
+                </Button>
+              </div>
+            )}
+          </div>
+        </form>
+      </Form>
     </div>
   );
 }
@@ -286,7 +381,7 @@ function ContainerJobCard({
           </Button>
         </div>
       </div>
-      {expanded && <DeliveryExpensesPanel containerId={c.id} />}
+      {expanded && <DeliveryChargesPanel containerId={c.id} />}
     </Card>
   );
 }
