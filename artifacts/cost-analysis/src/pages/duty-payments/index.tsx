@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import {
   useListDutyPayments,
   useRecordDutyPayment,
+  listDutyPayments,
   type DutyPaymentRow,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -205,6 +206,38 @@ export default function DutyPaymentsPage() {
   const total   = data?.total   ?? 0;
   const pages   = Math.max(1, Math.ceil(total / limit));
   const hasFilters = statusFilter !== "all" || dateFrom || dateTo;
+  const [exporting, setExporting] = useState(false);
+
+  // Fetch every filtered row across pages (capped at API max of 500) for export.
+  async function fetchAllFilteredRows(): Promise<DutyPaymentRow[]> {
+    const resp = await listDutyPayments({
+      page: 1,
+      limit: 500,
+      ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+      ...(debounced               ? { search: debounced }   : {}),
+      ...(dateFrom                ? { dateFrom }            : {}),
+      ...(dateTo                  ? { dateTo }              : {}),
+    });
+    return resp?.rows ?? [];
+  }
+
+  async function handleExport(kind: "excel" | "pdf") {
+    setExporting(true);
+    try {
+      const all = await fetchAllFilteredRows();
+      if (all.length === 0) {
+        toast({ variant: "destructive", title: "Nothing to export", description: "No rows match the current filters." });
+        return;
+      }
+      if (kind === "excel") exportRowsToExcel(all);
+      else                  exportRowsToPdf(all);
+      toast({ title: `${kind === "excel" ? "Excel" : "PDF"} exported`, description: `${all.length} row${all.length === 1 ? "" : "s"}` });
+    } catch (e: unknown) {
+      toast({ variant: "destructive", title: "Export failed", description: e instanceof Error ? e.message : "Export error" });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   if (!allowed) {
     return (
@@ -296,36 +329,38 @@ export default function DutyPaymentsPage() {
                     size="sm"
                     variant="outline"
                     className="gap-1.5 shrink-0"
-                    disabled={rows.length === 0}
+                    disabled={total === 0 || exporting}
                     data-testid="button-download"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    Download
+                    {exporting ? "Exporting…" : "Download"}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                    Export {rows.length} row{rows.length === 1 ? "" : "s"}
+                    Export {total} filtered row{total === 1 ? "" : "s"}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => { try { exportRowsToExcel(rows); toast({ title: "Excel exported" }); } catch (e: unknown) { toast({ variant: "destructive", title: "Export failed", description: e instanceof Error ? e.message : "Export error" }); } }}
+                    onClick={() => { void handleExport("excel"); }}
                     className="gap-2 cursor-pointer"
+                    data-testid="menuitem-export-excel"
                   >
                     <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
                     <div className="flex-1">
                       <div className="text-sm">Excel (.xlsx)</div>
-                      <div className="text-[10px] text-muted-foreground">Spreadsheet</div>
+                      <div className="text-[10px] text-muted-foreground">All filtered rows</div>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => { try { exportRowsToPdf(rows); toast({ title: "PDF exported" }); } catch (e: unknown) { toast({ variant: "destructive", title: "Export failed", description: e instanceof Error ? e.message : "Export error" }); } }}
+                    onClick={() => { void handleExport("pdf"); }}
                     className="gap-2 cursor-pointer"
+                    data-testid="menuitem-export-pdf"
                   >
                     <FileText className="w-4 h-4 text-red-500" />
                     <div className="flex-1">
                       <div className="text-sm">PDF (.pdf)</div>
-                      <div className="text-[10px] text-muted-foreground">Printable</div>
+                      <div className="text-[10px] text-muted-foreground">All filtered rows</div>
                     </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
