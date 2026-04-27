@@ -185,6 +185,19 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
     return;
   }
 
+  // paymentDate is optional, but if provided must be a parseable date string.
+  let paymentDateClean: string | null = null;
+  if (paymentDate != null && String(paymentDate).trim() !== "") {
+    const raw = String(paymentDate).trim();
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) {
+      res.status(400).json({ error: "Invalid paymentDate (expected ISO date)" });
+      return;
+    }
+    // Normalise to YYYY-MM-DD for the audit trail.
+    paymentDateClean = d.toISOString().slice(0, 10);
+  }
+
   try {
     const result = await db.transaction(async (tx) => {
       const [container] = await tx.select({
@@ -243,7 +256,7 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
         .returning();
 
       const reasonParts: string[] = [];
-      if (paymentDate) reasonParts.push(`date=${paymentDate}`);
+      if (paymentDateClean) reasonParts.push(`date=${paymentDateClean}`);
       if (notes && String(notes).trim()) reasonParts.push(String(notes).trim());
 
       await tx.insert(auditLogTable).values({
