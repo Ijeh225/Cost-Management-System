@@ -1,0 +1,44 @@
+#90 - Documentation Workspace Centralization & Pipeline Cleanup
+What & Why
+The documentation team currently has to split their work across two pages: their workspace (for the submit button) and the Operations pipeline detail page (to update stage owner, PAAR details, due dates, and delay notes). This creates friction and duplicate navigation.
+
+The goal is to make the Documentation workspace fully self-contained — all fields the team needs are editable directly from the workspace. No switching to Operations required. Changes save to the same database and automatically reflect everywhere else (pipeline board, container detail, Duty Payments).
+
+Additionally, the Operations Pipeline board shows a "Registered" column that adds noise — it should be hidden since actionable work only begins at the Documentation stage.
+
+Done looks like
+Operations Pipeline
+The pipeline board no longer shows a "Registered" column or filter chip. The registered stage stays in the workflow logic but is hidden from the visual board.
+Documentation Workspace — inline editing
+Each container card is expandable (click card or expand icon) to reveal an inline edit panel with:
+Stage Owner — person responsible for this container at this stage
+PAAR Number — the PAAR reference/document number (new field; stored in the database)
+PAAR ETA — expected date the PAAR will be ready (this is the "Next Action Due Date" field, relabelled in the documentation context to make its purpose clear; shown in red when overdue)
+PAAR Release Date — actual date PAAR was released (filled in once available)
+PAAR Delay Reason — optional note if PAAR is delayed
+Delay Reason — general stage blocker note
+Assessment Amount (₦) — shown only for containers at the duty_assessment stage; required before submitting to Accounts; pre-fills from any existing customs duty value
+A Save Changes button saves all edited fields without leaving the workspace.
+The Submit to [next stage] button sits in the same expanded card, no page switch needed.
+When submitting from duty_assessment, the assessment amount is saved to the container's Custom Duties & Tax section before the stage advances. An audit log entry is written. The Duty Payments page immediately reflects the amount under "Duty Assessed."
+Workspace filtering & export
+A search bar at the top of the page filters containers by Container #, BL #, or customer name.
+A stage filter lets the user view "All", "Documentation only", or "Duty Assessment only" containers.
+A Download button exports the current visible list (respecting active filters) to Excel. Columns: Container #, BL #, Customer, Stage, PAAR Number, PAAR ETA, PAAR Release Date, Delay Reason, Days in Stage.
+Out of scope
+Removing registered from the workflow stage order or the database — column hidden, stage preserved.
+Changes to the admin, accounts, or operations teams' own workflows.
+PDF export (Excel only for now).
+Changing the Operations pipeline detail page for documentation users — they simply won't need it.
+Steps
+Add PAAR Number to the database — Add a paarNumber column to the containers table. Run the schema push to apply the migration. Expose the field in the container update endpoint (read and write) and include it in the pipeline and container API responses.
+Hide Registered from the Operations pipeline board — Filter registered out of the Kanban columns and the stage filter chips in the Operations pipeline page.
+Build the expandable card panel in the Documentation workspace — Make each container card expandable with an inline panel showing: Stage Owner, PAAR Number, PAAR ETA (relabelled Next Action Due Date), PAAR Release Date, PAAR Delay Reason, Delay Reason. Pre-fill all fields from the pipeline/container data. Save via the existing container update endpoint.
+Add Assessment Amount field at duty_assessment stage — Within the expanded panel for duty_assessment containers, add a currency input for "Assessment Amount (₦)". Disable Submit until a valid positive amount is entered. On submit, save the amount to customs charges then advance the stage.
+Add search, stage filter, and Download button — Add a search input and stage filter tabs/chips at the top of the Documentation workspace. The Download button exports the filtered list to Excel using the same formatting pattern used elsewhere in the app.
+Relevant files
+artifacts/cost-analysis/src/pages/operations/index.tsx
+artifacts/cost-analysis/src/pages/workspace/documentation.tsx
+artifacts/cost-analysis/src/pages/operations/[id].tsx:775-915
+artifacts/cost-analysis/src/lib/format.ts
+artifacts/api-server/src/routes/containers.ts:60-75,434-460,840-930,1200-1240

@@ -12,7 +12,7 @@ import {
   Loader2, Activity, RefreshCw, Clock, AlertTriangle, ChevronRight, User, Target, Search, X,
 } from "lucide-react";
 
-const PIPELINE_STAGES = WORKFLOW_STAGES.filter(s => s.value !== "pending_verification");
+const PIPELINE_STAGES = WORKFLOW_STAGES.filter(s => s.value !== "pending_verification" && s.value !== "registered");
 
 function daysColor(days: number): string {
   if (days > 14) return "border-l-red-500 bg-red-500/5";

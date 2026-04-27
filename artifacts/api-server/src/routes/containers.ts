@@ -66,6 +66,7 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     offloadingConfirmed: c.offloadingConfirmed ?? false,
     emptyReturnDueDate: c.emptyReturnDueDate instanceof Date ? c.emptyReturnDueDate.toISOString() : (c.emptyReturnDueDate ?? null),
     emptyReturnDate: c.emptyReturnDate instanceof Date ? c.emptyReturnDate.toISOString() : (c.emptyReturnDate ?? null),
+    paarNumber: c.paarNumber ?? null,
     paarOfficer: c.paarOfficer ?? null,
     paarReleasedAt: c.paarReleasedAt instanceof Date ? c.paarReleasedAt.toISOString() : (c.paarReleasedAt ?? null),
     paarDelayReason: c.paarDelayReason ?? null,
@@ -479,7 +480,12 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       updatedAt: containersTable.updatedAt,
       assignedStaffName: usersTable.name,
       stageOwner: containersTable.stageOwner,
+      nextAction: containersTable.nextAction,
       nextActionDueDate: containersTable.nextActionDueDate,
+      delayReason: containersTable.delayReason,
+      paarNumber: containersTable.paarNumber,
+      paarReleasedAt: containersTable.paarReleasedAt,
+      paarDelayReason: containersTable.paarDelayReason,
       duty:        customsChargesTable.duty,
       dutyPaid:    customsChargesTable.dutyPaid,
       dutyNotPaid: customsChargesTable.dutyNotPaid,
@@ -499,7 +505,12 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       daysInStage: number;
       assignedStaffName: string | null;
       stageOwnerName: string | null;
+      nextAction: string | null;
       nextActionDueAt: string | null;
+      delayReason: string | null;
+      paarNumber: string | null;
+      paarReleasedAt: string | null;
+      paarDelayReason: string | null;
       duty: number;
       dutyPaid: number;
       dutyNotPaid: number;
@@ -523,7 +534,12 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
         daysInStage,
         assignedStaffName: c.assignedStaffName ?? null,
         stageOwnerName: c.stageOwner ?? null,
+        nextAction: c.nextAction ?? null,
         nextActionDueAt: c.nextActionDueDate instanceof Date ? c.nextActionDueDate.toISOString() : (c.nextActionDueDate ?? null),
+        delayReason: c.delayReason ?? null,
+        paarNumber: c.paarNumber ?? null,
+        paarReleasedAt: c.paarReleasedAt instanceof Date ? c.paarReleasedAt.toISOString() : (c.paarReleasedAt ?? null),
+        paarDelayReason: c.paarDelayReason ?? null,
         duty,
         dutyPaid,
         dutyNotPaid,
@@ -842,7 +858,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       deliveredAt, stageOwner, nextAction, nextActionDueDate, delayReason,
       deliveryTime, deliveryLocation, truckNumber, driverName, driverPhone,
       dispatchOfficer, deliveryStatus, offloadingConfirmed, emptyReturnDueDate, emptyReturnDate,
-      paarOfficer, paarReleasedAt, paarDelayReason,
+      paarNumber, paarOfficer, paarReleasedAt, paarDelayReason,
       eta, consignee,
     } = req.body;
     if (deliveredAt !== undefined && deliveredAt !== null) {
@@ -904,6 +920,11 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       const prev = existing.delayReason ?? null;
       updates.delayReason = delayReason || null;
       if (prev !== (delayReason || null)) changed.push(`Delay Reason: "${prev ?? "—"}" → "${delayReason || "—"}"`);
+    }
+    if (paarNumber !== undefined) {
+      const prev = existing.paarNumber ?? null;
+      updates.paarNumber = paarNumber || null;
+      if (prev !== (paarNumber || null)) changed.push(`PAAR Number: "${prev ?? "—"}" → "${paarNumber || "—"}"`);
     }
     if (paarOfficer !== undefined) {
       updates.paarOfficer = paarOfficer || null;

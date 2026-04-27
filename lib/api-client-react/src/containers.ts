@@ -11,7 +11,12 @@ export type PipelineContainer = {
   daysInStage: number;
   assignedStaffName: string | null;
   stageOwnerName?: string | null;
+  nextAction?: string | null;
   nextActionDueAt?: string | null;
+  delayReason?: string | null;
+  paarNumber?: string | null;
+  paarReleasedAt?: string | null;
+  paarDelayReason?: string | null;
   duty?: number;
   dutyPaid?: number;
   dutyNotPaid?: number;
@@ -198,10 +203,37 @@ export function useGetPaarStatus(options?: { query?: { refetchInterval?: number;
 }
 
 export type PaarFields = {
+  paarNumber?: string | null;
   paarOfficer?: string | null;
   paarReleasedAt?: string | null;
   paarDelayReason?: string | null;
 };
+
+export type DocumentationCardFields = {
+  stageOwner?: string | null;
+  nextAction?: string | null;
+  nextActionDueDate?: string | null;
+  delayReason?: string | null;
+  paarNumber?: string | null;
+  paarReleasedAt?: string | null;
+  paarDelayReason?: string | null;
+};
+
+export function useUpdateDocumentationCard() {
+  const qc = useQueryClient();
+  return useMutation<Record<string, unknown>, Error, { id: number } & DocumentationCardFields>({
+    mutationFn: ({ id, ...fields }) =>
+      customFetch(`/api/containers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(fields),
+        headers: { "Content-Type": "application/json" },
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
+    },
+  });
+}
 
 export function useUpdatePaar() {
   const qc = useQueryClient();
