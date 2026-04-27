@@ -68,7 +68,7 @@ The application is built as a monorepo using pnpm workspaces, separating the fro
 
 -   **Database:** PostgreSQL
 -   **ORM:** Drizzle ORM
--   **API Specification:** OpenAPI (used with Orval for client code generation)
+-   **API Specification:** OpenAPI (used with Orval for client code generation). **Important:** `lib/api-spec/openapi.yaml` is incomplete — it does not include all canonical role values (`super_admin`, `documentation_user`, `operations_user`, `terminal_user`, `delivery_user`, `accounts_user`) or many real `Container` fields (`stageOwner`, `paarReleasedAt`, `canUpload`, `eta`, `dispatchOfficer`, `deliveryStatus`, `truckNumber`, etc.). The generated files in `lib/api-client-react/src/generated/` and `lib/api-zod/src/generated/` have therefore been **hand-edited** to add the canonical types and to append duty-payment helpers. **Do NOT regenerate codegen** until `openapi.yaml` itself is updated to be the canonical source — re-running Orval will clobber the hand-edits and reintroduce the wrong enum values. Only `HealthCheckResponse` from `@workspace/api-zod` is consumed at runtime, so the stale role/status enums in the generated zod schemas are dead code, but they should still not be relied upon.
 -   **Charting:** Recharts
 -   **File Uploads:** `multer`
 -   **CSV Parsing:** `PapaParse`

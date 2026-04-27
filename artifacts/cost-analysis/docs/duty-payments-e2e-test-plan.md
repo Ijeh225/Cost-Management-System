@@ -32,11 +32,13 @@
 
 | # | Scenario | Expected |
 |---|----------|----------|
-| 3.1 | Valid `{ amount: <= outstanding }` | `200`; `customs_charges.dutyPaid` increments, `dutyNotPaid` decrements; `audit_log` row written with `section=customs`, `action=duty_payment_recorded`. |
-| 3.2 | `amount <= 0` | `400 { error: "Amount must be positive" }`. |
-| 3.3 | `amount > outstanding` | `400 { error: "Amount exceeds outstanding balance" }`. |
-| 3.4 | Container without an assessed duty | `400 { error: "No duty has been assessed yet" }`. |
+| 3.1 | Valid `{ amount: <= outstanding }` | `200`; `customs_charges.dutyPaid` increments, `dutyNotPaid` decrements; `audit_log` row written with `section=customs`, `action=duty_payment_recorded`, `fieldChanged=dutyPaid`, `oldValue=<prevPaid>`, `newValue=<newPaid>`, optional `reason` containing `date=<paymentDate>` and/or notes. |
+| 3.2 | `amount <= 0` | `400 { error: "Amount must be greater than zero" }`. |
+| 3.3 | `amount > outstanding` | `400 { error: "Amount (<amt>) exceeds outstanding balance (<outstanding>)." }`. |
+| 3.4 | Container without an assessed duty | `400 { error: "Duty has not been assessed for this container yet." }`. |
+| 3.4b | Container fully paid already | `400 { error: "Duty is already fully paid for this container." }`. |
 | 3.5 | Container ID does not exist | `404 { error: "Container not found" }`. |
+| 3.5b | Path parameter is not a number | `400 { error: "Invalid containerId" }`. |
 | 3.6 | Two simultaneous PATCHes against the same container | Serialised by `SELECT … FOR UPDATE` inside the transaction; final balance is consistent (no lost update). |
 | 3.7 | After PATCH: re-list `/api/duty-payments?search=<container#>` | Row reflects new paid/outstanding; `dutyStatus` flips to `paid` when outstanding reaches 0. |
 
