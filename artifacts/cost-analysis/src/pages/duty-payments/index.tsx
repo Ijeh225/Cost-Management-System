@@ -208,17 +208,44 @@ export default function DutyPaymentsPage() {
   const hasFilters = statusFilter !== "all" || dateFrom || dateTo;
   const [exporting, setExporting] = useState(false);
 
-  // Fetch every filtered row across pages (capped at API max of 500) for export.
+  // Iterate the API page-by-page (server cap = 500 per call) and collect
+  // every filtered row up to a generous hard ceiling, so exports cover the
+  // full filtered dataset, not just the current page.
   async function fetchAllFilteredRows(): Promise<DutyPaymentRow[]> {
-    const resp = await listDutyPayments({
-      page: 1,
-      limit: 500,
+    const PAGE_SIZE  = 500;
+    const HARD_CAP   = 10_000; // safety cap; warn the user if we hit it
+    const baseParams = {
       ...(statusFilter !== "all" ? { status: statusFilter } : {}),
       ...(debounced               ? { search: debounced }   : {}),
       ...(dateFrom                ? { dateFrom }            : {}),
       ...(dateTo                  ? { dateTo }              : {}),
-    });
-    return resp?.rows ?? [];
+    };
+
+    const all: DutyPaymentRow[] = [];
+    let pageN = 1;
+    let total = 0;
+    while (all.length < HARD_CAP) {
+      const resp = await listDutyPayments({
+        page:  pageN,
+        limit: PAGE_SIZE,
+        ...baseParams,
+      });
+      const batch = resp?.rows ?? [];
+      total = resp?.total ?? all.length + batch.length;
+      all.push(...batch);
+      if (batch.length < PAGE_SIZE) break; // last page
+      if (all.length >= total)       break; // covered everything
+      pageN += 1;
+    }
+
+    if (total > all.length) {
+      toast({
+        variant: "destructive",
+        title: "Export truncated",
+        description: `Only the first ${all.length.toLocaleString()} of ${total.toLocaleString()} rows were exported. Apply a tighter filter to capture the rest.`,
+      });
+    }
+    return all;
   }
 
   async function handleExport(kind: "excel" | "pdf") {
