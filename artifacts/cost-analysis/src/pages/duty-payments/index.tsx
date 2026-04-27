@@ -430,7 +430,8 @@ export default function DutyPaymentsPage() {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted-foreground bg-secondary/30 uppercase tracking-wider border-b border-border/50">
               <tr>
-                <th className="px-4 py-3 font-medium">Container / BL</th>
+                <th className="px-4 py-3 font-medium">Container #</th>
+                <th className="px-4 py-3 font-medium">BL #</th>
                 <th className="px-4 py-3 font-medium">Customer</th>
                 <th className="px-4 py-3 font-medium">Stage</th>
                 <th className="px-4 py-3 font-medium text-right">Duty Assessed</th>
@@ -451,13 +452,13 @@ export default function DutyPaymentsPage() {
                   </tr>
                 ))
               ) : isError ? (
-                <tr><td colSpan={9} className="px-6 py-12 text-center text-destructive">
+                <tr><td colSpan={10} className="px-6 py-12 text-center text-destructive">
                   <div className="flex flex-col items-center justify-center">
                     <AlertCircle className="w-8 h-8 mb-2" /> Failed to load duty payments.
                   </div>
                 </td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={9} className="px-6 py-16 text-center text-muted-foreground">
+                <tr><td colSpan={10} className="px-6 py-16 text-center text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Banknote className="w-12 h-12 text-muted-foreground/30" />
                     <p className="text-base">No duty payments to display.</p>
@@ -473,8 +474,8 @@ export default function DutyPaymentsPage() {
                         <div className="font-mono font-semibold text-sm cursor-pointer hover:text-primary" onClick={() => setLocation(`/containers/${r.containerId}`)}>
                           {r.containerNumber}
                         </div>
-                        <div className="text-[10px] text-muted-foreground font-mono">BL: {r.blNumber}</div>
                       </td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.blNumber}</td>
                       <td className="px-4 py-3 text-xs">{r.customerName}</td>
                       <td className="px-4 py-3">
                         <Badge variant="outline" className={`text-[10px] ${getStatusColor(r.status)}`}>
