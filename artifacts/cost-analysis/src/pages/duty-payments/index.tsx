@@ -244,7 +244,7 @@ export default function DutyPaymentsPage() {
       <div className="p-6 max-w-md mx-auto">
         <Card className="p-8 text-center space-y-3">
           <ShieldAlert className="w-10 h-10 mx-auto text-muted-foreground" />
-          <h1 className="text-lg font-semibold">Restricted</h1>
+          <h1 className="text-lg font-semibold">Duty Payments access required</h1>
           <p className="text-sm text-muted-foreground">
             Duty Payments is available to administrators and Accounts users.
           </p>
