@@ -510,9 +510,9 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
         (now.getTime() - new Date(c.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
       );
       if (!stages[c.status]) stages[c.status] = [];
-      const duty = parseFloat((c.duty as any) ?? "0") || 0;
-      const dutyPaid = parseFloat((c.dutyPaid as any) ?? "0") || 0;
-      const dutyNotPaid = c.dutyNotPaid != null ? (parseFloat(c.dutyNotPaid as any) || 0) : Math.max(duty - dutyPaid, 0);
+      const duty = parseFloat(c.duty ?? "0") || 0;
+      const dutyPaid = parseFloat(c.dutyPaid ?? "0") || 0;
+      const dutyNotPaid = c.dutyNotPaid != null ? (parseFloat(c.dutyNotPaid) || 0) : Math.max(duty - dutyPaid, 0);
       stages[c.status].push({
         id: c.id,
         containerNumber: c.containerNumber,

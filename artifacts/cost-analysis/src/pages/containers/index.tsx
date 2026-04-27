@@ -549,15 +549,18 @@ export default function Containers() {
                             </span>
                           )}
                           {(() => {
-                            const duty        = (container as any).duty ?? 0;
-                            const dutyPaid    = (container as any).dutyPaid ?? 0;
-                            const dutyOutstanding = (container as any).dutyNotPaid ?? Math.max(duty - dutyPaid, 0);
+                            const c = container as typeof container & { duty?: number | string | null; dutyPaid?: number | string | null; dutyNotPaid?: number | string | null };
+                            const duty        = Number(c.duty ?? 0) || 0;
+                            const dutyPaid    = Number(c.dutyPaid ?? 0) || 0;
+                            const dutyOutstanding = c.dutyNotPaid != null ? (Number(c.dutyNotPaid) || 0) : Math.max(duty - dutyPaid, 0);
                             const dutyStatus: DutyPaymentStatus = getDutyPaymentStatus({ duty, dutyPaid, dutyNotPaid: dutyOutstanding });
-                            if (dutyStatus === "not_assessed") return null;
+                            const tooltip = dutyStatus === "not_assessed"
+                              ? "Duty has not been assessed yet"
+                              : `Duty: ${formatCurrency(duty)} · Paid: ${formatCurrency(dutyPaid)} · Outstanding: ${formatCurrency(dutyOutstanding)}`;
                             return (
                               <span
                                 className={`inline-flex items-center gap-0.5 text-[10px] border rounded-full px-1.5 py-0.5 ${dutyPaymentChipClass(dutyStatus)}`}
-                                title={`Duty: ${formatCurrency(duty)} · Paid: ${formatCurrency(dutyPaid)} · Outstanding: ${formatCurrency(dutyOutstanding)}`}
+                                title={tooltip}
                                 data-testid={`chip-duty-${container.containerNumber}`}
                               >
                                 ₦ {dutyPaymentLabel(dutyStatus)}

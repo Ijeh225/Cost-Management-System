@@ -54,10 +54,11 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
         conds.push(lte(containersTable.createdAt, d));
       }
     }
-    const whereClause = conds.length === 0 ? undefined : (conds.length === 1 ? conds[0] : and(...conds));
+    const whereClause: SQL | undefined =
+      conds.length === 0 ? undefined : (conds.length === 1 ? conds[0] : and(...conds));
 
     // Pull all matching rows joined with customs_charges (left join — containers without a customs row treated as not_assessed)
-    const baseRows = await db
+    const baseQuery = db
       .select({
         containerId:     containersTable.id,
         containerNumber: containersTable.containerNumber,
@@ -71,8 +72,9 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
         customsUpdated:  customsChargesTable.updatedAt,
       })
       .from(containersTable)
-      .leftJoin(customsChargesTable, eq(customsChargesTable.containerId, containersTable.id))
-      .where(whereClause as any)
+      .leftJoin(customsChargesTable, eq(customsChargesTable.containerId, containersTable.id));
+
+    const baseRows = await (whereClause ? baseQuery.where(whereClause) : baseQuery)
       .orderBy(desc(containersTable.updatedAt));
 
     // Derive status & filter in-memory (status filter can't be pushed to DB easily because it's derived)
@@ -175,17 +177,19 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
       if (!container) return { error: { code: 404, message: "Container not found" } } as const;
 
       // Lock or insert the customs row to prevent concurrent duplicate writes.
-      const lockOnce = async () => {
-        const r: any = await tx.execute(
-          sql`SELECT * FROM customs_charges WHERE container_id = ${containerId} FOR UPDATE`
+      type CustomsRow = { duty: string | null; dutyPaid: string | null; duty_paid?: string | null };
+      const lockOnce = async (): Promise<CustomsRow | undefined> => {
+        const r = await tx.execute(
+          sql`SELECT duty, "dutyPaid" FROM customs_charges WHERE container_id = ${containerId} FOR UPDATE`
         );
-        const list: any[] = Array.isArray(r) ? r : (r?.rows ?? []);
+        const list = (Array.isArray(r) ? r : (r as { rows?: unknown[] })?.rows ?? []) as CustomsRow[];
         return list[0];
       };
-      let customs: any = await lockOnce();
+      let customs: CustomsRow | undefined = await lockOnce();
       if (!customs) {
         try {
-          [customs] = await tx.insert(customsChargesTable).values({ containerId }).returning();
+          const [inserted] = await tx.insert(customsChargesTable).values({ containerId }).returning();
+          customs = { duty: inserted.duty, dutyPaid: inserted.dutyPaid };
         } catch {
           // Lost insert race — re-select with lock.
           customs = await lockOnce();
@@ -196,8 +200,7 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
       if (duty <= 0) {
         return { error: { code: 400, message: "Duty has not been assessed for this container yet." } } as const;
       }
-      // dutyPaid may be returned by raw SQL using the actual column name "dutyPaid".
-      const currentPaid = toNum((customs as any).dutyPaid ?? (customs as any).duty_paid);
+      const currentPaid = toNum(customs?.dutyPaid);
       const outstanding = Math.max(duty - currentPaid, 0);
       if (outstanding <= 0) {
         return { error: { code: 400, message: "Duty is already fully paid for this container." } } as const;
@@ -245,12 +248,12 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
       } as const;
     });
 
-    if ("error" in result && result.error) {
+    if ("error" in result) {
       res.status(result.error.code).json({ error: result.error.message });
       return;
     }
 
-    const ok = (result as any).ok;
+    const ok = result.ok;
     res.json({
       containerId,
       containerNumber: ok.container.containerNumber,

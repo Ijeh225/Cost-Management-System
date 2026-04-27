@@ -76,7 +76,8 @@ export function AppSidebar() {
       ]
     : isAccountsUser
     ? [
-        { title: "Duty Payments",      url: "/workspace/accounts",      icon: BookOpen        },
+        { title: "Duty Payments",      url: "/duty-payments",           icon: Banknote        },
+        { title: "Accounts Workspace", url: "/workspace/accounts",      icon: BookOpen        },
       ]
     : isOperationsUser
     ? [
