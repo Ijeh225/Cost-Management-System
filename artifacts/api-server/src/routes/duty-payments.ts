@@ -14,7 +14,8 @@ function deriveDutyStatus(duty: number, paid: number, outstanding: number): "pai
   return "unpaid";
 }
 
-const toNum = (v: any): number => {
+type Numericish = number | string | null | undefined;
+const toNum = (v: Numericish): number => {
   if (v == null) return 0;
   const n = typeof v === "number" ? v : parseFloat(v);
   return Number.isFinite(n) ? n : 0;
