@@ -46,6 +46,11 @@ export function AppSidebar() {
 
   const staffCanUpload = !isAdmin && !isDepartmentUser && (user?.canUpload ?? false);
 
+  // Duty Payments is restricted to admin / super_admin / accounts_user
+  // (accounts_user lands on this entry via deptNav below). Hiding it from
+  // every other role on the main nav, including `staff`.
+  const canSeeDutyPayments = isAdmin || isSuperAdmin || isAccountsUser;
+
   const mainNav: NavItem[] = [
     { title: "Dashboard",       url: "/",               icon: LayoutDashboard },
     { title: "Operations",      url: "/operations",     icon: Activity         },
@@ -53,7 +58,7 @@ export function AppSidebar() {
     { title: "Containers",      url: "/containers",     icon: Box              },
     { title: "Clients",         url: "/clients",        icon: Building2        },
     { title: "Invoices",        url: "/invoices",       icon: FileText         },
-    { title: "Duty Payments",   url: "/duty-payments",  icon: Banknote         },
+    ...(canSeeDutyPayments ? [{ title: "Duty Payments", url: "/duty-payments", icon: Banknote }] : []),
     { title: "Accounts Receivable", url: "/accounts-receivable", icon: BookOpen },
     { title: "My Tasks",        url: "/my-tasks",       icon: ListTodo         },
     { title: "Notifications",   url: "/notifications",  icon: Bell, badge: unreadCount },
