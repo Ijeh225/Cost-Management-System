@@ -77,7 +77,7 @@ export function AppSidebar() {
 
   const deptNav: NavItem[] = isDocumentationUser
     ? [
-        { title: "My Jobs",            url: "/workspace/documentation", icon: FileCheck2      },
+        { title: "My Jobs",            url: "/documentation", icon: FileCheck2      },
       ]
     : isAccountsUser
     ? [

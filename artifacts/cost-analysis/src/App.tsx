@@ -33,7 +33,6 @@ import InvoicePrintPage from "@/pages/invoices/print/[id]";
 import PipelinePage from "@/pages/pipeline/index";
 import OperationsPage from "@/pages/operations/index";
 import OperationDetailPage from "@/pages/operations/[id]";
-import DocumentationPage from "@/pages/documentation/index";
 import ArPage from "@/pages/ar/index";
 import DutyPaymentsPage from "@/pages/duty-payments/index";
 import DocumentationWorkspace from "@/pages/workspace/documentation";
@@ -167,11 +166,11 @@ function Router() {
               <Route path="/notifications" component={NotificationsPage} />
               <Route path="/operations" component={OperationsPage} />
               <Route path="/operations/:id" component={OperationDetailPage} />
-              <Route path="/documentation" component={DocumentationPage} />
+              <Route path="/documentation" component={DocumentationWorkspace} />
               <Route path="/pipeline" component={PipelinePage} />
               <Route path="/accounts-receivable" component={ArPage} />
               <Route path="/duty-payments" component={DutyPaymentsPage} />
-              <Route path="/workspace/documentation" component={DocumentationWorkspace} />
+              <Route path="/workspace/documentation" component={() => { const [, nav] = useLocation(); nav("/documentation", { replace: true }); return null; }} />
               <Route path="/workspace/accounts" component={AccountsWorkspace} />
               <Route path="/workspace/operations" component={OperationsWorkspace} />
               <Route path="/workspace/terminal" component={TerminalWorkspace} />

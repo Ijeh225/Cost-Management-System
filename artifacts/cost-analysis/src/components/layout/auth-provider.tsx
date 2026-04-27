@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const role = (effectiveUser as any)?.role ?? "";
         const deptHomeMap: Record<string, string> = {
           operations_user:   "/workspace/operations",
-          documentation_user: "/workspace/documentation",
+          documentation_user: "/documentation",
           accounts_user:     "/workspace/accounts",
           terminal_manager:  "/workspace/terminal",
           delivery_user:     "/workspace/delivery",
