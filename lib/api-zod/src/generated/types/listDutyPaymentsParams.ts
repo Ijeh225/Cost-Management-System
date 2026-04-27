@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListContainersParams = {
-  search?: string;
-  status?: string;
-  berthed?: string;
+export type ListDutyPaymentsParams = {
   /**
    * Filter by duty-payment status: paid, partial, unpaid, not_assessed
    */
-  dutyPaymentStatus?: string;
+  status?: string;
+  search?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
   page?: number;
   limit?: number;
 };

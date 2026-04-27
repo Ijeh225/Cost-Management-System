@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useListContainers } from "@workspace/api-client-react";
-import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
+import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES, getDutyPaymentStatus, dutyPaymentChipClass, dutyPaymentLabel, type DutyPaymentStatus } from "@/lib/format";
 import { useLocation } from "wouter";
 import { useAuth } from "@/components/layout/auth-provider";
 import { Card } from "@/components/ui/card";
@@ -61,6 +61,7 @@ export default function Containers() {
   const [profitFilter, setProfitFilter] = useState<string>("all");
   const [paarFilter, setPaarFilter] = useState<string>("all");
   const [berthedFilter, setBerthedFilter] = useState<string>("all");
+  const [dutyPaymentFilter, setDutyPaymentFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -98,6 +99,7 @@ export default function Containers() {
       ...(debouncedSearch ? { search: debouncedSearch } : {}),
       ...(status !== "all" ? { status } : {}),
       ...(berthedFilter !== "all" ? { berthed: berthedFilter } : {}),
+      ...(dutyPaymentFilter !== "all" ? { dutyPaymentStatus: dutyPaymentFilter } : {}),
     },
     {}
   );
@@ -108,7 +110,7 @@ export default function Containers() {
   );
   const pendingCount = pendingData?.total ?? 0;
 
-  const hasActiveFilters = status !== "all" || profitFilter !== "all" || paarFilter !== "all" || berthedFilter !== "all" || dateFrom || dateTo;
+  const hasActiveFilters = status !== "all" || profitFilter !== "all" || paarFilter !== "all" || berthedFilter !== "all" || dutyPaymentFilter !== "all" || dateFrom || dateTo;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -380,6 +382,19 @@ export default function Containers() {
                     </Select>
                   </div>
                   <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground font-medium">Duty Payment</label>
+                    <Select value={dutyPaymentFilter} onValueChange={(v) => { setDutyPaymentFilter(v); setPage(1); }}>
+                      <SelectTrigger className="h-8 text-xs bg-background border-border/60" data-testid="select-duty-filter"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="partial">Partial</SelectItem>
+                        <SelectItem value="unpaid">Unpaid</SelectItem>
+                        <SelectItem value="not_assessed">Not Assessed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
                     <label className="text-xs text-muted-foreground font-medium">Created From</label>
                     <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className="h-8 text-xs bg-background border-border/60" />
                   </div>
@@ -533,6 +548,22 @@ export default function Containers() {
                               <Clock className="w-2.5 h-2.5" /> PAAR
                             </span>
                           )}
+                          {(() => {
+                            const duty        = (container as any).duty ?? 0;
+                            const dutyPaid    = (container as any).dutyPaid ?? 0;
+                            const dutyOutstanding = (container as any).dutyNotPaid ?? Math.max(duty - dutyPaid, 0);
+                            const dutyStatus: DutyPaymentStatus = getDutyPaymentStatus({ duty, dutyPaid, dutyNotPaid: dutyOutstanding });
+                            if (dutyStatus === "not_assessed") return null;
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-0.5 text-[10px] border rounded-full px-1.5 py-0.5 ${dutyPaymentChipClass(dutyStatus)}`}
+                                title={`Duty: ${formatCurrency(duty)} · Paid: ${formatCurrency(dutyPaid)} · Outstanding: ${formatCurrency(dutyOutstanding)}`}
+                                data-testid={`chip-duty-${container.containerNumber}`}
+                              >
+                                ₦ {dutyPaymentLabel(dutyStatus)}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </td>
                       <td className="px-4 py-4">

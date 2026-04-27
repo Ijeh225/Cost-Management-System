@@ -152,6 +152,7 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
     const berthedFilter = req.query.berthed as string | undefined;
+    const dutyPaymentStatus = (req.query.dutyPaymentStatus as string | undefined)?.trim();
     const page = parseInt((req.query.page as string) ?? "1");
     const limit = Math.min(parseInt((req.query.limit as string) ?? "20"), 1000);
     const offset = (page - 1) * limit;
@@ -199,6 +200,18 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     } else if (berthedFilter === "false") {
       conditions.push(eq(containersTable.berthed, false));
     }
+    if (dutyPaymentStatus && dutyPaymentStatus !== "all") {
+      // Push duty-payment status filter down to SQL via a correlated subquery on customs_charges.
+      if (dutyPaymentStatus === "paid") {
+        conditions.push(sql`EXISTS (SELECT 1 FROM customs_charges cc WHERE cc.container_id = ${containersTable.id} AND cc.duty > 0 AND cc."dutyPaid" > 0 AND (cc.duty - cc."dutyPaid") <= 0)`);
+      } else if (dutyPaymentStatus === "partial") {
+        conditions.push(sql`EXISTS (SELECT 1 FROM customs_charges cc WHERE cc.container_id = ${containersTable.id} AND cc."dutyPaid" > 0 AND (cc.duty - cc."dutyPaid") > 0)`);
+      } else if (dutyPaymentStatus === "unpaid") {
+        conditions.push(sql`EXISTS (SELECT 1 FROM customs_charges cc WHERE cc.container_id = ${containersTable.id} AND cc.duty > 0 AND COALESCE(cc."dutyPaid", 0) = 0)`);
+      } else if (dutyPaymentStatus === "not_assessed") {
+        conditions.push(sql`NOT EXISTS (SELECT 1 FROM customs_charges cc WHERE cc.container_id = ${containersTable.id} AND cc.duty > 0)`);
+      }
+    }
     if (conditions.length > 0) {
       const where = conditions.length === 1 ? conditions[0] : and(...conditions);
       query = query.where(where);
@@ -232,6 +245,8 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     const containerIds = rows.map(r => r.id);
     const totalsMap: Record<number, number> = {};
     const dutyMap: Record<number, number> = {};
+    const dutyAssessedMap: Record<number, number> = {};
+    const dutyPaidMap: Record<number, number> = {};
     if (containerIds.length > 0) {
       const shippingRows = await db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, containerIds));
       const customsRows  = await db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, containerIds));
@@ -260,6 +275,8 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
       for (const id of containerIds) {
         totalsMap[id] = calcTotalCost(sMap[id] ?? {}, cMap[id] ?? {}, tMap[id] ?? {}, dMap[id] ?? {}, oMap[id] ?? {}) + (extraTotalsMap[id] ?? 0);
         dutyMap[id] = parseFloat(cMap[id]?.dutyNotPaid ?? "0");
+        dutyAssessedMap[id] = parseFloat(cMap[id]?.duty ?? "0");
+        dutyPaidMap[id] = parseFloat(cMap[id]?.dutyPaid ?? "0");
       }
     }
 
@@ -268,6 +285,8 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
       totalCost: totalsMap[c.id] ?? 0,
       grossProfit: parseFloat(c.clearingCharges ?? "0") - (totalsMap[c.id] ?? 0),
       dutyNotPaid: dutyMap[c.id] ?? 0,
+      duty:        dutyAssessedMap[c.id] ?? 0,
+      dutyPaid:    dutyPaidMap[c.id] ?? 0,
     }));
 
     res.json({ containers, total: Number(count), page, limit });
@@ -461,9 +480,13 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       assignedStaffName: usersTable.name,
       stageOwner: containersTable.stageOwner,
       nextActionDueDate: containersTable.nextActionDueDate,
+      duty:        customsChargesTable.duty,
+      dutyPaid:    customsChargesTable.dutyPaid,
+      dutyNotPaid: customsChargesTable.dutyNotPaid,
     })
       .from(containersTable)
       .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id))
+      .leftJoin(customsChargesTable, eq(customsChargesTable.containerId, containersTable.id))
       .where(isNotNull(containersTable.verifiedAt));
 
     const stages: Record<string, Array<{
@@ -477,6 +500,9 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       assignedStaffName: string | null;
       stageOwnerName: string | null;
       nextActionDueAt: string | null;
+      duty: number;
+      dutyPaid: number;
+      dutyNotPaid: number;
     }>> = {};
 
     for (const c of rows) {
@@ -484,6 +510,9 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
         (now.getTime() - new Date(c.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
       );
       if (!stages[c.status]) stages[c.status] = [];
+      const duty = parseFloat((c.duty as any) ?? "0") || 0;
+      const dutyPaid = parseFloat((c.dutyPaid as any) ?? "0") || 0;
+      const dutyNotPaid = c.dutyNotPaid != null ? (parseFloat(c.dutyNotPaid as any) || 0) : Math.max(duty - dutyPaid, 0);
       stages[c.status].push({
         id: c.id,
         containerNumber: c.containerNumber,
@@ -495,6 +524,9 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
         assignedStaffName: c.assignedStaffName ?? null,
         stageOwnerName: c.stageOwner ?? null,
         nextActionDueAt: c.nextActionDueDate instanceof Date ? c.nextActionDueDate.toISOString() : (c.nextActionDueDate ?? null),
+        duty,
+        dutyPaid,
+        dutyNotPaid,
       });
     }
 

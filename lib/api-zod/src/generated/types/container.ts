@@ -24,6 +24,8 @@ export interface Container {
   clearingCharges: number;
   grossProfit: number;
   dutyNotPaid: number;
+  duty?: number;
+  dutyPaid?: number;
   clientId?: number | null;
   clientName?: string | null;
   deliveredAt?: string | null;

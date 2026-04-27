@@ -38,6 +38,8 @@ import type {
   CustomSectionWithFields,
   DashboardStats,
   DeliveryReportResponse,
+  DutyPaymentListResponse,
+  DutyPaymentRow,
   ErrorResponse,
   ExportContainersCSVParams,
   GetContainerReportParams,
@@ -46,11 +48,13 @@ import type {
   HealthStatus,
   IntelligenceResponse,
   ListContainersParams,
+  ListDutyPaymentsParams,
   LockContainerRequest,
   LoginRequest,
   LoginResponse,
   MessageResponse,
   MyTasksResponse,
+  RecordDutyPaymentRequest,
   RejectSectionRequest,
   SaveCustomFieldValuesRequest,
   SectionApproval,
@@ -4268,3 +4272,187 @@ export function useGetIntelligenceAlerts<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List containers with duty-payment status (admin / accounts only)
+ */
+export const getListDutyPaymentsUrl = (params?: ListDutyPaymentsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/duty-payments?${stringifiedParams}`
+    : `/api/duty-payments`;
+};
+
+export const listDutyPayments = async (
+  params?: ListDutyPaymentsParams,
+  options?: RequestInit,
+): Promise<DutyPaymentListResponse> => {
+  return customFetch<DutyPaymentListResponse>(getListDutyPaymentsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDutyPaymentsQueryKey = (
+  params?: ListDutyPaymentsParams,
+) => {
+  return [`/api/duty-payments`, ...(params ? [params] : [])] as const;
+};
+
+export const getListDutyPaymentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDutyPayments>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListDutyPaymentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDutyPayments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDutyPaymentsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDutyPayments>>
+  > = ({ signal }) => listDutyPayments(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDutyPayments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDutyPaymentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDutyPayments>>
+>;
+export type ListDutyPaymentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List containers with duty-payment status (admin / accounts only)
+ */
+
+export function useListDutyPayments<
+  TData = Awaited<ReturnType<typeof listDutyPayments>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListDutyPaymentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDutyPayments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDutyPaymentsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Record a duty payment for a container (admin / accounts only)
+ */
+export const getRecordDutyPaymentUrl = (containerId: number) => {
+  return `/api/duty-payments/${containerId}`;
+};
+
+export const recordDutyPayment = async (
+  containerId: number,
+  recordDutyPaymentRequest: RecordDutyPaymentRequest,
+  options?: RequestInit,
+): Promise<DutyPaymentRow> => {
+  return customFetch<DutyPaymentRow>(getRecordDutyPaymentUrl(containerId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(recordDutyPaymentRequest),
+  });
+};
+
+export const getRecordDutyPaymentMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof recordDutyPayment>>,
+    TError,
+    { containerId: number; data: BodyType<RecordDutyPaymentRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof recordDutyPayment>>,
+  TError,
+  { containerId: number; data: BodyType<RecordDutyPaymentRequest> },
+  TContext
+> => {
+  const mutationKey = ["recordDutyPayment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof recordDutyPayment>>,
+    { containerId: number; data: BodyType<RecordDutyPaymentRequest> }
+  > = (props) => {
+    const { containerId, data } = props ?? {};
+
+    return recordDutyPayment(containerId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RecordDutyPaymentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof recordDutyPayment>>
+>;
+export type RecordDutyPaymentMutationBody = BodyType<RecordDutyPaymentRequest>;
+export type RecordDutyPaymentMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Record a duty payment for a container (admin / accounts only)
+ */
+export const useRecordDutyPayment = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof recordDutyPayment>>,
+    TError,
+    { containerId: number; data: BodyType<RecordDutyPaymentRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof recordDutyPayment>>,
+  TError,
+  { containerId: number; data: BodyType<RecordDutyPaymentRequest> },
+  TContext
+> => {
+  return useMutation(getRecordDutyPaymentMutationOptions(options));
+};

@@ -25,14 +25,8 @@ export interface LoginRequest {
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 export const UserRole = {
-  super_admin: "super_admin",
   admin: "admin",
   staff: "staff",
-  documentation_user: "documentation_user",
-  accounts_user: "accounts_user",
-  operations_user: "operations_user",
-  terminal_manager: "terminal_manager",
-  delivery_user: "delivery_user",
 } as const;
 
 export interface User {
@@ -42,7 +36,6 @@ export interface User {
   role: UserRole;
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
-  canUpload?: boolean;
   isActive: boolean;
   createdAt: string;
 }
@@ -91,20 +84,16 @@ export type ContainerStatus =
   (typeof ContainerStatus)[keyof typeof ContainerStatus];
 
 export const ContainerStatus = {
-  pending_verification:      "pending_verification",
-  registered:                "registered",
-  documentation:             "documentation",
-  duty_assessment:           "duty_assessment",
-  duty_payment:              "duty_payment",
-  transire_processing:       "transire_processing",
-  shipping_terminal_payment: "shipping_terminal_payment",
-  pull_out:                  "pull_out",
-  gate_in:                   "gate_in",
-  examination:               "examination",
-  final_release:             "final_release",
-  delivery:                  "delivery",
-  empty_return:              "empty_return",
-  closed:                    "closed",
+  new_upload: "new_upload",
+  documentation_review: "documentation_review",
+  shipping_entry: "shipping_entry",
+  customs_entry: "customs_entry",
+  terminal_entry: "terminal_entry",
+  delivery_entry: "delivery_entry",
+  accounting_review: "accounting_review",
+  management_approval: "management_approval",
+  completed: "completed",
+  closed: "closed",
 } as const;
 
 export interface Container {
@@ -124,23 +113,12 @@ export interface Container {
   clearingCharges: number;
   grossProfit: number;
   dutyNotPaid: number;
+  duty?: number;
+  dutyPaid?: number;
   clientId?: number | null;
   clientName?: string | null;
   deliveredAt?: string | null;
   deliveredAtEstimated?: boolean;
-  stageOwner?: string | null;
-  nextAction?: string | null;
-  nextActionDueDate?: string | null;
-  delayReason?: string | null;
-  paarOfficer?: string | null;
-  paarReleasedAt?: string | null;
-  paarDelayReason?: string | null;
-  eta?: string | null;
-  consignee?: string | null;
-  berthed?: boolean;
-  berthingConfirmedAt?: string | null;
-  berthingConfirmedById?: number | null;
-  berthingConfirmedByName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -161,8 +139,6 @@ export interface CreateContainerRequest {
   vessel?: string;
   clearingCharges?: number;
   clientId?: number | null;
-  eta?: string | null;
-  consignee?: string | null;
 }
 
 export interface UpdateContainerRequest {
@@ -176,15 +152,6 @@ export interface UpdateContainerRequest {
   assignedStaffId?: number | null;
   clearingCharges?: number;
   deliveredAt?: string | null;
-  stageOwner?: string | null;
-  nextAction?: string | null;
-  nextActionDueDate?: string | null;
-  delayReason?: string | null;
-  paarOfficer?: string | null;
-  paarReleasedAt?: string | null;
-  paarDelayReason?: string | null;
-  eta?: string | null;
-  consignee?: string | null;
 }
 
 export interface UploadRow {
@@ -195,8 +162,6 @@ export interface UploadRow {
   size?: string;
   vessel?: string;
   clearingCharges?: number;
-  eta?: string;
-  consignee?: string;
 }
 
 export interface UploadContainersRequest {
@@ -731,10 +696,62 @@ export interface IntelligenceResponse {
   insights: IntelligenceInsight[];
 }
 
+export type DutyPaymentRowDutyStatus =
+  (typeof DutyPaymentRowDutyStatus)[keyof typeof DutyPaymentRowDutyStatus];
+
+export const DutyPaymentRowDutyStatus = {
+  paid: "paid",
+  partial: "partial",
+  unpaid: "unpaid",
+  not_assessed: "not_assessed",
+} as const;
+
+export interface DutyPaymentRow {
+  containerId: number;
+  containerNumber: string;
+  blNumber: string;
+  customerName: string;
+  status: string;
+  duty: number;
+  dutyPaid: number;
+  dutyNotPaid: number;
+  dutyStatus: DutyPaymentRowDutyStatus;
+  updatedAt?: string | null;
+  createdAt: string;
+}
+
+export interface DutyPaymentSummary {
+  totalAssessed: number;
+  totalPaid: number;
+  totalOutstanding: number;
+  countPaid: number;
+  countPartial: number;
+  countUnpaid: number;
+  countNotAssessed: number;
+}
+
+export interface DutyPaymentListResponse {
+  rows: DutyPaymentRow[];
+  summary: DutyPaymentSummary;
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface RecordDutyPaymentRequest {
+  amount: number;
+  paymentDate?: string | null;
+  notes?: string | null;
+}
+
 export type ListContainersParams = {
   search?: string;
   status?: string;
   berthed?: string;
+  /**
+   * Filter by duty-payment status: paid, partial, unpaid, not_assessed
+   */
+  dutyPaymentStatus?: string;
   page?: number;
   limit?: number;
 };
@@ -767,4 +784,16 @@ export type GetCustomSectionsParams = {
    * Filter sections by container ID
    */
   containerId?: number;
+};
+
+export type ListDutyPaymentsParams = {
+  /**
+   * Filter by duty-payment status: paid, partial, unpaid, not_assessed
+   */
+  status?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  limit?: number;
 };

@@ -6,9 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UserRole = (typeof UserRole)[keyof typeof UserRole];
-
-export const UserRole = {
-  admin: "admin",
-  staff: "staff",
-} as const;
+export interface RecordDutyPaymentRequest {
+  amount: number;
+  paymentDate?: Date | null;
+  notes?: string | null;
+}

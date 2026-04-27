@@ -35,6 +35,7 @@ import OperationsPage from "@/pages/operations/index";
 import OperationDetailPage from "@/pages/operations/[id]";
 import DocumentationPage from "@/pages/documentation/index";
 import ArPage from "@/pages/ar/index";
+import DutyPaymentsPage from "@/pages/duty-payments/index";
 import DocumentationWorkspace from "@/pages/workspace/documentation";
 import AccountsWorkspace from "@/pages/workspace/accounts";
 import OperationsWorkspace from "@/pages/workspace/operations";
@@ -169,6 +170,7 @@ function Router() {
               <Route path="/documentation" component={DocumentationPage} />
               <Route path="/pipeline" component={PipelinePage} />
               <Route path="/accounts-receivable" component={ArPage} />
+              <Route path="/duty-payments" component={DutyPaymentsPage} />
               <Route path="/workspace/documentation" component={DocumentationWorkspace} />
               <Route path="/workspace/accounts" component={AccountsWorkspace} />
               <Route path="/workspace/operations" component={OperationsWorkspace} />

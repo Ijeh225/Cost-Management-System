@@ -18,6 +18,7 @@ import { notificationsRouter } from "./notifications.js";
 import { invoicesRouter } from "./invoices.js";
 import { trackingRouter } from "./tracking.js";
 import { searchRouter } from "./search.js";
+import { dutyPaymentsRouter } from "./duty-payments.js";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use(notificationsRouter);
 router.use(invoicesRouter);
 router.use(trackingRouter);
 router.use(searchRouter);
+router.use(dutyPaymentsRouter);
 
 export default router;

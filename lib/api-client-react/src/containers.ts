@@ -12,6 +12,9 @@ export type PipelineContainer = {
   assignedStaffName: string | null;
   stageOwnerName?: string | null;
   nextActionDueAt?: string | null;
+  duty?: number;
+  dutyPaid?: number;
+  dutyNotPaid?: number;
 };
 
 export type PipelineResponse = {

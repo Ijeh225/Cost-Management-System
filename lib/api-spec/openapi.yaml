@@ -177,6 +177,15 @@ paths:
           in: query
           schema:
             type: string
+        - name: berthed
+          in: query
+          schema:
+            type: string
+        - name: dutyPaymentStatus
+          in: query
+          description: "Filter by duty-payment status: paid, partial, unpaid, not_assessed"
+          schema:
+            type: string
         - name: page
           in: query
           schema:
@@ -1024,6 +1033,71 @@ paths:
               schema:
                 $ref: "#/components/schemas/IntelligenceResponse"
 
+  /duty-payments:
+    get:
+      operationId: listDutyPayments
+      tags: [DutyPayments]
+      summary: List containers with duty-payment status (admin / accounts only)
+      security: [{cookieAuth: []}]
+      parameters:
+        - name: status
+          in: query
+          description: "Filter by duty-payment status: paid, partial, unpaid, not_assessed"
+          schema: {type: string}
+        - name: search
+          in: query
+          schema: {type: string}
+        - name: dateFrom
+          in: query
+          schema: {type: string, format: date}
+        - name: dateTo
+          in: query
+          schema: {type: string, format: date}
+        - name: page
+          in: query
+          schema: {type: integer}
+        - name: limit
+          in: query
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Duty-payment rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DutyPaymentListResponse"
+
+  /duty-payments/{containerId}:
+    patch:
+      operationId: recordDutyPayment
+      tags: [DutyPayments]
+      summary: Record a duty payment for a container (admin / accounts only)
+      security: [{cookieAuth: []}]
+      parameters:
+        - name: containerId
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordDutyPaymentRequest"
+      responses:
+        "200":
+          description: Updated duty-payment row
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DutyPaymentRow"
+        "400":
+          description: Invalid amount
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -1169,6 +1243,10 @@ components:
         grossProfit:
           type: number
         dutyNotPaid:
+          type: number
+        duty:
+          type: number
+        dutyPaid:
           type: number
         clientId:
           type: integer
@@ -2063,3 +2141,55 @@ components:
           items:
             $ref: "#/components/schemas/IntelligenceInsight"
       required: [alerts, insights]
+
+    DutyPaymentRow:
+      type: object
+      properties:
+        containerId: {type: integer}
+        containerNumber: {type: string}
+        blNumber: {type: string}
+        customerName: {type: string}
+        status: {type: string}
+        duty: {type: number}
+        dutyPaid: {type: number}
+        dutyNotPaid: {type: number}
+        dutyStatus:
+          type: string
+          enum: [paid, partial, unpaid, not_assessed]
+        updatedAt: {type: string, nullable: true}
+        createdAt: {type: string}
+      required: [containerId, containerNumber, blNumber, customerName, status, duty, dutyPaid, dutyNotPaid, dutyStatus, createdAt]
+
+    DutyPaymentSummary:
+      type: object
+      properties:
+        totalAssessed: {type: number}
+        totalPaid: {type: number}
+        totalOutstanding: {type: number}
+        countPaid: {type: integer}
+        countPartial: {type: integer}
+        countUnpaid: {type: integer}
+        countNotAssessed: {type: integer}
+      required: [totalAssessed, totalPaid, totalOutstanding, countPaid, countPartial, countUnpaid, countNotAssessed]
+
+    DutyPaymentListResponse:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/DutyPaymentRow"
+        summary:
+          $ref: "#/components/schemas/DutyPaymentSummary"
+        total: {type: integer}
+        page: {type: integer}
+        limit: {type: integer}
+      required: [rows, summary, total, page, limit]
+
+    RecordDutyPaymentRequest:
+      type: object
+      properties:
+        amount: {type: number}
+        paymentDate: {type: string, format: date, nullable: true}
+        notes: {type: string, nullable: true}
+      required: [amount]

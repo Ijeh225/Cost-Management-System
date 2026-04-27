@@ -16,7 +16,7 @@ import {
 import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
   ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, Activity, BookOpen, FileCheck2,
-  Truck, Kanban,
+  Truck, Kanban, Banknote,
 } from "lucide-react";
 
 type NavItem = {
@@ -53,6 +53,7 @@ export function AppSidebar() {
     { title: "Containers",      url: "/containers",     icon: Box              },
     { title: "Clients",         url: "/clients",        icon: Building2        },
     { title: "Invoices",        url: "/invoices",       icon: FileText         },
+    { title: "Duty Payments",   url: "/duty-payments",  icon: Banknote         },
     { title: "Accounts Receivable", url: "/accounts-receivable", icon: BookOpen },
     { title: "My Tasks",        url: "/my-tasks",       icon: ListTodo         },
     { title: "Notifications",   url: "/notifications",  icon: Bell, badge: unreadCount },

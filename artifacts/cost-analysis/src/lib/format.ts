@@ -98,6 +98,48 @@ export function getStatusLabel(status: string): string {
 
 export const PHASE1_STATUSES = WORKFLOW_STAGES;
 
+export type DutyPaymentStatus = "paid" | "partial" | "unpaid" | "not_assessed";
+
+export function getDutyPaymentStatus(customs: {
+  duty?: number | string | null;
+  dutyPaid?: number | string | null;
+  dutyNotPaid?: number | string | null;
+} | null | undefined): DutyPaymentStatus {
+  const toNum = (v: number | string | null | undefined): number => {
+    if (v == null) return 0;
+    const n = typeof v === "number" ? v : parseFloat(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const duty = toNum(customs?.duty);
+  const paid = toNum(customs?.dutyPaid);
+  const explicitOutstanding = customs?.dutyNotPaid != null ? toNum(customs?.dutyNotPaid) : Math.max(duty - paid, 0);
+
+  if (duty <= 0) return "not_assessed";
+  if (explicitOutstanding <= 0 && paid > 0) return "paid";
+  if (paid > 0 && explicitOutstanding > 0) return "partial";
+  return "unpaid";
+}
+
+export function dutyPaymentChipClass(status: DutyPaymentStatus): string {
+  switch (status) {
+    case "paid":         return "bg-emerald-500/15 text-emerald-400 border-emerald-500/40";
+    case "partial":      return "bg-amber-500/15 text-amber-400 border-amber-500/40";
+    case "unpaid":       return "bg-red-500/15 text-red-400 border-red-500/40";
+    case "not_assessed":
+    default:             return "bg-slate-500/15 text-slate-400 border-slate-500/40";
+  }
+}
+
+export function dutyPaymentLabel(status: DutyPaymentStatus): string {
+  switch (status) {
+    case "paid":         return "Paid";
+    case "partial":      return "Partial";
+    case "unpaid":       return "Unpaid";
+    case "not_assessed":
+    default:             return "Not Assessed";
+  }
+}
+
 export const SECTION_LABELS: Record<string, string> = {
   shipping:         "Shipping",
   customs:          "Customs",
