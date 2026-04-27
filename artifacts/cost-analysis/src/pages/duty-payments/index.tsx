@@ -55,7 +55,8 @@ function fmtDate(d: string | null | undefined) {
 }
 
 function exportRowsToExcel(rows: DutyPaymentRow[]) {
-  const data = rows.map(r => ({
+  type ExcelRow = Record<string, string>;
+  const data: ExcelRow[] = rows.map(r => ({
     "Container #":      r.containerNumber,
     "BL #":             r.blNumber,
     Customer:           r.customerName,
@@ -69,7 +70,7 @@ function exportRowsToExcel(rows: DutyPaymentRow[]) {
   const ws = XLSX.utils.json_to_sheet(data);
   const headers = Object.keys(data[0] ?? {});
   ws["!cols"] = headers.map(h => {
-    const maxLen = Math.max(h.length, ...data.map(r => String((r as any)[h] ?? "").length));
+    const maxLen = Math.max(h.length, ...data.map(r => String(r[h] ?? "").length));
     return { wch: Math.min(maxLen + 2, 40) };
   });
   const wb = XLSX.utils.book_new();
@@ -159,7 +160,13 @@ export default function DutyPaymentsPage() {
       ...(dateFrom                ? { dateFrom }            : {}),
       ...(dateTo                  ? { dateTo }              : {}),
     },
-    { query: { queryKey: ["/api/duty-payments", { page, limit, statusFilter, debounced, dateFrom, dateTo }], enabled: !!isAuthenticated && allowed, refetchInterval: 30_000 } as any },
+    {
+      query: {
+        queryKey: ["/api/duty-payments", { page, limit, statusFilter, debounced, dateFrom, dateTo }] as const,
+        enabled:  !!isAuthenticated && allowed,
+        refetchInterval: 30_000,
+      },
+    },
   );
 
   const recordMut = useRecordDutyPayment({
@@ -171,8 +178,9 @@ export default function DutyPaymentsPage() {
         qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
         qc.invalidateQueries({ queryKey: ["/api/containers"] });
       },
-      onError: (e: any) => {
-        toast({ variant: "destructive", title: "Could not record payment", description: e?.message ?? "Unknown error" });
+      onError: (e: unknown) => {
+        const msg = e instanceof Error ? e.message : "Unknown error";
+        toast({ variant: "destructive", title: "Could not record payment", description: msg });
       },
     },
   });
@@ -262,7 +270,7 @@ export default function DutyPaymentsPage() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as any); setPage(1); }}>
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as "all" | DutyPaymentStatus); setPage(1); }}>
                 <SelectTrigger className="w-full sm:w-[180px] bg-background border-border/60" data-testid="select-status-filter">
                   <SelectValue />
                 </SelectTrigger>
@@ -301,7 +309,7 @@ export default function DutyPaymentsPage() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => { try { exportRowsToExcel(rows); toast({ title: "Excel exported" }); } catch (e: any) { toast({ variant: "destructive", title: "Export failed", description: e?.message }); } }}
+                    onClick={() => { try { exportRowsToExcel(rows); toast({ title: "Excel exported" }); } catch (e: unknown) { toast({ variant: "destructive", title: "Export failed", description: e instanceof Error ? e.message : "Export error" }); } }}
                     className="gap-2 cursor-pointer"
                   >
                     <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
@@ -311,7 +319,7 @@ export default function DutyPaymentsPage() {
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => { try { exportRowsToPdf(rows); toast({ title: "PDF exported" }); } catch (e: any) { toast({ variant: "destructive", title: "Export failed", description: e?.message }); } }}
+                    onClick={() => { try { exportRowsToPdf(rows); toast({ title: "PDF exported" }); } catch (e: unknown) { toast({ variant: "destructive", title: "Export failed", description: e instanceof Error ? e.message : "Export error" }); } }}
                     className="gap-2 cursor-pointer"
                   >
                     <FileText className="w-4 h-4 text-red-500" />
