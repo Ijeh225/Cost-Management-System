@@ -405,7 +405,7 @@ export default function Containers() {
                 </div>
                 {hasActiveFilters && (
                   <button
-                    onClick={() => { setStatus("all"); setProfitFilter("all"); setPaarFilter("all"); setBerthedFilter("all"); setDateFrom(""); setDateTo(""); setPage(1); }}
+                    onClick={() => { setStatus("all"); setProfitFilter("all"); setPaarFilter("all"); setBerthedFilter("all"); setDutyPaymentFilter("all"); setDateFrom(""); setDateTo(""); setPage(1); }}
                     className="mt-2 text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
                   >
                     <X className="w-3 h-3" /> Clear all filters

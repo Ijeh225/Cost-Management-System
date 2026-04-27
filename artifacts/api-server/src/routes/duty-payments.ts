@@ -35,6 +35,36 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
     const limit    = Math.min(500, Math.max(1, parseInt((req.query.limit as string) ?? "50", 10) || 50));
     const offset   = (page - 1) * limit;
 
+    const VALID_STATUSES = new Set(["all", "paid", "partial", "unpaid", "not_assessed"]);
+    if (status && !VALID_STATUSES.has(status)) {
+      res.status(400).json({ error: `Invalid status. Allowed: ${Array.from(VALID_STATUSES).join(", ")}` });
+      return;
+    }
+
+    let dateFromObj: Date | null = null;
+    if (dateFrom) {
+      const d = new Date(dateFrom);
+      if (isNaN(d.getTime())) {
+        res.status(400).json({ error: "Invalid dateFrom (expected ISO date)" });
+        return;
+      }
+      dateFromObj = d;
+    }
+    let dateToObj: Date | null = null;
+    if (dateTo) {
+      const d = new Date(dateTo);
+      if (isNaN(d.getTime())) {
+        res.status(400).json({ error: "Invalid dateTo (expected ISO date)" });
+        return;
+      }
+      d.setHours(23, 59, 59, 999);
+      dateToObj = d;
+    }
+    if (dateFromObj && dateToObj && dateFromObj > dateToObj) {
+      res.status(400).json({ error: "dateFrom must be on or before dateTo" });
+      return;
+    }
+
     const conds: SQL[] = [];
     if (search) {
       conds.push(or(
@@ -43,17 +73,8 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
         ilike(containersTable.customerName,    `%${search}%`),
       ) as SQL);
     }
-    if (dateFrom) {
-      const d = new Date(dateFrom);
-      if (!isNaN(d.getTime())) conds.push(gte(containersTable.createdAt, d));
-    }
-    if (dateTo) {
-      const d = new Date(dateTo);
-      if (!isNaN(d.getTime())) {
-        d.setHours(23, 59, 59, 999);
-        conds.push(lte(containersTable.createdAt, d));
-      }
-    }
+    if (dateFromObj) conds.push(gte(containersTable.createdAt, dateFromObj));
+    if (dateToObj)   conds.push(lte(containersTable.createdAt, dateToObj));
     const whereClause: SQL | undefined =
       conds.length === 0 ? undefined : (conds.length === 1 ? conds[0] : and(...conds));
 
