@@ -14,26 +14,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   Loader2, Search, FileCheck2, Clock, SendHorizonal, Inbox,
-  CheckCircle2, ChevronDown, ChevronRight, Download, Save, AlertTriangle,
+  CheckCircle2, ChevronDown, ChevronRight, Download, AlertTriangle,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CompletedJobsView } from "@/components/workspace/completed-jobs-view";
 
 const DEPT_STAGES = ["registered", "documentation", "duty_assessment"];
 
-const STAGE_SUBMIT_LABEL: Record<string, string> = {
-  registered:      "Submit to Documentation",
-  documentation:   "Submit to Duty Assessment",
-  duty_assessment: "Submit to Accounts",
-};
-
 const STAGE_FILTER_OPTIONS = [
-  { value: "all",              label: "All" },
-  { value: "documentation",   label: "Documentation" },
+  { value: "all",            label: "All" },
+  { value: "documentation",  label: "Documentation" },
   { value: "duty_assessment", label: "Duty Assessment" },
 ];
 
@@ -63,82 +57,78 @@ type DocContainer = PipelineContainer & { stage: string };
 function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () => void }) {
   const { toast } = useToast();
   const [expanded, setExpanded]         = useState(false);
-  const [stageOwner,     setStageOwner]     = useState(c.stageOwnerName    ?? "");
-  const [paarNumber,     setPaarNumber]     = useState(c.paarNumber         ?? "");
-  const [paarEta,        setPaarEta]        = useState(
+  const [stageOwner,      setStageOwner]      = useState(c.stageOwnerName    ?? "");
+  const [paarNumber,      setPaarNumber]      = useState(c.paarNumber         ?? "");
+  const [paarEta,         setPaarEta]         = useState(
     c.nextActionDueAt ? c.nextActionDueAt.slice(0, 10) : ""
   );
   const [paarReleaseDate, setPaarReleaseDate] = useState(
     c.paarReleasedAt ? c.paarReleasedAt.slice(0, 10) : ""
   );
   const [paarDelayReason, setPaarDelayReason] = useState(c.paarDelayReason ?? "");
-  const [delayReason,    setDelayReason]    = useState(c.delayReason      ?? "");
-  const [assessmentAmt,  setAssessmentAmt]  = useState(
+  const [delayReason,     setDelayReason]     = useState(c.delayReason      ?? "");
+  const [assessmentAmt,   setAssessmentAmt]   = useState(
     c.duty && c.duty > 0 ? String(c.duty) : ""
   );
+  const [busy, setBusy] = useState(false);
 
-  const updateCard   = useUpdateDocumentationCard();
+  const updateCard    = useUpdateDocumentationCard();
   const updateCharges = useUpdateContainerCharges();
-  const advance      = useAdvanceContainerStatus();
+  const advance       = useAdvanceContainerStatus();
 
   const isPaarOverdue = paarEta && new Date(paarEta) < new Date() && !paarReleaseDate;
+  const needsAssessment = c.stage === "duty_assessment";
+  const assessmentInvalid = needsAssessment && (!assessmentAmt || parseFloat(assessmentAmt) <= 0);
 
-  async function handleSave() {
+  async function handleSaveAndSubmit() {
+    if (assessmentInvalid) {
+      toast({ variant: "destructive", title: "Assessment amount required", description: "Enter a valid amount before submitting." });
+      return;
+    }
+    setBusy(true);
     try {
       await updateCard.mutateAsync({
         id: c.id,
-        stageOwner:       stageOwner     || null,
-        nextAction:       null,
-        nextActionDueDate: paarEta       || null,
-        delayReason:      delayReason    || null,
-        paarNumber:       paarNumber     || null,
-        paarReleasedAt:   paarReleaseDate || null,
-        paarDelayReason:  paarDelayReason || null,
+        stageOwner:        stageOwner      || null,
+        nextAction:        null,
+        nextActionDueDate: paarEta         || null,
+        delayReason:       delayReason     || null,
+        paarNumber:        paarNumber      || null,
+        paarReleasedAt:    paarReleaseDate || null,
+        paarDelayReason:   paarDelayReason || null,
       });
-      toast({ title: "Saved", description: `${c.containerNumber} details updated.` });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Save failed", description: (e as Error).message });
-    }
-  }
 
-  async function handleSubmit() {
-    if (c.stage === "duty_assessment") {
-      const amt = parseFloat(assessmentAmt);
-      if (!assessmentAmt || isNaN(amt) || amt <= 0) {
-        toast({ variant: "destructive", title: "Assessment amount required", description: "Enter a valid amount greater than zero before submitting." });
-        return;
-      }
-      try {
+      if (assessmentAmt && parseFloat(assessmentAmt) > 0) {
         await updateCharges.mutateAsync({
           id: c.id,
-          data: { section: "customs", customs: { duty: amt } },
+          data: { section: "customs", customs: { duty: parseFloat(assessmentAmt) } },
         });
-      } catch (e) {
-        toast({ variant: "destructive", title: "Failed to save assessment", description: (e as Error).message });
-        return;
       }
-    }
-    advance.mutate(
-      { id: c.id, status: c.stage },
-      {
-        onSuccess: () => {
-          toast({ title: `${c.containerNumber} submitted to next stage.` });
-          onSubmitSuccess();
-        },
-        onError: (e) => toast({ variant: "destructive", title: "Submission failed", description: (e as Error).message }),
-      }
-    );
-  }
 
-  const submitDisabled =
-    advance.isPending ||
-    updateCharges.isPending ||
-    (c.stage === "duty_assessment" && (!assessmentAmt || parseFloat(assessmentAmt) <= 0));
+      await new Promise<void>((resolve, reject) => {
+        advance.mutate(
+          { id: c.id, status: c.stage },
+          {
+            onSuccess: () => resolve(),
+            onError: (e) => reject(e),
+          }
+        );
+      });
+
+      toast({ title: "Submitted", description: `${c.containerNumber} saved and moved to next stage.` });
+      onSubmitSuccess();
+    } catch (e) {
+      toast({ variant: "destructive", title: "Submission failed", description: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const stageInfo = WORKFLOW_STAGES.find(s => s.value === c.stage);
 
   return (
     <Card className={`border transition-colors ${expanded ? "border-primary/30 bg-card" : "border-border/50 bg-card/60 hover:bg-accent/20"}`}>
+      {/* Card header — always visible, click to toggle */}
       <div
         className="p-4 flex items-center gap-3 cursor-pointer select-none"
         onClick={() => setExpanded(v => !v)}
@@ -146,15 +136,15 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
         <div className="shrink-0 text-muted-foreground">
           {expanded
             ? <ChevronDown className="w-4 h-4 text-primary" />
-            : <ChevronRight className="w-4 h-4" />
-          }
+            : <ChevronRight className="w-4 h-4" />}
         </div>
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm font-mono">{c.containerNumber}</span>
             <span className="text-muted-foreground text-xs font-mono">BL: {c.blNumber}</span>
             <DaysChip days={c.daysInStage} />
-            {paarEta && isPaarOverdue && (
+            {isPaarOverdue && (
               <span className="inline-flex items-center gap-1 text-[10px] text-red-400 bg-red-500/10 border border-red-500/30 rounded-full px-2 py-0.5">
                 <AlertTriangle className="w-2.5 h-2.5" /> PAAR overdue
               </span>
@@ -162,17 +152,18 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">{c.customerName}</p>
         </div>
-        <div className="shrink-0">
-          <Badge variant="outline" className={`text-[10px] ${getStatusColor(c.stage)}`}>
-            {stageInfo?.short ?? c.stage}
-          </Badge>
-        </div>
+
+        <Badge variant="outline" className={`shrink-0 text-[10px] ${getStatusColor(c.stage)}`}>
+          {stageInfo?.short ?? c.stage}
+        </Badge>
       </div>
 
+      {/* Expanded body */}
       {expanded && (
-        <CardContent className="pt-0 pb-4 px-4 space-y-4">
-          <Separator className="mb-4" />
+        <div className="px-4 pb-5 space-y-4">
+          <Separator />
 
+          {/* Row 1: Stage Owner + PAAR Number */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Stage Owner</Label>
@@ -194,6 +185,7 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
             </div>
           </div>
 
+          {/* Row 2: PAAR ETA + PAAR Release Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className={`text-xs ${isPaarOverdue ? "text-red-400" : "text-muted-foreground"}`}>
@@ -217,9 +209,31 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
             </div>
           </div>
 
+          {/* Row 3: Assessment Amount (always shown) */}
+          <div className="space-y-1.5">
+            <Label className={`text-xs font-medium ${needsAssessment ? "text-amber-400" : "text-muted-foreground"}`}>
+              Assessment Amount (₦){needsAssessment && <span className="text-red-400 ml-1">*</span>}
+            </Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={assessmentAmt}
+              onChange={e => setAssessmentAmt(e.target.value)}
+              placeholder="Enter NCS-assessed duty amount"
+              className={`h-8 text-sm bg-background font-mono ${needsAssessment ? "border-amber-500/40" : "border-border/60"}`}
+            />
+            {needsAssessment && (
+              <p className="text-[10px] text-muted-foreground">
+                Required — this amount will appear on the Duty Payments page.
+              </p>
+            )}
+          </div>
+
+          {/* Row 4: Delay reasons (optional, collapsible feel) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">PAAR Delay Reason <span className="text-muted-foreground/50">(optional)</span></Label>
+              <Label className="text-xs text-muted-foreground">PAAR Delay Reason <span className="opacity-50">(optional)</span></Label>
               <Textarea
                 value={paarDelayReason}
                 onChange={e => setPaarDelayReason(e.target.value)}
@@ -229,7 +243,7 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Delay Reason <span className="text-muted-foreground/50">(optional)</span></Label>
+              <Label className="text-xs text-muted-foreground">General Delay Reason <span className="opacity-50">(optional)</span></Label>
               <Textarea
                 value={delayReason}
                 onChange={e => setDelayReason(e.target.value)}
@@ -240,56 +254,25 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
             </div>
           </div>
 
-          {c.stage === "duty_assessment" && (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground font-semibold text-amber-400">
-                Assessment Amount (₦) <span className="text-red-400">*</span>
-              </Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={assessmentAmt}
-                onChange={e => setAssessmentAmt(e.target.value)}
-                placeholder="Enter NCS-assessed duty amount"
-                className="h-8 text-sm bg-background border-amber-500/40 font-mono"
-              />
-              <p className="text-[10px] text-muted-foreground">
-                This amount will be saved as Duty Assessed and appear on the Duty Payments page.
-              </p>
-            </div>
-          )}
-
           <Separator />
 
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Single action button */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-[11px] text-muted-foreground/60">
+              Saves all fields and moves this job to the next stage.
+            </p>
             <Button
-              size="sm"
-              variant="outline"
-              onClick={handleSave}
-              disabled={updateCard.isPending}
-              className="h-7 gap-1.5 text-xs"
+              onClick={handleSaveAndSubmit}
+              disabled={busy || assessmentInvalid}
+              className="gap-2 shrink-0"
             >
-              {updateCard.isPending
-                ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <Save className="w-3 h-3" />
-              }
-              Save Changes
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSubmit}
-              disabled={submitDisabled}
-              className="h-7 gap-1.5 text-xs"
-            >
-              {(advance.isPending || updateCharges.isPending)
-                ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <SendHorizonal className="w-3 h-3" />
-              }
-              {STAGE_SUBMIT_LABEL[c.stage] ?? "Submit"}
+              {busy
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <SendHorizonal className="w-4 h-4" />}
+              Save &amp; Submit
             </Button>
           </div>
-        </CardContent>
+        </div>
       )}
     </Card>
   );
@@ -324,16 +307,15 @@ export default function DocumentationWorkspace() {
       return;
     }
     const rows = filtered.map(c => ({
-      "Container #":      c.containerNumber,
-      "BL #":             c.blNumber ?? "",
-      "Customer":         c.customerName,
-      "Stage":            WORKFLOW_STAGES.find(s => s.value === c.stage)?.label ?? c.stage,
-      "PAAR Number":      c.paarNumber ?? "",
-      "PAAR ETA":         c.nextActionDueAt ? fmtDate(c.nextActionDueAt) : "",
-      "PAAR Release Date": c.paarReleasedAt ? fmtDate(c.paarReleasedAt) : "",
-      "PAAR Delay Reason": c.paarDelayReason ?? "",
-      "Delay Reason":     c.delayReason ?? "",
-      "Days in Stage":    c.daysInStage,
+      "Container #":       c.containerNumber,
+      "BL #":              c.blNumber ?? "",
+      "Customer":          c.customerName,
+      "Stage":             WORKFLOW_STAGES.find(s => s.value === (c as DocContainer).stage)?.label ?? (c as DocContainer).stage,
+      "PAAR Number":       c.paarNumber ?? "",
+      "PAAR ETA":          c.nextActionDueAt ? fmtDate(c.nextActionDueAt) : "",
+      "PAAR Release Date": c.paarReleasedAt  ? fmtDate(c.paarReleasedAt)  : "",
+      "Delay Reason":      c.delayReason ?? "",
+      "Days in Stage":     c.daysInStage,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const headers = Object.keys(rows[0]);
@@ -347,7 +329,8 @@ export default function DocumentationWorkspace() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+      {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center shrink-0">
@@ -361,7 +344,7 @@ export default function DocumentationWorkspace() {
         <div className="flex items-center gap-3 shrink-0">
           {!isLoading && (
             <div className="text-right">
-              <p className="text-2xl font-bold text-foreground">{allContainers.length}</p>
+              <p className="text-2xl font-bold">{allContainers.length}</p>
               <p className="text-xs text-muted-foreground">active jobs</p>
             </div>
           )}
@@ -382,6 +365,7 @@ export default function DocumentationWorkspace() {
         </TabsList>
 
         <TabsContent value="active" className="space-y-4 mt-6">
+          {/* Search + Filter row */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -405,11 +389,17 @@ export default function DocumentationWorkspace() {
                   }`}
                 >
                   {opt.label}
+                  {opt.value !== "all" && (
+                    <span className="ml-1.5 opacity-60">
+                      {allContainers.filter(c => c.stage === opt.value).length}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Job list */}
           {isLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -429,32 +419,10 @@ export default function DocumentationWorkspace() {
               </p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {DEPT_STAGES.map(stage => {
-                const containers = filtered.filter(c => c.stage === stage);
-                if (stageFilter !== "all" && stage !== stageFilter) return null;
-                if (containers.length === 0 && stageFilter !== "all") return null;
-                const stageInfo = WORKFLOW_STAGES.find(s => s.value === stage);
-                return (
-                  <div key={stage}>
-                    <div className="flex items-center gap-3 mb-3">
-                      <Badge variant="outline" className={`text-xs ${getStatusColor(stage)}`}>
-                        {stageInfo?.label ?? stage}
-                      </Badge>
-                      <span className="text-xs bg-muted rounded-full px-2 py-0.5 font-medium">{containers.length}</span>
-                    </div>
-                    {containers.length === 0 ? (
-                      <p className="text-sm text-muted-foreground/50 italic pl-1">No jobs at this stage.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {containers.map(c => (
-                          <DocCard key={c.id} c={c} onSubmitSuccess={() => refetch()} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="space-y-2">
+              {filtered.map(c => (
+                <DocCard key={c.id} c={c} onSubmitSuccess={() => refetch()} />
+              ))}
             </div>
           )}
         </TabsContent>
@@ -463,7 +431,7 @@ export default function DocumentationWorkspace() {
           <CompletedJobsView
             deptStages={DEPT_STAGES}
             emptyTitle="No jobs submitted yet"
-            emptySubtitle="Once you submit a job onward, it will show up here so you can review or update its expenses."
+            emptySubtitle="Once you submit a job, it will show up here for review."
           />
         </TabsContent>
       </Tabs>
