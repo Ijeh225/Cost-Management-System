@@ -18,7 +18,24 @@ export type NotificationsResponse = {
   unreadCount: number;
 };
 
+export type WorkflowNotification = {
+  id: number;
+  type: string;
+  message: string;
+  containerId?: number | null;
+  containerNumber?: string | null;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type WorkflowNotificationsResponse = {
+  notifications: WorkflowNotification[];
+  unreadCount: number;
+};
+
 const NOTIFICATIONS_KEY = ["notifications"] as const;
+const WORKFLOW_NOTIFICATIONS_KEY = ["workflow-notifications"] as const;
 
 export function useGetNotifications<T = NotificationsResponse>(options?: {
   query?: { refetchInterval?: number; enabled?: boolean };
@@ -27,6 +44,38 @@ export function useGetNotifications<T = NotificationsResponse>(options?: {
     queryKey: NOTIFICATIONS_KEY,
     queryFn: () => customFetch<T>("/api/notifications"),
     ...(options?.query ?? {}),
+  });
+}
+
+export function useGetWorkflowNotifications(options?: {
+  query?: { refetchInterval?: number; enabled?: boolean };
+}) {
+  return useQuery<WorkflowNotificationsResponse>({
+    queryKey: WORKFLOW_NOTIFICATIONS_KEY,
+    queryFn: () => customFetch<WorkflowNotificationsResponse>("/api/workflow-notifications"),
+    ...(options?.query ?? {}),
+  });
+}
+
+export function useMarkWorkflowNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation<{ success: boolean }, Error, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch(`/api/workflow-notifications/${id}/read`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: WORKFLOW_NOTIFICATIONS_KEY });
+    },
+  });
+}
+
+export function useMarkAllWorkflowNotificationsRead() {
+  const qc = useQueryClient();
+  return useMutation<{ success: boolean }, Error, void>({
+    mutationFn: () =>
+      customFetch("/api/workflow-notifications/read-all", { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: WORKFLOW_NOTIFICATIONS_KEY });
+    },
   });
 }
 

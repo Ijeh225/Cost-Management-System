@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable } from "@workspace/db";
+import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
@@ -80,6 +80,22 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     verifiedBy: c.verifiedBy ?? null,
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
+    expectedTransireDate: c.expectedTransireDate instanceof Date ? c.expectedTransireDate.toISOString() : (c.expectedTransireDate ?? null),
+    transireReleasedAt: c.transireReleasedAt instanceof Date ? c.transireReleasedAt.toISOString() : (c.transireReleasedAt ?? null),
+    transireDelayReason: c.transireDelayReason ?? null,
+    transireFinalDate: c.transireFinalDate instanceof Date ? c.transireFinalDate.toISOString() : (c.transireFinalDate ?? null),
+    expectedDoDate: c.expectedDoDate instanceof Date ? c.expectedDoDate.toISOString() : (c.expectedDoDate ?? null),
+    doReleasedAt: c.doReleasedAt instanceof Date ? c.doReleasedAt.toISOString() : (c.doReleasedAt ?? null),
+    doDelayReason: c.doDelayReason ?? null,
+    doFinalDate: c.doFinalDate instanceof Date ? c.doFinalDate.toISOString() : (c.doFinalDate ?? null),
+    expectedTdoDate: c.expectedTdoDate instanceof Date ? c.expectedTdoDate.toISOString() : (c.expectedTdoDate ?? null),
+    tdoReleasedAt: c.tdoReleasedAt instanceof Date ? c.tdoReleasedAt.toISOString() : (c.tdoReleasedAt ?? null),
+    tdoDelayReason: c.tdoDelayReason ?? null,
+    tdoFinalDate: c.tdoFinalDate instanceof Date ? c.tdoFinalDate.toISOString() : (c.tdoFinalDate ?? null),
+    expectedPulloutDate: c.expectedPulloutDate instanceof Date ? c.expectedPulloutDate.toISOString() : (c.expectedPulloutDate ?? null),
+    pulloutReleasedAt: c.pulloutReleasedAt instanceof Date ? c.pulloutReleasedAt.toISOString() : (c.pulloutReleasedAt ?? null),
+    pulloutDelayReason: c.pulloutDelayReason ?? null,
+    pulloutFinalDate: c.pulloutFinalDate instanceof Date ? c.pulloutFinalDate.toISOString() : (c.pulloutFinalDate ?? null),
   };
 }
 
@@ -333,6 +349,13 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       consignee: consignee || null,
     }).returning();
     await getOrCreateCharges(container.id);
+    // Notify: new job created
+    await db.insert(workflowNotificationsTable).values({
+      type: "new_job",
+      message: `New job created: ${containerNumber} (${resolvedCustomerName})`,
+      containerId: container.id,
+      containerNumber: container.containerNumber,
+    });
     res.status(201).json(formatContainer(container));
   } catch (err: any) {
     if (err.code === "23505") {
@@ -643,6 +666,23 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
       action: "status_advanced",
       section: "basic_info",
     });
+    // Notify: stage completed
+    try {
+      const STAGE_LABELS: Record<string, string> = {
+        registered: "Registered", documentation: "Documentation", duty_assessment: "Duty Assessment",
+        duty_payment: "Duty Payment", transire_processing: "Transire", shipping: "Shipping",
+        terminal: "Terminal", pull_out: "Pull-Out", gate_in: "Gate In", examination: "Examination",
+        final_release: "Final Release", delivery: "Delivery", closed: "Closed",
+      };
+      const fromLabel = STAGE_LABELS[existing.status] ?? existing.status;
+      const toLabel = STAGE_LABELS[nextStatus] ?? nextStatus;
+      await db.insert(workflowNotificationsTable).values({
+        type: "stage_complete",
+        message: `${existing.containerNumber} advanced from ${fromLabel} → ${toLabel}`,
+        containerId: id,
+        containerNumber: existing.containerNumber,
+      });
+    } catch {}
     res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
@@ -719,6 +759,74 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
       }
     }
     res.json({ container: formatContainer(updated), whatsappResult });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Container not found" });
+      return;
+    }
+    const {
+      action, expectedDate, delayReason, finalDate,
+    } = req.body;
+    if (!action) {
+      res.status(400).json({ error: "action is required" });
+      return;
+    }
+    const status = existing.status;
+    const STAGE_ACTION_FIELDS: Record<string, { expected: string; releasedAt: string; delayReason: string; finalDate: string; label: string }> = {
+      transire_processing: { expected: "expectedTransireDate", releasedAt: "transireReleasedAt", delayReason: "transireDelayReason", finalDate: "transireFinalDate", label: "Transire" },
+      shipping:            { expected: "expectedDoDate",       releasedAt: "doReleasedAt",       delayReason: "doDelayReason",       finalDate: "doFinalDate",       label: "Delivery Order (DO)" },
+      terminal:            { expected: "expectedTdoDate",      releasedAt: "tdoReleasedAt",      delayReason: "tdoDelayReason",      finalDate: "tdoFinalDate",      label: "TDO" },
+      pull_out:            { expected: "expectedPulloutDate",  releasedAt: "pulloutReleasedAt",  delayReason: "pulloutDelayReason",  finalDate: "pulloutFinalDate",  label: "Pullout" },
+    };
+    const fields = STAGE_ACTION_FIELDS[status];
+    if (!fields) {
+      res.status(400).json({ error: `Stage action not supported for status: ${status}` });
+      return;
+    }
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    let notifMsg: string | null = null;
+    if (action === "set_expected_date") {
+      if (!expectedDate) { res.status(400).json({ error: "expectedDate required" }); return; }
+      updates[fields.expected] = new Date(expectedDate);
+    } else if (action === "mark_released") {
+      updates[fields.releasedAt] = new Date();
+      notifMsg = `${fields.label} released for ${existing.containerNumber}`;
+    } else if (action === "record_delay") {
+      if (!delayReason) { res.status(400).json({ error: "delayReason required" }); return; }
+      updates[fields.delayReason] = delayReason;
+      if (finalDate) updates[fields.finalDate] = new Date(finalDate);
+      notifMsg = `Delay recorded for ${existing.containerNumber} at ${fields.label}: ${delayReason}`;
+    } else if (action === "update_stage_owner") {
+      updates.stageOwner = req.body.stageOwner || null;
+    } else {
+      res.status(400).json({ error: `Unknown action: ${action}` }); return;
+    }
+    const [updated] = await db.update(containersTable).set(updates).where(eq(containersTable.id, id)).returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "stage_control",
+      section: "basic_info",
+      reason: `Stage action: ${action} for ${fields.label}${delayReason ? ` — ${delayReason}` : ""}`,
+    });
+    if (notifMsg) {
+      await db.insert(workflowNotificationsTable).values({
+        type: action === "mark_released" ? "stage_complete" : "delay_recorded",
+        message: notifMsg,
+        containerId: id,
+        containerNumber: existing.containerNumber,
+      });
+    }
+    res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });

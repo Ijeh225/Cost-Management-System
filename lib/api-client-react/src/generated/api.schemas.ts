@@ -143,6 +143,32 @@ export interface Container {
   berthingConfirmedByName?: string | null;
   createdAt: string;
   updatedAt: string;
+  expectedTransireDate?: string | null;
+  transireReleasedAt?: string | null;
+  transireDelayReason?: string | null;
+  transireFinalDate?: string | null;
+  expectedDoDate?: string | null;
+  doReleasedAt?: string | null;
+  doDelayReason?: string | null;
+  doFinalDate?: string | null;
+  expectedTdoDate?: string | null;
+  tdoReleasedAt?: string | null;
+  tdoDelayReason?: string | null;
+  tdoFinalDate?: string | null;
+  expectedPulloutDate?: string | null;
+  pulloutReleasedAt?: string | null;
+  pulloutDelayReason?: string | null;
+  pulloutFinalDate?: string | null;
+  deliveryTime?: string | null;
+  deliveryLocation?: string | null;
+  truckNumber?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  dispatchOfficer?: string | null;
+  deliveryStatus?: string | null;
+  offloadingConfirmed?: boolean | null;
+  emptyReturnDueDate?: string | null;
+  emptyReturnDate?: string | null;
 }
 
 export interface ContainerListResponse {

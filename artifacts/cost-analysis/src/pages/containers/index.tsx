@@ -106,7 +106,8 @@ export default function Containers() {
 
   const { data: pendingData } = useListContainers(
     { page: 1, limit: 100, status: "pending_verification" },
-    { query: { enabled: isAdmin } }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { query: { enabled: isAdmin } as any }
   );
   const pendingCount = pendingData?.total ?? 0;
 

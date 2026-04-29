@@ -384,3 +384,29 @@ export function useDeleteContainerExtraCharge(containerId: number) {
   });
 }
 
+export type StageActionRequest = {
+  id: number;
+  action: "set_expected_date" | "mark_released" | "record_delay" | "update_stage_owner";
+  expectedDate?: string | null;
+  delayReason?: string | null;
+  finalDate?: string | null;
+  stageOwner?: string | null;
+};
+
+export function useStageAction() {
+  const qc = useQueryClient();
+  return useMutation<import("./generated/api.schemas").Container, Error, StageActionRequest>({
+    mutationFn: ({ id, ...body }) =>
+      customFetch(`/api/containers/${id}/stage-action`, {
+        method: "POST",
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
+      qc.invalidateQueries({ queryKey: ["workflow-notifications"] });
+    },
+  });
+}
+

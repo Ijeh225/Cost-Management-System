@@ -50,7 +50,8 @@ export function CompletedJobsView({
       ...(statusParam ? { status: statusParam } : {}),
       ...(search.trim() ? { search: search.trim() } : {}),
     },
-    { query: { enabled: downstreamStatuses.length > 0 } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { query: { enabled: downstreamStatuses.length > 0 } as any },
   );
 
   const containers = data?.containers ?? [];

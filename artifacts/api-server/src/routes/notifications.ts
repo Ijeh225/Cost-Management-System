@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable } from "@workspace/db";
-import { eq, lt, sql, max, isNotNull } from "drizzle-orm";
+import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable } from "@workspace/db";
+import { eq, lt, sql, max, isNotNull, desc } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery } from "../lib/calculations.js";
 
@@ -371,6 +371,91 @@ notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, 
         set: { isRead: true, readAt: sql`CASE WHEN ${notificationsReadTable.isRead} THEN ${notificationsReadTable.readAt} ELSE ${now} END` },
       });
     return res.json({ success: true, marked: alerts.length });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Workflow notifications (event-based: new_job, stage_complete, overdue, delay_recorded)
+notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res) => {
+  try {
+    // Check for overdue stages and auto-create notifications (deduplicated by checking recent ones)
+    const containers = await db.select().from(containersTable);
+    const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+    const STAGE_OVERDUE_CHECK: Array<{
+      stage: string;
+      expectedField: keyof typeof containers[0];
+      releasedField: keyof typeof containers[0];
+      label: string;
+    }> = [
+      { stage: "transire_processing", expectedField: "expectedTransireDate", releasedField: "transireReleasedAt", label: "Transire" },
+      { stage: "shipping",            expectedField: "expectedDoDate",       releasedField: "doReleasedAt",       label: "Delivery Order (DO)" },
+      { stage: "terminal",            expectedField: "expectedTdoDate",      releasedField: "tdoReleasedAt",      label: "TDO" },
+      { stage: "pull_out",            expectedField: "expectedPulloutDate",  releasedField: "pulloutReleasedAt",  label: "Pullout" },
+    ];
+    for (const c of containers) {
+      if (c.status === "closed") continue;
+      for (const check of STAGE_OVERDUE_CHECK) {
+        if (c.status !== check.stage) continue;
+        const expectedDate = c[check.expectedField] as Date | null;
+        const releasedAt = c[check.releasedField] as Date | null;
+        if (!expectedDate || releasedAt) continue;
+        const exp = new Date(expectedDate); exp.setUTCHours(0, 0, 0, 0);
+        if (exp.getTime() < today.getTime()) {
+          const overdueDays = Math.floor((today.getTime() - exp.getTime()) / 86_400_000);
+          const message = `${check.label} overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}: ${c.containerNumber}`;
+          // Check if an identical unread notification already exists today
+          const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const [existing] = await db.select({ id: workflowNotificationsTable.id })
+            .from(workflowNotificationsTable)
+            .where(
+              eq(workflowNotificationsTable.containerId, c.id)
+            )
+            .limit(1);
+          if (!existing) {
+            await db.insert(workflowNotificationsTable).values({
+              type: "overdue",
+              message,
+              containerId: c.id,
+              containerNumber: c.containerNumber,
+            });
+          }
+        }
+      }
+    }
+
+    const notifications = await db.select()
+      .from(workflowNotificationsTable)
+      .orderBy(desc(workflowNotificationsTable.createdAt))
+      .limit(100);
+    const unreadCount = notifications.filter(n => !n.isRead).length;
+    return res.json({ notifications, unreadCount });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+notificationsRouter.post("/workflow-notifications/:id/read", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.update(workflowNotificationsTable)
+      .set({ isRead: true, readAt: new Date() })
+      .where(eq(workflowNotificationsTable.id, id));
+    return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+notificationsRouter.post("/workflow-notifications/read-all", requireAuth, async (_req, res) => {
+  try {
+    await db.update(workflowNotificationsTable)
+      .set({ isRead: true, readAt: new Date() })
+      .where(eq(workflowNotificationsTable.isRead, false));
+    return res.json({ success: true });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { GlobalSearch } from "./global-search";
+import { NotificationBeepBell } from "./notification-beep";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -57,6 +58,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
             <div className="flex items-center gap-3">
               <GlobalSearch />
+              <NotificationBeepBell isAuthenticated={!!user} />
               <div className="h-6 w-px bg-border/50"></div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
