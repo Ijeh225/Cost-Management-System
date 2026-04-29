@@ -373,13 +373,42 @@ function OperationalForm({
   const isOverdue =
     nextActionDueDate && new Date(nextActionDueDate) < new Date();
 
-  const isDeliveryStage = container.status === "delivery";
+  const isDeliveryStage    = container.status === "delivery";
+  const isDutyPaymentStage = container.status === "duty_payment";
+  const [, navigate] = useLocation();
+
   const dexStatusColor: Record<string, string> = {
     pending: "text-muted-foreground bg-muted/50 border-border/50",
     in_transit: "text-blue-400 bg-blue-500/10 border-blue-500/30",
     delivered: "text-green-400 bg-green-500/10 border-green-500/30",
   };
   const dexStatusLabel: Record<string, string> = { pending: "Pending", in_transit: "In Transit", delivered: "Delivered" };
+
+  if (isDutyPaymentStage) {
+    return (
+      <Card className="border-orange-500/30 bg-orange-500/5">
+        <CardContent className="pt-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="text-orange-400 text-base">₦</span> Duty Payment Required
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Record the duty payment to automatically advance this job to the next stage.
+              </p>
+            </div>
+            <Button
+              onClick={() => navigate(`/duty-payments?focus=${container.id}`)}
+              className="gap-2 shrink-0 bg-orange-600 hover:bg-orange-700"
+            >
+              <ChevronRight className="w-4 h-4" />
+              Pay Duty
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">

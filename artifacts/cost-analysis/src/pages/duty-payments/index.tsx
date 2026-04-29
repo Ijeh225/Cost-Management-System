@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   useListDutyPayments,
   useRecordDutyPayment,
+  useAdvanceContainerStatus,
   listDutyPayments,
   type DutyPaymentRow,
 } from "@workspace/api-client-react";
@@ -131,6 +132,7 @@ export default function DutyPaymentsPage() {
   const [showFilters,  setShowFilters]  = useState(false);
   const [page,         setPage]         = useState(1);
   const [recordFor,    setRecordFor]    = useState<DutyPaymentRow | null>(null);
+  const pendingRecordRef = useRef<DutyPaymentRow | null>(null);
   const limit = 25;
 
   useEffect(() => {
@@ -170,16 +172,34 @@ export default function DutyPaymentsPage() {
     },
   );
 
+  const advanceMut = useAdvanceContainerStatus();
+
   const recordMut = useRecordDutyPayment({
     mutation: {
       onSuccess: () => {
-        toast({ title: "Duty payment recorded" });
+        const paid = pendingRecordRef.current;
+        pendingRecordRef.current = null;
+        toast({ title: "Payment recorded", description: "Job has been moved to the next stage." });
         setRecordFor(null);
         qc.invalidateQueries({ queryKey: ["/api/duty-payments"] });
         qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
         qc.invalidateQueries({ queryKey: ["/api/containers"] });
+        if (paid?.status === "duty_payment") {
+          advanceMut.mutate(
+            { id: paid.containerId, status: "duty_payment" },
+            {
+              onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/containers"] }),
+              onError: (e) => toast({
+                variant: "destructive",
+                title: "Stage advance failed",
+                description: (e as Error).message,
+              }),
+            }
+          );
+        }
       },
       onError: (e: unknown) => {
+        pendingRecordRef.current = null;
         const msg = e instanceof Error ? e.message : "Unknown error";
         toast({ variant: "destructive", title: "Could not record payment", description: msg });
       },
@@ -536,6 +556,7 @@ export default function DutyPaymentsPage() {
         onClose={() => setRecordFor(null)}
         onSubmit={(amount, paymentDate, notes) => {
           if (!recordFor) return;
+          pendingRecordRef.current = recordFor;
           recordMut.mutate({
             containerId: recordFor.containerId,
             data: { amount, paymentDate: paymentDate || null, notes: notes || null },
