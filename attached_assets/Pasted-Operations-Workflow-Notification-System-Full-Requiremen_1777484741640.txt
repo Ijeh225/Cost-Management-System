@@ -1,0 +1,101 @@
+Operations Workflow & Notification System – Full Requirement
+
+TRANSIRE 
+In the Operations workflow, the following fields should be removed:
+
+Stage Name
+Next Action
+Next Action Due Date
+
+Instead, the interface should display only:
+
+Stage Owner (the responsible person)
+Expected Date (based on the specific stage, e.g., Transire RELEASE DATE )
+2. Stage-Based Expected Date Tracking
+
+Each stage will have its own Expected Date and tracking logic:
+
+a. Transire Stage
+Field: Expected Transire Date
+If the date is reached and the Transire is not released:
+The system should flag/alert the delay
+The assigned user must:
+Provide a reason for delay
+Enter a Final Transire Date
+If released:
+User clicks a “Mark as Released” button (or checkbox)
+System updates status and logs completion
+b. Shipping Stage (Delivery Order – DO)
+Field: Expected DO Date
+Same logic applies:
+If not released on time → system flags it
+User provides reason + updated final date
+User can confirm release via button
+c. Terminal Stage (TDO – Terminal Delivery Order)
+Field: Expected TDO Date
+Same behavior:
+Delay → system alert
+User input → reason + final date
+Completion → “Mark as Released”
+d. Pullout Stage
+Field: Expected Pullout Date
+If container is not pulled on the expected date:
+System should automatically flag it, even if the user does nothing
+User must:
+Confirm if pulled (via button)
+Or provide reason + updated date
+3. Automatic System Behavior
+
+For all stages:
+
+When expected date is reached:
+If no confirmation is made → system flags it as overdue
+When user confirms completion:
+System:
+Updates job status
+Moves job to next stage automatically
+When delayed:
+System logs:
+Delay reason
+New final date
+4. Notification & Alert System
+a. Event-Based Notifications
+
+The system should trigger notifications when:
+
+A stage reaches its expected date without completion
+A new job is created
+A stage is marked as completed
+A delay is recorded
+
+Notifications should be sent to:
+
+The assigned Stage Owner
+The system/dashboard (global visibility)
+b. Persistent Alert (Beep Sound Requirement)
+The system should produce a continuous beep sound when:
+There is a new job
+There is an overdue task
+There is a critical update
+The sound should:
+Continue non-stop (looping)
+Only stop when a user opens or acknowledges the notification
+This is an enhancement over the current single beep system.
+5. User Actions Summary
+
+At every stage, the user should be able to:
+
+Input Expected Date
+Click “Mark as Released / Completed”
+If delayed:
+Enter Reason
+Enter Final Date
+6. Key Outcome
+
+This system ensures:
+
+Clear accountability (Stage Owner-based)
+Real-time tracking of delays
+Automatic workflow progression
+Strong notification system (including persistent alerts)
+Reduced manual follow-up
