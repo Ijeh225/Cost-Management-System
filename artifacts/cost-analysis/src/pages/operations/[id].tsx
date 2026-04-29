@@ -483,6 +483,44 @@ function OpsStageTracker({
           )}
         </CardContent>
       </Card>
+
+      {/* Submit to Next Stage */}
+      {isEditable && nextStage && (() => {
+        const submitLabel = DEPT_SUBMIT_LABELS["operations_user"]?.[container.status] ?? `Submit to ${getStatusLabel(nextStage)}`;
+        const handleSubmit = async () => {
+          try {
+            await advanceMutation.mutateAsync({ id: container.id, status: nextStage });
+            toast({ title: submitLabel });
+          } catch (err) {
+            toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Failed to advance" });
+          }
+        };
+        return (
+          <Card className="border-primary/20 bg-primary/5 backdrop-blur-sm">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{submitLabel}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Move this job from{" "}
+                    <span className="font-medium text-foreground/70">{getStatusLabel(container.status)}</span>
+                    {" → "}
+                    <span className="font-medium text-primary">{getStatusLabel(nextStage)}</span>
+                  </p>
+                </div>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={advanceMutation.isPending}
+                  className="gap-2 shrink-0"
+                >
+                  {advanceMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
+                  {submitLabel}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
