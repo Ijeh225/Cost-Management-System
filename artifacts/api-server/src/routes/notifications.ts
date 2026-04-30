@@ -20,6 +20,11 @@ const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
   terminal_manager: new Set([
     "high_terminal",
     "berthing_confirmation_needed",
+    "aging_warn",
+    "aging_high",
+    "aging_critical",
+    "inactive",
+    "action_overdue",
     "rejected_section",
   ]),
   operations_user: new Set([
