@@ -3,10 +3,11 @@ import { Link } from "wouter";
 import {
   useGetWorkflowNotifications,
   useMarkAllWorkflowNotificationsRead,
+  useMarkWorkflowNotificationRead,
   useGetNotifications,
+  useMarkAllNotificationsRead,
   type WorkflowNotification,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, BriefcaseIcon, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,18 +19,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const NOTIF_TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  new_job:       { icon: BriefcaseIcon,  color: "text-blue-400",   label: "New Job"          },
-  stage_complete:{ icon: CheckCircle2,   color: "text-emerald-400", label: "Stage Completed"  },
-  overdue:       { icon: AlertTriangle,  color: "text-red-400",    label: "Overdue"           },
-  delay_recorded:{ icon: Clock,          color: "text-amber-400",  label: "Delay Recorded"    },
-  action_overdue:       { icon: AlertTriangle, color: "text-red-400",    label: "Action Overdue"      },
-  empty_return_overdue: { icon: AlertTriangle, color: "text-orange-400", label: "Empty Return Overdue" },
-  aging_critical:       { icon: AlertTriangle, color: "text-red-400",    label: "Critical Aging"      },
-  aging_high:           { icon: AlertTriangle, color: "text-orange-400", label: "High Aging"          },
-  aging_warn:           { icon: Clock,         color: "text-yellow-400", label: "Aging Warning"       },
-  overdue_task:         { icon: Clock,         color: "text-amber-400",  label: "Overdue Task"        },
-  inactive:             { icon: Clock,         color: "text-muted-foreground", label: "Inactive"      },
+const NOTIF_TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string }> = {
+  new_job:       { icon: BriefcaseIcon,  color: "text-blue-400"          },
+  stage_complete:{ icon: CheckCircle2,   color: "text-emerald-400"        },
+  overdue:       { icon: AlertTriangle,  color: "text-red-400"            },
+  delay_recorded:{ icon: Clock,          color: "text-amber-400"          },
+  action_overdue:       { icon: AlertTriangle, color: "text-red-400"      },
+  empty_return_overdue: { icon: AlertTriangle, color: "text-orange-400"   },
+  aging_critical:       { icon: AlertTriangle, color: "text-red-400"      },
+  aging_high:           { icon: AlertTriangle, color: "text-orange-400"   },
+  aging_warn:           { icon: Clock,         color: "text-yellow-400"   },
+  overdue_task:         { icon: Clock,         color: "text-amber-400"    },
+  inactive:             { icon: Clock,         color: "text-muted-foreground" },
 };
 
 function playBeep(ctx: AudioContext) {
@@ -55,12 +56,13 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
     query: { refetchInterval: POLL, enabled: isAuthenticated },
   });
 
-  const markAllRead = useMarkAllWorkflowNotificationsRead();
-  const qc = useQueryClient();
+  const markAllWorkflow  = useMarkAllWorkflowNotificationsRead();
+  const markOneWorkflow  = useMarkWorkflowNotificationRead();
+  const markAllClassic   = useMarkAllNotificationsRead();
 
   const notifications: WorkflowNotification[] = workflowData?.notifications ?? [];
   const workflowUnread: number = workflowData?.unreadCount ?? 0;
-  const classicUnread: number = (classicData as any)?.unreadCount ?? 0;
+  const classicUnread: number  = (classicData as any)?.unreadCount ?? 0;
   const totalUnread = workflowUnread + classicUnread;
   const hasUnread = totalUnread > 0;
 
@@ -99,21 +101,18 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
     };
   }, [beepActive]);
 
-  const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen);
-    if (isOpen && hasUnread) {
-      setBeepActive(false);
-      if (workflowUnread > 0) markAllRead.mutate();
-    }
+  const handleMarkAllRead = () => {
+    markAllWorkflow.mutate();
+    markAllClassic.mutate();
   };
 
   if (!isAuthenticated) return null;
 
   return (
-    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="relative h-9 w-9 p-0 rounded-full">
-          <Bell className={`w-4 h-4 ${hasUnread ? "text-primary animate-[bell-ring_0.5s_ease-in-out_infinite]" : "text-muted-foreground"}`} />
+          <Bell className={`w-4 h-4 ${hasUnread ? "text-primary" : "text-muted-foreground"}`} />
           {hasUnread && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white leading-none">
               {totalUnread > 9 ? "9+" : totalUnread}
@@ -125,7 +124,7 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
         <DropdownMenuLabel className="flex items-center justify-between">
           <span className="flex items-center gap-2">
             <Bell className="w-3.5 h-3.5 text-muted-foreground" />
-            Alerts & Notifications
+            Alerts &amp; Notifications
             {totalUnread > 0 && (
               <span className="text-[10px] bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none font-bold">
                 {totalUnread}
@@ -148,14 +147,16 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
               </p>
             </div>
             <DropdownMenuItem asChild className="cursor-pointer py-2.5">
-              <Link href="/notifications">
+              <Link href="/notifications" onClick={() => setOpen(false)}>
                 <div className="flex items-center gap-3 w-full">
                   <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-foreground leading-tight">
                       {classicUnread} unread system alert{classicUnread !== 1 ? "s" : ""}
                     </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Click to view on the Notifications page</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Click to view — alerts mark read on the Notifications page
+                    </p>
                   </div>
                   <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
                 </div>
@@ -174,6 +175,7 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
             </p>
           </div>
         )}
+
         {notifications.length === 0 && classicUnread === 0 ? (
           <div className="py-6 text-center text-xs text-muted-foreground">
             No new notifications
@@ -183,7 +185,15 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
             const cfg = NOTIF_TYPE_CONFIG[n.type] ?? NOTIF_TYPE_CONFIG.stage_complete;
             const Icon = cfg.icon;
             return (
-              <DropdownMenuItem key={n.id} asChild className={`cursor-pointer py-2.5 ${n.isRead ? "opacity-60" : ""}`}>
+              <DropdownMenuItem
+                key={n.id}
+                asChild
+                className={`cursor-pointer py-2.5 ${n.isRead ? "opacity-60" : ""}`}
+                onClick={() => {
+                  if (!n.isRead) markOneWorkflow.mutate({ id: n.id });
+                  setOpen(false);
+                }}
+              >
                 <Link href={n.containerId ? `/operations/${n.containerId}` : "/notifications"}>
                   <div className="flex items-start gap-3 w-full">
                     <Icon className={`w-4 h-4 shrink-0 mt-0.5 ${cfg.color}`} />
@@ -207,7 +217,7 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => { markAllRead.mutate(); qc.invalidateQueries({ queryKey: ["/api/notifications"] }); }}
+              onClick={handleMarkAllRead}
               className="text-xs text-muted-foreground cursor-pointer justify-center gap-2"
             >
               <CheckCheck className="w-3.5 h-3.5" />

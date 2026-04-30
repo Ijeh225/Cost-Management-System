@@ -1,0 +1,78 @@
+Notification System Adjustment Request
+From the screenshots provided, the notification system is generally working well, including the alert (beep) functionality. However, a few improvements are needed to make the behavior more accurate and user-friendly:
+
+
+Unread Count Not Updating
+
+
+Currently, all notifications remain marked as unread, even after they have been opened or viewed.
+
+
+Once a notification is clicked or opened, it should automatically move from unread to read.
+
+
+The system should properly display the number of read and unread messages accordingly.
+
+
+
+
+Notification Bell Count Not Clearing
+
+
+The notification bell shows a count (e.g., 8 unread messages).
+
+
+After opening the notification panel, the count remains the same.
+
+
+Expected behavior: once the user opens the notification dropdown or views the notifications, the unread count should update or clear appropriately.
+
+
+
+
+Click-to-Open & Auto-Mark as Read
+
+
+When a user clicks on a specific notification (e.g., delay alert, negative profit, workflow update), it should:
+
+
+Redirect the user directly to the relevant page (e.g., container details or issue page).
+
+
+Automatically mark that notification as read.
+
+
+Immediately reduce it from the unread count.
+
+
+
+
+
+
+Consistent Behavior Across All Views
+
+
+The same logic should apply both in the dropdown (notification bell) and the full Notifications page.
+
+
+Any interaction with a notification (viewing or clicking) should instantly reflect in its read/unread status.
+
+
+
+
+Beep Sound Behavior Adjustment
+
+
+Currently, the beep sound stops as soon as the notification bell is opened.
+
+
+Proposed improvement: the beep sound should continue until the user navigates to and views the specific notification that triggered the alert.
+
+
+In other words, opening the notification panel alone should not stop the sound—the alert should only stop once the exact issue has been accessed or acknowledged.
+
+
+
+
+
+This will make the notification system more precise, actionable, and aligned with real user interaction.

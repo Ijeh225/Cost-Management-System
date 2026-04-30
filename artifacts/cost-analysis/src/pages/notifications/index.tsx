@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import {
   useGetNotifications, useMarkAllNotificationsRead, useMarkNotificationRead,
+  useMarkNotificationsViewed,
   type Notification,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Bell, BellOff, AlertTriangle, TrendingDown, DollarSign,
   Clock, ShieldAlert, ListTodo, Activity, CheckCheck,
-  ExternalLink, Loader2, RefreshCw, XCircle, Check, Anchor,
+  ExternalLink, Loader2, RefreshCw, XCircle, Anchor,
 } from "lucide-react";
 
 const ALERT_CONFIG: Record<string, { icon: any; color: string; bg: string; border: string; label: string }> = {
@@ -55,9 +56,7 @@ function NotificationRow({ notif }: { notif: Notification }) {
   const Icon = cfg.icon;
   const markRead = useMarkNotificationRead();
 
-  const handleMarkRead = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleRowClick = () => {
     if (!notif.isRead) {
       markRead.mutate({ alertKey: notif.alertKey });
     }
@@ -68,7 +67,8 @@ function NotificationRow({ notif }: { notif: Notification }) {
       layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors ${
+      onClick={handleRowClick}
+      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer ${
         notif.isRead ? "opacity-55 hover:opacity-70" : "bg-primary/[0.025] hover:bg-primary/[0.04]"
       }`}
     >
@@ -86,25 +86,14 @@ function NotificationRow({ notif }: { notif: Notification }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-[11px] text-muted-foreground">{formatTime(notif.generatedAt)}</span>
-            {!notif.isRead && (
-              <button
-                onClick={handleMarkRead}
-                disabled={markRead.isPending}
-                title="Mark as read"
-                className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground"
-              >
-                {markRead.isPending ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Check className="w-3 h-3" />
-                )}
-              </button>
+            {markRead.isPending && (
+              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
             )}
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
         {notif.containerId && (
-          <div className="mt-2">
+          <div className="mt-2" onClick={e => e.stopPropagation()}>
             <Link href={`/containers/${notif.containerId}`}>
               <span className="flex items-center gap-1 text-xs text-primary hover:underline w-fit">
                 View container {notif.containerNumber && `· ${notif.containerNumber}`}
@@ -125,10 +114,15 @@ export default function NotificationsPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const { data, isLoading, refetch, isFetching } = useGetNotifications({
-    query: { refetchInterval: 60_000 },
+    query: { refetchInterval: 30_000 },
   });
 
-  const markAll = useMarkAllNotificationsRead();
+  const markAll    = useMarkAllNotificationsRead();
+  const markViewed = useMarkNotificationsViewed();
+
+  useEffect(() => {
+    markViewed.mutate();
+  }, []);
 
   const notifications: Notification[] = data?.notifications ?? [];
   const unreadCount: number = data?.unreadCount ?? 0;
