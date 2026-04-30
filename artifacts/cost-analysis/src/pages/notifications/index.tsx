@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import {
   useGetNotifications,
   useMarkAllNotificationsRead,
@@ -25,33 +25,35 @@ import {
   Bell, BellOff, AlertTriangle, TrendingDown, DollarSign,
   Clock, ShieldAlert, ListTodo, Activity, CheckCheck,
   ExternalLink, Loader2, RefreshCw, XCircle, Anchor,
-  BriefcaseIcon, CheckCircle2, Filter, CalendarRange,
+  BriefcaseIcon, CheckCircle2, Filter, CalendarRange, ArrowRight,
 } from "lucide-react";
 
+// ─── Alert type config ─────────────────────────────────────────────────────────
+
 const ALERT_CONFIG: Record<string, { icon: any; color: string; bg: string; border: string; label: string }> = {
-  negative_profit:  { icon: TrendingDown,  color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Negative Profit"    },
-  low_margin:       { icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Low Profit Margin"  },
-  high_terminal:    { icon: DollarSign,    color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "High Terminal Cost" },
-  high_delivery:    { icon: DollarSign,    color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "High Delivery Cost" },
-  unpaid_duty:      { icon: DollarSign,    color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20", label: "Unpaid Duty"        },
-  delayed:          { icon: Clock,         color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "Delayed Container"  },
-  aging_warn:       { icon: Clock,         color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "Clearing Delay"     },
-  aging_high:       { icon: Clock,         color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Long Delay"         },
-  aging_critical:   { icon: Clock,         color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Critical Delay"     },
-  inactive:         { icon: Activity,      color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "No Activity"        },
-  overdue_task:     { icon: ListTodo,      color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Overdue Task"       },
-  stale_approval:   { icon: ShieldAlert,   color: "text-violet-400", bg: "bg-violet-400/10", border: "border-violet-400/20", label: "Stale Approval"     },
-  rejected_section: { icon: XCircle,       color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Section Rejected"   },
+  negative_profit:  { icon: TrendingDown,  color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Negative Profit"         },
+  low_margin:       { icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Low Profit Margin"       },
+  high_terminal:    { icon: DollarSign,    color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "High Terminal Cost"      },
+  high_delivery:    { icon: DollarSign,    color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "High Delivery Cost"      },
+  unpaid_duty:      { icon: DollarSign,    color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20", label: "Unpaid Duty"             },
+  delayed:          { icon: Clock,         color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "Delayed Container"       },
+  aging_warn:       { icon: Clock,         color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "Clearing Delay"          },
+  aging_high:       { icon: Clock,         color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Long Delay"              },
+  aging_critical:   { icon: Clock,         color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Critical Delay"          },
+  inactive:         { icon: Activity,      color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "No Activity"             },
+  overdue_task:     { icon: ListTodo,      color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Overdue Task"            },
+  stale_approval:   { icon: ShieldAlert,   color: "text-violet-400", bg: "bg-violet-400/10", border: "border-violet-400/20", label: "Stale Approval"          },
+  rejected_section: { icon: XCircle,       color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20",    label: "Section Rejected"        },
   action_overdue:               { icon: ShieldAlert, color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Action Overdue"          },
   empty_return_overdue:         { icon: Clock,       color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Empty Return Overdue"    },
   berthing_confirmation_needed: { icon: Anchor,      color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "Confirm Berthing"        },
 };
 
 const WORKFLOW_TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string; border: string; label: string }> = {
-  new_job:       { icon: BriefcaseIcon,  color: "text-blue-400",    bg: "bg-blue-400/10",    border: "border-blue-400/20",    label: "New Job"          },
-  stage_complete:{ icon: CheckCircle2,   color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", label: "Stage Completed"  },
-  overdue:       { icon: AlertTriangle,  color: "text-red-400",     bg: "bg-red-400/10",     border: "border-red-400/20",     label: "Overdue Stage"    },
-  delay_recorded:{ icon: Clock,          color: "text-amber-400",   bg: "bg-amber-400/10",   border: "border-amber-400/20",   label: "Delay Recorded"   },
+  new_job:       { icon: BriefcaseIcon,  color: "text-blue-400",    bg: "bg-blue-400/10",    border: "border-blue-400/20",    label: "New Job"         },
+  stage_complete:{ icon: CheckCircle2,   color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", label: "Stage Completed" },
+  overdue:       { icon: AlertTriangle,  color: "text-red-400",     bg: "bg-red-400/10",     border: "border-red-400/20",     label: "Overdue Stage"   },
+  delay_recorded:{ icon: Clock,          color: "text-amber-400",   bg: "bg-amber-400/10",   border: "border-amber-400/20",   label: "Delay Recorded"  },
 };
 
 const SEVERITY_CONFIG: Record<string, { label: string; className: string }> = {
@@ -60,32 +62,86 @@ const SEVERITY_CONFIG: Record<string, { label: string; className: string }> = {
   info:     { label: "Info",     className: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
 };
 
+// ─── URL helpers ───────────────────────────────────────────────────────────────
+
+const FROM = encodeURIComponent("/notifications");
+
+function getAlertUrl(type: string, containerId?: number): string {
+  if (!containerId) {
+    return type === "stale_approval" ? "/approval-queue" : "/notifications";
+  }
+  const base = `/containers/${containerId}?from=${FROM}`;
+  const ops  = `/operations/${containerId}?from=${FROM}`;
+  switch (type) {
+    case "high_terminal":              return `${base}&section=terminal`;
+    case "high_delivery":              return `${base}&section=delivery`;
+    case "empty_return_overdue":       return `${base}&section=delivery`;
+    case "unpaid_duty":                return `/duty-payments?focus=${containerId}&from=${FROM}`;
+    case "overdue_task":               return `${base}&tab=tasks`;
+    case "berthing_confirmation_needed": return `${base}&section=berthing`;
+    case "aging_warn":
+    case "aging_high":
+    case "aging_critical":
+    case "inactive":
+    case "action_overdue":             return ops;
+    case "stale_approval":             return "/approval-queue";
+    default:                           return base;
+  }
+}
+
+function getWorkflowEventUrl(type: string, containerId?: number | null): string {
+  if (!containerId) return "/notifications";
+  const ops  = `/operations/${containerId}?from=${FROM}`;
+  const base = `/containers/${containerId}?from=${FROM}`;
+  switch (type) {
+    case "new_job": return base;
+    default:        return ops;
+  }
+}
+
+function getAlertActionLabel(type: string, containerId?: number): string {
+  if (!containerId) return "View";
+  switch (type) {
+    case "unpaid_duty":   return "Pay Duty";
+    case "overdue_task":  return "View Tasks";
+    case "stale_approval":return "Approval Queue";
+    case "aging_warn":
+    case "aging_high":
+    case "aging_critical":
+    case "inactive":
+    case "action_overdue": return "Open in Operations";
+    default:               return "View Container";
+  }
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
 function formatTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" });
+  return new Date(iso).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function inDateRange(iso: string, from: string, to: string): boolean {
   const d = new Date(iso);
-  if (from) {
-    const f = new Date(from); f.setUTCHours(0, 0, 0, 0);
-    if (d < f) return false;
-  }
-  if (to) {
-    const t = new Date(to); t.setUTCHours(23, 59, 59, 999);
-    if (d > t) return false;
-  }
+  if (from) { const f = new Date(from); f.setUTCHours(0,0,0,0); if (d < f) return false; }
+  if (to)   { const t = new Date(to);   t.setUTCHours(23,59,59,999); if (d > t) return false; }
   return true;
 }
+
+// ─── System Alert Row ──────────────────────────────────────────────────────────
 
 function NotificationRow({ notif }: { notif: Notification }) {
   const cfg = ALERT_CONFIG[notif.type] ?? ALERT_CONFIG.low_margin;
   const sev = SEVERITY_CONFIG[notif.severity] ?? SEVERITY_CONFIG.info;
   const Icon = cfg.icon;
   const markRead = useMarkNotificationRead();
+  const [, navigate] = useLocation();
 
-  const handleRowClick = () => {
+  const destination = getAlertUrl(notif.type, notif.containerId);
+  const actionLabel = getAlertActionLabel(notif.type, notif.containerId);
+
+  const handleClick = () => {
     if (!notif.isRead) markRead.mutate({ alertKey: notif.alertKey });
+    navigate(destination);
   };
 
   return (
@@ -93,9 +149,12 @@ function NotificationRow({ notif }: { notif: Notification }) {
       layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      onClick={handleRowClick}
-      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer ${
-        notif.isRead ? "opacity-55 hover:opacity-70" : "bg-primary/[0.025] hover:bg-primary/[0.04]"
+      onClick={handleClick}
+      role="link"
+      tabIndex={0}
+      onKeyDown={e => e.key === "Enter" && handleClick()}
+      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none ${
+        notif.isRead ? "opacity-60 hover:opacity-80" : "bg-primary/[0.025] hover:bg-primary/[0.04]"
       }`}
     >
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border} border`}>
@@ -116,28 +175,28 @@ function NotificationRow({ notif }: { notif: Notification }) {
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
-        {notif.containerId && (
-          <div className="mt-2" onClick={e => e.stopPropagation()}>
-            <Link href={`/containers/${notif.containerId}`}>
-              <span className="flex items-center gap-1 text-xs text-primary hover:underline w-fit">
-                View container {notif.containerNumber && `· ${notif.containerNumber}`}
-                <ExternalLink className="w-3 h-3" />
-              </span>
-            </Link>
-          </div>
-        )}
+        <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+          <ArrowRight className="w-3 h-3" />
+          {actionLabel}
+        </div>
       </div>
     </motion.div>
   );
 }
 
+// ─── Workflow Event Row ────────────────────────────────────────────────────────
+
 function WorkflowEventRow({ notif }: { notif: WorkflowNotification }) {
   const cfg = WORKFLOW_TYPE_CONFIG[notif.type] ?? WORKFLOW_TYPE_CONFIG.stage_complete;
   const Icon = cfg.icon;
   const markRead = useMarkWorkflowNotificationRead();
+  const [, navigate] = useLocation();
 
-  const handleRowClick = () => {
+  const destination = getWorkflowEventUrl(notif.type, notif.containerId);
+
+  const handleClick = () => {
     if (!notif.isRead) markRead.mutate({ id: notif.id });
+    navigate(destination);
   };
 
   return (
@@ -145,9 +204,12 @@ function WorkflowEventRow({ notif }: { notif: WorkflowNotification }) {
       layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      onClick={handleRowClick}
-      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer ${
-        notif.isRead ? "opacity-55 hover:opacity-70" : "bg-primary/[0.025] hover:bg-primary/[0.04]"
+      onClick={handleClick}
+      role="link"
+      tabIndex={0}
+      onKeyDown={e => e.key === "Enter" && handleClick()}
+      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none ${
+        notif.isRead ? "opacity-60 hover:opacity-80" : "bg-primary/[0.025] hover:bg-primary/[0.04]"
       }`}
     >
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border} border`}>
@@ -170,20 +232,18 @@ function WorkflowEventRow({ notif }: { notif: WorkflowNotification }) {
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
-        {notif.containerId && (
-          <div className="mt-2" onClick={e => e.stopPropagation()}>
-            <Link href={`/operations/${notif.containerId}`}>
-              <span className="flex items-center gap-1 text-xs text-primary hover:underline w-fit">
-                View in Operations {notif.containerNumber && `· ${notif.containerNumber}`}
-                <ExternalLink className="w-3 h-3" />
-              </span>
-            </Link>
+        {notif.containerNumber && (
+          <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+            <ArrowRight className="w-3 h-3" />
+            {notif.type === "new_job" ? "View Container" : "Open in Operations"} · {notif.containerNumber}
           </div>
         )}
       </div>
     </motion.div>
   );
 }
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function NotificationsPage() {
   const { toast } = useToast();
@@ -202,23 +262,20 @@ export default function NotificationsPage() {
     query: { refetchInterval: 30_000 },
   });
 
-  const markAll        = useMarkAllNotificationsRead();
-  const markViewed     = useMarkNotificationsViewed();
+  const markAll         = useMarkAllNotificationsRead();
+  const markViewed      = useMarkNotificationsViewed();
   const markAllWorkflow = useMarkAllWorkflowNotificationsRead();
 
-  useEffect(() => {
-    markViewed.mutate();
-  }, []);
+  useEffect(() => { markViewed.mutate(); }, []);
 
-  const notifications: Notification[]       = data?.notifications ?? [];
-  const wfNotifications: WorkflowNotification[] = wfData?.notifications ?? [];
-
-  const unreadCount   = data?.unreadCount ?? 0;
-  const wfUnreadCount = wfData?.unreadCount ?? 0;
+  const notifications: Notification[]           = data?.notifications    ?? [];
+  const wfNotifications: WorkflowNotification[] = wfData?.notifications  ?? [];
+  const unreadCount   = data?.unreadCount    ?? 0;
+  const wfUnreadCount = wfData?.unreadCount  ?? 0;
 
   const filteredSystem = notifications.filter(n => {
     if (filter === "unread" && n.isRead) return false;
-    if (filter === "read" && !n.isRead) return false;
+    if (filter === "read" && !n.isRead)  return false;
     if (typeFilter !== "all" && n.type !== typeFilter) return false;
     if (!inDateRange(n.generatedAt, dateFrom, dateTo)) return false;
     return true;
@@ -226,7 +283,7 @@ export default function NotificationsPage() {
 
   const filteredWorkflow = wfNotifications.filter(n => {
     if (filter === "unread" && n.isRead) return false;
-    if (filter === "read" && !n.isRead) return false;
+    if (filter === "read" && !n.isRead)  return false;
     if (!inDateRange(n.createdAt, dateFrom, dateTo)) return false;
     return true;
   });
@@ -234,32 +291,25 @@ export default function NotificationsPage() {
   const handleMarkAll = () => {
     if (tab === "system") {
       markAll.mutate(undefined, {
-        onSuccess: () => {
-          qc.invalidateQueries({ queryKey: ["notifications"] });
-          toast({ title: "All system alerts marked as read" });
-        },
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ["notifications"] }); toast({ title: "All system alerts marked as read" }); },
         onError: () => toast({ variant: "destructive", title: "Failed to mark all as read" }),
       });
     } else {
       markAllWorkflow.mutate(undefined, {
-        onSuccess: () => {
-          qc.invalidateQueries({ queryKey: ["workflow-notifications"] });
-          toast({ title: "All workflow events marked as read" });
-        },
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ["workflow-notifications"] }); toast({ title: "All workflow events marked as read" }); },
         onError: () => toast({ variant: "destructive", title: "Failed to mark all as read" }),
       });
     }
   };
 
   const clearDateFilter = () => { setDateFrom(""); setDateTo(""); };
-  const hasDateFilter = dateFrom || dateTo;
-  const currentUnread = tab === "system" ? unreadCount : wfUnreadCount;
-  const currentLoading = tab === "system" ? isLoading : wfLoading;
+  const hasDateFilter   = !!(dateFrom || dateTo);
+  const currentUnread   = tab === "system" ? unreadCount : wfUnreadCount;
+  const currentLoading  = tab === "system" ? isLoading : wfLoading;
   const currentFetching = tab === "system" ? isFetching : wfFetching;
-
-  const allTypes = Array.from(new Set(notifications.map(n => n.type)));
-  const displayedItems = tab === "system" ? filteredSystem.length : filteredWorkflow.length;
-  const totalItems = tab === "system" ? notifications.length : wfNotifications.length;
+  const displayedItems  = tab === "system" ? filteredSystem.length : filteredWorkflow.length;
+  const totalItems      = tab === "system" ? notifications.length  : wfNotifications.length;
+  const allTypes        = Array.from(new Set(notifications.map(n => n.type)));
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-4xl mx-auto">
@@ -272,30 +322,17 @@ export default function NotificationsPage() {
             Notifications
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Financial alerts, delays, and operational warnings across all containers.
+            Click any alert to go directly to the related issue. Alerts auto-refresh every 30 seconds.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost" size="sm"
-            onClick={() => tab === "system" ? refetch() : wfRefetch()}
-            disabled={currentFetching}
-            className="gap-1.5 text-xs h-8"
-          >
+          <Button variant="ghost" size="sm" onClick={() => tab === "system" ? refetch() : wfRefetch()} disabled={currentFetching} className="gap-1.5 text-xs h-8">
             <RefreshCw className={`w-3.5 h-3.5 ${currentFetching ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           {currentUnread > 0 && (
-            <Button
-              variant="outline" size="sm"
-              onClick={handleMarkAll}
-              disabled={markAll.isPending || markAllWorkflow.isPending}
-              className="gap-1.5 text-xs h-8"
-            >
-              {(markAll.isPending || markAllWorkflow.isPending)
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <CheckCheck className="w-3.5 h-3.5" />
-              }
+            <Button variant="outline" size="sm" onClick={handleMarkAll} disabled={markAll.isPending || markAllWorkflow.isPending} className="gap-1.5 text-xs h-8">
+              {(markAll.isPending || markAllWorkflow.isPending) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCheck className="w-3.5 h-3.5" />}
               Mark all read
             </Button>
           )}
@@ -306,49 +343,34 @@ export default function NotificationsPage() {
       <div className="flex items-center gap-3 border-b border-border/50 pb-1">
         <button
           onClick={() => { setTab("system"); setTypeFilter("all"); }}
-          className={`flex items-center gap-2 px-1 pb-2 text-sm font-medium border-b-2 transition-colors ${
-            tab === "system"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
+          className={`flex items-center gap-2 px-1 pb-2 text-sm font-medium border-b-2 transition-colors ${tab === "system" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
           <AlertTriangle className="w-3.5 h-3.5" />
           System Alerts
           {unreadCount > 0 && (
-            <span className="text-[10px] bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none font-bold">
-              {unreadCount}
-            </span>
+            <span className="text-[10px] bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none font-bold">{unreadCount}</span>
           )}
         </button>
         <button
           onClick={() => { setTab("workflow"); setTypeFilter("all"); }}
-          className={`flex items-center gap-2 px-1 pb-2 text-sm font-medium border-b-2 transition-colors ${
-            tab === "workflow"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
+          className={`flex items-center gap-2 px-1 pb-2 text-sm font-medium border-b-2 transition-colors ${tab === "workflow" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
           Workflow Events
           {wfUnreadCount > 0 && (
-            <span className="text-[10px] bg-primary/80 text-white rounded-full px-1.5 py-0.5 leading-none font-bold">
-              {wfUnreadCount}
-            </span>
+            <span className="text-[10px] bg-primary/80 text-white rounded-full px-1.5 py-0.5 leading-none font-bold">{wfUnreadCount}</span>
           )}
         </button>
       </div>
 
-      {/* Filters row */}
+      {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
-        {/* Read/Unread toggle */}
         <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
           {(["all", "unread", "read"] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-all capitalize ${
-                filter === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all capitalize ${filter === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               {f}
               {f === "unread" && currentUnread > 0 && (
@@ -358,7 +380,6 @@ export default function NotificationsPage() {
           ))}
         </div>
 
-        {/* Type filter — system alerts only */}
         {tab === "system" && (
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="h-8 text-xs w-44 bg-card/50 border-border/50">
@@ -373,38 +394,20 @@ export default function NotificationsPage() {
           </Select>
         )}
 
-        {/* Date range filter */}
         <div className="flex items-center gap-1.5 ml-auto">
           <CalendarRange className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-            className="h-8 text-xs w-36 bg-card/50 border-border/50"
-            title="From date"
-          />
+          <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs w-36 bg-card/50 border-border/50" title="From date" />
           <span className="text-xs text-muted-foreground">–</span>
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-            className="h-8 text-xs w-36 bg-card/50 border-border/50"
-            title="To date"
-          />
+          <Input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   className="h-8 text-xs w-36 bg-card/50 border-border/50" title="To date" />
           {hasDateFilter && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={clearDateFilter}
-              className="h-8 px-2 text-xs text-muted-foreground"
-              title="Clear date filter"
-            >
+            <Button variant="ghost" size="sm" onClick={clearDateFilter} className="h-8 px-2 text-xs text-muted-foreground" title="Clear date filter">
               <Filter className="w-3 h-3" />
             </Button>
           )}
         </div>
       </div>
 
-      {/* Notification list */}
+      {/* List */}
       <Card className="border-border/50 bg-card/40 overflow-hidden">
         {currentLoading ? (
           <div className="flex items-center justify-center py-16">
@@ -421,7 +424,7 @@ export default function NotificationsPage() {
                 <p className="text-sm text-muted-foreground/60 mt-1">
                   {tab === "system"
                     ? "All containers are within normal parameters."
-                    : "Workflow events appear here as containers move through stages."}
+                    : "Events appear here as containers move through stages."}
                 </p>
               </>
             ) : (
@@ -439,8 +442,8 @@ export default function NotificationsPage() {
         ) : (
           <AnimatePresence>
             {tab === "system"
-              ? filteredSystem.map(n => <NotificationRow key={n.alertKey} notif={n} />)
-              : filteredWorkflow.map(n => <WorkflowEventRow key={n.id} notif={n} />)
+              ? filteredSystem.map(n   => <NotificationRow   key={n.alertKey} notif={n} />)
+              : filteredWorkflow.map(n => <WorkflowEventRow  key={n.id}       notif={n} />)
             }
           </AnimatePresence>
         )}
@@ -450,7 +453,7 @@ export default function NotificationsPage() {
         <p className="text-center text-xs text-muted-foreground">
           Showing {displayedItems} of {totalItems} {tab === "system" ? "alerts" : "events"}
           {hasDateFilter && " · Date filter active"}
-          {" · Auto-refreshes every 30 seconds"}
+          {" · Auto-refreshes every 30 s"}
         </p>
       )}
     </motion.div>

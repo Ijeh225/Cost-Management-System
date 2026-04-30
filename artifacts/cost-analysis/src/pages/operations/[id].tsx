@@ -1405,24 +1405,31 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={
-          isDocumentationUser ? "/workspace/documentation"
-          : isAccountsUser    ? "/workspace/accounts"
-          : isTerminalManager ? "/workspace/terminal"
-          : isDeliveryUser    ? "/workspace/delivery"
-          : isOperationsUser  ? "/workspace/operations"
-          : "/operations"
-        }>
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground h-8 px-2">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            {isDocumentationUser ? "My Jobs"
-              : isAccountsUser    ? "Duty Payments"
-              : isTerminalManager ? "Terminal Workspace"
-              : isDeliveryUser    ? "Deliveries"
-              : isOperationsUser  ? "My Jobs"
-              : "Operations Board"}
-          </Button>
-        </Link>
+        {(() => {
+          const fromUrl = typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("from")
+            : null;
+          const defaultHref = isDocumentationUser ? "/workspace/documentation"
+            : isAccountsUser    ? "/workspace/accounts"
+            : isTerminalManager ? "/workspace/terminal"
+            : isDeliveryUser    ? "/workspace/delivery"
+            : isOperationsUser  ? "/workspace/operations"
+            : "/operations";
+          const defaultLabel = isDocumentationUser ? "My Jobs"
+            : isAccountsUser    ? "Duty Payments"
+            : isTerminalManager ? "Terminal Workspace"
+            : isDeliveryUser    ? "Deliveries"
+            : isOperationsUser  ? "My Jobs"
+            : "Operations Board";
+          return (
+            <Link href={fromUrl ?? defaultHref}>
+              <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground h-8 px-2">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                {fromUrl ? "Back" : defaultLabel}
+              </Button>
+            </Link>
+          );
+        })()}
         <span className="text-border/40">/</span>
         <span className="text-sm text-muted-foreground font-mono">
           {container.containerNumber}

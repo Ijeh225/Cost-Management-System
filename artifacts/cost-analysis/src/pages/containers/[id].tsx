@@ -829,6 +829,7 @@ export default function ContainerDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("charges");
+  const [openSection, setOpenSection] = useState<string | undefined>(undefined);
   const [rejectTargetSection, setRejectTargetSection] = useState<string | null>(null);
   const [editingClearing, setEditingClearing] = useState(false);
   const [clearingInput, setClearingInput] = useState("");
@@ -853,6 +854,21 @@ export default function ContainerDetail() {
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const autoFetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const sectionParam = params.get("section");
+    const tabParam     = params.get("tab");
+    if (tabParam)     setActiveTab(tabParam);
+    if (sectionParam) {
+      setActiveTab("charges");
+      setOpenSection(sectionParam);
+      setTimeout(() => {
+        document.getElementById(`section-anchor-${sectionParam}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 600);
+    }
+  }, []);
 
   const { data, isLoading, isError } = useGetContainer(containerId);
   const lockMutation = useLockContainer();
@@ -1884,28 +1900,29 @@ export default function ContainerDetail() {
                   </span>
                 </div>
               )}
-              <Accordion type="single" collapsible className="w-full">
+              <Accordion type="single" collapsible className="w-full" value={openSection} onValueChange={setOpenSection}>
                 {CHARGE_SECTIONS.map(s => (
-                  <ChargeSectionForm
-                    key={s.key}
-                    containerId={containerId}
-                    sectionKey={s.key}
-                    title={s.title}
-                    schema={s.schema}
-                    initialData={s.data}
-                    isRecordLocked={container.isLocked}
-                    isSectionLocked={lockedSections.includes(s.key)}
-                    isEditable={isSectionEditable(s.key)}
-                    isAdmin={isAdmin}
-                    approval={getSectionApproval(s.key)}
-                    onSubmitSection={handleSubmitSection}
-                    onApproveSection={handleApproveSection}
-                    onRejectSection={(section) => setRejectTargetSection(section)}
-                    onToggleSectionLock={handleToggleSectionLock}
-                    extraFields={builtinExtrasMap[s.key] ?? []}
-                    customValuesMap={customValuesMap}
-                    sectionSettings={sn}
-                  />
+                  <div key={s.key} id={`section-anchor-${s.key}`}>
+                    <ChargeSectionForm
+                      containerId={containerId}
+                      sectionKey={s.key}
+                      title={s.title}
+                      schema={s.schema}
+                      initialData={s.data}
+                      isRecordLocked={container.isLocked}
+                      isSectionLocked={lockedSections.includes(s.key)}
+                      isEditable={isSectionEditable(s.key)}
+                      isAdmin={isAdmin}
+                      approval={getSectionApproval(s.key)}
+                      onSubmitSection={handleSubmitSection}
+                      onApproveSection={handleApproveSection}
+                      onRejectSection={(section) => setRejectTargetSection(section)}
+                      onToggleSectionLock={handleToggleSectionLock}
+                      extraFields={builtinExtrasMap[s.key] ?? []}
+                      customValuesMap={customValuesMap}
+                      sectionSettings={sn}
+                    />
+                  </div>
                 ))}
                 {customSections.map(section => (
                   <CustomSectionForm
