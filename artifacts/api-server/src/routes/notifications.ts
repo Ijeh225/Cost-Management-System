@@ -9,6 +9,57 @@ export const notificationsRouter = Router();
 const AVG_THRESHOLD = 1.5;
 const LOW_MARGIN_PCT = 0.15;
 
+const ADMIN_ROLES = new Set(["admin", "super_admin"]);
+
+const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
+  delivery_user: new Set([
+    "high_delivery",
+    "empty_return_overdue",
+    "rejected_section",
+  ]),
+  terminal_manager: new Set([
+    "high_terminal",
+    "berthing_confirmation_needed",
+    "rejected_section",
+  ]),
+  operations_user: new Set([
+    "aging_warn",
+    "aging_high",
+    "aging_critical",
+    "inactive",
+    "action_overdue",
+    "rejected_section",
+  ]),
+  staff: new Set([
+    "aging_warn",
+    "aging_high",
+    "aging_critical",
+    "inactive",
+    "action_overdue",
+    "rejected_section",
+  ]),
+  accounts_user: new Set([
+    "negative_profit",
+    "low_margin",
+    "unpaid_duty",
+    "rejected_section",
+  ]),
+  documentation_user: new Set([
+    "overdue_task",
+    "stale_approval",
+    "rejected_section",
+  ]),
+};
+
+const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
+  delivery_user:      new Set(["overdue"]),
+  terminal_manager:   new Set(["overdue"]),
+  operations_user:    new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
+  staff:              new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
+  accounts_user:      new Set([]),
+  documentation_user: new Set([]),
+};
+
 async function getAgingThresholds() {
   const rows = await db.select().from(settingsTable);
   const map: Record<string, string> = {};
@@ -21,7 +72,7 @@ async function getAgingThresholds() {
   };
 }
 
-async function computeAlerts(userId?: number) {
+async function computeAlerts(userId?: number, role?: string) {
   const allContainers = await db.select().from(containersTable);
   if (allContainers.length === 0) return [];
 
@@ -202,13 +253,20 @@ async function computeAlerts(userId?: number) {
     }
   }
 
+  if (role && !ADMIN_ROLES.has(role)) {
+    const allowed = ROLE_ALERT_TYPES[role];
+    if (allowed) return alerts.filter(a => allowed.has(a.type));
+    return [];
+  }
+
   return alerts;
 }
 
 notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
   try {
     const userId = (req as AuthRequest).user.id;
-    const alerts = await computeAlerts(userId);
+    const role   = (req as AuthRequest).user.role;
+    const alerts = await computeAlerts(userId, role);
     const readRows = await db.select().from(notificationsReadTable).where(eq(notificationsReadTable.userId, userId));
     const readMap: Record<string, { isRead: boolean; readAt: string | null }> = {};
     for (const r of readRows) {
@@ -248,7 +306,8 @@ notificationsRouter.post("/notifications/:alertKey/read", requireAuth, async (re
 notificationsRouter.post("/notifications/read-all", requireAuth, async (req, res) => {
   try {
     const userId = (req as AuthRequest).user.id;
-    const alerts = await computeAlerts(userId);
+    const role   = (req as AuthRequest).user.role;
+    const alerts = await computeAlerts(userId, role);
     if (alerts.length === 0) return res.json({ success: true });
 
     const now = new Date();
@@ -360,7 +419,8 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
 notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, res) => {
   try {
     const userId = (req as AuthRequest).user.id;
-    const alerts = await computeAlerts(userId);
+    const role   = (req as AuthRequest).user.role;
+    const alerts = await computeAlerts(userId, role);
     if (alerts.length === 0) return res.json({ success: true, marked: 0 });
 
     const now = new Date();
@@ -380,6 +440,8 @@ notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, 
 // Workflow notifications (event-based: new_job, stage_complete, overdue, delay_recorded)
 notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res) => {
   try {
+    const role = (req as AuthRequest).user.role;
+
     // Check for overdue stages and auto-create notifications (deduplicated by checking recent ones)
     const containers = await db.select().from(containersTable);
     const today = new Date(); today.setUTCHours(0, 0, 0, 0);
@@ -425,10 +487,17 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
       }
     }
 
-    const notifications = await db.select()
+    const allWorkflow = await db.select()
       .from(workflowNotificationsTable)
       .orderBy(desc(workflowNotificationsTable.createdAt))
-      .limit(100);
+      .limit(200);
+
+    let notifications = allWorkflow;
+    if (role && !ADMIN_ROLES.has(role)) {
+      const allowed = ROLE_WORKFLOW_TYPES[role];
+      notifications = allowed ? allWorkflow.filter(n => allowed.has(n.type)) : [];
+    }
+
     const unreadCount = notifications.filter(n => !n.isRead).length;
     return res.json({ notifications, unreadCount });
   } catch (err) {
