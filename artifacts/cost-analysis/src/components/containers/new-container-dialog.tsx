@@ -23,6 +23,7 @@ import {
 import { Loader2, Package } from "lucide-react";
 
 const SIZE_OPTIONS = ["20FT", "40FT", "40HC", "45HC"];
+const COMMAND_OPTIONS = ["PTML", "TinCan", "Apapa", "Lekki"] as const;
 const NO_CLIENT = "__none__";
 
 interface NewContainerDialogProps {
@@ -40,6 +41,7 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
     customerName: "",
     containerNumber: "",
     blNumber: "",
+    command: "",
     declaration: "",
     size: "",
     vessel: "",
@@ -87,6 +89,7 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
     }
     if (!form.containerNumber.trim()) e.containerNumber = "Container number is required";
     if (!form.blNumber.trim()) e.blNumber = "B/L number is required";
+    if (!form.command) e.command = "Command is required";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -104,6 +107,7 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
           customerName,
           containerNumber: form.containerNumber.trim().toUpperCase(),
           blNumber: form.blNumber.trim(),
+          command: form.command,
           ...(form.declaration.trim() && { declaration: form.declaration.trim() }),
           ...(form.size && { size: form.size }),
           ...(form.vessel.trim() && { vessel: form.vessel.trim() }),
@@ -128,6 +132,7 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
         customerName: "",
         containerNumber: "",
         blNumber: "",
+        command: "",
         declaration: "",
         size: "",
         vessel: "",
@@ -201,6 +206,25 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
               />
               {errors.blNumber && (
                 <p className="text-xs text-destructive">{errors.blNumber}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="command">
+                Command <span className="text-destructive">*</span>
+              </Label>
+              <Select value={form.command} onValueChange={set("command")}>
+                <SelectTrigger id="command" className={errors.command ? "border-destructive" : ""}>
+                  <SelectValue placeholder="Select terminal…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COMMAND_OPTIONS.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.command && (
+                <p className="text-xs text-destructive">{errors.command}</p>
               )}
             </div>
 

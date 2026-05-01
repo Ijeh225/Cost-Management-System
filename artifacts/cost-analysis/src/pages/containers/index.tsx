@@ -62,6 +62,7 @@ export default function Containers() {
   const [paarFilter, setPaarFilter] = useState<string>("all");
   const [berthedFilter, setBerthedFilter] = useState<string>("all");
   const [dutyPaymentFilter, setDutyPaymentFilter] = useState<string>("all");
+  const [commandFilter, setCommandFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -100,6 +101,7 @@ export default function Containers() {
       ...(status !== "all" ? { status } : {}),
       ...(berthedFilter !== "all" ? { berthed: berthedFilter } : {}),
       ...(dutyPaymentFilter !== "all" ? { dutyPaymentStatus: dutyPaymentFilter } : {}),
+      ...(commandFilter !== "all" ? { command: commandFilter } : {}),
     },
     {}
   );
@@ -111,7 +113,7 @@ export default function Containers() {
   );
   const pendingCount = pendingData?.total ?? 0;
 
-  const hasActiveFilters = status !== "all" || profitFilter !== "all" || paarFilter !== "all" || berthedFilter !== "all" || dutyPaymentFilter !== "all" || dateFrom || dateTo;
+  const hasActiveFilters = status !== "all" || profitFilter !== "all" || paarFilter !== "all" || berthedFilter !== "all" || dutyPaymentFilter !== "all" || commandFilter !== "all" || dateFrom || dateTo;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -396,6 +398,19 @@ export default function Containers() {
                     </Select>
                   </div>
                   <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground font-medium">Command</label>
+                    <Select value={commandFilter} onValueChange={(v) => { setCommandFilter(v); setPage(1); }}>
+                      <SelectTrigger className="h-8 text-xs bg-background border-border/60"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Commands</SelectItem>
+                        <SelectItem value="PTML">PTML</SelectItem>
+                        <SelectItem value="TinCan">TinCan</SelectItem>
+                        <SelectItem value="Apapa">Apapa</SelectItem>
+                        <SelectItem value="Lekki">Lekki</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
                     <label className="text-xs text-muted-foreground font-medium">Created From</label>
                     <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className="h-8 text-xs bg-background border-border/60" />
                   </div>
@@ -406,7 +421,7 @@ export default function Containers() {
                 </div>
                 {hasActiveFilters && (
                   <button
-                    onClick={() => { setStatus("all"); setProfitFilter("all"); setPaarFilter("all"); setBerthedFilter("all"); setDutyPaymentFilter("all"); setDateFrom(""); setDateTo(""); setPage(1); }}
+                    onClick={() => { setStatus("all"); setProfitFilter("all"); setPaarFilter("all"); setBerthedFilter("all"); setDutyPaymentFilter("all"); setCommandFilter("all"); setDateFrom(""); setDateTo(""); setPage(1); }}
                     className="mt-2 text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
                   >
                     <X className="w-3 h-3" /> Clear all filters

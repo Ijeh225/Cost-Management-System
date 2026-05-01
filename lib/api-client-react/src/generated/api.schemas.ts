@@ -136,6 +136,7 @@ export interface Container {
   paarReleasedAt?: string | null;
   paarDelayReason?: string | null;
   eta?: string | null;
+  command?: string | null;
   consignee?: string | null;
   berthed?: boolean;
   berthingConfirmedAt?: string | null;
@@ -182,6 +183,7 @@ export interface CreateContainerRequest {
   customerName: string;
   containerNumber: string;
   blNumber: string;
+  command: string;
   declaration?: string;
   size?: string;
   vessel?: string;
@@ -217,6 +219,7 @@ export interface UploadRow {
   customerName: string;
   containerNumber: string;
   blNumber: string;
+  command: string;
   declaration?: string;
   size?: string;
   vessel?: string;
@@ -761,6 +764,8 @@ export type ListContainersParams = {
   search?: string;
   status?: string;
   berthed?: string;
+  command?: string;
+  dutyPaymentStatus?: string;
   page?: number;
   limit?: number;
 };

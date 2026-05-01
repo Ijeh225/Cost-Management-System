@@ -23,17 +23,27 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 const SAMPLE_ROWS = [
-  { "CUSTOMER NAME": "Dangote Industries Ltd",  "CON": "MSCU1234567", "B/LADING": "MSC0012345", "DECLARATION": "ND20251001", "SIZE": "40FT",  "VESSEL": "MSC ANNA",      "ETA": "2025-06-15", "CONSIGNEE": "Dangote Industries Ltd"  },
-  { "CUSTOMER NAME": "Nestlé Nigeria Plc",       "CON": "HLCU8765432", "B/LADING": "HLC0056789", "DECLARATION": "ND20251002", "SIZE": "20FT",  "VESSEL": "HAPAG SPIRIT",  "ETA": "2025-06-20", "CONSIGNEE": "Nestlé Nigeria Plc"      },
-  { "CUSTOMER NAME": "BUA Cement Plc",           "CON": "CMAU5553210", "B/LADING": "CMA0078901", "DECLARATION": "ND20251003", "SIZE": "40FT",  "VESSEL": "CMA KALAHARI",  "ETA": "",           "CONSIGNEE": ""                        },
-  { "CUSTOMER NAME": "Guinness Nigeria Plc",     "CON": "MAEU3214567", "B/LADING": "MAE0034567", "DECLARATION": "ND20251004", "SIZE": "40HC",  "VESSEL": "MAERSK ESSEX",  "ETA": "2025-07-01", "CONSIGNEE": "Guinness Nigeria Plc"    },
+  { "CUSTOMER NAME": "Dangote Industries Ltd",  "CON": "MSCU1234567", "B/LADING": "MSC0012345", "COMMAND": "PTML",   "DECLARATION": "ND20251001", "SIZE": "40FT",  "VESSEL": "MSC ANNA",      "ETA": "2025-06-15", "CONSIGNEE": "Dangote Industries Ltd"  },
+  { "CUSTOMER NAME": "Nestlé Nigeria Plc",       "CON": "HLCU8765432", "B/LADING": "HLC0056789", "COMMAND": "TinCan", "DECLARATION": "ND20251002", "SIZE": "20FT",  "VESSEL": "HAPAG SPIRIT",  "ETA": "2025-06-20", "CONSIGNEE": "Nestlé Nigeria Plc"      },
+  { "CUSTOMER NAME": "BUA Cement Plc",           "CON": "CMAU5553210", "B/LADING": "CMA0078901", "COMMAND": "Apapa",  "DECLARATION": "ND20251003", "SIZE": "40FT",  "VESSEL": "CMA KALAHARI",  "ETA": "",           "CONSIGNEE": ""                        },
+  { "CUSTOMER NAME": "Guinness Nigeria Plc",     "CON": "MAEU3214567", "B/LADING": "MAE0034567", "COMMAND": "Lekki",  "DECLARATION": "ND20251004", "SIZE": "40HC",  "VESSEL": "MAERSK ESSEX",  "ETA": "2025-07-01", "CONSIGNEE": "Guinness Nigeria Plc"    },
 ];
-const COLUMNS = ["CUSTOMER NAME", "CON", "B/LADING", "DECLARATION", "SIZE", "VESSEL", "ETA", "CONSIGNEE"];
+const COLUMNS = ["CUSTOMER NAME", "CON", "B/LADING", "COMMAND", "DECLARATION", "SIZE", "VESSEL", "ETA", "CONSIGNEE"];
+const VALID_COMMANDS_UPLOAD = ["PTML", "TinCan", "Apapa", "Lekki"];
+function normalizeCommandUpload(raw: string): string | undefined {
+  const map: Record<string, string> = {
+    ptml: "PTML",
+    tincan: "TinCan", "tin can": "TinCan",
+    apapa: "Apapa",
+    lekki: "Lekki",
+  };
+  return map[raw.toLowerCase().trim()];
+}
 
 function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(SAMPLE_ROWS, { header: COLUMNS });
-  ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 20 }, { wch: 14 }, { wch: 28 }];
+  ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 8 }, { wch: 20 }, { wch: 14 }, { wch: 28 }];
   XLSX.utils.book_append_sheet(wb, ws, "Containers");
   XLSX.writeFile(wb, "container_upload_template.xlsx");
 }
@@ -178,6 +188,14 @@ export default function UploadPage() {
           return;
         }
 
+        const rawCommand     = getVal(["command", "terminal", "commandarea"]);
+        const command        = rawCommand ? (normalizeCommandUpload(rawCommand) ?? rawCommand) : undefined;
+
+        if (!command || !VALID_COMMANDS_UPLOAD.includes(command)) {
+          errs.push(`Row ${idx + 1}: Missing or invalid "Command" — must be one of ${VALID_COMMANDS_UPLOAD.join(", ")}`);
+          return;
+        }
+
         const customerName =
           mode === "client" && selectedClient
             ? selectedClient.name
@@ -187,6 +205,7 @@ export default function UploadPage() {
           customerName: customerName ?? "",
           containerNumber,
           blNumber,
+          command,
           declaration:     getVal(["declaration", "sgad"]),
           size:            getVal(["size", "containersize"]),
           vessel:          getVal(["vessel", "ship"]),

@@ -71,6 +71,7 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     paarReleasedAt: c.paarReleasedAt instanceof Date ? c.paarReleasedAt.toISOString() : (c.paarReleasedAt ?? null),
     paarDelayReason: c.paarDelayReason ?? null,
     eta: c.eta instanceof Date ? c.eta.toISOString() : (c.eta ?? null),
+    command: c.command ?? null,
     consignee: c.consignee ?? null,
     berthed: c.berthed ?? false,
     berthingConfirmedAt: c.berthingConfirmedAt instanceof Date ? c.berthingConfirmedAt.toISOString() : (c.berthingConfirmedAt ?? null),
@@ -164,11 +165,25 @@ function numericToObj(row: any, exclude = ["id", "containerId", "updatedAt"]) {
   return obj;
 }
 
+const VALID_COMMANDS = ["PTML", "TinCan", "Apapa", "Lekki"] as const;
+type CommandValue = typeof VALID_COMMANDS[number];
+
+function normalizeCommand(raw: string): CommandValue | null {
+  const map: Record<string, CommandValue> = {
+    ptml: "PTML",
+    tincan: "TinCan", "tin can": "TinCan", tinccan: "TinCan",
+    apapa: "Apapa",
+    lekki: "Lekki",
+  };
+  return map[raw.toLowerCase().trim()] ?? null;
+}
+
 router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
   try {
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
     const berthedFilter = req.query.berthed as string | undefined;
+    const commandFilter = req.query.command as string | undefined;
     const dutyPaymentStatus = (req.query.dutyPaymentStatus as string | undefined)?.trim();
     const page = parseInt((req.query.page as string) ?? "1");
     const limit = Math.min(parseInt((req.query.limit as string) ?? "20"), 1000);
@@ -228,6 +243,9 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
       } else if (dutyPaymentStatus === "not_assessed") {
         conditions.push(sql`NOT EXISTS (SELECT 1 FROM customs_charges cc WHERE cc.container_id = ${containersTable.id} AND cc.duty > 0)`);
       }
+    }
+    if (commandFilter && commandFilter !== "all") {
+      conditions.push(eq(containersTable.command, commandFilter));
     }
     if (conditions.length > 0) {
       const where = conditions.length === 1 ? conditions[0] : and(...conditions);
@@ -315,11 +333,15 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
 
 router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const { customerName, containerNumber, blNumber, declaration, size, vessel, clearingCharges, clientId, eta, consignee } = req.body;
+    const { customerName, containerNumber, blNumber, command, declaration, size, vessel, clearingCharges, clientId, eta, consignee } = req.body;
     const trimmedCustomer = typeof customerName === "string" ? customerName.trim() : "";
     const parsedClientId = clientId ? Number(clientId) : null;
     if (!containerNumber || !blNumber) {
       res.status(400).json({ error: "containerNumber and blNumber are required" });
+      return;
+    }
+    if (!command || !(VALID_COMMANDS as readonly string[]).includes(command)) {
+      res.status(400).json({ error: `Command is required. Must be one of: ${VALID_COMMANDS.join(", ")}` });
       return;
     }
     let resolvedCustomerName = trimmedCustomer;
@@ -340,6 +362,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       customerName: resolvedCustomerName,
       containerNumber,
       blNumber,
+      command,
       declaration: declaration ?? "",
       size: size ?? "",
       vessel: vessel ?? "",
@@ -413,12 +436,30 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
     const duplicates: string[] = [];
     const errors: string[] = [];
 
+    // Pre-validate: reject entire upload if any row is missing a valid command
+    const missingCommandRows: number[] = [];
+    rows.forEach((row: any, idx: number) => {
+      const normalized = row.command ? normalizeCommand(String(row.command)) : null;
+      if (!normalized) missingCommandRows.push(idx + 1);
+    });
+    if (missingCommandRows.length > 0) {
+      return res.status(400).json({
+        error: `Upload rejected: The "Command" field is required for every row. ` +
+          `${missingCommandRows.length} row${missingCommandRows.length === 1 ? "" : "s"} ` +
+          `${missingCommandRows.length === 1 ? "is" : "are"} missing a valid Command ` +
+          `(row${missingCommandRows.length === 1 ? "" : "s"} ${missingCommandRows.slice(0, 10).join(", ")}` +
+          `${missingCommandRows.length > 10 ? "…" : ""}). ` +
+          `Valid values: ${VALID_COMMANDS.join(", ")}. Please add the Command column and re-upload.`,
+      });
+    }
+
     for (const row of rows) {
       if (!row.containerNumber || !row.blNumber) {
         errors.push(`Missing required fields for row: ${JSON.stringify(row)}`);
         continue;
       }
       const customerName = row.customerName || "";
+      const normalizedCommand = normalizeCommand(String(row.command ?? "")) ?? row.command;
       try {
         let etaDate: Date | null = null;
         if (row.eta) {
@@ -429,6 +470,7 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
           customerName,
           containerNumber: row.containerNumber,
           blNumber: row.blNumber,
+          command: normalizedCommand,
           declaration: row.declaration ?? "",
           size: row.size ?? "",
           vessel: row.vessel ?? "",

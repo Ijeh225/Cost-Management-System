@@ -41,6 +41,7 @@ export const containersTable = pgTable("containers", {
   paarReleasedAt: timestamp("paar_released_at"),
   paarDelayReason: text("paar_delay_reason"),
   eta: timestamp("eta"),
+  command: text("command"),
   consignee: text("consignee"),
   berthed: boolean("berthed").notNull().default(false),
   berthingConfirmedAt: timestamp("berthing_confirmed_at"),
