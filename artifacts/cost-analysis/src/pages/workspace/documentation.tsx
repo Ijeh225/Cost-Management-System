@@ -23,7 +23,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CompletedJobsView } from "@/components/workspace/completed-jobs-view";
 
-const DEPT_STAGES = ["registered", "documentation", "duty_assessment"];
+const DEPT_STAGES = ["registered", "documentation", "duty_assessment"] as const;
 
 const STAGE_FILTER_OPTIONS = [
   { value: "all",            label: "All" },
@@ -77,12 +77,11 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
   const advance       = useAdvanceContainerStatus();
 
   const isPaarOverdue = paarEta && new Date(paarEta) < new Date() && !paarReleaseDate;
-  const needsAssessment = c.stage === "duty_assessment";
-  const assessmentInvalid = needsAssessment && (!assessmentAmt || parseFloat(assessmentAmt) <= 0);
+  const assessmentInvalid = !assessmentAmt || parseFloat(assessmentAmt) <= 0;
 
   async function handleSaveAndSubmit() {
     if (assessmentInvalid) {
-      toast({ variant: "destructive", title: "Assessment amount required", description: "Enter a valid amount before submitting." });
+      toast({ variant: "destructive", title: "Assessment amount required", description: "Enter the NCS duty amount before submitting." });
       return;
     }
     setBusy(true);
@@ -98,24 +97,20 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
         paarDelayReason:   paarDelayReason || null,
       });
 
-      if (assessmentAmt && parseFloat(assessmentAmt) > 0) {
-        await updateCharges.mutateAsync({
-          id: c.id,
-          data: { section: "customs", customs: { duty: parseFloat(assessmentAmt) } },
-        });
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        advance.mutate(
-          { id: c.id, status: c.stage },
-          {
-            onSuccess: () => resolve(),
-            onError: (e) => reject(e),
-          }
-        );
+      await updateCharges.mutateAsync({
+        id: c.id,
+        data: { section: "customs", customs: { duty: parseFloat(assessmentAmt) } },
       });
 
-      toast({ title: "Submitted", description: `${c.containerNumber} saved and moved to next stage.` });
+      // Advance through ALL remaining doc-dept stages in sequence so one click
+      // takes the job all the way to Duty Payment, regardless of current stage.
+      const stageIdx = DEPT_STAGES.indexOf(c.stage as typeof DEPT_STAGES[number]);
+      const stagesToAdvance = DEPT_STAGES.slice(stageIdx >= 0 ? stageIdx : 0);
+      for (const stage of stagesToAdvance) {
+        await advance.mutateAsync({ id: c.id, status: stage });
+      }
+
+      toast({ title: "Submitted", description: `${c.containerNumber} submitted — moved to Duty Payment.` });
       onSubmitSuccess();
     } catch (e) {
       toast({ variant: "destructive", title: "Submission failed", description: (e as Error).message });
@@ -209,10 +204,10 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
             </div>
           </div>
 
-          {/* Row 3: Assessment Amount (always shown) */}
+          {/* Row 3: Assessment Amount (always required — full workflow submitted in one click) */}
           <div className="space-y-1.5">
-            <Label className={`text-xs font-medium ${needsAssessment ? "text-amber-400" : "text-muted-foreground"}`}>
-              Assessment Amount (₦){needsAssessment && <span className="text-red-400 ml-1">*</span>}
+            <Label className="text-xs font-medium text-amber-400">
+              Assessment Amount (₦)<span className="text-red-400 ml-1">*</span>
             </Label>
             <Input
               type="number"
@@ -221,13 +216,11 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
               value={assessmentAmt}
               onChange={e => setAssessmentAmt(e.target.value)}
               placeholder="Enter NCS-assessed duty amount"
-              className={`h-8 text-sm bg-background font-mono ${needsAssessment ? "border-amber-500/40" : "border-border/60"}`}
+              className="h-8 text-sm bg-background font-mono border-amber-500/40"
             />
-            {needsAssessment && (
-              <p className="text-[10px] text-muted-foreground">
-                Required — this amount will appear on the Duty Payments page.
-              </p>
-            )}
+            <p className="text-[10px] text-muted-foreground">
+              Required — this amount will appear on the Duty Payments page.
+            </p>
           </div>
 
           {/* Row 4: Delay reasons (optional, collapsible feel) */}
@@ -259,7 +252,7 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
           {/* Single action button */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-[11px] text-muted-foreground/60">
-              Saves all fields and moves this job to the next stage.
+              Saves all fields and submits this job directly to Duty Payment.
             </p>
             <Button
               onClick={handleSaveAndSubmit}
@@ -429,7 +422,7 @@ export default function DocumentationWorkspace() {
 
         <TabsContent value="completed" className="mt-6">
           <CompletedJobsView
-            deptStages={DEPT_STAGES}
+            deptStages={[...DEPT_STAGES]}
             emptyTitle="No jobs submitted yet"
             emptySubtitle="Once you submit a job, it will show up here for review."
           />
