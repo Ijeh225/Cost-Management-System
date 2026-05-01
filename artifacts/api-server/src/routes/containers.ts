@@ -97,6 +97,10 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     pulloutReleasedAt: c.pulloutReleasedAt instanceof Date ? c.pulloutReleasedAt.toISOString() : (c.pulloutReleasedAt ?? null),
     pulloutDelayReason: c.pulloutDelayReason ?? null,
     pulloutFinalDate: c.pulloutFinalDate instanceof Date ? c.pulloutFinalDate.toISOString() : (c.pulloutFinalDate ?? null),
+    earlyStartAuthorized: c.earlyStartAuthorized ?? false,
+    earlyStartAuthorizedById: c.earlyStartAuthorizedById ?? null,
+    earlyStartAuthorizedAt: c.earlyStartAuthorizedAt instanceof Date ? c.earlyStartAuthorizedAt.toISOString() : (c.earlyStartAuthorizedAt ?? null),
+    earlyStartReason: c.earlyStartReason ?? null,
   };
 }
 
@@ -554,11 +558,18 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       duty:        customsChargesTable.duty,
       dutyPaid:    customsChargesTable.dutyPaid,
       dutyNotPaid: customsChargesTable.dutyNotPaid,
+      earlyStartAuthorized: containersTable.earlyStartAuthorized,
+      earlyStartReason: containersTable.earlyStartReason,
+      earlyStartAuthorizedAt: containersTable.earlyStartAuthorizedAt,
     })
       .from(containersTable)
       .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id))
       .leftJoin(customsChargesTable, eq(customsChargesTable.containerId, containersTable.id))
       .where(isNotNull(containersTable.verifiedAt));
+
+    // Doc-adjacent stages: containers here that have earlyStartAuthorized also
+    // appear virtually in the ops workspace under transire_processing.
+    const EARLY_START_STAGES = new Set(["registered", "documentation", "duty_assessment", "duty_payment"]);
 
     const stages: Record<string, Array<{
       id: number;
@@ -579,6 +590,9 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       duty: number;
       dutyPaid: number;
       dutyNotPaid: number;
+      isEarlyStart?: boolean;
+      earlyStartReason?: string | null;
+      earlyStartAuthorizedAt?: string | null;
     }>> = {};
 
     for (const c of rows) {
@@ -589,7 +603,7 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       const duty = parseFloat(c.duty ?? "0") || 0;
       const dutyPaid = parseFloat(c.dutyPaid ?? "0") || 0;
       const dutyNotPaid = c.dutyNotPaid != null ? (parseFloat(c.dutyNotPaid) || 0) : Math.max(duty - dutyPaid, 0);
-      stages[c.status].push({
+      const entry = {
         id: c.id,
         containerNumber: c.containerNumber,
         blNumber: c.blNumber,
@@ -608,7 +622,22 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
         duty,
         dutyPaid,
         dutyNotPaid,
-      });
+      };
+      stages[c.status].push(entry);
+
+      // If early start is authorized and container is still in doc stages,
+      // also surface it in transire_processing for the operations workspace.
+      if (c.earlyStartAuthorized && EARLY_START_STAGES.has(c.status)) {
+        if (!stages.transire_processing) stages.transire_processing = [];
+        stages.transire_processing.push({
+          ...entry,
+          isEarlyStart: true,
+          earlyStartReason: c.earlyStartReason ?? null,
+          earlyStartAuthorizedAt: c.earlyStartAuthorizedAt instanceof Date
+            ? c.earlyStartAuthorizedAt.toISOString()
+            : (c.earlyStartAuthorizedAt ?? null),
+        });
+      }
     }
 
     for (const status of Object.keys(stages)) {
@@ -616,6 +645,69 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
     }
 
     res.json({ stages, total: rows.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /containers/:id/early-start — authorize early start (admin only)
+router.post("/containers/:id/early-start", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const reason: string | undefined = req.body?.reason?.trim();
+    if (!reason) {
+      res.status(400).json({ error: "A reason is required to authorize Early Start." });
+      return;
+    }
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    const [updated] = await db.update(containersTable)
+      .set({
+        earlyStartAuthorized: true,
+        earlyStartAuthorizedById: req.user!.id,
+        earlyStartAuthorizedAt: new Date(),
+        earlyStartReason: reason,
+        updatedAt: new Date(),
+      })
+      .where(eq(containersTable.id, id))
+      .returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "early_start_authorized",
+      section: "basic_info",
+    });
+    res.json(formatContainer(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// DELETE /containers/:id/early-start — revoke early start (admin only)
+router.delete("/containers/:id/early-start", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    const [updated] = await db.update(containersTable)
+      .set({
+        earlyStartAuthorized: false,
+        earlyStartAuthorizedById: null,
+        earlyStartAuthorizedAt: null,
+        earlyStartReason: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(containersTable.id, id))
+      .returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "early_start_revoked",
+      section: "basic_info",
+    });
+    res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });

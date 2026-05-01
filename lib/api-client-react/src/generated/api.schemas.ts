@@ -170,6 +170,10 @@ export interface Container {
   offloadingConfirmed?: boolean | null;
   emptyReturnDueDate?: string | null;
   emptyReturnDate?: string | null;
+  earlyStartAuthorized?: boolean;
+  earlyStartAuthorizedById?: number | null;
+  earlyStartAuthorizedAt?: string | null;
+  earlyStartReason?: string | null;
 }
 
 export interface ContainerListResponse {

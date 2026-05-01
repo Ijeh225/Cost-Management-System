@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Loader2, Search, Clock, SendHorizonal, ChevronRight, Briefcase, CheckCircle2 } from "lucide-react";
+import { Loader2, Search, Clock, SendHorizonal, ChevronRight, Briefcase, CheckCircle2, Zap } from "lucide-react";
 import { CompletedJobsView } from "@/components/workspace/completed-jobs-view";
 
 const DEPT_STAGES = ["transire_processing", "shipping", "terminal", "pull_out"];
@@ -162,8 +162,8 @@ export default function OperationsWorkspace() {
                     <div className="space-y-2">
                       {containers.map(c => (
                         <Card
-                          key={c.id}
-                          className="p-4 flex items-center gap-4 hover:bg-accent/20 transition-colors border-border/50"
+                          key={`${c.id}-${c.isEarlyStart ? "es" : "normal"}`}
+                          className={`p-4 flex items-center gap-4 transition-colors border-border/50 ${c.isEarlyStart ? "bg-orange-500/5 border-orange-500/20 hover:bg-orange-500/10" : "hover:bg-accent/20"}`}
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -172,9 +172,17 @@ export default function OperationsWorkspace() {
                                 <span className="text-muted-foreground text-xs font-mono">BL: {c.blNumber}</span>
                               )}
                               <DaysChip days={c.daysInStage} />
+                              {c.isEarlyStart && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold border rounded-full px-2 py-0.5 text-orange-400 bg-orange-500/10 border-orange-500/30">
+                                  <Zap className="w-2.5 h-2.5" /> Early Start
+                                </span>
+                              )}
                             </div>
                             {c.customerName && (
                               <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.customerName}</p>
+                            )}
+                            {c.isEarlyStart && c.earlyStartReason && (
+                              <p className="text-[10px] text-orange-300/70 mt-1 italic">"{c.earlyStartReason}"</p>
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
@@ -183,19 +191,25 @@ export default function OperationsWorkspace() {
                                 View Job <ChevronRight className="w-3 h-3" />
                               </Button>
                             </Link>
-                            <Button
-                              size="sm"
-                              className="gap-1.5 text-xs h-8"
-                              onClick={() => handleSubmit(c)}
-                              disabled={advance.isPending}
-                            >
-                              {advance.isPending ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <SendHorizonal className="w-3 h-3" />
-                              )}
-                              {STAGE_SUBMIT_LABEL[stage]}
-                            </Button>
+                            {c.isEarlyStart ? (
+                              <Button size="sm" className="gap-1.5 text-xs h-8" disabled title="Awaiting documentation and duty payment completion">
+                                <Clock className="w-3 h-3" /> Awaiting Docs
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                className="gap-1.5 text-xs h-8"
+                                onClick={() => handleSubmit(c)}
+                                disabled={advance.isPending}
+                              >
+                                {advance.isPending ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <SendHorizonal className="w-3 h-3" />
+                                )}
+                                {STAGE_SUBMIT_LABEL[stage]}
+                              </Button>
+                            )}
                           </div>
                         </Card>
                       ))}

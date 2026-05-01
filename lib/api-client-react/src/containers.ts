@@ -20,6 +20,9 @@ export type PipelineContainer = {
   duty?: number;
   dutyPaid?: number;
   dutyNotPaid?: number;
+  isEarlyStart?: boolean;
+  earlyStartReason?: string | null;
+  earlyStartAuthorizedAt?: string | null;
 };
 
 export type PipelineResponse = {
@@ -406,6 +409,34 @@ export function useStageAction() {
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
       qc.invalidateQueries({ queryKey: ["workflow-notifications"] });
+    },
+  });
+}
+
+export function useAuthorizeEarlyStart() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { id: number; reason: string }>({
+    mutationFn: ({ id, reason }) =>
+      customFetch(`/api/containers/${id}/early-start`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+        headers: { "Content-Type": "application/json" },
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
+    },
+  });
+}
+
+export function useRevokeEarlyStart() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch(`/api/containers/${id}/early-start`, { method: "DELETE" }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
     },
   });
 }

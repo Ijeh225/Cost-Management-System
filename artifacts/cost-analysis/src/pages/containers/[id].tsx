@@ -20,6 +20,8 @@ import {
   type BuiltinExtraField,
   useVerifyContainer,
   useConfirmBerthing,
+  useAuthorizeEarlyStart,
+  useRevokeEarlyStart,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -48,7 +50,7 @@ import {
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
   Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink, X,
   ClipboardCheck, PlusCircle, Truck, Plus, Trash2,
-  ChevronUp, ChevronDown, Activity,
+  ChevronUp, ChevronDown, Activity, Zap,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
@@ -853,6 +855,8 @@ export default function ContainerDetail() {
   const [trackingData, setTrackingData] = useState<TrackingResult | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [showEarlyStartDialog, setShowEarlyStartDialog] = useState(false);
+  const [earlyStartReason, setEarlyStartReason] = useState("");
   const autoFetchedRef = useRef(false);
 
   useEffect(() => {
@@ -890,6 +894,8 @@ export default function ContainerDetail() {
   const updateDeliveredAt = useUpdateDeliveredAt();
   const updateStageControl = useUpdateStageControl();
   const verifyContainerMutation = useVerifyContainer();
+  const authorizeEarlyStart = useAuthorizeEarlyStart();
+  const revokeEarlyStart = useRevokeEarlyStart();
   const { data: customSectionsRaw } = useGetCustomSections({ containerId });
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
   const { data: sectionSettings } = useGetSettings();
@@ -1284,6 +1290,17 @@ export default function ContainerDetail() {
               {container.isLocked ? <><Unlock className="w-4 h-4 mr-2" />Unlock</> : <><Lock className="w-4 h-4 mr-2" />Lock</>}
             </Button>
           )}
+          {isAdmin && !container.earlyStartAuthorized &&
+            ["registered","documentation","duty_assessment","duty_payment"].includes(container.status) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-orange-500/40 text-orange-400 hover:bg-orange-500/10"
+              onClick={() => setShowEarlyStartDialog(true)}
+            >
+              <Zap className="w-3.5 h-3.5" /> Early Start
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1347,6 +1364,88 @@ export default function ContainerDetail() {
           </div>
         </div>
       )}
+
+      {/* Early Start banner — visible to everyone when active */}
+      {container.earlyStartAuthorized && (
+        <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 flex items-center gap-4">
+          <Zap className="w-5 h-5 text-orange-400 shrink-0" />
+          <div className="flex-1">
+            <h4 className="font-semibold text-orange-400 text-sm">Early Start Authorized</h4>
+            <p className="text-xs text-orange-300/80 mt-0.5">
+              Operations can begin field work before documentation completes.
+              {container.earlyStartReason && <> Reason: <span className="italic">"{container.earlyStartReason}"</span></>}
+            </p>
+          </div>
+          {isAdmin && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-orange-500/40 text-orange-400 hover:bg-orange-500/10 shrink-0 gap-1.5"
+              disabled={revokeEarlyStart.isPending}
+              onClick={async () => {
+                try {
+                  await revokeEarlyStart.mutateAsync({ id: containerId });
+                  toast({ title: "Early Start Revoked", description: "Operations workflow returned to standard sequence." });
+                } catch (err) {
+                  toast({ variant: "destructive", title: "Error", description: (err as Error).message });
+                }
+              }}
+            >
+              {revokeEarlyStart.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+              Revoke
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Early Start authorization dialog */}
+      <Dialog open={showEarlyStartDialog} onOpenChange={setShowEarlyStartDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-orange-400" /> Authorize Early Start
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              This allows the operations team to begin field work (Transire, Shipping, Terminal) before documentation and duty payment are complete. A reason is required for audit purposes.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Reason <span className="text-red-400">*</span></Label>
+              <Textarea
+                value={earlyStartReason}
+                onChange={e => setEarlyStartReason(e.target.value)}
+                placeholder="e.g. Vessel berthing window closes in 48 hours — must begin Transire now"
+                rows={3}
+                className="text-sm bg-background border-border/60 resize-none"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setShowEarlyStartDialog(false); setEarlyStartReason(""); }}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1.5 bg-orange-500 hover:bg-orange-600 text-white"
+                disabled={!earlyStartReason.trim() || authorizeEarlyStart.isPending}
+                onClick={async () => {
+                  try {
+                    await authorizeEarlyStart.mutateAsync({ id: containerId, reason: earlyStartReason.trim() });
+                    toast({ title: "Early Start Authorized", description: "Operations team can now begin field work." });
+                    setShowEarlyStartDialog(false);
+                    setEarlyStartReason("");
+                  } catch (err) {
+                    toast({ variant: "destructive", title: "Error", description: (err as Error).message });
+                  }
+                }}
+              >
+                {authorizeEarlyStart.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                Authorize
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {(isAdmin || isOperationsUser) && container.eta && !container.berthed && container.status !== "closed" && (() => {
         const etaDate = new Date(container.eta);

@@ -66,6 +66,11 @@ export const containersTable = pgTable("containers", {
   pulloutReleasedAt: timestamp("pullout_released_at"),
   pulloutDelayReason: text("pullout_delay_reason"),
   pulloutFinalDate: timestamp("pullout_final_date"),
+  // Early Start authorization (allows operations to begin before documentation completes)
+  earlyStartAuthorized: boolean("early_start_authorized").notNull().default(false),
+  earlyStartAuthorizedById: integer("early_start_authorized_by_id").references(() => usersTable.id),
+  earlyStartAuthorizedAt: timestamp("early_start_authorized_at"),
+  earlyStartReason: text("early_start_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
