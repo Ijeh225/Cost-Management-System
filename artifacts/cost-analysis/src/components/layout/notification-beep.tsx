@@ -68,8 +68,34 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const beepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const unlockedRef = useRef(false);
   const [beepActive, setBeepActive] = useState(false);
   const [open, setOpen] = useState(false);
+
+  // Create and unlock the AudioContext on the very first user interaction.
+  // Desktop browsers block audio until a click/keydown has occurred.
+  useEffect(() => {
+    const unlock = () => {
+      if (unlockedRef.current) return;
+      unlockedRef.current = true;
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      // resume() is needed when the context starts in "suspended" state (Chrome default)
+      audioCtxRef.current.resume().catch(() => {});
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("keydown", unlock);
+      document.removeEventListener("touchstart", unlock);
+    };
+    document.addEventListener("click", unlock);
+    document.addEventListener("keydown", unlock);
+    document.addEventListener("touchstart", unlock);
+    return () => {
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("keydown", unlock);
+      document.removeEventListener("touchstart", unlock);
+    };
+  }, []);
 
   useEffect(() => {
     if (hasUnread && !beepActive) {
@@ -81,12 +107,19 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
 
   useEffect(() => {
     if (beepActive) {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioCtxRef.current;
-      playBeep(ctx);
-      beepIntervalRef.current = setInterval(() => playBeep(ctx), 8000);
+      const getCtx = () => {
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        return audioCtxRef.current;
+      };
+      const fire = () => {
+        const ctx = getCtx();
+        // Resume first in case the browser suspended it (desktop autoplay policy)
+        ctx.resume().then(() => playBeep(ctx)).catch(() => {});
+      };
+      fire();
+      beepIntervalRef.current = setInterval(fire, 8000);
     } else {
       if (beepIntervalRef.current) {
         clearInterval(beepIntervalRef.current);
