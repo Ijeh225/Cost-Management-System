@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "./auth-provider";
 import { useGetNotifications, type NotificationsResponse } from "@workspace/api-client-react";
@@ -16,7 +17,7 @@ import {
 import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
   ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, Activity, BookOpen, FileCheck2,
-  Truck, Kanban, Banknote, Anchor, Ship, PackageOpen,
+  Truck, Kanban, Banknote, Anchor, Ship, PackageOpen, ChevronDown,
 } from "lucide-react";
 
 type NavItem = {
@@ -37,6 +38,7 @@ function NotificationsBadge({ count }: { count: number }) {
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser } = useAuth();
 
   const { data: notifData } = useGetNotifications<NotificationsResponse>({
@@ -68,16 +70,23 @@ export function AppSidebar() {
   const adminNav: NavItem[] = [
     { title: "Approval Queue",   url: "/approvals",              icon: ClipboardCheck },
     { title: "Pipeline Board",   url: "/pipeline",               icon: Kanban          },
-    { title: "Transire Jobs",    url: "/workspace/transire",     icon: FileCheck2      },
-    { title: "Shipping Jobs",    url: "/workspace/shipping",     icon: Ship            },
-    { title: "Terminal Jobs",    url: "/workspace/terminal-ops", icon: Building2       },
-    { title: "Pull-Out Jobs",    url: "/workspace/pull-out",     icon: PackageOpen     },
     { title: "Analytics",        url: "/analytics",              icon: BarChart2       },
     { title: "Reports",          url: "/reports",                icon: FileDown        },
     { title: "Upload Data",      url: "/containers/upload",      icon: UploadCloud     },
     { title: "User Management",  url: "/users",                  icon: Users           },
     ...(isSuperAdmin ? [{ title: "Settings", url: "/settings", icon: Settings }] : []),
   ];
+
+  const adminWorkspaceNav: NavItem[] = [
+    { title: "Transire Jobs",    url: "/workspace/transire",     icon: FileCheck2  },
+    { title: "Shipping Jobs",    url: "/workspace/shipping",     icon: Ship        },
+    { title: "Terminal Jobs",    url: "/workspace/terminal-ops", icon: Building2   },
+    { title: "Pull-Out Jobs",    url: "/workspace/pull-out",     icon: PackageOpen },
+  ];
+
+  const anyWorkspaceActive = adminWorkspaceNav.some(
+    item => location === item.url || location.startsWith(item.url)
+  );
 
   const deptNav: NavItem[] = [
     ...(isDocumentationUser ? [{ title: "My Jobs",            url: "/documentation",           icon: FileCheck2  }] : []),
@@ -162,6 +171,47 @@ export function AppSidebar() {
                         tooltip={item.title}
                         className={`
                           transition-all duration-200
+                          ${isActive ? "bg-primary/10 text-primary font-medium border-r-2 border-primary rounded-none" : "text-muted-foreground hover:text-foreground hover:bg-accent"}
+                        `}
+                      >
+                        <Link href={item.url} className="flex items-center gap-3 w-full px-3">
+                          <item.icon className={`w-4 h-4 ${isActive ? "text-primary" : ""}`} />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+
+                {/* Collapsible Workspace Access sub-group */}
+                <SidebarMenuItem>
+                  <button
+                    onClick={() => setWorkspaceOpen(o => !o)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200
+                      ${anyWorkspaceActive
+                        ? "text-primary font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                      }`}
+                  >
+                    <Kanban className={`w-4 h-4 shrink-0 ${anyWorkspaceActive ? "text-primary" : ""}`} />
+                    <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">Workspace Access</span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden
+                        ${workspaceOpen || anyWorkspaceActive ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                </SidebarMenuItem>
+
+                {(workspaceOpen || anyWorkspaceActive) && adminWorkspaceNav.map((item) => {
+                  const isActive = location === item.url || location.startsWith(item.url);
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.title}
+                        className={`
+                          transition-all duration-200 pl-8
                           ${isActive ? "bg-primary/10 text-primary font-medium border-r-2 border-primary rounded-none" : "text-muted-foreground hover:text-foreground hover:bg-accent"}
                         `}
                       >
