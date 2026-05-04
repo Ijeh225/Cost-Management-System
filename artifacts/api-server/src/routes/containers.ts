@@ -567,8 +567,13 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       .leftJoin(customsChargesTable, eq(customsChargesTable.containerId, containersTable.id))
       .where(isNotNull(containersTable.verifiedAt));
 
+    // The three field-ops stages run in parallel — a container in any one of them
+    // appears in all three tabs of the ops workspace simultaneously.
+    const PARALLEL_OPS_STAGES = ["transire_processing", "shipping", "terminal"] as const;
+    const PARALLEL_OPS_SET   = new Set<string>(PARALLEL_OPS_STAGES);
+
     // Doc-adjacent stages: containers here that have earlyStartAuthorized also
-    // appear virtually in the ops workspace under transire_processing.
+    // appear virtually in all three ops workspace tabs simultaneously.
     const EARLY_START_STAGES = new Set(["registered", "documentation", "duty_assessment", "duty_payment"]);
 
     const stages: Record<string, Array<{
@@ -625,18 +630,31 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       };
       stages[c.status].push(entry);
 
-      // If early start is authorized and container is still in doc stages,
-      // also surface it in transire_processing for the operations workspace.
+      // Parallel ops: if the container is in any of the three field-ops stages,
+      // mirror it into the other two so all departments see it simultaneously.
+      if (PARALLEL_OPS_SET.has(c.status)) {
+        for (const opsStage of PARALLEL_OPS_STAGES) {
+          if (opsStage !== c.status) {
+            if (!stages[opsStage]) stages[opsStage] = [];
+            stages[opsStage].push(entry);
+          }
+        }
+      }
+
+      // Early Start: inject into all three parallel ops stages (not just transire).
       if (c.earlyStartAuthorized && EARLY_START_STAGES.has(c.status)) {
-        if (!stages.transire_processing) stages.transire_processing = [];
-        stages.transire_processing.push({
+        const earlyEntry = {
           ...entry,
           isEarlyStart: true,
           earlyStartReason: c.earlyStartReason ?? null,
           earlyStartAuthorizedAt: c.earlyStartAuthorizedAt instanceof Date
             ? c.earlyStartAuthorizedAt.toISOString()
             : (c.earlyStartAuthorizedAt ?? null),
-        });
+        };
+        for (const opsStage of PARALLEL_OPS_STAGES) {
+          if (!stages[opsStage]) stages[opsStage] = [];
+          stages[opsStage].push(earlyEntry);
+        }
       }
     }
 

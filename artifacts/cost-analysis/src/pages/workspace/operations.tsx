@@ -13,12 +13,7 @@ import { CompletedJobsView } from "@/components/workspace/completed-jobs-view";
 
 const DEPT_STAGES = ["transire_processing", "shipping", "terminal", "pull_out"];
 
-const STAGE_SUBMIT_LABEL: Record<string, string> = {
-  transire_processing: "Submit to Shipping",
-  shipping:            "Submit to Terminal",
-  terminal:            "Submit to Pull-Out",
-  pull_out:            "Submit to Terminal Manager",
-};
+const TERMINAL_SUBMIT_STAGES = new Set(["terminal"]);
 
 const STAGE_COLOR: Record<string, string> = {
   transire_processing: "bg-violet-500/10 text-violet-400 border-violet-500/30",
@@ -67,12 +62,12 @@ export default function OperationsWorkspace() {
   const totalJobs = allContainers.length;
   const searching = search.trim().length > 0;
 
-  const handleSubmit = (container: (typeof filtered)[0]) => {
+  const handleSubmitToPullout = (container: (typeof filtered)[0]) => {
     advance.mutate(
-      { id: container.id, status: container.stage },
+      { id: container.id, status: "pull_out" },
       {
         onSuccess: () =>
-          toast({ title: `Job ${container.containerNumber} submitted to next stage.` }),
+          toast({ title: `Job ${container.containerNumber} submitted to Pull-Out.` }),
         onError: e =>
           toast({ title: "Error", description: (e as Error).message, variant: "destructive" }),
       }
@@ -195,11 +190,11 @@ export default function OperationsWorkspace() {
                               <Button size="sm" className="gap-1.5 text-xs h-8" disabled title="Awaiting documentation and duty payment completion">
                                 <Clock className="w-3 h-3" /> Awaiting Docs
                               </Button>
-                            ) : (
+                            ) : TERMINAL_SUBMIT_STAGES.has(stage) ? (
                               <Button
                                 size="sm"
                                 className="gap-1.5 text-xs h-8"
-                                onClick={() => handleSubmit(c)}
+                                onClick={() => handleSubmitToPullout(c)}
                                 disabled={advance.isPending}
                               >
                                 {advance.isPending ? (
@@ -207,9 +202,9 @@ export default function OperationsWorkspace() {
                                 ) : (
                                   <SendHorizonal className="w-3 h-3" />
                                 )}
-                                {STAGE_SUBMIT_LABEL[stage]}
+                                Submit to Pull-Out
                               </Button>
-                            )}
+                            ) : null}
                           </div>
                         </Card>
                       ))}

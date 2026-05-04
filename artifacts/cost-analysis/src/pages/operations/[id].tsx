@@ -193,8 +193,6 @@ const DEPT_SUBMIT_LABELS: Record<string, Record<string, string>> = {
     delivery: "Mark as Closed",
   },
   operations_user: {
-    transire_processing: "Submit to Shipping",
-    shipping:            "Submit to Terminal",
     terminal:            "Submit to Pull-Out",
     pull_out:            "Submit to Terminal Manager",
   },
@@ -271,10 +269,9 @@ function OpsStageTracker({
   const handleMarkReleased = async () => {
     try {
       await stageActionMut.mutateAsync({ id: container.id, action: "mark_released" });
-      if (nextStage) {
-        await advanceMutation.mutateAsync({ id: container.id, status: nextStage });
-      }
       toast({ title: `${getStatusLabel(container.status)} marked as released` });
+      // Status advancement is handled by the explicit "Submit to Pull-Out" action,
+      // not by marking a stage as released (Transire/Shipping are data-entry only).
     } catch (err) {
       toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Failed" });
     }
@@ -484,8 +481,8 @@ function OpsStageTracker({
         </CardContent>
       </Card>
 
-      {/* Submit to Next Stage */}
-      {isEditable && nextStage && (() => {
+      {/* Submit to Next Stage — only for Terminal and Pull-Out; Transire/Shipping are data-entry only */}
+      {isEditable && nextStage && ["terminal", "pull_out"].includes(container.status) && (() => {
         const submitLabel = DEPT_SUBMIT_LABELS["operations_user"]?.[container.status] ?? `Submit to ${getStatusLabel(nextStage)}`;
         const handleSubmit = async () => {
           try {
