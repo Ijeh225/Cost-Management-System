@@ -16,7 +16,7 @@ import {
 import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
   ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, Activity, BookOpen, FileCheck2,
-  Truck, Kanban, Banknote,
+  Truck, Kanban, Banknote, Anchor,
 } from "lucide-react";
 
 type NavItem = {
@@ -37,7 +37,7 @@ function NotificationsBadge({ count }: { count: number }) {
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTerminalManager, isDeliveryUser, isDepartmentUser } = useAuth();
+  const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser } = useAuth();
 
   const { data: notifData } = useGetNotifications<NotificationsResponse>({
     query: { refetchInterval: 60_000, enabled: !!isAuthenticated },
@@ -77,24 +77,33 @@ export function AppSidebar() {
 
   const deptNav: NavItem[] = isDocumentationUser
     ? [
-        { title: "My Jobs",            url: "/documentation", icon: FileCheck2      },
+        { title: "My Jobs",              url: "/documentation",             icon: FileCheck2 },
       ]
     : isAccountsUser
     ? [
-        { title: "Duty Payments",      url: "/duty-payments",           icon: Banknote        },
-        { title: "Accounts Workspace", url: "/workspace/accounts",      icon: BookOpen        },
+        { title: "Duty Payments",        url: "/duty-payments",             icon: Banknote   },
+        { title: "Accounts Workspace",   url: "/workspace/accounts",        icon: BookOpen   },
+      ]
+    : isTransireUser
+    ? [
+        { title: "Transire Jobs",        url: "/workspace/transire",        icon: FileCheck2 },
+      ]
+    : isShippingTerminalUser
+    ? [
+        { title: "Shipping & Terminal",  url: "/workspace/shipping-terminal", icon: Anchor   },
       ]
     : isOperationsUser
     ? [
-        { title: "My Jobs",            url: "/workspace/operations",    icon: Activity        },
+        { title: "Transire Jobs",        url: "/workspace/transire",          icon: FileCheck2 },
+        { title: "Shipping & Terminal",  url: "/workspace/shipping-terminal", icon: Anchor     },
       ]
     : isTerminalManager
     ? [
-        { title: "Terminal Workspace", url: "/workspace/terminal",      icon: Building2       },
+        { title: "Terminal Workspace",   url: "/workspace/terminal",        icon: Building2  },
       ]
     : isDeliveryUser
     ? [
-        { title: "Deliveries",         url: "/workspace/delivery",      icon: Truck           },
+        { title: "Deliveries",           url: "/workspace/delivery",        icon: Truck      },
       ]
     : [];
 

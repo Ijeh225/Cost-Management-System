@@ -16,6 +16,8 @@ export type AuthContextType = {
   isDocumentationUser: boolean;
   isAccountsUser: boolean;
   isOperationsUser: boolean;
+  isTransireUser: boolean;
+  isShippingTerminalUser: boolean;
   isTerminalManager: boolean;
   isDeliveryUser: boolean;
 };
@@ -28,6 +30,8 @@ const AuthContext = createContext<AuthContextType>({
   isDocumentationUser: false,
   isAccountsUser: false,
   isOperationsUser: false,
+  isTransireUser: false,
+  isShippingTerminalUser: false,
   isTerminalManager: false,
   isDeliveryUser: false,
   isAuthenticated: false,
@@ -96,11 +100,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (isAuthPage || isSetupPage) {
         const role = (effectiveUser as any)?.role ?? "";
         const deptHomeMap: Record<string, string> = {
-          operations_user:   "/workspace/operations",
-          documentation_user: "/documentation",
-          accounts_user:     "/workspace/accounts",
-          terminal_manager:  "/workspace/terminal",
-          delivery_user:     "/workspace/delivery",
+          transire_user:          "/workspace/transire",
+          shipping_terminal_user: "/workspace/shipping-terminal",
+          operations_user:        "/workspace/transire",
+          documentation_user:     "/documentation",
+          accounts_user:          "/workspace/accounts",
+          terminal_manager:       "/workspace/terminal",
+          delivery_user:          "/workspace/delivery",
         };
         setLocation(deptHomeMap[role] ?? "/");
       }
@@ -130,9 +136,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isDocumentationUser: effectiveUser?.role === "documentation_user",
         isAccountsUser: effectiveUser?.role === "accounts_user",
         isOperationsUser: effectiveUser?.role === "operations_user",
+        isTransireUser: effectiveUser?.role === "transire_user",
+        isShippingTerminalUser: effectiveUser?.role === "shipping_terminal_user",
         isTerminalManager: effectiveUser?.role === "terminal_manager",
         isDeliveryUser: effectiveUser?.role === "delivery_user",
-        isDepartmentUser: ["documentation_user","accounts_user","operations_user","terminal_manager","delivery_user"].includes(effectiveUser?.role ?? ""),
+        isDepartmentUser: ["documentation_user","accounts_user","operations_user","transire_user","shipping_terminal_user","terminal_manager","delivery_user"].includes(effectiveUser?.role ?? ""),
       }}
     >
       {children}

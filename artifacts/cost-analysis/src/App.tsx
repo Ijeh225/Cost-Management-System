@@ -37,7 +37,8 @@ import ArPage from "@/pages/ar/index";
 import DutyPaymentsPage from "@/pages/duty-payments/index";
 import DocumentationWorkspace from "@/pages/workspace/documentation";
 import AccountsWorkspace from "@/pages/workspace/accounts";
-import OperationsWorkspace from "@/pages/workspace/operations";
+import TransireWorkspace from "@/pages/workspace/transire";
+import ShippingTerminalWorkspace from "@/pages/workspace/shipping-terminal";
 import TerminalWorkspace from "@/pages/workspace/terminal";
 import DeliveryWorkspace from "@/pages/workspace/delivery";
 import ClientStatementPrint from "@/pages/reports/client-statement/print";
@@ -172,7 +173,9 @@ function Router() {
               <Route path="/duty-payments" component={DutyPaymentsPage} />
               <Route path="/workspace/documentation" component={() => { const [, nav] = useLocation(); nav("/documentation", { replace: true }); return null; }} />
               <Route path="/workspace/accounts" component={AccountsWorkspace} />
-              <Route path="/workspace/operations" component={OperationsWorkspace} />
+              <Route path="/workspace/transire" component={TransireWorkspace} />
+              <Route path="/workspace/shipping-terminal" component={ShippingTerminalWorkspace} />
+              <Route path="/workspace/operations" component={() => { const [, nav] = useLocation(); nav("/workspace/transire", { replace: true }); return null; }} />
               <Route path="/workspace/terminal" component={TerminalWorkspace} />
               <Route path="/workspace/delivery" component={DeliveryWorkspace} />
               <Route path="/invoices" component={InvoicesPage} />
