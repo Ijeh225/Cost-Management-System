@@ -38,6 +38,9 @@ import DutyPaymentsPage from "@/pages/duty-payments/index";
 import DocumentationWorkspace from "@/pages/workspace/documentation";
 import AccountsWorkspace from "@/pages/workspace/accounts";
 import TransireWorkspace from "@/pages/workspace/transire";
+import ShippingWorkspace from "@/pages/workspace/shipping";
+import TerminalOpsWorkspace from "@/pages/workspace/terminal-ops";
+import PullOutWorkspace from "@/pages/workspace/pull-out";
 import ShippingTerminalWorkspace from "@/pages/workspace/shipping-terminal";
 import TerminalWorkspace from "@/pages/workspace/terminal";
 import DeliveryWorkspace from "@/pages/workspace/delivery";
@@ -174,7 +177,10 @@ function Router() {
               <Route path="/workspace/documentation" component={() => { const [, nav] = useLocation(); nav("/documentation", { replace: true }); return null; }} />
               <Route path="/workspace/accounts" component={AccountsWorkspace} />
               <Route path="/workspace/transire" component={TransireWorkspace} />
-              <Route path="/workspace/shipping-terminal" component={ShippingTerminalWorkspace} />
+              <Route path="/workspace/shipping" component={ShippingWorkspace} />
+              <Route path="/workspace/terminal-ops" component={TerminalOpsWorkspace} />
+              <Route path="/workspace/pull-out" component={PullOutWorkspace} />
+              <Route path="/workspace/shipping-terminal" component={() => { const [, nav] = useLocation(); nav("/workspace/shipping", { replace: true }); return null; }} />
               <Route path="/workspace/operations" component={() => { const [, nav] = useLocation(); nav("/workspace/transire", { replace: true }); return null; }} />
               <Route path="/workspace/terminal" component={TerminalWorkspace} />
               <Route path="/workspace/delivery" component={DeliveryWorkspace} />

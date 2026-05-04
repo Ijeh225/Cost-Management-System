@@ -752,6 +752,11 @@ const DEPT_OWNED_STAGES: Record<string, string[]> = {
   documentation_user: ["registered", "documentation", "duty_assessment"],
   accounts_user: ["duty_payment"],
   operations_user: ["transire_processing", "shipping", "terminal", "pull_out"],
+  transire_user: ["transire_processing"],
+  shipping_user: ["shipping"],
+  terminal_user: ["terminal"],
+  pull_out_user: ["pull_out"],
+  shipping_terminal_user: ["shipping", "terminal"],
   terminal_manager: ["gate_in", "examination", "final_release"],
   delivery_user: ["delivery"],
 };

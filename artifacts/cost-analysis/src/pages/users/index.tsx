@@ -82,7 +82,12 @@ function GranularPermissionsEditor({
   );
 }
 
-const ALL_ROLES = ["super_admin", "admin", "staff", "documentation_user", "accounts_user", "operations_user", "terminal_manager", "delivery_user"] as const;
+const ALL_ROLES = [
+  "super_admin", "admin", "staff",
+  "documentation_user", "accounts_user", "operations_user",
+  "transire_user", "shipping_user", "terminal_user", "pull_out_user",
+  "terminal_manager", "delivery_user",
+] as const;
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -90,7 +95,11 @@ const ROLE_LABELS: Record<string, string> = {
   staff: "Staff",
   documentation_user: "Documentation",
   accounts_user: "Accounts",
-  operations_user: "Operations",
+  operations_user: "Operations (Legacy)",
+  transire_user: "Transire",
+  shipping_user: "Shipping",
+  terminal_user: "Terminal",
+  pull_out_user: "Pull-Out",
   terminal_manager: "Terminal Manager",
   delivery_user: "Delivery / Transport",
 };
@@ -116,7 +125,11 @@ type UserRow = {
   isActive: boolean; createdAt: string;
 };
 
-const DEPT_ROLES = ["documentation_user", "accounts_user", "operations_user", "terminal_manager", "delivery_user"];
+const DEPT_ROLES = [
+  "documentation_user", "accounts_user", "operations_user",
+  "transire_user", "shipping_user", "terminal_user", "pull_out_user",
+  "shipping_terminal_user", "terminal_manager", "delivery_user",
+];
 
 function formatPermissionsSummary(user: UserRow): string {
   if (user.role === "super_admin") return "Full system control";
@@ -200,9 +213,13 @@ function CreateUserDialog() {
                     <SelectItem value="staff">Staff</SelectItem>
                     <SelectItem value="documentation_user">Documentation</SelectItem>
                     <SelectItem value="accounts_user">Accounts</SelectItem>
-                    <SelectItem value="operations_user">Operations</SelectItem>
+                    <SelectItem value="transire_user">Transire</SelectItem>
+                    <SelectItem value="shipping_user">Shipping</SelectItem>
+                    <SelectItem value="terminal_user">Terminal</SelectItem>
+                    <SelectItem value="pull_out_user">Pull-Out</SelectItem>
                     <SelectItem value="terminal_manager">Terminal Manager</SelectItem>
                     <SelectItem value="delivery_user">Delivery / Transport</SelectItem>
+                    <SelectItem value="operations_user">Operations (Legacy)</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -295,9 +312,13 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
                   <SelectItem value="staff">Staff</SelectItem>
                   <SelectItem value="documentation_user">Documentation</SelectItem>
                   <SelectItem value="accounts_user">Accounts</SelectItem>
-                  <SelectItem value="operations_user">Operations</SelectItem>
+                  <SelectItem value="transire_user">Transire</SelectItem>
+                  <SelectItem value="shipping_user">Shipping</SelectItem>
+                  <SelectItem value="terminal_user">Terminal</SelectItem>
+                  <SelectItem value="pull_out_user">Pull-Out</SelectItem>
                   <SelectItem value="terminal_manager">Terminal Manager</SelectItem>
                   <SelectItem value="delivery_user">Delivery / Transport</SelectItem>
+                  <SelectItem value="operations_user">Operations (Legacy)</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />

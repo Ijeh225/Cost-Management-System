@@ -17,6 +17,9 @@ export type AuthContextType = {
   isAccountsUser: boolean;
   isOperationsUser: boolean;
   isTransireUser: boolean;
+  isShippingUser: boolean;
+  isTerminalUser: boolean;
+  isPullOutUser: boolean;
   isShippingTerminalUser: boolean;
   isTerminalManager: boolean;
   isDeliveryUser: boolean;
@@ -31,6 +34,9 @@ const AuthContext = createContext<AuthContextType>({
   isAccountsUser: false,
   isOperationsUser: false,
   isTransireUser: false,
+  isShippingUser: false,
+  isTerminalUser: false,
+  isPullOutUser: false,
   isShippingTerminalUser: false,
   isTerminalManager: false,
   isDeliveryUser: false,
@@ -101,7 +107,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const role = (effectiveUser as any)?.role ?? "";
         const deptHomeMap: Record<string, string> = {
           transire_user:          "/workspace/transire",
-          shipping_terminal_user: "/workspace/shipping-terminal",
+          shipping_user:          "/workspace/shipping",
+          terminal_user:          "/workspace/terminal-ops",
+          pull_out_user:          "/workspace/pull-out",
+          shipping_terminal_user: "/workspace/shipping",
           operations_user:        "/workspace/transire",
           documentation_user:     "/documentation",
           accounts_user:          "/workspace/accounts",
@@ -124,23 +133,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const role = effectiveUser?.role ?? "";
+
   return (
     <AuthContext.Provider
       value={{
         user: effectiveUser,
         isLoading: !!isLoading,
         isAuthenticated: !!effectiveUser,
-        isSuperAdmin: effectiveUser?.role === "super_admin",
-        isAdmin: effectiveUser?.role === "admin" || effectiveUser?.role === "super_admin",
-        userRole: effectiveUser?.role ?? null,
-        isDocumentationUser: effectiveUser?.role === "documentation_user",
-        isAccountsUser: effectiveUser?.role === "accounts_user",
-        isOperationsUser: effectiveUser?.role === "operations_user",
-        isTransireUser: effectiveUser?.role === "transire_user",
-        isShippingTerminalUser: effectiveUser?.role === "shipping_terminal_user",
-        isTerminalManager: effectiveUser?.role === "terminal_manager",
-        isDeliveryUser: effectiveUser?.role === "delivery_user",
-        isDepartmentUser: ["documentation_user","accounts_user","operations_user","transire_user","shipping_terminal_user","terminal_manager","delivery_user"].includes(effectiveUser?.role ?? ""),
+        isSuperAdmin: role === "super_admin",
+        isAdmin: role === "admin" || role === "super_admin",
+        userRole: role || null,
+        isDocumentationUser: role === "documentation_user",
+        isAccountsUser: role === "accounts_user",
+        isOperationsUser: role === "operations_user",
+        isTransireUser: role === "transire_user",
+        isShippingUser: role === "shipping_user",
+        isTerminalUser: role === "terminal_user",
+        isPullOutUser: role === "pull_out_user",
+        isShippingTerminalUser: role === "shipping_terminal_user",
+        isTerminalManager: role === "terminal_manager",
+        isDeliveryUser: role === "delivery_user",
+        isDepartmentUser: [
+          "documentation_user","accounts_user","operations_user",
+          "transire_user","shipping_user","terminal_user","pull_out_user",
+          "shipping_terminal_user","terminal_manager","delivery_user",
+        ].includes(role),
       }}
     >
       {children}

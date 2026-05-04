@@ -16,7 +16,7 @@ import {
 import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
   ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, Activity, BookOpen, FileCheck2,
-  Truck, Kanban, Banknote, Anchor,
+  Truck, Kanban, Banknote, Anchor, Ship, PackageOpen,
 } from "lucide-react";
 
 type NavItem = {
@@ -37,7 +37,7 @@ function NotificationsBadge({ count }: { count: number }) {
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser } = useAuth();
+  const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser } = useAuth();
 
   const { data: notifData } = useGetNotifications<NotificationsResponse>({
     query: { refetchInterval: 60_000, enabled: !!isAuthenticated },
@@ -66,12 +66,16 @@ export function AppSidebar() {
   ];
 
   const adminNav: NavItem[] = [
-    { title: "Approval Queue",   url: "/approvals",          icon: ClipboardCheck },
-    { title: "Pipeline Board",   url: "/pipeline",           icon: Kanban          },
-    { title: "Analytics",        url: "/analytics",          icon: BarChart2       },
-    { title: "Reports",          url: "/reports",            icon: FileDown        },
-    { title: "Upload Data",      url: "/containers/upload",  icon: UploadCloud     },
-    { title: "User Management",  url: "/users",              icon: Users           },
+    { title: "Approval Queue",   url: "/approvals",              icon: ClipboardCheck },
+    { title: "Pipeline Board",   url: "/pipeline",               icon: Kanban          },
+    { title: "Transire Jobs",    url: "/workspace/transire",     icon: FileCheck2      },
+    { title: "Shipping Jobs",    url: "/workspace/shipping",     icon: Ship            },
+    { title: "Terminal Jobs",    url: "/workspace/terminal-ops", icon: Building2       },
+    { title: "Pull-Out Jobs",    url: "/workspace/pull-out",     icon: PackageOpen     },
+    { title: "Analytics",        url: "/analytics",              icon: BarChart2       },
+    { title: "Reports",          url: "/reports",                icon: FileDown        },
+    { title: "Upload Data",      url: "/containers/upload",      icon: UploadCloud     },
+    { title: "User Management",  url: "/users",                  icon: Users           },
     ...(isSuperAdmin ? [{ title: "Settings", url: "/settings", icon: Settings }] : []),
   ];
 
@@ -88,14 +92,26 @@ export function AppSidebar() {
     ? [
         { title: "Transire Jobs",        url: "/workspace/transire",        icon: FileCheck2 },
       ]
+    : isShippingUser
+    ? [
+        { title: "Shipping Jobs",        url: "/workspace/shipping",        icon: Ship       },
+      ]
+    : isTerminalUser
+    ? [
+        { title: "Terminal Jobs",        url: "/workspace/terminal-ops",    icon: Building2  },
+      ]
+    : isPullOutUser
+    ? [
+        { title: "Pull-Out Jobs",        url: "/workspace/pull-out",        icon: PackageOpen },
+      ]
     : isShippingTerminalUser
     ? [
-        { title: "Shipping & Terminal",  url: "/workspace/shipping-terminal", icon: Anchor   },
+        { title: "Shipping Jobs",        url: "/workspace/shipping",        icon: Ship       },
       ]
     : isOperationsUser
     ? [
-        { title: "Transire Jobs",        url: "/workspace/transire",          icon: FileCheck2 },
-        { title: "Shipping & Terminal",  url: "/workspace/shipping-terminal", icon: Anchor     },
+        { title: "Transire Jobs",        url: "/workspace/transire",        icon: FileCheck2 },
+        { title: "Shipping Jobs",        url: "/workspace/shipping",        icon: Ship       },
       ]
     : isTerminalManager
     ? [
