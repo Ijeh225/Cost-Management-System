@@ -23,3 +23,18 @@ export const workflowNotificationsTable = pgTable("workflow_notifications", {
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// Persistent log of every system alert that has ever been detected.
+// On each poll, active alerts are upserted (last_seen_at updated).
+// When an alert is no longer detected it is automatically considered resolved.
+export const systemAlertsHistoryTable = pgTable("system_alerts_history", {
+  id: serial("id").primaryKey(),
+  alertKey: text("alert_key").notNull().unique(),
+  type: text("type").notNull(),
+  severity: text("severity").notNull(),
+  message: text("message").notNull(),
+  containerId: integer("container_id").references(() => containersTable.id, { onDelete: "set null" }),
+  containerNumber: text("container_number"),
+  firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+});

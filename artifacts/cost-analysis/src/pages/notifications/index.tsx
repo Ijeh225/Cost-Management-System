@@ -8,8 +8,10 @@ import {
   useGetWorkflowNotifications,
   useMarkWorkflowNotificationRead,
   useMarkAllWorkflowNotificationsRead,
+  useGetAlertHistory,
   type Notification,
   type WorkflowNotification,
+  type AlertHistoryItem,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +28,7 @@ import {
   Clock, ShieldAlert, ListTodo, Activity, CheckCheck,
   ExternalLink, Loader2, RefreshCw, XCircle, Anchor,
   BriefcaseIcon, CheckCircle2, Filter, CalendarRange, ArrowRight,
+  History, CheckCircle, Circle,
 } from "lucide-react";
 
 // ─── Alert type config ─────────────────────────────────────────────────────────
@@ -245,21 +248,84 @@ function WorkflowEventRow({ notif }: { notif: WorkflowNotification }) {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
+// ─── Alert History Row ─────────────────────────────────────────────────────────
+
+function AlertHistoryRow({ item }: { item: AlertHistoryItem }) {
+  const cfg = ALERT_CONFIG[item.type] ?? ALERT_CONFIG.low_margin;
+  const sev = SEVERITY_CONFIG[item.severity] ?? SEVERITY_CONFIG.info;
+  const Icon = cfg.icon;
+  const [, navigate] = useLocation();
+
+  const destination = getAlertUrl(item.type, item.containerId ?? undefined);
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      onClick={() => navigate(destination)}
+      role="link"
+      tabIndex={0}
+      onKeyDown={e => e.key === "Enter" && navigate(destination)}
+      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none ${
+        item.isResolved ? "opacity-50 hover:opacity-70" : "hover:bg-primary/[0.025]"
+      }`}
+    >
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border} border`}>
+        <Icon className={`w-4 h-4 ${cfg.color}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-foreground">{cfg.label}</span>
+            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${sev.className}`}>{sev.label}</Badge>
+            {item.isResolved ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5">
+                <CheckCircle className="w-2.5 h-2.5" /> Resolved
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5">
+                <Circle className="w-2.5 h-2.5 fill-amber-400" /> Active
+              </span>
+            )}
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-[11px] text-muted-foreground">First seen: {formatTime(item.firstSeenAt)}</p>
+            <p className="text-[11px] text-muted-foreground">Last seen: {formatTime(item.lastSeenAt)}</p>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.message}</p>
+        <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+          <ArrowRight className="w-3 h-3" />
+          {getAlertActionLabel(item.type, item.containerId ?? undefined)}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
+
 export default function NotificationsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const [tab,        setTab]        = useState<"system" | "workflow">("system");
-  const [filter,     setFilter]     = useState<"all" | "unread" | "read">("all");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [dateFrom,   setDateFrom]   = useState<string>("");
-  const [dateTo,     setDateTo]     = useState<string>("");
+  const [tab,          setTab]          = useState<"system" | "workflow">("system");
+  const [systemView,   setSystemView]   = useState<"active" | "history">("active");
+  const [filter,       setFilter]       = useState<"all" | "unread" | "read">("all");
+  const [typeFilter,   setTypeFilter]   = useState<string>("all");
+  const [dateFrom,     setDateFrom]     = useState<string>("");
+  const [dateTo,       setDateTo]       = useState<string>("");
+  const [historyResFilter, setHistoryResFilter] = useState<"all" | "active" | "resolved">("all");
 
   const { data, isLoading, refetch, isFetching } = useGetNotifications({
     query: { refetchInterval: 30_000 },
   });
   const { data: wfData, isLoading: wfLoading, refetch: wfRefetch, isFetching: wfFetching } = useGetWorkflowNotifications({
     query: { refetchInterval: 30_000 },
+  });
+  const { data: historyData, isLoading: historyLoading, refetch: historyRefetch, isFetching: historyFetching } = useGetAlertHistory({
+    query: { refetchInterval: 60_000 },
   });
 
   const markAll         = useMarkAllNotificationsRead();
@@ -363,98 +429,197 @@ export default function NotificationsPage() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
-          {(["all", "unread", "read"] as const).map(f => (
+      {/* System Alerts sub-view toggle */}
+      {tab === "system" && (
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-all capitalize ${filter === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setSystemView("active")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${systemView === "active" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
-              {f}
-              {f === "unread" && currentUnread > 0 && (
-                <span className="ml-1.5 bg-primary/20 text-primary text-[10px] px-1.5 rounded-full">{currentUnread}</span>
+              <Bell className="w-3 h-3" />
+              Active Alerts
+              {unreadCount > 0 && (
+                <span className="bg-red-500/20 text-red-400 text-[10px] px-1.5 rounded-full">{unreadCount}</span>
               )}
             </button>
-          ))}
-        </div>
+            <button
+              onClick={() => setSystemView("history")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${systemView === "history" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <History className="w-3 h-3" />
+              History
+              {(historyData?.total ?? 0) > 0 && (
+                <span className="bg-secondary text-muted-foreground text-[10px] px-1.5 rounded-full">{historyData?.total}</span>
+              )}
+            </button>
+          </div>
 
-        {tab === "system" && (
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-8 text-xs w-44 bg-card/50 border-border/50">
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All alert types</SelectItem>
-              {allTypes.map(t => (
-                <SelectItem key={t} value={t}>{ALERT_CONFIG[t]?.label ?? t}</SelectItem>
+          {systemView === "history" && (
+            <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1 ml-auto">
+              {(["all", "active", "resolved"] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setHistoryResFilter(f)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all capitalize ${historyResFilter === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {f}
+                </button>
               ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        <div className="flex items-center gap-1.5 ml-auto">
-          <CalendarRange className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs w-36 bg-card/50 border-border/50" title="From date" />
-          <span className="text-xs text-muted-foreground">–</span>
-          <Input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   className="h-8 text-xs w-36 bg-card/50 border-border/50" title="To date" />
-          {hasDateFilter && (
-            <Button variant="ghost" size="sm" onClick={clearDateFilter} className="h-8 px-2 text-xs text-muted-foreground" title="Clear date filter">
-              <Filter className="w-3 h-3" />
-            </Button>
+            </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* List */}
-      <Card className="border-border/50 bg-card/40 overflow-hidden">
-        {currentLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-7 h-7 animate-spin text-primary" />
-          </div>
-        ) : displayedItems === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            {totalItems === 0 ? (
-              <>
-                <BellOff className="w-12 h-12 text-muted-foreground/20 mb-3" />
-                <p className="font-medium text-muted-foreground">
-                  {tab === "system" ? "No system alerts" : "No workflow events yet"}
-                </p>
-                <p className="text-sm text-muted-foreground/60 mt-1">
-                  {tab === "system"
-                    ? "All containers are within normal parameters."
-                    : "Events appear here as containers move through stages."}
-                </p>
-              </>
-            ) : (
-              <>
-                <Activity className="w-10 h-10 text-muted-foreground/20 mb-3" />
-                <p className="text-muted-foreground text-sm">No notifications match the current filters.</p>
-                {hasDateFilter && (
-                  <Button variant="ghost" size="sm" onClick={clearDateFilter} className="mt-2 text-xs gap-1.5">
-                    <Filter className="w-3 h-3" /> Clear date filter
-                  </Button>
+      {/* Filters (active view only) */}
+      {!(tab === "system" && systemView === "history") && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
+            {(["all", "unread", "read"] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all capitalize ${filter === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {f}
+                {f === "unread" && currentUnread > 0 && (
+                  <span className="ml-1.5 bg-primary/20 text-primary text-[10px] px-1.5 rounded-full">{currentUnread}</span>
                 )}
-              </>
+              </button>
+            ))}
+          </div>
+
+          {tab === "system" && (
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="h-8 text-xs w-44 bg-card/50 border-border/50">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All alert types</SelectItem>
+                {allTypes.map(t => (
+                  <SelectItem key={t} value={t}>{ALERT_CONFIG[t]?.label ?? t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <div className="flex items-center gap-1.5 ml-auto">
+            <CalendarRange className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs w-36 bg-card/50 border-border/50" title="From date" />
+            <span className="text-xs text-muted-foreground">–</span>
+            <Input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   className="h-8 text-xs w-36 bg-card/50 border-border/50" title="To date" />
+            {hasDateFilter && (
+              <Button variant="ghost" size="sm" onClick={clearDateFilter} className="h-8 px-2 text-xs text-muted-foreground" title="Clear date filter">
+                <Filter className="w-3 h-3" />
+              </Button>
             )}
           </div>
-        ) : (
-          <AnimatePresence>
-            {tab === "system"
-              ? filteredSystem.map(n   => <NotificationRow   key={n.alertKey} notif={n} />)
-              : filteredWorkflow.map(n => <WorkflowEventRow  key={n.id}       notif={n} />)
-            }
-          </AnimatePresence>
-        )}
-      </Card>
+        </div>
+      )}
 
-      {displayedItems > 0 && (
-        <p className="text-center text-xs text-muted-foreground">
-          Showing {displayedItems} of {totalItems} {tab === "system" ? "alerts" : "events"}
-          {hasDateFilter && " · Date filter active"}
-          {" · Auto-refreshes every 30 s"}
-        </p>
+      {/* List */}
+      {tab === "system" && systemView === "history" ? (
+        /* ── History view ── */
+        (() => {
+          const allHistory = historyData?.alerts ?? [];
+          const filtered = allHistory.filter(a => {
+            if (historyResFilter === "active"   && a.isResolved)  return false;
+            if (historyResFilter === "resolved" && !a.isResolved) return false;
+            return true;
+          });
+          return (
+            <Card className="border-border/50 bg-card/40 overflow-hidden">
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-7 h-7 animate-spin text-primary" />
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <History className="w-12 h-12 text-muted-foreground/20 mb-3" />
+                  <p className="font-medium text-muted-foreground">No alert history yet</p>
+                  <p className="text-sm text-muted-foreground/60 mt-1">
+                    Alerts are recorded here the first time they are detected. Check back after the next refresh.
+                  </p>
+                  <Button variant="ghost" size="sm" onClick={() => historyRefetch()} disabled={historyFetching} className="mt-3 gap-1.5 text-xs">
+                    <RefreshCw className={`w-3.5 h-3.5 ${historyFetching ? "animate-spin" : ""}`} />
+                    Refresh history
+                  </Button>
+                </div>
+              ) : (
+                <AnimatePresence>
+                  {filtered.map(a => <AlertHistoryRow key={a.alertKey} item={a} />)}
+                </AnimatePresence>
+              )}
+              {filtered.length > 0 && (
+                <div className="px-5 py-3 border-t border-border/30 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {filtered.length} of {allHistory.length} records
+                    {" · "}
+                    <span className="text-emerald-400">{allHistory.filter(a => a.isResolved).length} resolved</span>
+                    {" · "}
+                    <span className="text-amber-400">{allHistory.filter(a => !a.isResolved).length} active</span>
+                  </p>
+                  <Button variant="ghost" size="sm" onClick={() => historyRefetch()} disabled={historyFetching} className="gap-1.5 text-xs h-7">
+                    <RefreshCw className={`w-3 h-3 ${historyFetching ? "animate-spin" : ""}`} />
+                    Refresh
+                  </Button>
+                </div>
+              )}
+            </Card>
+          );
+        })()
+      ) : (
+        /* ── Active / Workflow view ── */
+        <>
+          <Card className="border-border/50 bg-card/40 overflow-hidden">
+            {currentLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-7 h-7 animate-spin text-primary" />
+              </div>
+            ) : displayedItems === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                {totalItems === 0 ? (
+                  <>
+                    <BellOff className="w-12 h-12 text-muted-foreground/20 mb-3" />
+                    <p className="font-medium text-muted-foreground">
+                      {tab === "system" ? "No system alerts" : "No workflow events yet"}
+                    </p>
+                    <p className="text-sm text-muted-foreground/60 mt-1">
+                      {tab === "system"
+                        ? "All containers are within normal parameters."
+                        : "Events appear here as containers move through stages."}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-10 h-10 text-muted-foreground/20 mb-3" />
+                    <p className="text-muted-foreground text-sm">No notifications match the current filters.</p>
+                    {hasDateFilter && (
+                      <Button variant="ghost" size="sm" onClick={clearDateFilter} className="mt-2 text-xs gap-1.5">
+                        <Filter className="w-3 h-3" /> Clear date filter
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : (
+              <AnimatePresence>
+                {tab === "system"
+                  ? filteredSystem.map(n   => <NotificationRow   key={n.alertKey} notif={n} />)
+                  : filteredWorkflow.map(n => <WorkflowEventRow  key={n.id}       notif={n} />)
+                }
+              </AnimatePresence>
+            )}
+          </Card>
+
+          {displayedItems > 0 && (
+            <p className="text-center text-xs text-muted-foreground">
+              Showing {displayedItems} of {totalItems} {tab === "system" ? "alerts" : "events"}
+              {hasDateFilter && " · Date filter active"}
+              {" · Auto-refreshes every 30 s"}
+            </p>
+          )}
+        </>
       )}
     </motion.div>
   );

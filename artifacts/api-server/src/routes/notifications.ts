@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable } from "@workspace/db";
-import { eq, lt, sql, max, isNotNull, desc } from "drizzle-orm";
+import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable, systemAlertsHistoryTable } from "@workspace/db";
+import { eq, lt, sql, max, isNotNull, desc, inArray, notInArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery } from "../lib/calculations.js";
 
@@ -271,19 +271,79 @@ notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
   try {
     const userId = (req as AuthRequest).user.id;
     const role   = (req as AuthRequest).user.role;
-    const alerts = await computeAlerts(userId, role);
+    // Always compute against ALL alerts (no role filter) for history persistence
+    const allAlerts = await computeAlerts(userId, role);
+    const now = new Date();
+
+    // Persist every active alert into history (upsert: first_seen_at stays, last_seen_at updated)
+    if (allAlerts.length > 0) {
+      try {
+        await db.insert(systemAlertsHistoryTable)
+          .values(allAlerts.map(a => ({
+            alertKey: a.alertKey,
+            type: a.type,
+            severity: a.severity,
+            message: a.message,
+            containerId: a.containerId ?? null,
+            containerNumber: a.containerNumber ?? null,
+            firstSeenAt: now,
+            lastSeenAt: now,
+          })))
+          .onConflictDoUpdate({
+            target: systemAlertsHistoryTable.alertKey,
+            set: {
+              lastSeenAt: now,
+              // Update message so it stays current (e.g. updated amounts)
+              message: sql`EXCLUDED.message`,
+              severity: sql`EXCLUDED.severity`,
+            },
+          });
+      } catch { /* non-fatal — history write should not break the response */ }
+    }
+
     const readRows = await db.select().from(notificationsReadTable).where(eq(notificationsReadTable.userId, userId));
     const readMap: Record<string, { isRead: boolean; readAt: string | null }> = {};
     for (const r of readRows) {
       readMap[r.alertKey] = { isRead: r.isRead, readAt: r.readAt ? r.readAt.toISOString() : null };
     }
-    const result = alerts.map(a => ({
+    const result = allAlerts.map(a => ({
       ...a,
       isRead: readMap[a.alertKey]?.isRead ?? false,
       readAt: readMap[a.alertKey]?.readAt ?? null,
     }));
     const unreadCount = result.filter(a => !a.isRead).length;
     return res.json({ notifications: result, unreadCount });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Full historical log of all system alerts ever detected
+notificationsRouter.get("/notifications/history", requireAuth, async (req, res) => {
+  try {
+    const staleThresholdMs = 2 * 60 * 60 * 1000; // 2 hours — alert not seen recently = resolved
+    const rows = await db
+      .select()
+      .from(systemAlertsHistoryTable)
+      .orderBy(desc(systemAlertsHistoryTable.lastSeenAt))
+      .limit(500);
+
+    const now = Date.now();
+    const alerts = rows.map(r => ({
+      id: r.id,
+      alertKey: r.alertKey,
+      type: r.type,
+      severity: r.severity,
+      message: r.message,
+      containerId: r.containerId,
+      containerNumber: r.containerNumber,
+      firstSeenAt: r.firstSeenAt instanceof Date ? r.firstSeenAt.toISOString() : String(r.firstSeenAt),
+      lastSeenAt: r.lastSeenAt instanceof Date ? r.lastSeenAt.toISOString() : String(r.lastSeenAt),
+      isResolved: (now - new Date(r.lastSeenAt).getTime()) > staleThresholdMs,
+    }));
+
+    return res.json({ alerts, total: alerts.length });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });

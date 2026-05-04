@@ -18,6 +18,24 @@ export type NotificationsResponse = {
   unreadCount: number;
 };
 
+export type AlertHistoryItem = {
+  id: number;
+  alertKey: string;
+  type: string;
+  severity: string;
+  message: string;
+  containerId?: number | null;
+  containerNumber?: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  isResolved: boolean;
+};
+
+export type AlertHistoryResponse = {
+  alerts: AlertHistoryItem[];
+  total: number;
+};
+
 export type WorkflowNotification = {
   id: number;
   type: string;
@@ -100,6 +118,16 @@ export function useMarkNotificationRead() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
     },
+  });
+}
+
+export function useGetAlertHistory(options?: {
+  query?: { refetchInterval?: number; enabled?: boolean };
+}) {
+  return useQuery<AlertHistoryResponse>({
+    queryKey: ["notifications", "history"],
+    queryFn: () => customFetch<AlertHistoryResponse>("/api/notifications/history"),
+    ...(options?.query ?? {}),
   });
 }
 
