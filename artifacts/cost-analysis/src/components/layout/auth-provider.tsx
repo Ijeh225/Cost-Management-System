@@ -12,6 +12,7 @@ export type AuthContextType = {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   userRole: string | null;
+  userRoles: string[];
   isDepartmentUser: boolean;
   isDocumentationUser: boolean;
   isAccountsUser: boolean;
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   userRole: null,
+  userRoles: [],
   isDepartmentUser: false,
   isDocumentationUser: false,
   isAccountsUser: false,
@@ -49,6 +51,12 @@ async function checkSetupRequired(): Promise<{ required: boolean }> {
   const res = await fetch("/api/auth/setup-required", { credentials: "include" });
   return res.json();
 }
+
+const DEPT_ROLE_KEYS = [
+  "documentation_user", "accounts_user", "operations_user",
+  "transire_user", "shipping_user", "terminal_user", "pull_out_user",
+  "shipping_terminal_user", "terminal_manager", "delivery_user",
+];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -105,6 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!isAuthPage && !isSetupPage) setLocation("/login");
       } else if (isAuthPage || isSetupPage) {
         const role = (effectiveUser as any)?.role ?? "";
+        const roles: string[] = (effectiveUser as any)?.roles ?? [role];
         const deptHomeMap: Record<string, string> = {
           transire_user:          "/workspace/transire",
           shipping_user:          "/workspace/shipping",
@@ -117,7 +126,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           terminal_manager:       "/workspace/terminal",
           delivery_user:          "/workspace/delivery",
         };
-        setLocation(deptHomeMap[role] ?? "/");
+        // Pick first dept home from the user's roles
+        const home = roles.map(r => deptHomeMap[r]).find(Boolean);
+        setLocation(home ?? deptHomeMap[role] ?? "/");
       }
     }
   }, [effectiveUser, userLoading, isFetching, isAuthPage, isSetupPage, setupStatus, setupLoading, setLocation]);
@@ -134,6 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const role = effectiveUser?.role ?? "";
+  const roles: string[] = (effectiveUser as any)?.roles ?? [role];
+  const hasRole = (r: string) => roles.includes(r);
 
   return (
     <AuthContext.Provider
@@ -144,21 +157,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isSuperAdmin: role === "super_admin",
         isAdmin: role === "admin" || role === "super_admin",
         userRole: role || null,
-        isDocumentationUser: role === "documentation_user",
-        isAccountsUser: role === "accounts_user",
-        isOperationsUser: role === "operations_user",
-        isTransireUser: role === "transire_user",
-        isShippingUser: role === "shipping_user",
-        isTerminalUser: role === "terminal_user",
-        isPullOutUser: role === "pull_out_user",
-        isShippingTerminalUser: role === "shipping_terminal_user",
-        isTerminalManager: role === "terminal_manager",
-        isDeliveryUser: role === "delivery_user",
-        isDepartmentUser: [
-          "documentation_user","accounts_user","operations_user",
-          "transire_user","shipping_user","terminal_user","pull_out_user",
-          "shipping_terminal_user","terminal_manager","delivery_user",
-        ].includes(role),
+        userRoles: roles,
+        isDocumentationUser: hasRole("documentation_user"),
+        isAccountsUser: hasRole("accounts_user"),
+        isOperationsUser: hasRole("operations_user"),
+        isTransireUser: hasRole("transire_user"),
+        isShippingUser: hasRole("shipping_user"),
+        isTerminalUser: hasRole("terminal_user"),
+        isPullOutUser: hasRole("pull_out_user"),
+        isShippingTerminalUser: hasRole("shipping_terminal_user"),
+        isTerminalManager: hasRole("terminal_manager"),
+        isDeliveryUser: hasRole("delivery_user"),
+        isDepartmentUser: DEPT_ROLE_KEYS.some(r => roles.includes(r)),
       }}
     >
       {children}

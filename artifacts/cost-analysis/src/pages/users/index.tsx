@@ -119,11 +119,19 @@ const editSchema = z.object({
 
 type UserRow = {
   id: number; name: string; email: string; role: string;
+  roles?: string[];
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
   canUpload?: boolean;
   isActive: boolean; createdAt: string;
 };
+
+const WORKSPACE_ROLES: { value: string; label: string; color: string }[] = [
+  { value: "transire_user",  label: "Transire",     color: "border-violet-500 text-violet-400 bg-violet-500/10" },
+  { value: "shipping_user",  label: "Shipping",     color: "border-sky-500 text-sky-400 bg-sky-500/10"         },
+  { value: "terminal_user",  label: "Terminal Ops", color: "border-amber-500 text-amber-400 bg-amber-500/10"   },
+  { value: "pull_out_user",  label: "Pull-Out",     color: "border-emerald-500 text-emerald-400 bg-emerald-500/10" },
+];
 
 const DEPT_ROLES = [
   "documentation_user", "accounts_user", "operations_user",
@@ -148,10 +156,50 @@ function formatPermissionsSummary(user: UserRow): string {
   return "All sections";
 }
 
+function WorkspaceRoleCheckboxes({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const toggle = (value: string) => {
+    onChange(selected.includes(value) ? selected.filter(r => r !== value) : [...selected, value]);
+  };
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Department Workspace Access</p>
+      <p className="text-xs text-muted-foreground">Tick all workspace queues this user can work in simultaneously.</p>
+      <div className="grid grid-cols-2 gap-2">
+        {WORKSPACE_ROLES.map(wr => (
+          <button
+            key={wr.value}
+            type="button"
+            onClick={() => toggle(wr.value)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              selected.includes(wr.value)
+                ? `${wr.color} border-current`
+                : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground bg-secondary/10"
+            }`}
+          >
+            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+              selected.includes(wr.value) ? "border-current bg-current/20" : "border-muted-foreground/40"
+            }`}>
+              {selected.includes(wr.value) && <Check className="w-2.5 h-2.5" />}
+            </span>
+            {wr.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CreateUserDialog() {
   const [open, setOpen] = useState(false);
   const [sectionPerms, setSectionPerms] = useState<SectionPermissionsMap>({});
   const [canUpload, setCanUpload] = useState(false);
+  const [workspaceRoles, setWorkspaceRoles] = useState<string[]>([]);
   const createMutation = useCreateUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -162,9 +210,14 @@ function CreateUserDialog() {
   });
 
   const watchedRole = form.watch("role");
+  const isNonElevated = !["super_admin", "admin"].includes(watchedRole);
 
   const onSubmit = (data: any) => {
-    const payload: any = { name: data.name, email: data.email, password: data.password, role: data.role };
+    const allRoles = [...new Set([data.role, ...workspaceRoles])];
+    const payload: any = {
+      name: data.name, email: data.email, password: data.password,
+      role: data.role, roles: allRoles,
+    };
     if (data.role === "staff") {
       payload.sectionPermissions = JSON.stringify(sectionPerms);
       payload.canUpload = canUpload;
@@ -177,6 +230,7 @@ function CreateUserDialog() {
         form.reset();
         setSectionPerms({});
         setCanUpload(false);
+        setWorkspaceRoles([]);
       },
       onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
     });
@@ -204,8 +258,8 @@ function CreateUserDialog() {
             )} />
             <FormField control={form.control} name="role" render={({ field }) => (
               <FormItem>
-                <FormLabel>Role</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormLabel>Primary Role</FormLabel>
+                <Select onValueChange={(v) => { field.onChange(v); setWorkspaceRoles([]); }} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                   <SelectContent>
                     <SelectItem value="super_admin">Super Admin</SelectItem>
@@ -225,6 +279,12 @@ function CreateUserDialog() {
                 <FormMessage />
               </FormItem>
             )} />
+            {isNonElevated && (
+              <WorkspaceRoleCheckboxes
+                selected={workspaceRoles}
+                onChange={setWorkspaceRoles}
+              />
+            )}
             {watchedRole === "staff" && (
               <>
                 <GranularPermissionsEditor value={sectionPerms} onChange={setSectionPerms} />
@@ -263,15 +323,21 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
   const [sectionPerms, setSectionPerms] = useState<SectionPermissionsMap>(initialPerms);
   const [canUpload, setCanUpload] = useState(user.canUpload ?? false);
 
+  const initialWorkspaceRoles = (user.roles ?? [user.role])
+    .filter(r => WORKSPACE_ROLES.some(wr => wr.value === r) && r !== user.role);
+  const [workspaceRoles, setWorkspaceRoles] = useState<string[]>(initialWorkspaceRoles);
+
   const form = useForm({
     resolver: zodResolver(editSchema),
     defaultValues: { name: user.name, role: user.role as typeof ALL_ROLES[number], password: "" },
   });
 
   const watchedRole = form.watch("role");
+  const isNonElevated = !["super_admin", "admin"].includes(watchedRole);
 
   const onSubmit = (data: any) => {
-    const payload: any = { name: data.name, role: data.role };
+    const allRoles = [...new Set([data.role, ...workspaceRoles])];
+    const payload: any = { name: data.name, role: data.role, roles: allRoles };
     if (data.password) payload.password = data.password;
     if (data.role === "staff") {
       payload.sectionPermissions = JSON.stringify(sectionPerms);
@@ -303,8 +369,8 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
           </div>
           <FormField control={form.control} name="role" render={({ field }) => (
             <FormItem>
-              <FormLabel>Role</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <FormLabel>Primary Role</FormLabel>
+              <Select onValueChange={(v) => { field.onChange(v); setWorkspaceRoles([]); }} defaultValue={field.value}>
                 <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                 <SelectContent>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
@@ -324,6 +390,12 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
               <FormMessage />
             </FormItem>
           )} />
+          {isNonElevated && (
+            <WorkspaceRoleCheckboxes
+              selected={[...new Set([...(WORKSPACE_ROLES.some(w => w.value === watchedRole) ? [watchedRole] : []), ...workspaceRoles])]}
+              onChange={(v) => setWorkspaceRoles(v.filter(r => r !== watchedRole))}
+            />
+          )}
           {watchedRole === "staff" && (
             <>
               <GranularPermissionsEditor value={sectionPerms} onChange={setSectionPerms} />
@@ -515,16 +587,25 @@ export default function Users() {
                       <div className="text-xs text-muted-foreground mt-0.5">{u.email}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant="outline" className={
-                        u.role === "super_admin"
-                          ? "border-yellow-500 text-yellow-400 bg-yellow-500/10"
-                          : u.role === "admin"
-                          ? "border-primary text-primary bg-primary/10"
-                          : "border-border text-muted-foreground"
-                      }>
-                        {u.role === "super_admin" ? <Shield className="w-3 h-3 mr-1" /> : u.role === "admin" ? <Shield className="w-3 h-3 mr-1" /> : <UserIcon className="w-3 h-3 mr-1" />}
-                        {ROLE_LABELS[u.role] ?? u.role}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {((u as UserRow).roles ?? [u.role]).map(r => {
+                          const wsRole = WORKSPACE_ROLES.find(w => w.value === r);
+                          return (
+                            <Badge key={r} variant="outline" className={
+                              r === "super_admin"
+                                ? "border-yellow-500 text-yellow-400 bg-yellow-500/10"
+                                : r === "admin"
+                                ? "border-primary text-primary bg-primary/10"
+                                : wsRole
+                                ? wsRole.color
+                                : "border-border text-muted-foreground"
+                            }>
+                              {(r === "super_admin" || r === "admin") ? <Shield className="w-3 h-3 mr-1" /> : <UserIcon className="w-3 h-3 mr-1" />}
+                              {ROLE_LABELS[r] ?? r}
+                            </Badge>
+                          );
+                        })}
+                      </div>
                     </td>
                     <td className="px-6 py-4 max-w-xs">
                       <span className="text-xs text-foreground/70 line-clamp-2">{formatPermissionsSummary(u as UserRow)}</span>

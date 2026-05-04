@@ -52,8 +52,27 @@ export function clearAuthCookie(res: Response) {
   res.clearCookie(COOKIE_NAME);
 }
 
+export function parseRoles(role: string, rolesJson: string | null | undefined): string[] {
+  if (rolesJson) {
+    try {
+      const parsed = JSON.parse(rolesJson);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as string[];
+    } catch {}
+  }
+  return [role];
+}
+
 export interface AuthRequest extends Request {
-  user?: { id: number; email: string; name: string; role: string; sectionPermission: string | null; sectionPermissions: string | null; canUpload: boolean };
+  user?: {
+    id: number;
+    email: string;
+    name: string;
+    role: string;
+    roles: string[];
+    sectionPermission: string | null;
+    sectionPermissions: string | null;
+    canUpload: boolean;
+  };
 }
 
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
@@ -80,6 +99,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       email: user.email,
       name: user.name,
       role: user.role,
+      roles: parseRoles(user.role, user.roles),
       sectionPermission: user.sectionPermission ?? null,
       sectionPermissions: user.sectionPermissions ?? null,
       canUpload: isElevated ? true : (user.canUpload ?? false),

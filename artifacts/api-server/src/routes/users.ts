@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, clientsTable, userClientAssignmentsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest, hashPassword } from "../lib/auth.js";
+import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest, hashPassword, parseRoles } from "../lib/auth.js";
 
 const router = Router();
 
@@ -10,6 +10,7 @@ const userFields = {
   email: usersTable.email,
   name: usersTable.name,
   role: usersTable.role,
+  roles: usersTable.roles,
   sectionPermission: usersTable.sectionPermission,
   sectionPermissions: usersTable.sectionPermissions,
   canUpload: usersTable.canUpload,
@@ -22,6 +23,7 @@ type UserRow = {
   email: string;
   name: string;
   role: string;
+  roles: string | null;
   sectionPermission: string | null;
   sectionPermissions: string | null;
   canUpload: boolean;
@@ -33,6 +35,7 @@ const ELEVATED_ROLES = new Set(["admin", "super_admin"]);
 
 const formatUser = (u: UserRow) => ({
   ...u,
+  roles: parseRoles(u.role, u.roles),
   sectionPermission: u.sectionPermission ?? null,
   sectionPermissions: u.sectionPermissions ?? null,
   canUpload: ELEVATED_ROLES.has(u.role) ? true : (u.canUpload ?? false),
@@ -51,7 +54,7 @@ router.get("/users", requireAdmin, async (_req, res) => {
 
 router.post("/users", requireSuperAdmin, async (req, res) => {
   try {
-    const { email, name, password, role, sectionPermission, sectionPermissions, canUpload } = req.body;
+    const { email, name, password, role, roles, sectionPermission, sectionPermissions, canUpload } = req.body;
     if (!email || !name || !password || !role) {
       res.status(400).json({ error: "All fields required" });
       return;
@@ -61,8 +64,10 @@ router.post("/users", requireSuperAdmin, async (req, res) => {
       return;
     }
     const passwordHash = await hashPassword(password);
+    const rolesJson = Array.isArray(roles) && roles.length > 0 ? JSON.stringify(roles) : null;
     const [user] = await db.insert(usersTable).values({
       email, name, passwordHash, role,
+      roles: rolesJson,
       sectionPermission: sectionPermission ?? null,
       sectionPermissions: sectionPermissions ?? null,
       canUpload: ELEVATED_ROLES.has(role) ? true : (canUpload === true),
@@ -98,7 +103,7 @@ router.put("/users/:id", requireSuperAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
-    const { name, role, isActive, password, sectionPermission, sectionPermissions, canUpload } = req.body;
+    const { name, role, roles, isActive, password, sectionPermission, sectionPermissions, canUpload } = req.body;
     if (password !== undefined && (typeof password !== "string" || password.length < 8)) {
       res.status(400).json({ error: "Password must be at least 8 characters" });
       return;
@@ -108,6 +113,9 @@ router.put("/users/:id", requireSuperAdmin, async (req, res) => {
     };
     if (name !== undefined) updates.name = name;
     if (role !== undefined) updates.role = role;
+    if (roles !== undefined) {
+      updates.roles = Array.isArray(roles) && roles.length > 0 ? JSON.stringify(roles) : null;
+    }
     if (isActive !== undefined) updates.isActive = isActive;
     if (password) updates.passwordHash = await hashPassword(password);
     if (sectionPermission !== undefined) updates.sectionPermission = sectionPermission || null;

@@ -8,6 +8,7 @@ export const usersTable = pgTable("users", {
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull().default("staff"),
+  roles: text("roles"),
   sectionPermission: text("section_permission"),
   sectionPermissions: text("section_permissions"),
   canUpload: boolean("can_upload").notNull().default(false),

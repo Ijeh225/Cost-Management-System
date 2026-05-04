@@ -49,12 +49,20 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
       .where(eq(usersTable.id, user.id));
     const token = signToken(user.id, sessionToken);
     setAuthCookie(res, token);
+    let parsedRoles: string[] = [user.role];
+    if (user.roles) {
+      try {
+        const arr = JSON.parse(user.roles);
+        if (Array.isArray(arr) && arr.length > 0) parsedRoles = arr;
+      } catch {}
+    }
     res.json({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
+        roles: parsedRoles,
         isActive: user.isActive,
         createdAt: user.createdAt.toISOString(),
       },
@@ -88,11 +96,19 @@ router.get("/auth/me", requireAuth, (req: AuthRequest, res) => {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
+    let parsedRoles: string[] = [u.role];
+    if (u.roles) {
+      try {
+        const arr = JSON.parse(u.roles);
+        if (Array.isArray(arr) && arr.length > 0) parsedRoles = arr;
+      } catch {}
+    }
     res.json({
       id: u.id,
       email: u.email,
       name: u.name,
       role: u.role,
+      roles: parsedRoles,
       sectionPermission: u.sectionPermission ?? null,
       sectionPermissions: u.sectionPermissions ?? null,
       canUpload: (u.role === "admin" || u.role === "super_admin") ? true : (u.canUpload ?? false),

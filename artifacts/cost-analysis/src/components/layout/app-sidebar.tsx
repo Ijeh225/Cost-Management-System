@@ -79,49 +79,20 @@ export function AppSidebar() {
     ...(isSuperAdmin ? [{ title: "Settings", url: "/settings", icon: Settings }] : []),
   ];
 
-  const deptNav: NavItem[] = isDocumentationUser
-    ? [
-        { title: "My Jobs",              url: "/documentation",             icon: FileCheck2 },
-      ]
-    : isAccountsUser
-    ? [
-        { title: "Duty Payments",        url: "/duty-payments",             icon: Banknote   },
-        { title: "Accounts Workspace",   url: "/workspace/accounts",        icon: BookOpen   },
-      ]
-    : isTransireUser
-    ? [
-        { title: "Transire Jobs",        url: "/workspace/transire",        icon: FileCheck2 },
-      ]
-    : isShippingUser
-    ? [
-        { title: "Shipping Jobs",        url: "/workspace/shipping",        icon: Ship       },
-      ]
-    : isTerminalUser
-    ? [
-        { title: "Terminal Jobs",        url: "/workspace/terminal-ops",    icon: Building2  },
-      ]
-    : isPullOutUser
-    ? [
-        { title: "Pull-Out Jobs",        url: "/workspace/pull-out",        icon: PackageOpen },
-      ]
-    : isShippingTerminalUser
-    ? [
-        { title: "Shipping Jobs",        url: "/workspace/shipping",        icon: Ship       },
-      ]
-    : isOperationsUser
-    ? [
-        { title: "Transire Jobs",        url: "/workspace/transire",        icon: FileCheck2 },
-        { title: "Shipping Jobs",        url: "/workspace/shipping",        icon: Ship       },
-      ]
-    : isTerminalManager
-    ? [
-        { title: "Terminal Workspace",   url: "/workspace/terminal",        icon: Building2  },
-      ]
-    : isDeliveryUser
-    ? [
-        { title: "Deliveries",           url: "/workspace/delivery",        icon: Truck      },
-      ]
-    : [];
+  const deptNav: NavItem[] = [
+    ...(isDocumentationUser ? [{ title: "My Jobs",            url: "/documentation",           icon: FileCheck2  }] : []),
+    ...(isAccountsUser      ? [{ title: "Duty Payments",      url: "/duty-payments",           icon: Banknote    },
+                                { title: "Accounts Workspace", url: "/workspace/accounts",      icon: BookOpen    }] : []),
+    ...(isTransireUser || isOperationsUser
+                            ? [{ title: "Transire Jobs",      url: "/workspace/transire",      icon: FileCheck2  }] : []),
+    ...(isShippingUser || isShippingTerminalUser || isOperationsUser
+                            ? [{ title: "Shipping Jobs",      url: "/workspace/shipping",      icon: Ship        }] : []),
+    ...(isTerminalUser || isShippingTerminalUser
+                            ? [{ title: "Terminal Jobs",      url: "/workspace/terminal-ops",  icon: Building2   }] : []),
+    ...(isPullOutUser       ? [{ title: "Pull-Out Jobs",      url: "/workspace/pull-out",      icon: PackageOpen }] : []),
+    ...(isTerminalManager   ? [{ title: "Terminal Workspace", url: "/workspace/terminal",      icon: Building2   }] : []),
+    ...(isDeliveryUser      ? [{ title: "Deliveries",         url: "/workspace/delivery",      icon: Truck       }] : []),
+  ];
 
   const navItems = isDepartmentUser ? deptNav : mainNav;
 

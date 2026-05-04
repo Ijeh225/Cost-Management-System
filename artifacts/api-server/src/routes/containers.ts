@@ -798,7 +798,8 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
     }
 
     if (!isAdmin) {
-      const allowedStages = DEPT_OWNED_STAGES[userRole] ?? [];
+      const userRoles: string[] = (req.user as any).roles ?? [userRole];
+      const allowedStages = [...new Set(userRoles.flatMap(r => DEPT_OWNED_STAGES[r] ?? []))];
       if (isNavigation) {
         // For navigation, check that the TARGET stage is within the user's allowed stages
         if (!allowedStages.includes(requestedStatus!)) {
