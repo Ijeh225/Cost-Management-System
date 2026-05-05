@@ -12,7 +12,7 @@ import {
   Box, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity,
   FileText, CheckCircle2, ArrowRight, ClipboardCheck, ListTodo,
   Brain, ShieldAlert, Clock, ExternalLink, X, ChevronDown, ChevronUp,
-  Wallet, CreditCard, ReceiptText,
+  Wallet, CreditCard, ReceiptText, ShieldCheck,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -280,8 +280,59 @@ function StatCard({ title, value, icon: Icon, isCurrency = false, colorClass = "
   );
 }
 
+function TerminalDrillDown({ list, onClose }: {
+  list: { id: number; containerNumber: string; blNumber: string; customerName: string; size: string; command: string | null; status: string; gateInDate: string | null }[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full sm:max-w-2xl max-h-[80vh] overflow-hidden flex flex-col bg-card border border-border/50 rounded-t-2xl sm:rounded-2xl shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <h2 className="font-semibold text-sm">Containers in Terminal</h2>
+            <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">{list.length}</span>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-accent/50 transition-colors">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+        <div className="overflow-y-auto divide-y divide-border/30">
+          {list.length === 0 && (
+            <div className="py-10 text-center text-muted-foreground text-sm">No containers currently in terminal.</div>
+          )}
+          {list.map(c => (
+            <Link key={c.id} href={`/containers/${c.id}`} onClick={onClose} className="block hover:bg-accent/20 transition-colors px-5 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm font-semibold text-foreground">{c.containerNumber}</span>
+                    {c.size && <span className="text-[10px] bg-muted/60 text-muted-foreground px-1.5 py-0.5 rounded font-medium">{c.size}</span>}
+                    {c.command && <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded font-medium">{c.command}</span>}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5 truncate">{c.customerName} · B/L {c.blNumber}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className={`text-[10px] font-bold uppercase tracking-wider ${getStatusColor(c.status)}`}>{getStatusLabel(c.status)}</div>
+                  {c.gateInDate && (
+                    <div className="text-[10px] text-muted-foreground/60 mt-0.5">In: {new Date(c.gateInDate).toLocaleString("en-NG", { dateStyle: "short", timeStyle: "short" })}</div>
+                  )}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { isAdmin } = useAuth();
+  const [terminalDrillOpen, setTerminalDrillOpen] = useState(false);
 
   const { data: stats, isLoading, isError } = useGetDashboardStats();
   const { data: arData } = useGetArLedger();
@@ -333,7 +384,7 @@ export default function Dashboard() {
 
       </div>
 
-      {/* 9 KPI Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard title="Total Containers"       value={stats.totalContainers}        icon={Box} />
         <StatCard title="In Progress"            value={stats.inProgress}             icon={Activity}    colorClass="text-blue-400" />
@@ -356,7 +407,32 @@ export default function Dashboard() {
           isCurrency
           colorClass={(stats.totalOutstanding ?? 0) > 0 ? "text-amber-400" : "text-muted-foreground"}
         />
+        {/* Containers in Terminal KPI — clickable drill-down */}
+        <button type="button" className="text-left w-full" onClick={() => setTerminalDrillOpen(true)}>
+          <Card className="border-emerald-500/30 bg-emerald-500/5 backdrop-blur-sm overflow-hidden relative group hover:bg-emerald-500/10 transition-colors h-full cursor-pointer">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Containers in Terminal</CardTitle>
+              <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center border border-emerald-500/30">
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+              </div>
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold tracking-tight text-emerald-400">
+                {formatNumber(stats.containersInTerminal ?? 0)}
+              </div>
+              <p className="text-[11px] text-muted-foreground/60 mt-1">Click to view list</p>
+            </CardContent>
+          </Card>
+        </button>
       </div>
+
+      {terminalDrillOpen && (
+        <TerminalDrillDown
+          list={stats.containersInTerminalList ?? []}
+          onClose={() => setTerminalDrillOpen(false)}
+        />
+      )}
 
       {/* Role-aware action cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

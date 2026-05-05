@@ -24,6 +24,7 @@ export type AuthContextType = {
   isShippingTerminalUser: boolean;
   isTerminalManager: boolean;
   isDeliveryUser: boolean;
+  isSecurityUser: boolean;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -42,6 +43,7 @@ const AuthContext = createContext<AuthContextType>({
   isShippingTerminalUser: false,
   isTerminalManager: false,
   isDeliveryUser: false,
+  isSecurityUser: false,
   isAuthenticated: false,
   isAdmin: false,
   isSuperAdmin: false,
@@ -55,7 +57,7 @@ async function checkSetupRequired(): Promise<{ required: boolean }> {
 const DEPT_ROLE_KEYS = [
   "documentation_user", "accounts_user", "operations_user",
   "transire_user", "shipping_user", "terminal_user", "pull_out_user",
-  "shipping_terminal_user", "terminal_manager", "delivery_user",
+  "shipping_terminal_user", "terminal_manager", "delivery_user", "security_user",
 ];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -125,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           accounts_user:          "/workspace/accounts",
           terminal_manager:       "/workspace/terminal",
           delivery_user:          "/workspace/delivery",
+          security_user:          "/gate",
         };
         // Pick first dept home from the user's roles
         const home = roles.map(r => deptHomeMap[r]).find(Boolean);
@@ -168,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isShippingTerminalUser: hasRole("shipping_terminal_user"),
         isTerminalManager: hasRole("terminal_manager"),
         isDeliveryUser: hasRole("delivery_user"),
+        isSecurityUser: hasRole("security_user"),
         isDepartmentUser: DEPT_ROLE_KEYS.some(r => roles.includes(r)),
       }}
     >

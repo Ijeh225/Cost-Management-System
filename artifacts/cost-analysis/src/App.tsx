@@ -44,6 +44,7 @@ import PullOutWorkspace from "@/pages/workspace/pull-out";
 import ShippingTerminalWorkspace from "@/pages/workspace/shipping-terminal";
 import TerminalWorkspace from "@/pages/workspace/terminal";
 import DeliveryWorkspace from "@/pages/workspace/delivery";
+import GatePage from "@/pages/gate/index";
 import ClientStatementPrint from "@/pages/reports/client-statement/print";
 import VatSummaryPrint from "@/pages/reports/vat-summary/print";
 import InvoiceAgingPrint from "@/pages/reports/invoice-aging/print";
@@ -184,6 +185,7 @@ function Router() {
               <Route path="/workspace/operations" component={() => { const [, nav] = useLocation(); nav("/workspace/transire", { replace: true }); return null; }} />
               <Route path="/workspace/terminal" component={TerminalWorkspace} />
               <Route path="/workspace/delivery" component={DeliveryWorkspace} />
+              <Route path="/gate" component={GatePage} />
               <Route path="/invoices" component={InvoicesPage} />
               <Route path="/invoices/:id" component={InvoiceDetailPage} />
               <Route path="/settings">

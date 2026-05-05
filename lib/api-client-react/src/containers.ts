@@ -445,3 +445,66 @@ export function useRevokeEarlyStart() {
   });
 }
 
+export function useGateIn() {
+  const qc = useQueryClient();
+  return useMutation<import("./generated/api.schemas").Container, Error, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch(`/api/containers/${id}/gate-in`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["/api/containers"] });
+      qc.invalidateQueries({ queryKey: ["dashboard", "stats"] });
+      qc.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+    },
+  });
+}
+
+export function useGateOut() {
+  const qc = useQueryClient();
+  return useMutation<import("./generated/api.schemas").Container, Error, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch(`/api/containers/${id}/gate-out`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["/api/containers"] });
+      qc.invalidateQueries({ queryKey: ["dashboard", "stats"] });
+      qc.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+    },
+  });
+}
+
+export type GateLogEntry = {
+  id: number;
+  containerNumber: string;
+  blNumber: string;
+  customerName: string;
+  size: string;
+  command: string;
+  status: string;
+  gateInDate: string | null;
+  gateOutDate: string | null;
+};
+
+export type GateLogResponse = {
+  entries: GateLogEntry[];
+  total: number;
+};
+
+export function useGetGateLog(params?: { from?: string; to?: string }, options?: { query?: { refetchInterval?: number; enabled?: boolean } }) {
+  const qp = new URLSearchParams();
+  if (params?.from) qp.set("from", params.from);
+  if (params?.to) qp.set("to", params.to);
+  const qs = qp.toString();
+  return useQuery<GateLogResponse>({
+    queryKey: ["containers", "gate-log", params?.from, params?.to],
+    queryFn: () => customFetch<GateLogResponse>(`/api/containers/gate-log${qs ? `?${qs}` : ""}`),
+    ...(options?.query ?? {}),
+  });
+}
+

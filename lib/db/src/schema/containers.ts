@@ -71,6 +71,9 @@ export const containersTable = pgTable("containers", {
   releaseConfirmedAt: timestamp("release_confirmed_at"),
   releaseDelayReason: text("release_delay_reason"),
   releaseFinalDate: timestamp("release_final_date"),
+  // Gate-In / Gate-Out tracking (Security personnel)
+  gateInDate: timestamp("gate_in_date"),
+  gateOutDate: timestamp("gate_out_date"),
   // Early Start authorization (allows operations to begin before documentation completes)
   earlyStartAuthorized: boolean("early_start_authorized").notNull().default(false),
   earlyStartAuthorizedById: integer("early_start_authorized_by_id").references(() => usersTable.id),

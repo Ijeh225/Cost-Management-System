@@ -17,7 +17,7 @@ import {
 import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
   ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, Activity, BookOpen, FileCheck2,
-  Truck, Kanban, Banknote, Anchor, Ship, PackageOpen, ChevronDown,
+  Truck, Kanban, Banknote, Anchor, Ship, PackageOpen, ChevronDown, ShieldCheck,
 } from "lucide-react";
 
 type NavItem = {
@@ -39,7 +39,7 @@ function NotificationsBadge({ count }: { count: number }) {
 export function AppSidebar() {
   const [location] = useLocation();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser } = useAuth();
+  const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser } = useAuth();
 
   const { data: notifData } = useGetNotifications<NotificationsResponse>({
     query: { refetchInterval: 60_000, enabled: !!isAuthenticated },
@@ -101,6 +101,7 @@ export function AppSidebar() {
     ...(isPullOutUser       ? [{ title: "Pull-Out Jobs",      url: "/workspace/pull-out",      icon: PackageOpen }] : []),
     ...(isTerminalManager   ? [{ title: "Terminal Workspace", url: "/workspace/terminal",      icon: Building2   }] : []),
     ...(isDeliveryUser      ? [{ title: "Deliveries",         url: "/workspace/delivery",      icon: Truck       }] : []),
+    ...(isSecurityUser      ? [{ title: "Gate Security",      url: "/gate",                    icon: ShieldCheck }] : []),
   ];
 
   const navItems = isDepartmentUser ? deptNav : mainNav;

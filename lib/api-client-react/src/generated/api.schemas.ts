@@ -178,6 +178,8 @@ export interface Container {
   earlyStartAuthorizedById?: number | null;
   earlyStartAuthorizedAt?: string | null;
   earlyStartReason?: string | null;
+  gateInDate?: string | null;
+  gateOutDate?: string | null;
 }
 
 export interface ContainerListResponse {
@@ -454,6 +456,8 @@ export interface DashboardStats {
   totalCollected?: number;
   totalOutstanding?: number;
   monthlyTrend?: DashboardStatsMonthlyTrendItem[];
+  containersInTerminal?: number;
+  containersInTerminalList?: { id: number; containerNumber: string; blNumber: string; customerName: string; size: string; command: string | null; status: string; gateInDate: string | null }[];
 }
 
 export type ApprovalQueueItemStatus =

@@ -105,6 +105,8 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     earlyStartAuthorizedById: c.earlyStartAuthorizedById ?? null,
     earlyStartAuthorizedAt: c.earlyStartAuthorizedAt instanceof Date ? c.earlyStartAuthorizedAt.toISOString() : (c.earlyStartAuthorizedAt ?? null),
     earlyStartReason: c.earlyStartReason ?? null,
+    gateInDate: c.gateInDate instanceof Date ? c.gateInDate.toISOString() : (c.gateInDate ?? null),
+    gateOutDate: c.gateOutDate instanceof Date ? c.gateOutDate.toISOString() : (c.gateOutDate ?? null),
   };
 }
 
@@ -774,6 +776,7 @@ const DEPT_OWNED_STAGES: Record<string, string[]> = {
   pull_out_user: ["pull_out"],
   shipping_terminal_user: ["shipping", "terminal"],
   terminal_manager: ["gate_in", "examination", "final_release"],
+  security_user: ["gate_in"],
   delivery_user: ["delivery"],
 };
 
@@ -1005,6 +1008,163 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
         containerNumber: existing.containerNumber,
       });
     }
+    res.json(formatContainer(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET /containers/gate-log — gate events log (security + admin)
+router.get("/containers/gate-log", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userRole = req.user!.role;
+    const isAdmin = userRole === "admin" || userRole === "super_admin";
+    const userRoles: string[] = (req.user as any).roles ?? [userRole];
+    const isSecurityUser = userRoles.includes("security_user");
+    if (!isAdmin && !isSecurityUser) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
+    const fromStr = req.query.from as string | undefined;
+    const toStr = req.query.to as string | undefined;
+    const csv = req.query.csv === "1";
+
+    let rows = await db.select().from(containersTable)
+      .where(or(
+        isNotNull(containersTable.gateInDate),
+        isNotNull(containersTable.gateOutDate),
+        inArray(containersTable.status, ["gate_in", "examination", "final_release"]),
+      ))
+      .orderBy(desc(containersTable.gateInDate));
+
+    if (fromStr) {
+      const from = new Date(fromStr);
+      if (!isNaN(from.getTime())) {
+        rows = rows.filter(r => (r.gateInDate && new Date(r.gateInDate) >= from) || (r.gateOutDate && new Date(r.gateOutDate) >= from));
+      }
+    }
+    if (toStr) {
+      const to = new Date(toStr);
+      if (!isNaN(to.getTime())) {
+        to.setHours(23, 59, 59, 999);
+        rows = rows.filter(r => !r.gateInDate || new Date(r.gateInDate) <= to);
+      }
+    }
+
+    const data = rows.map(c => ({
+      id: c.id,
+      containerNumber: c.containerNumber,
+      blNumber: c.blNumber,
+      customerName: c.customerName,
+      size: c.size ?? "",
+      command: c.command ?? "",
+      status: c.status,
+      gateInDate: c.gateInDate instanceof Date ? c.gateInDate.toISOString() : (c.gateInDate ?? null),
+      gateOutDate: c.gateOutDate instanceof Date ? c.gateOutDate.toISOString() : (c.gateOutDate ?? null),
+    }));
+
+    if (csv) {
+      const header = "Container No,B/L No,Customer,Size,Command,Status,Gate-In Date,Gate-Out Date\r\n";
+      const rowsCsv = data.map(r =>
+        [r.containerNumber, r.blNumber, r.customerName, r.size, r.command, r.status,
+          r.gateInDate ?? "", r.gateOutDate ?? ""]
+          .map(v => `"${String(v).replace(/"/g, '""')}"`)
+          .join(",")
+      ).join("\r\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="gate-log-${Date.now()}.csv"`);
+      return res.send(header + rowsCsv);
+    }
+
+    res.json({ entries: data, total: data.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /containers/:id/gate-in — Security records container entry with exact timestamp
+router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const userRole = req.user!.role;
+    const isAdmin = userRole === "admin" || userRole === "super_admin";
+    const userRoles: string[] = (req.user as any).roles ?? [userRole];
+    const isSecurityUser = userRoles.includes("security_user");
+    if (!isAdmin && !isSecurityUser) {
+      res.status(403).json({ error: "Only security personnel or administrators can record Gate-In" });
+      return;
+    }
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+
+    const now = new Date();
+    let nextStatus = existing.status;
+    if (existing.status === "pull_out") {
+      nextStatus = "gate_in";
+    } else if (!["gate_in", "examination", "final_release"].includes(existing.status)) {
+      res.status(409).json({ error: `Container is at "${existing.status}" stage — Gate-In can only be recorded from pull_out or once already in the terminal` });
+      return;
+    }
+
+    const [updated] = await db.update(containersTable)
+      .set({ status: nextStatus, gateInDate: now, updatedAt: now })
+      .where(eq(containersTable.id, id))
+      .returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "gate_in_recorded",
+      section: "basic_info",
+      reason: `Gate-In recorded at ${now.toISOString()} by security`,
+    });
+    try {
+      await db.delete(workflowNotificationsTable).where(eq(workflowNotificationsTable.containerId, id));
+      await db.insert(workflowNotificationsTable).values({
+        type: "gate_in",
+        message: `${existing.containerNumber} gated in — ready for terminal processing`,
+        containerId: id,
+        containerNumber: existing.containerNumber,
+      });
+    } catch {}
+    res.json(formatContainer(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /containers/:id/gate-out — Security records container exit (timestamp only, no stage change)
+router.post("/containers/:id/gate-out", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const userRole = req.user!.role;
+    const isAdmin = userRole === "admin" || userRole === "super_admin";
+    const userRoles: string[] = (req.user as any).roles ?? [userRole];
+    const isSecurityUser = userRoles.includes("security_user");
+    if (!isAdmin && !isSecurityUser) {
+      res.status(403).json({ error: "Only security personnel or administrators can record Gate-Out" });
+      return;
+    }
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    if (existing.gateOutDate) {
+      res.status(409).json({ error: "Gate-Out has already been recorded for this container" });
+      return;
+    }
+    const now = new Date();
+    const [updated] = await db.update(containersTable)
+      .set({ gateOutDate: now, updatedAt: now })
+      .where(eq(containersTable.id, id))
+      .returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "gate_out_recorded",
+      section: "basic_info",
+      reason: `Gate-Out recorded at ${now.toISOString()} by security`,
+    });
     res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
@@ -1767,6 +1927,20 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     const inProgress = allContainers.filter(c => c.status !== "closed").length;
     const completed = 0;
     const closed = allContainers.filter(c => c.status === "closed").length;
+    const terminalStages = new Set(["gate_in", "examination", "final_release"]);
+    const containersInTerminalList = allContainers
+      .filter(c => terminalStages.has(c.status) && !c.gateOutDate)
+      .map(c => ({
+        id: c.id,
+        containerNumber: c.containerNumber,
+        blNumber: c.blNumber,
+        customerName: c.customerName,
+        size: c.size ?? "",
+        command: c.command ?? null,
+        status: c.status,
+        gateInDate: c.gateInDate instanceof Date ? c.gateInDate.toISOString() : (c.gateInDate ?? null),
+      }));
+    const containersInTerminal = containersInTerminalList.length;
 
     const containerIds = allContainers.map(c => c.id);
     let totalCost = 0;
@@ -1934,6 +2108,8 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       totalCollected,
       totalOutstanding,
       monthlyTrend,
+      containersInTerminal,
+      containersInTerminalList,
       containersByStatus,
       profitByCustomer,
       costByVessel,

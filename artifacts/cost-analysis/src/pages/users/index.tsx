@@ -86,7 +86,7 @@ const ALL_ROLES = [
   "super_admin", "admin", "staff",
   "documentation_user", "accounts_user", "operations_user",
   "transire_user", "shipping_user", "terminal_user", "pull_out_user",
-  "terminal_manager", "delivery_user",
+  "terminal_manager", "delivery_user", "security_user",
 ] as const;
 
 const ROLE_LABELS: Record<string, string> = {
@@ -102,6 +102,7 @@ const ROLE_LABELS: Record<string, string> = {
   pull_out_user: "Pull-Out",
   terminal_manager: "Terminal Manager",
   delivery_user: "Delivery / Transport",
+  security_user: "Gate Security",
 };
 
 const createSchema = z.object({
@@ -136,7 +137,7 @@ const WORKSPACE_ROLES: { value: string; label: string; color: string }[] = [
 const DEPT_ROLES = [
   "documentation_user", "accounts_user", "operations_user",
   "transire_user", "shipping_user", "terminal_user", "pull_out_user",
-  "shipping_terminal_user", "terminal_manager", "delivery_user",
+  "shipping_terminal_user", "terminal_manager", "delivery_user", "security_user",
 ];
 
 function formatPermissionsSummary(user: UserRow): string {
@@ -273,6 +274,7 @@ function CreateUserDialog() {
                     <SelectItem value="pull_out_user">Pull-Out</SelectItem>
                     <SelectItem value="terminal_manager">Terminal Manager</SelectItem>
                     <SelectItem value="delivery_user">Delivery / Transport</SelectItem>
+                    <SelectItem value="security_user">Gate Security</SelectItem>
                     <SelectItem value="operations_user">Operations (Legacy)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -384,6 +386,7 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
                   <SelectItem value="pull_out_user">Pull-Out</SelectItem>
                   <SelectItem value="terminal_manager">Terminal Manager</SelectItem>
                   <SelectItem value="delivery_user">Delivery / Transport</SelectItem>
+                  <SelectItem value="security_user">Gate Security</SelectItem>
                   <SelectItem value="operations_user">Operations (Legacy)</SelectItem>
                 </SelectContent>
               </Select>

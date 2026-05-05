@@ -59,7 +59,8 @@ const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
 
 const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
   delivery_user:      new Set(["overdue"]),
-  terminal_manager:   new Set(["overdue", "stage_complete", "delay_recorded"]),
+  terminal_manager:   new Set(["overdue", "stage_complete", "delay_recorded", "gate_in"]),
+  security_user:      new Set(["new_job", "stage_complete", "gate_in"]),
   operations_user:    new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
   staff:              new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
   accounts_user:      new Set([]),
