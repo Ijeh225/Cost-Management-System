@@ -66,6 +66,11 @@ export const containersTable = pgTable("containers", {
   pulloutReleasedAt: timestamp("pullout_released_at"),
   pulloutDelayReason: text("pullout_delay_reason"),
   pulloutFinalDate: timestamp("pullout_final_date"),
+  // Final Release (bonded terminal) stage tracking
+  expectedReleaseDate: timestamp("expected_release_date"),
+  releaseConfirmedAt: timestamp("release_confirmed_at"),
+  releaseDelayReason: text("release_delay_reason"),
+  releaseFinalDate: timestamp("release_final_date"),
   // Early Start authorization (allows operations to begin before documentation completes)
   earlyStartAuthorized: boolean("early_start_authorized").notNull().default(false),
   earlyStartAuthorizedById: integer("early_start_authorized_by_id").references(() => usersTable.id),

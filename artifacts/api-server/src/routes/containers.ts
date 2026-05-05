@@ -97,6 +97,10 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     pulloutReleasedAt: c.pulloutReleasedAt instanceof Date ? c.pulloutReleasedAt.toISOString() : (c.pulloutReleasedAt ?? null),
     pulloutDelayReason: c.pulloutDelayReason ?? null,
     pulloutFinalDate: c.pulloutFinalDate instanceof Date ? c.pulloutFinalDate.toISOString() : (c.pulloutFinalDate ?? null),
+    expectedReleaseDate: c.expectedReleaseDate instanceof Date ? c.expectedReleaseDate.toISOString() : (c.expectedReleaseDate ?? null),
+    releaseConfirmedAt: c.releaseConfirmedAt instanceof Date ? c.releaseConfirmedAt.toISOString() : (c.releaseConfirmedAt ?? null),
+    releaseDelayReason: c.releaseDelayReason ?? null,
+    releaseFinalDate: c.releaseFinalDate instanceof Date ? c.releaseFinalDate.toISOString() : (c.releaseFinalDate ?? null),
     earlyStartAuthorized: c.earlyStartAuthorized ?? false,
     earlyStartAuthorizedById: c.earlyStartAuthorizedById ?? null,
     earlyStartAuthorizedAt: c.earlyStartAuthorizedAt instanceof Date ? c.earlyStartAuthorizedAt.toISOString() : (c.earlyStartAuthorizedAt ?? null),
@@ -561,6 +565,10 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       earlyStartAuthorized: containersTable.earlyStartAuthorized,
       earlyStartReason: containersTable.earlyStartReason,
       earlyStartAuthorizedAt: containersTable.earlyStartAuthorizedAt,
+      expectedReleaseDate: containersTable.expectedReleaseDate,
+      releaseConfirmedAt: containersTable.releaseConfirmedAt,
+      releaseDelayReason: containersTable.releaseDelayReason,
+      releaseFinalDate: containersTable.releaseFinalDate,
     })
       .from(containersTable)
       .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id))
@@ -598,6 +606,10 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       isEarlyStart?: boolean;
       earlyStartReason?: string | null;
       earlyStartAuthorizedAt?: string | null;
+      expectedReleaseDate?: string | null;
+      releaseConfirmedAt?: string | null;
+      releaseDelayReason?: string | null;
+      releaseFinalDate?: string | null;
     }>> = {};
 
     for (const c of rows) {
@@ -627,6 +639,10 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
         duty,
         dutyPaid,
         dutyNotPaid,
+        expectedReleaseDate: c.expectedReleaseDate instanceof Date ? c.expectedReleaseDate.toISOString() : (c.expectedReleaseDate ?? null),
+        releaseConfirmedAt: c.releaseConfirmedAt instanceof Date ? c.releaseConfirmedAt.toISOString() : (c.releaseConfirmedAt ?? null),
+        releaseDelayReason: c.releaseDelayReason ?? null,
+        releaseFinalDate: c.releaseFinalDate instanceof Date ? c.releaseFinalDate.toISOString() : (c.releaseFinalDate ?? null),
       };
       stages[c.status].push(entry);
 
@@ -944,6 +960,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       shipping:            { expected: "expectedDoDate",       releasedAt: "doReleasedAt",       delayReason: "doDelayReason",       finalDate: "doFinalDate",       label: "Delivery Order (DO)" },
       terminal:            { expected: "expectedTdoDate",      releasedAt: "tdoReleasedAt",      delayReason: "tdoDelayReason",      finalDate: "tdoFinalDate",      label: "TDO" },
       pull_out:            { expected: "expectedPulloutDate",  releasedAt: "pulloutReleasedAt",  delayReason: "pulloutDelayReason",  finalDate: "pulloutFinalDate",  label: "Pullout" },
+      final_release:       { expected: "expectedReleaseDate",  releasedAt: "releaseConfirmedAt", delayReason: "releaseDelayReason",  finalDate: "releaseFinalDate",  label: "Final Release" },
     };
     const fields = STAGE_ACTION_FIELDS[status];
     if (!fields) {
@@ -956,7 +973,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       if (!expectedDate) { res.status(400).json({ error: "expectedDate required" }); return; }
       updates[fields.expected] = new Date(expectedDate);
     } else if (action === "mark_released") {
-      updates[fields.releasedAt] = new Date();
+      updates[fields.releasedAt] = finalDate ? new Date(finalDate) : new Date();
       notifMsg = `${fields.label} released for ${existing.containerNumber}`;
     } else if (action === "record_delay") {
       if (!delayReason) { res.status(400).json({ error: "delayReason required" }); return; }

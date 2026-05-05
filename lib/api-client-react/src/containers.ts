@@ -23,6 +23,10 @@ export type PipelineContainer = {
   isEarlyStart?: boolean;
   earlyStartReason?: string | null;
   earlyStartAuthorizedAt?: string | null;
+  expectedReleaseDate?: string | null;
+  releaseConfirmedAt?: string | null;
+  releaseDelayReason?: string | null;
+  releaseFinalDate?: string | null;
 };
 
 export type PipelineResponse = {
