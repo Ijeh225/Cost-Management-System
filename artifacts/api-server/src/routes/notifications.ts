@@ -582,12 +582,21 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
     const allWorkflow = await db.select()
       .from(workflowNotificationsTable)
       .orderBy(desc(workflowNotificationsTable.createdAt))
-      .limit(200);
+      .limit(500);
 
-    let notifications = allWorkflow;
+    // Deduplicate: keep only the latest notification per container — one message per job
+    const seenContainers = new Set<number>();
+    const deduped = allWorkflow.filter(n => {
+      if (n.containerId == null) return true;
+      if (seenContainers.has(n.containerId)) return false;
+      seenContainers.add(n.containerId);
+      return true;
+    });
+
+    let notifications = deduped;
     if (role && !ADMIN_ROLES.has(role)) {
       const allowed = ROLE_WORKFLOW_TYPES[role];
-      notifications = allowed ? allWorkflow.filter(n => allowed.has(n.type)) : [];
+      notifications = allowed ? deduped.filter(n => allowed.has(n.type)) : [];
     }
 
     const unreadCount = notifications.filter(n => !n.isRead).length;

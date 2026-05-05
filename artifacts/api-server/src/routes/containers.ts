@@ -840,7 +840,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
       action: "status_advanced",
       section: "basic_info",
     });
-    // Notify: stage completed
+    // Notify: stage completed — replace any previous stage_complete for this container
     try {
       const STAGE_LABELS: Record<string, string> = {
         registered: "Registered", documentation: "Documentation", duty_assessment: "Duty Assessment",
@@ -850,6 +850,8 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
       };
       const fromLabel = STAGE_LABELS[existing.status] ?? existing.status;
       const toLabel = STAGE_LABELS[nextStatus] ?? nextStatus;
+      await db.delete(workflowNotificationsTable)
+        .where(eq(workflowNotificationsTable.containerId, id));
       await db.insert(workflowNotificationsTable).values({
         type: "stage_complete",
         message: `${existing.containerNumber} advanced from ${fromLabel} → ${toLabel}`,
@@ -994,6 +996,8 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       reason: `Stage action: ${action} for ${fields.label}${delayReason ? ` — ${delayReason}` : ""}`,
     });
     if (notifMsg) {
+      await db.delete(workflowNotificationsTable)
+        .where(eq(workflowNotificationsTable.containerId, id));
       await db.insert(workflowNotificationsTable).values({
         type: action === "mark_released" ? "stage_complete" : "delay_recorded",
         message: notifMsg,
