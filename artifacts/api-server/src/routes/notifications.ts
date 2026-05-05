@@ -25,6 +25,7 @@ const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
     "aging_critical",
     "inactive",
     "action_overdue",
+    "stage_stall",
     "rejected_section",
   ]),
   operations_user: new Set([
@@ -58,7 +59,7 @@ const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
 
 const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
   delivery_user:      new Set(["overdue"]),
-  terminal_manager:   new Set(["overdue"]),
+  terminal_manager:   new Set(["overdue", "stage_complete", "delay_recorded"]),
   operations_user:    new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
   staff:              new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
   accounts_user:      new Set([]),
@@ -195,6 +196,31 @@ async function computeAlerts(userId?: number, role?: string) {
           generatedAt: now,
         });
       }
+    }
+  }
+
+  const TERMINAL_STALL_DAYS: Record<string, number> = {
+    gate_in: 3,
+    examination: 4,
+    final_release: 5,
+  };
+  for (const c of allContainers) {
+    if (c.status === "closed") continue;
+    const stallDays = TERMINAL_STALL_DAYS[c.status];
+    if (stallDays == null) continue;
+    const lastActivity = lastActivityMap[c.id] ?? new Date(c.createdAt);
+    const idleDays = Math.floor((Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
+    if (idleDays >= stallDays) {
+      const stageLabel: Record<string, string> = { gate_in: "Gate-In", examination: "Examination", final_release: "Final Release" };
+      alerts.push({
+        alertKey: `stage_stall_${c.id}`,
+        type: "stage_stall",
+        severity: idleDays >= stallDays * 2 ? "critical" : "warning",
+        message: `${stageLabel[c.status]} stage stalled for ${idleDays} day${idleDays === 1 ? "" : "s"}: ${c.containerNumber} (${c.customerName})${c.stageOwner ? ` — owner: ${c.stageOwner}` : ""}`,
+        containerId: c.id,
+        containerNumber: c.containerNumber,
+        generatedAt: now,
+      });
     }
   }
 
@@ -520,6 +546,7 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
       { stage: "shipping",            expectedField: "expectedDoDate",       releasedField: "doReleasedAt",       label: "Delivery Order (DO)" },
       { stage: "terminal",            expectedField: "expectedTdoDate",      releasedField: "tdoReleasedAt",      label: "TDO" },
       { stage: "pull_out",            expectedField: "expectedPulloutDate",  releasedField: "pulloutReleasedAt",  label: "Pullout" },
+      { stage: "final_release",       expectedField: "expectedReleaseDate",  releasedField: "releaseConfirmedAt", label: "Final Release" },
     ];
     for (const c of containers) {
       if (c.status === "closed") continue;

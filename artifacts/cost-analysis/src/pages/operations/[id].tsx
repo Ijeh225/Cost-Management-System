@@ -522,6 +522,291 @@ function OpsStageTracker({
   );
 }
 
+function TerminalStageTracker({
+  container,
+  isEditable,
+  daysInStage,
+  advanceMutation,
+  toast,
+}: {
+  container: Container;
+  isEditable: boolean;
+  daysInStage: number;
+  advanceMutation: ReturnType<typeof useAdvanceContainerStatus>;
+  toast: ReturnType<typeof import("@/hooks/use-toast").useToast>["toast"];
+}) {
+  const updateMutation  = useUpdateContainer();
+  const stageActionMut  = useStageAction();
+  const isFinalRelease  = container.status === "final_release";
+
+  const [stageOwner, setStageOwner]     = useState(container.stageOwner ?? "");
+  const [stageDate, setStageDate]       = useState(container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : "");
+  const [delayReason, setDelayReason]   = useState(container.delayReason ?? "");
+  const [isDirty, setIsDirty]           = useState(false);
+
+  const [expectedDate, setExpectedDate]         = useState((container.expectedReleaseDate as string | null) ? (container.expectedReleaseDate as string).slice(0, 10) : "");
+  const [showDelayForm, setShowDelayForm]       = useState(false);
+  const [delayInput, setDelayInput]             = useState((container.releaseDelayReason as string | null) ?? "");
+  const [releaseDateInput, setReleaseDateInput] = useState(() => new Date().toISOString().slice(0, 10));
+
+  useEffect(() => {
+    setStageOwner(container.stageOwner ?? "");
+    setStageDate(container.nextActionDueDate ? container.nextActionDueDate.slice(0, 10) : "");
+    setDelayReason(container.delayReason ?? "");
+    setIsDirty(false);
+    setExpectedDate((container.expectedReleaseDate as string | null) ? (container.expectedReleaseDate as string).slice(0, 10) : "");
+    setDelayInput((container.releaseDelayReason as string | null) ?? "");
+  }, [container.id, container.updatedAt]);
+
+  const nextStage = getNextStage(container.status);
+  const submitLabel = DEPT_SUBMIT_LABELS["terminal_manager"]?.[container.status] ?? "Submit";
+
+  const stageDateLabel: Record<string, string> = {
+    gate_in:     "Gate-In Date",
+    examination: "Expected Exam Date",
+  };
+
+  const handleSaveGeneric = async () => {
+    try {
+      await updateMutation.mutateAsync({ id: container.id, data: { stageOwner: stageOwner || null, nextActionDueDate: stageDate || null, delayReason: delayReason || null } });
+      setIsDirty(false);
+      toast({ title: "Stage details saved" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Failed to save" });
+    }
+  };
+
+  const handleSetExpectedDate = async () => {
+    if (!expectedDate) return;
+    try {
+      await stageActionMut.mutateAsync({ id: container.id, action: "set_expected_date", expectedDate });
+      toast({ title: "Expected release date saved" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Failed to save" });
+    }
+  };
+
+  const handleSaveOwner = async () => {
+    try {
+      await stageActionMut.mutateAsync({ id: container.id, action: "update_stage_owner", stageOwner: stageOwner || null });
+      toast({ title: "Stage owner saved" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Failed" });
+    }
+  };
+
+  const handleMarkReleased = async () => {
+    try {
+      await stageActionMut.mutateAsync({ id: container.id, action: "mark_released", finalDate: releaseDateInput || undefined });
+      toast({ title: "Container marked as released" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Failed" });
+    }
+  };
+
+  const handleRecordDelay = async () => {
+    if (!delayInput.trim()) { toast({ variant: "destructive", title: "Please enter a delay reason" }); return; }
+    try {
+      await stageActionMut.mutateAsync({ id: container.id, action: "record_delay", delayReason: delayInput });
+      setShowDelayForm(false);
+      toast({ title: "Delay recorded" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Failed" });
+    }
+  };
+
+  const handleAdvance = async () => {
+    if (!nextStage) return;
+    try {
+      await advanceMutation.mutateAsync({ id: container.id, status: nextStage });
+      toast({ title: submitLabel });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Failed" });
+    }
+  };
+
+  const isReleased = !!(container.releaseConfirmedAt as string | null);
+  const isBusy     = stageActionMut.isPending || advanceMutation.isPending;
+
+  if (!isFinalRelease) {
+    return (
+      <div className="space-y-4">
+        <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">Current Stage Actions</CardTitle>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="w-3 h-3" />
+                <span className={daysInStage > 14 ? "text-red-400 font-semibold" : daysInStage > 7 ? "text-amber-400 font-semibold" : ""}>{daysInStage}d in stage</span>
+                {daysInStage > 7 && <AlertTriangle className={`w-3 h-3 ${daysInStage > 14 ? "text-red-400" : "text-amber-400"}`} />}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><User className="w-3 h-3" />Stage Owner</Label>
+                <Input value={stageOwner} onChange={e => { setStageOwner(e.target.value); setIsDirty(true); }} placeholder="Person responsible for this stage" className="h-8 text-sm bg-background border-border/60" disabled={!isEditable} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Calendar className="w-3 h-3" />{stageDateLabel[container.status] ?? "Stage Date"}</Label>
+                <Input type="date" value={stageDate} onChange={e => { setStageDate(e.target.value); setIsDirty(true); }} className="h-8 text-sm bg-background border-border/60" disabled={!isEditable} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><AlertTriangle className="w-3 h-3" />Delay Reason <span className="text-muted-foreground/50">(optional)</span></Label>
+              <Textarea value={delayReason} onChange={e => { setDelayReason(e.target.value); setIsDirty(true); }} placeholder="Document any delays or blockers" rows={2} className={`text-sm bg-background border-border/60 resize-none ${delayReason ? "border-amber-500/40 bg-amber-500/5" : ""}`} disabled={!isEditable} />
+            </div>
+            {isEditable && (
+              <div className="flex items-center gap-2 pt-1">
+                <Button size="sm" onClick={handleSaveGeneric} disabled={!isDirty || updateMutation.isPending} className="h-7 gap-1.5 text-xs">
+                  {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Changes
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        {isEditable && nextStage && (
+          <Card className="border-amber-500/20 bg-amber-500/5 backdrop-blur-sm">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{submitLabel}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">This job is ready. Confirm to send it to the next stage.</p>
+                </div>
+                <Button onClick={handleAdvance} disabled={advanceMutation.isPending} className="gap-2 shrink-0 bg-amber-600 hover:bg-amber-700">
+                  {advanceMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
+                  {submitLabel}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className={`backdrop-blur-sm ${isReleased ? "bg-emerald-500/5 border-emerald-500/20" : "border-border/50 bg-card/40"}`}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              {isReleased && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+              Final Release Tracker
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {isReleased && (
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                  Released {new Date(container.releaseConfirmedAt as string).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
+                </span>
+              )}
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="w-3 h-3" />
+                <span className={daysInStage > 14 ? "text-red-400 font-semibold" : daysInStage > 7 ? "text-amber-400 font-semibold" : ""}>{daysInStage}d in stage</span>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isEditable && (
+            <div className="flex items-end gap-3">
+              <div className="flex-1 space-y-1.5">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><User className="w-3 h-3" />Stage Owner</Label>
+                <Input value={stageOwner} onChange={e => setStageOwner(e.target.value)} placeholder="Person responsible for this stage" className="h-8 text-sm bg-background border-border/60" />
+              </div>
+              <Button size="sm" className="h-8 gap-1.5 text-xs shrink-0" onClick={handleSaveOwner} disabled={stageActionMut.isPending}>
+                <Save className="w-3 h-3" /> Save
+              </Button>
+            </div>
+          )}
+
+          {!isReleased && (
+            <div className="flex items-end gap-3">
+              <div className="flex-1 space-y-1.5">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><Calendar className="w-3 h-3" />Expected Release Date</Label>
+                <Input type="date" value={expectedDate} onChange={e => setExpectedDate(e.target.value)} className="h-8 text-sm bg-background border-border/60" disabled={!isEditable} />
+              </div>
+              {isEditable && (
+                <Button size="sm" className="h-8 gap-1.5 text-xs shrink-0" onClick={handleSetExpectedDate} disabled={!expectedDate || stageActionMut.isPending}>
+                  {stageActionMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Set Date
+                </Button>
+              )}
+            </div>
+          )}
+
+          {isReleased && (
+            <div className="flex items-center gap-2 text-sm text-emerald-400">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>Released on <strong>{new Date(container.releaseConfirmedAt as string).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })}</strong></span>
+            </div>
+          )}
+
+          {(container.releaseDelayReason as string | null) && !showDelayForm && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1">
+              <p className="text-xs font-semibold text-amber-400 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Delay Recorded</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{container.releaseDelayReason as string}</p>
+            </div>
+          )}
+
+          {showDelayForm && isEditable && (
+            <div className="space-y-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+              <p className="text-xs font-semibold text-amber-400">Record Release Delay</p>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Reason for Delay <span className="text-red-400">*</span></Label>
+                <Textarea value={delayInput} onChange={e => setDelayInput(e.target.value)} placeholder="Why is NCS release delayed?" rows={2} className="text-sm bg-background border-border/60 resize-none" />
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleRecordDelay} disabled={stageActionMut.isPending} className="h-7 gap-1 text-xs bg-amber-600 hover:bg-amber-700">
+                  {stageActionMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Delay
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowDelayForm(false)} className="h-7 text-xs text-muted-foreground">Cancel</Button>
+              </div>
+            </div>
+          )}
+
+          {!isReleased && isEditable && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3" />Actual Release Date</Label>
+                <Input type="date" value={releaseDateInput} onChange={e => setReleaseDateInput(e.target.value)} className="h-8 text-sm bg-background border-border/60" />
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button onClick={handleMarkReleased} disabled={isBusy} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-sm">
+                  {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Mark as Released
+                </Button>
+                {!showDelayForm && (
+                  <Button variant="outline" onClick={() => setShowDelayForm(true)} className="gap-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-sm">
+                    <AlertTriangle className="w-4 h-4" /> Record Delay
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {isEditable && nextStage && (
+        <Card className="border-amber-500/20 bg-amber-500/5 backdrop-blur-sm">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{submitLabel}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">This job is ready. Confirm to send it to the next department.</p>
+              </div>
+              <Button onClick={handleAdvance} disabled={advanceMutation.isPending} className="gap-2 shrink-0 bg-amber-600 hover:bg-amber-700">
+                {advanceMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
+                {submitLabel}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function OperationalForm({
   container,
   isAdmin,
@@ -747,6 +1032,19 @@ function OperationalForm({
       updateMutation={updateMutation}
       toast={toast}
     />;
+  }
+
+  const isTerminalStage = TERMINAL_STAGES.includes(container.status);
+  if (isTerminalStage) {
+    return (
+      <TerminalStageTracker
+        container={container}
+        isEditable={isEditable}
+        daysInStage={daysInStage}
+        advanceMutation={advanceMutation}
+        toast={toast}
+      />
+    );
   }
 
   return (

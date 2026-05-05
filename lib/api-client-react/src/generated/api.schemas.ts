@@ -160,6 +160,10 @@ export interface Container {
   pulloutReleasedAt?: string | null;
   pulloutDelayReason?: string | null;
   pulloutFinalDate?: string | null;
+  expectedReleaseDate?: string | null;
+  releaseConfirmedAt?: string | null;
+  releaseDelayReason?: string | null;
+  releaseFinalDate?: string | null;
   deliveryTime?: string | null;
   deliveryLocation?: string | null;
   truckNumber?: string | null;
