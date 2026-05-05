@@ -63,7 +63,7 @@ const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
   operations_user:    new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
   staff:              new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
   accounts_user:      new Set([]),
-  documentation_user: new Set([]),
+  documentation_user: new Set(["new_job"]),
 };
 
 async function getAgingThresholds() {
