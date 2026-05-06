@@ -54,6 +54,7 @@ const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
     "overdue_task",
     "stale_approval",
     "rejected_section",
+    "paar_overdue",
   ]),
 };
 
@@ -111,7 +112,9 @@ async function computeAlerts(userId?: number, role?: string) {
     const emptyReturnDate = c.emptyReturnDate ? new Date(c.emptyReturnDate) : null;
     const eta = c.eta ? new Date(c.eta) : null;
     const berthed = c.berthed ?? false;
-    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue, emptyReturnDueDate, emptyReturnDate, eta, berthed };
+    const paarReleasedAt = c.paarReleasedAt ? new Date(c.paarReleasedAt) : null;
+    const paarNumber = c.paarNumber ?? null;
+    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue, emptyReturnDueDate, emptyReturnDate, eta, berthed, paarReleasedAt, paarNumber };
   });
 
   const totals = containerData.reduce((acc, c) => ({ terminal: acc.terminal + c.terminalCost, delivery: acc.delivery + c.deliveryCost }), { terminal: 0, delivery: 0 });
@@ -246,6 +249,26 @@ async function computeAlerts(userId?: number, role?: string) {
         });
       }
     }
+  }
+
+  // PAAR overdue — fires when PAAR ETA has passed and PAAR has not been released yet
+  const DOC_STAGES = new Set(["registered", "documentation", "duty_assessment"]);
+  const startOfToday2 = new Date(); startOfToday2.setUTCHours(0, 0, 0, 0);
+  for (const c of containerData) {
+    if (!DOC_STAGES.has(c.status)) continue;
+    if (c.paarReleasedAt) continue;
+    if (!c.nextActionDueDate) continue;
+    if (c.nextActionDueDate.getTime() >= startOfToday2.getTime()) continue;
+    const overdueDays = Math.floor((startOfToday2.getTime() - c.nextActionDueDate.getTime()) / (1000 * 60 * 60 * 24));
+    alerts.push({
+      alertKey: `paar_overdue_${c.id}`,
+      type: "paar_overdue",
+      severity: overdueDays >= 3 ? "critical" : "warning",
+      message: `PAAR overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}: ${c.containerNumber} (${c.customerName}) — PAAR ETA has passed with no release recorded`,
+      containerId: c.id,
+      containerNumber: c.containerNumber,
+      generatedAt: now,
+    });
   }
 
   const overdueTasks = await db.select({ id: containerTasksTable.id, containerId: containerTasksTable.containerId, title: containerTasksTable.title })
