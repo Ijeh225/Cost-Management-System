@@ -21,6 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -29,8 +32,110 @@ import {
   Clock, ShieldAlert, ListTodo, Activity, CheckCheck,
   ExternalLink, Loader2, RefreshCw, XCircle, Anchor,
   BriefcaseIcon, CheckCircle2, Filter, CalendarRange, ArrowRight,
-  History, CheckCircle, Circle,
+  History, CheckCircle, Circle, ShieldCheck,
 } from "lucide-react";
+
+// ─── Security Container Info Modal ─────────────────────────────────────────────
+
+type ContainerInfo = {
+  containerNumber: string;
+  blNumber: string;
+  customerName: string;
+  vessel: string;
+  size: string;
+  eta: string | null;
+  consignee: string | null;
+  berthed: boolean;
+  berthingConfirmedAt: string | null;
+  berthingConfirmedByName: string | null;
+};
+
+function SecurityContainerModal({ containerId, open, onClose }: { containerId: number; open: boolean; onClose: () => void }) {
+  const [info, setInfo] = useState<ContainerInfo | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !containerId) return;
+    setLoading(true);
+    setInfo(null);
+    fetch(`/api/containers/${containerId}`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setInfo(d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [open, containerId]);
+
+  function fmtDate(iso: string | null | undefined) {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString("en-NG", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            Container Information
+          </DialogTitle>
+        </DialogHeader>
+        {loading && (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {!loading && info && (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-5 py-2">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Customer</p>
+              <p className="text-sm font-bold text-foreground">{info.customerName || "—"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Vessel</p>
+              <p className="text-sm font-bold text-foreground">{info.vessel || "—"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Size / Type</p>
+              <p className="text-sm font-bold text-foreground">{info.size || "—"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Container No.</p>
+              <p className="text-sm font-bold font-mono text-foreground">{info.containerNumber}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">ETA</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-foreground">{info.eta ? new Date(info.eta).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
+                {info.berthed && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5">
+                    <CheckCircle className="w-2.5 h-2.5" /> Berthed
+                  </span>
+                )}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Consignee</p>
+              <p className="text-sm font-bold text-foreground">{info.consignee || "—"}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Berthing Confirmed</p>
+              {info.berthingConfirmedAt ? (
+                <p className="text-sm font-bold text-emerald-400">
+                  {fmtDate(info.berthingConfirmedAt)}{info.berthingConfirmedByName ? ` · by ${info.berthingConfirmedByName}` : ""}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground/60 italic">Not yet confirmed</p>
+              )}
+            </div>
+          </div>
+        )}
+        {!loading && !info && (
+          <p className="text-sm text-muted-foreground text-center py-8">Could not load container details.</p>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // ─── Alert type config ─────────────────────────────────────────────────────────
 
@@ -140,52 +245,65 @@ function NotificationRow({ notif }: { notif: Notification }) {
   const markRead = useMarkNotificationRead();
   const [, navigate] = useLocation();
   const { isSecurityUser } = useAuth();
-
-  const destination = isSecurityUser ? "/gate" : getAlertUrl(notif.type, notif.containerId);
-  const actionLabel = isSecurityUser ? "View Gate Log" : getAlertActionLabel(notif.type, notif.containerId);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const handleClick = () => {
     if (!notif.isRead) markRead.mutate({ alertKey: notif.alertKey });
-    navigate(destination);
+    if (isSecurityUser && notif.containerId) {
+      setModalOpen(true);
+    } else {
+      navigate(getAlertUrl(notif.type, notif.containerId));
+    }
   };
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      onClick={handleClick}
-      role="link"
-      tabIndex={0}
-      onKeyDown={e => e.key === "Enter" && handleClick()}
-      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none ${
-        notif.isRead ? "opacity-60 hover:opacity-80" : "bg-primary/[0.025] hover:bg-primary/[0.04]"
-      }`}
-    >
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border} border`}>
-        <Icon className={`w-4 h-4 ${cfg.color}`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-foreground">{cfg.label}</span>
-            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${sev.className}`}>{sev.label}</Badge>
-            {!notif.isRead && (
-              <span className="w-2 h-2 rounded-full bg-primary shrink-0" aria-label="Unread" />
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[11px] text-muted-foreground">{formatTime(notif.generatedAt)}</span>
-            {markRead.isPending && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
-          </div>
+    <>
+      {isSecurityUser && notif.containerId && (
+        <SecurityContainerModal
+          containerId={notif.containerId}
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        onClick={handleClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => e.key === "Enter" && handleClick()}
+        className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none ${
+          notif.isRead ? "opacity-60 hover:opacity-80" : "bg-primary/[0.025] hover:bg-primary/[0.04]"
+        }`}
+      >
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border} border`}>
+          <Icon className={`w-4 h-4 ${cfg.color}`} />
         </div>
-        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
-        <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-          <ArrowRight className="w-3 h-3" />
-          {actionLabel}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-foreground">{cfg.label}</span>
+              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${sev.className}`}>{sev.label}</Badge>
+              {!notif.isRead && (
+                <span className="w-2 h-2 rounded-full bg-primary shrink-0" aria-label="Unread" />
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] text-muted-foreground">{formatTime(notif.generatedAt)}</span>
+              {markRead.isPending && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
+          {!isSecurityUser && (
+            <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+              <ArrowRight className="w-3 h-3" />
+              {getAlertActionLabel(notif.type, notif.containerId)}
+            </div>
+          )}
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
 }
 
@@ -197,55 +315,67 @@ function WorkflowEventRow({ notif }: { notif: WorkflowNotification }) {
   const markRead = useMarkWorkflowNotificationRead();
   const [, navigate] = useLocation();
   const { isSecurityUser } = useAuth();
-
-  const destination = isSecurityUser ? "/gate" : getWorkflowEventUrl(notif.type, notif.containerId);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const handleClick = () => {
     if (!notif.isRead) markRead.mutate({ id: notif.id });
-    navigate(destination);
+    if (isSecurityUser && notif.containerId) {
+      setModalOpen(true);
+    } else {
+      navigate(getWorkflowEventUrl(notif.type, notif.containerId));
+    }
   };
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      onClick={handleClick}
-      role="link"
-      tabIndex={0}
-      onKeyDown={e => e.key === "Enter" && handleClick()}
-      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none ${
-        notif.isRead ? "opacity-60 hover:opacity-80" : "bg-primary/[0.025] hover:bg-primary/[0.04]"
-      }`}
-    >
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border} border`}>
-        <Icon className={`w-4 h-4 ${cfg.color}`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-foreground">{cfg.label}</span>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-              Workflow Event
-            </Badge>
-            {!notif.isRead && (
-              <span className="w-2 h-2 rounded-full bg-primary shrink-0" aria-label="Unread" />
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[11px] text-muted-foreground">{formatTime(notif.createdAt)}</span>
-            {markRead.isPending && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
-          </div>
+    <>
+      {isSecurityUser && notif.containerId && (
+        <SecurityContainerModal
+          containerId={notif.containerId}
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        onClick={handleClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => e.key === "Enter" && handleClick()}
+        className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none ${
+          notif.isRead ? "opacity-60 hover:opacity-80" : "bg-primary/[0.025] hover:bg-primary/[0.04]"
+        }`}
+      >
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border} border`}>
+          <Icon className={`w-4 h-4 ${cfg.color}`} />
         </div>
-        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
-        {notif.containerNumber && (
-          <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-            <ArrowRight className="w-3 h-3" />
-            {notif.type === "new_job" ? "View Container" : "Open in Operations"} · {notif.containerNumber}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-foreground">{cfg.label}</span>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                Workflow Event
+              </Badge>
+              {!notif.isRead && (
+                <span className="w-2 h-2 rounded-full bg-primary shrink-0" aria-label="Unread" />
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] text-muted-foreground">{formatTime(notif.createdAt)}</span>
+              {markRead.isPending && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+            </div>
           </div>
-        )}
-      </div>
-    </motion.div>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
+          {notif.containerNumber && !isSecurityUser && (
+            <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+              <ArrowRight className="w-3 h-3" />
+              {notif.type === "new_job" ? "View Container" : "Open in Operations"} · {notif.containerNumber}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </>
   );
 }
 
