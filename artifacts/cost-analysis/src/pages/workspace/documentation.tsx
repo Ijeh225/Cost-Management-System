@@ -306,36 +306,26 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
 
           <Separator />
 
-          {/* Action buttons */}
+          {/* Action — single smart button */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-[11px] text-muted-foreground/60">
               {paarNumber.trim() && paarReleaseDate
-                ? "PAAR confirmed — clicking Save & Submit will move this job to Submitted."
-                : "Save any time. Job moves to Submitted only after PAAR number + Set are done."}
+                ? "Ready to submit — this job will move to Duty Payment."
+                : "Job stays Active until PAAR number is entered and release date is set."}
             </p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                onClick={handleSaveOnly}
-                disabled={busy}
-                className="gap-2 shrink-0"
-              >
-                {busy
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
+            <Button
+              onClick={handleSaveAndSubmit}
+              disabled={busy}
+              className={`gap-2 shrink-0 ${paarNumber.trim() && paarReleaseDate ? "" : "opacity-80"}`}
+              variant={paarNumber.trim() && paarReleaseDate ? "default" : "outline"}
+            >
+              {busy
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : paarNumber.trim() && paarReleaseDate
+                  ? <SendHorizonal className="w-4 h-4" />
                   : <CheckCircle2 className="w-4 h-4" />}
-                Save Draft
-              </Button>
-              <Button
-                onClick={handleSaveAndSubmit}
-                disabled={busy}
-                className="gap-2 shrink-0"
-              >
-                {busy
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <SendHorizonal className="w-4 h-4" />}
-                Save &amp; Submit
-              </Button>
-            </div>
+              {paarNumber.trim() && paarReleaseDate ? "Save & Submit" : "Save"}
+            </Button>
           </div>
         </div>
       )}
