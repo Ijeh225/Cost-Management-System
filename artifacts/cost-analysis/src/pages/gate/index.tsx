@@ -156,7 +156,9 @@ export default function GatePage() {
     : false;
   const canGateOut = selected ? !!selected.gateInDate && !selected.gateOutDate : false;
 
-  const entries: GateLogEntry[] = logData?.entries ?? [];
+  const allEntries: GateLogEntry[] = logData?.entries ?? [];
+  const expectedEntries = allEntries.filter(e => e.earlyStartAuthorized && !e.gateInDate);
+  const entries = allEntries.filter(e => !e.earlyStartAuthorized || !!e.gateInDate);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -295,11 +297,13 @@ export default function GatePage() {
                     {gateOut.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LogOut className="w-4 h-4 mr-2" />}
                     Record Gate-Out
                   </Button>
-                  <Link href={`/containers/${selected.id}`}>
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground shrink-0">
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                  </Link>
+                  {isAdmin && (
+                    <Link href={`/containers/${selected.id}`}>
+                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground shrink-0">
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               )}
               {!canOperate && (
@@ -309,6 +313,56 @@ export default function GatePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Expected Incoming — Early-Start Authorised (no gate-in yet) */}
+      {expectedEntries.length > 0 && (
+        <Card className="border-blue-500/30 bg-blue-500/5 backdrop-blur-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-blue-400">
+              <ShieldCheck className="w-4 h-4" />
+              Expected Incoming
+              <span className="text-xs text-blue-400/70 font-normal bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                {expectedEntries.length} pre-cleared
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-blue-500/20 bg-blue-500/5">
+                    <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2.5">Container</th>
+                    <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2.5">Customer</th>
+                    <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2.5">Size</th>
+                    <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2.5">Early-Start Reason</th>
+                    <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-blue-500/10">
+                  {expectedEntries.map(e => (
+                    <tr key={e.id} className="hover:bg-blue-500/5 transition-colors">
+                      <td className="px-4 py-3">
+                        <span className="font-mono font-semibold text-foreground text-sm">{e.containerNumber}</span>
+                        <div className="text-[10px] text-muted-foreground font-mono">{e.blNumber}</div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground max-w-[160px] truncate">{e.customerName}</td>
+                      <td className="px-4 py-3">
+                        {e.size ? <Badge variant="outline" className="text-[10px] font-medium">{e.size}</Badge> : <span className="text-muted-foreground/40">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-blue-400/80 italic max-w-[220px] truncate">
+                        {e.earlyStartReason ?? "Early start authorised"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={e.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Gate Log */}
       <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
@@ -409,11 +463,13 @@ export default function GatePage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/containers/${e.id}`}>
-                          <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent/50">
-                            <ExternalLink className="w-3 h-3 text-muted-foreground" />
-                          </button>
-                        </Link>
+                        {isAdmin && (
+                          <Link href={`/containers/${e.id}`}>
+                            <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent/50">
+                              <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                            </button>
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   ))}

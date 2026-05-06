@@ -1035,20 +1035,25 @@ router.get("/containers/gate-log", requireAuth, async (req: AuthRequest, res) =>
         isNotNull(containersTable.gateInDate),
         isNotNull(containersTable.gateOutDate),
         inArray(containersTable.status, ["gate_in", "examination", "final_release"]),
+        eq(containersTable.earlyStartAuthorized, true),
       ))
       .orderBy(desc(containersTable.gateInDate));
 
     if (fromStr) {
       const from = new Date(fromStr);
       if (!isNaN(from.getTime())) {
-        rows = rows.filter(r => (r.gateInDate && new Date(r.gateInDate) >= from) || (r.gateOutDate && new Date(r.gateOutDate) >= from));
+        rows = rows.filter(r =>
+          r.earlyStartAuthorized ||
+          (r.gateInDate && new Date(r.gateInDate) >= from) ||
+          (r.gateOutDate && new Date(r.gateOutDate) >= from)
+        );
       }
     }
     if (toStr) {
       const to = new Date(toStr);
       if (!isNaN(to.getTime())) {
         to.setHours(23, 59, 59, 999);
-        rows = rows.filter(r => !r.gateInDate || new Date(r.gateInDate) <= to);
+        rows = rows.filter(r => r.earlyStartAuthorized || !r.gateInDate || new Date(r.gateInDate) <= to);
       }
     }
 
@@ -1062,6 +1067,8 @@ router.get("/containers/gate-log", requireAuth, async (req: AuthRequest, res) =>
       status: c.status,
       gateInDate: c.gateInDate instanceof Date ? c.gateInDate.toISOString() : (c.gateInDate ?? null),
       gateOutDate: c.gateOutDate instanceof Date ? c.gateOutDate.toISOString() : (c.gateOutDate ?? null),
+      earlyStartAuthorized: c.earlyStartAuthorized ?? false,
+      earlyStartReason: c.earlyStartReason ?? null,
     }));
 
     if (csv) {

@@ -827,7 +827,7 @@ function AuditTrail({ containerId }: { containerId: number }) {
 export default function ContainerDetail() {
   const { id } = useParams();
   const containerId = Number(id);
-  const { isAdmin, isOperationsUser, user } = useAuth();
+  const { isAdmin, isOperationsUser, isSecurityUser, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("charges");
@@ -968,6 +968,78 @@ export default function ContainerDetail() {
   if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
 
   const { container, charges, sectionApprovals = [] } = data as any;
+
+  if (isSecurityUser) {
+    return (
+      <div className="space-y-6 max-w-xl mx-auto pb-16">
+        <div className="flex items-center gap-4">
+          <Link href="/gate">
+            <Button variant="ghost" size="icon" className="hover:bg-accent rounded-full">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight font-mono">{container.containerNumber}</h1>
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+              <FileText className="w-3.5 h-3.5" /> BL: {container.blNumber}
+            </p>
+          </div>
+          <div className="ml-auto">
+            <span className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider border ${getStatusColor(container.status)}`}>
+              {getStatusLabel(container.status)}
+            </span>
+          </div>
+        </div>
+        <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
+          <CardContent className="pt-5 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Customer</p>
+                <p className="text-sm font-medium">{container.customerName ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Size / Type</p>
+                <p className="text-sm font-medium">{[container.size, container.command].filter(Boolean).join(" · ") || "—"}</p>
+              </div>
+            </div>
+            <div className="border-t border-border/30 pt-4 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" /> Gate-In
+                </p>
+                {container.gateInDate ? (
+                  <p className="text-sm font-mono text-emerald-400">
+                    {new Date(container.gateInDate).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Not yet recorded</p>
+                )}
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" /> Gate-Out
+                </p>
+                {container.gateOutDate ? (
+                  <p className="text-sm font-mono text-amber-400">
+                    {new Date(container.gateOutDate).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Not yet recorded</p>
+                )}
+              </div>
+            </div>
+            {container.earlyStartAuthorized && (
+              <div className="border-t border-border/30 pt-4">
+                <p className="text-[11px] text-blue-400 uppercase tracking-wider font-semibold mb-1">Early Start Authorised</p>
+                <p className="text-xs text-muted-foreground italic">{container.earlyStartReason ?? "Pre-cleared for early processing"}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <p className="text-xs text-center text-muted-foreground/50">Security view — financial details are restricted.</p>
+      </div>
+    );
+  }
 
   const userSectionPermission: string | null = (user as any)?.sectionPermission ?? null;
   const userSectionPermissions: string | null = (user as any)?.sectionPermissions ?? null;

@@ -79,9 +79,44 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
   const isPaarOverdue = paarEta && new Date(paarEta) < new Date() && !paarReleaseDate;
   const assessmentInvalid = !assessmentAmt || parseFloat(assessmentAmt) <= 0;
 
+  async function handleSaveOnly() {
+    setBusy(true);
+    try {
+      await updateCard.mutateAsync({
+        id: c.id,
+        stageOwner:        stageOwner      || null,
+        nextAction:        null,
+        nextActionDueDate: paarEta         || null,
+        delayReason:       delayReason     || null,
+        paarNumber:        paarNumber      || null,
+        paarReleasedAt:    paarReleaseDate || null,
+        paarDelayReason:   paarDelayReason || null,
+      });
+      if (assessmentAmt && parseFloat(assessmentAmt) > 0) {
+        await updateCharges.mutateAsync({
+          id: c.id,
+          data: { section: "customs", customs: { duty: parseFloat(assessmentAmt) } },
+        });
+      }
+      toast({ title: "Saved", description: `${c.containerNumber} updated. Submit when PAAR is ready.` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Save failed", description: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleSaveAndSubmit() {
     if (assessmentInvalid) {
       toast({ variant: "destructive", title: "Assessment amount required", description: "Enter the NCS duty amount before submitting." });
+      return;
+    }
+    if (!paarNumber.trim()) {
+      toast({ variant: "destructive", title: "PAAR number required", description: "The job cannot be submitted until the PAAR number is entered." });
+      return;
+    }
+    if (!paarReleaseDate) {
+      toast({ variant: "destructive", title: "PAAR release date required", description: "Enter the PAAR release date before submitting to Duty Payment." });
       return;
     }
     setBusy(true);
@@ -249,21 +284,34 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
 
           <Separator />
 
-          {/* Single action button */}
+          {/* Action buttons */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-[11px] text-muted-foreground/60">
-              Saves all fields and submits this job directly to Duty Payment.
+              Save drafts any time. Submit only after PAAR number and release date are confirmed.
             </p>
-            <Button
-              onClick={handleSaveAndSubmit}
-              disabled={busy || assessmentInvalid}
-              className="gap-2 shrink-0"
-            >
-              {busy
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <SendHorizonal className="w-4 h-4" />}
-              Save &amp; Submit
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                onClick={handleSaveOnly}
+                disabled={busy}
+                className="gap-2 shrink-0"
+              >
+                {busy
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <CheckCircle2 className="w-4 h-4" />}
+                Save Draft
+              </Button>
+              <Button
+                onClick={handleSaveAndSubmit}
+                disabled={busy || assessmentInvalid}
+                className="gap-2 shrink-0"
+              >
+                {busy
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <SendHorizonal className="w-4 h-4" />}
+                Save &amp; Submit
+              </Button>
+            </div>
           </div>
         </div>
       )}

@@ -489,6 +489,8 @@ export type GateLogEntry = {
   status: string;
   gateInDate: string | null;
   gateOutDate: string | null;
+  earlyStartAuthorized?: boolean;
+  earlyStartReason?: string | null;
 };
 
 export type GateLogResponse = {

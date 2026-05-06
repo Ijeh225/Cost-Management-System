@@ -198,6 +198,13 @@ const DEPT_SUBMIT_LABELS: Record<string, Record<string, string>> = {
   },
 };
 
+const OPS_RELEASE_LABELS: Record<string, string> = {
+  transire_processing: "Mark as Transire Out",
+  shipping:            "Mark as Do Out",
+  terminal:            "Mark as TDO Out",
+  pull_out:            "Confirm Pullout",
+};
+
 const OPS_STAGE_CONFIG: Record<string, {
   expectedLabel: string;
   expectedField: keyof Container;
@@ -464,7 +471,7 @@ function OpsStageTracker({
                 className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-sm"
               >
                 {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                Mark as Released
+                {OPS_RELEASE_LABELS[container.status] ?? "Mark as Released"}
               </Button>
               {!showDelayForm && (
                 <Button
@@ -774,7 +781,7 @@ function TerminalStageTracker({
               <div className="flex items-center gap-2 flex-wrap">
                 <Button onClick={handleMarkReleased} disabled={isBusy} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-sm">
                   {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Mark as Released
+                  {OPS_RELEASE_LABELS[container.status] ?? "Mark as Released"}
                 </Button>
                 {!showDelayForm && (
                   <Button variant="outline" onClick={() => setShowDelayForm(true)} className="gap-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-sm">

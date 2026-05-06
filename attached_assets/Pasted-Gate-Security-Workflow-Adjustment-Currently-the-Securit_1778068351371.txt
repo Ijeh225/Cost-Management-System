@@ -1,0 +1,97 @@
+Gate Security Workflow Adjustment
+Currently, the Security role only sees a job on the Gate Log after the Pullout user submits 
+the job to the Terminal Manager. That is when the job becomes visible for Security processing.
+However, I want this workflow improved.
+Once Early Start is activated, the job should immediately appear on the Gate Security page, just like it already reflects instantly in:
+
+Transaya
+Operations
+Other related departments
+
+we should still maintain the existing Pullout workflow, but Security should not depend entirely on the Pullout team before seeing incoming jobs.
+The reason is simple:
+Sometimes the Pullout team delays updates or does not process jobs quickly enough
+Meanwhile, Security still needs to perform Gate-In activities immediately once containers arrive
+So the objective is to balance the workflow by:
+allowing Security users to see expected incoming jobs early
+While still keeping the normal Pullout submission process active in the background
+This ensures faster and more accurate Gate-In operations.
+
+🧠Smart Validation Logic (Documentation & Other Modules)
+There is also an issue with how jobs move between Active and Submitted sections.
+For example:
+In Documentation, a user may input a PAAR ETA and click Save and Submit
+
+
+Immediately, the system moves the job into Submitted
+Even when the actual PAAR has not yet been released
+Or the PAAR number is still missing
+This should not happen.
+The system needs to become smarter and validate whether the main process has actually been completed before changing the status.
+For example:
+
+
+Even if assessment has been completed
+Even if assessment values are available
+If the PAAR is not yet issued or the PAAR number is missing
+Then:
+The job should remain under Active
+It should not move to Submitted
+This same smart validation logic should also be reviewed across other modules and workflows where users can click Save and Submit 
+even though the primary task is incomplete.
+The system should automatically detect:
+Missing key fields
+Incomplete primary processes
+Overdue but unfinished tasks
+And keep such jobs in the Active section until all required conditions are completed.
+
+🏷️ Workflow Action Naming Improvements
+Currently, after expected release dates in Operations, we use a generic button labeled “Mark as Released.”
+This should be replaced with stage-specific action names that better reflect operational activities.
+Suggested naming structure:
+Transaya Stage
+→ “Mark as Transaya Out”
+Shipping Stage
+→ “Mark as Do Out”
+Terminal Stage
+→ “Mark as TDO Out”
+Pullout Stage
+→ “Mark as Pulled Out”
+or
+→ “Confirm Pullout”
+Please also review and standardize these action names professionally across the workflow.
+🔒 Security Role Access Restriction
+There is also an issue with the Security role permissions.
+Currently:
+Security users receive notifications when new jobs are created
+But when they click those notifications, the system exposes unrelated workflow stages such as Duty Payment and other operational areas
+This should be restricted immediately.
+When a Security user clicks a notification:
+They should only see limited job details relevant to Security operations
+The information visible should only include:
+Container Number
+Bill of Lading
+Container Owner / Client
+Nothing else.
+Security users should not:Access Duty Payment
+View operational pipelines
+Navigate to other workflow stages
+View financial records
+Access accounting information
+
+
+Additionally, I noticed there is a shortcut/button on the Security page that opens the financial records of a container.
+This should be removed completely for the Security role.
+Security personnel are only responsible for:
+Gate-In
+Gate-Out
+Viewing basic container details
+Their access should be strictly limited to those functions only.
+🎯 Overall Objective
+The overall goal is to make the system:
+More intelligent
+More role-based
+More secure
+less dependent on delayed workflows
+Faster and more operationally efficient
+The system should proactively validate processes, restrict unnecessary access, and improve synchronization between departments. 

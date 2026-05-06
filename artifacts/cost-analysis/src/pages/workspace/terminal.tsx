@@ -248,7 +248,7 @@ function FinalReleaseCard({ c, onAdvance, advancePending }: FinalReleaseCardProp
             disabled={isBusy}
           >
             {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-            Mark as Released
+            Confirm Final Release
           </Button>
         ) : (
           <Button

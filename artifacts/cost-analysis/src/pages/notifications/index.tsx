@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/components/layout/auth-provider";
 import {
   useGetNotifications,
   useMarkAllNotificationsRead,
@@ -138,9 +139,10 @@ function NotificationRow({ notif }: { notif: Notification }) {
   const Icon = cfg.icon;
   const markRead = useMarkNotificationRead();
   const [, navigate] = useLocation();
+  const { isSecurityUser } = useAuth();
 
-  const destination = getAlertUrl(notif.type, notif.containerId);
-  const actionLabel = getAlertActionLabel(notif.type, notif.containerId);
+  const destination = isSecurityUser ? "/gate" : getAlertUrl(notif.type, notif.containerId);
+  const actionLabel = isSecurityUser ? "View Gate Log" : getAlertActionLabel(notif.type, notif.containerId);
 
   const handleClick = () => {
     if (!notif.isRead) markRead.mutate({ alertKey: notif.alertKey });
@@ -194,8 +196,9 @@ function WorkflowEventRow({ notif }: { notif: WorkflowNotification }) {
   const Icon = cfg.icon;
   const markRead = useMarkWorkflowNotificationRead();
   const [, navigate] = useLocation();
+  const { isSecurityUser } = useAuth();
 
-  const destination = getWorkflowEventUrl(notif.type, notif.containerId);
+  const destination = isSecurityUser ? "/gate" : getWorkflowEventUrl(notif.type, notif.containerId);
 
   const handleClick = () => {
     if (!notif.isRead) markRead.mutate({ id: notif.id });
