@@ -77,7 +77,11 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
   const advance       = useAdvanceContainerStatus();
 
   const isPaarOverdue = paarEta && new Date(paarEta) < new Date() && !paarReleaseDate;
-  const assessmentInvalid = !assessmentAmt || parseFloat(assessmentAmt) <= 0;
+
+  function handleSetPaarReleaseDate() {
+    const today = new Date().toISOString().slice(0, 10);
+    setPaarReleaseDate(today);
+  }
 
   async function handleSaveOnly() {
     setBusy(true);
@@ -107,20 +111,9 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
   }
 
   async function handleSaveAndSubmit() {
-    if (assessmentInvalid) {
-      toast({ variant: "destructive", title: "Assessment amount required", description: "Enter the NCS duty amount before submitting." });
-      return;
-    }
-    if (!paarNumber.trim()) {
-      toast({ variant: "destructive", title: "PAAR number required", description: "The job cannot be submitted until the PAAR number is entered." });
-      return;
-    }
-    if (!paarReleaseDate) {
-      toast({ variant: "destructive", title: "PAAR release date required", description: "Enter the PAAR release date before submitting to Duty Payment." });
-      return;
-    }
     setBusy(true);
     try {
+      // Always save whatever data is present
       await updateCard.mutateAsync({
         id: c.id,
         stageOwner:        stageOwner      || null,
@@ -132,23 +125,31 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
         paarDelayReason:   paarDelayReason || null,
       });
 
-      await updateCharges.mutateAsync({
-        id: c.id,
-        data: { section: "customs", customs: { duty: parseFloat(assessmentAmt) } },
-      });
-
-      // Advance through ALL remaining doc-dept stages in sequence so one click
-      // takes the job all the way to Duty Payment, regardless of current stage.
-      const stageIdx = DEPT_STAGES.indexOf(c.stage as typeof DEPT_STAGES[number]);
-      const stagesToAdvance = DEPT_STAGES.slice(stageIdx >= 0 ? stageIdx : 0);
-      for (const stage of stagesToAdvance) {
-        await advance.mutateAsync({ id: c.id, status: stage });
+      if (assessmentAmt && parseFloat(assessmentAmt) > 0) {
+        await updateCharges.mutateAsync({
+          id: c.id,
+          data: { section: "customs", customs: { duty: parseFloat(assessmentAmt) } },
+        });
       }
 
-      toast({ title: "Submitted", description: `${c.containerNumber} submitted — moved to Duty Payment.` });
-      onSubmitSuccess();
+      // Only advance to Submitted when PAAR Number + PAAR Release Date are both confirmed
+      const canSubmit = paarNumber.trim() && paarReleaseDate;
+      if (canSubmit) {
+        const stageIdx = DEPT_STAGES.indexOf(c.stage as typeof DEPT_STAGES[number]);
+        const stagesToAdvance = DEPT_STAGES.slice(stageIdx >= 0 ? stageIdx : 0);
+        for (const stage of stagesToAdvance) {
+          await advance.mutateAsync({ id: c.id, status: stage });
+        }
+        toast({ title: "Submitted", description: `${c.containerNumber} submitted — moved to Duty Payment.` });
+        onSubmitSuccess();
+      } else {
+        const missing = !paarNumber.trim()
+          ? "Enter the PAAR number to move this job to Submitted."
+          : "Use the Set button beside PAAR Number to confirm the release date.";
+        toast({ title: "Saved", description: missing });
+      }
     } catch (e) {
-      toast({ variant: "destructive", title: "Submission failed", description: (e as Error).message });
+      toast({ variant: "destructive", title: "Save failed", description: (e as Error).message });
     } finally {
       setBusy(false);
     }
@@ -205,13 +206,34 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">PAAR Number</Label>
-              <Input
-                value={paarNumber}
-                onChange={e => setPaarNumber(e.target.value)}
-                placeholder="e.g. PAAR/2024/00123"
-                className="h-8 text-sm bg-background border-border/60"
-              />
+              <Label className="text-xs text-muted-foreground">
+                PAAR Number
+                {paarNumber.trim() && !paarReleaseDate && (
+                  <span className="ml-1.5 text-amber-400">— click Set to confirm release date</span>
+                )}
+                {paarNumber.trim() && paarReleaseDate && (
+                  <span className="ml-1.5 text-emerald-400">✓ Release date confirmed</span>
+                )}
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={paarNumber}
+                  onChange={e => setPaarNumber(e.target.value)}
+                  placeholder="e.g. PAAR/2024/00123"
+                  className="h-8 text-sm bg-background border-border/60 flex-1"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={paarReleaseDate ? "outline" : "default"}
+                  onClick={handleSetPaarReleaseDate}
+                  disabled={!paarNumber.trim()}
+                  className="h-8 px-3 text-xs shrink-0"
+                  title="Set today as PAAR Release Date"
+                >
+                  Set
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -239,10 +261,10 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
             </div>
           </div>
 
-          {/* Row 3: Assessment Amount (always required — full workflow submitted in one click) */}
+          {/* Row 3: Assessment Amount (optional — can be filled at any time) */}
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-amber-400">
-              Assessment Amount (₦)<span className="text-red-400 ml-1">*</span>
+              Assessment Amount (₦) <span className="text-muted-foreground font-normal">(optional)</span>
             </Label>
             <Input
               type="number"
@@ -254,7 +276,7 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
               className="h-8 text-sm bg-background font-mono border-amber-500/40"
             />
             <p className="text-[10px] text-muted-foreground">
-              Required — this amount will appear on the Duty Payments page.
+              Optional — enter when known. Will appear on the Duty Payments page.
             </p>
           </div>
 
@@ -287,7 +309,9 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
           {/* Action buttons */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-[11px] text-muted-foreground/60">
-              Save drafts any time. Submit only after PAAR number and release date are confirmed.
+              {paarNumber.trim() && paarReleaseDate
+                ? "PAAR confirmed — clicking Save & Submit will move this job to Submitted."
+                : "Save any time. Job moves to Submitted only after PAAR number + Set are done."}
             </p>
             <div className="flex items-center gap-2 flex-wrap">
               <Button
@@ -303,7 +327,7 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
               </Button>
               <Button
                 onClick={handleSaveAndSubmit}
-                disabled={busy || assessmentInvalid}
+                disabled={busy}
                 className="gap-2 shrink-0"
               >
                 {busy
