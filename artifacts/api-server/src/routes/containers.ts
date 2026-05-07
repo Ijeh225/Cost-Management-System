@@ -1108,10 +1108,10 @@ router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res
 
     const now = new Date();
     let nextStatus = existing.status;
-    if (existing.status === "pull_out") {
+    if (["shipping", "pull_out"].includes(existing.status)) {
       nextStatus = "gate_in";
     } else if (!["gate_in", "examination", "final_release"].includes(existing.status)) {
-      res.status(409).json({ error: `Container is at "${existing.status}" stage — Gate-In can only be recorded from pull_out or once already in the terminal` });
+      res.status(409).json({ error: `Container is at "${existing.status}" stage — Gate-In can only be recorded from shipping, pull_out, or once already in the terminal` });
       return;
     }
 

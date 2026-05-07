@@ -152,7 +152,7 @@ export default function GatePage() {
   };
 
   const canGateIn = selected
-    ? !selected.gateInDate && ["pull_out", "gate_in", "examination", "final_release"].includes(selected.status)
+    ? !selected.gateInDate && ["shipping", "pull_out", "gate_in", "examination", "final_release"].includes(selected.status)
     : false;
   const canGateOut = selected ? !!selected.gateInDate && !selected.gateOutDate : false;
 
