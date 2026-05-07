@@ -1659,10 +1659,16 @@ function AuditLog({ containerId }: { containerId: number }) {
 
 export default function OperationDetailPage({ params }: { params: { id: string } }) {
   const containerId = parseInt(params.id, 10);
-  const { isAdmin, isOperationsUser, isDocumentationUser, isAccountsUser, isTerminalManager, isDeliveryUser } = useAuth();
+  const { isAdmin, isOperationsUser, isDocumentationUser, isAccountsUser, isTerminalManager, isDeliveryUser, isSecurityUser } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const navMutation = useAdvanceContainerStatus();
+
+  // Security users have no business on this page — send them home
+  if (isSecurityUser) {
+    navigate("/gate", { replace: true });
+    return null;
+  }
 
   const { data, isLoading, isError } = useGetContainer(containerId, {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

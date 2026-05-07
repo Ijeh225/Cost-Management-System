@@ -388,52 +388,71 @@ function AlertHistoryRow({ item }: { item: AlertHistoryItem }) {
   const sev = SEVERITY_CONFIG[item.severity] ?? SEVERITY_CONFIG.info;
   const Icon = cfg.icon;
   const [, navigate] = useLocation();
+  const { isSecurityUser } = useAuth();
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const destination = getAlertUrl(item.type, item.containerId ?? undefined);
+  const handleClick = () => {
+    if (isSecurityUser && item.containerId) {
+      setModalOpen(true);
+    } else {
+      navigate(getAlertUrl(item.type, item.containerId ?? undefined));
+    }
+  };
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      onClick={() => navigate(destination)}
-      role="link"
-      tabIndex={0}
-      onKeyDown={e => e.key === "Enter" && navigate(destination)}
-      className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none ${
-        item.isResolved ? "opacity-50 hover:opacity-70" : "hover:bg-primary/[0.025]"
-      }`}
-    >
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border} border`}>
-        <Icon className={`w-4 h-4 ${cfg.color}`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-foreground">{cfg.label}</span>
-            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${sev.className}`}>{sev.label}</Badge>
-            {item.isResolved ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5">
-                <CheckCircle className="w-2.5 h-2.5" /> Resolved
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5">
-                <Circle className="w-2.5 h-2.5 fill-amber-400" /> Active
-              </span>
-            )}
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-[11px] text-muted-foreground">First seen: {formatTime(item.firstSeenAt)}</p>
-            <p className="text-[11px] text-muted-foreground">Last seen: {formatTime(item.lastSeenAt)}</p>
-          </div>
+    <>
+      {isSecurityUser && item.containerId && (
+        <SecurityContainerModal
+          containerId={item.containerId}
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        onClick={handleClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => e.key === "Enter" && handleClick()}
+        className={`group flex items-start gap-4 px-5 py-4 border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none ${
+          item.isResolved ? "opacity-50 hover:opacity-70" : "hover:bg-primary/[0.025]"
+        }`}
+      >
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} ${cfg.border} border`}>
+          <Icon className={`w-4 h-4 ${cfg.color}`} />
         </div>
-        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.message}</p>
-        <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-          <ArrowRight className="w-3 h-3" />
-          {getAlertActionLabel(item.type, item.containerId ?? undefined)}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-foreground">{cfg.label}</span>
+              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${sev.className}`}>{sev.label}</Badge>
+              {item.isResolved ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5">
+                  <CheckCircle className="w-2.5 h-2.5" /> Resolved
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5">
+                  <Circle className="w-2.5 h-2.5 fill-amber-400" /> Active
+                </span>
+              )}
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-[11px] text-muted-foreground">First seen: {formatTime(item.firstSeenAt)}</p>
+              <p className="text-[11px] text-muted-foreground">Last seen: {formatTime(item.lastSeenAt)}</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.message}</p>
+          {!isSecurityUser && (
+            <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+              <ArrowRight className="w-3 h-3" />
+              {getAlertActionLabel(item.type, item.containerId ?? undefined)}
+            </div>
+          )}
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
 }
 
