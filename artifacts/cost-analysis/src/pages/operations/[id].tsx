@@ -1664,16 +1664,24 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   const { toast } = useToast();
   const navMutation = useAdvanceContainerStatus();
 
-  // Security users have no business on this page — send them home
-  if (isSecurityUser) {
-    navigate("/gate", { replace: true });
-    return null;
-  }
-
+  // All hooks must run before any conditional returns
   const { data, isLoading, isError } = useGetContainer(containerId, {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     query: { refetchInterval: 30_000 } as any,
   });
+
+  // Security users have no business on this page — redirect to gate
+  useEffect(() => {
+    if (isSecurityUser) navigate("/gate", { replace: true });
+  }, [isSecurityUser, navigate]);
+
+  if (isSecurityUser) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
