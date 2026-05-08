@@ -499,43 +499,6 @@ function OpsStageTracker({
         </CardContent>
       </Card>
 
-      {/* Submit to Next Stage — only for admins; dept users (terminal/pull_out) advance via their workspace page */}
-      {isAdmin && isEditable && nextStage && ["terminal", "pull_out"].includes(container.status) && (() => {
-        const submitLabel = DEPT_SUBMIT_LABELS["operations_user"]?.[container.status] ?? `Submit to ${getStatusLabel(nextStage)}`;
-        const handleSubmit = async () => {
-          try {
-            await advanceMutation.mutateAsync({ id: container.id, status: nextStage });
-            toast({ title: submitLabel });
-          } catch (err) {
-            toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Failed to advance" });
-          }
-        };
-        return (
-          <Card className="border-primary/20 bg-primary/5 backdrop-blur-sm">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{submitLabel}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Move this job from{" "}
-                    <span className="font-medium text-foreground/70">{getStatusLabel(container.status)}</span>
-                    {" → "}
-                    <span className="font-medium text-primary">{getStatusLabel(nextStage)}</span>
-                  </p>
-                </div>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={advanceMutation.isPending}
-                  className="gap-2 shrink-0"
-                >
-                  {advanceMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
-                  {submitLabel}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
     </div>
   );
 }
@@ -1432,7 +1395,8 @@ function OperationalForm({
       </Card>
       )}
 
-      {isEditable && nextStage && (!deptScope || isAdmin) && (() => {
+      {/* Submit to Next Stage — not shown for terminal/pull_out stages; those actions belong in /workspace/terminal-ops */}
+      {isEditable && nextStage && !["terminal", "pull_out"].includes(container.status) && (!deptScope || isAdmin) && (() => {
         const deptRole = isDocumentationUser ? "documentation_user"
           : isAccountsUser    ? "accounts_user"
           : isTerminalManager ? "terminal_manager"
@@ -1809,14 +1773,14 @@ export default function OperationDetailPage({ params }: { params: { id: string }
     ? new URLSearchParams(window.location.search).get("dept")
     : null;
   // deptScope derivation:
-  // - Admins: use ?dept= if it's a known dept key, else null (no scoping)
+  // - Admins: always null — full view regardless of ?dept= query param
   // - Non-admins with no dept roles: null (no scoping, sees full view)
   // - Non-admins with exactly one allowed dept: always use that dept (ignores query param)
   // - Non-admins with multiple allowed depts (e.g. shipping_terminal_user): honor
   //   ?dept= if it matches one of their depts, else fall back to first dept
   const VALID_DEPTS = Object.values(ROLE_DEPT_MAP).flat();
   const deptScope = isAdmin
-    ? (queryDept && VALID_DEPTS.includes(queryDept) ? queryDept : null)
+    ? null
     : allowedDepts.size === 0
       ? null
       : allowedDepts.size === 1
