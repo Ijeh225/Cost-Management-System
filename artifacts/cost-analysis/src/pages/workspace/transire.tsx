@@ -47,7 +47,7 @@ export default function TransireWorkspace() {
   if (!canAccess) return null;
 
   const allContainers = TRANSIRE_STAGES.flatMap(s =>
-    (data?.stages?.[s] ?? []).map(c => ({ ...c, stage: s }))
+    (data?.stages?.[s] ?? []).filter(c => c.status === s).map(c => ({ ...c, stage: s }))
   );
 
   const filtered = search.trim()
