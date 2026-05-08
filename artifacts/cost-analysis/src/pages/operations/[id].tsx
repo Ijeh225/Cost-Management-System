@@ -229,7 +229,7 @@ const OPS_STAGE_CONFIG: Record<string, {
 
 function OpsStageTracker({
   container, isEditable, daysInStage, stageOwner, setStageOwner,
-  stageActionMut, advanceMutation, updateMutation, toast, deptScope, isAdmin,
+  stageActionMut, advanceMutation, updateMutation, toast,
 }: {
   container: Container;
   isEditable: boolean;
@@ -240,8 +240,6 @@ function OpsStageTracker({
   advanceMutation: ReturnType<typeof useAdvanceContainerStatus>;
   updateMutation: ReturnType<typeof useUpdateContainer>;
   toast: ReturnType<typeof import("@/hooks/use-toast").useToast>["toast"];
-  deptScope: string | null;
-  isAdmin: boolean;
 }) {
   const cfg = OPS_STAGE_CONFIG[container.status];
   const [localExpectedDate, setLocalExpectedDate] = useState(
@@ -1071,8 +1069,6 @@ function OperationalForm({
       advanceMutation={advanceMutation}
       updateMutation={updateMutation}
       toast={toast}
-      deptScope={deptScope}
-      isAdmin={isAdmin}
     />;
   }
 
@@ -1748,17 +1744,8 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   const isPipeline = container.status !== "pending_verification";
 
   // Derive dept scope from the user's role(s) — role-authoritative.
-  // Multi-role users (e.g. shipping_terminal_user) may honor the ?dept= query param
-  // if it corresponds to one of their permitted depts. Single-role users always get
-  // their fixed dept. Admins may use ?dept= freely to preview any dept view.
-  const ROLE_DEPT_MAP: Record<string, string[]> = {
-    shipping_user:          ["shipping"],
-    shipping_terminal_user: ["shipping", "terminal"],
-    terminal_user:          ["terminal"],
-    pull_out_user:          ["pull-out"],
-    transire_user:          ["transire"],
-    operations_user:        ["transire"],
-  };
+  // Multi-role users (e.g. shipping_terminal_user) may honor the ?dept= query param.
+  // Admins always get null (full view).
   const { isShippingTerminalUser, isTransireUser } = useAuth();
   // Build the set of dept keys this user is allowed to scope to
   const allowedDepts = new Set<string>([
@@ -1778,7 +1765,6 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   // - Non-admins with exactly one allowed dept: always use that dept (ignores query param)
   // - Non-admins with multiple allowed depts (e.g. shipping_terminal_user): honor
   //   ?dept= if it matches one of their depts, else fall back to first dept
-  const VALID_DEPTS = Object.values(ROLE_DEPT_MAP).flat();
   const deptScope = isAdmin
     ? null
     : allowedDepts.size === 0
