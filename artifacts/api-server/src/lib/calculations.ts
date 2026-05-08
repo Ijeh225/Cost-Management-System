@@ -13,7 +13,11 @@ export function sumShipping(s: NumericRecord): number {
 }
 
 export function sumCustoms(c: NumericRecord): number {
-  return toNum(c.duty) + toNum(c.dutyPaid) + toNum(c.valuation) + toNum(c.ciu) +
+  // `duty` is the total assessed customs duty (what is owed).
+  // `dutyPaid` and `dutyNotPaid` are payment-status fields that together equal `duty`
+  // — they are NOT additional cost lines. Including them would double-count the
+  // paid portion. Customs cost = `duty` (assessed) + the other line items below.
+  return toNum(c.duty) + toNum(c.valuation) + toNum(c.ciu) +
     toNum(c.upCountryCustom) + toNum(c.dciu) + toNum(c.mdReleasingPackage) +
     toNum(c.ocSettlement) + toNum(c.ocReleaseLocal) + toNum(c.dcEnforcementForTransire) +
     toNum(c.complianceTeam) + toNum(c.cacSettlement) + toNum(c.crffn) + toNum(c.soncap) +

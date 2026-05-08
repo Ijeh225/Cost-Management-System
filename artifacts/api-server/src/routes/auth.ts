@@ -1,5 +1,5 @@
 import { Router } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { db, usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import {
@@ -22,10 +22,12 @@ const loginLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   skipSuccessfulRequests: true,
-  // Key by email so each account has its own bucket (avoids shared-IP proxy issues)
+  // Key by email so each account has its own bucket (avoids shared-IP proxy issues).
+  // Falls back to IP — use ipKeyGenerator helper so IPv6 addresses are normalised.
   keyGenerator: (req) => {
     const email = (req.body?.email ?? "").toString().toLowerCase().trim();
-    return email || req.ip || "unknown";
+    if (email) return email;
+    return ipKeyGenerator(req.ip ?? "") || "unknown";
   },
 });
 

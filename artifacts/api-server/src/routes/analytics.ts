@@ -45,7 +45,9 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
     const oMap = idx(allOps);
 
     const SHIPPING_KEYS   = ["shippingCompany","shippingPaymentVat","consignee","finalInvoiceShippingCompany","telexCharge","shippingRunnings","shippingDetentionToBePaidByCustomer"];
-    const CUSTOMS_KEYS    = ["duty","dutyPaid","dutyNotPaid","valuation","ciu","upCountryCustom","dciu","mdReleasingPackage","ocSettlement","ocReleaseLocal","dcEnforcementForTransire","complianceTeam","cacSettlement","crffn","soncap","alerts","examinationBonus"];
+    // `dutyPaid`/`dutyNotPaid` are payment-status fields that together equal `duty`,
+    // not additional cost lines — including them would double-count the paid portion.
+    const CUSTOMS_KEYS    = ["duty","valuation","ciu","upCountryCustom","dciu","mdReleasingPackage","ocSettlement","ocReleaseLocal","dcEnforcementForTransire","complianceTeam","cacSettlement","crffn","soncap","alerts","examinationBonus"];
     const TERMINAL_KEYS   = ["terminalCharges","terminalAdditions1","ikorouduTerminalAdditions2","terminalDemurrageToBePaidByCustomer","terminalPaymentVat","wharfageFeeForNpa","sifaxGmtSigning","tsDcAdmin","tincanBond","bond","manifest"];
     const DELIVERY_KEYS   = ["passingOfTruck","passingOfTruckForEmptyReturn","parkingForPullout","pullout","delivery","emptyReturn","unchainingTruck","emptyCallUp","pulloutExpenses","transferToIkorodu","transportAllowance"];
     const OPERATIONS_KEYS = ["fouBooking","fou","scanningToPhysical","security","additionalDeliveryExpenses","miscellaneous","abandoned","agenciesBlocks","callUp","transireRunnings","officePtml","freshPayment"];
@@ -123,7 +125,7 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
       .map(u => {
         const assigned = allContainers.filter(c => c.assignedStaffId === u.id).length;
         const submitted = allApprovals.filter(a => a.submittedById === u.id).length;
-        const approved  = allApprovals.filter(a => a.approvedById === u.id).length;
+        const approved  = allApprovals.filter(a => a.reviewedById === u.id && a.status === "approved").length;
         const rejected  = allApprovals.filter(a => a.status === "rejected" && a.submittedById === u.id).length;
         return { userId: u.id, name: u.name, containersAssigned: assigned, sectionsSubmitted: submitted, sectionsApproved: approved, sectionsRejected: rejected };
       })
