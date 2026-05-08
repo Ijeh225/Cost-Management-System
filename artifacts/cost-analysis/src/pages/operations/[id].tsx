@@ -1790,10 +1790,11 @@ export default function OperationDetailPage({ params }: { params: { id: string }
     transire_user:          "transire",
     operations_user:        "transire",
   };
-  const roleDerivedDept = isShippingUser  ? "shipping"
+  const { isShippingTerminalUser, isTransireUser } = useAuth();
+  const roleDerivedDept = isShippingUser || isShippingTerminalUser ? "shipping"
     : isTerminalUser  ? "terminal"
     : isPullOutUser   ? "pull-out"
-    : isOperationsUser ? "transire"
+    : isTransireUser || isOperationsUser ? "transire"
     : null;
   const queryDept = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("dept")
