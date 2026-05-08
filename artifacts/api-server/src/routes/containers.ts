@@ -783,6 +783,19 @@ const DEPT_OWNED_STAGES: Record<string, string[]> = {
   delivery_user: ["delivery"],
 };
 
+// Roles permitted to perform status ADVANCEMENT (moving the container to the next stage).
+// transire_user and operations_user are data-entry only — they may NOT advance pipeline status.
+const STAGE_ADVANCE_ALLOWED: Record<string, string[]> = {
+  documentation_user: ["registered", "documentation", "duty_assessment"],
+  accounts_user: ["duty_payment"],
+  shipping_user: ["shipping"],
+  terminal_user: ["terminal"],
+  pull_out_user: ["pull_out"],
+  shipping_terminal_user: ["shipping", "terminal"],
+  terminal_manager: ["gate_in", "examination", "final_release"],
+  delivery_user: ["delivery"],
+};
+
 router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -821,15 +834,15 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
 
     if (!isAdmin) {
       // Non-admin dept users: arbitrary stage navigation is not permitted.
-      // Only the natural forward advance from a stage the user owns is allowed.
+      // Only the natural forward advance from a stage the user is allowed to advance is permitted.
       if (isNavigation) {
         res.status(403).json({ error: "Stage navigation is restricted to administrators." });
         return;
       }
       const userRoles: string[] = req.user!.roles ?? [userRole];
-      const allowedStages = [...new Set(userRoles.flatMap(r => DEPT_OWNED_STAGES[r] ?? []))];
-      // Forward advance: check that the CURRENT stage is within the user's owned stages
-      if (!allowedStages.includes(existing.status)) {
+      const advanceAllowed = [...new Set(userRoles.flatMap(r => STAGE_ADVANCE_ALLOWED[r] ?? []))];
+      // Forward advance: current stage must be in the user's advancement-allowed stages
+      if (!advanceAllowed.includes(existing.status)) {
         res.status(403).json({ error: "You don't have permission to advance this container from its current stage" });
         return;
       }
@@ -1296,15 +1309,15 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (size !== undefined) updates.size = size;
     if (vessel !== undefined) updates.vessel = vessel;
     // Status changes via PUT: admins can set any status freely.
-    // Non-admin dept users may only perform the natural forward advance from their owned stage.
+    // Non-admin dept users may only perform the natural forward advance from stages they're allowed to advance.
     if (status !== undefined) {
       if (!isAdmin) {
         const userRoles: string[] = req.user!.roles ?? [userRole];
-        const allowedStages = [...new Set(userRoles.flatMap(r => DEPT_OWNED_STAGES[r] ?? []))];
+        const advanceAllowed = [...new Set(userRoles.flatMap(r => STAGE_ADVANCE_ALLOWED[r] ?? []))];
         const currentIdx = PIPELINE_STAGE_ORDER.indexOf(existing.status);
         const naturalNext = currentIdx !== -1 ? PIPELINE_STAGE_ORDER[currentIdx + 1] : undefined;
-        // Allow only if: current stage is owned by user AND requested status is the natural next stage
-        if (!allowedStages.includes(existing.status) || status !== naturalNext) {
+        // Allow only if: current stage is in advancement-allowed set AND requested status is the natural next stage
+        if (!advanceAllowed.includes(existing.status) || status !== naturalNext) {
           res.status(403).json({ error: "You can only advance this container from its current stage to the next stage." });
           return;
         }

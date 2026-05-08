@@ -145,7 +145,7 @@ export default function OverheadExpensesPage() {
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<any | null>(null);
+  const [editTarget, setEditTarget] = useState<OverheadExpense | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const canAccess = isAdmin || isAccountsUser;

@@ -499,8 +499,8 @@ function OpsStageTracker({
         </CardContent>
       </Card>
 
-      {/* Submit to Next Stage — only for admin or non-dept views; dept users advance via their workspace page */}
-      {isEditable && nextStage && ["terminal", "pull_out"].includes(container.status) && (!deptScope || isAdmin) && (() => {
+      {/* Submit to Next Stage — only for admins; dept users (terminal/pull_out) advance via their workspace page */}
+      {isAdmin && isEditable && nextStage && ["terminal", "pull_out"].includes(container.status) && (() => {
         const submitLabel = DEPT_SUBMIT_LABELS["operations_user"]?.[container.status] ?? `Submit to ${getStatusLabel(nextStage)}`;
         const handleSubmit = async () => {
           try {

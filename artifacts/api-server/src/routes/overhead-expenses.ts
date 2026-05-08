@@ -5,7 +5,12 @@ import { requireAdmin, AuthRequest } from "../lib/auth.js";
 
 export const overheadExpensesRouter = Router();
 
-function formatExpense(row: any, bankName?: string | null, recordedByName?: string | null) {
+type ExpenseRow = {
+  id: number; category: string; description: string; amount: string | null;
+  bankId: number | null; paidAt: Date | string; reference: string | null;
+  recordedBy: number | null; createdAt: Date | string; updatedAt: Date | string;
+};
+function formatExpense(row: ExpenseRow, bankName?: string | null, recordedByName?: string | null) {
   return {
     id: row.id,
     category: row.category,
@@ -28,7 +33,7 @@ overheadExpensesRouter.get("/overhead-expenses", requireAdmin, async (req: AuthR
     const from = req.query.from as string | undefined;
     const to = req.query.to as string | undefined;
 
-    const conditions: any[] = [];
+    const conditions: ReturnType<typeof eq>[] = [];
     if (category && category !== "all") conditions.push(eq(overheadExpensesTable.category, category));
     if (from) conditions.push(gte(overheadExpensesTable.paidAt, new Date(from)));
     if (to) {
@@ -107,7 +112,7 @@ overheadExpensesRouter.patch("/overhead-expenses/:id", requireAdmin, async (req:
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const { category, description, amount, bankId, paidAt, reference } = req.body;
-    const updates: any = { updatedAt: new Date() };
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (category !== undefined) updates.category = category;
     if (description !== undefined) updates.description = description;
     if (amount !== undefined) updates.amount = String(amount);
