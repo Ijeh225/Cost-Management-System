@@ -49,7 +49,7 @@ export default function ShippingWorkspace() {
   if (!canAccess) return null;
 
   const allContainers = SHIPPING_STAGES.flatMap(s =>
-    (data?.stages?.[s] ?? []).map(c => ({ ...c, stage: s }))
+    (data?.stages?.[s] ?? []).filter(c => c.status === s).map(c => ({ ...c, stage: s }))
   );
 
   const filtered = search.trim()

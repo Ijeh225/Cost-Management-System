@@ -1285,15 +1285,24 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       res.status(403).json({ error: "Container is locked" });
       return;
     }
+    const userRole = req.user!.role;
+    const isAdmin = userRole === "admin" || userRole === "super_admin";
     const { customerName, containerNumber, blNumber, declaration, size, vessel, status, assignedStaffId, clearingCharges, deliveredAt, eta, consignee } = req.body;
-    const updates: any = { updatedAt: new Date() };
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (customerName !== undefined) updates.customerName = customerName;
     if (containerNumber !== undefined) updates.containerNumber = containerNumber;
     if (blNumber !== undefined) updates.blNumber = blNumber;
     if (declaration !== undefined) updates.declaration = declaration;
     if (size !== undefined) updates.size = size;
     if (vessel !== undefined) updates.vessel = vessel;
-    if (status !== undefined) updates.status = status;
+    // Status changes via PUT are restricted to admins — all other roles must use PATCH /status
+    if (status !== undefined) {
+      if (!isAdmin) {
+        res.status(403).json({ error: "Only administrators can change status directly. Use the advance action instead." });
+        return;
+      }
+      updates.status = status;
+    }
     if (assignedStaffId !== undefined) updates.assignedStaffId = assignedStaffId;
     if (clearingCharges !== undefined) updates.clearingCharges = String(clearingCharges);
     if (deliveredAt !== undefined) {
