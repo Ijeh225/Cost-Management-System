@@ -19,7 +19,7 @@ import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
   ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, Activity, BookOpen, FileCheck2,
   Truck, Kanban, Banknote, Anchor, Ship, PackageOpen, ChevronDown, ShieldCheck,
-  Sun, Moon,
+  Sun, Moon, Landmark,
 } from "lucide-react";
 
 type NavItem = {
@@ -75,6 +75,7 @@ export function AppSidebar() {
     { title: "Pipeline Board",   url: "/pipeline",               icon: Kanban          },
     { title: "Analytics",        url: "/analytics",              icon: BarChart2       },
     { title: "Reports",          url: "/reports",                icon: FileDown        },
+    { title: "Bank Management",  url: "/banks",                  icon: Landmark        },
     { title: "Upload Data",      url: "/containers/upload",      icon: UploadCloud     },
     { title: "User Management",  url: "/users",                  icon: Users           },
     ...(isSuperAdmin ? [{ title: "Settings", url: "/settings", icon: Settings }] : []),

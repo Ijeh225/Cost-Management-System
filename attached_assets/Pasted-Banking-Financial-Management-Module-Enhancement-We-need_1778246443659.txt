@@ -1,0 +1,111 @@
+Banking & Financial Management Module Enhancement
+We need to introduce a centralized Banking System into the application that integrates fully with the accounting, invoicing, wallet, and reporting modules.
+🏦 1. Bank Management Section
+At the top area of the dashboard (around the username/header section), create a dedicated Bank Management Bar where banks can be created and displayed dynamically.
+Examples:
+Zenith Bank
+UBA
+GTBank
+Access Bank
+Etc.
+Requirements
+Admin users should be able to:
+Create banks
+Edit banks
+Disable/remove banks
+Once created, the bank should automatically appear in the top dashboard bank section.
+💰 2. Bank Integration Across the System
+The created banks must synchronize across all financial modules in the application.
+Areas where banks should appear:
+A. Wallet Funding / Client Credit
+When crediting a client wallet:
+User selects:
+Transaction Type
+Bank
+Amount
+The list of selectable banks should come from the banks created in the system.
+Once transaction is completed:
+The bank balance should update automatically
+Wallet transaction should reflect in accounting records
+B. Invoice Payment Recording
+When recording invoice payments:
+User selects:
+Invoice
+Bank received into
+Amount paid
+Once saved:
+The selected bank ledger should update automatically
+Accounting records should synchronize immediately
+🔄 3. Internal Bank Transfers
+Introduce a feature that allows movement of funds between company bank accounts directly within the application.
+Example:
+Transfer from Zenith Bank → UBA
+Requirements:
+Select source bank
+Select destination bank
+Enter amount
+Add narration/reference
+System automatically:
+Debits source bank
+Credits destination bank
+Creates accounting journal entry
+Updates balances in real time
+📊 4. Full Accounting Synchronization
+The banking system must synchronize completely with:
+Accounting module
+Wallet transactions
+Invoice payments
+Accounts receivable
+Financial reports
+Client ledgers
+Expense tracking
+Revenue tracking
+Every bank-related transaction should automatically generate proper accounting entries.
+📥 5. Bank Transaction History & Downloads
+Each bank should have:
+Transaction history page
+Running balance
+Filter by:
+Date
+Transaction type
+User
+Reference
+Client
+Export Features
+Users should be able to download:
+Bank transaction reports
+Statements
+Filtered transaction history
+Formats:
+PDF
+Excel
+CSV
+📑 6. Accounts Receivable Statement Integration
+Since the system already has an Accounts Receivable module:
+In the Reports section, users should be able to:
+Download customer statements
+Download outstanding balances
+Generate receivable statements by:
+Client
+Date range
+Invoice status
+This should synchronize with:
+Payments received
+Wallet credits
+Bank transactions
+Outstanding invoices
+🧠 7. Smart Financial Structure
+The system should behave like a proper accounting ERP.
+Meaning:
+Every financial activity should affect the correct ledger automatically
+No duplicate entries
+Real-time balance updates
+Full audit trail for all transactions
+Proper synchronization between operational and financial modules
+🎯 Objective
+The goal is to transform the system into a fully connected operational and accounting platform where:
+Banks are centrally managed
+Transactions flow automatically
+Reports are downloadable
+Financial records remain synchronized across the entire application
+Management can track cash flow, receivables, payments, and balances in real time

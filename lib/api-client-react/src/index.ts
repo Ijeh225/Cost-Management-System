@@ -1,5 +1,6 @@
 export * from "./generated/api";
 export * from "./generated/api.schemas";
+export * from "./banks";
 export * from "./clients";
 export * from "./settings";
 export * from "./invoices";
