@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, invoicesTable, invoicePaymentsTable, clientsTable } from "@workspace/db";
-import { eq, gte, lte, and, inArray, type SQL } from "drizzle-orm";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, invoicesTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable } from "@workspace/db";
+import { eq, gte, lte, and, inArray, gt, type SQL } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
@@ -302,6 +302,239 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireAdmin, async (req:
       period: { from: from ?? null, to: to ?? null },
       invoices: rows,
       totals: { totalSubtotal, totalVat, totalInvoiced },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { from, to, bankId } = req.query as Record<string, string>;
+
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to + "T23:59:59") : null;
+    const bankIdNum = bankId && bankId !== "all" ? parseInt(bankId, 10) : null;
+
+    // INFLOWS — invoice_payments
+    const invPayConds: SQL[] = [];
+    if (fromDate) invPayConds.push(gte(invoicePaymentsTable.paidAt, fromDate));
+    if (toDate)   invPayConds.push(lte(invoicePaymentsTable.paidAt, toDate));
+    if (bankIdNum !== null) invPayConds.push(eq(invoicePaymentsTable.bankId, bankIdNum));
+
+    const invoicePaymentRows = await db
+      .select({
+        id: invoicePaymentsTable.id,
+        amount: invoicePaymentsTable.amount,
+        paidAt: invoicePaymentsTable.paidAt,
+        paymentMethod: invoicePaymentsTable.paymentMethod,
+        reference: invoicePaymentsTable.reference,
+        notes: invoicePaymentsTable.notes,
+        bankId: invoicePaymentsTable.bankId,
+        bankName: banksTable.name,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        clientName: clientsTable.name,
+      })
+      .from(invoicePaymentsTable)
+      .leftJoin(banksTable, eq(invoicePaymentsTable.bankId, banksTable.id))
+      .leftJoin(invoicesTable, eq(invoicePaymentsTable.invoiceId, invoicesTable.id))
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(invPayConds.length > 0 ? and(...invPayConds) : undefined)
+      .orderBy(invoicePaymentsTable.paidAt);
+
+    // INFLOWS — client_deposits
+    const depConds: SQL[] = [];
+    if (fromDate) depConds.push(gte(clientDepositsTable.createdAt, fromDate));
+    if (toDate)   depConds.push(lte(clientDepositsTable.createdAt, toDate));
+    if (bankIdNum !== null) depConds.push(eq(clientDepositsTable.bankId, bankIdNum));
+
+    const depositRows = await db
+      .select({
+        id: clientDepositsTable.id,
+        amount: clientDepositsTable.amount,
+        createdAt: clientDepositsTable.createdAt,
+        paymentMethod: clientDepositsTable.paymentMethod,
+        reference: clientDepositsTable.reference,
+        notes: clientDepositsTable.notes,
+        bankId: clientDepositsTable.bankId,
+        bankName: banksTable.name,
+        clientName: clientsTable.name,
+      })
+      .from(clientDepositsTable)
+      .leftJoin(banksTable, eq(clientDepositsTable.bankId, banksTable.id))
+      .leftJoin(clientsTable, eq(clientDepositsTable.clientId, clientsTable.id))
+      .where(depConds.length > 0 ? and(...depConds) : undefined)
+      .orderBy(clientDepositsTable.createdAt);
+
+    // OUTFLOWS — overhead_expenses
+    const ohConds: SQL[] = [];
+    if (fromDate) ohConds.push(gte(overheadExpensesTable.paidAt, fromDate));
+    if (toDate)   ohConds.push(lte(overheadExpensesTable.paidAt, toDate));
+    if (bankIdNum !== null) ohConds.push(eq(overheadExpensesTable.bankId, bankIdNum));
+
+    const overheadRows = await db
+      .select({
+        id: overheadExpensesTable.id,
+        amount: overheadExpensesTable.amount,
+        paidAt: overheadExpensesTable.paidAt,
+        category: overheadExpensesTable.category,
+        description: overheadExpensesTable.description,
+        reference: overheadExpensesTable.reference,
+        bankId: overheadExpensesTable.bankId,
+        bankName: banksTable.name,
+      })
+      .from(overheadExpensesTable)
+      .leftJoin(banksTable, eq(overheadExpensesTable.bankId, banksTable.id))
+      .where(ohConds.length > 0 ? and(...ohConds) : undefined)
+      .orderBy(overheadExpensesTable.paidAt);
+
+    // OUTFLOWS — duty payments (no per-payment history; use customs_charges.dutyPaid as snapshot,
+    // dated by customs_charges.updatedAt). Bank attribution unavailable for duty payments.
+    const dutyConds: SQL[] = [gt(customsChargesTable.dutyPaid, "0")];
+    if (fromDate) dutyConds.push(gte(customsChargesTable.updatedAt, fromDate));
+    if (toDate)   dutyConds.push(lte(customsChargesTable.updatedAt, toDate));
+
+    const dutyRows = bankIdNum !== null ? [] : await db
+      .select({
+        id: customsChargesTable.id,
+        dutyPaid: customsChargesTable.dutyPaid,
+        updatedAt: customsChargesTable.updatedAt,
+        containerNumber: containersTable.containerNumber,
+        blNumber: containersTable.blNumber,
+      })
+      .from(customsChargesTable)
+      .leftJoin(containersTable, eq(customsChargesTable.containerId, containersTable.id))
+      .where(and(...dutyConds))
+      .orderBy(customsChargesTable.updatedAt);
+
+    type Txn = {
+      id: string;
+      date: string;
+      type: "invoice_payment" | "client_deposit" | "overhead_expense" | "duty_payment";
+      direction: "in" | "out";
+      description: string;
+      category: string | null;
+      bankId: number | null;
+      bankName: string | null;
+      reference: string | null;
+      amount: number;
+    };
+
+    const inflows: Txn[] = [];
+    const outflows: Txn[] = [];
+
+    for (const r of invoicePaymentRows) {
+      inflows.push({
+        id: `ip-${r.id}`,
+        date: r.paidAt instanceof Date ? r.paidAt.toISOString() : String(r.paidAt),
+        type: "invoice_payment",
+        direction: "in",
+        description: `Invoice ${r.invoiceNumber ?? ""} payment${r.clientName ? ` — ${r.clientName}` : ""}`,
+        category: r.paymentMethod ?? null,
+        bankId: r.bankId,
+        bankName: r.bankName,
+        reference: r.reference ?? null,
+        amount: parseFloat(r.amount as string ?? "0"),
+      });
+    }
+
+    for (const r of depositRows) {
+      inflows.push({
+        id: `cd-${r.id}`,
+        date: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+        type: "client_deposit",
+        direction: "in",
+        description: `Wallet deposit${r.clientName ? ` — ${r.clientName}` : ""}`,
+        category: r.paymentMethod ?? null,
+        bankId: r.bankId,
+        bankName: r.bankName,
+        reference: r.reference ?? null,
+        amount: parseFloat(r.amount as string ?? "0"),
+      });
+    }
+
+    for (const r of overheadRows) {
+      outflows.push({
+        id: `oh-${r.id}`,
+        date: r.paidAt instanceof Date ? r.paidAt.toISOString() : String(r.paidAt),
+        type: "overhead_expense",
+        direction: "out",
+        description: r.description ?? "",
+        category: r.category ?? null,
+        bankId: r.bankId,
+        bankName: r.bankName,
+        reference: r.reference ?? null,
+        amount: parseFloat(r.amount as string ?? "0"),
+      });
+    }
+
+    for (const r of dutyRows) {
+      outflows.push({
+        id: `dp-${r.id}`,
+        date: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : String(r.updatedAt),
+        type: "duty_payment",
+        direction: "out",
+        description: `Duty paid — Container ${r.containerNumber ?? ""}${r.blNumber ? ` (BL ${r.blNumber})` : ""}`,
+        category: "Customs Duty",
+        bankId: null,
+        bankName: null,
+        reference: null,
+        amount: parseFloat(r.dutyPaid as string ?? "0"),
+      });
+    }
+
+    inflows.sort((a, b) => a.date.localeCompare(b.date));
+    outflows.sort((a, b) => a.date.localeCompare(b.date));
+
+    const totalIn = inflows.reduce((s, t) => s + t.amount, 0);
+    const totalOut = outflows.reduce((s, t) => s + t.amount, 0);
+
+    // Per-bank breakdown
+    const bankBreakdown: Record<string, { bankId: number | null; bankName: string; totalIn: number; totalOut: number }> = {};
+    const bumpBank = (bankId: number | null, bankName: string | null, amount: number, dir: "in" | "out") => {
+      const key = bankId === null ? "unassigned" : String(bankId);
+      const label = bankName ?? "Unassigned";
+      if (!bankBreakdown[key]) bankBreakdown[key] = { bankId, bankName: label, totalIn: 0, totalOut: 0 };
+      if (dir === "in") bankBreakdown[key].totalIn += amount;
+      else bankBreakdown[key].totalOut += amount;
+    };
+    inflows.forEach(t => bumpBank(t.bankId, t.bankName, t.amount, "in"));
+    outflows.forEach(t => bumpBank(t.bankId, t.bankName, t.amount, "out"));
+
+    // Per-category outflow breakdown
+    const outflowByCategory: Record<string, number> = {};
+    for (const t of outflows) {
+      const cat = t.category ?? "Other";
+      outflowByCategory[cat] = (outflowByCategory[cat] ?? 0) + t.amount;
+    }
+
+    // Per-type inflow breakdown
+    const inflowByType: Record<string, number> = {
+      invoice_payment: 0,
+      client_deposit: 0,
+    };
+    for (const t of inflows) inflowByType[t.type] = (inflowByType[t.type] ?? 0) + t.amount;
+
+    // List of banks (for filter dropdown convenience)
+    const allBanks = await db.select({ id: banksTable.id, name: banksTable.name }).from(banksTable);
+
+    return res.json({
+      period: { from: from ?? null, to: to ?? null },
+      filters: { bankId: bankIdNum },
+      inflows,
+      outflows,
+      totals: {
+        totalIn,
+        totalOut,
+        netCashFlow: totalIn - totalOut,
+      },
+      breakdown: {
+        byBank: Object.values(bankBreakdown),
+        outflowByCategory,
+        inflowByType,
+      },
+      banks: allBanks,
     });
   } catch (err) {
     console.error(err);
