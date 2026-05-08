@@ -1925,7 +1925,7 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             </p>
             <StageRail
               currentStatus={container.status}
-              onNavigate={(isAdmin || isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser || isShippingUser || isTerminalUser || isPullOutUser) ? handleStageNavigate : undefined}
+              onNavigate={isAdmin ? handleStageNavigate : undefined}
               isAdmin={isAdmin ?? false}
               isOperationsUser={(isOperationsUser || isShippingUser || isTerminalUser || isPullOutUser) ?? false}
               isDocumentationUser={isDocumentationUser ?? false}
