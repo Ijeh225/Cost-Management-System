@@ -1316,7 +1316,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       deliveryTime, deliveryLocation, truckNumber, driverName, driverPhone,
       dispatchOfficer, deliveryStatus, offloadingConfirmed, emptyReturnDueDate, emptyReturnDate,
       paarNumber, paarOfficer, paarReleasedAt, paarDelayReason,
-      eta, consignee,
+      eta, consignee, tdoReleasedAt,
     } = req.body;
     if (deliveredAt !== undefined && deliveredAt !== null) {
       if (typeof deliveredAt !== "string" || !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(deliveredAt) || isNaN(new Date(deliveredAt).getTime())) {
@@ -1410,6 +1410,18 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (consignee !== undefined) {
       updates.consignee = consignee || null;
       changed.push(`Consignee: "${consignee || "cleared"}"`);
+    }
+    if (tdoReleasedAt !== undefined) {
+      if (tdoReleasedAt !== null && tdoReleasedAt !== "") {
+        if (typeof tdoReleasedAt !== "string" || isNaN(new Date(tdoReleasedAt as string).getTime())) {
+          res.status(400).json({ error: "Invalid tdoReleasedAt — expected ISO 8601 date format" });
+          return;
+        }
+        updates.tdoReleasedAt = new Date(tdoReleasedAt as string);
+        changed.push(`TDO Released: ${tdoReleasedAt}`);
+      } else {
+        updates.tdoReleasedAt = null;
+      }
     }
     if (Object.keys(updates).length === 1) {
       res.status(400).json({ error: "No valid fields to update" });
