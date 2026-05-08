@@ -119,6 +119,50 @@ export function useGetInvoiceAging() {
   });
 }
 
+export type CashFlowTxn = {
+  id: string;
+  date: string;
+  type: "invoice_payment" | "client_deposit" | "overhead_expense" | "duty_payment";
+  direction: "in" | "out";
+  description: string;
+  category: string | null;
+  bankId: number | null;
+  bankName: string | null;
+  reference: string | null;
+  amount: number;
+};
+
+export type CashFlowResponse = {
+  period: { from: string | null; to: string | null };
+  filters: { bankId: number | null };
+  inflows: CashFlowTxn[];
+  outflows: CashFlowTxn[];
+  totals: {
+    totalIn: number;
+    totalOut: number;
+    netCashFlow: number;
+  };
+  breakdown: {
+    byBank: Array<{ bankId: number | null; bankName: string; totalIn: number; totalOut: number }>;
+    outflowByCategory: Record<string, number>;
+    inflowByType: Record<string, number>;
+  };
+  banks: Array<{ id: number; name: string }>;
+};
+
+export function useGetCashFlow(params: { from?: string; to?: string; bankId?: string }) {
+  return useQuery<CashFlowResponse>({
+    queryKey: ["/api/reports/cashflow", params.from, params.to, params.bankId],
+    queryFn: async () => {
+      const qs = new URLSearchParams();
+      if (params.from) qs.set("from", params.from);
+      if (params.to) qs.set("to", params.to);
+      if (params.bankId && params.bankId !== "all") qs.set("bankId", params.bankId);
+      return customFetch(`/api/reports/cashflow?${qs}`);
+    },
+  });
+}
+
 export type DeliveryAnalyticsItem = {
   id: number;
   containerNumber: string;

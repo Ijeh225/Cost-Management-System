@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, type DeliveryAnalyticsResponse } from "@workspace/api-client-react";
+import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, type DeliveryAnalyticsResponse } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -547,11 +547,15 @@ function DeliveryReportSection() {
 
 function PrintableReportsSection() {
   const { data: clients = [] } = useListClients();
+  const { data: banks = [] } = useListBanks();
   const [csClientId, setCsClientId] = useState("");
   const [csFrom, setCsFrom] = useState("");
   const [csTo, setCsTo] = useState("");
   const [vatFrom, setVatFrom] = useState("");
   const [vatTo, setVatTo] = useState("");
+  const [cfFrom, setCfFrom] = useState("");
+  const [cfTo, setCfTo] = useState("");
+  const [cfBankId, setCfBankId] = useState("all");
 
   const openReport = (path: string, params: Record<string, string>) => {
     const qs = new URLSearchParams();
@@ -568,7 +572,7 @@ function PrintableReportsSection() {
         </h2>
         <p className="text-xs text-muted-foreground">Generate formatted documents that open in a new tab, ready to print or save as PDF.</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Client Statement */}
         <Card className="border-border/50 bg-card/40">
           <CardHeader className="pb-3 border-b border-border/40">
@@ -662,6 +666,49 @@ function PrintableReportsSection() {
               onClick={() => openReport("/reports/invoice-aging/print", {})}
             >
               <ExternalLink className="w-3.5 h-3.5" /> Generate Aging Report
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Cash Flow */}
+        <Card className="border-border/50 bg-card/40">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-emerald-400" /> Cash Flow Statement
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">Inflow (payments + deposits) vs outflow (overheads + duty), with bank breakdown and net position.</p>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">From</Label>
+                <Input type="date" value={cfFrom} onChange={e => setCfFrom(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">To</Label>
+                <Input type="date" value={cfTo} onChange={e => setCfTo(e.target.value)} className="h-8 text-xs" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Bank</Label>
+              <Select value={cfBankId} onValueChange={setCfBankId}>
+                <SelectTrigger className="h-8 text-xs border-border/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Banks</SelectItem>
+                  {banks.map(b => (
+                    <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              size="sm"
+              className="w-full gap-2 text-xs h-8"
+              onClick={() => openReport("/reports/cashflow/print", { from: cfFrom, to: cfTo, bankId: cfBankId })}
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Generate Cash Flow
             </Button>
           </CardContent>
         </Card>

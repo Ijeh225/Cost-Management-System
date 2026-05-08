@@ -313,9 +313,26 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
   try {
     const { from, to, bankId } = req.query as Record<string, string>;
 
-    const fromDate = from ? new Date(from) : null;
-    const toDate = to ? new Date(to + "T23:59:59") : null;
-    const bankIdNum = bankId && bankId !== "all" ? parseInt(bankId, 10) : null;
+    let fromDate: Date | null = null;
+    let toDate: Date | null = null;
+    if (from) {
+      fromDate = new Date(from);
+      if (isNaN(fromDate.getTime())) return res.status(400).json({ error: "Invalid 'from' date" });
+    }
+    if (to) {
+      toDate = new Date(to + "T23:59:59");
+      if (isNaN(toDate.getTime())) return res.status(400).json({ error: "Invalid 'to' date" });
+    }
+    if (fromDate && toDate && fromDate > toDate) {
+      return res.status(400).json({ error: "'from' must be on or before 'to'" });
+    }
+
+    let bankIdNum: number | null = null;
+    if (bankId && bankId !== "all") {
+      if (!/^\d+$/.test(bankId)) return res.status(400).json({ error: "Invalid bankId" });
+      bankIdNum = parseInt(bankId, 10);
+      if (!Number.isFinite(bankIdNum) || bankIdNum <= 0) return res.status(400).json({ error: "Invalid bankId" });
+    }
 
     // INFLOWS — invoice_payments
     const invPayConds: SQL[] = [];
