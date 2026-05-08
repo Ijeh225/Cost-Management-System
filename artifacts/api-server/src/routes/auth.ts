@@ -181,24 +181,5 @@ router.post("/auth/setup", async (req, res) => {
   }
 });
 
-router.post("/auth/emergency-reset", async (req, res) => {
-  const { token } = req.body;
-  if (token !== "RESET_SUPER_ADMIN_9x7z2q") {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
-  try {
-    const hash = await hashPassword("Admin2026!");
-    const result = await db
-      .update(usersTable)
-      .set({ passwordHash: hash, updatedAt: new Date() })
-      .where(eq(usersTable.email, "ijehifeany@gmail.com"))
-      .returning({ id: usersTable.id, email: usersTable.email });
-    res.json({ ok: true, updated: result });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
 export { router as authRouter };
 export { hashPassword };
