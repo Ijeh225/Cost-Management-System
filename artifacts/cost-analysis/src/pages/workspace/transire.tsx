@@ -39,7 +39,7 @@ export default function TransireWorkspace() {
 
   const { data, isLoading } = useGetPipeline({ query: { refetchInterval: 30_000 } });
 
-  const canAccess = isAdmin || isTransireUser;
+  const canAccess = isAdmin || isTransireUser || isOperationsUser;
   useEffect(() => {
     if (!canAccess) setLocation("/");
   }, [canAccess]);
@@ -161,7 +161,7 @@ export default function TransireWorkspace() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <Link href={`/operations/${c.id}`}>
+                        <Link href={`/operations/${c.id}?dept=transire`}>
                           <Button size="sm" variant="outline" className="gap-1 text-xs h-8">
                             View Job <ChevronRight className="w-3 h-3" />
                           </Button>

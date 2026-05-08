@@ -32,7 +32,7 @@ function DaysChip({ days }: { days: number }) {
 }
 
 export default function ShippingWorkspace() {
-  const { isAdmin, isShippingUser } = useAuth();
+  const { isAdmin, isShippingUser, isShippingTerminalUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -41,7 +41,7 @@ export default function ShippingWorkspace() {
   const { data, isLoading, refetch } = useGetPipeline({ query: { refetchInterval: 30_000 } });
   const advanceMutation = useAdvanceContainerStatus();
 
-  const canAccess = isAdmin || isShippingUser;
+  const canAccess = isAdmin || isShippingUser || isShippingTerminalUser;
   useEffect(() => {
     if (!canAccess) setLocation("/");
   }, [canAccess]);
