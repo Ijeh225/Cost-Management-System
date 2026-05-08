@@ -86,6 +86,7 @@ const ALL_ROLES = [
   "super_admin", "admin", "staff",
   "documentation_user", "accounts_user", "operations_user",
   "transire_user", "shipping_user", "terminal_user", "pull_out_user",
+  "shipping_terminal_user",
   "terminal_manager", "delivery_user", "security_user",
 ] as const;
 
@@ -100,6 +101,7 @@ const ROLE_LABELS: Record<string, string> = {
   shipping_user: "Shipping",
   terminal_user: "Terminal",
   pull_out_user: "Pull-Out",
+  shipping_terminal_user: "Shipping & Terminal (Legacy)",
   terminal_manager: "Terminal Manager",
   delivery_user: "Delivery / Transport",
   security_user: "Gate Security",
@@ -272,6 +274,7 @@ function CreateUserDialog() {
                     <SelectItem value="shipping_user">Shipping</SelectItem>
                     <SelectItem value="terminal_user">Terminal</SelectItem>
                     <SelectItem value="pull_out_user">Pull-Out</SelectItem>
+                    <SelectItem value="shipping_terminal_user">Shipping &amp; Terminal (Legacy)</SelectItem>
                     <SelectItem value="terminal_manager">Terminal Manager</SelectItem>
                     <SelectItem value="delivery_user">Delivery / Transport</SelectItem>
                     <SelectItem value="security_user">Gate Security</SelectItem>
@@ -395,6 +398,7 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
                   <SelectItem value="shipping_user">Shipping</SelectItem>
                   <SelectItem value="terminal_user">Terminal</SelectItem>
                   <SelectItem value="pull_out_user">Pull-Out</SelectItem>
+                  <SelectItem value="shipping_terminal_user">Shipping &amp; Terminal (Legacy)</SelectItem>
                   <SelectItem value="terminal_manager">Terminal Manager</SelectItem>
                   <SelectItem value="delivery_user">Delivery / Transport</SelectItem>
                   <SelectItem value="security_user">Gate Security</SelectItem>

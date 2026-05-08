@@ -1295,11 +1295,19 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (declaration !== undefined) updates.declaration = declaration;
     if (size !== undefined) updates.size = size;
     if (vessel !== undefined) updates.vessel = vessel;
-    // Status changes via PUT are restricted to admins — all other roles must use PATCH /status
+    // Status changes via PUT: admins can set any status freely.
+    // Non-admin dept users may only perform the natural forward advance from their owned stage.
     if (status !== undefined) {
       if (!isAdmin) {
-        res.status(403).json({ error: "Only administrators can change status directly. Use the advance action instead." });
-        return;
+        const userRoles: string[] = req.user!.roles ?? [userRole];
+        const allowedStages = [...new Set(userRoles.flatMap(r => DEPT_OWNED_STAGES[r] ?? []))];
+        const currentIdx = PIPELINE_STAGE_ORDER.indexOf(existing.status);
+        const naturalNext = currentIdx !== -1 ? PIPELINE_STAGE_ORDER[currentIdx + 1] : undefined;
+        // Allow only if: current stage is owned by user AND requested status is the natural next stage
+        if (!allowedStages.includes(existing.status) || status !== naturalNext) {
+          res.status(403).json({ error: "You can only advance this container from its current stage to the next stage." });
+          return;
+        }
       }
       updates.status = status;
     }
