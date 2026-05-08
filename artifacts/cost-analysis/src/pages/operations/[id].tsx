@@ -196,6 +196,15 @@ const DEPT_SUBMIT_LABELS: Record<string, Record<string, string>> = {
     terminal:            "Submit to Pull-Out",
     pull_out:            "Submit to Terminal Manager",
   },
+  shipping_user: {
+    shipping: "Mark DO Released",
+  },
+  terminal_user: {
+    terminal: "Submit to Pull-Out",
+  },
+  pull_out_user: {
+    pull_out: "Release to Gate-In",
+  },
 };
 
 const OPS_RELEASE_LABELS: Record<string, string> = {
@@ -822,6 +831,9 @@ function OperationalForm({
   isAccountsUser,
   isTerminalManager,
   isDeliveryUser,
+  isShippingUser,
+  isTerminalUser,
+  isPullOutUser,
 }: {
   container: Container;
   isAdmin: boolean;
@@ -830,6 +842,9 @@ function OperationalForm({
   isAccountsUser: boolean;
   isTerminalManager: boolean;
   isDeliveryUser: boolean;
+  isShippingUser: boolean;
+  isTerminalUser: boolean;
+  isPullOutUser: boolean;
 }) {
   const { toast } = useToast();
   const updateMutation = useUpdateContainer();
@@ -982,7 +997,7 @@ function OperationalForm({
     }
   };
 
-  const isDeptUser = isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser;
+  const isDeptUser = isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser || isShippingUser || isTerminalUser || isPullOutUser;
   const isEditable = isAdmin || isDeptUser;
   const daysInStage = daysAgo(container.updatedAt);
   const isOverdue =
@@ -1366,6 +1381,9 @@ function OperationalForm({
           : isTerminalManager ? "terminal_manager"
           : isDeliveryUser    ? "delivery_user"
           : isOperationsUser  ? "operations_user"
+          : isShippingUser    ? "shipping_user"
+          : isTerminalUser    ? "terminal_user"
+          : isPullOutUser     ? "pull_out_user"
           : null;
         const deptLabel = deptRole
           ? DEPT_SUBMIT_LABELS[deptRole]?.[container.status]
@@ -1659,7 +1677,7 @@ function AuditLog({ containerId }: { containerId: number }) {
 
 export default function OperationDetailPage({ params }: { params: { id: string } }) {
   const containerId = parseInt(params.id, 10);
-  const { isAdmin, isOperationsUser, isDocumentationUser, isAccountsUser, isTerminalManager, isDeliveryUser, isSecurityUser } = useAuth();
+  const { isAdmin, isOperationsUser, isDocumentationUser, isAccountsUser, isTerminalManager, isDeliveryUser, isSecurityUser, isShippingUser, isTerminalUser, isPullOutUser } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const navMutation = useAdvanceContainerStatus();
@@ -1730,12 +1748,18 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             : isTerminalManager ? "/workspace/terminal"
             : isDeliveryUser    ? "/workspace/delivery"
             : isOperationsUser  ? "/workspace/operations"
+            : isShippingUser    ? "/workspace/shipping"
+            : isTerminalUser    ? "/workspace/terminal-ops"
+            : isPullOutUser     ? "/workspace/pull-out"
             : "/operations";
           const defaultLabel = isDocumentationUser ? "My Jobs"
             : isAccountsUser    ? "Duty Payments"
             : isTerminalManager ? "Terminal Workspace"
             : isDeliveryUser    ? "Deliveries"
             : isOperationsUser  ? "My Jobs"
+            : isShippingUser    ? "Shipping Jobs"
+            : isTerminalUser    ? "Terminal Jobs"
+            : isPullOutUser     ? "Pull-Out Jobs"
             : "Operations Board";
           return (
             <Link href={fromUrl ?? defaultHref}>
@@ -1824,7 +1848,7 @@ export default function OperationDetailPage({ params }: { params: { id: string }
               currentStatus={container.status}
               onNavigate={(isAdmin || isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser) ? handleStageNavigate : undefined}
               isAdmin={isAdmin ?? false}
-              isOperationsUser={isOperationsUser ?? false}
+              isOperationsUser={(isOperationsUser || isShippingUser || isTerminalUser || isPullOutUser) ?? false}
               isDocumentationUser={isDocumentationUser ?? false}
               isAccountsUser={isAccountsUser ?? false}
               isTerminalManager={isTerminalManager ?? false}
@@ -1853,6 +1877,9 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             isAccountsUser={isAccountsUser ?? false}
             isTerminalManager={isTerminalManager ?? false}
             isDeliveryUser={isDeliveryUser ?? false}
+            isShippingUser={isShippingUser ?? false}
+            isTerminalUser={isTerminalUser ?? false}
+            isPullOutUser={isPullOutUser ?? false}
           />
           <PaarPanel
             container={container}

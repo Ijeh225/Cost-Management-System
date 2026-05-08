@@ -38,6 +38,7 @@ import ArPage from "@/pages/ar/index";
 import DutyPaymentsPage from "@/pages/duty-payments/index";
 import BanksPage from "@/pages/banks/index";
 import BankDetailPage from "@/pages/banks/[id]";
+import OverheadExpensesPage from "@/pages/overhead-expenses/index";
 import DocumentationWorkspace from "@/pages/workspace/documentation";
 import AccountsWorkspace from "@/pages/workspace/accounts";
 import TransireWorkspace from "@/pages/workspace/transire";
@@ -184,13 +185,16 @@ function Router() {
               <Route path="/banks/:id">
                 <AdminGuard><BankDetailPage /></AdminGuard>
               </Route>
+              <Route path="/overhead-expenses">
+                <AdminGuard><OverheadExpensesPage /></AdminGuard>
+              </Route>
               <Route path="/workspace/documentation" component={() => { const [, nav] = useLocation(); nav("/documentation", { replace: true }); return null; }} />
               <Route path="/workspace/accounts" component={AccountsWorkspace} />
               <Route path="/workspace/transire" component={TransireWorkspace} />
               <Route path="/workspace/shipping" component={ShippingWorkspace} />
               <Route path="/workspace/terminal-ops" component={TerminalOpsWorkspace} />
               <Route path="/workspace/pull-out" component={PullOutWorkspace} />
-              <Route path="/workspace/shipping-terminal" component={ShippingTerminalWorkspace} />
+              <Route path="/workspace/shipping-terminal" component={() => { const [, nav] = useLocation(); nav("/workspace/shipping", { replace: true }); return null; }} />
               <Route path="/workspace/terminal" component={TerminalWorkspace} />
               <Route path="/workspace/delivery" component={DeliveryWorkspace} />
               <Route path="/gate" component={GatePage} />

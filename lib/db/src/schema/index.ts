@@ -17,3 +17,4 @@ export * from "./invoices";
 export * from "./whatsapp";
 export * from "./migrations";
 export * from "./user-client-assignments";
+export * from "./overhead-expenses";
