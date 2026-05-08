@@ -820,20 +820,18 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
     }
 
     if (!isAdmin) {
-      const userRoles: string[] = (req.user as any).roles ?? [userRole];
-      const allowedStages = [...new Set(userRoles.flatMap(r => DEPT_OWNED_STAGES[r] ?? []))];
+      // Non-admin dept users: arbitrary stage navigation is not permitted.
+      // Only the natural forward advance from a stage the user owns is allowed.
       if (isNavigation) {
-        // For navigation, check that the TARGET stage is within the user's allowed stages
-        if (!allowedStages.includes(requestedStatus!)) {
-          res.status(403).json({ error: "You don't have permission to navigate this container to that stage" });
-          return;
-        }
-      } else {
-        // For forward advance, check that the CURRENT stage is within the user's allowed stages
-        if (!allowedStages.includes(existing.status)) {
-          res.status(403).json({ error: "You don't have permission to advance this container from its current stage" });
-          return;
-        }
+        res.status(403).json({ error: "Stage navigation is restricted to administrators." });
+        return;
+      }
+      const userRoles: string[] = req.user!.roles ?? [userRole];
+      const allowedStages = [...new Set(userRoles.flatMap(r => DEPT_OWNED_STAGES[r] ?? []))];
+      // Forward advance: check that the CURRENT stage is within the user's owned stages
+      if (!allowedStages.includes(existing.status)) {
+        res.status(403).json({ error: "You don't have permission to advance this container from its current stage" });
+        return;
       }
     }
     const [updated] = await db.update(containersTable)
