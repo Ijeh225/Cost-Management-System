@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable } from "@workspace/db";
-import { eq, desc, and, gte, lte, or } from "drizzle-orm";
+import { eq, desc, and, gte, lte, or, SQL } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 
 export const banksRouter = Router();
@@ -112,7 +112,7 @@ banksRouter.get("/banks/transfers", requireAuth, async (_req, res) => {
 
 // ─── Bank Detail ───────────────────────────────────────────────────────────
 
-banksRouter.get("/banks/:id", requireAuth, async (req, res) => {
+banksRouter.get("/banks/:id", requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -127,7 +127,7 @@ banksRouter.get("/banks/:id", requireAuth, async (req, res) => {
 
 // ─── Bank Transaction History ───────────────────────────────────────────────
 
-banksRouter.get("/banks/:id/transactions", requireAuth, async (req, res) => {
+banksRouter.get("/banks/:id/transactions", requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -155,7 +155,7 @@ banksRouter.get("/banks/:id/transactions", requireAuth, async (req, res) => {
 
     // 1. Invoice payments credited to this bank
     if (!typeFilter || typeFilter === "payment") {
-      const paymentConditions: any[] = [eq(invoicePaymentsTable.bankId, id)];
+      const paymentConditions: SQL<unknown>[] = [eq(invoicePaymentsTable.bankId, id)];
       if (fromDate) paymentConditions.push(gte(invoicePaymentsTable.paidAt, fromDate));
       if (toDate)   paymentConditions.push(lte(invoicePaymentsTable.paidAt, toDate));
 
@@ -194,7 +194,7 @@ banksRouter.get("/banks/:id/transactions", requireAuth, async (req, res) => {
 
     // 2. Client deposits credited to this bank
     if (!typeFilter || typeFilter === "deposit") {
-      const depositConditions: any[] = [eq(clientDepositsTable.bankId, id)];
+      const depositConditions: SQL<unknown>[] = [eq(clientDepositsTable.bankId, id)];
       if (fromDate) depositConditions.push(gte(clientDepositsTable.createdAt, fromDate));
       if (toDate)   depositConditions.push(lte(clientDepositsTable.createdAt, toDate));
 
@@ -229,7 +229,7 @@ banksRouter.get("/banks/:id/transactions", requireAuth, async (req, res) => {
 
     // 3. Internal transfers in (this bank is the destination)
     if (!typeFilter || typeFilter === "transfer_in") {
-      const inConditions: any[] = [eq(bankTransfersTable.toBankId, id)];
+      const inConditions: SQL<unknown>[] = [eq(bankTransfersTable.toBankId, id)];
       if (fromDate) inConditions.push(gte(bankTransfersTable.createdAt, fromDate));
       if (toDate)   inConditions.push(lte(bankTransfersTable.createdAt, toDate));
 
@@ -270,7 +270,7 @@ banksRouter.get("/banks/:id/transactions", requireAuth, async (req, res) => {
 
     // 4. Internal transfers out (this bank is the source)
     if (!typeFilter || typeFilter === "transfer_out") {
-      const outConditions: any[] = [eq(bankTransfersTable.fromBankId, id)];
+      const outConditions: SQL<unknown>[] = [eq(bankTransfersTable.fromBankId, id)];
       if (fromDate) outConditions.push(gte(bankTransfersTable.createdAt, fromDate));
       if (toDate)   outConditions.push(lte(bankTransfersTable.createdAt, toDate));
 

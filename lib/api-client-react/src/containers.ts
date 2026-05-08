@@ -27,6 +27,7 @@ export type PipelineContainer = {
   releaseConfirmedAt?: string | null;
   releaseDelayReason?: string | null;
   releaseFinalDate?: string | null;
+  tdoReleasedAt?: string | null;
 };
 
 export type PipelineResponse = {

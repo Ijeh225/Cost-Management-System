@@ -191,7 +191,6 @@ function Router() {
               <Route path="/workspace/terminal-ops" component={TerminalOpsWorkspace} />
               <Route path="/workspace/pull-out" component={PullOutWorkspace} />
               <Route path="/workspace/shipping-terminal" component={ShippingTerminalWorkspace} />
-              <Route path="/workspace/operations" component={() => { const [, nav] = useLocation(); nav("/workspace/transire", { replace: true }); return null; }} />
               <Route path="/workspace/terminal" component={TerminalWorkspace} />
               <Route path="/workspace/delivery" component={DeliveryWorkspace} />
               <Route path="/gate" component={GatePage} />

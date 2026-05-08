@@ -571,6 +571,7 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       releaseConfirmedAt: containersTable.releaseConfirmedAt,
       releaseDelayReason: containersTable.releaseDelayReason,
       releaseFinalDate: containersTable.releaseFinalDate,
+      tdoReleasedAt: containersTable.tdoReleasedAt,
     })
       .from(containersTable)
       .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id))
@@ -612,6 +613,7 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       releaseConfirmedAt?: string | null;
       releaseDelayReason?: string | null;
       releaseFinalDate?: string | null;
+      tdoReleasedAt?: string | null;
     }>> = {};
 
     for (const c of rows) {
@@ -645,6 +647,7 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
         releaseConfirmedAt: c.releaseConfirmedAt instanceof Date ? c.releaseConfirmedAt.toISOString() : (c.releaseConfirmedAt ?? null),
         releaseDelayReason: c.releaseDelayReason ?? null,
         releaseFinalDate: c.releaseFinalDate instanceof Date ? c.releaseFinalDate.toISOString() : (c.releaseFinalDate ?? null),
+        tdoReleasedAt: c.tdoReleasedAt instanceof Date ? c.tdoReleasedAt.toISOString() : (c.tdoReleasedAt ?? null),
       };
       stages[c.status].push(entry);
 
