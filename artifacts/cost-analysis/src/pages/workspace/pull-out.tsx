@@ -78,7 +78,7 @@ export default function PullOutWorkspace() {
   const handleReleaseToGateIn = async (containerId: number) => {
     setAdvancing(containerId);
     try {
-      await advanceMutation.mutateAsync({ id: containerId });
+      await advanceMutation.mutateAsync({ id: containerId, status: "gate_in" });
       toast({ title: "Released to Gate-In", description: "Container moved to Gate-In queue." });
       refetch();
     } catch (err) {

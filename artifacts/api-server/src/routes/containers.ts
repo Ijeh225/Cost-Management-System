@@ -995,7 +995,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
         shipping:            ["shipping_user", "shipping_terminal_user"],
         terminal:            ["terminal_user", "shipping_terminal_user"],
         pull_out:            ["pull_out_user"],
-        final_release:       [],
+        final_release:       ["terminal_manager"],
       };
       const allowedRoles = STAGE_ALLOWED_ROLES[status] ?? [];
       const hasRole = userRoles.some(r => allowedRoles.includes(r));

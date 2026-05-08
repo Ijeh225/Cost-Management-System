@@ -66,7 +66,7 @@ export default function ShippingWorkspace() {
   const handleReleaseDO = async (containerId: number) => {
     setAdvancing(containerId);
     try {
-      await advanceMutation.mutateAsync({ id: containerId });
+      await advanceMutation.mutateAsync({ id: containerId, status: "terminal" });
       toast({ title: "DO Released", description: "Container moved to Terminal queue." });
       refetch();
     } catch (err) {

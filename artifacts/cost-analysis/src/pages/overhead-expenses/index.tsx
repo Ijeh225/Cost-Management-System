@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetOverheadExpenses, useCreateOverheadExpense, useUpdateOverheadExpense, useDeleteOverheadExpense, OVERHEAD_CATEGORIES } from "@workspace/api-client-react";
+import { useGetOverheadExpenses, useCreateOverheadExpense, useUpdateOverheadExpense, useDeleteOverheadExpense, OVERHEAD_CATEGORIES, type OverheadExpense } from "@workspace/api-client-react";
 import { useListBanks } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useLocation } from "wouter";

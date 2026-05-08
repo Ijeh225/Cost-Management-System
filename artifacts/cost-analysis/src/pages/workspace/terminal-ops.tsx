@@ -66,7 +66,7 @@ export default function TerminalOpsWorkspace() {
   const handleSubmitToPullOut = async (containerId: number) => {
     setAdvancing(containerId);
     try {
-      await advanceMutation.mutateAsync({ id: containerId });
+      await advanceMutation.mutateAsync({ id: containerId, status: "pull_out" });
       toast({ title: "Submitted to Pull-Out", description: "Container moved to the Pull-Out queue." });
       refetch();
     } catch (err) {
