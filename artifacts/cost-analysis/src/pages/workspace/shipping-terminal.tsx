@@ -47,7 +47,7 @@ function StepIndicator({ done, label }: { done: boolean; label: string }) {
 }
 
 export default function ShippingTerminalWorkspace() {
-  const { isAdmin, isShippingTerminalUser, isShippingUser, isTerminalUser, isOperationsUser } = useAuth();
+  const { isAdmin, isShippingTerminalUser, isShippingUser, isTerminalUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
