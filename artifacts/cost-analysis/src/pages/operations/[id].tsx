@@ -1779,11 +1779,30 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   const currentStageLabel = getStatusLabel(container.status);
   const isPipeline = container.status !== "pending_verification";
 
-  // Read optional ?dept= query param — set by workspace pages when linking to this detail.
-  // When present, the view is scoped to that department (StageRail hidden, dept-specific content).
-  const deptScope = typeof window !== "undefined"
+  // Derive dept scope from the user's role (role-authoritative).
+  // The ?dept= query param is used only as a secondary hint when the user has no
+  // fixed-dept role (e.g. admin). Non-admin dept users always get their role-derived scope.
+  const ROLE_DEPT_MAP: Record<string, string> = {
+    shipping_user:          "shipping",
+    shipping_terminal_user: "shipping",
+    terminal_user:          "terminal",
+    pull_out_user:          "pull-out",
+    transire_user:          "transire",
+    operations_user:        "transire",
+  };
+  const roleDerivedDept = isShippingUser  ? "shipping"
+    : isTerminalUser  ? "terminal"
+    : isPullOutUser   ? "pull-out"
+    : isOperationsUser ? "transire"
+    : null;
+  const queryDept = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("dept")
     : null;
+  // Non-admin dept users: always use role-derived dept (query param cannot override).
+  // Admins: use query param if present (allows them to preview dept views).
+  const deptScope = !isAdmin && roleDerivedDept
+    ? roleDerivedDept
+    : (isAdmin && queryDept && Object.keys(ROLE_DEPT_MAP).some(r => ROLE_DEPT_MAP[r] === queryDept) ? queryDept : null);
 
   const handleStageNavigate = async (targetStage: string) => {
     try {
@@ -1941,24 +1960,28 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             isPullOutUser={isPullOutUser ?? false}
             deptScope={deptScope}
           />
-          <PaarPanel
-            container={container}
-            isAdmin={isAdmin ?? false}
-          />
+          {(!deptScope || isAdmin) && (
+            <PaarPanel
+              container={container}
+              isAdmin={isAdmin ?? false}
+            />
+          )}
         </div>
 
         <div className="space-y-4">
-          <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Activity className="w-4 h-4 text-muted-foreground" />
-                Stage History
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AuditLog containerId={container.id} />
-            </CardContent>
-          </Card>
+          {(!deptScope || isAdmin) && (
+            <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-muted-foreground" />
+                  Stage History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AuditLog containerId={container.id} />
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
             <CardHeader className="pb-2">
