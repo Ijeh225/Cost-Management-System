@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable } from "@workspace/db";
+import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio } from "../lib/whatsapp.js";
@@ -64,6 +64,26 @@ async function fetchItemsForInvoices(invoiceIds: number[]) {
   return map;
 }
 
+async function fetchPaymentsWithBank(invoiceId: number) {
+  return db
+    .select({
+      id: invoicePaymentsTable.id,
+      invoiceId: invoicePaymentsTable.invoiceId,
+      amount: invoicePaymentsTable.amount,
+      paidAt: invoicePaymentsTable.paidAt,
+      paymentMethod: invoicePaymentsTable.paymentMethod,
+      reference: invoicePaymentsTable.reference,
+      notes: invoicePaymentsTable.notes,
+      bankId: invoicePaymentsTable.bankId,
+      bankName: banksTable.name,
+      createdAt: invoicePaymentsTable.createdAt,
+    })
+    .from(invoicePaymentsTable)
+    .leftJoin(banksTable, eq(invoicePaymentsTable.bankId, banksTable.id))
+    .where(eq(invoicePaymentsTable.invoiceId, invoiceId))
+    .orderBy(invoicePaymentsTable.paidAt);
+}
+
 async function formatInvoice(inv: any, payments: any[], items?: any[]) {
   const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
   const total = parseFloat(inv.total ?? "0");
@@ -106,6 +126,8 @@ async function formatInvoice(inv: any, payments: any[], items?: any[]) {
       paymentMethod: p.paymentMethod,
       reference: p.reference,
       notes: p.notes,
+      bankId: p.bankId ?? null,
+      bankName: p.bankName ?? null,
       createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
     })),
   };
@@ -452,9 +474,7 @@ router.get("/invoices/:id", requireAuth, async (req, res) => {
 
     if (!row) return res.status(404).json({ error: "Invoice not found" });
 
-    const payments = await db.select().from(invoicePaymentsTable)
-      .where(eq(invoicePaymentsTable.invoiceId, id))
-      .orderBy(invoicePaymentsTable.paidAt);
+    const payments = await fetchPaymentsWithBank(id);
 
     const itemsMap = await fetchItemsForInvoices([id]);
     const items = itemsMap.get(id) ?? [];
@@ -515,8 +535,7 @@ router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
       .where(eq(invoicesTable.id, id));
 
-    const payments = await db.select().from(invoicePaymentsTable)
-      .where(eq(invoicePaymentsTable.invoiceId, id));
+    const payments = await fetchPaymentsWithBank(id);
 
     const itemsMap = await fetchItemsForInvoices([id]);
     const items = itemsMap.get(id) ?? [];
@@ -746,12 +765,13 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
     const invoiceId = parseInt(req.params.id, 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
-    const { amount, paymentMethod, reference, notes, paidAt } = req.body as {
+    const { amount, paymentMethod, reference, notes, paidAt, bankId } = req.body as {
       amount: number;
       paymentMethod?: string;
       reference?: string;
       notes?: string;
       paidAt?: string;
+      bankId?: number | null;
     };
 
     if (!amount || isNaN(amount) || amount <= 0) {
@@ -768,6 +788,7 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       reference: reference ?? "",
       notes: notes ?? "",
       paidAt: paidAt ? new Date(paidAt) : new Date(),
+      bankId: bankId ?? null,
     });
 
     const payments = await db.select().from(invoicePaymentsTable)

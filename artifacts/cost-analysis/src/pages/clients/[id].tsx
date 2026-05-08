@@ -4,6 +4,7 @@ import {
   useGetClient, useUpdateClient, useGetClientReceivables,
   useGetClientWalletSummary, useGetClientDeposits,
   useCreateClientDeposit, useDeleteClientDeposit, useResetClientWallet,
+  useListActiveBanks,
   type ClientWithContainers,
 } from "@workspace/api-client-react";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
@@ -54,11 +55,13 @@ function RecordDepositDialog({
 }: { open: boolean; onOpenChange: (v: boolean) => void; clientId: number }) {
   const { toast } = useToast();
   const createDeposit = useCreateClientDeposit(clientId);
+  const { data: banks = [] } = useListActiveBanks();
   const [form, setForm] = useState({
     amount: "",
     paymentMethod: "",
     reference: "",
     notes: "",
+    bankId: null as number | null,
   });
 
   const handleSubmit = async () => {
@@ -77,9 +80,10 @@ function RecordDepositDialog({
         paymentMethod: form.paymentMethod,
         reference: form.reference || undefined,
         notes: form.notes || undefined,
+        bankId: form.bankId ?? undefined,
       });
       toast({ title: "Deposit recorded successfully" });
-      setForm({ amount: "", paymentMethod: "", reference: "", notes: "" });
+      setForm({ amount: "", paymentMethod: "", reference: "", notes: "", bankId: null });
       onOpenChange(false);
     } catch {
       toast({ variant: "destructive", title: "Failed to record deposit" });
@@ -114,7 +118,7 @@ function RecordDepositDialog({
           </div>
           <div className="space-y-1.5">
             <Label className="text-sm">Payment Method *</Label>
-            <Select value={form.paymentMethod} onValueChange={v => setForm(f => ({ ...f, paymentMethod: v }))}>
+            <Select value={form.paymentMethod} onValueChange={v => setForm(f => ({ ...f, paymentMethod: v, bankId: null }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Select method..." />
               </SelectTrigger>
@@ -125,6 +129,26 @@ function RecordDepositDialog({
               </SelectContent>
             </Select>
           </div>
+          {form.paymentMethod === "Bank Transfer" && banks.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-sm">Bank Account</Label>
+              <Select
+                value={form.bankId != null ? String(form.bankId) : ""}
+                onValueChange={v => setForm(f => ({ ...f, bankId: v ? parseInt(v) : null }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select bank (optional)..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {banks.map(b => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}{b.accountNumber ? ` — ${b.accountNumber}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label className="text-sm">Reference / Receipt No.</Label>
             <Input

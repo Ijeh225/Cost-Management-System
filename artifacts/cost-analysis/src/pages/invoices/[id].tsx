@@ -4,6 +4,7 @@ import {
   useGetInvoice, useUpdateInvoice, useRecordPayment, useDeletePayment,
   useGetInvoiceWhatsAppLog, useSendInvoiceWhatsApp, useSendInvoiceReminder, useSendInvoiceReceipt,
   useAddInvoiceItem, useEditInvoiceItem, useRemoveInvoiceItem,
+  useListActiveBanks,
   type RecordPaymentBody, type InvoiceItem,
 } from "@workspace/api-client-react";
 import { useListContainers, getListContainersQueryKey } from "@workspace/api-client-react";
@@ -57,12 +58,14 @@ function RecordPaymentDialog({
 }) {
   const { toast } = useToast();
   const recordMutation = useRecordPayment();
+  const { data: banks = [] } = useListActiveBanks();
   const [form, setForm] = useState<RecordPaymentBody>({
     amount: 0,
     paymentMethod: "transfer",
     reference: "",
     notes: "",
     paidAt: new Date().toISOString().split("T")[0],
+    bankId: null,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,7 +78,7 @@ function RecordPaymentDialog({
       await recordMutation.mutateAsync({ invoiceId, data: form });
       toast({ title: "Payment recorded" });
       onClose();
-      setForm({ amount: 0, paymentMethod: "transfer", reference: "", notes: "", paidAt: new Date().toISOString().split("T")[0] });
+      setForm({ amount: 0, paymentMethod: "transfer", reference: "", notes: "", paidAt: new Date().toISOString().split("T")[0], bankId: null });
     } catch {
       toast({ variant: "destructive", title: "Failed to record payment" });
     }
@@ -106,7 +109,7 @@ function RecordPaymentDialog({
           </div>
           <div>
             <Label htmlFor="method">Payment Method</Label>
-            <Select value={form.paymentMethod} onValueChange={v => setForm(f => ({ ...f, paymentMethod: v }))}>
+            <Select value={form.paymentMethod} onValueChange={v => setForm(f => ({ ...f, paymentMethod: v, bankId: null }))}>
               <SelectTrigger className="mt-1">
                 <SelectValue />
               </SelectTrigger>
@@ -118,6 +121,26 @@ function RecordPaymentDialog({
               </SelectContent>
             </Select>
           </div>
+          {form.paymentMethod === "transfer" && banks.length > 0 && (
+            <div>
+              <Label htmlFor="bank">Bank Account</Label>
+              <Select
+                value={form.bankId != null ? String(form.bankId) : ""}
+                onValueChange={v => setForm(f => ({ ...f, bankId: v ? parseInt(v) : null }))}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select bank (optional)..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {banks.map(b => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}{b.accountNumber ? ` — ${b.accountNumber}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <Label htmlFor="paidAt">Date Paid</Label>
             <Input

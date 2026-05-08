@@ -3,7 +3,7 @@ import {
   db, clientsTable, containersTable, invoicesTable, invoicePaymentsTable,
   clientDepositsTable, shippingChargesTable, customsChargesTable,
   terminalChargesTable, deliveryChargesTable, operationsChargesTable,
-  usersTable,
+  usersTable, banksTable,
 } from "@workspace/db";
 import { eq, desc, sum, inArray, gte, and } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest, verifyPassword } from "../lib/auth.js";
@@ -334,8 +334,19 @@ clientsRouter.get("/clients/:id/deposits", requireAuth, async (req: AuthRequest,
     const clientId = parseInt(req.params.id);
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
     const deposits = await db
-      .select()
+      .select({
+        id: clientDepositsTable.id,
+        clientId: clientDepositsTable.clientId,
+        amount: clientDepositsTable.amount,
+        paymentMethod: clientDepositsTable.paymentMethod,
+        reference: clientDepositsTable.reference,
+        notes: clientDepositsTable.notes,
+        bankId: clientDepositsTable.bankId,
+        bankName: banksTable.name,
+        createdAt: clientDepositsTable.createdAt,
+      })
       .from(clientDepositsTable)
+      .leftJoin(banksTable, eq(clientDepositsTable.bankId, banksTable.id))
       .where(eq(clientDepositsTable.clientId, clientId))
       .orderBy(desc(clientDepositsTable.createdAt));
     return res.json(deposits.map(d => ({
@@ -345,6 +356,8 @@ clientsRouter.get("/clients/:id/deposits", requireAuth, async (req: AuthRequest,
       paymentMethod: d.paymentMethod,
       reference: d.reference ?? null,
       notes: d.notes ?? null,
+      bankId: d.bankId ?? null,
+      bankName: d.bankName ?? null,
       createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : d.createdAt,
     })));
   } catch (err) {
@@ -359,7 +372,7 @@ clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthReques
   try {
     const clientId = parseInt(req.params.id);
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
-    const { amount, paymentMethod, reference, notes } = req.body;
+    const { amount, paymentMethod, reference, notes, bankId } = req.body;
     if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
       return res.status(400).json({ error: "Amount must be a positive number" });
     }
@@ -372,7 +385,13 @@ clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthReques
       paymentMethod,
       reference: reference ?? null,
       notes: notes ?? null,
+      bankId: bankId ?? null,
     }).returning();
+    let bankName: string | null = null;
+    if (deposit.bankId) {
+      const [bank] = await db.select({ name: banksTable.name }).from(banksTable).where(eq(banksTable.id, deposit.bankId));
+      bankName = bank?.name ?? null;
+    }
     return res.status(201).json({
       id: deposit.id,
       clientId: deposit.clientId,
@@ -380,6 +399,8 @@ clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthReques
       paymentMethod: deposit.paymentMethod,
       reference: deposit.reference ?? null,
       notes: deposit.notes ?? null,
+      bankId: deposit.bankId ?? null,
+      bankName,
       createdAt: deposit.createdAt instanceof Date ? deposit.createdAt.toISOString() : deposit.createdAt,
     });
   } catch (err) {

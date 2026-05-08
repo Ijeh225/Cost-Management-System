@@ -39,6 +39,8 @@ export type InvoicePayment = {
   paymentMethod: string;
   reference: string;
   notes: string;
+  bankId: number | null;
+  bankName: string | null;
   createdAt: string;
 };
 
@@ -87,6 +89,7 @@ export type RecordPaymentBody = {
   reference?: string;
   notes?: string;
   paidAt?: string;
+  bankId?: number | null;
 };
 
 export const INVOICES_QUERY_KEY = ["/api/invoices"];

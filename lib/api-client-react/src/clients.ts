@@ -195,6 +195,8 @@ export type ClientDeposit = {
   paymentMethod: string;
   reference: string | null;
   notes: string | null;
+  bankId: number | null;
+  bankName: string | null;
   createdAt: string;
 };
 
@@ -203,6 +205,7 @@ export type CreateDepositBody = {
   paymentMethod: string;
   reference?: string;
   notes?: string;
+  bankId?: number | null;
 };
 
 export type ClientWalletSummary = {
