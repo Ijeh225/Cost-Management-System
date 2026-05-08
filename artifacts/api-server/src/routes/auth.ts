@@ -17,11 +17,16 @@ const router = Router();
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  limit: 50,
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
   standardHeaders: "draft-7",
   legacyHeaders: false,
   skipSuccessfulRequests: true,
+  // Key by email so each account has its own bucket (avoids shared-IP proxy issues)
+  keyGenerator: (req) => {
+    const email = (req.body?.email ?? "").toString().toLowerCase().trim();
+    return email || req.ip || "unknown";
+  },
 });
 
 router.post("/auth/login", loginLimiter, async (req, res) => {
