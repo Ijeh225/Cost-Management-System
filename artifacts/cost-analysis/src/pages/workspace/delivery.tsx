@@ -27,8 +27,10 @@ import { CompletedJobsView } from "@/components/workspace/completed-jobs-view";
 import {
   Loader2, Search, Truck, ChevronRight, Clock, SendHorizonal,
   CheckCircle2, Inbox, ChevronDown, ChevronUp, Plus, Pencil,
-  Trash2, Save, X, Receipt, Lock,
+  Trash2, Save, X, Receipt, Lock, CheckCheck, Eye, Ban
 } from "lucide-react";
+
+const QUICKSTART_KEY = "delivery_quickstart_dismissed";
 
 const DEPT_STAGES = ["delivery"];
 
@@ -188,6 +190,38 @@ function CustomLineItems({ containerId, canEdit }: { containerId: number; canEdi
             </Button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function QuickStartBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="relative rounded-xl border border-teal-500/30 bg-teal-500/5 px-5 py-4 space-y-3">
+      <button
+        onClick={onDismiss}
+        className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors"
+        aria-label="Dismiss"
+      >
+        <X className="w-4 h-4" />
+      </button>
+      <div className="flex items-center gap-2">
+        <Truck className="w-4 h-4 text-teal-400 shrink-0" />
+        <p className="text-sm font-semibold text-teal-400">Quick Start — Delivery Team</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-muted-foreground">
+        <div className="flex items-start gap-2">
+          <CheckCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+          <span><strong className="text-foreground/80">You can:</strong> view and advance delivery jobs, search by container or BL number, and submit containers to Empty Return or mark them as Closed.</span>
+        </div>
+        <div className="flex items-start gap-2">
+          <Eye className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
+          <span><strong className="text-foreground/80">View only:</strong> open the full job details page for any container in your queue via "View Job".</span>
+        </div>
+        <div className="flex items-start gap-2">
+          <Ban className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+          <span><strong className="text-foreground/80">Not available:</strong> invoices, financial data, client records, analytics, or admin settings are outside your access level.</span>
+        </div>
       </div>
     </div>
   );
@@ -392,6 +426,18 @@ export default function DeliveryWorkspace() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const [showQuickStart, setShowQuickStart] = useState(() => {
+    try {
+      return !localStorage.getItem(QUICKSTART_KEY);
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissQuickStart = () => {
+    try { localStorage.setItem(QUICKSTART_KEY, "1"); } catch {}
+    setShowQuickStart(false);
+  };
   const { data, isLoading } = useGetPipeline({ query: { refetchInterval: 30_000 } });
   const advance = useAdvanceContainerStatus();
 
@@ -423,6 +469,7 @@ export default function DeliveryWorkspace() {
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
+      {showQuickStart && <QuickStartBanner onDismiss={handleDismissQuickStart} />}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center shrink-0">

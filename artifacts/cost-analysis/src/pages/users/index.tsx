@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Shield, User as UserIcon, Pencil, PowerOff, Power, UploadCloud, Users2, X, Check } from "lucide-react";
+import { Loader2, Plus, Shield, User as UserIcon, Pencil, PowerOff, Power, UploadCloud, Users2, X, Check, Truck, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -287,6 +287,17 @@ function CreateUserDialog() {
                 onChange={setWorkspaceRoles}
               />
             )}
+            {watchedRole === "delivery_user" && (
+              <div className="flex items-start gap-3 rounded-lg border border-teal-500/30 bg-teal-500/5 px-4 py-3">
+                <Truck className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-teal-400">Delivery / Transport Account</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    This user will only see containers in the <strong>Delivery</strong> and <strong>Empty Return</strong> stages. They can advance job status and view job details, but cannot access financial data, invoices, or admin tools.
+                  </p>
+                </div>
+              </div>
+            )}
             {watchedRole === "staff" && (
               <>
                 <GranularPermissionsEditor value={sectionPerms} onChange={setSectionPerms} />
@@ -398,6 +409,17 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
               selected={[...new Set([...(WORKSPACE_ROLES.some(w => w.value === watchedRole) ? [watchedRole] : []), ...workspaceRoles])]}
               onChange={(v) => setWorkspaceRoles(v.filter(r => r !== watchedRole))}
             />
+          )}
+          {watchedRole === "delivery_user" && (
+            <div className="flex items-start gap-3 rounded-lg border border-teal-500/30 bg-teal-500/5 px-4 py-3">
+              <Truck className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-teal-400">Delivery / Transport Account</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  This user will only see containers in the <strong>Delivery</strong> and <strong>Empty Return</strong> stages. They can advance job status and view job details, but cannot access financial data, invoices, or admin tools.
+                </p>
+              </div>
+            </div>
           )}
           {watchedRole === "staff" && (
             <>

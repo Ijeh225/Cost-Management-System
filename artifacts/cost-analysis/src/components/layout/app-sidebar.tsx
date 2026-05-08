@@ -103,7 +103,8 @@ export function AppSidebar() {
                             ? [{ title: "Terminal Jobs",      url: "/workspace/terminal-ops",  icon: Building2   }] : []),
     ...(isPullOutUser       ? [{ title: "Pull-Out Jobs",      url: "/workspace/pull-out",      icon: PackageOpen }] : []),
     ...(isTerminalManager   ? [{ title: "Terminal Workspace", url: "/workspace/terminal",      icon: Building2   }] : []),
-    ...(isDeliveryUser      ? [{ title: "Deliveries",         url: "/workspace/delivery",      icon: Truck       }] : []),
+    ...(isDeliveryUser      ? [{ title: "Deliveries",         url: "/workspace/delivery",      icon: Truck       },
+                                { title: "Active Jobs",        url: "/operations",              icon: Activity    }] : []),
     ...(isSecurityUser      ? [{ title: "Gate Security",      url: "/gate",                    icon: ShieldCheck }] : []),
   ];
 
