@@ -47,7 +47,7 @@ function StepIndicator({ done, label }: { done: boolean; label: string }) {
 }
 
 export default function ShippingTerminalWorkspace() {
-  const { isAdmin, isShippingTerminalUser, isOperationsUser } = useAuth();
+  const { isAdmin, isShippingTerminalUser, isShippingUser, isTerminalUser, isOperationsUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -55,7 +55,7 @@ export default function ShippingTerminalWorkspace() {
 
   const { data, isLoading } = useGetPipeline({ query: { refetchInterval: 30_000 } });
 
-  const canAccess = isAdmin || isShippingTerminalUser || isOperationsUser;
+  const canAccess = isAdmin || isShippingTerminalUser || isShippingUser || isTerminalUser || isOperationsUser;
   useEffect(() => {
     if (!canAccess) setLocation("/");
   }, [canAccess]);
