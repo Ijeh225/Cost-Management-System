@@ -45,7 +45,6 @@ import TransireWorkspace from "@/pages/workspace/transire";
 import ShippingWorkspace from "@/pages/workspace/shipping";
 import TerminalOpsWorkspace from "@/pages/workspace/terminal-ops";
 import PullOutWorkspace from "@/pages/workspace/pull-out";
-import ShippingTerminalWorkspace from "@/pages/workspace/shipping-terminal";
 import TerminalWorkspace from "@/pages/workspace/terminal";
 import DeliveryWorkspace from "@/pages/workspace/delivery";
 import GatePage from "@/pages/gate/index";

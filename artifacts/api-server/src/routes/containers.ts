@@ -975,6 +975,25 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       res.status(400).json({ error: `Stage action not supported for status: ${status}` });
       return;
     }
+
+    const userRoles: string[] = req.user!.roles;
+    const isAdmin = userRoles.some(r => r === "admin" || r === "super_admin");
+    if (!isAdmin) {
+      const STAGE_ALLOWED_ROLES: Record<string, string[]> = {
+        transire_processing: ["transire_user", "operations_user"],
+        shipping:            ["shipping_user", "shipping_terminal_user"],
+        terminal:            ["terminal_user", "shipping_terminal_user"],
+        pull_out:            ["pull_out_user"],
+        final_release:       [],
+      };
+      const allowedRoles = STAGE_ALLOWED_ROLES[status] ?? [];
+      const hasRole = userRoles.some(r => allowedRoles.includes(r));
+      if (!hasRole) {
+        res.status(403).json({ error: "You do not have permission to perform actions at this stage." });
+        return;
+      }
+    }
+
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     let notifMsg: string | null = null;
     if (action === "set_expected_date") {
