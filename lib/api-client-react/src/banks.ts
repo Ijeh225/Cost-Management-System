@@ -19,7 +19,30 @@ export type CreateBankBody = {
 
 export type UpdateBankBody = Partial<CreateBankBody> & { isActive?: boolean };
 
+export type BankTransfer = {
+  id: number;
+  fromBankId: number | null;
+  fromBankName: string | null;
+  toBankId: number | null;
+  toBankName: string | null;
+  amount: number;
+  narration: string;
+  reference: string | null;
+  createdBy: number | null;
+  createdByName: string | null;
+  createdAt: string;
+};
+
+export type CreateBankTransferBody = {
+  fromBankId: number;
+  toBankId: number;
+  amount: number;
+  narration?: string;
+  reference?: string;
+};
+
 export const BANKS_QUERY_KEY = ["/api/banks"];
+export const BANK_TRANSFERS_QUERY_KEY = ["/api/banks/transfers"];
 
 export function useListBanks() {
   return useQuery({
@@ -67,5 +90,27 @@ export function useDeleteBank() {
     mutationFn: (id: number) =>
       customFetch<{ success: boolean }>(`/api/banks/${id}`, { method: "DELETE" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: BANKS_QUERY_KEY }); },
+  });
+}
+
+export function useListBankTransfers() {
+  return useQuery({
+    queryKey: BANK_TRANSFERS_QUERY_KEY,
+    queryFn: () => customFetch<BankTransfer[]>("/api/banks/transfers"),
+  });
+}
+
+export function useCreateBankTransfer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateBankTransferBody) =>
+      customFetch<BankTransfer>("/api/banks/transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: BANK_TRANSFERS_QUERY_KEY });
+    },
   });
 }
