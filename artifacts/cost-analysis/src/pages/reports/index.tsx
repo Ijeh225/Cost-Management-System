@@ -556,6 +556,9 @@ function PrintableReportsSection() {
   const [cfFrom, setCfFrom] = useState("");
   const [cfTo, setCfTo] = useState("");
   const [cfBankId, setCfBankId] = useState("all");
+  const [plFrom, setPlFrom] = useState("");
+  const [plTo, setPlTo] = useState("");
+  const [plClientId, setPlClientId] = useState("all");
 
   const openReport = (path: string, params: Record<string, string>) => {
     const qs = new URLSearchParams();
@@ -572,7 +575,7 @@ function PrintableReportsSection() {
         </h2>
         <p className="text-xs text-muted-foreground">Generate formatted documents that open in a new tab, ready to print or save as PDF.</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* Client Statement */}
         <Card className="border-border/50 bg-card/40">
           <CardHeader className="pb-3 border-b border-border/40">
@@ -709,6 +712,49 @@ function PrintableReportsSection() {
               onClick={() => openReport("/reports/cashflow/print", { from: cfFrom, to: cfTo, bankId: cfBankId })}
             >
               <ExternalLink className="w-3.5 h-3.5" /> Generate Cash Flow
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* P&L / Income Statement */}
+        <Card className="border-border/50 bg-card/40">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-blue-400" /> Profit &amp; Loss
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">Revenue minus cost of sales and overheads — true Net Profit with monthly trend.</p>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">From</Label>
+                <Input type="date" value={plFrom} onChange={e => setPlFrom(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">To</Label>
+                <Input type="date" value={plTo} onChange={e => setPlTo(e.target.value)} className="h-8 text-xs" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Client</Label>
+              <Select value={plClientId} onValueChange={setPlClientId}>
+                <SelectTrigger className="h-8 text-xs border-border/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Clients</SelectItem>
+                  {clients.map(c => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              size="sm"
+              className="w-full gap-2 text-xs h-8"
+              onClick={() => openReport("/reports/pl/print", { from: plFrom, to: plTo, clientId: plClientId })}
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Generate P&amp;L
             </Button>
           </CardContent>
         </Card>

@@ -52,6 +52,7 @@ import ClientStatementPrint from "@/pages/reports/client-statement/print";
 import VatSummaryPrint from "@/pages/reports/vat-summary/print";
 import InvoiceAgingPrint from "@/pages/reports/invoice-aging/print";
 import CashFlowPrint from "@/pages/reports/cashflow/print";
+import ProfitLossPrint from "@/pages/reports/pl/print";
 import DeliveryReportPrint from "@/pages/reports/delivery-report/print";
 
 const queryClient = new QueryClient({
@@ -153,6 +154,7 @@ function Router() {
       <Route path="/reports/vat-summary/print" component={VatSummaryPrint} />
       <Route path="/reports/invoice-aging/print" component={InvoiceAgingPrint} />
       <Route path="/reports/cashflow/print" component={CashFlowPrint} />
+      <Route path="/reports/pl/print" component={ProfitLossPrint} />
       <Route path="/reports/delivery-report/print" component={DeliveryReportPrint} />
       <Route>
         <AppLayout>

@@ -119,6 +119,62 @@ export function useGetInvoiceAging() {
   });
 }
 
+export type ProfitLossResponse = {
+  period: { from: string | null; to: string | null };
+  filters: { clientId: number | null };
+  revenue: {
+    totalRevenue: number;
+    totalInvoicedInclVat: number;
+    totalVatCollected: number;
+    invoiceCount: number;
+    byClient: Array<{ clientId: number; clientName: string; revenue: number; invoiceCount: number }>;
+    excludesDrafts: boolean;
+  };
+  costOfSales: {
+    total: number;
+    shipping: number;
+    customs: number;
+    terminal: number;
+    delivery: number;
+    operations: number;
+    extras: number;
+  };
+  grossProfit: number;
+  grossMarginPct: number;
+  overheads: {
+    total: number;
+    byCategory: Record<string, number>;
+    appliedToNet: boolean;
+  };
+  netProfit: number;
+  netMarginPct: number;
+  containerCount: number;
+  avgProfitPerContainer: number;
+  monthly: Array<{
+    month: string;
+    revenue: number;
+    costOfSales: number;
+    grossProfit: number;
+    overheads: number;
+    netProfit: number;
+    containerCount: number;
+  }>;
+  clients: Array<{ id: number; name: string }>;
+};
+
+export function useGetProfitLoss(params: { from?: string; to?: string; clientId?: string }) {
+  return useQuery<ProfitLossResponse>({
+    queryKey: ["/api/reports/pl", params.from, params.to, params.clientId],
+    queryFn: async () => {
+      const qs = new URLSearchParams();
+      if (params.from) qs.set("from", params.from);
+      if (params.to) qs.set("to", params.to);
+      if (params.clientId && params.clientId !== "all") qs.set("clientId", params.clientId);
+      return customFetch(`/api/reports/pl?${qs}`);
+    },
+  });
+}
+
 export type CashFlowTxn = {
   id: string;
   date: string;

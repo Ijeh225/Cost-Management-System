@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, invoicesTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable } from "@workspace/db";
-import { eq, gte, lte, and, inArray, gt, type SQL } from "drizzle-orm";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable } from "@workspace/db";
+import { eq, gte, lte, and, inArray, gt, ne, type SQL } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
-import { calcTotalCost } from "../lib/calculations.js";
+import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
 
 export const reportsRouter = Router();
 
@@ -302,6 +302,243 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireAdmin, async (req:
       period: { from: from ?? null, to: to ?? null },
       invoices: rows,
       totals: { totalSubtotal, totalVat, totalInvoiced },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { from, to, clientId } = req.query as Record<string, string>;
+
+    let fromDate: Date | null = null;
+    let toDate: Date | null = null;
+    if (from) {
+      fromDate = new Date(from);
+      if (isNaN(fromDate.getTime())) return res.status(400).json({ error: "Invalid 'from' date" });
+    }
+    if (to) {
+      toDate = new Date(to + "T23:59:59");
+      if (isNaN(toDate.getTime())) return res.status(400).json({ error: "Invalid 'to' date" });
+    }
+    if (fromDate && toDate && fromDate > toDate) {
+      return res.status(400).json({ error: "'from' must be on or before 'to'" });
+    }
+
+    let clientIdNum: number | null = null;
+    if (clientId && clientId !== "all") {
+      if (!/^\d+$/.test(clientId)) return res.status(400).json({ error: "Invalid clientId" });
+      clientIdNum = parseInt(clientId, 10);
+      if (!Number.isFinite(clientIdNum) || clientIdNum <= 0) return res.status(400).json({ error: "Invalid clientId" });
+    }
+
+    // ===== REVENUE: issued invoices in period (excludes drafts; uses ex-VAT net sales) =====
+    const invConds: SQL[] = [ne(invoicesTable.status, "draft")];
+    if (fromDate) invConds.push(gte(invoicesTable.createdAt, fromDate));
+    if (toDate)   invConds.push(lte(invoicesTable.createdAt, toDate));
+    if (clientIdNum !== null) invConds.push(eq(invoicesTable.clientId, clientIdNum));
+
+    const invoiceRows = await db
+      .select({
+        id: invoicesTable.id,
+        clientId: invoicesTable.clientId,
+        clientName: clientsTable.name,
+        subtotal: invoicesTable.subtotal,
+        vatAmount: invoicesTable.vatAmount,
+        total: invoicesTable.total,
+        createdAt: invoicesTable.createdAt,
+      })
+      .from(invoicesTable)
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(and(...invConds));
+
+    let totalRevenue = 0;          // ex-VAT net sales (recognised revenue)
+    let totalInvoicedInclVat = 0;  // gross invoiced (for reference)
+    let totalVatCollected = 0;
+    const revenueByClient: Record<string, { clientId: number; clientName: string; revenue: number; invoiceCount: number }> = {};
+    for (const inv of invoiceRows) {
+      const subtotal = parseFloat(inv.subtotal ?? "0");
+      const vat = parseFloat(inv.vatAmount ?? "0");
+      const total = parseFloat(inv.total ?? "0");
+      totalRevenue += subtotal;
+      totalInvoicedInclVat += total;
+      totalVatCollected += vat;
+      const key = String(inv.clientId);
+      if (!revenueByClient[key]) revenueByClient[key] = {
+        clientId: inv.clientId, clientName: inv.clientName ?? "Unknown", revenue: 0, invoiceCount: 0,
+      };
+      revenueByClient[key].revenue += subtotal;
+      revenueByClient[key].invoiceCount += 1;
+    }
+
+    // ===== COST OF SALES: containers in period =====
+    const conConds: SQL[] = [];
+    if (fromDate) conConds.push(gte(containersTable.createdAt, fromDate));
+    if (toDate)   conConds.push(lte(containersTable.createdAt, toDate));
+    if (clientIdNum !== null) conConds.push(eq(containersTable.clientId, clientIdNum));
+
+    const containers = await db
+      .select({
+        id: containersTable.id,
+        clearingCharges: containersTable.clearingCharges,
+        clientId: containersTable.clientId,
+        createdAt: containersTable.createdAt,
+      })
+      .from(containersTable)
+      .where(conConds.length > 0 ? and(...conConds) : undefined);
+
+    const containerCount = containers.length;
+    const ids = containers.map(c => c.id);
+
+    let costShipping = 0, costCustoms = 0, costTerminal = 0, costDelivery = 0, costOperations = 0, costExtras = 0;
+    const extrasByContainer: Map<number, number> = new Map();
+
+    if (ids.length > 0) {
+      const [allS, allC, allT, allD, allO, allE] = await Promise.all([
+        db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, ids)),
+        db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, ids)),
+        db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, ids)),
+        db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, ids)),
+        db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, ids)),
+        db.select({ containerId: containerExtraChargesTable.containerId, amount: containerExtraChargesTable.amount })
+          .from(containerExtraChargesTable).where(inArray(containerExtraChargesTable.containerId, ids)),
+      ]);
+      for (const r of allS) costShipping   += sumShipping(r as any);
+      for (const r of allC) costCustoms    += sumCustoms(r as any);
+      for (const r of allT) costTerminal   += sumTerminal(r as any);
+      for (const r of allD) costDelivery   += sumDelivery(r as any);
+      for (const r of allO) costOperations += sumOperations(r as any);
+      for (const r of allE) {
+        const amt = parseFloat(r.amount as string ?? "0");
+        costExtras += amt;
+        extrasByContainer.set(r.containerId, (extrasByContainer.get(r.containerId) ?? 0) + amt);
+      }
+    }
+
+    const totalCostOfSales = costShipping + costCustoms + costTerminal + costDelivery + costOperations + costExtras;
+    const grossProfit = totalRevenue - totalCostOfSales;
+    const grossMarginPct = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+    // ===== OVERHEAD EXPENSES =====
+    // Note: overheads are organisation-wide; when a client filter is set we still show
+    // company overheads (a client filter on overheads would be meaningless).
+    const ohConds: SQL[] = [];
+    if (fromDate) ohConds.push(gte(overheadExpensesTable.paidAt, fromDate));
+    if (toDate)   ohConds.push(lte(overheadExpensesTable.paidAt, toDate));
+
+    const overheadRows = await db
+      .select({
+        id: overheadExpensesTable.id,
+        amount: overheadExpensesTable.amount,
+        paidAt: overheadExpensesTable.paidAt,
+        category: overheadExpensesTable.category,
+      })
+      .from(overheadExpensesTable)
+      .where(ohConds.length > 0 ? and(...ohConds) : undefined);
+
+    let totalOverheads = 0;
+    const overheadByCategory: Record<string, number> = {};
+    for (const r of overheadRows) {
+      const amt = parseFloat(r.amount as string ?? "0");
+      totalOverheads += amt;
+      const cat = r.category ?? "Other";
+      overheadByCategory[cat] = (overheadByCategory[cat] ?? 0) + amt;
+    }
+
+    // When a client filter is applied, do NOT subtract company-wide overheads from that
+    // client's gross profit — Net Profit only makes sense at the company level.
+    const netProfit = clientIdNum !== null ? grossProfit : grossProfit - totalOverheads;
+    const netMarginPct = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+    const avgProfitPerContainer = containerCount > 0 ? grossProfit / containerCount : 0;
+
+    // ===== MONTHLY BREAKDOWN =====
+    const monthKey = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const months: Record<string, {
+      month: string; revenue: number; costOfSales: number; grossProfit: number; overheads: number; netProfit: number; containerCount: number;
+    }> = {};
+    const ensureMonth = (k: string) => {
+      if (!months[k]) months[k] = { month: k, revenue: 0, costOfSales: 0, grossProfit: 0, overheads: 0, netProfit: 0, containerCount: 0 };
+      return months[k];
+    };
+
+    for (const inv of invoiceRows) {
+      const d = inv.createdAt instanceof Date ? inv.createdAt : new Date(inv.createdAt);
+      ensureMonth(monthKey(d)).revenue += parseFloat(inv.subtotal ?? "0");
+    }
+
+    if (ids.length > 0) {
+      // Per-container month attribution
+      const [allS, allC, allT, allD, allO] = await Promise.all([
+        db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, ids)),
+        db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, ids)),
+        db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, ids)),
+        db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, ids)),
+        db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, ids)),
+      ]);
+      const sMap = new Map<number, any>(allS.map(r => [r.containerId, r]));
+      const cMap = new Map<number, any>(allC.map(r => [r.containerId, r]));
+      const tMap = new Map<number, any>(allT.map(r => [r.containerId, r]));
+      const dMap = new Map<number, any>(allD.map(r => [r.containerId, r]));
+      const oMap = new Map<number, any>(allO.map(r => [r.containerId, r]));
+      for (const c of containers) {
+        const k = monthKey(c.createdAt instanceof Date ? c.createdAt : new Date(c.createdAt));
+        const baseCost = calcTotalCost(sMap.get(c.id) ?? {}, cMap.get(c.id) ?? {}, tMap.get(c.id) ?? {}, dMap.get(c.id) ?? {}, oMap.get(c.id) ?? {});
+        const extras = extrasByContainer.get(c.id) ?? 0;
+        const m = ensureMonth(k);
+        m.costOfSales += baseCost + extras;
+        m.containerCount += 1;
+      }
+    }
+
+    for (const r of overheadRows) {
+      const d = r.paidAt instanceof Date ? r.paidAt : new Date(r.paidAt as any);
+      ensureMonth(monthKey(d)).overheads += parseFloat(r.amount as string ?? "0");
+    }
+
+    for (const m of Object.values(months)) {
+      m.grossProfit = m.revenue - m.costOfSales;
+      m.netProfit = clientIdNum !== null ? m.grossProfit : m.grossProfit - m.overheads;
+    }
+    const monthly = Object.values(months).sort((a, b) => a.month.localeCompare(b.month));
+
+    // Per-client gross profit (only when no specific client filter is applied)
+    const clientsList = await db.select({ id: clientsTable.id, name: clientsTable.name }).from(clientsTable);
+
+    return res.json({
+      period: { from: from ?? null, to: to ?? null },
+      filters: { clientId: clientIdNum },
+      revenue: {
+        totalRevenue,                 // ex-VAT (recognised revenue)
+        totalInvoicedInclVat,         // gross invoiced (informational)
+        totalVatCollected,            // VAT liability (not revenue)
+        invoiceCount: invoiceRows.length,
+        byClient: Object.values(revenueByClient).sort((a, b) => b.revenue - a.revenue),
+        excludesDrafts: true,
+      },
+      costOfSales: {
+        total: totalCostOfSales,
+        shipping: costShipping,
+        customs: costCustoms,
+        terminal: costTerminal,
+        delivery: costDelivery,
+        operations: costOperations,
+        extras: costExtras,
+      },
+      grossProfit,
+      grossMarginPct,
+      overheads: {
+        total: totalOverheads,
+        byCategory: overheadByCategory,
+        appliedToNet: clientIdNum === null,
+      },
+      netProfit,
+      netMarginPct,
+      containerCount,
+      avgProfitPerContainer,
+      monthly,
+      clients: clientsList,
     });
   } catch (err) {
     console.error(err);
