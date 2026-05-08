@@ -823,6 +823,20 @@ function TerminalStageTracker({
   );
 }
 
+const DEPT_STAGE_MAP: Record<string, string> = {
+  shipping: "shipping",
+  terminal: "terminal",
+  "pull-out": "pull_out",
+  transire: "transire_processing",
+};
+
+const DEPT_LABEL_MAP: Record<string, string> = {
+  shipping: "Shipping",
+  terminal: "Terminal",
+  "pull-out": "Pull-Out",
+  transire: "Transire",
+};
+
 function OperationalForm({
   container,
   isAdmin,
@@ -834,6 +848,7 @@ function OperationalForm({
   isShippingUser,
   isTerminalUser,
   isPullOutUser,
+  deptScope,
 }: {
   container: Container;
   isAdmin: boolean;
@@ -845,6 +860,7 @@ function OperationalForm({
   isShippingUser: boolean;
   isTerminalUser: boolean;
   isPullOutUser: boolean;
+  deptScope: string | null;
 }) {
   const { toast } = useToast();
   const updateMutation = useUpdateContainer();
@@ -1040,6 +1056,43 @@ function OperationalForm({
         </CardContent>
       </Card>
     );
+  }
+
+  // Dept-scoped view: when a dept user arrives via ?dept=... param, restrict
+  // the form to show only their stage. If the container has moved to a different
+  // stage, display an informational notice instead of the stage tracker.
+  if (deptScope && !isAdmin) {
+    const expectedStage = DEPT_STAGE_MAP[deptScope];
+    const deptLabel = DEPT_LABEL_MAP[deptScope] ?? deptScope;
+    if (expectedStage && container.status !== expectedStage) {
+      const isPast = (() => {
+        const order = ["registered", "documentation", "duty_assessment", "duty_payment", "transire_processing", "shipping", "terminal", "pull_out", "gate_in", "examination", "final_release", "delivery", "closed"];
+        return order.indexOf(container.status) > order.indexOf(expectedStage);
+      })();
+      return (
+        <Card className={`border-border/50 ${isPast ? "bg-teal-500/5 border-teal-500/20" : "bg-amber-500/5 border-amber-500/20"}`}>
+          <CardContent className="pt-5 pb-5">
+            <div className="flex items-start gap-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isPast ? "bg-teal-500/10" : "bg-amber-500/10"}`}>
+                {isPast
+                  ? <CheckCircle2 className="w-4 h-4 text-teal-400" />
+                  : <AlertTriangle className="w-4 h-4 text-amber-400" />}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {isPast ? `${deptLabel} stage is complete` : `Container not yet at ${deptLabel} stage`}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {isPast
+                    ? `This job has already moved past the ${deptLabel} stage. No further action is needed from your department.`
+                    : `This job is currently at an earlier stage. It will appear in your queue once it reaches the ${deptLabel} stage.`}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
   }
 
   if (isOpsStage) {
@@ -1726,6 +1779,12 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   const currentStageLabel = getStatusLabel(container.status);
   const isPipeline = container.status !== "pending_verification";
 
+  // Read optional ?dept= query param — set by workspace pages when linking to this detail.
+  // When present, the view is scoped to that department (StageRail hidden, dept-specific content).
+  const deptScope = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("dept")
+    : null;
+
   const handleStageNavigate = async (targetStage: string) => {
     try {
       await navMutation.mutateAsync({ id: container.id, status: targetStage });
@@ -1838,7 +1897,7 @@ export default function OperationDetailPage({ params }: { params: { id: string }
         )}
       </div>
 
-      {isPipeline && (
+      {isPipeline && !deptScope && (
         <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
           <CardContent className="pt-4 pb-3">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
@@ -1846,7 +1905,7 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             </p>
             <StageRail
               currentStatus={container.status}
-              onNavigate={(isAdmin || isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser) ? handleStageNavigate : undefined}
+              onNavigate={(isAdmin || isOperationsUser || isDocumentationUser || isAccountsUser || isTerminalManager || isDeliveryUser || isShippingUser || isTerminalUser || isPullOutUser) ? handleStageNavigate : undefined}
               isAdmin={isAdmin ?? false}
               isOperationsUser={(isOperationsUser || isShippingUser || isTerminalUser || isPullOutUser) ?? false}
               isDocumentationUser={isDocumentationUser ?? false}
@@ -1880,6 +1939,7 @@ export default function OperationDetailPage({ params }: { params: { id: string }
             isShippingUser={isShippingUser ?? false}
             isTerminalUser={isTerminalUser ?? false}
             isPullOutUser={isPullOutUser ?? false}
+            deptScope={deptScope}
           />
           <PaarPanel
             container={container}
