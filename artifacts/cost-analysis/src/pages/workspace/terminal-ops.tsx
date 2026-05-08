@@ -201,6 +201,7 @@ export default function TerminalOpsWorkspace() {
           <TabsContent value="completed" className="mt-6">
             <CompletedJobsView
               deptStages={TERMINAL_STAGES}
+              dept="terminal"
               emptyTitle="No jobs submitted yet"
               emptySubtitle="Once Terminal processing is done, jobs will appear here for reference."
             />

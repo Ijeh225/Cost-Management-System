@@ -220,6 +220,7 @@ export default function PullOutWorkspace() {
           <TabsContent value="completed" className="mt-6">
             <CompletedJobsView
               deptStages={PULLOUT_STAGES}
+              dept="pull-out"
               emptyTitle="No jobs released yet"
               emptySubtitle="Once containers are released to Gate-In, they will appear here."
             />

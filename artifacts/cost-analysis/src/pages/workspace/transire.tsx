@@ -177,6 +177,7 @@ export default function TransireWorkspace() {
           <TabsContent value="completed" className="mt-6">
             <CompletedJobsView
               deptStages={TRANSIRE_STAGES}
+              dept="transire"
               emptyTitle="No jobs submitted yet"
               emptySubtitle="Once Transire processing is done, jobs will appear here for reference."
             />

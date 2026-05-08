@@ -201,6 +201,7 @@ export default function ShippingWorkspace() {
           <TabsContent value="completed" className="mt-6">
             <CompletedJobsView
               deptStages={SHIPPING_STAGES}
+              dept="shipping"
               emptyTitle="No jobs released yet"
               emptySubtitle="Once DO is released, jobs will appear here for reference."
             />

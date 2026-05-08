@@ -18,6 +18,8 @@ interface CompletedJobsViewProps {
   /** Empty-state messaging. */
   emptyTitle?: string;
   emptySubtitle?: string;
+  /** Dept param to append to detail links, e.g. "shipping", "terminal", "pull-out", "transire". */
+  dept?: string;
 }
 
 const PAGE_LIMIT = 100;
@@ -28,6 +30,7 @@ export function CompletedJobsView({
   showEditExpenses = true,
   emptyTitle = "No submitted jobs yet",
   emptySubtitle = "Once you submit a job onward, it will appear here for reference.",
+  dept,
 }: CompletedJobsViewProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -128,14 +131,14 @@ export function CompletedJobsView({
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {showEditExpenses && (
-                    <Link href={`${viewBasePath}/${c.id}`}>
+                    <Link href={`${viewBasePath}/${c.id}${dept ? `?dept=${dept}` : ""}`}>
                       <Button size="sm" variant="outline" className="gap-1 text-xs h-8" title="Open job to edit expenses">
                         <Pencil className="w-3 h-3" />
                         Edit
                       </Button>
                     </Link>
                   )}
-                  <Link href={`${viewBasePath}/${c.id}`}>
+                  <Link href={`${viewBasePath}/${c.id}${dept ? `?dept=${dept}` : ""}`}>
                     <Button size="sm" variant="ghost" className="gap-1 text-xs h-8">
                       View <ChevronRight className="w-3 h-3" />
                     </Button>
