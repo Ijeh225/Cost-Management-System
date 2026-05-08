@@ -28,6 +28,8 @@ export type PipelineContainer = {
   releaseDelayReason?: string | null;
   releaseFinalDate?: string | null;
   tdoReleasedAt?: string | null;
+  expectedPulloutDate?: string | null;
+  pulloutReleasedAt?: string | null;
 };
 
 export type PipelineResponse = {

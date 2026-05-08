@@ -32,7 +32,7 @@ function DaysChip({ days }: { days: number }) {
 }
 
 export default function TerminalOpsWorkspace() {
-  const { isAdmin, isTerminalUser } = useAuth();
+  const { isAdmin, isTerminalUser, isShippingTerminalUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -41,7 +41,7 @@ export default function TerminalOpsWorkspace() {
   const { data, isLoading, refetch } = useGetPipeline({ query: { refetchInterval: 30_000 } });
   const advanceMutation = useAdvanceContainerStatus();
 
-  const canAccess = isAdmin || isTerminalUser;
+  const canAccess = isAdmin || isTerminalUser || isShippingTerminalUser;
   useEffect(() => {
     if (!canAccess) setLocation("/");
   }, [canAccess]);

@@ -184,9 +184,9 @@ export default function PullOutWorkspace() {
                           <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.customerName}</p>
                         )}
                         <div className="flex flex-wrap gap-1.5 mt-1.5">
-                          <DateChip label="Expected" date={(c as any).expectedPulloutDate} />
-                          {(c as any).pulloutReleasedAt && (
-                            <DateChip label="Released" date={(c as any).pulloutReleasedAt} />
+                          <DateChip label="Expected" date={c.expectedPulloutDate} />
+                          {c.pulloutReleasedAt && (
+                            <DateChip label="Released" date={c.pulloutReleasedAt} />
                           )}
                         </div>
                       </div>
