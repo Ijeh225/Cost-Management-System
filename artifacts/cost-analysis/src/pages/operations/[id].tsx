@@ -1783,31 +1783,45 @@ export default function OperationDetailPage({ params }: { params: { id: string }
   const currentStageLabel = getStatusLabel(container.status);
   const isPipeline = container.status !== "pending_verification";
 
-  // Derive dept scope from the user's role (role-authoritative).
-  // The ?dept= query param is used only as a secondary hint when the user has no
-  // fixed-dept role (e.g. admin). Non-admin dept users always get their role-derived scope.
-  const ROLE_DEPT_MAP: Record<string, string> = {
-    shipping_user:          "shipping",
-    shipping_terminal_user: "shipping",
-    terminal_user:          "terminal",
-    pull_out_user:          "pull-out",
-    transire_user:          "transire",
-    operations_user:        "transire",
+  // Derive dept scope from the user's role(s) — role-authoritative.
+  // Multi-role users (e.g. shipping_terminal_user) may honor the ?dept= query param
+  // if it corresponds to one of their permitted depts. Single-role users always get
+  // their fixed dept. Admins may use ?dept= freely to preview any dept view.
+  const ROLE_DEPT_MAP: Record<string, string[]> = {
+    shipping_user:          ["shipping"],
+    shipping_terminal_user: ["shipping", "terminal"],
+    terminal_user:          ["terminal"],
+    pull_out_user:          ["pull-out"],
+    transire_user:          ["transire"],
+    operations_user:        ["transire"],
   };
   const { isShippingTerminalUser, isTransireUser } = useAuth();
-  const roleDerivedDept = isShippingUser || isShippingTerminalUser ? "shipping"
-    : isTerminalUser  ? "terminal"
-    : isPullOutUser   ? "pull-out"
-    : isTransireUser || isOperationsUser ? "transire"
-    : null;
+  // Build the set of dept keys this user is allowed to scope to
+  const allowedDepts = new Set<string>([
+    ...(isShippingUser        ? ["shipping"]             : []),
+    ...(isShippingTerminalUser ? ["shipping", "terminal"] : []),
+    ...(isTerminalUser        ? ["terminal"]             : []),
+    ...(isPullOutUser         ? ["pull-out"]             : []),
+    ...(isTransireUser        ? ["transire"]             : []),
+    ...(isOperationsUser      ? ["transire"]             : []),
+  ]);
   const queryDept = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("dept")
     : null;
-  // Non-admin dept users: always use role-derived dept (query param cannot override).
-  // Admins: use query param if present (allows them to preview dept views).
-  const deptScope = !isAdmin && roleDerivedDept
-    ? roleDerivedDept
-    : (isAdmin && queryDept && Object.keys(ROLE_DEPT_MAP).some(r => ROLE_DEPT_MAP[r] === queryDept) ? queryDept : null);
+  // deptScope derivation:
+  // - Admins: use ?dept= if it's a known dept key, else null (no scoping)
+  // - Non-admins with no dept roles: null (no scoping, sees full view)
+  // - Non-admins with exactly one allowed dept: always use that dept (ignores query param)
+  // - Non-admins with multiple allowed depts (e.g. shipping_terminal_user): honor
+  //   ?dept= if it matches one of their depts, else fall back to first dept
+  const VALID_DEPTS = Object.values(ROLE_DEPT_MAP).flat();
+  const deptScope = isAdmin
+    ? (queryDept && VALID_DEPTS.includes(queryDept) ? queryDept : null)
+    : allowedDepts.size === 0
+      ? null
+      : allowedDepts.size === 1
+        ? [...allowedDepts][0]
+        : (queryDept && allowedDepts.has(queryDept) ? queryDept : [...allowedDepts][0]);
 
   const handleStageNavigate = async (targetStage: string) => {
     try {
