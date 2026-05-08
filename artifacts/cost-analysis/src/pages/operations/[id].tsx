@@ -1428,7 +1428,7 @@ function OperationalForm({
       </Card>
       )}
 
-      {isEditable && nextStage && (() => {
+      {isEditable && nextStage && (!deptScope || isAdmin) && (() => {
         const deptRole = isDocumentationUser ? "documentation_user"
           : isAccountsUser    ? "accounts_user"
           : isTerminalManager ? "terminal_manager"
