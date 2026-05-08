@@ -229,7 +229,7 @@ const OPS_STAGE_CONFIG: Record<string, {
 
 function OpsStageTracker({
   container, isEditable, daysInStage, stageOwner, setStageOwner,
-  stageActionMut, advanceMutation, updateMutation, toast,
+  stageActionMut, advanceMutation, updateMutation, toast, deptScope, isAdmin,
 }: {
   container: Container;
   isEditable: boolean;
@@ -240,6 +240,8 @@ function OpsStageTracker({
   advanceMutation: ReturnType<typeof useAdvanceContainerStatus>;
   updateMutation: ReturnType<typeof useUpdateContainer>;
   toast: ReturnType<typeof import("@/hooks/use-toast").useToast>["toast"];
+  deptScope: string | null;
+  isAdmin: boolean;
 }) {
   const cfg = OPS_STAGE_CONFIG[container.status];
   const [localExpectedDate, setLocalExpectedDate] = useState(
@@ -497,8 +499,8 @@ function OpsStageTracker({
         </CardContent>
       </Card>
 
-      {/* Submit to Next Stage — only for Terminal and Pull-Out; Transire/Shipping are data-entry only */}
-      {isEditable && nextStage && ["terminal", "pull_out"].includes(container.status) && (() => {
+      {/* Submit to Next Stage — only for admin or non-dept views; dept users advance via their workspace page */}
+      {isEditable && nextStage && ["terminal", "pull_out"].includes(container.status) && (!deptScope || isAdmin) && (() => {
         const submitLabel = DEPT_SUBMIT_LABELS["operations_user"]?.[container.status] ?? `Submit to ${getStatusLabel(nextStage)}`;
         const handleSubmit = async () => {
           try {
@@ -1106,6 +1108,8 @@ function OperationalForm({
       advanceMutation={advanceMutation}
       updateMutation={updateMutation}
       toast={toast}
+      deptScope={deptScope}
+      isAdmin={isAdmin}
     />;
   }
 
