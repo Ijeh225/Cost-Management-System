@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useGetPipeline, useAdvanceContainerStatus } from "@workspace/api-client-react";
+import { useGetPipeline, useAdvanceContainerStatus, useMarkTdoReleased } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Loader2, Search, Clock, SendHorizonal, ChevronRight,
-  CheckCircle2, Zap, Anchor, Circle,
+  CheckCircle2, Zap, Anchor, Circle, FileCheck,
 } from "lucide-react";
 import { CompletedJobsView } from "@/components/workspace/completed-jobs-view";
 
@@ -52,6 +52,7 @@ export default function ShippingTerminalWorkspace() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const advance = useAdvanceContainerStatus();
+  const markTdo = useMarkTdoReleased();
 
   const { data, isLoading } = useGetPipeline({ query: { refetchInterval: 30_000 } });
 
@@ -62,8 +63,9 @@ export default function ShippingTerminalWorkspace() {
 
   if (!canAccess) return null;
 
+  // Filter by actual container status to avoid duplicates from pipeline mirroring
   const allContainers = DEPT_STAGES.flatMap(s =>
-    (data?.stages?.[s] ?? []).map(c => ({ ...c, stage: s }))
+    (data?.stages?.[s] ?? []).filter(c => c.status === s).map(c => ({ ...c, stage: s }))
   );
 
   const filtered = search.trim()
@@ -82,6 +84,18 @@ export default function ShippingTerminalWorkspace() {
       {
         onSuccess: () =>
           toast({ title: `DO Released — ${c.containerNumber} moved to Terminal.` }),
+        onError: e =>
+          toast({ title: "Error", description: (e as Error).message, variant: "destructive" }),
+      }
+    );
+  };
+
+  const handleMarkTdoReleased = (c: (typeof filtered)[0]) => {
+    markTdo.mutate(
+      { id: c.id },
+      {
+        onSuccess: () =>
+          toast({ title: `TDO Released — ${c.containerNumber} is ready for Pull-Out.` }),
         onError: e =>
           toast({ title: "Error", description: (e as Error).message, variant: "destructive" }),
       }
@@ -161,10 +175,10 @@ export default function ShippingTerminalWorkspace() {
             ) : (
               <div className="space-y-2">
                 {filtered.map(c => {
-                  const inShipping  = c.stage === "shipping";
-                  const inTerminal  = c.stage === "terminal";
-                  const doReleased  = inTerminal; // if it's in terminal, DO was already released
-                  const tdreleased  = false;       // TDO done = submitted to pull_out (won't appear here)
+                  const inShipping  = c.status === "shipping";
+                  const inTerminal  = c.status === "terminal";
+                  const doReleased  = inTerminal;
+                  const tdoReleased = inTerminal && !!c.tdoReleasedAt;
 
                   return (
                     <Card
@@ -198,7 +212,7 @@ export default function ShippingTerminalWorkspace() {
                         {/* Sub-step progress indicators */}
                         <div className="flex items-center gap-2 mt-2">
                           <StepIndicator done={doReleased} label="DO Released" />
-                          <StepIndicator done={tdreleased} label="TDO Released" />
+                          <StepIndicator done={tdoReleased} label="TDO Released" />
                         </div>
                       </div>
 
@@ -227,7 +241,21 @@ export default function ShippingTerminalWorkspace() {
                             }
                             Mark DO Released
                           </Button>
-                        ) : inTerminal ? (
+                        ) : inTerminal && !tdoReleased ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="gap-1.5 text-xs h-8 border border-amber-500/30 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
+                            onClick={() => handleMarkTdoReleased(c)}
+                            disabled={markTdo.isPending}
+                          >
+                            {markTdo.isPending
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <FileCheck className="w-3 h-3" />
+                            }
+                            Mark TDO Released
+                          </Button>
+                        ) : inTerminal && tdoReleased ? (
                           <Button
                             size="sm"
                             className="gap-1.5 text-xs h-8"

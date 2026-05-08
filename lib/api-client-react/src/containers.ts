@@ -88,6 +88,22 @@ export function useAdvanceContainerStatus() {
   });
 }
 
+export function useMarkTdoReleased() {
+  const qc = useQueryClient();
+  return useMutation<Record<string, unknown>, Error, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch(`/api/containers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ tdoReleasedAt: new Date().toISOString() }),
+        headers: { "Content-Type": "application/json" },
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
+    },
+  });
+}
+
 export type StageControlFields = {
   stageOwner?: string | null;
   nextAction?: string | null;
