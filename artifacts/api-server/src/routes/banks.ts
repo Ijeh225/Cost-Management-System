@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, banksTable, bankTransfersTable, usersTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable } from "@workspace/db";
+import { eq, desc, and, gte, lte, or } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 
 export const banksRouter = Router();
@@ -106,6 +106,256 @@ banksRouter.get("/banks/transfers", requireAuth, async (_req, res) => {
     })));
   } catch (err) {
     console.error("GET /banks/transfers error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Bank Detail ───────────────────────────────────────────────────────────
+
+banksRouter.get("/banks/:id", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+    const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, id));
+    if (!bank) { res.status(404).json({ error: "Bank not found" }); return; }
+    res.json(bank);
+  } catch (err) {
+    console.error("GET /banks/:id error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Bank Transaction History ───────────────────────────────────────────────
+
+banksRouter.get("/banks/:id/transactions", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+    const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, id));
+    if (!bank) { res.status(404).json({ error: "Bank not found" }); return; }
+
+    const fromDate = req.query.from ? new Date(req.query.from as string) : null;
+    const toDate   = req.query.to   ? new Date(req.query.to as string)   : null;
+    const typeFilter = req.query.type as string | undefined;
+
+    type RawTx = {
+      id: string;
+      date: Date;
+      type: "payment" | "deposit" | "transfer_in" | "transfer_out";
+      description: string;
+      reference: string | null;
+      clientName: string | null;
+      invoiceNumber: string | null;
+      debit: number;
+      credit: number;
+    };
+
+    const txs: RawTx[] = [];
+
+    // 1. Invoice payments credited to this bank
+    if (!typeFilter || typeFilter === "payment") {
+      const paymentConditions: any[] = [eq(invoicePaymentsTable.bankId, id)];
+      if (fromDate) paymentConditions.push(gte(invoicePaymentsTable.paidAt, fromDate));
+      if (toDate)   paymentConditions.push(lte(invoicePaymentsTable.paidAt, toDate));
+
+      const payments = await db
+        .select({
+          id: invoicePaymentsTable.id,
+          amount: invoicePaymentsTable.amount,
+          paidAt: invoicePaymentsTable.paidAt,
+          reference: invoicePaymentsTable.reference,
+          notes: invoicePaymentsTable.notes,
+          paymentMethod: invoicePaymentsTable.paymentMethod,
+          invoiceId: invoicePaymentsTable.invoiceId,
+          invoiceNumber: invoicesTable.invoiceNumber,
+          clientId: invoicesTable.clientId,
+          clientName: clientsTable.name,
+        })
+        .from(invoicePaymentsTable)
+        .leftJoin(invoicesTable, eq(invoicePaymentsTable.invoiceId, invoicesTable.id))
+        .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+        .where(and(...paymentConditions));
+
+      for (const p of payments) {
+        txs.push({
+          id: `payment_${p.id}`,
+          date: p.paidAt,
+          type: "payment",
+          description: `Invoice payment — ${p.invoiceNumber ?? `INV-${p.invoiceId}`}${p.notes ? ` (${p.notes})` : ""}`,
+          reference: p.reference || null,
+          clientName: p.clientName ?? null,
+          invoiceNumber: p.invoiceNumber ?? null,
+          debit: 0,
+          credit: parseFloat(p.amount),
+        });
+      }
+    }
+
+    // 2. Client deposits credited to this bank
+    if (!typeFilter || typeFilter === "deposit") {
+      const depositConditions: any[] = [eq(clientDepositsTable.bankId, id)];
+      if (fromDate) depositConditions.push(gte(clientDepositsTable.createdAt, fromDate));
+      if (toDate)   depositConditions.push(lte(clientDepositsTable.createdAt, toDate));
+
+      const deposits = await db
+        .select({
+          id: clientDepositsTable.id,
+          amount: clientDepositsTable.amount,
+          createdAt: clientDepositsTable.createdAt,
+          reference: clientDepositsTable.reference,
+          notes: clientDepositsTable.notes,
+          paymentMethod: clientDepositsTable.paymentMethod,
+          clientName: clientsTable.name,
+        })
+        .from(clientDepositsTable)
+        .leftJoin(clientsTable, eq(clientDepositsTable.clientId, clientsTable.id))
+        .where(and(...depositConditions));
+
+      for (const d of deposits) {
+        txs.push({
+          id: `deposit_${d.id}`,
+          date: d.createdAt,
+          type: "deposit",
+          description: `Client deposit${d.notes ? ` — ${d.notes}` : ""}`,
+          reference: d.reference ?? null,
+          clientName: d.clientName ?? null,
+          invoiceNumber: null,
+          debit: 0,
+          credit: parseFloat(d.amount),
+        });
+      }
+    }
+
+    // 3. Internal transfers in (this bank is the destination)
+    if (!typeFilter || typeFilter === "transfer_in") {
+      const inConditions: any[] = [eq(bankTransfersTable.toBankId, id)];
+      if (fromDate) inConditions.push(gte(bankTransfersTable.createdAt, fromDate));
+      if (toDate)   inConditions.push(lte(bankTransfersTable.createdAt, toDate));
+
+      const transfersIn = await db
+        .select({
+          id: bankTransfersTable.id,
+          amount: bankTransfersTable.amount,
+          createdAt: bankTransfersTable.createdAt,
+          reference: bankTransfersTable.reference,
+          narration: bankTransfersTable.narration,
+          fromBankId: bankTransfersTable.fromBankId,
+        })
+        .from(bankTransfersTable)
+        .where(and(...inConditions));
+
+      const fromBankIds = [...new Set(transfersIn.map(t => t.fromBankId).filter(Boolean))];
+      const fromBankMap: Record<number, string> = {};
+      if (fromBankIds.length > 0) {
+        const bRows = await db.select({ id: banksTable.id, name: banksTable.name }).from(banksTable);
+        bRows.forEach(b => { fromBankMap[b.id] = b.name; });
+      }
+
+      for (const t of transfersIn) {
+        const fromName = t.fromBankId ? (fromBankMap[t.fromBankId] ?? "Unknown") : "Unknown";
+        txs.push({
+          id: `transfer_in_${t.id}`,
+          date: t.createdAt,
+          type: "transfer_in",
+          description: `Transfer in from ${fromName}${t.narration ? ` — ${t.narration}` : ""}`,
+          reference: t.reference ?? null,
+          clientName: null,
+          invoiceNumber: null,
+          debit: 0,
+          credit: parseFloat(t.amount),
+        });
+      }
+    }
+
+    // 4. Internal transfers out (this bank is the source)
+    if (!typeFilter || typeFilter === "transfer_out") {
+      const outConditions: any[] = [eq(bankTransfersTable.fromBankId, id)];
+      if (fromDate) outConditions.push(gte(bankTransfersTable.createdAt, fromDate));
+      if (toDate)   outConditions.push(lte(bankTransfersTable.createdAt, toDate));
+
+      const transfersOut = await db
+        .select({
+          id: bankTransfersTable.id,
+          amount: bankTransfersTable.amount,
+          createdAt: bankTransfersTable.createdAt,
+          reference: bankTransfersTable.reference,
+          narration: bankTransfersTable.narration,
+          toBankId: bankTransfersTable.toBankId,
+        })
+        .from(bankTransfersTable)
+        .where(and(...outConditions));
+
+      const toBankIds = [...new Set(transfersOut.map(t => t.toBankId).filter(Boolean))];
+      const toBankMap: Record<number, string> = {};
+      if (toBankIds.length > 0) {
+        const bRows = await db.select({ id: banksTable.id, name: banksTable.name }).from(banksTable);
+        bRows.forEach(b => { toBankMap[b.id] = b.name; });
+      }
+
+      for (const t of transfersOut) {
+        const toName = t.toBankId ? (toBankMap[t.toBankId] ?? "Unknown") : "Unknown";
+        txs.push({
+          id: `transfer_out_${t.id}`,
+          date: t.createdAt,
+          type: "transfer_out",
+          description: `Transfer out to ${toName}${t.narration ? ` — ${t.narration}` : ""}`,
+          reference: t.reference ?? null,
+          clientName: null,
+          invoiceNumber: null,
+          debit: parseFloat(t.amount),
+          credit: 0,
+        });
+      }
+    }
+
+    // Sort all transactions by date ascending to compute running balance
+    txs.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    let balance = 0;
+    let totalCredits = 0;
+    let totalDebits = 0;
+    const openingBalance = 0;
+
+    const result = txs.map(tx => {
+      balance += tx.credit - tx.debit;
+      totalCredits += tx.credit;
+      totalDebits += tx.debit;
+      return {
+        id: tx.id,
+        date: tx.date instanceof Date ? tx.date.toISOString() : tx.date,
+        type: tx.type,
+        description: tx.description,
+        reference: tx.reference,
+        clientName: tx.clientName,
+        invoiceNumber: tx.invoiceNumber,
+        debit: tx.debit,
+        credit: tx.credit,
+        balance,
+      };
+    });
+
+    // Return in descending date order for display (most recent first)
+    result.reverse();
+
+    res.json({
+      bank: {
+        id: bank.id,
+        name: bank.name,
+        accountNumber: bank.accountNumber,
+        bankCode: bank.bankCode,
+        isActive: bank.isActive,
+        createdAt: bank.createdAt instanceof Date ? bank.createdAt.toISOString() : bank.createdAt,
+        updatedAt: bank.updatedAt instanceof Date ? bank.updatedAt.toISOString() : bank.updatedAt,
+      },
+      transactions: result,
+      openingBalance,
+      closingBalance: balance,
+      totalCredits,
+      totalDebits,
+    });
+  } catch (err) {
+    console.error("GET /banks/:id/transactions error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });

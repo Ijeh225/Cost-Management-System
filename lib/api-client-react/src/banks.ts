@@ -41,6 +41,28 @@ export type CreateBankTransferBody = {
   reference?: string;
 };
 
+export type BankTransaction = {
+  id: string;
+  date: string;
+  type: "payment" | "deposit" | "transfer_in" | "transfer_out";
+  description: string;
+  reference: string | null;
+  clientName: string | null;
+  invoiceNumber: string | null;
+  debit: number;
+  credit: number;
+  balance: number;
+};
+
+export type BankTransactionResponse = {
+  bank: Bank;
+  transactions: BankTransaction[];
+  openingBalance: number;
+  closingBalance: number;
+  totalCredits: number;
+  totalDebits: number;
+};
+
 export const BANKS_QUERY_KEY = ["/api/banks"];
 export const BANK_TRANSFERS_QUERY_KEY = ["/api/banks/transfers"];
 
@@ -97,6 +119,22 @@ export function useListBankTransfers() {
   return useQuery({
     queryKey: BANK_TRANSFERS_QUERY_KEY,
     queryFn: () => customFetch<BankTransfer[]>("/api/banks/transfers"),
+  });
+}
+
+export function useGetBankTransactions(
+  id: number | null,
+  params?: { from?: string; to?: string; type?: string }
+) {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to)   qs.set("to", params.to);
+  if (params?.type) qs.set("type", params.type);
+  const url = `/api/banks/${id}/transactions${qs.toString() ? `?${qs}` : ""}`;
+  return useQuery<BankTransactionResponse>({
+    queryKey: [...BANKS_QUERY_KEY, id, "transactions", params?.from ?? "", params?.to ?? "", params?.type ?? ""],
+    queryFn: () => customFetch<BankTransactionResponse>(url),
+    enabled: !!id,
   });
 }
 

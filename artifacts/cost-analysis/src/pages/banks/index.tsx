@@ -23,9 +23,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Link } from "wouter";
 import {
   Landmark, Plus, Pencil, Trash2, Loader2, ToggleLeft, ToggleRight, Building2,
-  ArrowLeftRight, ArrowRight, User, Calendar,
+  ArrowLeftRight, ArrowRight, User, Calendar, FileText,
 } from "lucide-react";
 
 function formatCurrency(n: number) {
@@ -263,6 +264,11 @@ function BankCard({
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              <Link href={`/banks/${bank.id}`}>
+                <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-foreground" title="View Statement">
+                  <FileText className="w-3.5 h-3.5" />
+                </Button>
+              </Link>
               <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-foreground" onClick={() => onEdit(bank)} title="Edit">
                 <Pencil className="w-3.5 h-3.5" />
               </Button>

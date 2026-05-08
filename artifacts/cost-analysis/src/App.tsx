@@ -37,6 +37,7 @@ import OperationDetailPage from "@/pages/operations/[id]";
 import ArPage from "@/pages/ar/index";
 import DutyPaymentsPage from "@/pages/duty-payments/index";
 import BanksPage from "@/pages/banks/index";
+import BankDetailPage from "@/pages/banks/[id]";
 import DocumentationWorkspace from "@/pages/workspace/documentation";
 import AccountsWorkspace from "@/pages/workspace/accounts";
 import TransireWorkspace from "@/pages/workspace/transire";
@@ -179,6 +180,9 @@ function Router() {
               <Route path="/duty-payments" component={DutyPaymentsPage} />
               <Route path="/banks">
                 <AdminGuard><BanksPage /></AdminGuard>
+              </Route>
+              <Route path="/banks/:id">
+                <AdminGuard><BankDetailPage /></AdminGuard>
               </Route>
               <Route path="/workspace/documentation" component={() => { const [, nav] = useLocation(); nav("/documentation", { replace: true }); return null; }} />
               <Route path="/workspace/accounts" component={AccountsWorkspace} />
