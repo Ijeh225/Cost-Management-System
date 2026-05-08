@@ -97,9 +97,9 @@ export function AppSidebar() {
     ...(isDocumentationUser ? [{ title: "My Jobs",            url: "/documentation",           icon: FileCheck2  }] : []),
     ...(isAccountsUser      ? [{ title: "Duty Payments",      url: "/duty-payments",           icon: Banknote    },
                                 { title: "Accounts Workspace", url: "/workspace/accounts",      icon: BookOpen    }] : []),
-    ...(isTransireUser || isOperationsUser
+    ...(isTransireUser
                             ? [{ title: "Transire Jobs",      url: "/workspace/transire",      icon: FileCheck2  }] : []),
-    ...(isShippingTerminalUser || isShippingUser || isTerminalUser || isOperationsUser
+    ...(isShippingTerminalUser || isShippingUser || isTerminalUser
                             ? [{ title: "Shipping & Terminal", url: "/workspace/shipping-terminal", icon: Ship }] : []),
     ...(isPullOutUser       ? [{ title: "Pull-Out Jobs",      url: "/workspace/pull-out",      icon: PackageOpen }] : []),
     ...(isTerminalManager   ? [{ title: "Terminal Workspace", url: "/workspace/terminal",      icon: Building2   }] : []),

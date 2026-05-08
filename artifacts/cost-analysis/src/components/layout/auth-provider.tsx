@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           terminal_user:          "/workspace/shipping-terminal",
           pull_out_user:          "/workspace/pull-out",
           shipping_terminal_user: "/workspace/shipping-terminal",
-          operations_user:        "/workspace/transire",
+          operations_user:        "/",
           documentation_user:     "/documentation",
           accounts_user:          "/workspace/accounts",
           terminal_manager:       "/workspace/terminal",

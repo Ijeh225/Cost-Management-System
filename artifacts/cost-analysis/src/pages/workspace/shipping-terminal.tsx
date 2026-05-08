@@ -56,7 +56,7 @@ export default function ShippingTerminalWorkspace() {
 
   const { data, isLoading } = useGetPipeline({ query: { refetchInterval: 30_000 } });
 
-  const canAccess = isAdmin || isShippingTerminalUser || isShippingUser || isTerminalUser || isOperationsUser;
+  const canAccess = isAdmin || isShippingTerminalUser || isShippingUser || isTerminalUser;
   useEffect(() => {
     if (!canAccess) setLocation("/");
   }, [canAccess]);

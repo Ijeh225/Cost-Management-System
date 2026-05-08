@@ -39,7 +39,7 @@ export default function TransireWorkspace() {
 
   const { data, isLoading } = useGetPipeline({ query: { refetchInterval: 30_000 } });
 
-  const canAccess = isAdmin || isTransireUser || isOperationsUser;
+  const canAccess = isAdmin || isTransireUser;
   useEffect(() => {
     if (!canAccess) setLocation("/");
   }, [canAccess]);
