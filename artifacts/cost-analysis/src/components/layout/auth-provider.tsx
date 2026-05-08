@@ -118,10 +118,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const roles: string[] = (effectiveUser as any)?.roles ?? [role];
         const deptHomeMap: Record<string, string> = {
           transire_user:          "/workspace/transire",
-          shipping_user:          "/workspace/shipping",
-          terminal_user:          "/workspace/terminal-ops",
+          shipping_user:          "/workspace/shipping-terminal",
+          terminal_user:          "/workspace/shipping-terminal",
           pull_out_user:          "/workspace/pull-out",
-          shipping_terminal_user: "/workspace/shipping",
+          shipping_terminal_user: "/workspace/shipping-terminal",
           operations_user:        "/workspace/transire",
           documentation_user:     "/documentation",
           accounts_user:          "/workspace/accounts",

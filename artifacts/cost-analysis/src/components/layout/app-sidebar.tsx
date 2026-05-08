@@ -99,12 +99,8 @@ export function AppSidebar() {
                                 { title: "Accounts Workspace", url: "/workspace/accounts",      icon: BookOpen    }] : []),
     ...(isTransireUser || isOperationsUser
                             ? [{ title: "Transire Jobs",      url: "/workspace/transire",      icon: FileCheck2  }] : []),
-    ...(isShippingTerminalUser
+    ...(isShippingTerminalUser || isShippingUser || isTerminalUser || isOperationsUser
                             ? [{ title: "Shipping & Terminal", url: "/workspace/shipping-terminal", icon: Ship }] : []),
-    ...(!isShippingTerminalUser && (isShippingUser || isOperationsUser)
-                            ? [{ title: "Shipping Jobs",      url: "/workspace/shipping",      icon: Ship        }] : []),
-    ...(!isShippingTerminalUser && isTerminalUser
-                            ? [{ title: "Terminal Jobs",      url: "/workspace/terminal-ops",  icon: Building2   }] : []),
     ...(isPullOutUser       ? [{ title: "Pull-Out Jobs",      url: "/workspace/pull-out",      icon: PackageOpen }] : []),
     ...(isTerminalManager   ? [{ title: "Terminal Workspace", url: "/workspace/terminal",      icon: Building2   }] : []),
     ...(isDeliveryUser      ? [{ title: "Deliveries",         url: "/workspace/delivery",      icon: Truck       },
