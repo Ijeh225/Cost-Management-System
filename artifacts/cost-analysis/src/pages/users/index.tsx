@@ -209,7 +209,7 @@ function CreateUserDialog() {
 
   const form = useForm({
     resolver: zodResolver(createSchema),
-    defaultValues: { name: "", email: "", password: "", role: "staff" as const },
+    defaultValues: { name: "", email: "", password: "", role: "staff" as typeof ALL_ROLES[number] },
   });
 
   const watchedRole = form.watch("role");

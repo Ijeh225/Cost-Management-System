@@ -68,7 +68,7 @@ export default function GatePage() {
 
   const { data: searchData, isLoading: searching } = useListContainers(
     { page: 1, limit: 10, search: debouncedSearch || undefined },
-    { query: { enabled: debouncedSearch.length >= 2 } }
+    { query: { enabled: debouncedSearch.length >= 2, queryKey: ["gate-search-containers", debouncedSearch] } }
   );
 
   const { data: logData, isLoading: logLoading, refetch: refetchLog } = useGetGateLog(
