@@ -137,7 +137,7 @@ function ExpenseFormDialog({
 }
 
 export default function OverheadExpensesPage() {
-  const { isAdmin, isAccountsUser } = useAuth();
+  const { isAdmin } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -148,9 +148,8 @@ export default function OverheadExpensesPage() {
   const [editTarget, setEditTarget] = useState<OverheadExpense | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
-  const canAccess = isAdmin || isAccountsUser;
-  useEffect(() => { if (!canAccess) setLocation("/"); }, [canAccess]);
-  if (!canAccess) return null;
+  useEffect(() => { if (!isAdmin) setLocation("/"); }, [isAdmin]);
+  if (!isAdmin) return null;
 
   const { data, isLoading } = useGetOverheadExpenses({
     category: filterCategory !== "all" ? filterCategory : undefined,
