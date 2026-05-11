@@ -44,7 +44,7 @@ export default function ContainerPaymentsPage() {
 
   const { data: categories = [], isLoading: catsLoading } = useGetContainerExpenseCategories();
   const { data: banks = [] } = useActiveBanks();
-  const { data: recentPayments = [], refetch: refetchRecent } = useGetRecentContainerExpensePayments(50);
+  const { data: recentPayments = [], refetch: refetchRecent } = useGetRecentContainerExpensePayments(20);
 
   const createCategory = useCreateContainerExpenseCategory();
   const deleteCategory = useDeleteContainerExpenseCategory();
@@ -473,7 +473,7 @@ export default function ContainerPaymentsPage() {
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">Total Payments</p>
                 <p className="text-2xl font-bold font-mono mt-1">{recentPayments.length}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Last 50 records</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Last 20 records</p>
               </CardContent>
             </Card>
             <Card className="border-border/40 bg-card/40">
@@ -482,7 +482,7 @@ export default function ContainerPaymentsPage() {
                 <p className="text-lg font-bold font-mono mt-1 leading-tight">
                   {formatCurrency(recentPayments.reduce((s, p) => s + p.amount, 0))}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Last 50 records</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Last 20 records</p>
               </CardContent>
             </Card>
           </div>

@@ -105,42 +105,50 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, 
 
     const paidAtDate = paidAt ? new Date(paidAt) : new Date();
     const resolvedBankId = paymentMethod === "bank" && bankId ? Number(bankId) : null;
+    const actorId = req.user?.id ?? null;
 
-    const inserted = await db.insert(containerExpensePaymentsTable).values(
-      items.map(item => ({
-        containerId: Number(item.containerId),
-        categoryId: Number(categoryId),
-        amount: String(item.amount),
-        paymentMethod,
-        bankId: resolvedBankId,
-        reference: reference || null,
-        narration: narration || null,
-        paidAt: paidAtDate,
-        recordedBy: req.user?.id ?? null,
-      }))
-    ).returning();
-
-    // Write one audit log entry per container so the event appears in each
-    // container's Audit Trail tab.
-    if (req.user?.id && inserted.length > 0) {
-      const auditEntries = inserted.map(p => ({
-        containerId: p.containerId,
-        userId: req.user!.id,
-        action: "expense_payment_recorded" as const,
-        section: "payments",
-        newValue: JSON.stringify({
-          paymentId: p.id,
-          category: cat.name,
-          amount: parseFloat(p.amount ?? "0"),
+    // Wrap both inserts in a single transaction so a failure in either rolls
+    // back all writes atomically — essential for a financial sync operation.
+    const inserted = await db.transaction(async (tx) => {
+      const payments = await tx.insert(containerExpensePaymentsTable).values(
+        items.map(item => ({
+          containerId: Number(item.containerId),
+          categoryId: Number(categoryId),
+          amount: String(item.amount),
           paymentMethod,
-          bankId: resolvedBankId ?? null,
+          bankId: resolvedBankId,
           reference: reference || null,
           narration: narration || null,
-          paidAt: paidAtDate.toISOString(),
-        }),
-      }));
-      await db.insert(auditLogTable).values(auditEntries);
-    }
+          paidAt: paidAtDate,
+          recordedBy: actorId,
+        }))
+      ).returning();
+
+      // Write one audit log entry per container so the event appears in each
+      // container's Audit Trail tab.
+      if (actorId && payments.length > 0) {
+        await tx.insert(auditLogTable).values(
+          payments.map(p => ({
+            containerId: p.containerId,
+            userId: actorId,
+            action: "expense_payment_recorded" as const,
+            section: "payments",
+            newValue: JSON.stringify({
+              paymentId: p.id,
+              category: cat.name,
+              amount: parseFloat(p.amount ?? "0"),
+              paymentMethod,
+              bankId: resolvedBankId ?? null,
+              reference: reference || null,
+              narration: narration || null,
+              paidAt: paidAtDate.toISOString(),
+            }),
+          }))
+        );
+      }
+
+      return payments;
+    });
 
     res.status(201).json({ ok: true, count: inserted.length, payments: inserted.map(p => ({
       id: p.id,

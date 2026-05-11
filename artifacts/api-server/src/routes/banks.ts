@@ -184,7 +184,7 @@ banksRouter.get("/banks/:id/transactions", requireAdmin, async (req, res) => {
     type RawTx = {
       id: string;
       date: Date;
-      type: "payment" | "deposit" | "transfer_in" | "transfer_out";
+      type: "payment" | "deposit" | "transfer_in" | "transfer_out" | "fund_addition" | "expense_payment" | "container_expense_payment";
       description: string;
       reference: string | null;
       clientName: string | null;
@@ -372,7 +372,7 @@ banksRouter.get("/banks/:id/transactions", requireAdmin, async (req, res) => {
         txs.push({
           id: `fund_addition_${f.id}`,
           date: f.createdAt,
-          type: "fund_addition" as any,
+          type: "fund_addition" as const,
           description: `Fund addition${f.narration ? ` — ${f.narration}` : ""}`,
           reference: f.reference ?? null,
           clientName: null,
@@ -408,7 +408,7 @@ banksRouter.get("/banks/:id/transactions", requireAdmin, async (req, res) => {
         txs.push({
           id: `container_expense_payment_${cep.id}`,
           date: cep.paidAt,
-          type: "container_expense_payment" as any,
+          type: "container_expense_payment" as const,
           description: `${cep.categoryName ?? "Container Expense"} — ${cep.containerNumber ?? "Container"}${cep.narration ? ` (${cep.narration})` : ""}`,
           reference: cep.reference ?? null,
           clientName: null,
@@ -442,7 +442,7 @@ banksRouter.get("/banks/:id/transactions", requireAdmin, async (req, res) => {
         txs.push({
           id: `expense_payment_${ep.id}`,
           date: ep.paidAt,
-          type: "expense_payment" as any,
+          type: "expense_payment" as const,
           description: `Expense — ${ep.category ?? "Overhead"}${ep.description ? `: ${ep.description}` : ""}${ep.notes ? ` (${ep.notes})` : ""}`,
           reference: null,
           clientName: null,
