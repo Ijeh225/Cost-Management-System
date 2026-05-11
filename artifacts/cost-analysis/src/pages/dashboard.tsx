@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger } from "@workspace/api-client-react";
+import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import {
   Box, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity,
   FileText, CheckCircle2, ArrowRight, ClipboardCheck, ListTodo,
   Brain, ShieldAlert, Clock, ExternalLink, X, ChevronDown, ChevronUp,
-  Wallet, CreditCard, ReceiptText, ShieldCheck,
+  Wallet, CreditCard, ReceiptText, ShieldCheck, Landmark,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -330,6 +330,38 @@ function TerminalDrillDown({ list, onClose }: {
   );
 }
 
+function BankBalanceBar() {
+  const { data: banks, isLoading } = useListBanks();
+  const activeBanks = (banks ?? []).filter((b: any) => b.isActive);
+  if (isLoading) return (
+    <div className="flex gap-3 overflow-x-auto pb-1">
+      {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-44 shrink-0 rounded-xl" />)}
+    </div>
+  );
+  if (!activeBanks.length) return null;
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin">
+      {activeBanks.map((b: any) => {
+        const bal = Number(b.currentBalance ?? 0);
+        const isPositive = bal >= 0;
+        return (
+          <Link key={b.id} href={`/banks/${b.id}`}>
+            <div className="shrink-0 min-w-[160px] rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm px-4 py-3 hover:bg-card/80 transition-colors cursor-pointer group">
+              <div className="flex items-center gap-2 mb-1">
+                <Landmark className="w-3.5 h-3.5 text-primary shrink-0" />
+                <p className="text-xs font-medium text-muted-foreground truncate max-w-[120px] group-hover:text-foreground transition-colors">{b.name}</p>
+              </div>
+              <p className={`text-sm font-bold font-mono tracking-tight ${isPositive ? "text-emerald-400" : "text-destructive"}`}>
+                {formatCurrency(bal)}
+              </p>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { isAdmin } = useAuth();
   const [terminalDrillOpen, setTerminalDrillOpen] = useState(false);
@@ -372,6 +404,9 @@ export default function Dashboard() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
+      {/* Bank balance quick-view bar */}
+      <BankBalanceBar />
+
       {/* Header row: title + alert beacon + search */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

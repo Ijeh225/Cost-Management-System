@@ -113,7 +113,7 @@ function ExpenseFormDialog({
               <Select onValueChange={field.onChange} value={field.value}>
                 <SelectTrigger><SelectValue placeholder="No bank selected" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No bank</SelectItem>
+                  <SelectItem value="none">No bank</SelectItem>
                   {(banks ?? []).map(b => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -166,7 +166,7 @@ export default function OverheadExpensesPage() {
       category: values.category,
       description: values.description,
       amount: values.amount,
-      bankId: values.bankId ? Number(values.bankId) : null,
+      bankId: values.bankId && values.bankId !== "none" ? Number(values.bankId) : null,
       paidAt: values.paidAt,
       reference: values.reference || undefined,
     }, {
@@ -183,7 +183,7 @@ export default function OverheadExpensesPage() {
         category: values.category,
         description: values.description,
         amount: values.amount,
-        bankId: values.bankId ? Number(values.bankId) : null,
+        bankId: values.bankId && values.bankId !== "none" ? Number(values.bankId) : null,
         paidAt: values.paidAt,
         reference: values.reference || undefined,
       },
