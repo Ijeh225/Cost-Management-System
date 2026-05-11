@@ -36,7 +36,8 @@ function TxTypeBadge({ type }: { type: BankTransaction["type"] }) {
     deposit:       { label: "Deposit",       cls: "bg-blue-500/10 text-blue-400 border-blue-500/30",         icon: ArrowDownLeft },
     transfer_in:   { label: "Transfer In",   cls: "bg-violet-500/10 text-violet-400 border-violet-500/30",   icon: ArrowDownLeft },
     transfer_out:  { label: "Transfer Out",  cls: "bg-amber-500/10 text-amber-400 border-amber-500/30",      icon: ArrowUpRight },
-    fund_addition: { label: "Fund Addition", cls: "bg-teal-500/10 text-teal-400 border-teal-500/30",         icon: ArrowDownLeft },
+    fund_addition:    { label: "Fund Addition",    cls: "bg-teal-500/10 text-teal-400 border-teal-500/30",   icon: ArrowDownLeft },
+    expense_payment:  { label: "Expense Payment",  cls: "bg-red-500/10 text-red-400 border-red-500/30",       icon: ArrowUpRight },
   }[type] ?? { label: type, cls: "bg-muted/60 text-muted-foreground border-border/40", icon: Receipt };
   const Icon = config.icon;
   return (
@@ -346,6 +347,7 @@ export default function BankDetailPage() {
                   <SelectItem value="transfer_in">Transfers In</SelectItem>
                   <SelectItem value="transfer_out">Transfers Out</SelectItem>
                   <SelectItem value="fund_addition">Fund Additions</SelectItem>
+                  <SelectItem value="expense_payment">Expense Payments</SelectItem>
                 </SelectContent>
               </Select>
             </div>

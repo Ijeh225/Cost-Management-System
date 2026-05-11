@@ -1,0 +1,86 @@
+Overhead Expenses Module Improvements
+
+We need to improve the Record Overhead Expenses feature to make it more flexible and accounting-friendly.
+
+1. Custom Expense Categories
+
+Currently, the system only uses predefined expense categories.
+
+I want users to also be able to:
+
+Create their own custom expense categories
+Edit categories
+Manage categories dynamically
+Example:
+
+Apart from default categories, users should be able to create categories like:
+
+Diesel Advance
+Emergency Repairs
+Driver Welfare
+Customs Settlement
+Terminal Miscellaneous
+Etc.
+
+These created categories should automatically appear in the expense category dropdown.
+
+2. Partial Expense Payments
+
+We also need to support partial payment of expenses.
+
+In real operations:
+
+A vendor or staff may submit an expense
+But the company may pay it gradually (bit by bit)
+Example:
+Total Expense = ₦500,000
+First Payment = ₦200,000
+Balance Remaining = ₦300,000
+
+The system should allow:
+
+Multiple payments against one expense
+Tracking of outstanding balances
+Viewing payment history for each expense
+3. Expense-to-Bank Integration
+
+Expenses should synchronize directly with the Banking module.
+
+When recording an expense:
+
+User selects payment method:
+Cash
+Bank/Card
+If Bank/Card is selected:
+User should choose the bank account used for payment
+
+Once saved:
+
+The selected bank balance should reduce automatically
+The transaction should reflect in:
+Bank transaction history
+Accounting records
+Expense ledger
+4. Outstanding Expense Tracking
+
+The system should also help track unpaid or partially paid expenses.
+
+Suggested Features:
+Filter for:
+Fully Paid Expenses
+Partially Paid Expenses
+Unpaid Expenses
+Outstanding balance display
+Payment progress tracking
+
+This will make it easier to monitor pending liabilities and unpaid operational expenses.
+
+🎯 Objective
+
+The goal is to make the Expenses module work like a proper accounting and operational expense management system by supporting:
+
+Custom categories
+Partial payments
+Bank synchronization
+Outstanding balance tracking
+Better financial visibility and reporting.

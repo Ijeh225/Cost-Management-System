@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable } from "@workspace/db";
+import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 
@@ -21,8 +21,8 @@ banksRouter.get("/banks", requireAuth, async (req, res) => {
         .from(bankTransfersTable).where(isNotNull(bankTransfersTable.toBankId)).groupBy(bankTransfersTable.toBankId),
       db.select({ bankId: bankTransfersTable.fromBankId, total: sum(bankTransfersTable.amount) })
         .from(bankTransfersTable).where(isNotNull(bankTransfersTable.fromBankId)).groupBy(bankTransfersTable.fromBankId),
-      db.select({ bankId: overheadExpensesTable.bankId, total: sum(overheadExpensesTable.amount) })
-        .from(overheadExpensesTable).where(isNotNull(overheadExpensesTable.bankId)).groupBy(overheadExpensesTable.bankId),
+      db.select({ bankId: expensePaymentsTable.bankId, total: sum(expensePaymentsTable.amount) })
+        .from(expensePaymentsTable).where(isNotNull(expensePaymentsTable.bankId)).groupBy(expensePaymentsTable.bankId),
       db.select({ bankId: bankFundAdditionsTable.bankId, total: sum(bankFundAdditionsTable.amount) })
         .from(bankFundAdditionsTable).groupBy(bankFundAdditionsTable.bankId),
     ]);
@@ -375,6 +375,40 @@ banksRouter.get("/banks/:id/transactions", requireAdmin, async (req, res) => {
           invoiceNumber: null,
           debit: 0,
           credit: parseFloat(f.amount),
+        });
+      }
+    }
+
+    // 6. Expense payments debited from this bank
+    if (!typeFilter || typeFilter === "expense_payment") {
+      const epConditions: SQL<unknown>[] = [eq(expensePaymentsTable.bankId, id)];
+      if (fromDate) epConditions.push(gte(expensePaymentsTable.paidAt, fromDate));
+      if (toDate)   epConditions.push(lte(expensePaymentsTable.paidAt, toDate));
+
+      const expPayments = await db
+        .select({
+          id: expensePaymentsTable.id,
+          amount: expensePaymentsTable.amount,
+          paidAt: expensePaymentsTable.paidAt,
+          notes: expensePaymentsTable.notes,
+          description: overheadExpensesTable.description,
+          category: overheadExpensesTable.category,
+        })
+        .from(expensePaymentsTable)
+        .leftJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id))
+        .where(and(...epConditions));
+
+      for (const ep of expPayments) {
+        txs.push({
+          id: `expense_payment_${ep.id}`,
+          date: ep.paidAt,
+          type: "expense_payment" as any,
+          description: `Expense — ${ep.category ?? "Overhead"}${ep.description ? `: ${ep.description}` : ""}${ep.notes ? ` (${ep.notes})` : ""}`,
+          reference: null,
+          clientName: null,
+          invoiceNumber: null,
+          debit: parseFloat(ep.amount),
+          credit: 0,
         });
       }
     }

@@ -1,37 +1,49 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
 
-export const OVERHEAD_CATEGORIES = [
-  "Salaries",
-  "Office Rent",
-  "Fuel",
-  "Bank Charges",
-  "Utilities",
-  "Maintenance",
-  "Other",
-] as const;
+export type ExpenseCategory = {
+  id: number;
+  name: string;
+  isDefault: boolean;
+  createdBy: number | null;
+  createdAt: string;
+};
 
-export type OverheadCategory = typeof OVERHEAD_CATEGORIES[number];
+export type ExpensePayment = {
+  id: number;
+  expenseId: number;
+  amount: number;
+  paymentMethod: "cash" | "bank";
+  bankId: number | null;
+  bankName: string | null;
+  paidAt: string;
+  notes: string | null;
+  recordedBy: number | null;
+  recordedByName: string | null;
+  createdAt: string;
+};
 
 export type OverheadExpense = {
   id: number;
   category: string;
   description: string;
   amount: number;
-  bankId: number | null;
-  bankName: string | null;
-  paidAt: string;
   reference: string | null;
   recordedBy: number | null;
   recordedByName: string | null;
   createdAt: string;
   updatedAt: string;
+  totalPaid: number;
+  balance: number;
+  status: "unpaid" | "partial" | "paid";
+  payments: ExpensePayment[];
 };
 
 export type OverheadExpensesResponse = {
   expenses: OverheadExpense[];
-  totalThisMonth: number;
-  totalThisYear: number;
+  totalOutstanding: number;
+  totalPaidThisMonth: number;
+  totalPaidThisYear: number;
   byCategory: Record<string, number>;
 };
 
@@ -39,24 +51,34 @@ export type CreateOverheadExpenseBody = {
   category: string;
   description: string;
   amount: number;
-  bankId?: number | null;
-  paidAt?: string;
   reference?: string;
 };
 
 export type UpdateOverheadExpenseBody = Partial<CreateOverheadExpenseBody>;
 
+export type CreateExpensePaymentBody = {
+  expenseId: number;
+  amount: number;
+  paymentMethod: "cash" | "bank";
+  bankId?: number | null;
+  paidAt?: string;
+  notes?: string;
+};
+
 const QK = "/api/overhead-expenses";
+const CATS_QK = "/api/overhead-expenses/categories";
 
 export function useGetOverheadExpenses(params?: {
   category?: string;
   from?: string;
   to?: string;
+  status?: string;
 }) {
   const search = new URLSearchParams();
   if (params?.category && params.category !== "all") search.set("category", params.category);
   if (params?.from) search.set("from", params.from);
   if (params?.to) search.set("to", params.to);
+  if (params?.status && params.status !== "all") search.set("status", params.status);
   const qs = search.toString();
   return useQuery<OverheadExpensesResponse>({
     queryKey: [QK, params],
@@ -85,5 +107,47 @@ export function useDeleteOverheadExpense() {
   return useMutation<{ ok: boolean }, Error, number>({
     mutationFn: (id) => customFetch<{ ok: boolean }>(`/api/overhead-expenses/${id}`, { method: "DELETE" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [QK] }); },
+  });
+}
+
+export function useCreateExpensePayment() {
+  const qc = useQueryClient();
+  return useMutation<{ payment: ExpensePayment; expense: OverheadExpense }, Error, CreateExpensePaymentBody>({
+    mutationFn: ({ expenseId, ...data }) => customFetch(`/api/overhead-expenses/${expenseId}/payments`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK] });
+      qc.invalidateQueries({ queryKey: ["/api/banks"] });
+    },
+  });
+}
+
+export function useGetExpenseCategories() {
+  return useQuery<ExpenseCategory[]>({
+    queryKey: [CATS_QK],
+    queryFn: () => customFetch<ExpenseCategory[]>("/api/overhead-expenses/categories"),
+  });
+}
+
+export function useCreateExpenseCategory() {
+  const qc = useQueryClient();
+  return useMutation<ExpenseCategory, Error, { name: string }>({
+    mutationFn: (data) => customFetch<ExpenseCategory>("/api/overhead-expenses/categories", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [CATS_QK] }); },
+  });
+}
+
+export function useUpdateExpenseCategory() {
+  const qc = useQueryClient();
+  return useMutation<ExpenseCategory, Error, { id: number; name: string }>({
+    mutationFn: ({ id, name }) => customFetch<ExpenseCategory>(`/api/overhead-expenses/categories/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [CATS_QK] }); },
+  });
+}
+
+export function useDeleteExpenseCategory() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, Error, number>({
+    mutationFn: (id) => customFetch<{ ok: boolean }>(`/api/overhead-expenses/categories/${id}`, { method: "DELETE" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [CATS_QK] }); },
   });
 }

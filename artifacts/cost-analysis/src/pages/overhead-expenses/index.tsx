@@ -1,10 +1,14 @@
-import { useState } from "react";
-import { useGetOverheadExpenses, useCreateOverheadExpense, useUpdateOverheadExpense, useDeleteOverheadExpense, OVERHEAD_CATEGORIES, type OverheadExpense } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import {
+  useGetOverheadExpenses, useCreateOverheadExpense, useUpdateOverheadExpense,
+  useDeleteOverheadExpense, useCreateExpensePayment, useGetExpenseCategories,
+  useCreateExpenseCategory, useUpdateExpenseCategory, useDeleteExpenseCategory,
+  type OverheadExpense, type ExpenseCategory,
+} from "@workspace/api-client-react";
 import { useListBanks } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
-import { useLocation } from "wouter";
-import { useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,122 +17,166 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useForm, Controller } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Pencil, Trash2, Receipt, TrendingDown, Calendar, Filter } from "lucide-react";
+import {
+  Loader2, Plus, Pencil, Trash2, Receipt, TrendingDown, Filter,
+  CreditCard, Banknote, ChevronDown, ChevronRight, Lock, Tag,
+} from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "Salaries":     "border-blue-500/30 text-blue-400 bg-blue-500/10",
-  "Office Rent":  "border-purple-500/30 text-purple-400 bg-purple-500/10",
-  "Fuel":         "border-orange-500/30 text-orange-400 bg-orange-500/10",
-  "Bank Charges": "border-red-500/30 text-red-400 bg-red-500/10",
-  "Utilities":    "border-yellow-500/30 text-yellow-400 bg-yellow-500/10",
-  "Maintenance":  "border-teal-500/30 text-teal-400 bg-teal-500/10",
-  "Other":        "border-gray-500/30 text-gray-400 bg-gray-500/10",
+const STATUS_COLORS: Record<string, string> = {
+  unpaid:  "border-red-500/30 text-red-400 bg-red-500/10",
+  partial: "border-amber-500/30 text-amber-400 bg-amber-500/10",
+  paid:    "border-green-500/30 text-green-400 bg-green-500/10",
+};
+const STATUS_LABELS: Record<string, string> = {
+  unpaid: "Unpaid", partial: "Partial", paid: "Paid",
 };
 
-type ExpenseFormValues = {
-  category: string;
-  description: string;
-  amount: number;
-  bankId: string;
-  paidAt: string;
-  reference: string;
-};
+const CATEGORY_PALETTE = [
+  "border-blue-500/30 text-blue-400 bg-blue-500/10",
+  "border-purple-500/30 text-purple-400 bg-purple-500/10",
+  "border-orange-500/30 text-orange-400 bg-orange-500/10",
+  "border-yellow-500/30 text-yellow-400 bg-yellow-500/10",
+  "border-teal-500/30 text-teal-400 bg-teal-500/10",
+  "border-indigo-500/30 text-indigo-400 bg-indigo-500/10",
+  "border-pink-500/30 text-pink-400 bg-pink-500/10",
+  "border-gray-500/30 text-gray-400 bg-gray-500/10",
+];
+function catColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return CATEGORY_PALETTE[Math.abs(h) % CATEGORY_PALETTE.length];
+}
 
-function ExpenseFormDialog({
-  open,
-  onOpenChange,
-  defaultValues,
-  onSubmit,
-  isPending,
-  title,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
+type ExpenseFormValues = { category: string; description: string; amount: number; reference: string };
+type PaymentFormValues = { amount: number; paymentMethod: "cash" | "bank"; bankId: string; paidAt: string; notes: string };
+
+function ExpenseForm({ categories, defaultValues, onSubmit, onCancel, isPending, submitLabel }: {
+  categories: ExpenseCategory[];
   defaultValues?: Partial<ExpenseFormValues>;
-  onSubmit: (data: ExpenseFormValues) => void;
+  onSubmit: (v: ExpenseFormValues) => void;
+  onCancel: () => void;
   isPending: boolean;
-  title: string;
+  submitLabel: string;
+}) {
+  const { register, handleSubmit, control, formState: { errors } } = useForm<ExpenseFormValues>({
+    defaultValues: { category: defaultValues?.category ?? (categories[0]?.name ?? "Other"), description: defaultValues?.description ?? "", amount: defaultValues?.amount ?? 0, reference: defaultValues?.reference ?? "" },
+  });
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Category</Label>
+        <Controller name="category" control={control} rules={{ required: true }} render={({ field }) => (
+          <Select onValueChange={field.onChange} value={field.value}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{categories.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
+          </Select>
+        )} />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Description</Label>
+        <Input {...register("description", { required: true })} placeholder="Brief description of expense" />
+        {errors.description && <p className="text-xs text-destructive">Required</p>}
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Total Amount (₦)</Label>
+        <Input type="number" step="0.01" min="0" {...register("amount", { required: true, valueAsNumber: true, min: 0.01 })} placeholder="0.00" />
+        {errors.amount && <p className="text-xs text-destructive">Valid amount required</p>}
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Reference / Notes <span className="text-muted-foreground/50">(optional)</span></Label>
+        <Input {...register("reference")} placeholder="Voucher number, notes, etc." />
+      </div>
+      <div className="flex justify-end gap-3 pt-2">
+        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" disabled={isPending}>{isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{submitLabel}</Button>
+      </div>
+    </form>
+  );
+}
+
+function MakePaymentDialog({ expense, onOpenChange, onSubmit, isPending }: {
+  expense: OverheadExpense | null;
+  onOpenChange: (v: boolean) => void;
+  onSubmit: (v: PaymentFormValues) => void;
+  isPending: boolean;
 }) {
   const { data: banks } = useListBanks();
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm<ExpenseFormValues>({
-    defaultValues: {
-      category: defaultValues?.category ?? "Other",
-      description: defaultValues?.description ?? "",
-      amount: defaultValues?.amount ?? 0,
-      bankId: defaultValues?.bankId ?? "",
-      paidAt: defaultValues?.paidAt ?? new Date().toISOString().slice(0, 10),
-      reference: defaultValues?.reference ?? "",
-    },
+  const { register, handleSubmit, control, reset, watch, formState: { errors } } = useForm<PaymentFormValues>({
+    defaultValues: { amount: 0, paymentMethod: "bank", bankId: "", paidAt: new Date().toISOString().slice(0, 10), notes: "" },
   });
-
+  const paymentMethod = watch("paymentMethod");
   useEffect(() => {
-    if (open) {
-      reset({
-        category: defaultValues?.category ?? "Other",
-        description: defaultValues?.description ?? "",
-        amount: defaultValues?.amount ?? 0,
-        bankId: defaultValues?.bankId ?? "",
-        paidAt: defaultValues?.paidAt ?? new Date().toISOString().slice(0, 10),
-        reference: defaultValues?.reference ?? "",
-      });
-    }
-  }, [open]);
+    if (expense) reset({ amount: Number(expense.balance.toFixed(2)), paymentMethod: "bank", bankId: "", paidAt: new Date().toISOString().slice(0, 10), notes: "" });
+  }, [expense?.id]);
+
+  if (!expense) return null;
+  const progressPct = expense.amount > 0 ? Math.min(100, (expense.totalPaid / expense.amount) * 100) : 0;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-md">
-        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Category</Label>
-            <Controller name="category" control={control} rules={{ required: true }} render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {OVERHEAD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )} />
+        <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
+        <div className="rounded-lg border border-border/40 bg-muted/30 p-3 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium">{expense.description}</p>
+              <p className="text-xs text-muted-foreground">{expense.category}</p>
+            </div>
+            <Badge variant="outline" className={`text-[10px] shrink-0 ${STATUS_COLORS[expense.status]}`}>{STATUS_LABELS[expense.status]}</Badge>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Description</Label>
-            <Input {...register("description", { required: true })} placeholder="Brief description of the expense" />
-            {errors.description && <p className="text-xs text-destructive">Description is required</p>}
+          <div className="w-full bg-muted rounded-full h-1.5">
+            <div className={`h-1.5 rounded-full transition-all ${expense.status === "paid" ? "bg-green-500" : "bg-amber-500"}`} style={{ width: `${progressPct}%` }} />
           </div>
+          <div className="flex justify-between text-[10px]">
+            <span className="text-muted-foreground">Paid: <span className="text-green-400 font-medium">{formatCurrency(expense.totalPaid)}</span></span>
+            <span className="text-muted-foreground">Balance: <span className="text-red-400 font-medium">{formatCurrency(expense.balance)}</span></span>
+            <span className="text-muted-foreground">Total: <span className="font-medium">{formatCurrency(expense.amount)}</span></span>
+          </div>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Amount (₦)</Label>
-              <Input type="number" step="0.01" min="0" {...register("amount", { required: true, valueAsNumber: true, min: 0.01 })} placeholder="0.00" />
-              {errors.amount && <p className="text-xs text-destructive">Valid amount required</p>}
+              <Label className="text-xs text-muted-foreground">Amount Paying (₦)</Label>
+              <Input type="number" step="0.01" min="0.01" {...register("amount", { required: true, valueAsNumber: true, min: 0.01 })} />
+              {errors.amount && <p className="text-xs text-destructive">Required</p>}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Date Paid</Label>
+              <Label className="text-xs text-muted-foreground">Payment Date</Label>
               <Input type="date" {...register("paidAt", { required: true })} />
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Bank Account <span className="text-muted-foreground/50">(optional)</span></Label>
-            <Controller name="bankId" control={control} render={({ field }) => (
+            <Label className="text-xs text-muted-foreground">Payment Method</Label>
+            <Controller name="paymentMethod" control={control} render={({ field }) => (
               <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger><SelectValue placeholder="No bank selected" /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No bank</SelectItem>
-                  {(banks ?? []).map(b => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Bank / Card</SelectItem>
                 </SelectContent>
               </Select>
             )} />
           </div>
+          {paymentMethod === "bank" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Bank Account</Label>
+              <Controller name="bankId" control={control} rules={{ required: paymentMethod === "bank" }} render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
+                  <SelectContent>{(banks ?? []).map(b => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}</SelectContent>
+                </Select>
+              )} />
+              {errors.bankId && <p className="text-xs text-destructive">Bank required for bank payments</p>}
+            </div>
+          )}
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Reference / Notes <span className="text-muted-foreground/50">(optional)</span></Label>
-            <Input {...register("reference")} placeholder="Voucher number, notes, etc." />
+            <Label className="text-xs text-muted-foreground">Notes <span className="text-muted-foreground/50">(optional)</span></Label>
+            <Input {...register("notes")} placeholder="Cheque no., reference, etc." />
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Expense
-            </Button>
+            <Button type="submit" disabled={isPending}>{isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Record Payment</Button>
           </div>
         </form>
       </DialogContent>
@@ -141,12 +189,19 @@ export default function OverheadExpensesPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
+  const [mainTab, setMainTab] = useState<"expenses" | "categories">("expenses");
+  const [statusTab, setStatusTab] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [paymentTarget, setPaymentTarget] = useState<OverheadExpense | null>(null);
   const [editTarget, setEditTarget] = useState<OverheadExpense | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [newCatName, setNewCatName] = useState("");
+  const [editingCatId, setEditingCatId] = useState<number | null>(null);
+  const [editingCatName, setEditingCatName] = useState("");
 
   useEffect(() => { if (!isAdmin) setLocation("/"); }, [isAdmin]);
   if (!isAdmin) return null;
@@ -155,58 +210,93 @@ export default function OverheadExpensesPage() {
     category: filterCategory !== "all" ? filterCategory : undefined,
     from: filterFrom || undefined,
     to: filterTo || undefined,
+    status: statusTab !== "all" ? statusTab : undefined,
   });
+  const { data: categories = [] } = useGetExpenseCategories();
 
   const createMutation = useCreateOverheadExpense();
   const updateMutation = useUpdateOverheadExpense();
   const deleteMutation = useDeleteOverheadExpense();
+  const paymentMutation = useCreateExpensePayment();
+  const createCatMutation = useCreateExpenseCategory();
+  const updateCatMutation = useUpdateExpenseCategory();
+  const deleteCatMutation = useDeleteExpenseCategory();
 
-  const handleCreate = (values: ExpenseFormValues) => {
-    createMutation.mutate({
-      category: values.category,
-      description: values.description,
-      amount: values.amount,
-      bankId: values.bankId && values.bankId !== "none" ? Number(values.bankId) : null,
-      paidAt: values.paidAt,
-      reference: values.reference || undefined,
-    }, {
+  const expenses = data?.expenses ?? [];
+  const totalOutstanding = data?.totalOutstanding ?? 0;
+  const totalPaidThisMonth = data?.totalPaidThisMonth ?? 0;
+  const byCategory = data?.byCategory ?? {};
+
+  const handleCreate = (v: ExpenseFormValues) => {
+    createMutation.mutate({ category: v.category, description: v.description, amount: v.amount, reference: v.reference || undefined }, {
       onSuccess: () => { toast({ title: "Expense recorded." }); setCreateOpen(false); },
-      onError: (err) => toast({ variant: "destructive", title: "Error", description: err.message }),
+      onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
     });
   };
 
-  const handleUpdate = (values: ExpenseFormValues) => {
+  const handleUpdate = (v: ExpenseFormValues) => {
     if (!editTarget) return;
-    updateMutation.mutate({
-      id: editTarget.id,
-      data: {
-        category: values.category,
-        description: values.description,
-        amount: values.amount,
-        bankId: values.bankId && values.bankId !== "none" ? Number(values.bankId) : null,
-        paidAt: values.paidAt,
-        reference: values.reference || undefined,
-      },
-    }, {
+    updateMutation.mutate({ id: editTarget.id, data: { category: v.category, description: v.description, amount: v.amount, reference: v.reference || undefined } }, {
       onSuccess: () => { toast({ title: "Expense updated." }); setEditTarget(null); },
-      onError: (err) => toast({ variant: "destructive", title: "Error", description: err.message }),
+      onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    });
+  };
+
+  const handlePayment = (v: PaymentFormValues) => {
+    if (!paymentTarget) return;
+    paymentMutation.mutate({
+      expenseId: paymentTarget.id,
+      amount: v.amount,
+      paymentMethod: v.paymentMethod,
+      bankId: v.paymentMethod === "bank" && v.bankId ? Number(v.bankId) : null,
+      paidAt: v.paidAt || undefined,
+      notes: v.notes || undefined,
+    }, {
+      onSuccess: () => { toast({ title: "Payment recorded. Bank balance updated." }); setPaymentTarget(null); },
+      onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
     });
   };
 
   const handleDelete = (id: number) => {
     deleteMutation.mutate(id, {
       onSuccess: () => { toast({ title: "Expense deleted." }); setDeleteId(null); },
-      onError: (err) => toast({ variant: "destructive", title: "Error", description: err.message }),
+      onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
     });
   };
 
-  const expenses = data?.expenses ?? [];
-  const totalThisMonth = data?.totalThisMonth ?? 0;
-  const totalThisYear = data?.totalThisYear ?? 0;
-  const byCategory = data?.byCategory ?? {};
+  const handleAddCat = () => {
+    if (!newCatName.trim()) return;
+    createCatMutation.mutate({ name: newCatName.trim() }, {
+      onSuccess: () => { toast({ title: "Category added." }); setNewCatName(""); },
+      onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    });
+  };
+
+  const handleRenameCat = (id: number) => {
+    if (!editingCatName.trim()) return;
+    updateCatMutation.mutate({ id, name: editingCatName.trim() }, {
+      onSuccess: () => { toast({ title: "Category renamed." }); setEditingCatId(null); },
+      onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    });
+  };
+
+  const handleDeleteCat = (id: number) => {
+    deleteCatMutation.mutate(id, {
+      onSuccess: () => toast({ title: "Category deleted." }),
+      onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    });
+  };
+
+  const statusTabs = [
+    { value: "all", label: "All" },
+    { value: "unpaid", label: "Unpaid" },
+    { value: "partial", label: "Partial" },
+    { value: "paid", label: "Paid" },
+  ];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
@@ -214,156 +304,257 @@ export default function OverheadExpensesPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Overhead Expenses</h1>
-            <p className="text-sm text-muted-foreground">Track operational costs: salaries, rent, fuel, and more</p>
+            <p className="text-sm text-muted-foreground">Track costs with partial payment support and bank sync</p>
           </div>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2 shrink-0">
-          <Plus className="w-4 h-4" /> Record Expense
-        </Button>
+        {mainTab === "expenses" && (
+          <Button onClick={() => setCreateOpen(true)} className="gap-2 shrink-0">
+            <Plus className="w-4 h-4" /> Record Expense
+          </Button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-border/50 bg-card/40">
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">This Month</p>
-            <p className="text-2xl font-bold text-red-400 mt-1">{formatCurrency(totalThisMonth)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50 bg-card/40">
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">This Year</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{formatCurrency(totalThisYear)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50 bg-card/40">
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground mb-2">By Category</p>
-            <div className="space-y-1">
-              {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([cat, amt]) => (
-                <div key={cat} className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground truncate">{cat}</span>
-                  <span className="font-medium text-foreground/80">{formatCurrency(amt)}</span>
+      {/* Main Tabs */}
+      <div className="flex gap-1 border-b border-border/40">
+        {([{ v: "expenses", label: "Expenses", Icon: Receipt }, { v: "categories", label: "Categories", Icon: Tag }] as const).map(t => (
+          <button key={t.v} onClick={() => setMainTab(t.v)}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mainTab === t.v ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            <t.Icon className="w-4 h-4" />{t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── EXPENSES TAB ── */}
+      {mainTab === "expenses" && (
+        <>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="border-border/50 bg-card/40">
+              <CardContent className="pt-4">
+                <p className="text-xs text-muted-foreground">Outstanding Balance</p>
+                <p className="text-2xl font-bold text-amber-400 mt-1">{formatCurrency(totalOutstanding)}</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Unpaid + partially paid</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/40">
+              <CardContent className="pt-4">
+                <p className="text-xs text-muted-foreground">Paid This Month</p>
+                <p className="text-2xl font-bold text-green-400 mt-1">{formatCurrency(totalPaidThisMonth)}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/40">
+              <CardContent className="pt-4">
+                <p className="text-xs text-muted-foreground mb-2">By Category (total billed)</p>
+                <div className="space-y-1">
+                  {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([cat, amt]) => (
+                    <div key={cat} className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground truncate">{cat}</span>
+                      <span className="font-medium">{formatCurrency(amt)}</span>
+                    </div>
+                  ))}
+                  {Object.keys(byCategory).length === 0 && <p className="text-xs text-muted-foreground/50">No data yet</p>}
                 </div>
-              ))}
-              {Object.keys(byCategory).length === 0 && <p className="text-xs text-muted-foreground/50">No data yet</p>}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-border/50 bg-card/40">
-        <CardHeader className="pb-3 border-b border-border/40">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-44 h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {OVERHEAD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Calendar className="w-3.5 h-3.5" />
-              <Input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} className="h-8 text-xs w-36" placeholder="From" />
-              <span>–</span>
-              <Input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} className="h-8 text-xs w-36" placeholder="To" />
-              {(filterFrom || filterTo) && (
-                <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => { setFilterFrom(""); setFilterTo(""); }}>Clear</Button>
-              )}
-            </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : expenses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-              <Receipt className="w-10 h-10 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No expenses recorded yet.</p>
-              <p className="text-xs text-muted-foreground/60">Click "Record Expense" to add your first entry.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/40">
-              <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 px-3 py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                <span>Description</span>
-                <span>Category</span>
-                <span>Date</span>
-                <span className="text-right">Amount</span>
-                <span />
+
+          {/* List Card */}
+          <Card className="border-border/50 bg-card/40">
+            <CardHeader className="pb-0 border-b border-border/40 space-y-3 pt-4">
+              {/* Status sub-tabs */}
+              <div className="flex gap-1">
+                {statusTabs.map(t => (
+                  <button key={t.value} onClick={() => setStatusTab(t.value)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${statusTab === t.value ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-accent/30"}`}>
+                    {t.label}
+                  </button>
+                ))}
               </div>
-              {expenses.map(e => (
-                <div key={e.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 px-3 py-3 items-center hover:bg-accent/20 transition-colors">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{e.description}</p>
-                    {(e.bankName || e.reference) && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {[e.bankName, e.reference].filter(Boolean).join(" · ")}
-                      </p>
-                    )}
-                  </div>
-                  <Badge variant="outline" className={`text-[10px] font-medium shrink-0 ${CATEGORY_COLORS[e.category] ?? CATEGORY_COLORS["Other"]}`}>
-                    {e.category}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(e.paidAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
-                  </span>
-                  <span className="text-sm font-semibold text-red-400 text-right whitespace-nowrap">
-                    {formatCurrency(e.amount)}
-                  </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => setEditTarget(e)}>
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="w-7 h-7 text-destructive hover:text-destructive" onClick={() => setDeleteId(e.id)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+              {/* Filters */}
+              <div className="flex items-center gap-2 flex-wrap pb-3">
+                <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
+                <Select value={filterCategory} onValueChange={setFilterCategory}>
+                  <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} className="h-8 text-xs w-36" />
+                  <span>–</span>
+                  <Input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} className="h-8 text-xs w-36" />
+                  {(filterFrom || filterTo) && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => { setFilterFrom(""); setFilterTo(""); }}>Clear</Button>}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+              ) : expenses.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                  <Receipt className="w-10 h-10 text-muted-foreground/30" />
+                  <p className="text-sm text-muted-foreground">No expenses found.</p>
+                  <p className="text-xs text-muted-foreground/60">Adjust filters or click "Record Expense".</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border/30">
+                  {expenses.map(e => {
+                    const isExpanded = expandedId === e.id;
+                    const progressPct = e.amount > 0 ? Math.min(100, (e.totalPaid / e.amount) * 100) : 0;
+                    return (
+                      <div key={e.id}>
+                        <div className="px-3 py-3 hover:bg-accent/10 transition-colors">
+                          <div className="flex items-start gap-2">
+                            <button onClick={() => setExpandedId(isExpanded ? null : e.id)} className="mt-1 text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-foreground">{e.description}</span>
+                                <Badge variant="outline" className={`text-[10px] font-medium shrink-0 ${catColor(e.category)}`}>{e.category}</Badge>
+                                <Badge variant="outline" className={`text-[10px] font-medium shrink-0 ${STATUS_COLORS[e.status]}`}>{STATUS_LABELS[e.status]}</Badge>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
+                                {e.reference && <span>Ref: {e.reference}</span>}
+                                <span>{new Date(e.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span>
+                                {e.recordedByName && <span>· {e.recordedByName}</span>}
+                              </div>
+                              <div className="mt-2 space-y-1">
+                                <div className="w-full bg-muted rounded-full h-1.5">
+                                  <div className={`h-1.5 rounded-full transition-all ${e.status === "paid" ? "bg-green-500" : "bg-amber-500"}`} style={{ width: `${progressPct}%` }} />
+                                </div>
+                                <div className="flex justify-between text-[10px] text-muted-foreground">
+                                  <span>Paid: <span className="text-green-400 font-medium">{formatCurrency(e.totalPaid)}</span></span>
+                                  {e.balance > 0 && <span>Balance: <span className="text-red-400 font-medium">{formatCurrency(e.balance)}</span></span>}
+                                  <span>Total: <span className="font-medium text-foreground/80">{formatCurrency(e.amount)}</span></span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                              {e.status !== "paid" && (
+                                <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1 text-green-400 border-green-500/30 hover:bg-green-500/10" onClick={() => setPaymentTarget(e)}>
+                                  <CreditCard className="w-3 h-3" /> Pay
+                                </Button>
+                              )}
+                              <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => setEditTarget(e)}><Pencil className="w-3.5 h-3.5" /></Button>
+                              <Button size="icon" variant="ghost" className="w-7 h-7 text-destructive hover:text-destructive" onClick={() => setDeleteId(e.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                            </div>
+                          </div>
+                        </div>
+                        {isExpanded && (
+                          <div className="pl-9 pr-3 pb-3 bg-muted/20 border-t border-border/20">
+                            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider pt-2 pb-1">Payment History ({e.payments.length})</p>
+                            {e.payments.length === 0 ? (
+                              <p className="text-xs text-muted-foreground py-1">No payments recorded yet.</p>
+                            ) : (
+                              <div className="space-y-1">
+                                {e.payments.map(p => (
+                                  <div key={p.id} className="flex items-center gap-3 text-xs py-1 border-t border-border/20 first:border-t-0">
+                                    <div className="flex items-center gap-1.5 text-muted-foreground shrink-0">
+                                      {p.paymentMethod === "bank" ? <CreditCard className="w-3 h-3" /> : <Banknote className="w-3 h-3" />}
+                                      <span>{p.paymentMethod === "bank" ? (p.bankName ?? "Bank") : "Cash"}</span>
+                                    </div>
+                                    <span className="font-semibold text-green-400">{formatCurrency(p.amount)}</span>
+                                    <span className="text-muted-foreground">{new Date(p.paidAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span>
+                                    {p.notes && <span className="text-muted-foreground/70 truncate">· {p.notes}</span>}
+                                    {p.recordedByName && <span className="text-muted-foreground/50 ml-auto shrink-0">by {p.recordedByName}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* ── CATEGORIES TAB ── */}
+      {mainTab === "categories" && (
+        <Card className="border-border/50 bg-card/40">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Expense Categories</span>
+              <span className="text-xs text-muted-foreground/60">· Default categories cannot be deleted</span>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            <div className="flex gap-2">
+              <Input value={newCatName} onChange={e => setNewCatName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddCat(); } }}
+                placeholder="New category name (e.g. Diesel Advance, Emergency Repairs)" className="flex-1" />
+              <Button onClick={handleAddCat} disabled={!newCatName.trim() || createCatMutation.isPending} className="gap-2 shrink-0">
+                {createCatMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Add
+              </Button>
+            </div>
+            <div className="divide-y divide-border/30">
+              {categories.map(cat => (
+                <div key={cat.id} className="flex items-center gap-3 py-2.5">
+                  {editingCatId === cat.id ? (
+                    <>
+                      <Input value={editingCatName} onChange={e => setEditingCatName(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") handleRenameCat(cat.id); if (e.key === "Escape") setEditingCatId(null); }}
+                        className="flex-1 h-8 text-sm" autoFocus />
+                      <Button size="sm" className="h-7 px-3 text-xs" onClick={() => handleRenameCat(cat.id)} disabled={updateCatMutation.isPending}>Save</Button>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditingCatId(null)}>Cancel</Button>
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant="outline" className={`text-[10px] font-medium shrink-0 ${catColor(cat.name)}`}>{cat.name}</Badge>
+                      <span className="flex-1 text-sm">{cat.name}</span>
+                      {cat.isDefault ? (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground/40"><Lock className="w-3 h-3" /><span>Default</span></div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => { setEditingCatId(cat.id); setEditingCatName(cat.name); }}><Pencil className="w-3.5 h-3.5" /></Button>
+                          <Button size="icon" variant="ghost" className="w-7 h-7 text-destructive hover:text-destructive" onClick={() => handleDeleteCat(cat.id)} disabled={deleteCatMutation.isPending}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               ))}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      <ExpenseFormDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        onSubmit={handleCreate}
-        isPending={createMutation.isPending}
-        title="Record Overhead Expense"
-      />
+      {/* ── DIALOGS ── */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-md">
+          <DialogHeader><DialogTitle>Record Overhead Expense</DialogTitle></DialogHeader>
+          <ExpenseForm categories={categories} onSubmit={handleCreate} onCancel={() => setCreateOpen(false)} isPending={createMutation.isPending} submitLabel="Save Expense" />
+        </DialogContent>
+      </Dialog>
 
       {editTarget && (
-        <ExpenseFormDialog
-          open={!!editTarget}
-          onOpenChange={(v) => { if (!v) setEditTarget(null); }}
-          defaultValues={{
-            category: editTarget.category,
-            description: editTarget.description,
-            amount: editTarget.amount,
-            bankId: editTarget.bankId ? String(editTarget.bankId) : "",
-            paidAt: editTarget.paidAt ? editTarget.paidAt.slice(0, 10) : "",
-            reference: editTarget.reference ?? "",
-          }}
-          onSubmit={handleUpdate}
-          isPending={updateMutation.isPending}
-          title="Edit Expense"
-        />
+        <Dialog open onOpenChange={(v) => { if (!v) setEditTarget(null); }}>
+          <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-md">
+            <DialogHeader><DialogTitle>Edit Expense</DialogTitle></DialogHeader>
+            <ExpenseForm categories={categories}
+              defaultValues={{ category: editTarget.category, description: editTarget.description, amount: editTarget.amount, reference: editTarget.reference ?? "" }}
+              onSubmit={handleUpdate} onCancel={() => setEditTarget(null)} isPending={updateMutation.isPending} submitLabel="Update Expense" />
+          </DialogContent>
+        </Dialog>
       )}
+
+      <MakePaymentDialog expense={paymentTarget} onOpenChange={(v) => { if (!v) setPaymentTarget(null); }} onSubmit={handlePayment} isPending={paymentMutation.isPending} />
 
       <Dialog open={deleteId !== null} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
         <DialogContent className="border-border/50 bg-card/95 max-w-sm">
           <DialogHeader><DialogTitle>Delete Expense?</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+          <p className="text-sm text-muted-foreground">All payment history for this expense will also be removed. This cannot be undone.</p>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
             <Button variant="destructive" disabled={deleteMutation.isPending} onClick={() => deleteId && handleDelete(deleteId)}>
-              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Delete
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Delete
             </Button>
           </div>
         </DialogContent>

@@ -141,6 +141,62 @@ async function runStartupMigrations() {
         )
       `);
     });
+
+    await runMigration("create_expense_categories_table", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS expense_categories (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE,
+          is_default BOOLEAN NOT NULL DEFAULT FALSE,
+          created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        INSERT INTO expense_categories (name, is_default) VALUES
+          ('Salaries', TRUE),
+          ('Office Rent', TRUE),
+          ('Fuel', TRUE),
+          ('Bank Charges', TRUE),
+          ('Utilities', TRUE),
+          ('Maintenance', TRUE),
+          ('Other', TRUE)
+        ON CONFLICT (name) DO NOTHING
+      `);
+    });
+
+    await runMigration("create_expense_payments_table", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS expense_payments (
+          id SERIAL PRIMARY KEY,
+          expense_id INTEGER NOT NULL REFERENCES overhead_expenses(id) ON DELETE CASCADE,
+          amount NUMERIC(15,2) NOT NULL,
+          payment_method TEXT NOT NULL DEFAULT 'cash',
+          bank_id INTEGER REFERENCES banks(id) ON DELETE SET NULL,
+          paid_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          notes TEXT,
+          recorded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    });
+
+    await runMigration("migrate_existing_expenses_to_payments", async () => {
+      await pool.query(`
+        INSERT INTO expense_payments (expense_id, amount, payment_method, bank_id, paid_at, recorded_by, created_at)
+        SELECT
+          id,
+          CAST(amount AS NUMERIC(15,2)),
+          CASE WHEN bank_id IS NOT NULL THEN 'bank' ELSE 'cash' END,
+          bank_id,
+          COALESCE(paid_at, created_at),
+          recorded_by,
+          created_at
+        FROM overhead_expenses
+        WHERE amount IS NOT NULL AND CAST(amount AS NUMERIC) > 0
+        ON CONFLICT DO NOTHING
+      `);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);
