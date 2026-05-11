@@ -32,11 +32,12 @@ function formatDateShort(iso: string) {
 
 function TxTypeBadge({ type }: { type: BankTransaction["type"] }) {
   const config = {
-    payment: { label: "Payment", cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30", icon: Receipt },
-    deposit: { label: "Deposit", cls: "bg-blue-500/10 text-blue-400 border-blue-500/30", icon: ArrowDownLeft },
-    transfer_in: { label: "Transfer In", cls: "bg-violet-500/10 text-violet-400 border-violet-500/30", icon: ArrowDownLeft },
-    transfer_out: { label: "Transfer Out", cls: "bg-amber-500/10 text-amber-400 border-amber-500/30", icon: ArrowUpRight },
-  }[type];
+    payment:       { label: "Payment",       cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30", icon: Receipt },
+    deposit:       { label: "Deposit",       cls: "bg-blue-500/10 text-blue-400 border-blue-500/30",         icon: ArrowDownLeft },
+    transfer_in:   { label: "Transfer In",   cls: "bg-violet-500/10 text-violet-400 border-violet-500/30",   icon: ArrowDownLeft },
+    transfer_out:  { label: "Transfer Out",  cls: "bg-amber-500/10 text-amber-400 border-amber-500/30",      icon: ArrowUpRight },
+    fund_addition: { label: "Fund Addition", cls: "bg-teal-500/10 text-teal-400 border-teal-500/30",         icon: ArrowDownLeft },
+  }[type] ?? { label: type, cls: "bg-muted/60 text-muted-foreground border-border/40", icon: Receipt };
   const Icon = config.icon;
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-semibold border rounded-full px-2 py-0.5 ${config.cls}`}>
@@ -344,6 +345,7 @@ export default function BankDetailPage() {
                   <SelectItem value="deposit">Client Deposits</SelectItem>
                   <SelectItem value="transfer_in">Transfers In</SelectItem>
                   <SelectItem value="transfer_out">Transfers Out</SelectItem>
+                  <SelectItem value="fund_addition">Fund Additions</SelectItem>
                 </SelectContent>
               </Select>
             </div>

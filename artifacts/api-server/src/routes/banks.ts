@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable } from "@workspace/db";
+import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 
@@ -12,7 +12,7 @@ banksRouter.get("/banks", requireAuth, async (req, res) => {
     const filtered = activeOnly ? rows.filter(b => b.isActive) : rows;
 
     // Compute current balance for each bank from all transaction sources
-    const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows] = await Promise.all([
+    const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows, fundAddRows] = await Promise.all([
       db.select({ bankId: invoicePaymentsTable.bankId, total: sum(invoicePaymentsTable.amount) })
         .from(invoicePaymentsTable).where(isNotNull(invoicePaymentsTable.bankId)).groupBy(invoicePaymentsTable.bankId),
       db.select({ bankId: clientDepositsTable.bankId, total: sum(clientDepositsTable.amount) })
@@ -23,6 +23,8 @@ banksRouter.get("/banks", requireAuth, async (req, res) => {
         .from(bankTransfersTable).where(isNotNull(bankTransfersTable.fromBankId)).groupBy(bankTransfersTable.fromBankId),
       db.select({ bankId: overheadExpensesTable.bankId, total: sum(overheadExpensesTable.amount) })
         .from(overheadExpensesTable).where(isNotNull(overheadExpensesTable.bankId)).groupBy(overheadExpensesTable.bankId),
+      db.select({ bankId: bankFundAdditionsTable.bankId, total: sum(bankFundAdditionsTable.amount) })
+        .from(bankFundAdditionsTable).groupBy(bankFundAdditionsTable.bankId),
     ]);
 
     const toMap = (arr: { bankId: number | null; total: string | null }[]) =>
@@ -33,13 +35,15 @@ banksRouter.get("/banks", requireAuth, async (req, res) => {
     const tinMap  = toMap(transfersInRows);
     const toutMap = toMap(transfersOutRows);
     const expMap  = toMap(expensesRows);
+    const fadMap  = toMap(fundAddRows);
 
     const result = filtered.map(b => ({
       ...b,
       currentBalance:
         (pmtMap[b.id] ?? 0) +
         (depMap[b.id] ?? 0) +
-        (tinMap[b.id] ?? 0) -
+        (tinMap[b.id] ?? 0) +
+        (fadMap[b.id] ?? 0) -
         (toutMap[b.id] ?? 0) -
         (expMap[b.id] ?? 0),
     }));
@@ -343,6 +347,38 @@ banksRouter.get("/banks/:id/transactions", requireAdmin, async (req, res) => {
       }
     }
 
+    // 5. Manual fund additions credited to this bank
+    if (!typeFilter || typeFilter === "fund_addition") {
+      const fadConditions: SQL<unknown>[] = [eq(bankFundAdditionsTable.bankId, id)];
+      if (fromDate) fadConditions.push(gte(bankFundAdditionsTable.createdAt, fromDate));
+      if (toDate)   fadConditions.push(lte(bankFundAdditionsTable.createdAt, toDate));
+
+      const additions = await db
+        .select({
+          id: bankFundAdditionsTable.id,
+          amount: bankFundAdditionsTable.amount,
+          narration: bankFundAdditionsTable.narration,
+          reference: bankFundAdditionsTable.reference,
+          createdAt: bankFundAdditionsTable.createdAt,
+        })
+        .from(bankFundAdditionsTable)
+        .where(and(...fadConditions));
+
+      for (const f of additions) {
+        txs.push({
+          id: `fund_addition_${f.id}`,
+          date: f.createdAt,
+          type: "fund_addition" as any,
+          description: `Fund addition${f.narration ? ` — ${f.narration}` : ""}`,
+          reference: f.reference ?? null,
+          clientName: null,
+          invoiceNumber: null,
+          debit: 0,
+          credit: parseFloat(f.amount),
+        });
+      }
+    }
+
     // Sort all transactions by date ascending to compute running balance
     txs.sort((a, b) => a.date.getTime() - b.date.getTime());
 
@@ -390,6 +426,43 @@ banksRouter.get("/banks/:id/transactions", requireAdmin, async (req, res) => {
     });
   } catch (err) {
     console.error("GET /banks/:id/transactions error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Fund Additions ──────────────────────────────────────────────────────────
+
+banksRouter.post("/banks/:id/fund-additions", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const bankId = Number(req.params.id);
+    if (isNaN(bankId)) { res.status(400).json({ error: "Invalid bank id" }); return; }
+
+    const { amount, narration, reference } = req.body as {
+      amount: number;
+      narration?: string;
+      reference?: string;
+    };
+
+    if (!amount || isNaN(amount) || amount <= 0) {
+      res.status(400).json({ error: "Amount must be a positive number" });
+      return;
+    }
+
+    const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, bankId));
+    if (!bank) { res.status(404).json({ error: "Bank not found" }); return; }
+
+    const userId = req.user?.id ?? null;
+    const [addition] = await db.insert(bankFundAdditionsTable).values({
+      bankId,
+      amount: String(amount),
+      narration: narration ?? "",
+      reference: reference ?? null,
+      addedBy: userId,
+    }).returning();
+
+    res.status(201).json(addition);
+  } catch (err) {
+    console.error("POST /banks/:id/fund-additions error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });

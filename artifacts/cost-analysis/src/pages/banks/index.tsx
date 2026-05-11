@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   useListBanks, useCreateBank, useUpdateBank, useDeleteBank,
-  useListBankTransfers, useCreateBankTransfer,
+  useListBankTransfers, useCreateBankTransfer, useCreateBankFundAddition,
   type Bank, type BankTransfer,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Link } from "wouter";
 import {
   Landmark, Plus, Pencil, Trash2, Loader2, ToggleLeft, ToggleRight, Building2,
-  ArrowLeftRight, ArrowRight, User, Calendar, FileText,
+  ArrowLeftRight, ArrowRight, User, Calendar, FileText, PlusCircle,
 } from "lucide-react";
 
 function formatCurrency(n: number) {
@@ -229,15 +229,114 @@ function TransferDialog({
   );
 }
 
+// ─── Add Funds Dialog ─────────────────────────────────────────────────────────
+
+function AddFundsDialog({
+  bank, open, onOpenChange,
+}: {
+  bank: Bank | null;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const addFunds = useCreateBankFundAddition();
+  const [form, setForm] = useState({ amount: "", narration: "", reference: "" });
+
+  const handleOpen = (v: boolean) => {
+    if (!v) setForm({ amount: "", narration: "", reference: "" });
+    onOpenChange(v);
+  };
+
+  const handleSubmit = async () => {
+    if (!bank) return;
+    const amt = parseFloat(form.amount);
+    if (!form.amount || isNaN(amt) || amt <= 0) {
+      toast({ variant: "destructive", title: "Enter a valid amount" });
+      return;
+    }
+    try {
+      await addFunds.mutateAsync({
+        bankId: bank.id,
+        data: { amount: amt, narration: form.narration || undefined, reference: form.reference || undefined },
+      });
+      toast({ title: `₦${amt.toLocaleString()} added to ${bank.name}` });
+      handleOpen(false);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Failed to add funds", description: e?.message ?? "Unknown error" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PlusCircle className="w-4 h-4 text-emerald-400" />
+            Add Funds — {bank?.name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="space-y-1.5">
+            <Label>Amount (₦) <span className="text-destructive">*</span></Label>
+            <Input
+              type="number"
+              min="1"
+              step="0.01"
+              placeholder="0.00"
+              value={form.amount}
+              onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+              className="font-mono"
+              autoFocus
+            />
+            {form.amount && !isNaN(parseFloat(form.amount)) && parseFloat(form.amount) > 0 && (
+              <p className="text-xs text-muted-foreground font-mono">= {formatCurrency(parseFloat(form.amount))}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Narration <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Textarea
+              placeholder="e.g. Opening balance, Cash lodgement..."
+              value={form.narration}
+              onChange={e => setForm(f => ({ ...f, narration: e.target.value }))}
+              rows={2}
+              className="resize-none"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Reference <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Input
+              placeholder="e.g. DEPO-001"
+              value={form.reference}
+              onChange={e => setForm(f => ({ ...f, reference: e.target.value }))}
+            />
+          </div>
+        </div>
+        <DialogFooter className="pt-2">
+          <Button variant="outline" onClick={() => handleOpen(false)} disabled={addFunds.isPending}>Cancel</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={addFunds.isPending}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white"
+          >
+            {addFunds.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Add Funds
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Bank Card ───────────────────────────────────────────────────────────────
 
 function BankCard({
-  bank, onEdit, onToggle, onDelete,
+  bank, onEdit, onToggle, onDelete, onAddFunds,
 }: {
   bank: Bank;
   onEdit: (b: Bank) => void;
   onToggle: (b: Bank) => void;
   onDelete: (b: Bank) => void;
+  onAddFunds: (b: Bank) => void;
 }) {
   return (
     <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}>
@@ -264,6 +363,16 @@ function BankCard({
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              {bank.isActive && (
+                <Button
+                  variant="ghost" size="icon"
+                  className="w-8 h-8 text-emerald-500 hover:text-emerald-400"
+                  onClick={() => onAddFunds(bank)}
+                  title="Add Funds"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                </Button>
+              )}
               <Link href={`/banks/${bank.id}`}>
                 <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-foreground" title="View Statement">
                   <FileText className="w-3.5 h-3.5" />
@@ -355,6 +464,7 @@ export default function BanksPage() {
   const [editBank, setEditBank] = useState<Bank | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Bank | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [addFundsTarget, setAddFundsTarget] = useState<Bank | null>(null);
 
   const handleCreate = (form: BankFormState) => {
     createBank.mutate(
@@ -478,7 +588,7 @@ export default function BanksPage() {
                 </p>
                 <AnimatePresence mode="popLayout">
                   {active.map(bank => (
-                    <BankCard key={bank.id} bank={bank} onEdit={setEditBank} onToggle={handleToggle} onDelete={setDeleteTarget} />
+                    <BankCard key={bank.id} bank={bank} onEdit={setEditBank} onToggle={handleToggle} onDelete={setDeleteTarget} onAddFunds={setAddFundsTarget} />
                   ))}
                 </AnimatePresence>
               </div>
@@ -490,7 +600,7 @@ export default function BanksPage() {
                 </p>
                 <AnimatePresence mode="popLayout">
                   {inactive.map(bank => (
-                    <BankCard key={bank.id} bank={bank} onEdit={setEditBank} onToggle={handleToggle} onDelete={setDeleteTarget} />
+                    <BankCard key={bank.id} bank={bank} onEdit={setEditBank} onToggle={handleToggle} onDelete={setDeleteTarget} onAddFunds={setAddFundsTarget} />
                   ))}
                 </AnimatePresence>
               </div>
@@ -582,6 +692,12 @@ export default function BanksPage() {
       </AlertDialog>
 
       <TransferDialog open={transferOpen} onOpenChange={setTransferOpen} banks={banks} />
+
+      <AddFundsDialog
+        bank={addFundsTarget}
+        open={!!addFundsTarget}
+        onOpenChange={(v) => { if (!v) setAddFundsTarget(null); }}
+      />
     </div>
   );
 }

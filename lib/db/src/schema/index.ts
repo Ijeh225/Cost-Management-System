@@ -18,3 +18,4 @@ export * from "./whatsapp";
 export * from "./migrations";
 export * from "./user-client-assignments";
 export * from "./overhead-expenses";
+export * from "./bank-fund-additions";

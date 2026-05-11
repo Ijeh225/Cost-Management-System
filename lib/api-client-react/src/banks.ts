@@ -45,7 +45,7 @@ export type CreateBankTransferBody = {
 export type BankTransaction = {
   id: string;
   date: string;
-  type: "payment" | "deposit" | "transfer_in" | "transfer_out";
+  type: "payment" | "deposit" | "transfer_in" | "transfer_out" | "fund_addition";
   description: string;
   reference: string | null;
   clientName: string | null;
@@ -53,6 +53,12 @@ export type BankTransaction = {
   debit: number;
   credit: number;
   balance: number;
+};
+
+export type CreateBankFundAdditionBody = {
+  amount: number;
+  narration?: string;
+  reference?: string;
 };
 
 export type BankTransactionResponse = {
@@ -150,6 +156,21 @@ export function useCreateBankTransfer() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: BANK_TRANSFERS_QUERY_KEY });
+    },
+  });
+}
+
+export function useCreateBankFundAddition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bankId, data }: { bankId: number; data: CreateBankFundAdditionBody }) =>
+      customFetch<{ id: number }>(`/api/banks/${bankId}/fund-additions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: BANKS_QUERY_KEY });
     },
   });
 }

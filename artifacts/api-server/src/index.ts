@@ -128,6 +128,19 @@ async function runStartupMigrations() {
         console.log(`[migration] Backfilled deliveredAt for ${updated.length} completed/closed containers.`);
       }
     });
+    await runMigration("create_bank_fund_additions_table", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS bank_fund_additions (
+          id SERIAL PRIMARY KEY,
+          bank_id INTEGER NOT NULL REFERENCES banks(id) ON DELETE CASCADE,
+          amount NUMERIC(15,2) NOT NULL,
+          narration TEXT NOT NULL DEFAULT '',
+          reference TEXT,
+          added_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);
