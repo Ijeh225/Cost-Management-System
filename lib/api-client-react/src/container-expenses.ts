@@ -94,10 +94,24 @@ export type BatchContainerExpensePaymentPayload = {
   paidAt?: string;
 };
 
+export type BatchCreatedExpensePayment = {
+  id: number;
+  containerId: number;
+  categoryId: number;
+  amount: number;
+  paymentMethod: "cash" | "bank";
+  bankId: number | null;
+  reference: string | null;
+  narration: string | null;
+  paidAt: string;
+  recordedBy: number | null;
+  createdAt: string;
+};
+
 export type BatchContainerExpensePaymentResponse = {
   ok: boolean;
   count: number;
-  payments: ContainerExpensePayment[];
+  payments: BatchCreatedExpensePayment[];
 };
 
 const CATS_QK = "/api/container-expense-categories";

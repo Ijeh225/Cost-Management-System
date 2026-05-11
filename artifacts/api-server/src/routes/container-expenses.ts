@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containerExpenseCategoriesTable, containerExpensePaymentsTable, banksTable, containersTable, usersTable } from "@workspace/db";
+import { db, containerExpenseCategoriesTable, containerExpensePaymentsTable, banksTable, containersTable, usersTable, auditLogTable } from "@workspace/db";
 import { eq, desc, inArray, isNotNull } from "drizzle-orm";
 import { requireAdmin, AuthRequest } from "../lib/auth.js";
 
@@ -119,6 +119,28 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, 
         recordedBy: req.user?.id ?? null,
       }))
     ).returning();
+
+    // Write one audit log entry per container so the event appears in each
+    // container's Audit Trail tab.
+    if (req.user?.id && inserted.length > 0) {
+      const auditEntries = inserted.map(p => ({
+        containerId: p.containerId,
+        userId: req.user!.id,
+        action: "expense_payment_recorded" as const,
+        section: "payments",
+        newValue: JSON.stringify({
+          paymentId: p.id,
+          category: cat.name,
+          amount: parseFloat(p.amount ?? "0"),
+          paymentMethod,
+          bankId: resolvedBankId ?? null,
+          reference: reference || null,
+          narration: narration || null,
+          paidAt: paidAtDate.toISOString(),
+        }),
+      }));
+      await db.insert(auditLogTable).values(auditEntries);
+    }
 
     res.status(201).json({ ok: true, count: inserted.length, payments: inserted.map(p => ({
       id: p.id,
