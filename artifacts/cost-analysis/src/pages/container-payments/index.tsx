@@ -10,6 +10,7 @@ import {
   useActiveBanks,
   type BatchContainerExpensePaymentItem,
   type ContainerSearchResult,
+  type BankOption,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { formatCurrency } from "@/lib/format";
