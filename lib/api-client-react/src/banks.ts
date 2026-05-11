@@ -7,6 +7,7 @@ export type Bank = {
   accountNumber: string | null;
   bankCode: string | null;
   isActive: boolean;
+  currentBalance: number;
   createdAt: string;
   updatedAt: string;
 };

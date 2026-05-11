@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable } from "@workspace/db";
-import { eq, desc, and, gte, lte, or, SQL } from "drizzle-orm";
+import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable } from "@workspace/db";
+import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 
 export const banksRouter = Router();
@@ -9,7 +9,41 @@ banksRouter.get("/banks", requireAuth, async (req, res) => {
   try {
     const activeOnly = req.query.active === "true";
     const rows = await db.select().from(banksTable).orderBy(banksTable.name);
-    const result = activeOnly ? rows.filter(b => b.isActive) : rows;
+    const filtered = activeOnly ? rows.filter(b => b.isActive) : rows;
+
+    // Compute current balance for each bank from all transaction sources
+    const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows] = await Promise.all([
+      db.select({ bankId: invoicePaymentsTable.bankId, total: sum(invoicePaymentsTable.amount) })
+        .from(invoicePaymentsTable).where(isNotNull(invoicePaymentsTable.bankId)).groupBy(invoicePaymentsTable.bankId),
+      db.select({ bankId: clientDepositsTable.bankId, total: sum(clientDepositsTable.amount) })
+        .from(clientDepositsTable).where(isNotNull(clientDepositsTable.bankId)).groupBy(clientDepositsTable.bankId),
+      db.select({ bankId: bankTransfersTable.toBankId, total: sum(bankTransfersTable.amount) })
+        .from(bankTransfersTable).where(isNotNull(bankTransfersTable.toBankId)).groupBy(bankTransfersTable.toBankId),
+      db.select({ bankId: bankTransfersTable.fromBankId, total: sum(bankTransfersTable.amount) })
+        .from(bankTransfersTable).where(isNotNull(bankTransfersTable.fromBankId)).groupBy(bankTransfersTable.fromBankId),
+      db.select({ bankId: overheadExpensesTable.bankId, total: sum(overheadExpensesTable.amount) })
+        .from(overheadExpensesTable).where(isNotNull(overheadExpensesTable.bankId)).groupBy(overheadExpensesTable.bankId),
+    ]);
+
+    const toMap = (arr: { bankId: number | null; total: string | null }[]) =>
+      Object.fromEntries(arr.map(r => [r.bankId!, parseFloat(r.total ?? "0")]));
+
+    const pmtMap  = toMap(paymentsRows);
+    const depMap  = toMap(depositsRows);
+    const tinMap  = toMap(transfersInRows);
+    const toutMap = toMap(transfersOutRows);
+    const expMap  = toMap(expensesRows);
+
+    const result = filtered.map(b => ({
+      ...b,
+      currentBalance:
+        (pmtMap[b.id] ?? 0) +
+        (depMap[b.id] ?? 0) +
+        (tinMap[b.id] ?? 0) -
+        (toutMap[b.id] ?? 0) -
+        (expMap[b.id] ?? 0),
+    }));
+
     res.json(result);
   } catch (err) {
     console.error("GET /banks error:", err);
