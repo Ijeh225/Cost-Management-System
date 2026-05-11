@@ -183,5 +183,27 @@ router.post("/auth/setup", async (req, res) => {
   }
 });
 
+// TEMPORARY: one-time emergency password reset — remove after use
+router.post("/auth/emergency-reset", async (req, res) => {
+  const token = process.env.EMERGENCY_RESET_TOKEN;
+  if (!token || req.headers["x-reset-token"] !== token) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const { email, newPassword } = req.body;
+  if (!email || !newPassword || newPassword.length < 8) {
+    res.status(400).json({ error: "email and newPassword (min 8 chars) required" });
+    return;
+  }
+  try {
+    const hash = await hashPassword(newPassword);
+    const result = await db.update(usersTable).set({ passwordHash: hash, updatedAt: new Date() }).where(eq(usersTable.email, email)).returning({ id: usersTable.id, email: usersTable.email });
+    if (result.length === 0) { res.status(404).json({ error: "User not found" }); return; }
+    res.json({ success: true, updated: result[0].email });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 export { router as authRouter };
 export { hashPassword };
