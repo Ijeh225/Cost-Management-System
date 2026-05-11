@@ -260,7 +260,7 @@ export default function ContainerPaymentsPage() {
                     </div>
                   ))}
 
-                  {selected.length > 1 && (
+                  {selected.length > 0 && (
                     <div className="flex justify-end items-center gap-2 pt-1 pr-2">
                       <span className="text-xs text-muted-foreground">Total bank debit:</span>
                       <span className="font-mono font-bold text-sm text-foreground">{formatCurrency(totalAmount)}</span>

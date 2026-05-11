@@ -45,7 +45,7 @@ export type CreateBankTransferBody = {
 export type BankTransaction = {
   id: string;
   date: string;
-  type: "payment" | "deposit" | "transfer_in" | "transfer_out" | "fund_addition";
+  type: "payment" | "deposit" | "transfer_in" | "transfer_out" | "fund_addition" | "expense_payment" | "container_expense_payment";
   description: string;
   reference: string | null;
   clientName: string | null;

@@ -2131,9 +2131,11 @@ export default function ContainerDetail() {
             <TabsTrigger value="documents" className="gap-2">
               <FileText className="w-4 h-4" /> Documents
             </TabsTrigger>
-            <TabsTrigger value="payments" className="gap-2">
-              <CreditCard className="w-4 h-4" /> Payment History
-            </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="payments" className="gap-2">
+                <CreditCard className="w-4 h-4" /> Payment History
+              </TabsTrigger>
+            )}
             <TabsTrigger value="audit" className="gap-2">
               <History className="w-4 h-4" /> Audit Trail
             </TabsTrigger>
@@ -2443,9 +2445,11 @@ export default function ContainerDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="payments" className="mt-6">
-          <PaymentHistoryTab containerId={containerId} />
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="payments" className="mt-6">
+            <PaymentHistoryTab containerId={containerId} />
+          </TabsContent>
+        )}
 
         <TabsContent value="audit" className="mt-6">
           <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg">
