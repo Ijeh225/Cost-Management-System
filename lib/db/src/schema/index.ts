@@ -21,3 +21,5 @@ export * from "./overhead-expenses";
 export * from "./bank-fund-additions";
 export * from "./expense-categories";
 export * from "./expense-payments";
+export * from "./container-expense-categories";
+export * from "./container-expense-payments";

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable } from "@workspace/db";
+import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 
@@ -12,7 +12,7 @@ banksRouter.get("/banks", requireAuth, async (req, res) => {
     const filtered = activeOnly ? rows.filter(b => b.isActive) : rows;
 
     // Compute current balance for each bank from all transaction sources
-    const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows, fundAddRows] = await Promise.all([
+    const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows, fundAddRows, containerExpRows] = await Promise.all([
       db.select({ bankId: invoicePaymentsTable.bankId, total: sum(invoicePaymentsTable.amount) })
         .from(invoicePaymentsTable).where(isNotNull(invoicePaymentsTable.bankId)).groupBy(invoicePaymentsTable.bankId),
       db.select({ bankId: clientDepositsTable.bankId, total: sum(clientDepositsTable.amount) })
@@ -25,17 +25,20 @@ banksRouter.get("/banks", requireAuth, async (req, res) => {
         .from(expensePaymentsTable).where(isNotNull(expensePaymentsTable.bankId)).groupBy(expensePaymentsTable.bankId),
       db.select({ bankId: bankFundAdditionsTable.bankId, total: sum(bankFundAdditionsTable.amount) })
         .from(bankFundAdditionsTable).groupBy(bankFundAdditionsTable.bankId),
+      db.select({ bankId: containerExpensePaymentsTable.bankId, total: sum(containerExpensePaymentsTable.amount) })
+        .from(containerExpensePaymentsTable).where(isNotNull(containerExpensePaymentsTable.bankId)).groupBy(containerExpensePaymentsTable.bankId),
     ]);
 
     const toMap = (arr: { bankId: number | null; total: string | null }[]) =>
       Object.fromEntries(arr.map(r => [r.bankId!, parseFloat(r.total ?? "0")]));
 
-    const pmtMap  = toMap(paymentsRows);
-    const depMap  = toMap(depositsRows);
-    const tinMap  = toMap(transfersInRows);
-    const toutMap = toMap(transfersOutRows);
-    const expMap  = toMap(expensesRows);
-    const fadMap  = toMap(fundAddRows);
+    const pmtMap       = toMap(paymentsRows);
+    const depMap       = toMap(depositsRows);
+    const tinMap       = toMap(transfersInRows);
+    const toutMap      = toMap(transfersOutRows);
+    const expMap       = toMap(expensesRows);
+    const fadMap       = toMap(fundAddRows);
+    const cExpMap      = toMap(containerExpRows);
 
     const result = filtered.map(b => ({
       ...b,
@@ -45,7 +48,8 @@ banksRouter.get("/banks", requireAuth, async (req, res) => {
         (tinMap[b.id] ?? 0) +
         (fadMap[b.id] ?? 0) -
         (toutMap[b.id] ?? 0) -
-        (expMap[b.id] ?? 0),
+        (expMap[b.id] ?? 0) -
+        (cExpMap[b.id] ?? 0),
     }));
 
     res.json(result);
@@ -379,7 +383,43 @@ banksRouter.get("/banks/:id/transactions", requireAdmin, async (req, res) => {
       }
     }
 
-    // 6. Expense payments debited from this bank
+    // 6. Container expense payments debited from this bank
+    if (!typeFilter || typeFilter === "container_expense_payment") {
+      const cepConditions: SQL<unknown>[] = [eq(containerExpensePaymentsTable.bankId, id)];
+      if (fromDate) cepConditions.push(gte(containerExpensePaymentsTable.paidAt, fromDate));
+      if (toDate)   cepConditions.push(lte(containerExpensePaymentsTable.paidAt, toDate));
+
+      const cepRows = await db
+        .select({
+          id: containerExpensePaymentsTable.id,
+          amount: containerExpensePaymentsTable.amount,
+          paidAt: containerExpensePaymentsTable.paidAt,
+          reference: containerExpensePaymentsTable.reference,
+          narration: containerExpensePaymentsTable.narration,
+          categoryName: containerExpenseCategoriesTable.name,
+          containerNumber: containersTable.containerNumber,
+        })
+        .from(containerExpensePaymentsTable)
+        .leftJoin(containerExpenseCategoriesTable, eq(containerExpensePaymentsTable.categoryId, containerExpenseCategoriesTable.id))
+        .leftJoin(containersTable, eq(containerExpensePaymentsTable.containerId, containersTable.id))
+        .where(and(...cepConditions));
+
+      for (const cep of cepRows) {
+        txs.push({
+          id: `container_expense_payment_${cep.id}`,
+          date: cep.paidAt,
+          type: "container_expense_payment" as any,
+          description: `${cep.categoryName ?? "Container Expense"} — ${cep.containerNumber ?? "Container"}${cep.narration ? ` (${cep.narration})` : ""}`,
+          reference: cep.reference ?? null,
+          clientName: null,
+          invoiceNumber: null,
+          debit: parseFloat(cep.amount),
+          credit: 0,
+        });
+      }
+    }
+
+    // 7. Overhead expense payments debited from this bank
     if (!typeFilter || typeFilter === "expense_payment") {
       const epConditions: SQL<unknown>[] = [eq(expensePaymentsTable.bankId, id)];
       if (fromDate) epConditions.push(gte(expensePaymentsTable.paidAt, fromDate));

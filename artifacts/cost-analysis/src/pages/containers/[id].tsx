@@ -50,17 +50,108 @@ import {
   History, BarChart3, Send, CheckCircle2, XCircle, ShieldCheck, Pencil,
   Clock, CheckSquare, Printer, ExternalLink, Layers, Users, LinkIcon, Unlink, X,
   ClipboardCheck, PlusCircle, Truck, Plus, Trash2,
-  ChevronUp, ChevronDown, Activity, Zap,
+  ChevronUp, ChevronDown, Activity, Zap, CreditCard, Banknote, Building2,
 } from "lucide-react";
 import { TimelineTab } from "@/components/containers/TimelineTab";
 import { TasksTab } from "@/components/containers/TasksTab";
 import { DocumentsTab } from "@/components/containers/DocumentsTab";
 import { EditSectionsTab } from "@/components/containers/EditSectionsTab";
 import { EditContainerDetailsDialog } from "@/components/containers/edit-container-details-dialog";
-import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY, useListInvoices } from "@workspace/api-client-react";
+import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY, useListInvoices, useGetContainerExpensePayments } from "@workspace/api-client-react";
 import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+
+function PaymentHistoryTab({ containerId }: { containerId: number }) {
+  const { data, isLoading } = useGetContainerExpensePayments(containerId);
+  const payments = data?.payments ?? [];
+  const totalPaid = data?.totalPaid ?? 0;
+
+  if (isLoading) {
+    return (
+      <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg">
+        <CardContent className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border-border/50 bg-card/40 backdrop-blur shadow-lg">
+      <CardHeader className="border-b border-border/40">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-bold flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-primary" /> Payment History
+          </CardTitle>
+          {payments.length > 0 && (
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Total Paid</p>
+              <p className="font-mono font-bold text-base text-red-400">
+                -{formatCurrency(totalPaid)}
+              </p>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="p-6">
+        {payments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center">
+              <CreditCard className="w-6 h-6 text-muted-foreground/40" />
+            </div>
+            <p className="text-sm text-muted-foreground">No expense payments recorded for this container</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {payments.map(p => (
+              <div
+                key={p.id}
+                className="flex items-start gap-4 p-4 rounded-lg border border-border/30 bg-muted/10 hover:bg-muted/20 transition-colors"
+              >
+                <div className="w-9 h-9 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                  {p.paymentMethod === "bank"
+                    ? <Building2 className="w-4 h-4 text-orange-400" />
+                    : <Banknote className="w-4 h-4 text-orange-400" />
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">{p.categoryName}</p>
+                      <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                        <span className="text-xs text-muted-foreground">
+                          {p.paymentMethod === "bank" ? (p.bankName ?? "Bank") : "Cash"}
+                        </span>
+                        {p.reference && (
+                          <span className="text-xs font-mono text-muted-foreground">· {p.reference}</span>
+                        )}
+                        {p.recordedByName && (
+                          <span className="text-xs text-muted-foreground">· by {p.recordedByName}</span>
+                        )}
+                      </div>
+                      {p.narration && (
+                        <p className="text-xs text-muted-foreground italic mt-1">{p.narration}</p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-mono font-bold text-base text-red-400">-{formatCurrency(p.amount)}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {new Date(p.paidAt).toLocaleDateString("en-NG", {
+                          year: "numeric", month: "short", day: "numeric",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 const createNumberSchema = (keys: string[]) => {
   const shape: Record<string, z.ZodTypeAny> = {};
@@ -2040,6 +2131,9 @@ export default function ContainerDetail() {
             <TabsTrigger value="documents" className="gap-2">
               <FileText className="w-4 h-4" /> Documents
             </TabsTrigger>
+            <TabsTrigger value="payments" className="gap-2">
+              <CreditCard className="w-4 h-4" /> Payment History
+            </TabsTrigger>
             <TabsTrigger value="audit" className="gap-2">
               <History className="w-4 h-4" /> Audit Trail
             </TabsTrigger>
@@ -2347,6 +2441,10 @@ export default function ContainerDetail() {
               <DocumentsTab containerId={containerId} />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="payments" className="mt-6">
+          <PaymentHistoryTab containerId={containerId} />
         </TabsContent>
 
         <TabsContent value="audit" className="mt-6">

@@ -197,6 +197,54 @@ async function runStartupMigrations() {
         ON CONFLICT DO NOTHING
       `);
     });
+
+    await runMigration("create_container_expense_categories_table", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS container_expense_categories (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE,
+          is_default BOOLEAN NOT NULL DEFAULT FALSE,
+          created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        INSERT INTO container_expense_categories (name, is_default) VALUES
+          ('Shipping Charges', TRUE),
+          ('Customs Duty', TRUE),
+          ('Terminal Charges', TRUE),
+          ('Delivery / Trucking', TRUE),
+          ('Demurrage', TRUE),
+          ('Storage', TRUE),
+          ('NAFDAC / SON Fees', TRUE),
+          ('Port Charges (NPA / Wharfage)', TRUE),
+          ('SIFAX / GMT Signing', TRUE),
+          ('Bond / Manifest', TRUE),
+          ('CIU', TRUE),
+          ('Agency Fees', TRUE),
+          ('FOU Booking', TRUE),
+          ('Miscellaneous', TRUE)
+        ON CONFLICT (name) DO NOTHING
+      `);
+    });
+
+    await runMigration("create_container_expense_payments_table", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS container_expense_payments (
+          id SERIAL PRIMARY KEY,
+          container_id INTEGER NOT NULL REFERENCES containers(id) ON DELETE CASCADE,
+          category_id INTEGER NOT NULL REFERENCES container_expense_categories(id) ON DELETE RESTRICT,
+          amount NUMERIC(15,2) NOT NULL,
+          payment_method TEXT NOT NULL DEFAULT 'cash',
+          bank_id INTEGER REFERENCES banks(id) ON DELETE SET NULL,
+          reference TEXT,
+          narration TEXT,
+          paid_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          recorded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

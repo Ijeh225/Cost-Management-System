@@ -10,3 +10,4 @@ export * from "./notifications";
 export * from "./search";
 export * from "./user-client-assignments";
 export * from "./overhead-expenses";
+export * from "./container-expenses";

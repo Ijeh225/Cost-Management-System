@@ -21,6 +21,7 @@ import { searchRouter } from "./search.js";
 import { dutyPaymentsRouter } from "./duty-payments.js";
 import { banksRouter } from "./banks.js";
 import { overheadExpensesRouter } from "./overhead-expenses.js";
+import { containerExpensesRouter } from "./container-expenses.js";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use(searchRouter);
 router.use(dutyPaymentsRouter);
 router.use(banksRouter);
 router.use(overheadExpensesRouter);
+router.use(containerExpensesRouter);
 
 export default router;
