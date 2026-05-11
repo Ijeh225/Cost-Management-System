@@ -130,8 +130,9 @@ export default function ContainerPaymentsPage() {
       toast({ title: "Payment recorded successfully", description: `${items.length} container(s) updated` });
       resetForm();
       refetchRecent();
-    } catch (err: any) {
-      toast({ title: "Payment failed", description: err?.message ?? "Server error", variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Server error";
+      toast({ title: "Payment failed", description: msg, variant: "destructive" });
     }
   }
 
@@ -143,8 +144,9 @@ export default function ContainerPaymentsPage() {
       setShowAddCat(false);
       setCategoryId(String(cat.id));
       toast({ title: "Category created" });
-    } catch (err: any) {
-      toast({ title: "Failed to create category", description: err?.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create";
+      toast({ title: "Failed to create category", description: msg, variant: "destructive" });
     }
   }
 
@@ -375,7 +377,7 @@ export default function ContainerPaymentsPage() {
                       <SelectValue placeholder="Select bank account…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {banks.filter((b: any) => b.isActive).map((b: any) => (
+                      {banks.filter((b: BankOption) => b.isActive).map((b: BankOption) => (
                         <SelectItem key={b.id} value={String(b.id)}>
                           <div className="flex flex-col">
                             <span>{b.name}</span>
@@ -445,7 +447,7 @@ export default function ContainerPaymentsPage() {
                   {paymentMethod === "bank" && bankId && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">From</span>
-                      <span className="font-semibold">{banks.find((b: any) => String(b.id) === bankId)?.name ?? "—"}</span>
+                      <span className="font-semibold">{banks.find((b: BankOption) => String(b.id) === bankId)?.name ?? "—"}</span>
                     </div>
                   )}
                 </div>

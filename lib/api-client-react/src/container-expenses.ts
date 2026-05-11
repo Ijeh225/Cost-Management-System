@@ -9,20 +9,39 @@ export type ContainerSearchResult = {
   status?: string | null;
 };
 
+type ContainerSearchRaw = {
+  id: number;
+  containerNumber?: string;
+  container_number?: string;
+  customerName?: string;
+  customer_name?: string;
+  blNumber?: string | null;
+  bl_number?: string | null;
+  status?: string | null;
+};
+
+type ContainerSearchResponse = ContainerSearchRaw[] | { containers: ContainerSearchRaw[] } | { data: ContainerSearchRaw[] };
+
+function toContainerSearchResult(c: ContainerSearchRaw): ContainerSearchResult {
+  return {
+    id: c.id,
+    containerNumber: c.containerNumber ?? c.container_number ?? "",
+    customerName: c.customerName ?? c.customer_name ?? "",
+    blNumber: c.blNumber ?? c.bl_number ?? null,
+    status: c.status ?? null,
+  };
+}
+
 export function useContainerSearch(query: string) {
   return useQuery<ContainerSearchResult[]>({
     queryKey: ["/api/containers/search-lightweight", query],
     queryFn: async () => {
       if (!query.trim() || query.trim().length < 2) return [];
-      const res = await customFetch<any>(`/api/containers?search=${encodeURIComponent(query)}&limit=15`);
-      const list = Array.isArray(res) ? res : (res?.containers ?? res?.data ?? []);
-      return list.map((c: any) => ({
-        id: c.id,
-        containerNumber: c.containerNumber ?? c.container_number ?? "",
-        customerName: c.customerName ?? c.customer_name ?? "",
-        blNumber: c.blNumber ?? c.bl_number ?? null,
-        status: c.status ?? null,
-      }));
+      const res = await customFetch<ContainerSearchResponse>(`/api/containers?search=${encodeURIComponent(query)}&limit=15`);
+      const list: ContainerSearchRaw[] = Array.isArray(res)
+        ? res
+        : ("containers" in res ? res.containers : res.data) ?? [];
+      return list.map(toContainerSearchResult);
     },
     enabled: query.trim().length >= 2,
     staleTime: 10_000,
