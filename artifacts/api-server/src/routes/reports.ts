@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable, containerExpensePaymentsTable } from "@workspace/db";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable, containerExpensePaymentsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, and, inArray, gt, ne, isNotNull, sql, type SQL } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
@@ -908,7 +908,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
 
 reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const { from, to } = req.query as Record<string, string>;
+    const { from, to, status } = req.query as Record<string, string>;
 
     let fromDate: Date | null = null;
     let toDate: Date | null = null;
@@ -921,7 +921,24 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
       if (isNaN(toDate.getTime())) return res.status(400).json({ error: "Invalid 'to' date" });
     }
 
-    // Fetch all containers with their identifiers
+    const emptyResponse = {
+      period: { from: from ?? null, to: to ?? null, status: status ?? null },
+      rows: [] as ReturnType<typeof buildRow>[],
+      aggregate: {
+        sections: {
+          shipping:   { budgeted: 0, disbursed: 0, variance: 0 },
+          customs:    { budgeted: 0, disbursed: 0, variance: 0 },
+          terminal:   { budgeted: 0, disbursed: 0, variance: 0 },
+          delivery:   { budgeted: 0, disbursed: 0, variance: 0 },
+          operations: { budgeted: 0, disbursed: 0, variance: 0 },
+        },
+        totals: { budgeted: 0, disbursed: 0, variance: 0 },
+      },
+    };
+
+    // Fetch containers, filtered by status if provided
+    const containerConds: SQL[] = [];
+    if (status) containerConds.push(eq(containersTable.status, status));
     const allContainers = await db
       .select({
         id: containersTable.id,
@@ -931,23 +948,11 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
         status: containersTable.status,
       })
       .from(containersTable)
+      .where(containerConds.length > 0 ? and(...containerConds) : undefined)
       .orderBy(containersTable.id);
 
     if (allContainers.length === 0) {
-      return res.json({
-        period: { from: from ?? null, to: to ?? null },
-        rows: [],
-        aggregate: {
-          sections: {
-            shipping:   { budgeted: 0, disbursed: 0, variance: 0 },
-            customs:    { budgeted: 0, disbursed: 0, variance: 0 },
-            terminal:   { budgeted: 0, disbursed: 0, variance: 0 },
-            delivery:   { budgeted: 0, disbursed: 0, variance: 0 },
-            operations: { budgeted: 0, disbursed: 0, variance: 0 },
-          },
-          totals: { budgeted: 0, disbursed: 0, variance: 0 },
-        },
-      });
+      return res.json(emptyResponse);
     }
 
     const allIds = allContainers.map(c => c.id);
@@ -981,6 +986,11 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
       ? [...new Set(disbPayments.map(r => r.containerId))]
       : allIds;
 
+    // Short-circuit: no relevant containers means no disbursements in the period
+    if (relevantContainerIds.length === 0) {
+      return res.json(emptyResponse);
+    }
+
     // Fetch budgeted charges in bulk for relevant containers
     const [allS, allC, allT, allD, allO, allE] = await Promise.all([
       db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, relevantContainerIds)),
@@ -1001,33 +1011,14 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
       }, 0);
     }
 
-    const sMap = new Map<number, any>(allS.map(r => [r.containerId, r]));
-    const cMap = new Map<number, any>(allC.map(r => [r.containerId, r]));
-    const tMap = new Map<number, any>(allT.map(r => [r.containerId, r]));
-    const dMap = new Map<number, any>(allD.map(r => [r.containerId, r]));
-    const oMap = new Map<number, any>(allO.map(r => [r.containerId, r]));
-    const extraMap = new Map<number, Record<string, number>>();
-    for (const r of allE) {
-      if (!extraMap.has(r.containerId)) extraMap.set(r.containerId, {});
-      const sec = r.section ?? "other";
-      extraMap.get(r.containerId)![sec] = (extraMap.get(r.containerId)![sec] ?? 0) + parseFloat(r.amount ?? "0");
-    }
-
-    const containerMap = new Map(allContainers.map(c => [c.id, c]));
-
-    // Aggregate totals
-    const aggBudgeted: Record<string, number> = { shipping: 0, customs: 0, terminal: 0, delivery: 0, operations: 0 };
-    const aggDisbursed: Record<string, number> = { shipping: 0, customs: 0, terminal: 0, delivery: 0, operations: 0 };
-
-    const rows = relevantContainerIds.map(id => {
-      const c = containerMap.get(id);
+    function buildRow(id: number, c: typeof allContainers[number] | undefined) {
       const extras = extraMap.get(id) ?? {};
       const budgeted: Record<string, number> = {
-        shipping:   (sMap.get(id) ? sumRow(sMap.get(id)) : 0) + (extras.shipping   ?? 0),
-        customs:    (cMap.get(id) ? sumRow(cMap.get(id)) : 0) + (extras.customs    ?? 0),
-        terminal:   (tMap.get(id) ? sumRow(tMap.get(id)) : 0) + (extras.terminal   ?? 0),
-        delivery:   (dMap.get(id) ? sumRow(dMap.get(id)) : 0) + (extras.delivery   ?? 0),
-        operations: (oMap.get(id) ? sumRow(oMap.get(id)) : 0) + (extras.operations ?? 0),
+        shipping:   (sMap.get(id) ? sumRow(sMap.get(id) as Record<string, unknown>) : 0) + (extras.shipping   ?? 0),
+        customs:    (cMap.get(id) ? sumRow(cMap.get(id) as Record<string, unknown>) : 0) + (extras.customs    ?? 0),
+        terminal:   (tMap.get(id) ? sumRow(tMap.get(id) as Record<string, unknown>) : 0) + (extras.terminal   ?? 0),
+        delivery:   (dMap.get(id) ? sumRow(dMap.get(id) as Record<string, unknown>) : 0) + (extras.delivery   ?? 0),
+        operations: (oMap.get(id) ? sumRow(oMap.get(id) as Record<string, unknown>) : 0) + (extras.operations ?? 0),
       };
       const secDisb = disbMap.get(id) ?? new Map<string, number>();
       const disbursed: Record<string, number> = {
@@ -1054,7 +1045,29 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
         sections,
         totals: { budgeted: totalBudgeted, disbursed: totalDisbursed, variance: totalDisbursed - totalBudgeted },
       };
-    }).sort((a, b) => Math.abs(b.totals.variance) - Math.abs(a.totals.variance));
+    }
+
+    const sMap = new Map<number, ShippingCharges>(allS.map(r => [r.containerId, r]));
+    const cMap = new Map<number, CustomsCharges>(allC.map(r => [r.containerId, r]));
+    const tMap = new Map<number, TerminalCharges>(allT.map(r => [r.containerId, r]));
+    const dMap = new Map<number, DeliveryCharges>(allD.map(r => [r.containerId, r]));
+    const oMap = new Map<number, OperationsCharges>(allO.map(r => [r.containerId, r]));
+    const extraMap = new Map<number, Record<string, number>>();
+    for (const r of allE) {
+      if (!extraMap.has(r.containerId)) extraMap.set(r.containerId, {});
+      const sec = r.section ?? "other";
+      extraMap.get(r.containerId)![sec] = (extraMap.get(r.containerId)![sec] ?? 0) + parseFloat(r.amount ?? "0");
+    }
+
+    const containerMap = new Map(allContainers.map(c => [c.id, c]));
+
+    // Aggregate totals — mutated by buildRow
+    const aggBudgeted: Record<string, number> = { shipping: 0, customs: 0, terminal: 0, delivery: 0, operations: 0 };
+    const aggDisbursed: Record<string, number> = { shipping: 0, customs: 0, terminal: 0, delivery: 0, operations: 0 };
+
+    const rows = relevantContainerIds
+      .map(id => buildRow(id, containerMap.get(id)))
+      .sort((a, b) => Math.abs(b.totals.variance) - Math.abs(a.totals.variance));
 
     const aggSections: Record<string, { budgeted: number; disbursed: number; variance: number }> = {};
     for (const sec of SECTIONS) {
@@ -1064,7 +1077,7 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
     const aggTotalDisbursed = SECTIONS.reduce((s, sec) => s + aggDisbursed[sec], 0);
 
     return res.json({
-      period: { from: from ?? null, to: to ?? null },
+      period: { from: from ?? null, to: to ?? null, status: status ?? null },
       rows,
       aggregate: {
         sections: aggSections,

@@ -201,7 +201,7 @@ export type DisbursementReconciliationRow = {
 };
 
 export type DisbursementReconciliationResponse = {
-  period: { from: string | null; to: string | null };
+  period: { from: string | null; to: string | null; status: string | null };
   rows: DisbursementReconciliationRow[];
   aggregate: {
     sections: Record<string, DisbursementReconciliationSection>;
@@ -209,13 +209,14 @@ export type DisbursementReconciliationResponse = {
   };
 };
 
-export function useGetDisbursementReconciliation(params: { from?: string; to?: string }) {
+export function useGetDisbursementReconciliation(params: { from?: string; to?: string; status?: string }) {
   return useQuery<DisbursementReconciliationResponse>({
-    queryKey: ["/api/reports/disbursement-reconciliation", params.from, params.to],
+    queryKey: ["/api/reports/disbursement-reconciliation", params.from, params.to, params.status],
     queryFn: async () => {
       const qs = new URLSearchParams();
       if (params.from) qs.set("from", params.from);
       if (params.to) qs.set("to", params.to);
+      if (params.status) qs.set("status", params.status);
       return customFetch(`/api/reports/disbursement-reconciliation?${qs}`);
     },
   });

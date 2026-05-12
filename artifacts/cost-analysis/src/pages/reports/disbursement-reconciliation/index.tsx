@@ -1,20 +1,24 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useGetDisbursementReconciliation, type DisbursementReconciliationRow } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Filter, TrendingUp, TrendingDown, Scale, AlertTriangle, RefreshCw, BarChart2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Filter, TrendingUp, TrendingDown, Scale, AlertTriangle, RefreshCw, Download, ChevronsUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+import { WORKFLOW_STAGES } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
-import * as XLSX from "xlsx";
 
 const SECTIONS = ["shipping", "customs", "terminal", "delivery", "operations"] as const;
 const SECTION_LABELS: Record<string, string> = {
   shipping: "Shipping", customs: "Customs", terminal: "Terminal",
   delivery: "Delivery", operations: "Operations",
 };
+
+type SortKey = "containerNumber" | "status" | "budgeted" | "disbursed" | "variance";
+type SortDir = "asc" | "desc";
 
 function VarianceCell({ variance, size = "sm" }: { variance: number; size?: "sm" | "xs" }) {
   const textSize = size === "xs" ? "text-[10px]" : "text-xs";
@@ -26,6 +30,13 @@ function VarianceCell({ variance, size = "sm" }: { variance: number; size?: "sm"
       {over ? "+" : ""}{formatCurrency(variance)}
     </span>
   );
+}
+
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (col !== sortKey) return <ChevronsUpDown className="w-3 h-3 opacity-40 inline ml-1" />;
+  return sortDir === "asc"
+    ? <ChevronUp className="w-3 h-3 inline ml-1" />
+    : <ChevronDown className="w-3 h-3 inline ml-1" />;
 }
 
 function AggCard({ label, budgeted, disbursed, variance }: { label: string; budgeted: number; disbursed: number; variance: number }) {
@@ -114,53 +125,93 @@ function ContainerRow({ row }: { row: DisbursementReconciliationRow }) {
   );
 }
 
+function exportCsv(rows: DisbursementReconciliationRow[], filename: string) {
+  const esc = (v: string | number | null | undefined) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const headers = [
+    "Container", "Customer", "BL Number", "Status",
+    "Total Budgeted (₦)", "Total Disbursed (₦)", "Variance (₦)",
+    ...SECTIONS.flatMap(sec => [
+      `${SECTION_LABELS[sec]} Budgeted (₦)`,
+      `${SECTION_LABELS[sec]} Disbursed (₦)`,
+      `${SECTION_LABELS[sec]} Variance (₦)`,
+    ]),
+  ];
+  const dataRows = rows.map(r => [
+    esc(r.containerNumber), esc(r.customerName), esc(r.blNumber ?? ""), esc(r.status),
+    r.totals.budgeted.toFixed(2), r.totals.disbursed.toFixed(2), r.totals.variance.toFixed(2),
+    ...SECTIONS.flatMap(sec => {
+      const s = r.sections[sec] ?? { budgeted: 0, disbursed: 0, variance: 0 };
+      return [s.budgeted.toFixed(2), s.disbursed.toFixed(2), s.variance.toFixed(2)];
+    }),
+  ].join(","));
+  const csv = [headers.join(","), ...dataRows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function DisbursementReconciliationPage() {
   const { toast } = useToast();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [applied, setApplied] = useState<{ from: string; to: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [applied, setApplied] = useState<{ from: string; to: string; status: string } | null>(null);
   const [generated, setGenerated] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("variance");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const { data, isLoading, isError, refetch } = useGetDisbursementReconciliation(
-    applied ? { from: applied.from || undefined, to: applied.to || undefined } : { from: undefined, to: undefined }
+    applied
+      ? {
+          from: applied.from || undefined,
+          to: applied.to || undefined,
+          status: applied.status !== "all" ? applied.status : undefined,
+        }
+      : { from: undefined, to: undefined, status: undefined }
   );
 
   const handleGenerate = () => {
-    setApplied({ from, to });
+    setApplied({ from, to, status: statusFilter });
     setGenerated(true);
   };
 
   const handleReset = () => {
-    setFrom("");
-    setTo("");
-    setApplied(null);
-    setGenerated(false);
+    setFrom(""); setTo(""); setStatusFilter("all");
+    setApplied(null); setGenerated(false);
   };
 
-  const exportExcel = () => {
-    if (!data) return;
-    const wb = XLSX.utils.book_new();
-    const summaryData = data.rows.map(r => ({
-      "Container": r.containerNumber,
-      "Customer": r.customerName,
-      "BL Number": r.blNumber ?? "",
-      "Status": r.status,
-      "Total Budgeted (₦)": r.totals.budgeted,
-      "Total Disbursed (₦)": r.totals.disbursed,
-      "Variance (₦)": r.totals.variance,
-      ...Object.fromEntries(SECTIONS.flatMap(sec => [
-        [`${SECTION_LABELS[sec]} Budgeted`, r.sections[sec]?.budgeted ?? 0],
-        [`${SECTION_LABELS[sec]} Disbursed`, r.sections[sec]?.disbursed ?? 0],
-        [`${SECTION_LABELS[sec]} Variance`, r.sections[sec]?.variance ?? 0],
-      ])),
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), "Reconciliation");
-    XLSX.writeFile(wb, `disbursement-reconciliation-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast({ title: "Excel exported", description: `${data.rows.length} containers exported.` });
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir(key === "variance" ? "desc" : "asc"); }
   };
 
-  const rows = data?.rows ?? [];
+  const sortedRows = useMemo(() => {
+    const rows = [...(data?.rows ?? [])];
+    rows.sort((a, b) => {
+      let av: number | string;
+      let bv: number | string;
+      switch (sortKey) {
+        case "containerNumber": av = a.containerNumber; bv = b.containerNumber; break;
+        case "status":          av = a.status;          bv = b.status;          break;
+        case "budgeted":        av = a.totals.budgeted;  bv = b.totals.budgeted; break;
+        case "disbursed":       av = a.totals.disbursed; bv = b.totals.disbursed; break;
+        case "variance":
+        default:                av = Math.abs(a.totals.variance); bv = Math.abs(b.totals.variance); break;
+      }
+      if (typeof av === "string" && typeof bv === "string") {
+        return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+    });
+    return rows;
+  }, [data?.rows, sortKey, sortDir]);
+
   const agg = data?.aggregate;
+
+  const thClass = "px-4 py-3 text-left font-medium cursor-pointer hover:text-foreground select-none";
+  const thRClass = "px-4 py-3 text-right font-medium cursor-pointer hover:text-foreground select-none";
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 py-6 px-4">
@@ -171,7 +222,7 @@ export default function DisbursementReconciliationPage() {
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Compare budgeted charges to actual disbursements (money paid out) per container and section.
-          Filter by payment date range to see disbursements in a specific period.
+          Filter by payment date range and container status.
         </p>
       </div>
 
@@ -187,6 +238,20 @@ export default function DisbursementReconciliationPage() {
               <Label className="text-xs">Payment Date To</Label>
               <Input type="date" value={to} onChange={e => setTo(e.target.value)} className="h-8 text-xs w-40" />
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Container Status</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-8 text-xs w-44 border-border/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {WORKFLOW_STAGES.map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button size="sm" className="h-8 text-xs gap-1.5" onClick={handleGenerate} disabled={isLoading}>
               {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Filter className="w-3 h-3" />}
               {generated ? "Refresh" : "Generate Report"}
@@ -194,15 +259,21 @@ export default function DisbursementReconciliationPage() {
             {generated && (
               <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleReset}>Reset</Button>
             )}
-            {data && rows.length > 0 && (
-              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5 ml-auto" onClick={exportExcel}>
-                <BarChart2 className="w-3 h-3" /> Export Excel
+            {data && sortedRows.length > 0 && (
+              <Button
+                size="sm" variant="outline" className="h-8 text-xs gap-1.5 ml-auto"
+                onClick={() => {
+                  exportCsv(sortedRows, `disbursement-reconciliation-${new Date().toISOString().slice(0, 10)}.csv`);
+                  toast({ title: "CSV exported", description: `${sortedRows.length} containers exported.` });
+                }}
+              >
+                <Download className="w-3 h-3" /> Export CSV
               </Button>
             )}
           </div>
           {!generated && (
             <p className="text-xs text-muted-foreground mt-3">
-              Leave dates blank to include <span className="font-semibold">all disbursements across all time</span>, or filter by a specific payment period.
+              Leave dates blank to include <span className="font-semibold">all disbursements across all time</span>, or filter by a specific payment period and/or status.
             </p>
           )}
         </CardContent>
@@ -239,7 +310,7 @@ export default function DisbursementReconciliationPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="col-span-2 sm:col-span-3 lg:col-span-1 bg-card/40 border border-border/40 rounded-lg p-3 flex flex-col justify-between">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Containers</div>
-              <div className="font-bold text-2xl mt-1">{rows.length}</div>
+              <div className="font-bold text-2xl mt-1">{sortedRows.length}</div>
               <div className={`text-xs font-semibold mt-1 ${agg.totals.variance > 0 ? "text-red-400" : agg.totals.variance < 0 ? "text-emerald-400" : "text-muted-foreground"}`}>
                 {agg.totals.variance === 0 ? "On budget" : agg.totals.variance > 0 ? "Over budget" : "Under budget"}
               </div>
@@ -282,9 +353,9 @@ export default function DisbursementReconciliationPage() {
           </div>
 
           {/* Container table */}
-          {rows.length === 0 ? (
+          {sortedRows.length === 0 ? (
             <div className="py-16 text-center text-muted-foreground text-sm">
-              No disbursements found for the selected period.
+              No disbursements found for the selected filters.
             </div>
           ) : (
             <Card className="border-border/40 bg-card/40">
@@ -300,22 +371,32 @@ export default function DisbursementReconciliationPage() {
                   <table className="w-full text-sm min-w-[700px]">
                     <thead className="border-b border-border/50 bg-secondary/20 text-xs text-muted-foreground uppercase tracking-wider">
                       <tr>
-                        <th className="px-4 py-3 text-left font-medium">Container</th>
-                        <th className="px-4 py-3 text-left font-medium">Status</th>
-                        <th className="px-4 py-3 text-right font-medium">Budgeted (₦)</th>
-                        <th className="px-4 py-3 text-right font-medium">Disbursed (₦)</th>
-                        <th className="px-4 py-3 text-right font-medium">Variance (₦)</th>
-                        <th className="px-4 py-3 text-right font-medium w-10"></th>
+                        <th className={thClass} onClick={() => handleSort("containerNumber")}>
+                          Container <SortIcon col="containerNumber" sortKey={sortKey} sortDir={sortDir} />
+                        </th>
+                        <th className={thClass} onClick={() => handleSort("status")}>
+                          Status <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />
+                        </th>
+                        <th className={thRClass} onClick={() => handleSort("budgeted")}>
+                          Budgeted (₦) <SortIcon col="budgeted" sortKey={sortKey} sortDir={sortDir} />
+                        </th>
+                        <th className={thRClass} onClick={() => handleSort("disbursed")}>
+                          Disbursed (₦) <SortIcon col="disbursed" sortKey={sortKey} sortDir={sortDir} />
+                        </th>
+                        <th className={thRClass} onClick={() => handleSort("variance")}>
+                          Variance (₦) <SortIcon col="variance" sortKey={sortKey} sortDir={sortDir} />
+                        </th>
+                        <th className="px-4 py-3 w-10"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map(row => (
+                      {sortedRows.map(row => (
                         <ContainerRow key={row.containerId} row={row} />
                       ))}
                     </tbody>
                     <tfoot className="border-t-2 border-border/40 bg-muted/10">
                       <tr>
-                        <td className="px-4 py-3 font-bold text-sm" colSpan={2}>Totals ({rows.length} containers)</td>
+                        <td className="px-4 py-3 font-bold text-sm" colSpan={2}>Totals ({sortedRows.length} containers)</td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-muted-foreground">{formatCurrency(agg.totals.budgeted)}</td>
                         <td className="px-4 py-3 text-right font-mono font-bold">{formatCurrency(agg.totals.disbursed)}</td>
                         <td className="px-4 py-3 text-right">
@@ -337,8 +418,8 @@ export default function DisbursementReconciliationPage() {
           <div className="w-14 h-14 rounded-2xl bg-muted/20 border border-border/30 flex items-center justify-center">
             <Scale className="w-6 h-6 text-muted-foreground/40" />
           </div>
-          <p className="text-sm text-muted-foreground">Set your date range above and click Generate Report</p>
-          <p className="text-xs text-muted-foreground/60">Or leave dates blank to see all-time reconciliation across every container</p>
+          <p className="text-sm text-muted-foreground">Set your filters above and click Generate Report</p>
+          <p className="text-xs text-muted-foreground/60">Or leave all filters blank to see all-time reconciliation across every container</p>
         </div>
       )}
     </div>
