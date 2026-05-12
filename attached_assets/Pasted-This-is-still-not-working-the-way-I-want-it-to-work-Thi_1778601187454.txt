@@ -1,0 +1,59 @@
+This is still not working the way I want it to work.
+
+This is the exact workflow and structure I expect:
+
+When a user opens Container Payments and selects a container, the system should automatically display the existing breakdown categories such as:
+
+Shipping charges
+Customs duty
+Etc.
+
+Now, once the user clicks on a category like Shipping, it should expand and display the same detailed fields
+ that already exist inside the Container Breakdown of Charges section.
+
+For example, under Shipping, the expanded fields may include:
+
+Shipping Line
+Shipping Payments
+Amount
+Additional payment entries if needed
+
+The same structure currently used in the Breakdown of Charges should also appear inside the Container Payments page.
+
+In other words:
+
+Both sections should be fully synchronized and interconnected
+What appears in the Breakdown of Charges should also appear in Container Payments
+🔄 Expected Synchronization Logic
+
+For example:
+
+A user selects a container
+Clicks on “Shipping”
+Selects the Shipping Line
+Inputs an amount/payment
+
+As this payment is being entered in the Container Payments section, it should automatically reflect immediately inside the Container Breakdown of Charges section for that same container.
+
+So essentially:
+
+The Container Payments page becomes the payment/input side
+The Breakdown of Charges section becomes the financial tracking and record side
+
+Both are connected to the same data source and should update each other automatically in real time.
+
+🎯 Final Objective
+
+The goal is to ensure that:
+
+Payments are not recorded separately from the breakdown structure
+Every payment made updates the corresponding breakdown category automatically
+The container financial records remain synchronized at all times
+Users can clearly track:
+What has been paid
+Who it was paid to
+Which category it belongs to
+Outstanding balances
+Full container cost breakdown
+
+This should function as one connected financial workflow, not two separate sections.
