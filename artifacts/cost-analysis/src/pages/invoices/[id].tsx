@@ -5,6 +5,7 @@ import {
   useGetInvoiceWhatsAppLog, useSendInvoiceWhatsApp, useSendInvoiceReminder, useSendInvoiceReceipt,
   useAddInvoiceItem, useEditInvoiceItem, useRemoveInvoiceItem,
   useListActiveBanks, useApplyClientCredit, useGetClientWalletSummary,
+  useGetClientDeposits, useAllocateDeposit,
   type RecordPaymentBody, type InvoiceItem,
 } from "@workspace/api-client-react";
 import { useListContainers, getListContainersQueryKey } from "@workspace/api-client-react";
@@ -30,6 +31,103 @@ import {
   Box, Calendar, StickyNote, MessageCircle, Bell, ChevronDown, ChevronUp, Printer, Receipt,
   Pencil, ChevronsUpDown, Check, Banknote,
 } from "lucide-react";
+
+function ApplyDepositDialog({
+  open, onClose, invoiceId, clientId, invoiceOutstanding,
+}: {
+  open: boolean; onClose: () => void;
+  invoiceId: number; clientId: number; invoiceOutstanding: number;
+}) {
+  const { toast } = useToast();
+  const allocate = useAllocateDeposit(clientId);
+  const { data: deposits = [] } = useGetClientDeposits(open ? clientId : null);
+  const [selectedDepositId, setSelectedDepositId] = useState<string>("");
+  const [amount, setAmount] = useState("");
+
+  const unallocated = deposits.filter(d => d.remainingAmount > 0);
+  const selected = unallocated.find(d => String(d.id) === selectedDepositId);
+  const maxApply = selected ? Math.min(selected.remainingAmount, invoiceOutstanding) : invoiceOutstanding;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected) { toast({ variant: "destructive", title: "Select a deposit" }); return; }
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) { toast({ variant: "destructive", title: "Enter a valid amount" }); return; }
+    try {
+      const res = await allocate.mutateAsync({ depositId: selected.id, invoiceId, amount: amt });
+      toast({ title: `₦${res.allocationAmount.toLocaleString()} applied from deposit. Remaining on deposit: ₦${res.remainingOnDeposit.toLocaleString()}` });
+      onClose();
+      setSelectedDepositId("");
+      setAmount("");
+    } catch (err: any) {
+      toast({ variant: "destructive", title: err?.message ?? "Failed to allocate deposit" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-blue-400" />
+            Apply Deposit to Invoice
+          </DialogTitle>
+        </DialogHeader>
+        {unallocated.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">No unallocated deposits available for this client.</p>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4 mt-1">
+            <div>
+              <Label>Select Deposit</Label>
+              <Select value={selectedDepositId} onValueChange={v => { setSelectedDepositId(v); setAmount(""); }}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Choose a deposit..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {unallocated.map(d => (
+                    <SelectItem key={d.id} value={String(d.id)}>
+                      ₦{d.remainingAmount.toLocaleString("en-NG", { minimumFractionDigits: 2 })} remaining
+                      {d.reference ? ` · ${d.reference}` : ""} ({new Date(d.createdAt).toLocaleDateString("en-NG")})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selected && (
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm">
+                <p className="text-xs text-muted-foreground mb-0.5">Remaining on Deposit</p>
+                <p className="font-mono font-bold text-blue-400">
+                  ₦{selected.remainingAmount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            )}
+            <div>
+              <Label>Amount to Apply (₦) *</Label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                max={maxApply}
+                placeholder={`Max ₦${maxApply.toLocaleString()}`}
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                className="mt-1 font-mono"
+                disabled={!selected}
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-1">
+              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              <Button type="submit" disabled={allocate.isPending || !selected} className="gap-2 bg-blue-600 hover:bg-blue-700">
+                {allocate.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Apply Deposit
+              </Button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function ApplyCreditDialog({
   open, onClose, invoiceId, clientId, invoiceOutstanding,
@@ -509,6 +607,7 @@ export default function InvoiceDetailPage() {
   const { data: whatsappLog } = useGetInvoiceWhatsAppLog(isNaN(invoiceId) ? null : invoiceId);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [creditOpen, setCreditOpen] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
   const [whatsappLogOpen, setWhatsappLogOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InvoiceItem | null>(null);
@@ -800,6 +899,17 @@ export default function InvoiceDetailPage() {
         {isAdmin && invoice.outstanding > 0 && (
           <Button
             variant="outline"
+            className="gap-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+            onClick={() => setDepositOpen(true)}
+          >
+            <CreditCard className="w-4 h-4" />
+            Apply Deposit
+          </Button>
+        )}
+
+        {isAdmin && invoice.outstanding > 0 && (
+          <Button
+            variant="outline"
             className="gap-2 border-violet-500/50 text-violet-400 hover:bg-violet-500/10"
             onClick={() => setCreditOpen(true)}
           >
@@ -1065,6 +1175,16 @@ export default function InvoiceDetailPage() {
         onClose={() => setPaymentOpen(false)}
         invoiceId={invoiceId}
       />
+
+      {invoice.clientId != null && (
+        <ApplyDepositDialog
+          open={depositOpen}
+          onClose={() => setDepositOpen(false)}
+          invoiceId={invoiceId}
+          clientId={invoice.clientId}
+          invoiceOutstanding={invoice.outstanding}
+        />
+      )}
 
       {invoice.clientId != null && (
         <ApplyCreditDialog

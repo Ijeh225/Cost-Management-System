@@ -948,6 +948,7 @@ router.delete("/invoices/:id/payments/:paymentId", requireAdmin, async (req, res
 
     const [payment] = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.id, paymentId));
     if (!payment) return res.status(404).json({ error: "Payment not found" });
+    if (payment.invoiceId !== invoiceId) return res.status(400).json({ error: "Payment does not belong to this invoice" });
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     const paymentAmount = parseFloat(payment.amount ?? "0");

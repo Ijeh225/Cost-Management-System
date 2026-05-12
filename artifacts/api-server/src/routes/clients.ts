@@ -625,11 +625,31 @@ clientsRouter.post("/clients/:id/wallet/reset", requireAuth, requireAdmin, async
     if (!passwordMatch) return res.status(403).json({ error: "Incorrect password" });
 
     const now = new Date();
-    await db.update(clientsTable)
-      .set({ walletResetAt: now, creditBalance: "0" })
-      .where(eq(clientsTable.id, clientId));
 
-    return res.json({ success: true, walletResetAt: now.toISOString() });
+    // Fetch unallocated deposits before reset for count/audit
+    const deposits = await db.select().from(clientDepositsTable).where(eq(clientDepositsTable.clientId, clientId));
+    const unallocatedDeposits = deposits.filter(d => parseFloat(d.allocatedAmount ?? "0") < parseFloat(d.amount ?? "0"));
+
+    await db.transaction(async (tx) => {
+      // Void remaining balance on all unallocated/partial deposits
+      for (const dep of unallocatedDeposits) {
+        await tx.update(clientDepositsTable)
+          .set({ allocatedAmount: dep.amount, notes: (dep.notes ? dep.notes + " | " : "") + `[VOIDED by wallet reset ${now.toISOString()} by user #${adminUser.id}]` })
+          .where(eq(clientDepositsTable.id, dep.id));
+      }
+
+      // Append audit note to client record
+      const auditLine = `[WALLET RESET ${now.toISOString()} by user #${adminUser.id} (${userRow.email})] — creditBalance zeroed; ${unallocatedDeposits.length} unallocated deposit(s) voided`;
+      await tx.update(clientsTable)
+        .set({
+          walletResetAt: now,
+          creditBalance: "0",
+          notes: sql`CASE WHEN ${clientsTable.notes} = '' THEN ${auditLine} ELSE ${clientsTable.notes} || E'\n' || ${auditLine} END`,
+        })
+        .where(eq(clientsTable.id, clientId));
+    });
+
+    return res.json({ success: true, walletResetAt: now.toISOString(), depositVoided: unallocatedDeposits.length });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
