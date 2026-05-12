@@ -21,6 +21,7 @@ function useQueryParams() {
     from: p.get("from") ?? undefined,
     to: p.get("to") ?? undefined,
     clientId: p.get("clientId") ?? undefined,
+    costBasis: p.get("costBasis") ?? undefined,
   };
 }
 
@@ -68,8 +69,8 @@ function downloadCsv(data: ProfitLossResponse, filename: string) {
 }
 
 export default function ProfitLossPrint() {
-  const { from, to, clientId } = useQueryParams();
-  const { data, isLoading, isError } = useGetProfitLoss({ from, to, clientId });
+  const { from, to, clientId, costBasis } = useQueryParams();
+  const { data, isLoading, isError } = useGetProfitLoss({ from, to, clientId, costBasis });
 
   if (isLoading) {
     return (

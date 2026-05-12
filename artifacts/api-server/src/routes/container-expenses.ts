@@ -429,3 +429,48 @@ containerExpensesRouter.get("/container-expense-payments/recent", requireAdmin, 
     res.status(500).json({ error: "Server error" });
   }
 });
+
+// ─── GET /containers/:id/reconciliation ──────────────────────────────────────
+
+containerExpensesRouter.get("/containers/:id/reconciliation", requireAdmin, async (req, res) => {
+  const containerId = Number(req.params.id);
+  if (!Number.isFinite(containerId) || containerId <= 0) {
+    return res.status(400).json({ error: "Invalid containerId" });
+  }
+  try {
+    const [budgeted, disbPayments] = await Promise.all([
+      getSectionChargedTotals(containerId),
+      db.select({
+        section: containerExpensePaymentsTable.section,
+        total: sql<string>`sum(${containerExpensePaymentsTable.amount})`,
+      })
+        .from(containerExpensePaymentsTable)
+        .where(eq(containerExpensePaymentsTable.containerId, containerId))
+        .groupBy(containerExpensePaymentsTable.section),
+    ]);
+
+    const disbursedBySection: Record<string, number> = {};
+    for (const r of disbPayments) {
+      if (r.section) disbursedBySection[r.section] = parseFloat(r.total ?? "0");
+    }
+
+    const SECTIONS = ["shipping", "customs", "terminal", "delivery", "operations"] as const;
+    const sections = SECTIONS.map(sec => {
+      const b = budgeted[sec] ?? 0;
+      const d = disbursedBySection[sec] ?? 0;
+      return { section: sec, budgeted: b, disbursed: d, variance: d - b };
+    });
+
+    const totalBudgeted = sections.reduce((s, r) => s + r.budgeted, 0);
+    const totalDisbursed = sections.reduce((s, r) => s + r.disbursed, 0);
+
+    return res.json({
+      containerId,
+      sections,
+      totals: { budgeted: totalBudgeted, disbursed: totalDisbursed, variance: totalDisbursed - totalBudgeted },
+    });
+  } catch (err) {
+    console.error("GET /containers/:id/reconciliation error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});

@@ -14,6 +14,7 @@ import {
   useActiveBanks,
   useContainerSearch,
   useGetSettings,
+  useGetContainerReconciliation,
   BUILT_IN_SECTION_DEFAULTS,
   getBuiltInFieldLabel,
   isBuiltInFieldHidden,
@@ -39,7 +40,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import {
   CreditCard, Search, X, Loader2, Banknote, Building2, Save,
   Anchor, Package, Truck, Settings, DollarSign, CheckCircle2,
-  ArrowRight, Receipt,
+  ArrowRight, Receipt, Scale, TrendingUp, TrendingDown,
 } from "lucide-react";
 
 // ── Schemas (identical to Breakdown of Charges section) ──────────────────────
@@ -400,6 +401,16 @@ function ContainerView({
     { key: "operations", title: sn.operations ?? BUILT_IN_SECTION_DEFAULTS.operations },
   ];
 
+  const { data: recon } = useGetContainerReconciliation(containerId);
+
+  const SECTION_ICONS: Record<PaymentSection, React.ReactNode> = {
+    shipping:   <Anchor className="w-3.5 h-3.5" />,
+    customs:    <Package className="w-3.5 h-3.5" />,
+    terminal:   <Building2 className="w-3.5 h-3.5" />,
+    delivery:   <Truck className="w-3.5 h-3.5" />,
+    operations: <Settings className="w-3.5 h-3.5" />,
+  };
+
   return (
     <div className="space-y-5">
       {/* Container banner */}
@@ -446,6 +457,83 @@ function ContainerView({
             />
           ))}
         </Accordion>
+      )}
+
+      {/* Reconciliation Panel */}
+      {recon && (
+        <Card className="border-border/40 bg-card/40">
+          <CardHeader className="pb-3 border-b border-border/30">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Scale className="w-4 h-4 text-primary" />
+              Budget vs Disbursements Reconciliation
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">Budgeted charges vs actual money disbursed per section</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="border-b border-border/30 bg-muted/10">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left text-muted-foreground font-medium uppercase tracking-wide">Section</th>
+                    <th className="px-4 py-2.5 text-right text-muted-foreground font-medium uppercase tracking-wide">Budgeted</th>
+                    <th className="px-4 py-2.5 text-right text-muted-foreground font-medium uppercase tracking-wide">Disbursed</th>
+                    <th className="px-4 py-2.5 text-right text-muted-foreground font-medium uppercase tracking-wide">Variance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/20">
+                  {recon.sections.map(sec => {
+                    const style = SECTION_STYLE[sec.section as PaymentSection];
+                    const label = sn[sec.section] ?? PAYMENT_SECTION_LABELS[sec.section as PaymentSection] ?? sec.section;
+                    const over = sec.variance > 0;
+                    const under = sec.variance < 0;
+                    return (
+                      <tr key={sec.section} className="hover:bg-muted/5 transition-colors">
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className={style?.text ?? "text-muted-foreground"}>{SECTION_ICONS[sec.section as PaymentSection]}</span>
+                            <span className="font-medium capitalize">{label}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{formatCurrency(sec.budgeted)}</td>
+                        <td className="px-4 py-2.5 text-right font-mono">{formatCurrency(sec.disbursed)}</td>
+                        <td className="px-4 py-2.5 text-right font-mono font-semibold">
+                          {sec.variance === 0 ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className={`flex items-center justify-end gap-1 ${over ? "text-red-400" : "text-emerald-400"}`}>
+                              {over ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                              {over ? "+" : ""}{formatCurrency(sec.variance)}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="border-t border-border/40 bg-muted/10">
+                  <tr>
+                    <td className="px-4 py-2.5 font-semibold">Total</td>
+                    <td className="px-4 py-2.5 text-right font-mono font-semibold text-muted-foreground">{formatCurrency(recon.totals.budgeted)}</td>
+                    <td className="px-4 py-2.5 text-right font-mono font-semibold">{formatCurrency(recon.totals.disbursed)}</td>
+                    <td className="px-4 py-2.5 text-right font-mono font-bold">
+                      {recon.totals.variance === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <span className={recon.totals.variance > 0 ? "text-red-400" : "text-emerald-400"}>
+                          {recon.totals.variance > 0 ? "+" : ""}{formatCurrency(recon.totals.variance)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div className="px-4 py-2 border-t border-border/20 flex gap-4 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><TrendingDown className="w-3 h-3 text-emerald-400" /> Under budget (good)</span>
+              <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3 text-red-400" /> Over budget</span>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

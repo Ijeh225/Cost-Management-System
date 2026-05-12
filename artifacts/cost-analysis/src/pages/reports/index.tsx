@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, type DeliveryAnalyticsResponse } from "@workspace/api-client-react";
+import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import {
   Loader2, FileDown, Filter, AlertTriangle, RefreshCw,
   TrendingDown, TrendingUp, DollarSign, CheckCircle2,
   Users, BarChart3, PieChart, CalendarRange, FileSpreadsheet, Printer,
-  FileText, Receipt, Clock, ExternalLink, Truck,
+  FileText, Receipt, Clock, ExternalLink, Truck, Scale, ArrowRight,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
@@ -559,6 +560,8 @@ function PrintableReportsSection() {
   const [plFrom, setPlFrom] = useState("");
   const [plTo, setPlTo] = useState("");
   const [plClientId, setPlClientId] = useState("all");
+  const [plCostBasis, setPlCostBasis] = useState<"budgeted" | "disbursements">("budgeted");
+  const [, setLocation] = useLocation();
 
   const openReport = (path: string, params: Record<string, string>) => {
     const qs = new URLSearchParams();
@@ -749,12 +752,53 @@ function PrintableReportsSection() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Cost Basis</Label>
+              <div className="flex gap-1.5">
+                {(["budgeted", "disbursements"] as const).map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setPlCostBasis(v)}
+                    className={`flex-1 h-7 rounded border text-[10px] font-medium transition-all ${
+                      plCostBasis === v
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/40 bg-background/40 text-muted-foreground hover:bg-muted/30"
+                    }`}
+                  >
+                    {v === "budgeted" ? "Budgeted Charges" : "Actual Disbursements"}
+                  </button>
+                ))}
+              </div>
+            </div>
             <Button
               size="sm"
               className="w-full gap-2 text-xs h-8"
-              onClick={() => openReport("/reports/pl/print", { from: plFrom, to: plTo, clientId: plClientId })}
+              onClick={() => openReport("/reports/pl/print", { from: plFrom, to: plTo, clientId: plClientId, costBasis: plCostBasis })}
             >
               <ExternalLink className="w-3.5 h-3.5" /> Generate P&amp;L
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Disbursement Reconciliation */}
+        <Card className="border-border/50 bg-card/40">
+          <CardHeader className="pb-3 border-b border-border/40">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Scale className="w-4 h-4 text-teal-400" /> Disbursement Reconciliation
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">Compare budgeted charges to actual disbursements per container and section. Filter by payment date.</p>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="rounded-lg bg-secondary/40 border border-border/40 p-3 text-xs text-muted-foreground leading-relaxed mb-3">
+              Shows every container's budgeted vs actual spend, sorted by largest variance. Click any row to expand section-level detail.
+            </div>
+            <Button
+              size="sm"
+              className="w-full gap-2 text-xs h-8"
+              onClick={() => setLocation("/reports/disbursement-reconciliation")}
+            >
+              <ArrowRight className="w-3.5 h-3.5" /> Open Reconciliation Report
             </Button>
           </CardContent>
         </Card>

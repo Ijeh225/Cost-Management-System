@@ -209,6 +209,27 @@ export function useGetRecentContainerExpensePayments(limit = 50) {
   });
 }
 
+export type ContainerReconciliationSection = {
+  section: string;
+  budgeted: number;
+  disbursed: number;
+  variance: number;
+};
+
+export type ContainerReconciliationResponse = {
+  containerId: number;
+  sections: ContainerReconciliationSection[];
+  totals: { budgeted: number; disbursed: number; variance: number };
+};
+
+export function useGetContainerReconciliation(containerId: number | null) {
+  return useQuery<ContainerReconciliationResponse>({
+    queryKey: ["/api/containers", containerId, "reconciliation"],
+    queryFn: () => customFetch<ContainerReconciliationResponse>(`/api/containers/${containerId}/reconciliation`),
+    enabled: containerId !== null && containerId > 0,
+  });
+}
+
 export function useBatchCreateContainerExpensePayment() {
   const qc = useQueryClient();
   return useMutation<BatchContainerExpensePaymentResponse, Error, BatchContainerExpensePaymentPayload>({

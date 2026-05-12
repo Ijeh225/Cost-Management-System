@@ -129,6 +129,7 @@ export function useGetInvoiceAging() {
 export type ProfitLossResponse = {
   period: { from: string | null; to: string | null };
   filters: { clientId: number | null };
+  costBasis?: "budgeted" | "disbursements";
   revenue: {
     totalRevenue: number;
     totalInvoicedInclVat: number;
@@ -169,15 +170,53 @@ export type ProfitLossResponse = {
   clients: Array<{ id: number; name: string }>;
 };
 
-export function useGetProfitLoss(params: { from?: string; to?: string; clientId?: string }) {
+export function useGetProfitLoss(params: { from?: string; to?: string; clientId?: string; costBasis?: string }) {
   return useQuery<ProfitLossResponse>({
-    queryKey: ["/api/reports/pl", params.from, params.to, params.clientId],
+    queryKey: ["/api/reports/pl", params.from, params.to, params.clientId, params.costBasis],
     queryFn: async () => {
       const qs = new URLSearchParams();
       if (params.from) qs.set("from", params.from);
       if (params.to) qs.set("to", params.to);
       if (params.clientId && params.clientId !== "all") qs.set("clientId", params.clientId);
+      if (params.costBasis === "disbursements") qs.set("costBasis", "disbursements");
       return customFetch(`/api/reports/pl?${qs}`);
+    },
+  });
+}
+
+export type DisbursementReconciliationSection = {
+  budgeted: number;
+  disbursed: number;
+  variance: number;
+};
+
+export type DisbursementReconciliationRow = {
+  containerId: number;
+  containerNumber: string;
+  customerName: string;
+  blNumber: string | null;
+  status: string;
+  sections: Record<string, DisbursementReconciliationSection>;
+  totals: { budgeted: number; disbursed: number; variance: number };
+};
+
+export type DisbursementReconciliationResponse = {
+  period: { from: string | null; to: string | null };
+  rows: DisbursementReconciliationRow[];
+  aggregate: {
+    sections: Record<string, DisbursementReconciliationSection>;
+    totals: { budgeted: number; disbursed: number; variance: number };
+  };
+};
+
+export function useGetDisbursementReconciliation(params: { from?: string; to?: string }) {
+  return useQuery<DisbursementReconciliationResponse>({
+    queryKey: ["/api/reports/disbursement-reconciliation", params.from, params.to],
+    queryFn: async () => {
+      const qs = new URLSearchParams();
+      if (params.from) qs.set("from", params.from);
+      if (params.to) qs.set("to", params.to);
+      return customFetch(`/api/reports/disbursement-reconciliation?${qs}`);
     },
   });
 }
