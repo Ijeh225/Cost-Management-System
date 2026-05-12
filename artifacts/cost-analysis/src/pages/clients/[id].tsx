@@ -646,12 +646,12 @@ export default function ClientDetailPage() {
                                   <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded px-1.5 py-0.5 text-[10px]">
                                     <Check className="w-2.5 h-2.5" />
                                     Fully Applied
-                                    {d.allocatedInvoiceNumber && ` → ${d.allocatedInvoiceNumber}`}
+                                    {d.allocatedInvoiceNumber && ` → Invoice ${d.allocatedInvoiceNumber}`}
                                   </span>
                                 ) : isPartiallyAllocated ? (
                                   <span className="inline-flex items-center gap-1 text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5 text-[10px]">
                                     Partial — {formatCurrency(d.allocatedAmount)} applied
-                                    {d.allocatedInvoiceNumber && ` → ${d.allocatedInvoiceNumber}`}
+                                    {d.allocatedInvoiceNumber && ` (last: Invoice ${d.allocatedInvoiceNumber})`}
                                   </span>
                                 ) : (
                                   <span className="text-muted-foreground/50 text-[10px] italic">Unallocated</span>

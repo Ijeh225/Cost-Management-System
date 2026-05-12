@@ -295,11 +295,12 @@ export function useAllocateDeposit(clientId: number) {
           body: JSON.stringify({ invoiceId, amount }),
         }
       ),
-    onSuccess: () => {
+    onSuccess: (_, { invoiceId }) => {
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "deposits"] });
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"] });
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "receivables"] });
       qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId] });
     },
   });
 }
