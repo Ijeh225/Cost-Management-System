@@ -373,42 +373,44 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
       revenueByClient[key].invoiceCount += 1;
     }
 
-    // ===== COST OF SALES: attributed to invoice date (not container creation date) =====
-    // Step 1: containers referenced in non-draft invoices within the period
-    const invoicedItemConds: SQL[] = [isNotNull(invoiceItemsTable.containerId), ne(invoicesTable.status, "draft")];
-    if (fromDate) invoicedItemConds.push(gte(invoicesTable.createdAt, fromDate));
-    if (toDate)   invoicedItemConds.push(lte(invoicesTable.createdAt, toDate));
-    if (clientIdNum !== null) invoicedItemConds.push(eq(invoicesTable.clientId, clientIdNum));
+    // ===== COST OF SALES: attributed to each container's first-ever invoice date =====
+    // We query ALL non-draft invoice items globally (optionally filtered by client) to find
+    // the earliest-ever invoice date per container. COGS is recognised exactly ONCE — in the
+    // period that first-ever date falls in. This prevents double-counting when a container
+    // appears on multiple invoices across different periods.
+    const allInvoiceItemConds: SQL[] = [isNotNull(invoiceItemsTable.containerId), ne(invoicesTable.status, "draft")];
+    if (clientIdNum !== null) allInvoiceItemConds.push(eq(invoicesTable.clientId, clientIdNum));
 
-    const invoicedItemRows = await db
+    const allNonDraftInvoiceItemRows = await db
       .select({
         containerId: invoiceItemsTable.containerId,
         invoiceCreatedAt: invoicesTable.createdAt,
       })
       .from(invoiceItemsTable)
       .innerJoin(invoicesTable, eq(invoiceItemsTable.invoiceId, invoicesTable.id))
-      .where(and(...invoicedItemConds));
+      .where(and(...allInvoiceItemConds));
 
-    // Map: containerId -> earliest invoice date in period (for monthly attribution)
-    const containerToInvoiceDate = new Map<number, Date>();
-    for (const row of invoicedItemRows) {
+    // Build: containerId -> earliest-ever non-draft invoice date (all time)
+    const containerFirstInvoiceDate = new Map<number, Date>();
+    for (const row of allNonDraftInvoiceItemRows) {
       if (row.containerId === null) continue;
       const d = row.invoiceCreatedAt instanceof Date ? row.invoiceCreatedAt : new Date(row.invoiceCreatedAt);
-      const existing = containerToInvoiceDate.get(row.containerId);
-      if (!existing || d < existing) containerToInvoiceDate.set(row.containerId, d);
+      const existing = containerFirstInvoiceDate.get(row.containerId);
+      if (!existing || d < existing) containerFirstInvoiceDate.set(row.containerId, d);
+    }
+
+    // Only include containers whose first-ever invoice date falls within the requested period.
+    // This ensures each container's COGS is recognised in exactly one period.
+    const containerToInvoiceDate = new Map<number, Date>();
+    for (const [containerId, firstDate] of containerFirstInvoiceDate) {
+      const afterFrom = !fromDate || firstDate >= fromDate;
+      const beforeTo  = !toDate   || firstDate <= toDate;
+      if (afterFrom && beforeTo) containerToInvoiceDate.set(containerId, firstDate);
     }
     const invoicedIds = [...containerToInvoiceDate.keys()];
 
-    // Step 2: All containers that have at least one NON-DRAFT invoice item (used to identify uninvoiced ones).
-    // Containers linked only to draft invoices are treated as uninvoiced until a real invoice is issued.
-    const allInvoicedRows = await db
-      .select({ containerId: invoiceItemsTable.containerId })
-      .from(invoiceItemsTable)
-      .innerJoin(invoicesTable, eq(invoiceItemsTable.invoiceId, invoicesTable.id))
-      .where(and(isNotNull(invoiceItemsTable.containerId), ne(invoicesTable.status, "draft")));
-    const allInvoicedContainerIds = new Set(
-      allInvoicedRows.map(r => r.containerId).filter((v): v is number => v !== null)
-    );
+    // allInvoicedContainerIds: ALL containers ever on a non-draft invoice (for uninvoiced detection)
+    const allInvoicedContainerIds = new Set(containerFirstInvoiceDate.keys());
 
     // Step 3: Uninvoiced containers created in the period (no non-draft invoice ever raised)
     const uninvConds: SQL[] = [];
