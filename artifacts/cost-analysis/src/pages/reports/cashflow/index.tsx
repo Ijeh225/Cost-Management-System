@@ -15,7 +15,6 @@ const TYPE_LABEL: Record<CashFlowTxn["type"], string> = {
   invoice_payment: "Invoice Payment",
   client_deposit: "Wallet Deposit",
   overhead_expense: "Overhead Expense",
-  duty_payment: "Customs Duty",
   fund_addition: "Fund Addition",
   container_expense: "Container Disbursement",
   bank_transfer: "Bank Transfer",

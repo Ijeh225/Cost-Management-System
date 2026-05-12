@@ -769,25 +769,6 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
       .where(ohConds.length > 0 ? and(...ohConds) : undefined)
       .orderBy(expensePaymentsTable.paidAt);
 
-    // OUTFLOWS — duty payments (no per-payment history; use customs_charges.dutyPaid as snapshot,
-    // dated by customs_charges.updatedAt). Bank attribution unavailable for duty payments.
-    const dutyConds: SQL[] = [gt(customsChargesTable.dutyPaid, "0")];
-    if (fromDate) dutyConds.push(gte(customsChargesTable.updatedAt, fromDate));
-    if (toDate)   dutyConds.push(lte(customsChargesTable.updatedAt, toDate));
-
-    const dutyRows = bankIdNum !== null ? [] : await db
-      .select({
-        id: customsChargesTable.id,
-        dutyPaid: customsChargesTable.dutyPaid,
-        updatedAt: customsChargesTable.updatedAt,
-        containerNumber: containersTable.containerNumber,
-        blNumber: containersTable.blNumber,
-      })
-      .from(customsChargesTable)
-      .leftJoin(containersTable, eq(customsChargesTable.containerId, containersTable.id))
-      .where(and(...dutyConds))
-      .orderBy(customsChargesTable.updatedAt);
-
     // INFLOWS — bank fund additions
     const fundAddConds: SQL[] = [];
     if (fromDate) fundAddConds.push(gte(bankFundAdditionsTable.createdAt, fromDate));
@@ -836,7 +817,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
     type Txn = {
       id: string;
       date: string;
-      type: "invoice_payment" | "client_deposit" | "overhead_expense" | "duty_payment" | "fund_addition" | "container_expense" | "bank_transfer";
+      type: "invoice_payment" | "client_deposit" | "overhead_expense" | "fund_addition" | "container_expense" | "bank_transfer";
       direction: "in" | "out";
       description: string;
       category: string | null;
@@ -891,21 +872,6 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
         bankName: r.bankName,
         reference: r.reference ?? null,
         amount: parseFloat(r.amount as string ?? "0"),
-      });
-    }
-
-    for (const r of dutyRows) {
-      outflows.push({
-        id: `dp-${r.id}`,
-        date: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : String(r.updatedAt),
-        type: "duty_payment",
-        direction: "out",
-        description: `Duty paid — Container ${r.containerNumber ?? ""}${r.blNumber ? ` (BL ${r.blNumber})` : ""}`,
-        category: "Customs Duty",
-        bankId: null,
-        bankName: null,
-        reference: null,
-        amount: parseFloat(r.dutyPaid as string ?? "0"),
       });
     }
 
@@ -1046,15 +1012,6 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
       openingBalance -= parseFloat(prevOh[0]?.s ?? "0");
       openingBalance += parseFloat(prevFundAdd[0]?.s ?? "0");
       openingBalance -= parseFloat(prevCep[0]?.s ?? "0");
-
-      // Duty has no bank attribution — only include in all-banks view
-      if (bankIdNum === null) {
-        const prevDuty = await db
-          .select({ s: sql<string>`coalesce(sum(${customsChargesTable.dutyPaid}), 0)` })
-          .from(customsChargesTable)
-          .where(and(gt(customsChargesTable.dutyPaid, "0"), lt(customsChargesTable.updatedAt, fromDate)));
-        openingBalance -= parseFloat(prevDuty[0]?.s ?? "0");
-      }
 
       // Bank transfers (specific-bank view only)
       if (bankIdNum !== null) {
