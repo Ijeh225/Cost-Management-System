@@ -883,6 +883,11 @@ function ChargeSectionForm({
                     </div>
                   </div>
                 </div>
+                {ngnEquivalent != null && ngnEquivalent > 0 && (
+                  <p className="text-xs text-blue-400 mt-2 flex items-center gap-1">
+                    <DollarSign className="w-3 h-3" /> USD conversion active — the section total will use <strong className="font-semibold">{formatCurrency(ngnEquivalent)}</strong> as its NGN value instead of individual field entries.
+                  </p>
+                )}
                 {usdAmount && exchangeRate && (parseFloat(usdAmount) <= 0 || parseFloat(exchangeRate) <= 0) && (
                   <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" /> Both USD amount and exchange rate must be greater than zero.

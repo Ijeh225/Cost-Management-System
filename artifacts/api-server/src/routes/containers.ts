@@ -1757,7 +1757,6 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       return out;
     };
 
-    const FX_META = new Set(["usdAmount", "exchangeRate", "id", "containerId", "updatedAt"]);
     const validateFx = (obj: any, sectionName: string): string | null => {
       if (!obj) return null;
       const hasUsd = obj.usdAmount != null && obj.usdAmount !== "" && !isNaN(parseFloat(obj.usdAmount)) && parseFloat(obj.usdAmount) > 0;
@@ -1765,18 +1764,6 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       if (!hasUsd && !hasRate) return null;
       if (hasUsd && !hasRate) return `${sectionName}: Exchange rate is required when a USD amount is entered`;
       if (!hasUsd && hasRate) return `${sectionName}: USD amount is required when an exchange rate is entered`;
-      const usd = parseFloat(obj.usdAmount);
-      const rate = parseFloat(obj.exchangeRate);
-      const expected = usd * rate;
-      const ngnTotal = Object.entries(obj)
-        .filter(([k, v]) => !FX_META.has(k) && v != null && !isNaN(parseFloat(String(v))))
-        .reduce((s, [, v]) => s + parseFloat(String(v as any)), 0);
-      if (ngnTotal === 0) return null;
-      const ratio = Math.abs(expected - ngnTotal) / ngnTotal;
-      if (ratio > 0.05) {
-        const fmt = (n: number) => n.toLocaleString("en-NG", { maximumFractionDigits: 0 });
-        return `${sectionName}: USD conversion (₦${fmt(expected)}) doesn't match section total (₦${fmt(ngnTotal)}) — verify the exchange rate`;
-      }
       return null;
     };
 
