@@ -222,7 +222,9 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
     const invoiceIds = clientInvoices.map(i => i.id);
 
     const [allPayments, allItems] = await Promise.all([
-      db.select().from(invoicePaymentsTable),
+      invoiceIds.length > 0
+        ? db.select().from(invoicePaymentsTable).where(inArray(invoicePaymentsTable.invoiceId, invoiceIds))
+        : Promise.resolve([] as Array<{ id: number; invoiceId: number; amount: string; paidAt: Date | null; paymentMethod: string; reference: string; notes: string; bankId: number | null; createdAt: Date }>),
       invoiceIds.length > 0
         ? db.select({
             id: invoiceItemsTable.id,

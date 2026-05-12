@@ -21,6 +21,15 @@ export type ClientStatementInvoice = {
     reference: string;
     notes: string;
   }>;
+  items: Array<{
+    id: number;
+    containerId: number | null;
+    containerNumber: string | null;
+    blNumber: string | null;
+    description: string;
+    amount: number;
+    sortOrder: number;
+  }>;
 };
 
 export type ClientStatementResponse = {
