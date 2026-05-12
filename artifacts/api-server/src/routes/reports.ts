@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
@@ -365,9 +365,12 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireAdmin, async (_r
 
     const earliestFrom = quarterDefs[quarterDefs.length - 1].from;
 
+    // Fetch non-draft, non-cancelled invoices in the window
     const invoices = await db.select({
+      id: invoicesTable.id,
       subtotal: invoicesTable.subtotal,
       vatAmount: invoicesTable.vatAmount,
+      total: invoicesTable.total,
       status: invoicesTable.status,
       createdAt: invoicesTable.createdAt,
     })
@@ -380,24 +383,116 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireAdmin, async (_r
         )
       );
 
-    const quarterData = quarterDefs.map(q => {
-      const qInvs = invoices.filter(inv => {
+    // Fetch credit notes for invoices in this window to derive VAT reduction
+    const invoiceIds = invoices.map(inv => inv.id);
+    type CreditNoteVatRow = { invoiceId: number; creditAmount: number; invoiceTotal: number; invoiceVat: number };
+    let creditNoteRows: CreditNoteVatRow[] = [];
+    if (invoiceIds.length > 0) {
+      const cnRows = await db.select({
+        invoiceId: creditNotesTable.invoiceId,
+        amount: creditNotesTable.amount,
+        status: creditNotesTable.status,
+        createdAt: creditNotesTable.createdAt,
+        invoiceTotal: invoicesTable.total,
+        invoiceVat: invoicesTable.vatAmount,
+      })
+        .from(creditNotesTable)
+        .innerJoin(invoicesTable, eq(creditNotesTable.invoiceId, invoicesTable.id))
+        .where(
+          and(
+            inArray(creditNotesTable.invoiceId, invoiceIds),
+            ne(creditNotesTable.status, "voided"),
+          )
+        );
+      // VAT credit = pro-rata of invoice VAT based on credit note amount vs invoice total
+      creditNoteRows = cnRows.map(cn => ({
+        invoiceId: cn.invoiceId,
+        creditAmount: parseFloat(cn.amount ?? "0"),
+        invoiceTotal: parseFloat(cn.invoiceTotal ?? "1"),
+        invoiceVat: parseFloat(cn.invoiceVat ?? "0"),
+      }));
+    }
+
+    // Helper: get quarter index for a date
+    const getQuarterIdx = (d: Date): number => {
+      for (let i = 0; i < quarterDefs.length; i++) {
+        if (d >= quarterDefs[i].from && d <= quarterDefs[i].to) return i;
+      }
+      return -1;
+    };
+
+    // Build per-quarter accumulators
+    type QAcc = { grossVat: number; creditVat: number; taxable: number; count: number };
+    const qAccs: QAcc[] = quarterDefs.map(() => ({ grossVat: 0, creditVat: 0, taxable: 0, count: 0 }));
+
+    for (const inv of invoices) {
+      const d = inv.createdAt instanceof Date ? inv.createdAt : new Date(inv.createdAt!);
+      const qi = getQuarterIdx(d);
+      if (qi < 0) continue;
+      qAccs[qi].grossVat += parseFloat(inv.vatAmount ?? "0");
+      qAccs[qi].taxable += parseFloat(inv.subtotal ?? "0");
+      qAccs[qi].count++;
+    }
+
+    // Build a lookup: invoiceId -> invoice createdAt quarter index
+    const invQuarterMap: Record<number, number> = {};
+    for (const inv of invoices) {
+      const d = inv.createdAt instanceof Date ? inv.createdAt : new Date(inv.createdAt!);
+      invQuarterMap[inv.id] = getQuarterIdx(d);
+    }
+
+    for (const cn of creditNoteRows) {
+      const qi = invQuarterMap[cn.invoiceId] ?? -1;
+      if (qi < 0) continue;
+      const invTotal = cn.invoiceTotal > 0 ? cn.invoiceTotal : 1;
+      const vatCredit = (cn.creditAmount / invTotal) * cn.invoiceVat;
+      qAccs[qi].creditVat += vatCredit;
+    }
+
+    // Build monthly breakdown for the current quarter
+    const cqDef = quarterDefs[0];
+    const cqStartMonth = (cqDef.quarter - 1) * 3;
+    const months = [0, 1, 2].map(offset => {
+      const mNum = cqStartMonth + offset;
+      const mFrom = new Date(cqDef.year, mNum, 1);
+      const mTo = new Date(cqDef.year, mNum + 1, 0, 23, 59, 59, 999);
+      const mLabel = mFrom.toLocaleString("en-NG", { month: "short" });
+      const mInvs = invoices.filter(inv => {
         const d = inv.createdAt instanceof Date ? inv.createdAt : new Date(inv.createdAt!);
-        return d >= q.from && d <= q.to;
+        return d >= mFrom && d <= mTo;
       });
-      const vatCollected = qInvs.reduce((s, inv) => s + parseFloat(inv.vatAmount ?? "0"), 0);
-      const taxableAmount = qInvs.reduce((s, inv) => s + parseFloat(inv.subtotal ?? "0"), 0);
+      const mGrossVat = mInvs.reduce((s, inv) => s + parseFloat(inv.vatAmount ?? "0"), 0);
+      const mTaxable = mInvs.reduce((s, inv) => s + parseFloat(inv.subtotal ?? "0"), 0);
+      // Credit VAT credit attributable to this month's invoices
+      const mInvIds = new Set(mInvs.map(inv => inv.id));
+      const mCreditVat = creditNoteRows
+        .filter(cn => mInvIds.has(cn.invoiceId))
+        .reduce((s, cn) => {
+          const invTotal = cn.invoiceTotal > 0 ? cn.invoiceTotal : 1;
+          return s + (cn.creditAmount / invTotal) * cn.invoiceVat;
+        }, 0);
       return {
-        label: q.label,
-        year: q.year,
-        quarter: q.quarter,
-        from: q.from.toISOString().slice(0, 10),
-        to: q.to.toISOString().slice(0, 10),
-        vatCollected,
-        taxableAmount,
-        invoiceCount: qInvs.length,
+        label: mLabel,
+        month: mNum + 1,
+        year: cqDef.year,
+        vatCollected: Math.max(0, mGrossVat - mCreditVat),
+        taxableAmount: mTaxable,
+        invoiceCount: mInvs.length,
       };
     });
+
+    const quarterData = quarterDefs.map((q, i) => ({
+      label: q.label,
+      year: q.year,
+      quarter: q.quarter,
+      from: q.from.toISOString().slice(0, 10),
+      to: q.to.toISOString().slice(0, 10),
+      vatCollected: Math.max(0, qAccs[i].grossVat - qAccs[i].creditVat),
+      taxableAmount: qAccs[i].taxable,
+      invoiceCount: qAccs[i].count,
+      creditNoteVatDeduction: qAccs[i].creditVat,
+      ...(i === 0 ? { months } : {}),
+    }));
 
     const currentQuarter = quarterData[0];
     const currentYearQuarters = quarterData.filter(q => q.year === currentYear);

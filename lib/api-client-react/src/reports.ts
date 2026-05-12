@@ -315,6 +315,15 @@ export function useDeliveryAnalyticsReport(
   });
 }
 
+export type VatLiabilityMonth = {
+  label: string;
+  month: number;
+  year: number;
+  vatCollected: number;
+  taxableAmount: number;
+  invoiceCount: number;
+};
+
 export type VatLiabilityQuarter = {
   label: string;
   year: number;
@@ -324,6 +333,8 @@ export type VatLiabilityQuarter = {
   vatCollected: number;
   taxableAmount: number;
   invoiceCount: number;
+  creditNoteVatDeduction: number;
+  months?: VatLiabilityMonth[];
 };
 
 export type VatLiabilityResponse = {

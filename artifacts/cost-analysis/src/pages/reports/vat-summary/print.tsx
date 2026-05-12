@@ -136,12 +136,38 @@ export default function VatSummaryPrint() {
           </div>
         </div>
 
-        {totals.totalVat > 0 && (
-          <div className="vat-note">
-            VAT payable to FIRS for period {periodLabel}: <strong>{fmt(totals.totalVat)}</strong>
-            {vatRate && ` (effective rate: ${vatRate}%)`}
+        {/* Quarterly VAT callout band — always shown */}
+        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "14px 18px", marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: totals.totalVat > 0 ? 10 : 0 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", color: "#1d4ed8", marginBottom: 2 }}>VAT Return Summary · For FIRS Filing</div>
+              <div style={{ fontSize: 12, color: "#475569" }}>
+                Period: <strong>{periodLabel}</strong>
+                {vatRate && <span style={{ marginLeft: 12 }}>Effective VAT rate: <strong>{vatRate}%</strong></span>}
+              </div>
+            </div>
+            <div style={{ textAlign: "right", fontSize: 11, color: "#64748b" }}>
+              <div>FIRS VAT is due on the <strong>21st of the month</strong> following the filing period.</div>
+              <div style={{ marginTop: 2 }}>VAT Registration Number required on submission.</div>
+            </div>
           </div>
-        )}
+          {totals.totalVat > 0 && (
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              <div style={{ background: "#fff", borderRadius: 6, border: "1px solid #bfdbfe", padding: "8px 14px", minWidth: 140 }}>
+                <div style={{ fontSize: 10, textTransform: "uppercase", color: "#94a3b8", letterSpacing: "0.8px", marginBottom: 4 }}>Taxable Turnover</div>
+                <div style={{ fontSize: 15, fontWeight: 800, fontFamily: "monospace", color: "#1e293b" }}>{fmt(totals.totalSubtotal)}</div>
+              </div>
+              <div style={{ background: "#fff", borderRadius: 6, border: "1px solid #bfdbfe", padding: "8px 14px", minWidth: 140 }}>
+                <div style={{ fontSize: 10, textTransform: "uppercase", color: "#94a3b8", letterSpacing: "0.8px", marginBottom: 4 }}>VAT Payable to FIRS</div>
+                <div style={{ fontSize: 15, fontWeight: 800, fontFamily: "monospace", color: "#1d4ed8" }}>{fmt(totals.totalVat)}</div>
+              </div>
+              <div style={{ background: "#fff", borderRadius: 6, border: "1px solid #bfdbfe", padding: "8px 14px", minWidth: 140 }}>
+                <div style={{ fontSize: 10, textTransform: "uppercase", color: "#94a3b8", letterSpacing: "0.8px", marginBottom: 4 }}>Grand Total (incl. VAT)</div>
+                <div style={{ fontSize: 15, fontWeight: 800, fontFamily: "monospace", color: "#0f766e" }}>{fmt(totals.totalInvoiced)}</div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {quarterlyBreakdown.length > 1 && (
           <>

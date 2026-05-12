@@ -572,7 +572,25 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            {vatLiability.quarters.filter(q => q.vatCollected > 0 || q.label === vatLiability.currentQuarter.label).length > 1 && (
+            {/* Monthly breakdown for current quarter */}
+            {vatLiability.currentQuarter.months && vatLiability.currentQuarter.months.length > 0 && (
+              <div className="mb-3">
+                <div className="text-[10px] text-muted-foreground font-medium mb-1.5 uppercase tracking-wider">
+                  {vatLiability.currentQuarter.label} — Monthly Breakdown
+                </div>
+                <div className="flex gap-2">
+                  {vatLiability.currentQuarter.months.map(m => (
+                    <div key={m.label} className="flex-1 rounded-lg px-3 py-2 bg-blue-500/8 border border-blue-500/15 text-center">
+                      <div className="text-[10px] text-muted-foreground font-medium">{m.label}</div>
+                      <div className="text-xs font-bold font-mono text-blue-400 mt-0.5">{formatCurrency(m.vatCollected)}</div>
+                      <div className="text-[9px] text-muted-foreground/60 mt-0.5">{m.invoiceCount} inv</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Prior-quarter trend chips */}
+            {vatLiability.quarters.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {vatLiability.quarters.slice(0, 4).map(q => (
                   <div key={q.label} className={`shrink-0 rounded-lg px-3 py-2 border text-center min-w-[90px] ${q.label === vatLiability.currentQuarter.label ? "bg-blue-500/15 border-blue-500/30" : "bg-muted/20 border-border/20"}`}>
