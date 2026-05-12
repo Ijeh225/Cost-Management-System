@@ -19,6 +19,8 @@ export const containerExtraChargesTable = pgTable("container_extra_charges", {
 export type ContainerExtraCharge = typeof containerExtraChargesTable.$inferSelect;
 
 const numericField = () => numeric({ precision: 15, scale: 2 }).notNull().default("0");
+const nullableNumericFx = () => numeric({ precision: 15, scale: 2 });
+const nullableNumericRate = () => numeric({ precision: 15, scale: 6 });
 
 export const shippingChargesTable = pgTable("shipping_charges", {
   id: serial("id").primaryKey(),
@@ -30,6 +32,8 @@ export const shippingChargesTable = pgTable("shipping_charges", {
   telexCharge: numericField(),
   shippingRunnings: numericField(),
   shippingDetentionToBePaidByCustomer: numericField(),
+  usdAmount: nullableNumericFx(),
+  exchangeRate: nullableNumericRate(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -53,6 +57,8 @@ export const customsChargesTable = pgTable("customs_charges", {
   soncap: numericField(),
   alerts: numericField(),
   examinationBonus: numericField(),
+  usdAmount: nullableNumericFx(),
+  exchangeRate: nullableNumericRate(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -70,6 +76,8 @@ export const terminalChargesTable = pgTable("terminal_charges", {
   tincanBond: numericField(),
   bond: numericField(),
   manifest: numericField(),
+  usdAmount: nullableNumericFx(),
+  exchangeRate: nullableNumericRate(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -87,6 +95,8 @@ export const deliveryChargesTable = pgTable("delivery_charges", {
   pulloutExpenses: numericField(),
   transferToIkorodu: numericField(),
   transportAllowance: numericField(),
+  usdAmount: nullableNumericFx(),
+  exchangeRate: nullableNumericRate(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -105,6 +115,8 @@ export const operationsChargesTable = pgTable("operations_charges", {
   transireRunnings: numericField(),
   officePtml: numericField(),
   freshPayment: numericField(),
+  usdAmount: nullableNumericFx(),
+  exchangeRate: nullableNumericRate(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

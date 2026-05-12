@@ -1544,3 +1544,79 @@ reportsRouter.get("/reports/invoice-aging", requireAuth, requireAdmin, async (re
     return res.status(500).json({ error: "Server error" });
   }
 });
+
+reportsRouter.get("/reports/fx-history", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { from, to } = req.query as Record<string, string>;
+
+    const sections: Array<{ table: typeof shippingChargesTable | typeof customsChargesTable | typeof terminalChargesTable | typeof deliveryChargesTable | typeof operationsChargesTable; name: string }> = [
+      { table: shippingChargesTable, name: "shipping" },
+      { table: customsChargesTable, name: "customs" },
+      { table: terminalChargesTable, name: "terminal" },
+      { table: deliveryChargesTable, name: "delivery" },
+      { table: operationsChargesTable, name: "operations" },
+    ];
+
+    const allEntries: Array<{
+      containerId: number;
+      containerNumber: string;
+      section: string;
+      usdAmount: number;
+      exchangeRate: number;
+      ngnEquivalent: number;
+      recordedAt: string;
+    }> = [];
+
+    await Promise.all(sections.map(async ({ table, name }) => {
+      const rows = await db
+        .select({
+          containerId: table.containerId,
+          containerNumber: containersTable.containerNumber,
+          usdAmount: table.usdAmount,
+          exchangeRate: table.exchangeRate,
+          updatedAt: table.updatedAt,
+        })
+        .from(table)
+        .innerJoin(containersTable, eq(table.containerId, containersTable.id))
+        .where(isNotNull(table.usdAmount));
+
+      for (const row of rows) {
+        const usd = parseFloat(row.usdAmount ?? "0");
+        const rate = parseFloat(row.exchangeRate ?? "1");
+        allEntries.push({
+          containerId: row.containerId,
+          containerNumber: row.containerNumber,
+          section: name,
+          usdAmount: usd,
+          exchangeRate: rate,
+          ngnEquivalent: usd * rate,
+          recordedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : String(row.updatedAt),
+        });
+      }
+    }));
+
+    let entries = allEntries;
+    if (from) {
+      const fromDate = new Date(from);
+      entries = entries.filter(e => new Date(e.recordedAt) >= fromDate);
+    }
+    if (to) {
+      const toDate = new Date(to + "T23:59:59");
+      entries = entries.filter(e => new Date(e.recordedAt) <= toDate);
+    }
+
+    entries.sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
+
+    const totalUsd = entries.reduce((s, e) => s + e.usdAmount, 0);
+    const totalNgn = entries.reduce((s, e) => s + e.ngnEquivalent, 0);
+
+    return res.json({
+      entries,
+      period: { from: from ?? null, to: to ?? null },
+      totals: { totalUsd, totalNgn },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});

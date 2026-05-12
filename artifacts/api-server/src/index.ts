@@ -277,6 +277,13 @@ async function runStartupMigrations() {
         END $$;
       `);
     });
+
+    await runMigration("add_fx_fields_to_charges_tables", async () => {
+      for (const tbl of ["shipping_charges", "customs_charges", "terminal_charges", "delivery_charges", "operations_charges"]) {
+        await pool.query(`ALTER TABLE ${tbl} ADD COLUMN IF NOT EXISTS usd_amount NUMERIC(15,2)`);
+        await pool.query(`ALTER TABLE ${tbl} ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(15,6)`);
+      }
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

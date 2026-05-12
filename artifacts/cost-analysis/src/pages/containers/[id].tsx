@@ -700,13 +700,27 @@ function ChargeSectionForm({
 
   const isDirty = form.formState.isDirty;
 
+  const [usdAmount, setUsdAmount] = useState<string>(
+    initialData?.usdAmount != null ? String(initialData.usdAmount) : ""
+  );
+  const [exchangeRate, setExchangeRate] = useState<string>(
+    initialData?.exchangeRate != null ? String(initialData.exchangeRate) : ""
+  );
+
   useEffect(() => {
     form.reset(initialData || {});
+    setUsdAmount(initialData?.usdAmount != null ? String(initialData.usdAmount) : "");
+    setExchangeRate(initialData?.exchangeRate != null ? String(initialData.exchangeRate) : "");
   }, [JSON.stringify(initialData)]);
 
   const allFields = Object.keys(schema.shape);
   const fields = allFields.filter(f => !isBuiltInFieldHidden(sectionSettings, sectionKey, f));
   const baseTotal = fields.reduce((sum, field) => sum + Number(initialData?.[field] || 0), 0);
+
+  const ngnEquivalent =
+    usdAmount && exchangeRate && parseFloat(usdAmount) > 0 && parseFloat(exchangeRate) > 0
+      ? parseFloat(usdAmount) * parseFloat(exchangeRate)
+      : null;
   const { data: allExtraCharges = [] } = useGetContainerExtraCharges(containerId);
   const extraTotal = allExtraCharges.filter(r => r.section === sectionKey).reduce((s, r) => s + r.amount, 0);
   const extraBuiltinTotal = (extraFields ?? [])
@@ -721,8 +735,13 @@ function ChargeSectionForm({
   const canSubmit = isEditable && (isAdmin || !effectivelyLocked) && (approvalStatus === "draft" || approvalStatus === "rejected");
 
   const onSubmit = (data: any) => {
+    const sectionData = {
+      ...data,
+      usdAmount: usdAmount !== "" ? parseFloat(usdAmount) || null : null,
+      exchangeRate: exchangeRate !== "" ? parseFloat(exchangeRate) || null : null,
+    };
     updateMutation.mutate(
-      { id: containerId, data: { section: sectionKey as UpdateContainerChargesRequestSection, [sectionKey]: data, reason: "Manual UI update" } },
+      { id: containerId, data: { section: sectionKey as UpdateContainerChargesRequestSection, [sectionKey]: sectionData, reason: "Manual UI update" } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
@@ -810,6 +829,62 @@ function ChargeSectionForm({
                     </FormItem>
                   )} />
                 ))}
+              </div>
+              {/* USD / FX Entry */}
+              <div className="mt-2 border-t border-border/30 pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">USD Entry (Optional)</span>
+                  {(initialData?.usdAmount != null || (usdAmount && parseFloat(usdAmount) > 0)) && (
+                    <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-semibold border border-blue-500/20">FX Recorded</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium">USD Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">$</span>
+                      <Input
+                        type="number"
+                        disabled={!canEdit || updateMutation.isPending}
+                        value={usdAmount}
+                        onChange={e => setUsdAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="pl-7 font-mono text-sm bg-background/50 border-border/60 disabled:opacity-70 h-10"
+                        onFocus={e => e.target.select()}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium">Exchange Rate (₦/$)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-mono">₦</span>
+                      <Input
+                        type="number"
+                        disabled={!canEdit || updateMutation.isPending}
+                        value={exchangeRate}
+                        onChange={e => setExchangeRate(e.target.value)}
+                        placeholder="0.00"
+                        className="pl-7 font-mono text-sm bg-background/50 border-border/60 disabled:opacity-70 h-10"
+                        onFocus={e => e.target.select()}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium">NGN Equivalent</label>
+                    <div className="h-10 flex items-center px-3 rounded-md border border-border/40 bg-muted/20 font-mono text-sm text-muted-foreground">
+                      {ngnEquivalent != null
+                        ? <><span className="text-foreground font-semibold">{formatCurrency(ngnEquivalent)}</span></>
+                        : <span className="italic text-xs">Enter USD + rate</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+                {usdAmount && exchangeRate && (parseFloat(usdAmount) <= 0 || parseFloat(exchangeRate) <= 0) && (
+                  <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> Both USD amount and exchange rate must be greater than zero.
+                  </p>
+                )}
               </div>
               <ExtraLineItems containerId={containerId} sectionKey={sectionKey} canEdit={canEdit} />
               {(extraFields?.length ?? 0) > 0 && (

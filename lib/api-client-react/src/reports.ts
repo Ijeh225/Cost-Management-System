@@ -362,3 +362,34 @@ export function useGetVatLiability() {
     queryFn: async () => customFetch("/api/reports/vat-liability"),
   });
 }
+
+export type FxHistoryEntry = {
+  containerId: number;
+  containerNumber: string;
+  section: string;
+  usdAmount: number;
+  exchangeRate: number;
+  ngnEquivalent: number;
+  recordedAt: string;
+};
+
+export type FxHistoryResponse = {
+  entries: FxHistoryEntry[];
+  period: { from: string | null; to: string | null };
+  totals: { totalUsd: number; totalNgn: number };
+};
+
+export function useGetFxHistory(
+  params: { from?: string; to?: string },
+  options?: { enabled?: boolean }
+) {
+  const { enabled = true } = options ?? {};
+  const qs = new URLSearchParams();
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  return useQuery<FxHistoryResponse>({
+    queryKey: ["/api/reports/fx-history", params.from, params.to],
+    enabled,
+    queryFn: async () => customFetch(`/api/reports/fx-history?${qs}`),
+  });
+}

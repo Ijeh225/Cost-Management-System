@@ -170,7 +170,8 @@ function numericToObj(row: any, exclude = ["id", "containerId", "updatedAt"]) {
   const obj: any = {};
   for (const key of Object.keys(row)) {
     if (exclude.includes(key)) continue;
-    obj[key] = parseFloat(row[key] ?? "0");
+    const val = row[key];
+    obj[key] = val == null ? null : parseFloat(val);
   }
   return obj;
 }
@@ -1750,7 +1751,8 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       if (!obj) return undefined;
       const out: any = {};
       for (const k of Object.keys(obj)) {
-        out[k] = String(obj[k] ?? 0);
+        const v = obj[k];
+        out[k] = (v === null || v === undefined) ? null : String(v);
       }
       return out;
     };

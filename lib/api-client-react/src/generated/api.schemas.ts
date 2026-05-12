@@ -262,6 +262,8 @@ export interface ShippingCharges {
   telexCharge?: number;
   shippingRunnings?: number;
   shippingDetentionToBePaidByCustomer?: number;
+  usdAmount?: number | null;
+  exchangeRate?: number | null;
 }
 
 export interface CustomsCharges {
@@ -282,6 +284,8 @@ export interface CustomsCharges {
   soncap?: number;
   alerts?: number;
   examinationBonus?: number;
+  usdAmount?: number | null;
+  exchangeRate?: number | null;
 }
 
 export interface TerminalCharges {
@@ -296,6 +300,8 @@ export interface TerminalCharges {
   tincanBond?: number;
   bond?: number;
   manifest?: number;
+  usdAmount?: number | null;
+  exchangeRate?: number | null;
 }
 
 export interface DeliveryCharges {
@@ -310,6 +316,8 @@ export interface DeliveryCharges {
   pulloutExpenses?: number;
   transferToIkorodu?: number;
   transportAllowance?: number;
+  usdAmount?: number | null;
+  exchangeRate?: number | null;
 }
 
 export interface OperationsCharges {
@@ -325,6 +333,8 @@ export interface OperationsCharges {
   transireRunnings?: number;
   officePtml?: number;
   freshPayment?: number;
+  usdAmount?: number | null;
+  exchangeRate?: number | null;
 }
 
 export interface ContainerCharges {

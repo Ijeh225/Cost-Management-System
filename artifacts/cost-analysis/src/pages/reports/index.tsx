@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, type DeliveryAnalyticsResponse } from "@workspace/api-client-react";
+import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, useGetFxHistory, type DeliveryAnalyticsResponse, type FxHistoryEntry } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import {
   TrendingDown, TrendingUp, DollarSign, CheckCircle2,
   Users, BarChart3, PieChart, CalendarRange, FileSpreadsheet, Printer,
   FileText, Receipt, Clock, ExternalLink, Truck, Scale, ArrowRight,
+  Globe,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
@@ -540,6 +541,156 @@ function DeliveryReportSection() {
               <p className="text-sm">Click <span className="font-medium text-foreground">Generate Report</span> to load delivery data</p>
             </div>
           ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function FxHistorySection() {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [applied, setApplied] = useState<{ from: string; to: string }>({ from: "", to: "" });
+  const { toast } = useToast();
+
+  const { data, isLoading } = useGetFxHistory(
+    { from: applied.from || undefined, to: applied.to || undefined }
+  );
+
+  const entries = data?.entries ?? [];
+  const totals = data?.totals ?? { totalUsd: 0, totalNgn: 0 };
+
+  const SECTION_LABELS: Record<string, string> = {
+    shipping: "Shipping",
+    customs: "Customs",
+    terminal: "Terminal",
+    delivery: "Delivery",
+    operations: "Operations",
+  };
+
+  const exportCsv = () => {
+    if (entries.length === 0) { toast({ variant: "destructive", title: "No data to export" }); return; }
+    const headers = ["Container No.", "Section", "USD Amount", "Exchange Rate (₦/$)", "NGN Equivalent", "Recorded At"];
+    const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [
+      headers.join(","),
+      ...entries.map(e => [
+        esc(e.containerNumber),
+        esc(SECTION_LABELS[e.section] ?? e.section),
+        e.usdAmount.toFixed(2),
+        e.exchangeRate.toFixed(6),
+        e.ngnEquivalent.toFixed(2),
+        esc(new Date(e.recordedAt).toLocaleDateString("en-NG")),
+      ].join(",")),
+    ];
+    const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `fx_history_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported", description: `${entries.length} FX entries exported.` });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-bold text-foreground flex items-center gap-2 mb-1">
+          <Globe className="w-4 h-4 text-blue-400" /> Exchange Rate History
+        </h2>
+        <p className="text-xs text-muted-foreground">USD/NGN exchange rates used across all containers in a period.</p>
+      </div>
+      <Card className="border-border/50 bg-card/40">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-end gap-3 mb-4">
+            <div className="space-y-1">
+              <Label className="text-xs">From</Label>
+              <Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="h-8 text-xs w-36" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">To</Label>
+              <Input type="date" value={to} onChange={e => setTo(e.target.value)} className="h-8 text-xs w-36" />
+            </div>
+            <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setApplied({ from, to })}>
+              <Filter className="w-3.5 h-3.5" /> Apply
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => { setFrom(""); setTo(""); setApplied({ from: "", to: "" }); }}>
+              <RefreshCw className="w-3.5 h-3.5" /> Reset
+            </Button>
+            {entries.length > 0 && (
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5 ml-auto" onClick={exportCsv}>
+                <FileDown className="w-3.5 h-3.5" /> Export CSV
+              </Button>
+            )}
+          </div>
+
+          {entries.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+              <div className="bg-card/40 border border-border/40 rounded-lg px-4 py-3">
+                <div className="text-xs text-muted-foreground mb-1">Total USD Recorded</div>
+                <div className="font-bold font-mono text-lg text-blue-400">${totals.totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+              <div className="bg-card/40 border border-border/40 rounded-lg px-4 py-3">
+                <div className="text-xs text-muted-foreground mb-1">Total NGN Equivalent</div>
+                <div className="font-bold font-mono text-lg">{formatCurrency(totals.totalNgn)}</div>
+              </div>
+              <div className="bg-card/40 border border-border/40 rounded-lg px-4 py-3">
+                <div className="text-xs text-muted-foreground mb-1">FX Entries</div>
+                <div className="font-bold font-mono text-lg">{entries.length}</div>
+              </div>
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">
+              <Globe className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              No FX entries found{applied.from || applied.to ? " for the selected period" : ""}. USD amounts are recorded in the charge sections on each container.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead className="border-b border-border/50 bg-secondary/20 text-xs text-muted-foreground uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium">Container</th>
+                    <th className="px-4 py-3 text-left font-medium">Section</th>
+                    <th className="px-4 py-3 text-right font-medium">USD Amount</th>
+                    <th className="px-4 py-3 text-right font-medium">Rate (₦/$)</th>
+                    <th className="px-4 py-3 text-right font-medium">NGN Equivalent</th>
+                    <th className="px-4 py-3 text-left font-medium">Recorded</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                  {entries.map((e: FxHistoryEntry, i: number) => (
+                    <tr key={i} className="hover:bg-muted/10 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs font-semibold">{e.containerNumber}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-semibold border border-blue-500/20">
+                          {SECTION_LABELS[e.section] ?? e.section}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-blue-400 font-semibold">
+                        ${e.usdAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">
+                        {e.exchangeRate.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold">
+                        {formatCurrency(e.ngnEquivalent)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {new Date(e.recordedAt).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -1146,6 +1297,11 @@ export default function ReportsPage() {
         {/* Delivery Tracking Report */}
         <div className="border-t border-border/40 pt-6">
           <DeliveryReportSection />
+        </div>
+
+        {/* FX Rate History Section */}
+        <div className="border-t border-border/40 pt-6">
+          <FxHistorySection />
         </div>
 
         {/* Printable Reports Section */}
