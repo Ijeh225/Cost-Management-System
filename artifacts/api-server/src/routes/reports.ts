@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
@@ -746,27 +746,28 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
       .where(depConds.length > 0 ? and(...depConds) : undefined)
       .orderBy(clientDepositsTable.createdAt);
 
-    // OUTFLOWS — overhead_expenses
+    // OUTFLOWS — overhead expense payments (actual bank cash movements, not expense records)
     const ohConds: SQL[] = [];
-    if (fromDate) ohConds.push(gte(overheadExpensesTable.paidAt, fromDate));
-    if (toDate)   ohConds.push(lte(overheadExpensesTable.paidAt, toDate));
-    if (bankIdNum !== null) ohConds.push(eq(overheadExpensesTable.bankId, bankIdNum));
+    if (fromDate) ohConds.push(gte(expensePaymentsTable.paidAt, fromDate));
+    if (toDate)   ohConds.push(lte(expensePaymentsTable.paidAt, toDate));
+    if (bankIdNum !== null) ohConds.push(eq(expensePaymentsTable.bankId, bankIdNum));
 
     const overheadRows = await db
       .select({
-        id: overheadExpensesTable.id,
-        amount: overheadExpensesTable.amount,
-        paidAt: overheadExpensesTable.paidAt,
+        id: expensePaymentsTable.id,
+        amount: expensePaymentsTable.amount,
+        paidAt: expensePaymentsTable.paidAt,
         category: overheadExpensesTable.category,
         description: overheadExpensesTable.description,
-        reference: overheadExpensesTable.reference,
-        bankId: overheadExpensesTable.bankId,
+        reference: sql<string | null>`null`,
+        bankId: expensePaymentsTable.bankId,
         bankName: banksTable.name,
       })
-      .from(overheadExpensesTable)
-      .leftJoin(banksTable, eq(overheadExpensesTable.bankId, banksTable.id))
+      .from(expensePaymentsTable)
+      .leftJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id))
+      .leftJoin(banksTable, eq(expensePaymentsTable.bankId, banksTable.id))
       .where(ohConds.length > 0 ? and(...ohConds) : undefined)
-      .orderBy(overheadExpensesTable.paidAt);
+      .orderBy(expensePaymentsTable.paidAt);
 
     // OUTFLOWS — duty payments (no per-payment history; use customs_charges.dutyPaid as snapshot,
     // dated by customs_charges.updatedAt). Bank attribution unavailable for duty payments.
@@ -1020,8 +1021,8 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
       if (bankIdNum !== null) prevInvPayConds.push(eq(invoicePaymentsTable.bankId, bankIdNum));
       const prevDepConds: SQL[] = [lt(clientDepositsTable.createdAt, fromDate)];
       if (bankIdNum !== null) prevDepConds.push(eq(clientDepositsTable.bankId, bankIdNum));
-      const prevOhConds: SQL[] = [lt(overheadExpensesTable.paidAt, fromDate)];
-      if (bankIdNum !== null) prevOhConds.push(eq(overheadExpensesTable.bankId, bankIdNum));
+      const prevOhConds: SQL[] = [lt(expensePaymentsTable.paidAt, fromDate)];
+      if (bankIdNum !== null) prevOhConds.push(eq(expensePaymentsTable.bankId, bankIdNum));
       const prevFundAddConds: SQL[] = [lt(bankFundAdditionsTable.createdAt, fromDate)];
       if (bankIdNum !== null) prevFundAddConds.push(eq(bankFundAdditionsTable.bankId, bankIdNum));
       const prevCepConds: SQL[] = [lt(containerExpensePaymentsTable.paidAt, fromDate)];
@@ -1032,8 +1033,8 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
           .from(invoicePaymentsTable).where(and(...prevInvPayConds)),
         db.select({ s: sql<string>`coalesce(sum(${clientDepositsTable.amount}), 0)` })
           .from(clientDepositsTable).where(and(...prevDepConds)),
-        db.select({ s: sql<string>`coalesce(sum(${overheadExpensesTable.amount}), 0)` })
-          .from(overheadExpensesTable).where(and(...prevOhConds)),
+        db.select({ s: sql<string>`coalesce(sum(${expensePaymentsTable.amount}), 0)` })
+          .from(expensePaymentsTable).where(and(...prevOhConds)),
         db.select({ s: sql<string>`coalesce(sum(${bankFundAdditionsTable.amount}), 0)` })
           .from(bankFundAdditionsTable).where(and(...prevFundAddConds)),
         db.select({ s: sql<string>`coalesce(sum(${containerExpensePaymentsTable.amount}), 0)` })
