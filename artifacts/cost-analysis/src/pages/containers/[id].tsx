@@ -1009,6 +1009,7 @@ export default function ContainerDetail() {
   const { data: customValuesData } = useGetCustomFieldValues(containerId);
   const { data: sectionSettings } = useGetSettings();
   const { data: builtinExtrasMap = {} } = useGetBuiltinExtras();
+  const { data: sectionPaymentsData = [] } = useGetContainerExpensePaymentsBySection(isAdmin ? containerId : null);
 
   const handleLinkClient = () => {
     if (!selectedClientId) return;
@@ -1374,7 +1375,6 @@ export default function ContainerDetail() {
     { key: "operations", title: sn.operations ?? BUILT_IN_SECTION_DEFAULTS.operations, schema: operationsSchema, data: charges.operations },
   ];
 
-  const { data: sectionPaymentsData = [] } = useGetContainerExpensePaymentsBySection(isAdmin ? containerId : null);
   const sectionPaymentsMap = Object.fromEntries(sectionPaymentsData.map((s: ContainerSectionSummary) => [s.section, s]));
 
   const customSections = ((customSectionsRaw ?? []) as CustomSectionWithFields[]).filter(s => !s.isArchived);
