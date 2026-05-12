@@ -1432,9 +1432,15 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
     const invoiceTotal = parseFloat(inv.total ?? "0");
     const outstanding = Math.max(0, invoiceTotal - totalPaid);
 
-    if (amount > outstanding) {
-      return res.status(400).json({ error: `Credit note amount (₦${amount.toLocaleString()}) exceeds outstanding balance (₦${outstanding.toLocaleString()})` });
+    // Allow credit note up to full invoice value; excess beyond outstanding posts to client credit
+    if (amount > invoiceTotal) {
+      return res.status(400).json({ error: `Credit note cannot exceed the invoice total (₦${invoiceTotal.toLocaleString()})` });
     }
+
+    // Amount applied to reduce invoice balance (capped at outstanding)
+    const applyToInvoice = Math.min(amount, outstanding);
+    // Any excess beyond outstanding becomes a client credit balance
+    const excessCredit = Math.max(0, amount - outstanding);
 
     const creditNoteNumber = await generateCreditNoteNumber();
 
@@ -1449,17 +1455,20 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
         createdBy: userId,
       }).returning();
 
-      await tx.insert(invoicePaymentsTable).values({
-        invoiceId,
-        amount: String(amount),
-        paymentMethod: "credit_note",
-        reference: creditNoteNumber,
-        notes: `Credit note: ${reason.trim()}`,
-        paidAt: new Date(),
-        bankId: null,
-      });
+      // Apply portion to invoice balance (first-class adjustment recorded separately from cash)
+      if (applyToInvoice > 0) {
+        await tx.insert(invoicePaymentsTable).values({
+          invoiceId,
+          amount: String(applyToInvoice),
+          paymentMethod: "credit_note",
+          reference: creditNoteNumber,
+          notes: `Credit note adjustment: ${reason.trim()}`,
+          paidAt: new Date(),
+          bankId: null,
+        });
+      }
 
-      const newTotalPaid = totalPaid + amount;
+      const newTotalPaid = totalPaid + applyToInvoice;
       let newStatus = inv.status;
       if (newTotalPaid >= invoiceTotal) newStatus = "paid";
       else if (newTotalPaid > 0) newStatus = "partial";
@@ -1467,10 +1476,18 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
         .set({ status: newStatus, updatedAt: new Date() })
         .where(eq(invoicesTable.id, invoiceId));
 
+      // Post excess credit to client's credit balance (e.g. full CN on partially paid invoice)
+      if (excessCredit > 0 && inv.clientId) {
+        await tx
+          .update(clientsTable)
+          .set({ creditBalance: sql`coalesce(${clientsTable.creditBalance}, 0) + ${String(excessCredit)}` })
+          .where(eq(clientsTable.id, inv.clientId));
+      }
+
       await tx.insert(invoiceAuditLogTable).values({
         invoiceId,
         action: "credit_note_raised",
-        details: `${creditNoteNumber} — ₦${amount.toLocaleString()} — ${reason.trim()}`,
+        details: `${creditNoteNumber} — ₦${amount.toLocaleString()} total (₦${applyToInvoice.toLocaleString()} applied to invoice${excessCredit > 0 ? `, ₦${excessCredit.toLocaleString()} to client credit` : ""}) — ${reason.trim()}`,
         performedBy: userId,
       });
 
@@ -1484,6 +1501,8 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
       reason: cn.reason,
       amount: parseFloat(cn.amount ?? "0"),
       status: cn.status,
+      appliedToInvoice: applyToInvoice,
+      creditedToClient: excessCredit,
       createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
     });
   } catch (err) {
@@ -1507,6 +1526,8 @@ router.get("/invoices/:id/credit-notes", requireAuth, async (req, res) => {
       creditNoteNumber: cn.creditNoteNumber,
       reason: cn.reason,
       amount: parseFloat(cn.amount ?? "0"),
+      status: cn.status,
+      createdBy: cn.createdBy ?? null,
       createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
     })));
   } catch (err) {
@@ -1585,6 +1606,7 @@ router.get("/credit-notes", requireAuth, async (req, res) => {
         creditNoteNumber: creditNotesTable.creditNoteNumber,
         reason: creditNotesTable.reason,
         amount: creditNotesTable.amount,
+        status: creditNotesTable.status,
         createdBy: creditNotesTable.createdBy,
         createdAt: creditNotesTable.createdAt,
       })
@@ -1606,6 +1628,7 @@ router.get("/credit-notes", requireAuth, async (req, res) => {
       creditNoteNumber: cn.creditNoteNumber,
       reason: cn.reason,
       amount: parseFloat(cn.amount ?? "0"),
+      status: cn.status ?? "active",
       createdBy: cn.createdBy ?? null,
       createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
     })));
@@ -1629,6 +1652,7 @@ router.get("/credit-notes/:id", requireAuth, async (req, res) => {
         creditNoteNumber: creditNotesTable.creditNoteNumber,
         reason: creditNotesTable.reason,
         amount: creditNotesTable.amount,
+        status: creditNotesTable.status,
         createdBy: creditNotesTable.createdBy,
         createdAt: creditNotesTable.createdAt,
       })
@@ -1647,6 +1671,7 @@ router.get("/credit-notes/:id", requireAuth, async (req, res) => {
       creditNoteNumber: cn.creditNoteNumber,
       reason: cn.reason,
       amount: parseFloat(cn.amount ?? "0"),
+      status: cn.status ?? "active",
       createdBy: cn.createdBy ?? null,
       createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
     });

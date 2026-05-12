@@ -254,12 +254,13 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
     const grossOutstanding = formattedInvoices.reduce((s, inv) => s + inv.outstanding, 0);
     const effectiveClosingBalance = Math.max(0, grossOutstanding - creditBalance - unallocatedDeposits);
 
-    // Total credited via credit notes (paymentMethod='credit_note') for transparent reporting
-    const totalCreditNotes = formattedInvoices.reduce((s, inv) => {
+    // Split totalPaid into cash collections vs credit-note adjustments for transparent reporting
+    const totalCreditNoteAdjustments = formattedInvoices.reduce((s, inv) => {
       return s + inv.payments
         .filter(p => p.paymentMethod === "credit_note")
         .reduce((ps, p) => ps + p.amount, 0);
     }, 0);
+    const totalCashCollected = totalPaid - totalCreditNoteAdjustments;
 
     return res.json({
       client,
@@ -268,7 +269,8 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
       totals: {
         totalInvoiced,
         totalPaid,
-        totalCreditNotes,
+        totalCashCollected,
+        totalCreditNoteAdjustments,
         closingBalance: grossOutstanding,
         creditBalance,
         unallocatedDeposits,
