@@ -974,32 +974,25 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
       .where(and(...payConds))
       .groupBy(containerExpensePaymentsTable.containerId, containerExpensePaymentsTable.section);
 
-    // Build disbursements map: containerId -> section -> amount
+    // Build disbursements map: containerId -> section -> amount (only for payments within the date range)
     const disbMap = new Map<number, Map<string, number>>();
     for (const r of disbPayments) {
       if (!disbMap.has(r.containerId)) disbMap.set(r.containerId, new Map());
       disbMap.get(r.containerId)!.set(r.section ?? "other", parseFloat(r.total ?? "0"));
     }
 
-    // Only include containers that have at least one payment in the period (or all if no period filter)
-    const relevantContainerIds = (fromDate || toDate)
-      ? [...new Set(disbPayments.map(r => r.containerId))]
-      : allIds;
-
-    // Short-circuit: no relevant containers means no disbursements in the period
-    if (relevantContainerIds.length === 0) {
-      return res.json(emptyResponse);
-    }
-
-    // Fetch budgeted charges in bulk for relevant containers
+    // Always include ALL containers matching the status filter.
+    // Date filters only affect which disbursements are counted — not which containers appear.
+    // This ensures containers with budget but zero disbursements in the period still show up
+    // with disbursed=0, correctly surfacing unexpended budget as variance.
     const [allS, allC, allT, allD, allO, allE] = await Promise.all([
-      db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, relevantContainerIds)),
-      db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, relevantContainerIds)),
-      db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, relevantContainerIds)),
-      db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, relevantContainerIds)),
-      db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, relevantContainerIds)),
+      db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, allIds)),
+      db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, allIds)),
+      db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, allIds)),
+      db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, allIds)),
+      db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, allIds)),
       db.select({ containerId: containerExtraChargesTable.containerId, section: containerExtraChargesTable.section, amount: containerExtraChargesTable.amount })
-        .from(containerExtraChargesTable).where(inArray(containerExtraChargesTable.containerId, relevantContainerIds)),
+        .from(containerExtraChargesTable).where(inArray(containerExtraChargesTable.containerId, allIds)),
     ]);
 
     const EXCLUDE_KEYS = new Set(["id", "containerId", "updatedAt"]);
@@ -1065,8 +1058,8 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
     const aggBudgeted: Record<string, number> = { shipping: 0, customs: 0, terminal: 0, delivery: 0, operations: 0 };
     const aggDisbursed: Record<string, number> = { shipping: 0, customs: 0, terminal: 0, delivery: 0, operations: 0 };
 
-    const rows = relevantContainerIds
-      .map(id => buildRow(id, containerMap.get(id)))
+    const rows = allIds
+      .map((id): ReturnType<typeof buildRow> => buildRow(id, containerMap.get(id)))
       .sort((a, b) => Math.abs(b.totals.variance) - Math.abs(a.totals.variance));
 
     const aggSections: Record<string, { budgeted: number; disbursed: number; variance: number }> = {};
