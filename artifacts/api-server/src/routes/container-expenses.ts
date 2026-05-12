@@ -450,19 +450,29 @@ containerExpensesRouter.get("/containers/:id/reconciliation", requireAdmin, asyn
     ]);
 
     const disbursedBySection: Record<string, number> = {};
+    let totalDisbursedAllSections = 0;
     for (const r of disbPayments) {
-      if (r.section) disbursedBySection[r.section] = parseFloat(r.total ?? "0");
+      const amt = parseFloat(r.total ?? "0");
+      disbursedBySection[r.section ?? "other"] = (disbursedBySection[r.section ?? "other"] ?? 0) + amt;
+      totalDisbursedAllSections += amt;
     }
 
     const SECTIONS = ["shipping", "customs", "terminal", "delivery", "operations"] as const;
-    const sections = SECTIONS.map(sec => {
+    const sections: Array<{ section: string; budgeted: number; disbursed: number; variance: number }> = SECTIONS.map(sec => {
       const b = budgeted[sec] ?? 0;
       const d = disbursedBySection[sec] ?? 0;
       return { section: sec, budgeted: b, disbursed: d, variance: d - b };
     });
+    // Include any unallocated (null-section) payments in a separate row so totals remain accurate
+    const unallocatedDisbursed = Object.entries(disbursedBySection)
+      .filter(([k]) => !(SECTIONS as readonly string[]).includes(k))
+      .reduce((s, [, v]) => s + v, 0);
+    if (unallocatedDisbursed > 0) {
+      sections.push({ section: "other", budgeted: 0, disbursed: unallocatedDisbursed, variance: unallocatedDisbursed });
+    }
 
-    const totalBudgeted = sections.reduce((s, r) => s + r.budgeted, 0);
-    const totalDisbursed = sections.reduce((s, r) => s + r.disbursed, 0);
+    const totalBudgeted = sections.filter(s => s.section !== "other").reduce((s, r) => s + r.budgeted, 0);
+    const totalDisbursed = totalDisbursedAllSections;
 
     return res.json({
       containerId,

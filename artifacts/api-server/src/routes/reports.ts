@@ -488,18 +488,21 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
           const t = secMap.get("terminal")   ?? 0;
           const d = secMap.get("delivery")   ?? 0;
           const o = secMap.get("operations") ?? 0;
-          const total = s + c + t + d + o;
+          // Sum ALL section entries (including null-section → "other") so no payment is dropped
+          const total = [...secMap.values()].reduce((sum, v) => sum + v, 0);
+          const unallocated = total - (s + c + t + d + o);
           if (invoicedIdSet.has(id)) {
             costShipping   += s;
             costCustoms    += c;
             costTerminal   += t;
             costDelivery   += d;
             costOperations += o;
+            costExtras     += unallocated; // unallocated payments go into extras bucket
           }
           totalCostByContainer.set(id, total);
           if (uninvoicedCreatedAt.has(id)) uninvoicedCogs += total;
         }
-        // costExtras = 0 when using disbursements (payments capture all spend)
+        // costExtras captures unallocated (null/other-section) payments when using disbursements
       } else {
         const [allS, allC, allT, allD, allO, allE] = await Promise.all([
           db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, allCostIds)),
@@ -1027,8 +1030,9 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
         aggBudgeted[sec]  += budgeted[sec];
         aggDisbursed[sec] += disbursed[sec];
       }
-      const totalBudgeted  = SECTIONS.reduce((s, sec) => s + budgeted[sec],  0);
-      const totalDisbursed = SECTIONS.reduce((s, sec) => s + disbursed[sec], 0);
+      const totalBudgeted = SECTIONS.reduce((s, sec) => s + budgeted[sec], 0);
+      // Sum ALL entries in secDisb (including null-section → "other") so no payment is dropped
+      const totalDisbursed = [...secDisb.values()].reduce((s, v) => s + v, 0);
       return {
         containerId: id,
         containerNumber: c?.containerNumber ?? "",
