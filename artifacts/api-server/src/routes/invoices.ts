@@ -1526,6 +1526,10 @@ router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, re
     if (!inv) return res.status(404).json({ error: "Invoice not found" });
     if (inv.status === "written_off") return res.status(400).json({ error: "Invoice is already written off" });
     if (inv.status === "paid") return res.status(400).json({ error: "Invoice is already fully paid" });
+    if (!inv.dueDate) return res.status(400).json({ error: "Cannot write off an invoice without a due date" });
+    const dueDate = new Date(inv.dueDate);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (dueDate >= today) return res.status(400).json({ error: "Only overdue invoices (past their due date) can be written off as bad debt" });
 
     const existingPayments = await db.select({ amount: invoicePaymentsTable.amount })
       .from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));

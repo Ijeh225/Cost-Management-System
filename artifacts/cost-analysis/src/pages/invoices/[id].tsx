@@ -788,7 +788,8 @@ export default function InvoiceDetailPage() {
   const waIsPending = sendWhatsAppMutation.isPending || sendReminderMutation.isPending || sendReceiptMutation.isPending;
   const isWrittenOff = invoice.status === "written_off";
   const canRaiseCreditNote = isAdmin && !isWrittenOff && invoice.status !== "draft" && invoice.outstanding > 0;
-  const canWriteOff = isAdmin && !isWrittenOff && invoice.status !== "paid" && invoice.outstanding > 0;
+  const isOverdue = !!invoice.dueDate && new Date(invoice.dueDate) < new Date();
+  const canWriteOff = isAdmin && !isWrittenOff && invoice.status !== "paid" && invoice.outstanding > 0 && isOverdue;
 
   const regularPayments = (invoice.payments ?? []).filter(p => p.paymentMethod !== "credit_note");
   const creditNotePayments = (invoice.payments ?? []).filter(p => p.paymentMethod === "credit_note");

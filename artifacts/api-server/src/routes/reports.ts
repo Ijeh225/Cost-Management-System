@@ -249,8 +249,17 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
       return s + Math.max(0, parseFloat(d.amount ?? "0") - parseFloat(d.allocatedAmount ?? "0"));
     }, 0);
 
-    const grossOutstanding = Math.max(0, totalInvoiced - totalPaid);
+    // Sum per-invoice outstanding; written_off invoices already have outstanding=0 above,
+    // so they are correctly excluded from the receivable balance.
+    const grossOutstanding = formattedInvoices.reduce((s, inv) => s + inv.outstanding, 0);
     const effectiveClosingBalance = Math.max(0, grossOutstanding - creditBalance - unallocatedDeposits);
+
+    // Total credited via credit notes (paymentMethod='credit_note') for transparent reporting
+    const totalCreditNotes = formattedInvoices.reduce((s, inv) => {
+      return s + inv.payments
+        .filter(p => p.paymentMethod === "credit_note")
+        .reduce((ps, p) => ps + p.amount, 0);
+    }, 0);
 
     return res.json({
       client,
@@ -259,6 +268,7 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
       totals: {
         totalInvoiced,
         totalPaid,
+        totalCreditNotes,
         closingBalance: grossOutstanding,
         creditBalance,
         unallocatedDeposits,
