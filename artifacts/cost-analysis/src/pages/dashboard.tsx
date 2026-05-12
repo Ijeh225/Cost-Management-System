@@ -544,8 +544,8 @@ export default function Dashboard() {
                 {vatLiability.currentQuarter.label}
               </span>
             </CardTitle>
-            <Link href="/reports" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
-              View VAT Report <ArrowRight className="w-3 h-3" />
+            <Link href="/reports#vat-summary" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+              View VAT Summary <ArrowRight className="w-3 h-3" />
             </Link>
           </CardHeader>
           <CardContent>

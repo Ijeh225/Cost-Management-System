@@ -269,17 +269,28 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireAdmin, asy
       .where(eq(overheadExpensesTable.id, expenseId));
     if (!expense) { res.status(404).json({ error: "Expense not found" }); return; }
 
+    const paymentDate = paidAt ? new Date(paidAt) : new Date();
+
     const [payment] = await db.insert(expensePaymentsTable).values({
       expenseId,
       amount: String(amount),
       paymentMethod,
       bankId: paymentMethod === "bank" && bankId ? Number(bankId) : null,
-      paidAt: paidAt ? new Date(paidAt) : new Date(),
+      paidAt: paymentDate,
       notes: notes || null,
       recordedBy: req.user?.id ?? null,
     }).returning();
 
-    const [updatedExpense] = await buildExpensesWithPayments([expense]);
+    // Set paidAt on the parent expense to the date of the first payment recorded
+    if (expense.paidAt === null) {
+      await db.update(overheadExpensesTable)
+        .set({ paidAt: paymentDate, updatedAt: new Date() })
+        .where(eq(overheadExpensesTable.id, expenseId));
+    }
+
+    const [refreshedExpense] = await db.select().from(overheadExpensesTable)
+      .where(eq(overheadExpensesTable.id, expenseId));
+    const [updatedExpense] = await buildExpensesWithPayments([refreshedExpense]);
     res.status(201).json({ payment, expense: updatedExpense });
   } catch (err) {
     console.error("POST /overhead-expenses/:id/payments error:", err);
