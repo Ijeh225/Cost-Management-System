@@ -236,11 +236,33 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
       };
     });
 
+    // Include credit balance and unallocated deposits in the statement closing balance
+    const [clientRow] = await db.select({ creditBalance: clientsTable.creditBalance }).from(clientsTable).where(eq(clientsTable.id, id));
+    const creditBalance = parseFloat(clientRow?.creditBalance ?? "0");
+
+    const allDeposits = await db
+      .select({ amount: clientDepositsTable.amount, allocatedAmount: clientDepositsTable.allocatedAmount })
+      .from(clientDepositsTable)
+      .where(eq(clientDepositsTable.clientId, id));
+    const unallocatedDeposits = allDeposits.reduce((s, d) => {
+      return s + Math.max(0, parseFloat(d.amount ?? "0") - parseFloat(d.allocatedAmount ?? "0"));
+    }, 0);
+
+    const grossOutstanding = Math.max(0, totalInvoiced - totalPaid);
+    const effectiveClosingBalance = Math.max(0, grossOutstanding - creditBalance - unallocatedDeposits);
+
     return res.json({
       client,
       period: { from: from ?? null, to: to ?? null },
       invoices: formattedInvoices,
-      totals: { totalInvoiced, totalPaid, closingBalance: Math.max(0, totalInvoiced - totalPaid) },
+      totals: {
+        totalInvoiced,
+        totalPaid,
+        closingBalance: grossOutstanding,
+        creditBalance,
+        unallocatedDeposits,
+        effectiveClosingBalance,
+      },
     });
   } catch (err) {
     console.error(err);

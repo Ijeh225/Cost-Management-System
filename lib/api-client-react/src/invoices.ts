@@ -253,6 +253,7 @@ export type ArClientRow = {
   totalInvoiced: number;
   totalCollected: number;
   outstanding: number;
+  effectiveOutstanding: number;
   aging: ArAgingBuckets;
   unpaidInvoices: ArUnpaidInvoice[];
   unallocatedDeposits: number;

@@ -448,11 +448,12 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
       creditBalanceMap.set(c.id, parseFloat(c.creditBalance ?? "0"));
     }
 
-    const clients = [...clientMap.values()].map(c => ({
-      ...c,
-      unallocatedDeposits: c.clientId != null ? (unallocatedByClient.get(c.clientId) ?? 0) : 0,
-      creditBalance: c.clientId != null ? (creditBalanceMap.get(c.clientId) ?? 0) : 0,
-    })).sort((a, b) => b.outstanding - a.outstanding);
+    const clients = [...clientMap.values()].map(c => {
+      const unallocatedDeposits = c.clientId != null ? (unallocatedByClient.get(c.clientId) ?? 0) : 0;
+      const creditBalance = c.clientId != null ? (creditBalanceMap.get(c.clientId) ?? 0) : 0;
+      const effectiveOutstanding = Math.max(0, c.outstanding - unallocatedDeposits - creditBalance);
+      return { ...c, unallocatedDeposits, creditBalance, effectiveOutstanding };
+    }).sort((a, b) => b.outstanding - a.outstanding);
     const totalOutstanding = clients.reduce((s, c) => s + c.outstanding, 0);
     const totalOverdue = summaryAging.days31to60 + summaryAging.days61to90 + summaryAging.days90plus;
     const totalUnallocatedDeposits = clients.reduce((s, c) => s + c.unallocatedDeposits, 0);
@@ -816,6 +817,12 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!inv) return res.status(404).json({ error: "Invoice not found" });
 
+    // Capture pre-insert total so we can compute incremental overpayment
+    const preInsertPayments = await db.select({ amount: invoicePaymentsTable.amount })
+      .from(invoicePaymentsTable)
+      .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const prevTotalPaid = preInsertPayments.reduce((s, p) => s + parseFloat(p.amount), 0);
+
     await db.insert(invoicePaymentsTable).values({
       invoiceId,
       amount: String(amount),
@@ -826,10 +833,8 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       bankId: bankId ?? null,
     });
 
-    const payments = await db.select().from(invoicePaymentsTable)
-      .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const totalPaid = prevTotalPaid + amount;
 
-    const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
     const total = parseFloat(inv.total);
     let newStatus = inv.status;
     if (totalPaid >= total) {
@@ -842,14 +847,18 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       .set({ status: newStatus, updatedAt: new Date() })
       .where(eq(invoicesTable.id, invoiceId));
 
-    // Capture overpayment as client credit balance
+    // Capture only the incremental overpayment delta as credit balance
     let overpaymentStored = 0;
-    if (totalPaid > total && inv.clientId) {
-      const overpayment = totalPaid - total;
-      await db.update(clientsTable)
-        .set({ creditBalance: sql`${clientsTable.creditBalance}::numeric + ${String(overpayment)}` })
-        .where(eq(clientsTable.id, inv.clientId));
-      overpaymentStored = overpayment;
+    if (inv.clientId) {
+      const prevOverpaid = Math.max(0, prevTotalPaid - total);
+      const nowOverpaid = Math.max(0, totalPaid - total);
+      const creditIncrement = nowOverpaid - prevOverpaid;
+      if (creditIncrement > 0) {
+        await db.update(clientsTable)
+          .set({ creditBalance: sql`${clientsTable.creditBalance}::numeric + ${String(creditIncrement)}` })
+          .where(eq(clientsTable.id, inv.clientId));
+        overpaymentStored = creditIncrement;
+      }
     }
 
     res.status(201).json({ success: true, totalPaid, status: newStatus, overpaymentStored });
@@ -937,21 +946,59 @@ router.delete("/invoices/:id/payments/:paymentId", requireAdmin, async (req, res
     const paymentId = parseInt(req.params.paymentId, 10);
     if (isNaN(invoiceId) || isNaN(paymentId)) return res.status(400).json({ error: "Invalid id" });
 
-    await db.delete(invoicePaymentsTable).where(eq(invoicePaymentsTable.id, paymentId));
+    const [payment] = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.id, paymentId));
+    if (!payment) return res.status(404).json({ error: "Payment not found" });
 
-    const payments = await db.select().from(invoicePaymentsTable)
-      .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (inv) {
-      const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
-      const total = parseFloat(inv.total);
-      let newStatus = "sent";
-      if (totalPaid >= total) newStatus = "paid";
-      else if (totalPaid > 0) newStatus = "partial";
-      else if (inv.status === "paid" || inv.status === "partial") newStatus = "sent";
-      else newStatus = inv.status;
-      await db.update(invoicesTable).set({ status: newStatus, updatedAt: new Date() }).where(eq(invoicesTable.id, invoiceId));
-    }
+    const paymentAmount = parseFloat(payment.amount ?? "0");
+
+    await db.transaction(async (tx) => {
+      await tx.delete(invoicePaymentsTable).where(eq(invoicePaymentsTable.id, paymentId));
+
+      // Reverse credit balance if this was a credit-method payment
+      if (payment.paymentMethod === "credit" && inv?.clientId) {
+        await tx.update(clientsTable)
+          .set({ creditBalance: sql`GREATEST(0, ${clientsTable.creditBalance}::numeric + ${String(paymentAmount)})` })
+          .where(eq(clientsTable.id, inv.clientId));
+      }
+
+      // Reverse deposit allocation if this payment originated from a deposit
+      const depositMatch = payment.notes?.match(/Applied from deposit #(\d+)/);
+      if (depositMatch) {
+        const sourceDepositId = parseInt(depositMatch[1]);
+        await tx.update(clientDepositsTable)
+          .set({ allocatedAmount: sql`GREATEST(0, ${clientDepositsTable.allocatedAmount}::numeric - ${String(paymentAmount)})` })
+          .where(eq(clientDepositsTable.id, sourceDepositId));
+      }
+
+      // Reverse overpayment credit that was stored when this payment was recorded
+      if (inv?.clientId && payment.paymentMethod !== "credit") {
+        const remainingPayments = await tx.select().from(invoicePaymentsTable)
+          .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+        const prevTotalPaid = remainingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+        const invoiceTotal = parseFloat(inv.total ?? "0");
+        const prevOverpaidBeforeDelete = Math.max(0, prevTotalPaid + paymentAmount - invoiceTotal);
+        const nowOverpaid = Math.max(0, prevTotalPaid - invoiceTotal);
+        const creditToReverse = prevOverpaidBeforeDelete - nowOverpaid;
+        if (creditToReverse > 0) {
+          await tx.update(clientsTable)
+            .set({ creditBalance: sql`GREATEST(0, ${clientsTable.creditBalance}::numeric - ${String(creditToReverse)})` })
+            .where(eq(clientsTable.id, inv.clientId));
+        }
+      }
+
+      if (inv) {
+        const payments = await tx.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+        const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
+        const total = parseFloat(inv.total);
+        let newStatus = "sent";
+        if (totalPaid >= total) newStatus = "paid";
+        else if (totalPaid > 0) newStatus = "partial";
+        else if (inv.status === "paid" || inv.status === "partial") newStatus = "sent";
+        else newStatus = inv.status;
+        await tx.update(invoicesTable).set({ status: newStatus, updatedAt: new Date() }).where(eq(invoicesTable.id, invoiceId));
+      }
+    });
 
     res.json({ success: true });
   } catch (err) {

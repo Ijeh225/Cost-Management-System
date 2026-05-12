@@ -482,6 +482,9 @@ clientsRouter.post("/client-deposits/:id/allocate", requireAdmin, async (req: Au
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!inv) return res.status(404).json({ error: "Invoice not found" });
+    if (inv.clientId !== deposit.clientId) {
+      return res.status(400).json({ error: "Deposit and invoice must belong to the same client" });
+    }
     if (inv.status === "draft") return res.status(400).json({ error: "Cannot allocate a deposit against a draft invoice" });
 
     const existingPayments = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
