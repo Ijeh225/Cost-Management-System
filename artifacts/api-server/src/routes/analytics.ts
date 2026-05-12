@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, sectionApprovalsTable } from "@workspace/db";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, sectionApprovalsTable } from "@workspace/db";
 import { eq, desc, gte, lte, and, isNotNull, type SQL } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
@@ -31,11 +31,15 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
       });
     }
 
-    const allShipping   = await db.select().from(shippingChargesTable);
-    const allCustoms    = await db.select().from(customsChargesTable);
-    const allTerminal   = await db.select().from(terminalChargesTable);
-    const allDelivery   = await db.select().from(deliveryChargesTable);
-    const allOps        = await db.select().from(operationsChargesTable);
+    const [allShipping, allCustoms, allTerminal, allDelivery, allOps, allExtrasRaw] = await Promise.all([
+      db.select().from(shippingChargesTable),
+      db.select().from(customsChargesTable),
+      db.select().from(terminalChargesTable),
+      db.select().from(deliveryChargesTable),
+      db.select().from(operationsChargesTable),
+      db.select({ containerId: containerExtraChargesTable.containerId, amount: containerExtraChargesTable.amount })
+        .from(containerExtraChargesTable),
+    ]);
 
     const idx = (arr: any[]) => { const m: Record<number, any> = {}; arr.forEach(r => { m[r.containerId] = r; }); return m; };
     const sMap = idx(allShipping);
@@ -43,6 +47,12 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
     const tMap = idx(allTerminal);
     const dMap = idx(allDelivery);
     const oMap = idx(allOps);
+
+    // Build a per-container extras total map
+    const extrasMap: Record<number, number> = {};
+    for (const r of allExtrasRaw) {
+      extrasMap[r.containerId] = (extrasMap[r.containerId] ?? 0) + parseFloat(r.amount as string ?? "0");
+    }
 
     const SHIPPING_KEYS   = ["shippingCompany","shippingPaymentVat","consignee","finalInvoiceShippingCompany","telexCharge","shippingRunnings","shippingDetentionToBePaidByCustomer"];
     // `dutyPaid`/`dutyNotPaid` are payment-status fields that together equal `duty`,
@@ -54,7 +64,7 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
 
     let totalRevenue = 0;
     let totalCost = 0;
-    let sectionTotals = { shipping: 0, customs: 0, terminal: 0, delivery: 0, operations: 0 };
+    let sectionTotals = { shipping: 0, customs: 0, terminal: 0, delivery: 0, operations: 0, extras: 0 };
 
     const customerData: Record<string, { revenue: number; cost: number; count: number }> = {};
     const vesselData:   Record<string, { revenue: number; cost: number; count: number }> = {};
@@ -67,7 +77,8 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
       const t = tMap[c.id] ?? {};
       const d = dMap[c.id] ?? {};
       const o = oMap[c.id] ?? {};
-      const cost = calcTotalCost(s, cu, t, d, o);
+      const extras = extrasMap[c.id] ?? 0;
+      const cost = calcTotalCost(s, cu, t, d, o) + extras;
       const revenue = parseFloat(c.clearingCharges as string ?? "0");
       const grossProfit = revenue - cost;
 
@@ -78,6 +89,7 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
       sectionTotals.terminal   += sumFields(t, TERMINAL_KEYS);
       sectionTotals.delivery   += sumFields(d, DELIVERY_KEYS);
       sectionTotals.operations += sumFields(o, OPERATIONS_KEYS);
+      sectionTotals.extras     += extras;
 
       // Customer
       const cust = c.customerName || "Unknown";
@@ -148,6 +160,9 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
       { section: "Terminal",   cost: sectionTotals.terminal,   pct: totalCost ? Math.round(sectionTotals.terminal / totalCost * 100) : 0 },
       { section: "Delivery",   cost: sectionTotals.delivery,   pct: totalCost ? Math.round(sectionTotals.delivery / totalCost * 100) : 0 },
       { section: "Operations", cost: sectionTotals.operations, pct: totalCost ? Math.round(sectionTotals.operations / totalCost * 100) : 0 },
+      ...(sectionTotals.extras > 0
+        ? [{ section: "Extra Charges", cost: sectionTotals.extras, pct: totalCost ? Math.round(sectionTotals.extras / totalCost * 100) : 0 }]
+        : []),
     ];
 
     const monthlyTrend = Object.entries(monthlyData)

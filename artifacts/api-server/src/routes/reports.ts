@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable } from "@workspace/db";
-import { eq, gte, lte, and, inArray, gt, ne, type SQL } from "drizzle-orm";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable } from "@workspace/db";
+import { eq, gte, lte, and, inArray, gt, ne, isNotNull, type SQL } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
 
@@ -367,44 +367,88 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
       totalVatCollected += vat;
       const key = String(inv.clientId);
       if (!revenueByClient[key]) revenueByClient[key] = {
-        clientId: inv.clientId, clientName: inv.clientName ?? "Unknown", revenue: 0, invoiceCount: 0,
+        clientId: inv.clientId ?? 0, clientName: inv.clientName ?? "Unknown", revenue: 0, invoiceCount: 0,
       };
       revenueByClient[key].revenue += subtotal;
       revenueByClient[key].invoiceCount += 1;
     }
 
-    // ===== COST OF SALES: containers in period =====
-    const conConds: SQL[] = [];
-    if (fromDate) conConds.push(gte(containersTable.createdAt, fromDate));
-    if (toDate)   conConds.push(lte(containersTable.createdAt, toDate));
-    if (clientIdNum !== null) conConds.push(eq(containersTable.clientId, clientIdNum));
+    // ===== COST OF SALES: attributed to invoice date (not container creation date) =====
+    // Step 1: containers referenced in non-draft invoices within the period
+    const invoicedItemConds: SQL[] = [isNotNull(invoiceItemsTable.containerId), ne(invoicesTable.status, "draft")];
+    if (fromDate) invoicedItemConds.push(gte(invoicesTable.createdAt, fromDate));
+    if (toDate)   invoicedItemConds.push(lte(invoicesTable.createdAt, toDate));
+    if (clientIdNum !== null) invoicedItemConds.push(eq(invoicesTable.clientId, clientIdNum));
 
-    const containers = await db
+    const invoicedItemRows = await db
       .select({
-        id: containersTable.id,
-        clearingCharges: containersTable.clearingCharges,
-        clientId: containersTable.clientId,
-        createdAt: containersTable.createdAt,
+        containerId: invoiceItemsTable.containerId,
+        invoiceCreatedAt: invoicesTable.createdAt,
       })
-      .from(containersTable)
-      .where(conConds.length > 0 ? and(...conConds) : undefined);
+      .from(invoiceItemsTable)
+      .innerJoin(invoicesTable, eq(invoiceItemsTable.invoiceId, invoicesTable.id))
+      .where(and(...invoicedItemConds));
 
-    const containerCount = containers.length;
-    const ids = containers.map(c => c.id);
+    // Map: containerId -> earliest invoice date in period (for monthly attribution)
+    const containerToInvoiceDate = new Map<number, Date>();
+    for (const row of invoicedItemRows) {
+      if (row.containerId === null) continue;
+      const d = row.invoiceCreatedAt instanceof Date ? row.invoiceCreatedAt : new Date(row.invoiceCreatedAt);
+      const existing = containerToInvoiceDate.get(row.containerId);
+      if (!existing || d < existing) containerToInvoiceDate.set(row.containerId, d);
+    }
+    const invoicedIds = [...containerToInvoiceDate.keys()];
+
+    // Step 2: All containers ever invoiced (used to identify truly uninvoiced ones)
+    const allInvoicedRows = await db
+      .select({ containerId: invoiceItemsTable.containerId })
+      .from(invoiceItemsTable)
+      .where(isNotNull(invoiceItemsTable.containerId));
+    const allInvoicedContainerIds = new Set(
+      allInvoicedRows.map(r => r.containerId).filter((v): v is number => v !== null)
+    );
+
+    // Step 3: Uninvoiced containers created in the period (no invoice ever raised)
+    const uninvConds: SQL[] = [];
+    if (fromDate) uninvConds.push(gte(containersTable.createdAt, fromDate));
+    if (toDate)   uninvConds.push(lte(containersTable.createdAt, toDate));
+    if (clientIdNum !== null) uninvConds.push(eq(containersTable.clientId, clientIdNum));
+
+    const allPeriodContainers = await db
+      .select({ id: containersTable.id, createdAt: containersTable.createdAt })
+      .from(containersTable)
+      .where(uninvConds.length > 0 ? and(...uninvConds) : undefined);
+    const uninvoicedContainers = allPeriodContainers.filter(c => !allInvoicedContainerIds.has(c.id));
+    const uninvoicedIds = uninvoicedContainers.map(c => c.id);
+    const uninvoicedCreatedAt = new Map(
+      uninvoicedContainers.map(c => [c.id, c.createdAt instanceof Date ? c.createdAt : new Date(c.createdAt)])
+    );
+
+    // Combined set of container IDs to fetch charges for
+    const allCostIds = [...new Set([...invoicedIds, ...uninvoicedIds])];
+    const containerCount = allCostIds.length;
 
     let costShipping = 0, costCustoms = 0, costTerminal = 0, costDelivery = 0, costOperations = 0, costExtras = 0;
+    let uninvoicedCogs = 0;
     const extrasByContainer: Map<number, number> = new Map();
+    const totalCostByContainer: Map<number, number> = new Map();
 
-    if (ids.length > 0) {
+    if (allCostIds.length > 0) {
       const [allS, allC, allT, allD, allO, allE] = await Promise.all([
-        db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, ids)),
-        db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, ids)),
-        db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, ids)),
-        db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, ids)),
-        db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, ids)),
+        db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, allCostIds)),
+        db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, allCostIds)),
+        db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, allCostIds)),
+        db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, allCostIds)),
+        db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, allCostIds)),
         db.select({ containerId: containerExtraChargesTable.containerId, amount: containerExtraChargesTable.amount })
-          .from(containerExtraChargesTable).where(inArray(containerExtraChargesTable.containerId, ids)),
+          .from(containerExtraChargesTable).where(inArray(containerExtraChargesTable.containerId, allCostIds)),
       ]);
+      const sMap2 = new Map<number, any>(allS.map(r => [r.containerId, r]));
+      const cMap2 = new Map<number, any>(allC.map(r => [r.containerId, r]));
+      const tMap2 = new Map<number, any>(allT.map(r => [r.containerId, r]));
+      const dMap2 = new Map<number, any>(allD.map(r => [r.containerId, r]));
+      const oMap2 = new Map<number, any>(allO.map(r => [r.containerId, r]));
+
       for (const r of allS) costShipping   += sumShipping(r as any);
       for (const r of allC) costCustoms    += sumCustoms(r as any);
       for (const r of allT) costTerminal   += sumTerminal(r as any);
@@ -414,6 +458,12 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
         const amt = parseFloat(r.amount as string ?? "0");
         costExtras += amt;
         extrasByContainer.set(r.containerId, (extrasByContainer.get(r.containerId) ?? 0) + amt);
+      }
+      for (const id of allCostIds) {
+        const base = calcTotalCost(sMap2.get(id) ?? {}, cMap2.get(id) ?? {}, tMap2.get(id) ?? {}, dMap2.get(id) ?? {}, oMap2.get(id) ?? {});
+        const extras = extrasByContainer.get(id) ?? 0;
+        totalCostByContainer.set(id, base + extras);
+        if (uninvoicedCreatedAt.has(id)) uninvoicedCogs += base + extras;
       }
     }
 
@@ -468,28 +518,13 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
       ensureMonth(monthKey(d)).revenue += parseFloat(inv.subtotal ?? "0");
     }
 
-    if (ids.length > 0) {
-      // Per-container month attribution
-      const [allS, allC, allT, allD, allO] = await Promise.all([
-        db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, ids)),
-        db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, ids)),
-        db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, ids)),
-        db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, ids)),
-        db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, ids)),
-      ]);
-      const sMap = new Map<number, any>(allS.map(r => [r.containerId, r]));
-      const cMap = new Map<number, any>(allC.map(r => [r.containerId, r]));
-      const tMap = new Map<number, any>(allT.map(r => [r.containerId, r]));
-      const dMap = new Map<number, any>(allD.map(r => [r.containerId, r]));
-      const oMap = new Map<number, any>(allO.map(r => [r.containerId, r]));
-      for (const c of containers) {
-        const k = monthKey(c.createdAt instanceof Date ? c.createdAt : new Date(c.createdAt));
-        const baseCost = calcTotalCost(sMap.get(c.id) ?? {}, cMap.get(c.id) ?? {}, tMap.get(c.id) ?? {}, dMap.get(c.id) ?? {}, oMap.get(c.id) ?? {});
-        const extras = extrasByContainer.get(c.id) ?? 0;
-        const m = ensureMonth(k);
-        m.costOfSales += baseCost + extras;
-        m.containerCount += 1;
-      }
+    // Monthly COGS: invoiced containers attributed to their invoice month
+    // Uninvoiced containers are excluded from the monthly breakdown (captured in costOfSales.uninvoicedCogs)
+    for (const [containerId, invoiceDate] of containerToInvoiceDate) {
+      const cost = totalCostByContainer.get(containerId) ?? 0;
+      const m = ensureMonth(monthKey(invoiceDate));
+      m.costOfSales += cost;
+      m.containerCount += 1;
     }
 
     for (const r of overheadRows) {
@@ -525,6 +560,9 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
         delivery: costDelivery,
         operations: costOperations,
         extras: costExtras,
+        uninvoicedCogs,
+        invoicedContainerCount: invoicedIds.length,
+        uninvoicedContainerCount: uninvoicedIds.length,
       },
       grossProfit,
       grossMarginPct,

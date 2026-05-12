@@ -1392,6 +1392,14 @@ export default function ContainerDetail() {
   const totalDisbursed = (sectionPaymentsData as ContainerSectionSummary[]).reduce((s, p) => s + (p.paid ?? 0), 0);
   const stillToDisburse = Math.max(0, combinedExpenses - totalDisbursed);
 
+  // Revenue: use client's agreedClearingRate if set (that's what invoices use), else fall back to clearingCharges
+  const linkedClient = container.clientId
+    ? (clientsList ?? []).find(c => c.id === container.clientId)
+    : null;
+  const clientAgreedRate = linkedClient?.agreedClearingRate != null ? Number(linkedClient.agreedClearingRate) : null;
+  const effectiveRevenue = clientAgreedRate !== null ? clientAgreedRate : (charges.clearingCharges ?? 0);
+  const hasRateDifference = clientAgreedRate !== null && clientAgreedRate !== (charges.clearingCharges ?? 0);
+
   const pendingApprovals = sectionApprovals.filter((a: SectionApproval) => a.status === "submitted").length;
 
   return (
@@ -2347,7 +2355,9 @@ export default function ContainerDetail() {
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium text-muted-foreground">Agreed Clearing Charges</p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {clientAgreedRate !== null ? "Revenue (Client Agreed Rate)" : "Agreed Clearing Charges"}
+                      </p>
                       {isAdmin && !container.isLocked && !editingClearing && (
                         <button
                           onClick={() => { setClearingInput(String(charges.clearingCharges ?? 0)); setEditingClearing(true); }}
@@ -2379,12 +2389,19 @@ export default function ContainerDetail() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-2xl font-mono font-bold text-primary">{formatCurrency(charges.clearingCharges)}</p>
+                      <>
+                        <p className="text-2xl font-mono font-bold text-primary">{formatCurrency(effectiveRevenue)}</p>
+                        {hasRateDifference && (
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Container rate: {formatCurrency(charges.clearingCharges ?? 0)} · Client agreed rate applied
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                   <div className="pt-6 border-t border-border/40">
                     {(() => {
-                      const combinedProfit = (charges.clearingCharges ?? 0) - combinedExpenses;
+                      const combinedProfit = effectiveRevenue - combinedExpenses;
                       return (
                         <>
                           <p className="text-sm font-medium text-muted-foreground flex justify-between mb-2">
