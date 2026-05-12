@@ -3,6 +3,7 @@ import { db, containersTable, usersTable, clientsTable, shippingChargesTable, cu
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
+import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
 
 const router = Router();
 
@@ -1758,14 +1759,6 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       return out;
     };
 
-    const USD_TARGET_FIELD: Record<string, string> = {
-      shipping: "shippingCompany",
-      customs: "duty",
-      terminal: "terminalCharges",
-      delivery: "delivery",
-      operations: "miscellaneous",
-    };
-
     const validateFx = (obj: any, sectionName: string): string | null => {
       if (!obj) return null;
       const hasUsd = obj.usdAmount != null && obj.usdAmount !== "" && !isNaN(parseFloat(obj.usdAmount)) && parseFloat(obj.usdAmount) > 0;
@@ -1773,6 +1766,19 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       if (!hasUsd && !hasRate) return null;
       if (hasUsd && !hasRate) return `${sectionName}: Exchange rate is required when a USD amount is entered`;
       if (!hasUsd && hasRate) return `${sectionName}: USD amount is required when an exchange rate is entered`;
+      const usd = parseFloat(obj.usdAmount);
+      const rate = parseFloat(obj.exchangeRate);
+      const expectedNgn = usd * rate;
+      const target = FX_TARGET_FIELD[sectionName.toLowerCase()];
+      if (target) {
+        const actualNgn = parseFloat(obj[target] ?? "");
+        if (isNaN(actualNgn)) {
+          return `${sectionName}: ${FX_TARGET_LABEL[sectionName.toLowerCase()]} must be provided when using USD denomination`;
+        }
+        if (Math.abs(expectedNgn - actualNgn) > FX_TOLERANCE_NGN) {
+          return `${sectionName}: USD ${usd} \u00d7 \u20a6${rate.toLocaleString()} = \u20a6${expectedNgn.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} does not match ${FX_TARGET_LABEL[sectionName.toLowerCase()]} \u20a6${actualNgn.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (tolerance \u20a6${FX_TOLERANCE_NGN})`;
+        }
+      }
       return null;
     };
 
@@ -1786,22 +1792,6 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       res.status(422).json({ error: fxErrors.join("; ") });
       return;
     }
-
-    const applyFxToTargetField = (obj: any, sectionName: string): any => {
-      if (!obj) return obj;
-      const usd = parseFloat(obj.usdAmount ?? "");
-      const rate = parseFloat(obj.exchangeRate ?? "");
-      if (isNaN(usd) || isNaN(rate) || usd <= 0 || rate <= 0) return obj;
-      const target = USD_TARGET_FIELD[sectionName];
-      if (!target) return obj;
-      return { ...obj, [target]: (usd * rate).toFixed(2) };
-    };
-
-    if (section === "shipping" && shipping) shipping = applyFxToTargetField(shipping, "shipping");
-    if (section === "customs" && customs) customs = applyFxToTargetField(customs, "customs");
-    if (section === "terminal" && terminal) terminal = applyFxToTargetField(terminal, "terminal");
-    if (section === "delivery" && delivery) delivery = applyFxToTargetField(delivery, "delivery");
-    if (section === "operations" && operations) operations = applyFxToTargetField(operations, "operations");
 
     if (section === "shipping" && shipping) {
       await db.insert(shippingChargesTable)

@@ -710,11 +710,37 @@ function ChargeSectionForm({
   const fxDirty = usdAmount !== initialUsd || exchangeRate !== initialRate;
   const isDirty = form.formState.isDirty || fxDirty;
 
+  const FX_TARGET_FIELD: Record<string, string> = {
+    shipping: "shippingCompany",
+    customs: "duty",
+    terminal: "terminalCharges",
+    delivery: "delivery",
+    operations: "miscellaneous",
+  };
+  const FX_TARGET_LABEL: Record<string, string> = {
+    shipping: "Shipping Company",
+    customs: "Customs Duty",
+    terminal: "Terminal Charges",
+    delivery: "Delivery",
+    operations: "Miscellaneous",
+  };
+
   useEffect(() => {
     form.reset(initialData || {});
     setUsdAmount(initialData?.usdAmount != null ? String(initialData.usdAmount) : "");
     setExchangeRate(initialData?.exchangeRate != null ? String(initialData.exchangeRate) : "");
   }, [JSON.stringify(initialData)]);
+
+  useEffect(() => {
+    const usd = parseFloat(usdAmount);
+    const rate = parseFloat(exchangeRate);
+    if (usd > 0 && rate > 0) {
+      const target = FX_TARGET_FIELD[sectionKey];
+      if (target) {
+        form.setValue(target as any, parseFloat((usd * rate).toFixed(2)), { shouldDirty: true });
+      }
+    }
+  }, [usdAmount, exchangeRate, sectionKey]);
 
   const allFields = Object.keys(schema.shape);
   const fields = allFields.filter(f => !isBuiltInFieldHidden(sectionSettings, sectionKey, f));
