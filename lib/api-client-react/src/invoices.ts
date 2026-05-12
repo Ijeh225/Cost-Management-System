@@ -255,6 +255,8 @@ export type ArClientRow = {
   outstanding: number;
   aging: ArAgingBuckets;
   unpaidInvoices: ArUnpaidInvoice[];
+  unallocatedDeposits: number;
+  creditBalance: number;
 };
 
 export type ArLedgerResponse = {
@@ -265,6 +267,8 @@ export type ArLedgerResponse = {
     collectedThisMonth: number;
     openInvoiceCount: number;
     totalOverdue: number;
+    totalUnallocatedDeposits: number;
+    totalCreditBalance: number;
   };
   aging: ArAgingBuckets;
   clients: ArClientRow[];
@@ -334,6 +338,26 @@ export function useRemoveInvoiceItem() {
     onSuccess: (_, { invoiceId }) => {
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
       qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
+    },
+  });
+}
+
+export function useApplyClientCredit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId, amount }: { invoiceId: number; amount: number }) =>
+      customFetch<{ success: boolean; appliedAmount: number; remainingCredit: number }>(
+        `/api/invoices/${invoiceId}/apply-credit`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount }),
+        }
+      ),
+    onSuccess: (_, { invoiceId }) => {
+      qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
     },
   });
 }

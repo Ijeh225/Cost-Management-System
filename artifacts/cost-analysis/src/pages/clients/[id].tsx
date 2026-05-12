@@ -4,8 +4,9 @@ import {
   useGetClient, useUpdateClient, useGetClientReceivables,
   useGetClientWalletSummary, useGetClientDeposits,
   useCreateClientDeposit, useDeleteClientDeposit, useResetClientWallet,
+  useAllocateDeposit,
   useListActiveBanks,
-  type ClientWithContainers,
+  type ClientWithContainers, type ClientDeposit,
 } from "@workspace/api-client-react";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -32,7 +33,7 @@ import {
   Pencil, Check, X, Loader2, Box, Search,
   ReceiptText, Wallet, CreditCard, ChevronDown, ChevronUp, History,
   PlusCircle, Trash2, TrendingDown, TrendingUp, AlertTriangle, SlidersHorizontal,
-  RotateCcw, ShieldAlert, Eye, EyeOff,
+  RotateCcw, ShieldAlert, Eye, EyeOff, Link2, Banknote,
 } from "lucide-react";
 
 const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque"];
@@ -47,6 +48,130 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
         {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
       </CardContent>
     </Card>
+  );
+}
+
+function AllocateDepositDialog({
+  open, onOpenChange, deposit, clientId, openInvoices,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  deposit: ClientDeposit | null;
+  clientId: number;
+  openInvoices: Array<{ id: number; invoiceNumber: string; outstanding: number }>;
+}) {
+  const { toast } = useToast();
+  const allocate = useAllocateDeposit(clientId);
+  const [invoiceId, setInvoiceId] = useState<number | null>(null);
+  const [amount, setAmount] = useState("");
+
+  const selectedInvoice = openInvoices.find(i => i.id === invoiceId);
+  const maxAmount = deposit && selectedInvoice
+    ? Math.min(deposit.remainingAmount, selectedInvoice.outstanding)
+    : (deposit?.remainingAmount ?? 0);
+
+  const handleOpen = (v: boolean) => {
+    if (v) {
+      setInvoiceId(openInvoices.length === 1 ? openInvoices[0].id : null);
+      setAmount(deposit ? String(deposit.remainingAmount) : "");
+    }
+    onOpenChange(v);
+  };
+
+  const handleSubmit = async () => {
+    if (!deposit) return;
+    if (!invoiceId) { toast({ variant: "destructive", title: "Select an invoice" }); return; }
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) { toast({ variant: "destructive", title: "Enter a valid amount" }); return; }
+    if (amt > deposit.remainingAmount + 0.01) {
+      toast({ variant: "destructive", title: `Cannot exceed deposit remaining balance of ${formatCurrency(deposit.remainingAmount)}` });
+      return;
+    }
+    try {
+      await allocate.mutateAsync({ depositId: deposit.id, invoiceId, amount: amt });
+      toast({ title: "Deposit applied to invoice successfully" });
+      onOpenChange(false);
+    } catch (err: any) {
+      const msg = err?.message ?? "Failed to apply deposit";
+      toast({ variant: "destructive", title: msg.includes("exceeds") || msg.includes("Cannot") ? msg : "Failed to apply deposit" });
+    }
+  };
+
+  if (!deposit) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Link2 className="w-4 h-4 text-primary" /> Apply Deposit to Invoice
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm">
+            <p className="text-xs text-muted-foreground mb-0.5">Deposit Remaining Balance</p>
+            <p className="font-mono font-bold text-primary">{formatCurrency(deposit.remainingAmount)}</p>
+            {deposit.allocatedAmount > 0 && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {formatCurrency(deposit.allocatedAmount)} already allocated
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-sm">Invoice *</Label>
+            {openInvoices.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">No open invoices with outstanding balance.</p>
+            ) : (
+              <Select value={invoiceId != null ? String(invoiceId) : ""} onValueChange={v => {
+                const id = parseInt(v);
+                setInvoiceId(id);
+                const inv = openInvoices.find(i => i.id === id);
+                if (inv) setAmount(String(Math.min(deposit.remainingAmount, inv.outstanding)));
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an invoice..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {openInvoices.map(inv => (
+                    <SelectItem key={inv.id} value={String(inv.id)}>
+                      {inv.invoiceNumber} — {formatCurrency(inv.outstanding)} outstanding
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-sm">Amount to Apply (₦) *</Label>
+            <Input
+              type="number"
+              min="0.01"
+              step="0.01"
+              max={maxAmount}
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="font-mono"
+            />
+            {amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0 && (
+              <p className="text-xs text-muted-foreground font-mono">= {formatCurrency(parseFloat(amount))}</p>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={allocate.isPending || !invoiceId || openInvoices.length === 0}
+            className="gap-2"
+          >
+            {allocate.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Apply Deposit
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -198,6 +323,7 @@ export default function ClientDetailPage() {
   const [showDepositHistory, setShowDepositHistory] = useState(false);
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [deleteDepositId, setDeleteDepositId] = useState<number | null>(null);
+  const [allocateDeposit, setAllocateDeposit] = useState<ClientDeposit | null>(null);
 
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
@@ -401,13 +527,13 @@ export default function ClientDetailPage() {
           </div>
         </CardHeader>
         <CardContent className="p-4">
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-5 gap-3 mb-4">
             {/* Total Deposited */}
             <div className="text-center">
               <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
                 <TrendingUp className="w-3 h-3 text-emerald-400" /> Total Deposited
               </p>
-              <p className="font-mono font-bold text-lg text-emerald-400">
+              <p className="font-mono font-bold text-base text-emerald-400">
                 {formatCurrency(walletSummary?.totalDeposited ?? 0)}
               </p>
             </div>
@@ -416,20 +542,40 @@ export default function ClientDetailPage() {
               <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
                 <TrendingDown className="w-3 h-3 text-amber-400" /> Total Invoiced
               </p>
-              <p className="font-mono font-bold text-lg text-amber-400">
+              <p className="font-mono font-bold text-base text-amber-400">
                 {formatCurrency(walletSummary?.totalExpenses ?? 0)}
               </p>
               <p className="text-[10px] text-muted-foreground/60 mt-0.5">From invoices issued</p>
             </div>
             {/* Balance */}
-            <div className="text-center">
+            <div className="text-center border-r border-border/40">
               <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
-                <CreditCard className="w-3 h-3" /> Current Balance
+                <CreditCard className="w-3 h-3" /> Net Balance
               </p>
-              <p className={`font-mono font-bold text-lg ${isOverdrawn ? "text-red-400" : "text-emerald-400"}`}>
+              <p className={`font-mono font-bold text-base ${isOverdrawn ? "text-red-400" : "text-emerald-400"}`}>
                 {formatCurrency(Math.abs(balance))}
                 {isOverdrawn ? " (Overdrawn)" : ""}
               </p>
+            </div>
+            {/* Unallocated Deposits */}
+            <div className="text-center border-r border-border/40">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                <Banknote className="w-3 h-3 text-sky-400" /> Unallocated
+              </p>
+              <p className="font-mono font-bold text-base text-sky-400">
+                {formatCurrency(walletSummary?.unallocatedDeposits ?? 0)}
+              </p>
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5">Deposits not on invoice</p>
+            </div>
+            {/* Credit Balance */}
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                <CreditCard className="w-3 h-3 text-violet-400" /> Credit Balance
+              </p>
+              <p className="font-mono font-bold text-base text-violet-400">
+                {formatCurrency(walletSummary?.creditBalance ?? 0)}
+              </p>
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5">From overpayments</p>
             </div>
           </div>
 
@@ -465,37 +611,75 @@ export default function ClientDetailPage() {
                         <tr className="text-muted-foreground font-mono uppercase tracking-wider">
                           <th className="px-3 py-2 text-left font-medium">Date</th>
                           <th className="px-3 py-2 text-right font-medium">Amount</th>
+                          <th className="px-3 py-2 text-right font-medium">Remaining</th>
                           <th className="px-3 py-2 text-left font-medium">Method</th>
                           <th className="px-3 py-2 text-left font-medium">Reference</th>
-                          <th className="px-3 py-2 text-left font-medium">Notes</th>
-                          <th className="px-3 py-2 text-center font-medium">Remove</th>
+                          <th className="px-3 py-2 text-left font-medium">Allocation</th>
+                          <th className="px-3 py-2 text-center font-medium">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/30">
-                        {deposits.map(d => (
-                          <tr key={d.id} className="hover:bg-accent/10 transition-colors">
-                            <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
-                              {new Date(d.createdAt).toLocaleDateString("en-NG", {
-                                day: "numeric", month: "short", year: "numeric",
-                              })}
-                            </td>
-                            <td className="px-3 py-2 text-right font-mono text-emerald-400 font-semibold">
-                              {formatCurrency(d.amount)}
-                            </td>
-                            <td className="px-3 py-2 text-muted-foreground capitalize">{d.paymentMethod}</td>
-                            <td className="px-3 py-2 text-muted-foreground font-mono">{d.reference ?? "—"}</td>
-                            <td className="px-3 py-2 text-muted-foreground max-w-[160px] truncate">{d.notes ?? "—"}</td>
-                            <td className="px-3 py-2 text-center">
-                              <button
-                                onClick={() => setDeleteDepositId(d.id)}
-                                className="text-muted-foreground hover:text-red-400 transition-colors p-0.5 rounded"
-                                title="Remove deposit"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {deposits.map(d => {
+                          const isFullyAllocated = d.remainingAmount <= 0.01;
+                          const isPartiallyAllocated = d.allocatedAmount > 0 && !isFullyAllocated;
+                          return (
+                            <tr key={d.id} className="hover:bg-accent/10 transition-colors">
+                              <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                                {new Date(d.createdAt).toLocaleDateString("en-NG", {
+                                  day: "numeric", month: "short", year: "numeric",
+                                })}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono text-emerald-400 font-semibold">
+                                {formatCurrency(d.amount)}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono">
+                                {isFullyAllocated ? (
+                                  <span className="text-muted-foreground/50">—</span>
+                                ) : (
+                                  <span className="text-sky-400">{formatCurrency(d.remainingAmount)}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-muted-foreground capitalize">{d.paymentMethod}</td>
+                              <td className="px-3 py-2 text-muted-foreground font-mono">{d.reference ?? "—"}</td>
+                              <td className="px-3 py-2">
+                                {isFullyAllocated ? (
+                                  <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded px-1.5 py-0.5 text-[10px]">
+                                    <Check className="w-2.5 h-2.5" />
+                                    Fully Applied
+                                    {d.allocatedInvoiceNumber && ` → ${d.allocatedInvoiceNumber}`}
+                                  </span>
+                                ) : isPartiallyAllocated ? (
+                                  <span className="inline-flex items-center gap-1 text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5 text-[10px]">
+                                    Partial — {formatCurrency(d.allocatedAmount)} applied
+                                    {d.allocatedInvoiceNumber && ` → ${d.allocatedInvoiceNumber}`}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground/50 text-[10px] italic">Unallocated</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  {!isFullyAllocated && isAdmin && (
+                                    <button
+                                      onClick={() => setAllocateDeposit(d)}
+                                      className="text-muted-foreground hover:text-sky-400 transition-colors p-0.5 rounded"
+                                      title="Apply to invoice"
+                                    >
+                                      <Link2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => setDeleteDepositId(d.id)}
+                                    className="text-muted-foreground hover:text-red-400 transition-colors p-0.5 rounded"
+                                    title="Remove deposit"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -896,6 +1080,17 @@ export default function ClientDetailPage() {
         open={depositDialogOpen}
         onOpenChange={setDepositDialogOpen}
         clientId={clientId}
+      />
+
+      {/* Allocate Deposit Dialog */}
+      <AllocateDepositDialog
+        open={!!allocateDeposit}
+        onOpenChange={v => { if (!v) setAllocateDeposit(null); }}
+        deposit={allocateDeposit}
+        clientId={clientId}
+        openInvoices={(receivables?.invoices ?? [])
+          .filter(inv => inv.outstanding > 0.01)
+          .map(inv => ({ id: inv.id, invoiceNumber: inv.invoiceNumber, outstanding: inv.outstanding }))}
       />
 
       {/* Delete Deposit Confirmation */}

@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable } from "@workspace/db";
-import { eq, desc, sql, inArray, and, gte, lte } from "drizzle-orm";
+import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable } from "@workspace/db";
+import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio } from "../lib/whatsapp.js";
 
@@ -421,9 +421,42 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
       }
     }
 
-    const clients = [...clientMap.values()].sort((a, b) => b.outstanding - a.outstanding);
+    // Fetch unallocated deposits per client (for informational display on AR)
+    const allDeposits = await db
+      .select({
+        clientId: clientDepositsTable.clientId,
+        amount: clientDepositsTable.amount,
+        allocatedAmount: clientDepositsTable.allocatedAmount,
+      })
+      .from(clientDepositsTable);
+
+    const unallocatedByClient = new Map<number, number>();
+    for (const d of allDeposits) {
+      if (!d.clientId) continue;
+      const remaining = Math.max(0, parseFloat(d.amount ?? "0") - parseFloat(d.allocatedAmount ?? "0"));
+      if (remaining > 0) {
+        unallocatedByClient.set(d.clientId, (unallocatedByClient.get(d.clientId) ?? 0) + remaining);
+      }
+    }
+
+    // Fetch credit balances per client
+    const allClientRows = await db
+      .select({ id: clientsTable.id, creditBalance: clientsTable.creditBalance })
+      .from(clientsTable);
+    const creditBalanceMap = new Map<number, number>();
+    for (const c of allClientRows) {
+      creditBalanceMap.set(c.id, parseFloat(c.creditBalance ?? "0"));
+    }
+
+    const clients = [...clientMap.values()].map(c => ({
+      ...c,
+      unallocatedDeposits: c.clientId != null ? (unallocatedByClient.get(c.clientId) ?? 0) : 0,
+      creditBalance: c.clientId != null ? (creditBalanceMap.get(c.clientId) ?? 0) : 0,
+    })).sort((a, b) => b.outstanding - a.outstanding);
     const totalOutstanding = clients.reduce((s, c) => s + c.outstanding, 0);
     const totalOverdue = summaryAging.days31to60 + summaryAging.days61to90 + summaryAging.days90plus;
+    const totalUnallocatedDeposits = clients.reduce((s, c) => s + c.unallocatedDeposits, 0);
+    const totalCreditBalance = clients.reduce((s, c) => s + c.creditBalance, 0);
 
     res.json({
       summary: {
@@ -433,6 +466,8 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
         collectedThisMonth,
         openInvoiceCount,
         totalOverdue,
+        totalUnallocatedDeposits,
+        totalCreditBalance,
       },
       aging: summaryAging,
       clients,
@@ -807,10 +842,92 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       .set({ status: newStatus, updatedAt: new Date() })
       .where(eq(invoicesTable.id, invoiceId));
 
-    res.status(201).json({ success: true, totalPaid, status: newStatus });
+    // Capture overpayment as client credit balance
+    let overpaymentStored = 0;
+    if (totalPaid > total && inv.clientId) {
+      const overpayment = totalPaid - total;
+      await db.update(clientsTable)
+        .set({ creditBalance: sql`${clientsTable.creditBalance}::numeric + ${String(overpayment)}` })
+        .where(eq(clientsTable.id, inv.clientId));
+      overpaymentStored = overpayment;
+    }
+
+    res.status(201).json({ success: true, totalPaid, status: newStatus, overpaymentStored });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to record payment" });
+  }
+});
+
+// ─── Apply Client Credit to Invoice ─────────────────────────────────────────
+
+router.post("/invoices/:id/apply-credit", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id, 10);
+    if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
+
+    const { amount: rawAmount } = req.body as { amount?: number };
+    const applyAmount = parseFloat(String(rawAmount ?? 0));
+    if (isNaN(applyAmount) || applyAmount <= 0) {
+      return res.status(400).json({ error: "Valid amount is required" });
+    }
+
+    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!inv) return res.status(404).json({ error: "Invoice not found" });
+    if (!inv.clientId) return res.status(400).json({ error: "Invoice has no linked client" });
+
+    const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, inv.clientId));
+    if (!client) return res.status(404).json({ error: "Client not found" });
+
+    const creditBalance = parseFloat(client.creditBalance ?? "0");
+    if (creditBalance <= 0) return res.status(400).json({ error: "Client has no credit balance" });
+
+    const applyActual = Math.min(applyAmount, creditBalance);
+
+    const existingPayments = await db.select().from(invoicePaymentsTable)
+      .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+    const invoiceTotal = parseFloat(inv.total ?? "0");
+    const outstanding = Math.max(0, invoiceTotal - totalPaid);
+    if (outstanding <= 0) return res.status(400).json({ error: "Invoice is already fully paid" });
+
+    const actualApply = Math.min(applyActual, outstanding);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(invoicePaymentsTable).values({
+        invoiceId,
+        amount: String(actualApply),
+        paymentMethod: "credit",
+        reference: "",
+        notes: `Applied from client credit balance`,
+        paidAt: new Date(),
+        bankId: null,
+      });
+
+      await tx.update(clientsTable)
+        .set({ creditBalance: sql`GREATEST(0, ${clientsTable.creditBalance}::numeric - ${String(actualApply)})` })
+        .where(eq(clientsTable.id, inv.clientId!));
+
+      const newTotalPaid = totalPaid + actualApply;
+      let newStatus = inv.status;
+      if (newTotalPaid >= invoiceTotal) newStatus = "paid";
+      else if (newTotalPaid > 0) newStatus = "partial";
+      await tx.update(invoicesTable)
+        .set({ status: newStatus, updatedAt: new Date() })
+        .where(eq(invoicesTable.id, invoiceId));
+    });
+
+    const [updatedClient] = await db.select({ creditBalance: clientsTable.creditBalance })
+      .from(clientsTable).where(eq(clientsTable.id, inv.clientId));
+
+    res.status(201).json({
+      success: true,
+      appliedAmount: actualApply,
+      remainingCredit: parseFloat(updatedClient?.creditBalance ?? "0"),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to apply credit" });
   }
 });
 

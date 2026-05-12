@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   BookOpen, Download, Search, ChevronDown, ChevronRight,
   AlertTriangle, Loader2, ExternalLink, Calendar,
-  Wallet, CreditCard, ReceiptText, TrendingUp,
+  Wallet, CreditCard, ReceiptText, TrendingUp, Banknote,
 } from "lucide-react";
 
 function rowHighlight(aging: ArAgingBuckets): string {
@@ -69,7 +69,7 @@ function InvoiceSubRow({ inv }: { inv: ArUnpaidInvoice }) {
           ? <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{inv.dueDate}</span>
           : <span className="text-muted-foreground/40">No due date</span>}
       </td>
-      <td colSpan={4} />
+      <td colSpan={6} />
     </tr>
   );
 }
@@ -114,6 +114,16 @@ function ClientTableRow({ client, expanded, onToggle }: {
         </td>
         <td className="py-3 px-3 text-right">
           <AgingBadge amount={client.aging.days90plus} label="90+d"    color="text-red-600 font-semibold" />
+        </td>
+        <td className="py-3 px-3 text-right">
+          {client.unallocatedDeposits > 0
+            ? <span className="text-xs font-mono text-sky-400">{formatCurrency(client.unallocatedDeposits)}</span>
+            : <span className="text-muted-foreground/40 text-xs">—</span>}
+        </td>
+        <td className="py-3 px-3 text-right">
+          {client.creditBalance > 0
+            ? <span className="text-xs font-mono text-violet-400">{formatCurrency(client.creditBalance)}</span>
+            : <span className="text-muted-foreground/40 text-xs">—</span>}
         </td>
       </tr>
       {expanded && client.unpaidInvoices.map(inv => (
@@ -246,14 +256,14 @@ export default function AccountsReceivablePage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Outstanding</CardTitle>
             <CreditCard className="w-4 h-4 text-amber-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-400">
+            <div className="text-xl font-bold text-amber-400">
               {formatCurrency(summary?.totalOutstanding ?? 0)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">{summary?.openInvoiceCount ?? 0} open invoices</p>
@@ -265,7 +275,7 @@ export default function AccountsReceivablePage() {
             <AlertTriangle className="w-4 h-4 text-red-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-400">
+            <div className="text-xl font-bold text-red-400">
               {formatCurrency(summary?.totalOverdue ?? 0)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Past due date</p>
@@ -277,7 +287,7 @@ export default function AccountsReceivablePage() {
             <Wallet className="w-4 h-4 text-emerald-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-400">
+            <div className="text-xl font-bold text-emerald-400">
               {formatCurrency(summary?.collectedThisMonth ?? 0)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -291,12 +301,36 @@ export default function AccountsReceivablePage() {
             <ReceiptText className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">
+            <div className="text-xl font-bold text-foreground">
               {formatCurrency(summary?.totalInvoiced ?? 0)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {formatCurrency(summary?.totalCollected ?? 0)} collected
             </p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/40 bg-sky-500/5 backdrop-blur-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Unallocated Deposits</CardTitle>
+            <Banknote className="w-4 h-4 text-sky-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold text-sky-400">
+              {formatCurrency(summary?.totalUnallocatedDeposits ?? 0)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Not yet on invoice</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/40 bg-violet-500/5 backdrop-blur-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Credit Balances</CardTitle>
+            <CreditCard className="w-4 h-4 text-violet-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold text-violet-400">
+              {formatCurrency(summary?.totalCreditBalance ?? 0)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">From overpayments</p>
           </CardContent>
         </Card>
       </div>
@@ -375,12 +409,14 @@ export default function AccountsReceivablePage() {
                 <th className="py-3 px-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">31–60d</th>
                 <th className="py-3 px-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">61–90d</th>
                 <th className="py-3 px-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">90+d</th>
+                <th className="py-3 px-3 text-right text-xs font-semibold text-sky-400/80 uppercase tracking-wider">Unalloc.</th>
+                <th className="py-3 px-3 text-right text-xs font-semibold text-violet-400/80 uppercase tracking-wider">Credit Bal.</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-16 text-center text-muted-foreground text-sm">
+                  <td colSpan={12} className="py-16 text-center text-muted-foreground text-sm">
                     No clients match your filters.
                   </td>
                 </tr>
@@ -425,6 +461,12 @@ export default function AccountsReceivablePage() {
                   </td>
                   <td className="py-3 px-3 text-right text-xs font-mono text-red-600 font-bold">
                     {formatCurrency(filtered.reduce((s, c) => s + c.aging.days90plus, 0))}
+                  </td>
+                  <td className="py-3 px-3 text-right text-xs font-mono text-sky-400">
+                    {formatCurrency(filtered.reduce((s, c) => s + (c.unallocatedDeposits ?? 0), 0))}
+                  </td>
+                  <td className="py-3 px-3 text-right text-xs font-mono text-violet-400">
+                    {formatCurrency(filtered.reduce((s, c) => s + (c.creditBalance ?? 0), 0))}
                   </td>
                 </tr>
               </tfoot>

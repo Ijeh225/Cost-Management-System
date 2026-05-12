@@ -5,7 +5,7 @@ import {
   terminalChargesTable, deliveryChargesTable, operationsChargesTable,
   usersTable, banksTable,
 } from "@workspace/db";
-import { eq, desc, sum, inArray, gte, and } from "drizzle-orm";
+import { eq, desc, sum, inArray, gte, and, isNull, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest, verifyPassword } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
@@ -43,6 +43,7 @@ clientsRouter.get("/clients", requireAuth, async (req: AuthRequest, res) => {
     const result = rows.map(c => ({
       ...c,
       agreedClearingRate: c.agreedClearingRate != null ? parseFloat(c.agreedClearingRate) : null,
+      creditBalance: parseFloat(c.creditBalance ?? "0"),
       totalOutstanding: outstandingByClient.get(c.id) ?? 0,
     }));
 
@@ -72,6 +73,7 @@ clientsRouter.post("/clients", requireAuth, async (req: AuthRequest, res) => {
     return res.status(201).json({
       ...client,
       agreedClearingRate: client.agreedClearingRate != null ? parseFloat(client.agreedClearingRate) : null,
+      creditBalance: parseFloat(client.creditBalance ?? "0"),
     });
   } catch (err) {
     console.error(err);
@@ -85,7 +87,11 @@ clientsRouter.get("/clients/:id", requireAuth, async (req: AuthRequest, res) => 
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
     const [raw] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
     if (!raw) return res.status(404).json({ error: "Client not found" });
-    const client = { ...raw, agreedClearingRate: raw.agreedClearingRate != null ? parseFloat(raw.agreedClearingRate) : null };
+    const client = {
+      ...raw,
+      agreedClearingRate: raw.agreedClearingRate != null ? parseFloat(raw.agreedClearingRate) : null,
+      creditBalance: parseFloat(raw.creditBalance ?? "0"),
+    };
     const containers = await db.select({
       id: containersTable.id,
       containerNumber: containersTable.containerNumber,
@@ -142,6 +148,7 @@ clientsRouter.patch("/clients/:id", requireAuth, async (req: AuthRequest, res) =
     return res.json({
       ...updated,
       agreedClearingRate: updated.agreedClearingRate != null ? parseFloat(updated.agreedClearingRate) : null,
+      creditBalance: parseFloat(updated.creditBalance ?? "0"),
     });
   } catch (err) {
     console.error(err);
@@ -343,23 +350,35 @@ clientsRouter.get("/clients/:id/deposits", requireAuth, async (req: AuthRequest,
         notes: clientDepositsTable.notes,
         bankId: clientDepositsTable.bankId,
         bankName: banksTable.name,
+        allocatedInvoiceId: clientDepositsTable.allocatedInvoiceId,
+        allocatedAmount: clientDepositsTable.allocatedAmount,
+        allocatedInvoiceNumber: invoicesTable.invoiceNumber,
         createdAt: clientDepositsTable.createdAt,
       })
       .from(clientDepositsTable)
       .leftJoin(banksTable, eq(clientDepositsTable.bankId, banksTable.id))
+      .leftJoin(invoicesTable, eq(clientDepositsTable.allocatedInvoiceId, invoicesTable.id))
       .where(eq(clientDepositsTable.clientId, clientId))
       .orderBy(desc(clientDepositsTable.createdAt));
-    return res.json(deposits.map(d => ({
-      id: d.id,
-      clientId: d.clientId,
-      amount: parseFloat(d.amount),
-      paymentMethod: d.paymentMethod,
-      reference: d.reference ?? null,
-      notes: d.notes ?? null,
-      bankId: d.bankId ?? null,
-      bankName: d.bankName ?? null,
-      createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : d.createdAt,
-    })));
+    return res.json(deposits.map(d => {
+      const amount = parseFloat(d.amount);
+      const allocatedAmount = parseFloat(d.allocatedAmount ?? "0");
+      return {
+        id: d.id,
+        clientId: d.clientId,
+        amount,
+        paymentMethod: d.paymentMethod,
+        reference: d.reference ?? null,
+        notes: d.notes ?? null,
+        bankId: d.bankId ?? null,
+        bankName: d.bankName ?? null,
+        allocatedInvoiceId: d.allocatedInvoiceId ?? null,
+        allocatedInvoiceNumber: d.allocatedInvoiceNumber ?? null,
+        allocatedAmount,
+        remainingAmount: amount - allocatedAmount,
+        createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : d.createdAt,
+      };
+    }));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -392,15 +411,21 @@ clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthReques
       const [bank] = await db.select({ name: banksTable.name }).from(banksTable).where(eq(banksTable.id, deposit.bankId));
       bankName = bank?.name ?? null;
     }
+    const depositAmount = parseFloat(deposit.amount);
+    const allocatedAmount = parseFloat(deposit.allocatedAmount ?? "0");
     return res.status(201).json({
       id: deposit.id,
       clientId: deposit.clientId,
-      amount: parseFloat(deposit.amount),
+      amount: depositAmount,
       paymentMethod: deposit.paymentMethod,
       reference: deposit.reference ?? null,
       notes: deposit.notes ?? null,
       bankId: deposit.bankId ?? null,
       bankName,
+      allocatedInvoiceId: null,
+      allocatedInvoiceNumber: null,
+      allocatedAmount,
+      remainingAmount: depositAmount - allocatedAmount,
       createdAt: deposit.createdAt instanceof Date ? deposit.createdAt.toISOString() : deposit.createdAt,
     });
   } catch (err) {
@@ -417,8 +442,100 @@ clientsRouter.delete("/clients/:id/deposits/:depositId", requireAdmin, async (re
     const [existing] = await db.select().from(clientDepositsTable)
       .where(eq(clientDepositsTable.id, depositId));
     if (!existing || existing.clientId !== clientId) return res.status(404).json({ error: "Deposit not found" });
+    const allocatedAmount = parseFloat(existing.allocatedAmount ?? "0");
+    if (allocatedAmount > 0) {
+      return res.status(400).json({ error: "Cannot remove a deposit that has been allocated to an invoice. Remove the invoice payment first." });
+    }
     await db.delete(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
     return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Deposit Allocation ─────────────────────────────────────────────────────
+
+clientsRouter.post("/client-deposits/:id/allocate", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const depositId = parseInt(req.params.id);
+    if (isNaN(depositId)) return res.status(400).json({ error: "Invalid deposit ID" });
+
+    const { invoiceId, amount: rawAmount } = req.body as { invoiceId: number; amount: number };
+    if (!invoiceId || isNaN(invoiceId)) return res.status(400).json({ error: "invoiceId is required" });
+    const allocationAmount = parseFloat(String(rawAmount));
+    if (isNaN(allocationAmount) || allocationAmount <= 0) {
+      return res.status(400).json({ error: "Allocation amount must be a positive number" });
+    }
+
+    const [deposit] = await db.select().from(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
+    if (!deposit) return res.status(404).json({ error: "Deposit not found" });
+
+    const depositTotal = parseFloat(deposit.amount);
+    const alreadyAllocated = parseFloat(deposit.allocatedAmount ?? "0");
+    const remainingOnDeposit = depositTotal - alreadyAllocated;
+    if (allocationAmount > remainingOnDeposit + 0.001) {
+      return res.status(400).json({
+        error: `Allocation amount (₦${allocationAmount.toLocaleString()}) exceeds the deposit's remaining balance (₦${remainingOnDeposit.toLocaleString()})`,
+      });
+    }
+
+    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!inv) return res.status(404).json({ error: "Invoice not found" });
+    if (inv.status === "draft") return res.status(400).json({ error: "Cannot allocate a deposit against a draft invoice" });
+
+    const existingPayments = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+    const invoiceTotal = parseFloat(inv.total ?? "0");
+    const invoiceOutstanding = Math.max(0, invoiceTotal - totalPaid);
+    if (invoiceOutstanding <= 0) {
+      return res.status(400).json({ error: "Invoice is already fully paid" });
+    }
+    if (allocationAmount > invoiceOutstanding + 0.001) {
+      return res.status(400).json({
+        error: `Allocation amount exceeds invoice outstanding balance (₦${invoiceOutstanding.toLocaleString()})`,
+      });
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.insert(invoicePaymentsTable).values({
+        invoiceId,
+        amount: String(allocationAmount),
+        paymentMethod: deposit.paymentMethod,
+        reference: deposit.reference ?? "",
+        notes: `Applied from deposit #${depositId}${deposit.notes ? ` — ${deposit.notes}` : ""}`,
+        paidAt: new Date(),
+        bankId: deposit.bankId ?? null,
+      });
+
+      const newAllocated = alreadyAllocated + allocationAmount;
+      await tx.update(clientDepositsTable)
+        .set({ allocatedAmount: String(newAllocated), allocatedInvoiceId: invoiceId })
+        .where(eq(clientDepositsTable.id, depositId));
+
+      const newTotalPaid = totalPaid + allocationAmount;
+      let newStatus = inv.status;
+      if (newTotalPaid >= invoiceTotal) {
+        newStatus = "paid";
+      } else if (newTotalPaid > 0) {
+        newStatus = "partial";
+      }
+      await tx.update(invoicesTable)
+        .set({ status: newStatus, updatedAt: new Date() })
+        .where(eq(invoicesTable.id, invoiceId));
+    });
+
+    const [updatedDeposit] = await db.select().from(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
+    const updatedAmount = parseFloat(updatedDeposit.amount);
+    const updatedAllocated = parseFloat(updatedDeposit.allocatedAmount ?? "0");
+
+    return res.json({
+      success: true,
+      depositId,
+      invoiceId,
+      allocationAmount,
+      remainingOnDeposit: updatedAmount - updatedAllocated,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -455,11 +572,26 @@ clientsRouter.get("/clients/:id/wallet-summary", requireAuth, async (req: AuthRe
       .where(invoiceFilter);
     const totalExpenses = parseFloat(invoiceSumRow?.total ?? "0");
 
+    // Unallocated deposits: amount - allocatedAmount > 0 (ignore wallet reset for unallocated — show true picture)
+    const allDeposits = await db
+      .select({ amount: clientDepositsTable.amount, allocatedAmount: clientDepositsTable.allocatedAmount })
+      .from(clientDepositsTable)
+      .where(eq(clientDepositsTable.clientId, clientId));
+    const unallocatedDeposits = allDeposits.reduce((s, d) => {
+      const amt = parseFloat(d.amount ?? "0");
+      const alloc = parseFloat(d.allocatedAmount ?? "0");
+      return s + Math.max(0, amt - alloc);
+    }, 0);
+
+    const creditBalance = parseFloat(clientRow.creditBalance ?? "0");
+
     return res.json({
       totalDeposited,
       totalExpenses,
       balance: totalDeposited - totalExpenses,
       walletResetAt: resetAt ? resetAt.toISOString() : null,
+      unallocatedDeposits,
+      creditBalance,
     });
   } catch (err) {
     console.error(err);
@@ -484,7 +616,6 @@ clientsRouter.post("/clients/:id/wallet/reset", requireAuth, requireAdmin, async
     if (!adminUser) return res.status(401).json({ error: "Not authenticated" });
 
     const [userRow] = await db.select().from(usersTable).where(eq(usersTable.id, adminUser.id));
-
     if (!userRow) return res.status(401).json({ error: "User not found" });
 
     const passwordMatch = await verifyPassword(adminPassword, userRow.passwordHash);

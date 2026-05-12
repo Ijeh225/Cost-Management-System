@@ -197,6 +197,10 @@ export type ClientDeposit = {
   notes: string | null;
   bankId: number | null;
   bankName: string | null;
+  allocatedInvoiceId: number | null;
+  allocatedInvoiceNumber: string | null;
+  allocatedAmount: number;
+  remainingAmount: number;
   createdAt: string;
 };
 
@@ -213,6 +217,8 @@ export type ClientWalletSummary = {
   totalExpenses: number;
   balance: number;
   walletResetAt: string | null;
+  unallocatedDeposits: number;
+  creditBalance: number;
 };
 
 export function useGetClientDeposits(clientId: number | null) {
@@ -273,6 +279,27 @@ export function useResetClientWallet(clientId: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"] });
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "deposits"] });
+    },
+  });
+}
+
+export function useAllocateDeposit(clientId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ depositId, invoiceId, amount }: { depositId: number; invoiceId: number; amount: number }) =>
+      customFetch<{ success: boolean; depositId: number; invoiceId: number; allocationAmount: number; remainingOnDeposit: number }>(
+        `/api/client-deposits/${depositId}/allocate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ invoiceId, amount }),
+        }
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "deposits"] });
+      qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"] });
+      qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "receivables"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
     },
   });
 }

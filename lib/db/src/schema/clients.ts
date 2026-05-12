@@ -12,6 +12,7 @@ export const clientsTable = pgTable("clients", {
   notes: text("notes").notNull().default(""),
   agreedClearingRate: numeric("agreed_clearing_rate"),
   walletResetAt: timestamp("wallet_reset_at"),
+  creditBalance: numeric("credit_balance", { precision: 15, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
