@@ -56,6 +56,7 @@ import CashFlowPrint from "@/pages/reports/cashflow/print";
 import ProfitLossPrint from "@/pages/reports/pl/print";
 import DeliveryReportPrint from "@/pages/reports/delivery-report/print";
 import DisbursementReconciliationPage from "@/pages/reports/disbursement-reconciliation/index";
+import CreditNotePrintPage from "@/pages/credit-notes/print/[id]";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -152,6 +153,7 @@ function Router() {
       <Route path="/setup" component={Setup} />
       <Route path="/containers/:id/print" component={ContainerPrintPage} />
       <Route path="/invoices/:id/print" component={InvoicePrintPage} />
+      <Route path="/credit-notes/:id/print" component={CreditNotePrintPage} />
       <Route path="/reports/client-statement/print" component={ClientStatementPrint} />
       <Route path="/reports/vat-summary/print" component={VatSummaryPrint} />
       <Route path="/reports/invoice-aging/print" component={InvoiceAgingPrint} />

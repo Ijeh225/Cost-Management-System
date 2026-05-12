@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable } from "@workspace/db";
+import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio } from "../lib/whatsapp.js";
@@ -492,13 +492,16 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
         clientId: invoicesTable.clientId,
         clientName: clientsTable.name,
         total: invoicesTable.total,
+        writtenOffAmount: invoicesTable.writtenOffAmount,
         createdAt: invoicesTable.createdAt,
       })
       .from(invoicesTable)
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
       .where(eq(invoicesTable.status, "written_off"))
       .orderBy(desc(invoicesTable.createdAt));
-    const totalWrittenOff = writtenOffRows.reduce((s, r) => s + parseFloat(r.total ?? "0"), 0);
+    // Use the stored writtenOffAmount (outstanding at write-off time); fall back to total for legacy rows
+    const totalWrittenOff = writtenOffRows.reduce((s, r) =>
+      s + parseFloat(r.writtenOffAmount ?? r.total ?? "0"), 0);
 
     res.json({
       summary: {
@@ -521,6 +524,7 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
         clientId: r.clientId ?? null,
         clientName: r.clientName ?? null,
         total: parseFloat(r.total ?? "0"),
+        writtenOffAmount: parseFloat(r.writtenOffAmount ?? r.total ?? "0"),
         createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
       })),
     });
@@ -1434,13 +1438,15 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
 
     const creditNoteNumber = await generateCreditNoteNumber();
 
+    const userId = (req as AuthRequest).user?.id ?? null;
     const [cn] = await db.transaction(async (tx) => {
       const [inserted] = await tx.insert(creditNotesTable).values({
         invoiceId,
         creditNoteNumber,
         reason: reason.trim(),
         amount: String(amount),
-        createdBy: (req as AuthRequest).user?.id ?? null,
+        status: "active",
+        createdBy: userId,
       }).returning();
 
       await tx.insert(invoicePaymentsTable).values({
@@ -1461,6 +1467,13 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
         .set({ status: newStatus, updatedAt: new Date() })
         .where(eq(invoicesTable.id, invoiceId));
 
+      await tx.insert(invoiceAuditLogTable).values({
+        invoiceId,
+        action: "credit_note_raised",
+        details: `${creditNoteNumber} — ₦${amount.toLocaleString()} — ${reason.trim()}`,
+        performedBy: userId,
+      });
+
       return [inserted];
     });
 
@@ -1470,6 +1483,7 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
       creditNoteNumber: cn.creditNoteNumber,
       reason: cn.reason,
       amount: parseFloat(cn.amount ?? "0"),
+      status: cn.status,
       createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
     });
   } catch (err) {
@@ -1519,24 +1533,33 @@ router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, re
     const invoiceTotal = parseFloat(inv.total ?? "0");
     const outstanding = Math.max(0, invoiceTotal - totalPaid);
 
+    const writeOffAmount = outstanding > 0 ? outstanding : invoiceTotal;
+    const writeOffUserId = (req as AuthRequest).user?.id ?? null;
     let expenseId = 0;
     await db.transaction(async (tx) => {
       await tx.update(invoicesTable)
-        .set({ status: "written_off", updatedAt: new Date() })
+        .set({ status: "written_off", writtenOffAmount: String(writeOffAmount), updatedAt: new Date() })
         .where(eq(invoicesTable.id, invoiceId));
 
       const [exp] = await tx.insert(overheadExpensesTable).values({
         category: "Bad Debt",
         description: `Bad Debt Write-off: ${inv.invoiceNumber}`,
-        amount: String(outstanding > 0 ? outstanding : invoiceTotal),
+        amount: String(writeOffAmount),
         reference: inv.invoiceNumber,
-        recordedBy: (req as AuthRequest).user?.id ?? null,
+        recordedBy: writeOffUserId,
         paidAt: new Date(),
       }).returning({ id: overheadExpensesTable.id });
       expenseId = exp.id;
+
+      await tx.insert(invoiceAuditLogTable).values({
+        invoiceId,
+        action: "written_off",
+        details: `Bad debt write-off — ₦${writeOffAmount.toLocaleString()} — overhead expense #${exp.id}`,
+        performedBy: writeOffUserId,
+      });
     });
 
-    res.status(201).json({ success: true, overheadExpenseId: expenseId });
+    res.status(201).json({ success: true, overheadExpenseId: expenseId, writtenOffAmount: writeOffAmount });
   } catch (err) {
     console.error("POST /invoices/:id/write-off error:", err);
     res.status(500).json({ error: "Failed to write off invoice" });
@@ -1544,9 +1567,6 @@ router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, re
 });
 
 // ─── Flat Credit-Note Endpoints ──────────────────────────────────────────────
-// credit_notes table IS the audit trail — records invoiceId, number, reason,
-// amount, createdBy, createdAt. No separate audit_log insert is needed here;
-// the overhead_expenses row (Bad Debt category) serves as the write-off trail.
 
 router.get("/credit-notes", requireAuth, async (req, res) => {
   try {

@@ -52,6 +52,7 @@ export type CreditNote = {
   creditNoteNumber: string;
   reason: string;
   amount: number;
+  status: string;
   createdBy: number | null;
   createdAt: string;
 };
@@ -279,6 +280,7 @@ export type ArWrittenOffInvoice = {
   clientId: number | null;
   clientName: string | null;
   total: number;
+  writtenOffAmount: number;
   createdAt: string;
 };
 

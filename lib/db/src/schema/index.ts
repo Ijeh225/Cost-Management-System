@@ -19,6 +19,7 @@ export * from "./migrations";
 export * from "./user-client-assignments";
 export * from "./overhead-expenses";
 export * from "./credit-notes";
+export * from "./invoice-audit-log";
 export * from "./bank-fund-additions";
 export * from "./expense-categories";
 export * from "./expense-payments";

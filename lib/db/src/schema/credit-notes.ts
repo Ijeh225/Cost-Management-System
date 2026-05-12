@@ -7,6 +7,7 @@ export const creditNotesTable = pgTable("credit_notes", {
   creditNoteNumber: text("credit_note_number").notNull().unique(),
   reason: text("reason").notNull().default(""),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  status: text("status").notNull().default("active"),
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

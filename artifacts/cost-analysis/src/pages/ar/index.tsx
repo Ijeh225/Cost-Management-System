@@ -537,7 +537,7 @@ export default function AccountsReceivablePage() {
                           </Link>
                         </td>
                         <td className="py-2 px-4 text-xs text-zinc-400">{inv.clientName ?? "—"}</td>
-                        <td className="py-2 px-4 text-right font-mono text-xs text-zinc-300">{formatCurrency(inv.total)}</td>
+                        <td className="py-2 px-4 text-right font-mono text-xs text-zinc-300">{formatCurrency(inv.writtenOffAmount ?? inv.total)}</td>
                         <td className="py-2 px-4 text-right text-xs text-zinc-500">
                           {new Date(inv.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
                         </td>
@@ -548,7 +548,7 @@ export default function AccountsReceivablePage() {
                     <tr className="border-t border-zinc-500/20 bg-zinc-500/10">
                       <td colSpan={2} className="py-2 px-4 text-xs font-semibold text-zinc-400">Total</td>
                       <td className="py-2 px-4 text-right font-mono text-sm font-bold text-zinc-300">
-                        {formatCurrency(summary?.totalWrittenOff ?? 0)}
+                        {formatCurrency(summary?.totalWrittenOff ?? writtenOffInvoices.reduce((s, i) => s + (i.writtenOffAmount ?? i.total), 0))}
                       </td>
                       <td />
                     </tr>

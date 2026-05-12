@@ -14,6 +14,7 @@ export const invoicesTable = pgTable("invoices", {
   total: numeric("total", { precision: 15, scale: 2 }).notNull().default("0"),
   dueDate: date("due_date"),
   notes: text("notes").notNull().default(""),
+  writtenOffAmount: numeric("written_off_amount", { precision: 15, scale: 2 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

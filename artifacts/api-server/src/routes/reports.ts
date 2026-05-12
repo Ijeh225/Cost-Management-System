@@ -209,7 +209,8 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
       const invPayments = paymentsByInvoice.get(inv.id) ?? [];
       const paid = invPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
       const total = parseFloat(inv.total ?? "0");
-      const outstanding = Math.max(0, total - paid);
+      // Written-off invoices have zero effective outstanding — their balance was absorbed as bad debt
+      const outstanding = inv.status === "written_off" ? 0 : Math.max(0, total - paid);
       totalInvoiced += total;
       totalPaid += paid;
 
