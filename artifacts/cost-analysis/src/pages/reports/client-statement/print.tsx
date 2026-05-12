@@ -8,11 +8,13 @@ const fmtDate = (d: string | null | undefined) =>
   d ? new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" }) : "\u2014";
 
 const STATUS_LABEL: Record<string, string> = {
-  draft: "Draft", sent: "Sent", paid: "Paid", partial: "Partially Paid", overdue: "Overdue",
+  draft: "Draft", sent: "Sent", paid: "Paid", partial: "Partially Paid",
+  overdue: "Overdue", written_off: "Written Off",
 };
 
 const METHOD_LABEL: Record<string, string> = {
   transfer: "Bank Transfer", cash: "Cash", cheque: "Cheque", pos: "POS",
+  credit_note: "Credit Note", deposit: "Client Deposit",
 };
 
 function useQueryParams() {
@@ -101,6 +103,7 @@ export default function ClientStatementPrint() {
         .status-partial { color: #1d4ed8; font-weight: 700; }
         .status-draft { color: #475569; }
         .status-sent { color: #854d0e; }
+        .status-written_off { color: #64748b; font-style: italic; }
       `}</style>
 
       <div className="action-bar no-print">

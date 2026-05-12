@@ -6,8 +6,8 @@ import {
   useAddInvoiceItem, useEditInvoiceItem, useRemoveInvoiceItem,
   useListActiveBanks, useApplyClientCredit, useGetClientWalletSummary,
   useGetClientDeposits, useAllocateDeposit,
-  useRaiseCreditNote, useWriteOffInvoice,
-  type RecordPaymentBody, type InvoiceItem, type CreditNote,
+  useRaiseCreditNote, useWriteOffInvoice, useGetInvoiceAuditLog,
+  type RecordPaymentBody, type InvoiceItem, type CreditNote, type InvoiceAuditLogEntry,
 } from "@workspace/api-client-react";
 import { useListContainers, getListContainersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -702,6 +702,8 @@ export default function InvoiceDetailPage() {
   const removeItemMutation = useRemoveInvoiceItem();
   const writeOffMutation = useWriteOffInvoice();
   const { data: whatsappLog } = useGetInvoiceWhatsAppLog(isNaN(invoiceId) ? null : invoiceId);
+  const { data: auditLog } = useGetInvoiceAuditLog(isNaN(invoiceId) ? null : invoiceId);
+  const [auditLogOpen, setAuditLogOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [creditOpen, setCreditOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
@@ -1346,6 +1348,67 @@ export default function InvoiceDetailPage() {
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap">
                         {entry.messageBody.split("\n").slice(0, 3).join(" · ")}
                       </p>
+                      <span className="text-xs text-muted-foreground mt-0.5 block">
+                        {new Date(entry.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {auditLog && auditLog.length > 0 && (
+        <Card className="border-border/50">
+          <CardHeader className="pb-2 cursor-pointer" onClick={() => setAuditLogOpen(o => !o)}>
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <FileText className="w-4 h-4 text-zinc-400" />
+              Audit Log
+              <Badge variant="secondary" className="ml-1">{auditLog.length}</Badge>
+              <span className="ml-auto text-muted-foreground">
+                {auditLogOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          {auditLogOpen && (
+            <CardContent>
+              <div className="space-y-2">
+                {auditLog.map((entry: InvoiceAuditLogEntry) => (
+                  <div
+                    key={entry.id}
+                    className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-muted/30 border border-border/30"
+                  >
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                      entry.action === "written_off"
+                        ? "bg-zinc-500/20"
+                        : entry.action === "credit_note_raised"
+                          ? "bg-cyan-500/20"
+                          : "bg-primary/10"
+                    }`}>
+                      {entry.action === "written_off"
+                        ? <FileX className="w-3.5 h-3.5 text-zinc-400" />
+                        : entry.action === "credit_note_raised"
+                          ? <ReceiptText className="w-3.5 h-3.5 text-cyan-400" />
+                          : <FileText className="w-3.5 h-3.5 text-primary" />
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary" className={`text-xs capitalize ${
+                          entry.action === "written_off" ? "text-zinc-400"
+                          : entry.action === "credit_note_raised" ? "text-cyan-400"
+                          : "text-primary"
+                        }`}>
+                          {entry.action === "written_off" ? "Written Off"
+                            : entry.action === "credit_note_raised" ? "Credit Note Raised"
+                            : entry.action}
+                        </Badge>
+                      </div>
+                      {entry.details && (
+                        <p className="text-xs text-muted-foreground mt-1">{entry.details}</p>
+                      )}
                       <span className="text-xs text-muted-foreground mt-0.5 block">
                         {new Date(entry.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                       </span>

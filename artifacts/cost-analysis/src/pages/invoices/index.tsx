@@ -16,7 +16,7 @@ import {
 import {
   FileText, Search, Loader2, Trash2, ChevronRight, Plus,
   CheckCircle2, Clock, AlertTriangle, CreditCard, Package,
-  ChevronUp, ChevronDown,
+  ChevronUp, ChevronDown, ReceiptText,
 } from "lucide-react";
 
 function statusConfig(status: string) {
@@ -135,6 +135,12 @@ function InvoiceRow({ invoice, isAdmin }: { invoice: Invoice; isAdmin: boolean }
             {aging && (
               <Badge className={`text-[10px] border px-1.5 py-0 w-fit ${aging.color}`}>
                 {aging.days}d overdue
+              </Badge>
+            )}
+            {invoice.creditNotes && invoice.creditNotes.length > 0 && (
+              <Badge className="text-[10px] border px-1.5 py-0 w-fit bg-cyan-500/20 text-cyan-400 border-cyan-500/40 flex items-center gap-0.5">
+                <ReceiptText className="w-2.5 h-2.5" />
+                {invoice.creditNotes.length} CN
               </Badge>
             )}
           </div>

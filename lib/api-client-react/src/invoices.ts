@@ -44,6 +44,15 @@ export type InvoicePayment = {
   createdAt: string;
 };
 
+export type InvoiceAuditLogEntry = {
+  id: number;
+  invoiceId: number;
+  action: string;
+  details: string | null;
+  performedBy: number | null;
+  createdAt: string;
+};
+
 export type CreditNote = {
   id: number;
   invoiceId: number;
@@ -409,6 +418,14 @@ export function useGetInvoiceCreditNotes(invoiceId: number | null) {
   return useQuery<CreditNote[]>({
     queryKey: [...INVOICES_QUERY_KEY, invoiceId, "credit-notes"],
     queryFn: () => customFetch<CreditNote[]>(`/api/invoices/${invoiceId}/credit-notes`),
+    enabled: !!invoiceId,
+  });
+}
+
+export function useGetInvoiceAuditLog(invoiceId: number | null) {
+  return useQuery<InvoiceAuditLogEntry[]>({
+    queryKey: [...INVOICES_QUERY_KEY, invoiceId, "audit-log"],
+    queryFn: () => customFetch<InvoiceAuditLogEntry[]>(`/api/invoices/${invoiceId}/audit-log`),
     enabled: !!invoiceId,
   });
 }

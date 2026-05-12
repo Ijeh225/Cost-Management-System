@@ -194,8 +194,17 @@ router.get("/invoices", requireAuth, async (req, res) => {
     const invoiceIds = rows.map(r => r.id);
     const itemsByInvoice = await fetchItemsForInvoices(invoiceIds);
 
+    const allCreditNotes = invoiceIds.length > 0
+      ? await db.select().from(creditNotesTable).where(inArray(creditNotesTable.invoiceId, invoiceIds))
+      : [];
+    const cnByInvoice = new Map<number, typeof allCreditNotes>();
+    for (const cn of allCreditNotes) {
+      if (!cnByInvoice.has(cn.invoiceId)) cnByInvoice.set(cn.invoiceId, []);
+      cnByInvoice.get(cn.invoiceId)!.push(cn);
+    }
+
     const invoices = await Promise.all(
-      rows.map(r => formatInvoice(r, paymentsByInvoice.get(r.id) ?? [], itemsByInvoice.get(r.id) ?? []))
+      rows.map(r => formatInvoice(r, paymentsByInvoice.get(r.id) ?? [], itemsByInvoice.get(r.id) ?? [], cnByInvoice.get(r.id) ?? []))
     );
 
     res.json(invoices);
@@ -1595,6 +1604,36 @@ router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, re
   } catch (err) {
     console.error("POST /invoices/:id/write-off error:", err);
     res.status(500).json({ error: "Failed to write off invoice" });
+  }
+});
+
+// ─── Invoice Audit Log ───────────────────────────────────────────────────────
+
+router.get("/invoices/:id/audit-log", requireAuth, async (req, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id, 10);
+    if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
+
+    const rows = await db
+      .select({
+        id: invoiceAuditLogTable.id,
+        invoiceId: invoiceAuditLogTable.invoiceId,
+        action: invoiceAuditLogTable.action,
+        details: invoiceAuditLogTable.details,
+        performedBy: invoiceAuditLogTable.performedBy,
+        createdAt: invoiceAuditLogTable.createdAt,
+      })
+      .from(invoiceAuditLogTable)
+      .where(eq(invoiceAuditLogTable.invoiceId, invoiceId))
+      .orderBy(desc(invoiceAuditLogTable.createdAt));
+
+    res.json(rows.map(r => ({
+      ...r,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+    })));
+  } catch (err) {
+    console.error("GET /invoices/:id/audit-log error:", err);
+    res.status(500).json({ error: "Failed to fetch audit log" });
   }
 });
 
