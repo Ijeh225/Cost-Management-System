@@ -698,14 +698,17 @@ function ChargeSectionForm({
     defaultValues: initialData || {},
   });
 
-  const isDirty = form.formState.isDirty;
-
   const [usdAmount, setUsdAmount] = useState<string>(
     initialData?.usdAmount != null ? String(initialData.usdAmount) : ""
   );
   const [exchangeRate, setExchangeRate] = useState<string>(
     initialData?.exchangeRate != null ? String(initialData.exchangeRate) : ""
   );
+
+  const initialUsd = initialData?.usdAmount != null ? String(initialData.usdAmount) : "";
+  const initialRate = initialData?.exchangeRate != null ? String(initialData.exchangeRate) : "";
+  const fxDirty = usdAmount !== initialUsd || exchangeRate !== initialRate;
+  const isDirty = form.formState.isDirty || fxDirty;
 
   useEffect(() => {
     form.reset(initialData || {});

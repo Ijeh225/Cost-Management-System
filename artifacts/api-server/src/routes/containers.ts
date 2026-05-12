@@ -1241,7 +1241,7 @@ router.get("/containers/:id", requireAuth, async (req, res) => {
       .where(eq(containerExtraChargesTable.containerId, id))
       .orderBy(containerExtraChargesTable.sortOrder, containerExtraChargesTable.createdAt);
     const extraTotal = extraChargeRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
-    const totalCost = calcTotalCost(charges.shipping as any, charges.customs as any, charges.terminal as any, charges.delivery as any, charges.operations as any) + extraTotal;
+    const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations) + extraTotal;
     const dutyNotPaid = parseFloat(charges.customs.dutyNotPaid ?? "0");
 
     const containerFormatted = {
@@ -1705,7 +1705,7 @@ router.get("/containers/:id/charges", requireAuth, async (req, res) => {
     const extraRows = await db.select().from(containerExtraChargesTable)
       .where(eq(containerExtraChargesTable.containerId, id));
     const extraTotal = extraRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
-    const baseTotal = calcTotalCost(charges.shipping as any, charges.customs as any, charges.terminal as any, charges.delivery as any, charges.operations as any);
+    const baseTotal = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations);
     const totalCost = baseTotal + extraTotal;
     res.json({
       containerId: id,
@@ -1759,10 +1759,14 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
 
     const FX_META = new Set(["usdAmount", "exchangeRate", "id", "containerId", "updatedAt"]);
     const validateFx = (obj: any, sectionName: string): string | null => {
-      if (!obj || obj.usdAmount == null || obj.exchangeRate == null) return null;
+      if (!obj) return null;
+      const hasUsd = obj.usdAmount != null && obj.usdAmount !== "" && !isNaN(parseFloat(obj.usdAmount)) && parseFloat(obj.usdAmount) > 0;
+      const hasRate = obj.exchangeRate != null && obj.exchangeRate !== "" && !isNaN(parseFloat(obj.exchangeRate)) && parseFloat(obj.exchangeRate) > 0;
+      if (!hasUsd && !hasRate) return null;
+      if (hasUsd && !hasRate) return `${sectionName}: Exchange rate is required when a USD amount is entered`;
+      if (!hasUsd && hasRate) return `${sectionName}: USD amount is required when an exchange rate is entered`;
       const usd = parseFloat(obj.usdAmount);
       const rate = parseFloat(obj.exchangeRate);
-      if (isNaN(usd) || isNaN(rate) || usd <= 0 || rate <= 0) return null;
       const expected = usd * rate;
       const ngnTotal = Object.entries(obj)
         .filter(([k, v]) => !FX_META.has(k) && v != null && !isNaN(parseFloat(String(v))))
@@ -1831,7 +1835,7 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
     const [updated] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     const extraRows = await db.select().from(containerExtraChargesTable).where(eq(containerExtraChargesTable.containerId, id));
     const extraTotal = extraRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
-    const totalCost = calcTotalCost(charges.shipping as any, charges.customs as any, charges.terminal as any, charges.delivery as any, charges.operations as any) + extraTotal;
+    const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations) + extraTotal;
     res.json({
       containerId: id,
       shipping: numericToObj(charges.shipping),

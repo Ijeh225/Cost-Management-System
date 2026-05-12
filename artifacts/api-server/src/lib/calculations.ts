@@ -1,7 +1,7 @@
-type NumericRecord = Record<string, string | number | null | undefined>;
+type NumericRecord = Record<string, string | number | Date | null | undefined>;
 
-function toNum(val: string | number | null | undefined): number {
-  if (val === null || val === undefined) return 0;
+function toNum(val: string | number | Date | null | undefined): number {
+  if (val === null || val === undefined || val instanceof Date) return 0;
   const n = typeof val === "number" ? val : parseFloat(val);
   return isNaN(n) ? 0 : n;
 }
