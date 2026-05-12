@@ -885,7 +885,15 @@ function ChargeSectionForm({
                 </div>
                 {ngnEquivalent != null && ngnEquivalent > 0 && (
                   <p className="text-xs text-blue-400 mt-2 flex items-center gap-1">
-                    <DollarSign className="w-3 h-3" /> <strong className="font-semibold">{formatCurrency(ngnEquivalent)}</strong> will be added to this section's total as a USD-converted charge.
+                    <DollarSign className="w-3 h-3" />
+                    <span>
+                      <strong className="font-semibold">{formatCurrency(ngnEquivalent)}</strong> will be saved as the&nbsp;
+                      {sectionKey === "shipping" ? "Shipping Company" :
+                       sectionKey === "customs" ? "Customs Duty" :
+                       sectionKey === "terminal" ? "Terminal Charges" :
+                       sectionKey === "delivery" ? "Delivery" : "Miscellaneous"}&nbsp;
+                      charge for this section.
+                    </span>
                   </p>
                 )}
                 {usdAmount && exchangeRate && (parseFloat(usdAmount) <= 0 || parseFloat(exchangeRate) <= 0) && (

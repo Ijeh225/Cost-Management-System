@@ -1735,7 +1735,8 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       res.status(403).json({ error: "Container is locked" });
       return;
     }
-    const { section, shipping, customs, terminal, delivery, operations, clearingCharges, reason } = req.body;
+    const { section, clearingCharges, reason } = req.body;
+    let { shipping, customs, terminal, delivery, operations } = req.body;
 
     // Check section-level lock
     if (section) {
@@ -1755,6 +1756,14 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
         out[k] = (v === null || v === undefined) ? null : String(v);
       }
       return out;
+    };
+
+    const USD_TARGET_FIELD: Record<string, string> = {
+      shipping: "shippingCompany",
+      customs: "duty",
+      terminal: "terminalCharges",
+      delivery: "delivery",
+      operations: "miscellaneous",
     };
 
     const validateFx = (obj: any, sectionName: string): string | null => {
@@ -1777,6 +1786,22 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       res.status(422).json({ error: fxErrors.join("; ") });
       return;
     }
+
+    const applyFxToTargetField = (obj: any, sectionName: string): any => {
+      if (!obj) return obj;
+      const usd = parseFloat(obj.usdAmount ?? "");
+      const rate = parseFloat(obj.exchangeRate ?? "");
+      if (isNaN(usd) || isNaN(rate) || usd <= 0 || rate <= 0) return obj;
+      const target = USD_TARGET_FIELD[sectionName];
+      if (!target) return obj;
+      return { ...obj, [target]: (usd * rate).toFixed(2) };
+    };
+
+    if (section === "shipping" && shipping) shipping = applyFxToTargetField(shipping, "shipping");
+    if (section === "customs" && customs) customs = applyFxToTargetField(customs, "customs");
+    if (section === "terminal" && terminal) terminal = applyFxToTargetField(terminal, "terminal");
+    if (section === "delivery" && delivery) delivery = applyFxToTargetField(delivery, "delivery");
+    if (section === "operations" && operations) operations = applyFxToTargetField(operations, "operations");
 
     if (section === "shipping" && shipping) {
       await db.insert(shippingChargesTable)

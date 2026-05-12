@@ -1595,11 +1595,12 @@ reportsRouter.get("/reports/fx-history", requireAuth, requireAdmin, async (req: 
         })
         .from(table)
         .innerJoin(containersTable, eq(table.containerId, containersTable.id))
-        .where(isNotNull(table.usdAmount));
+        .where(and(isNotNull(table.usdAmount), isNotNull(table.exchangeRate)));
 
       for (const row of rows) {
-        const usd = parseFloat(row.usdAmount ?? "0");
-        const rate = parseFloat(row.exchangeRate ?? "1");
+        const usd = parseFloat(row.usdAmount!);
+        const rate = parseFloat(row.exchangeRate!);
+        if (isNaN(usd) || isNaN(rate) || usd <= 0 || rate <= 0) continue;
         allEntries.push({
           containerId: row.containerId,
           containerNumber: row.containerNumber,
