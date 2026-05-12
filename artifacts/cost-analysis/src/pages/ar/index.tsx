@@ -99,7 +99,12 @@ function ClientTableRow({ client, expanded, onToggle }: {
         </td>
         <td className="py-3 px-3 text-right text-sm font-mono">{formatCurrency(client.totalInvoiced)}</td>
         <td className="py-3 px-3 text-right text-sm font-mono text-emerald-400">{formatCurrency(client.totalCollected)}</td>
-        <td className="py-3 px-3 text-right text-sm font-mono font-semibold text-foreground">{formatCurrency(client.outstanding)}</td>
+        <td className="py-3 px-3 text-right text-sm font-mono font-semibold text-foreground">
+          <div>{formatCurrency(client.effectiveOutstanding)}</div>
+          {client.effectiveOutstanding < client.outstanding && (
+            <div className="text-[10px] text-muted-foreground/60">gross {formatCurrency(client.outstanding)}</div>
+          )}
+        </td>
         <td className="py-3 px-3 text-right">
           <AgingBadge amount={client.aging.current}    label="Current" color="text-foreground" />
         </td>
@@ -445,7 +450,7 @@ export default function AccountsReceivablePage() {
                     {formatCurrency(filtered.reduce((s, c) => s + c.totalCollected, 0))}
                   </td>
                   <td className="py-3 px-3 text-right text-sm font-mono font-bold">
-                    {formatCurrency(filtered.reduce((s, c) => s + c.outstanding, 0))}
+                    {formatCurrency(filtered.reduce((s, c) => s + (c.effectiveOutstanding ?? c.outstanding), 0))}
                   </td>
                   <td className="py-3 px-3 text-right text-xs font-mono">
                     {formatCurrency(filtered.reduce((s, c) => s + c.aging.current, 0))}

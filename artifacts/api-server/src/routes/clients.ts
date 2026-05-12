@@ -626,7 +626,7 @@ clientsRouter.post("/clients/:id/wallet/reset", requireAuth, requireAdmin, async
 
     const now = new Date();
     await db.update(clientsTable)
-      .set({ walletResetAt: now })
+      .set({ walletResetAt: now, creditBalance: "0" })
       .where(eq(clientsTable.id, clientId));
 
     return res.json({ success: true, walletResetAt: now.toISOString() });

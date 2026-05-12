@@ -193,9 +193,25 @@ export default function ClientStatementPrint() {
               <span className="lbl">Total Paid</span>
               <span className="val" style={{ color: "#15803d" }}>{fmt(totals.totalPaid)}</span>
             </div>
-            <div className={`totals-row closing${totals.closingBalance > 0 ? " debt" : ""}`}>
-              <span>{totals.closingBalance > 0 ? "Closing Balance (Owed)" : "Fully Settled"}</span>
-              <span className="val">{fmt(totals.closingBalance)}</span>
+            <div className="totals-row">
+              <span className="lbl">Gross Outstanding</span>
+              <span className="val" style={{ color: totals.closingBalance > 0 ? "#ea580c" : "#15803d" }}>{fmt(totals.closingBalance)}</span>
+            </div>
+            {totals.unallocatedDeposits > 0 && (
+              <div className="totals-row">
+                <span className="lbl">Less: Unallocated Deposits</span>
+                <span className="val" style={{ color: "#0369a1" }}>({fmt(totals.unallocatedDeposits)})</span>
+              </div>
+            )}
+            {totals.creditBalance > 0 && (
+              <div className="totals-row">
+                <span className="lbl">Less: Credit Balance</span>
+                <span className="val" style={{ color: "#7c3aed" }}>({fmt(totals.creditBalance)})</span>
+              </div>
+            )}
+            <div className={`totals-row closing${totals.effectiveClosingBalance > 0 ? " debt" : ""}`}>
+              <span>{totals.effectiveClosingBalance > 0 ? "Net Balance Owed" : "Fully Settled"}</span>
+              <span className="val">{fmt(totals.effectiveClosingBalance)}</span>
             </div>
           </div>
         </div>

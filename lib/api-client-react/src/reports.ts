@@ -34,7 +34,14 @@ export type ClientStatementResponse = {
   };
   period: { from: string | null; to: string | null };
   invoices: ClientStatementInvoice[];
-  totals: { totalInvoiced: number; totalPaid: number; closingBalance: number };
+  totals: {
+    totalInvoiced: number;
+    totalPaid: number;
+    closingBalance: number;
+    creditBalance: number;
+    unallocatedDeposits: number;
+    effectiveClosingBalance: number;
+  };
 };
 
 export type VatSummaryInvoice = {

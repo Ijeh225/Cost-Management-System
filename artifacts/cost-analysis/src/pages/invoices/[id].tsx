@@ -4,7 +4,7 @@ import {
   useGetInvoice, useUpdateInvoice, useRecordPayment, useDeletePayment,
   useGetInvoiceWhatsAppLog, useSendInvoiceWhatsApp, useSendInvoiceReminder, useSendInvoiceReceipt,
   useAddInvoiceItem, useEditInvoiceItem, useRemoveInvoiceItem,
-  useListActiveBanks,
+  useListActiveBanks, useApplyClientCredit, useGetClientWalletSummary,
   type RecordPaymentBody, type InvoiceItem,
 } from "@workspace/api-client-react";
 import { useListContainers, getListContainersQueryKey } from "@workspace/api-client-react";
@@ -28,8 +28,78 @@ import {
   FileText, ArrowLeft, Phone, Loader2, Trash2, CheckCircle2,
   Clock, AlertTriangle, CreditCard, Send, PlusCircle, Building2,
   Box, Calendar, StickyNote, MessageCircle, Bell, ChevronDown, ChevronUp, Printer, Receipt,
-  Pencil, ChevronsUpDown, Check,
+  Pencil, ChevronsUpDown, Check, Banknote,
 } from "lucide-react";
+
+function ApplyCreditDialog({
+  open, onClose, invoiceId, clientId, invoiceOutstanding,
+}: {
+  open: boolean; onClose: () => void;
+  invoiceId: number; clientId: number; invoiceOutstanding: number;
+}) {
+  const { toast } = useToast();
+  const applyCredit = useApplyClientCredit();
+  const { data: walletSummary } = useGetClientWalletSummary(open ? clientId : null);
+  const [amount, setAmount] = useState("");
+
+  const creditBalance = walletSummary?.creditBalance ?? 0;
+  const maxApply = Math.min(creditBalance, invoiceOutstanding);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) { toast({ variant: "destructive", title: "Enter a valid amount" }); return; }
+    try {
+      const res = await applyCredit.mutateAsync({ invoiceId, amount: amt });
+      toast({ title: `₦${res.appliedAmount.toLocaleString()} credit applied. Remaining credit: ₦${res.remainingCredit.toLocaleString()}` });
+      onClose();
+      setAmount("");
+    } catch (err: any) {
+      toast({ variant: "destructive", title: err?.message ?? "Failed to apply credit" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Banknote className="w-4 h-4 text-violet-400" />
+            Apply Credit Balance
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-1">
+          <div className="bg-violet-500/10 border border-violet-500/30 rounded-lg p-3 text-sm">
+            <p className="text-xs text-muted-foreground mb-0.5">Available Credit Balance</p>
+            <p className="font-mono font-bold text-violet-400">
+              ₦{creditBalance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div>
+            <Label>Amount to Apply (₦) *</Label>
+            <Input
+              type="number"
+              min="0.01"
+              step="0.01"
+              max={maxApply}
+              placeholder={`Max ₦${maxApply.toLocaleString()}`}
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="mt-1 font-mono"
+            />
+          </div>
+          <div className="flex gap-2 justify-end pt-1">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={applyCredit.isPending || creditBalance <= 0} className="gap-2 bg-violet-600 hover:bg-violet-700">
+              {applyCredit.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              Apply Credit
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function statusConfig(status: string) {
   switch (status) {
@@ -438,6 +508,7 @@ export default function InvoiceDetailPage() {
   const removeItemMutation = useRemoveInvoiceItem();
   const { data: whatsappLog } = useGetInvoiceWhatsAppLog(isNaN(invoiceId) ? null : invoiceId);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [creditOpen, setCreditOpen] = useState(false);
   const [whatsappLogOpen, setWhatsappLogOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InvoiceItem | null>(null);
@@ -726,6 +797,17 @@ export default function InvoiceDetailPage() {
           Record Payment
         </Button>
 
+        {isAdmin && invoice.outstanding > 0 && (
+          <Button
+            variant="outline"
+            className="gap-2 border-violet-500/50 text-violet-400 hover:bg-violet-500/10"
+            onClick={() => setCreditOpen(true)}
+          >
+            <Banknote className="w-4 h-4" />
+            Apply Credit
+          </Button>
+        )}
+
         <Button
           variant="outline"
           className="gap-2"
@@ -983,6 +1065,16 @@ export default function InvoiceDetailPage() {
         onClose={() => setPaymentOpen(false)}
         invoiceId={invoiceId}
       />
+
+      {invoice.clientId != null && (
+        <ApplyCreditDialog
+          open={creditOpen}
+          onClose={() => setCreditOpen(false)}
+          invoiceId={invoiceId}
+          clientId={invoice.clientId}
+          invoiceOutstanding={invoice.outstanding}
+        />
+      )}
 
       <AddItemDialog
         open={addItemOpen}
