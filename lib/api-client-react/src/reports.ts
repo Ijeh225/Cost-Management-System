@@ -246,9 +246,11 @@ export type CashFlowResponse = {
   inflows: CashFlowTxn[];
   outflows: CashFlowTxn[];
   totals: {
+    openingBalance: number;
     totalIn: number;
     totalOut: number;
     netCashFlow: number;
+    closingBalance: number;
   };
   breakdown: {
     byBank: Array<{ bankId: number | null; bankName: string; totalIn: number; totalOut: number }>;

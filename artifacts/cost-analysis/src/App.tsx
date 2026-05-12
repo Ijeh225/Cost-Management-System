@@ -53,6 +53,7 @@ import ClientStatementPrint from "@/pages/reports/client-statement/print";
 import VatSummaryPrint from "@/pages/reports/vat-summary/print";
 import InvoiceAgingPrint from "@/pages/reports/invoice-aging/print";
 import CashFlowPrint from "@/pages/reports/cashflow/print";
+import CashFlowPage from "@/pages/reports/cashflow/index";
 import ProfitLossPrint from "@/pages/reports/pl/print";
 import DeliveryReportPrint from "@/pages/reports/delivery-report/print";
 import DisbursementReconciliationPage from "@/pages/reports/disbursement-reconciliation/index";
@@ -176,6 +177,9 @@ function Router() {
               </Route>
               <Route path="/reports">
                 <AdminGuard><ReportsPage /></AdminGuard>
+              </Route>
+              <Route path="/reports/cashflow">
+                <AdminGuard><CashFlowPage /></AdminGuard>
               </Route>
               <Route path="/reports/disbursement-reconciliation">
                 <AdminGuard><DisbursementReconciliationPage /></AdminGuard>

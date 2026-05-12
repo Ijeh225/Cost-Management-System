@@ -99,7 +99,7 @@ export default function CashFlowPrint() {
         .company-sub { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
         .report-title { font-size: 18px; font-weight: 800; color: #1e293b; text-align: right; }
         .report-sub { font-size: 12px; color: #64748b; margin-top: 4px; text-align: right; }
-        .summary-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+        .summary-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 28px; }
         .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; }
         .summary-card .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 600; margin-bottom: 6px; }
         .summary-card .val { font-size: 18px; font-weight: 800; font-family: monospace; color: #1e293b; }
@@ -107,6 +107,17 @@ export default function CashFlowPrint() {
         .summary-card.out .val { color: #dc2626; }
         .summary-card.net .val { color: #0f766e; }
         .summary-card.net.negative .val { color: #dc2626; }
+        .summary-card.open .val { color: #1d4ed8; }
+        .summary-card.close .val { color: #0f766e; }
+        .summary-card.close.negative .val { color: #dc2626; }
+        .statement-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; margin-bottom: 28px; }
+        .stmt-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+        .stmt-row:last-child { border-bottom: none; }
+        .stmt-row.heading { font-weight: 700; color: #334155; }
+        .stmt-row.sub { padding-left: 24px; font-size: 12px; color: #64748b; }
+        .stmt-row.total { font-weight: 800; font-size: 14px; border-top: 2px solid #e2e8f0; padding-top: 10px; margin-top: 4px; }
+        .stmt-row .lbl { color: #475569; }
+        .stmt-row .val { font-family: monospace; font-weight: 600; }
         .section-heading { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; margin: 24px 0 8px 0; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
         thead th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; padding: 8px 10px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; text-align: left; }
@@ -156,6 +167,10 @@ export default function CashFlowPrint() {
         </div>
 
         <div className="summary-cards">
+          <div className={`summary-card open ${totals.openingBalance < 0 ? "negative" : ""}`}>
+            <div className="lbl">Opening Balance</div>
+            <div className="val">{fmt(totals.openingBalance)}</div>
+          </div>
           <div className="summary-card in">
             <div className="lbl">Total Inflow</div>
             <div className="val">{fmt(totals.totalIn)}</div>
@@ -165,8 +180,46 @@ export default function CashFlowPrint() {
             <div className="val">{fmt(totals.totalOut)}</div>
           </div>
           <div className={`summary-card net ${totals.netCashFlow < 0 ? "negative" : ""}`}>
-            <div className="lbl">Net Cash Position</div>
+            <div className="lbl">Net Movement</div>
             <div className="val">{fmt(totals.netCashFlow)}</div>
+          </div>
+          <div className={`summary-card close ${totals.closingBalance < 0 ? "negative" : ""}`}>
+            <div className="lbl">Closing Balance</div>
+            <div className="val">{fmt(totals.closingBalance)}</div>
+          </div>
+        </div>
+
+        {/* Statement of Cash Flows */}
+        <div className="statement-box">
+          <div className="stmt-row heading">
+            <div className="lbl">Opening Balance (b/f)</div>
+            <div className="val" style={{ color: totals.openingBalance < 0 ? "#dc2626" : "#1d4ed8" }}>{fmt(totals.openingBalance)}</div>
+          </div>
+          <div className="stmt-row heading">
+            <div className="lbl">Cash received in period</div>
+            <div className="val" style={{ color: "#059669" }}>{fmt(totals.totalIn)}</div>
+          </div>
+          <div className="stmt-row sub">
+            <div className="lbl">Invoice payments received</div>
+            <div className="val">{fmt(breakdown.inflowByType.invoice_payment ?? 0)}</div>
+          </div>
+          <div className="stmt-row sub">
+            <div className="lbl">Wallet / client deposits</div>
+            <div className="val">{fmt(breakdown.inflowByType.client_deposit ?? 0)}</div>
+          </div>
+          <div className="stmt-row heading">
+            <div className="lbl">Cash paid out in period</div>
+            <div className="val" style={{ color: "#dc2626" }}>({fmt(totals.totalOut)})</div>
+          </div>
+          {Object.entries(breakdown.outflowByCategory).sort((a, b) => b[1] - a[1]).map(([cat, amt]) => (
+            <div className="stmt-row sub" key={cat}>
+              <div className="lbl">{cat}</div>
+              <div className="val">({fmt(amt)})</div>
+            </div>
+          ))}
+          <div className="stmt-row total">
+            <div className="lbl" style={{ color: totals.closingBalance < 0 ? "#dc2626" : "#0f766e" }}>Closing Balance (c/f)</div>
+            <div className="val" style={{ color: totals.closingBalance < 0 ? "#dc2626" : "#0f766e", fontSize: 15 }}>{fmt(totals.closingBalance)}</div>
           </div>
         </div>
 

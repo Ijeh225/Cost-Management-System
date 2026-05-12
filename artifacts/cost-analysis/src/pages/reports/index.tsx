@@ -682,7 +682,7 @@ function PrintableReportsSection() {
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-emerald-400" /> Cash Flow Statement
             </CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">Inflow (payments + deposits) vs outflow (overheads + duty), with bank breakdown and net position.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Opening balance → cash in/out by category → closing balance, with bank breakdown.</p>
           </CardHeader>
           <CardContent className="p-4 space-y-3">
             <div className="grid grid-cols-2 gap-2">
@@ -712,9 +712,17 @@ function PrintableReportsSection() {
             <Button
               size="sm"
               className="w-full gap-2 text-xs h-8"
+              onClick={() => setLocation("/reports/cashflow")}
+            >
+              <ArrowRight className="w-3.5 h-3.5" /> View Cash Flow Report
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full gap-2 text-xs h-8"
               onClick={() => openReport("/reports/cashflow/print", { from: cfFrom, to: cfTo, bankId: cfBankId })}
             >
-              <ExternalLink className="w-3.5 h-3.5" /> Generate Cash Flow
+              <ExternalLink className="w-3.5 h-3.5" /> Print / PDF
             </Button>
           </CardContent>
         </Card>

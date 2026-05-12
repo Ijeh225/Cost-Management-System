@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable, containerExpensePaymentsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
-import { eq, gte, lte, and, inArray, gt, ne, isNotNull, sql, type SQL } from "drizzle-orm";
+import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, type SQL } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
 
@@ -868,6 +868,39 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
     const totalIn = inflows.reduce((s, t) => s + t.amount, 0);
     const totalOut = outflows.reduce((s, t) => s + t.amount, 0);
 
+    // Opening balance — sum of all matched transaction types BEFORE the period start
+    let openingBalance = 0;
+    if (fromDate) {
+      const prevInvPayConds: SQL[] = [lt(invoicePaymentsTable.paidAt, fromDate)];
+      if (bankIdNum !== null) prevInvPayConds.push(eq(invoicePaymentsTable.bankId, bankIdNum));
+      const prevDepConds: SQL[] = [lt(clientDepositsTable.createdAt, fromDate)];
+      if (bankIdNum !== null) prevDepConds.push(eq(clientDepositsTable.bankId, bankIdNum));
+      const prevOhConds: SQL[] = [lt(overheadExpensesTable.paidAt, fromDate)];
+      if (bankIdNum !== null) prevOhConds.push(eq(overheadExpensesTable.bankId, bankIdNum));
+
+      const [prevInvPay, prevDep, prevOh] = await Promise.all([
+        db.select({ s: sql<string>`coalesce(sum(${invoicePaymentsTable.amount}), 0)` })
+          .from(invoicePaymentsTable).where(and(...prevInvPayConds)),
+        db.select({ s: sql<string>`coalesce(sum(${clientDepositsTable.amount}), 0)` })
+          .from(clientDepositsTable).where(and(...prevDepConds)),
+        db.select({ s: sql<string>`coalesce(sum(${overheadExpensesTable.amount}), 0)` })
+          .from(overheadExpensesTable).where(and(...prevOhConds)),
+      ]);
+      openingBalance += parseFloat(prevInvPay[0]?.s ?? "0");
+      openingBalance += parseFloat(prevDep[0]?.s ?? "0");
+      openingBalance -= parseFloat(prevOh[0]?.s ?? "0");
+
+      // Duty has no bank attribution — only include in all-banks view
+      if (bankIdNum === null) {
+        const prevDuty = await db
+          .select({ s: sql<string>`coalesce(sum(${customsChargesTable.dutyPaid}), 0)` })
+          .from(customsChargesTable)
+          .where(and(gt(customsChargesTable.dutyPaid, "0"), lt(customsChargesTable.updatedAt, fromDate)));
+        openingBalance -= parseFloat(prevDuty[0]?.s ?? "0");
+      }
+    }
+    const closingBalance = openingBalance + totalIn - totalOut;
+
     // Per-bank breakdown
     const bankBreakdown: Record<string, { bankId: number | null; bankName: string; totalIn: number; totalOut: number }> = {};
     const bumpBank = (bankId: number | null, bankName: string | null, amount: number, dir: "in" | "out") => {
@@ -903,9 +936,11 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
       inflows,
       outflows,
       totals: {
+        openingBalance,
         totalIn,
         totalOut,
         netCashFlow: totalIn - totalOut,
+        closingBalance,
       },
       breakdown: {
         byBank: Object.values(bankBreakdown),
