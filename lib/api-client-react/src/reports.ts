@@ -230,7 +230,7 @@ export function useGetDisbursementReconciliation(
 export type CashFlowTxn = {
   id: string;
   date: string;
-  type: "invoice_payment" | "client_deposit" | "overhead_expense" | "duty_payment";
+  type: "invoice_payment" | "client_deposit" | "overhead_expense" | "duty_payment" | "fund_addition" | "container_expense" | "bank_transfer";
   direction: "in" | "out";
   description: string;
   category: string | null;

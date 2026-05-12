@@ -14,8 +14,11 @@ import { motion } from "framer-motion";
 const TYPE_LABEL: Record<CashFlowTxn["type"], string> = {
   invoice_payment: "Invoice Payment",
   client_deposit: "Wallet Deposit",
-  overhead_expense: "Overhead",
+  overhead_expense: "Overhead Expense",
   duty_payment: "Customs Duty",
+  fund_addition: "Fund Addition",
+  container_expense: "Container Disbursement",
+  bank_transfer: "Bank Transfer",
 };
 
 function fmtDate(d: string | null | undefined) {
@@ -80,6 +83,18 @@ function StatementSection({
               <tr className="border-b border-border/10">
                 <td className="px-5 py-2.5 pl-10 text-xs text-muted-foreground">Wallet / client deposits</td>
                 <td className="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{formatCurrency(inflowByType.client_deposit ?? 0)}</td>
+              </tr>
+            )}
+            {(inflowByType.fund_addition ?? 0) > 0 && (
+              <tr className="border-b border-border/10">
+                <td className="px-5 py-2.5 pl-10 text-xs text-muted-foreground">Fund additions</td>
+                <td className="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{formatCurrency(inflowByType.fund_addition ?? 0)}</td>
+              </tr>
+            )}
+            {(inflowByType.bank_transfer ?? 0) > 0 && (
+              <tr className="border-b border-border/10">
+                <td className="px-5 py-2.5 pl-10 text-xs text-muted-foreground">Bank transfers in</td>
+                <td className="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{formatCurrency(inflowByType.bank_transfer ?? 0)}</td>
               </tr>
             )}
             <tr className="border-b border-border/20">

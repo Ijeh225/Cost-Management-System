@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable, containerExpensePaymentsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
 
@@ -786,10 +787,55 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
       .where(and(...dutyConds))
       .orderBy(customsChargesTable.updatedAt);
 
+    // INFLOWS — bank fund additions
+    const fundAddConds: SQL[] = [];
+    if (fromDate) fundAddConds.push(gte(bankFundAdditionsTable.createdAt, fromDate));
+    if (toDate)   fundAddConds.push(lte(bankFundAdditionsTable.createdAt, toDate));
+    if (bankIdNum !== null) fundAddConds.push(eq(bankFundAdditionsTable.bankId, bankIdNum));
+
+    const fundAddRows = await db
+      .select({
+        id: bankFundAdditionsTable.id,
+        amount: bankFundAdditionsTable.amount,
+        createdAt: bankFundAdditionsTable.createdAt,
+        narration: bankFundAdditionsTable.narration,
+        reference: bankFundAdditionsTable.reference,
+        bankId: bankFundAdditionsTable.bankId,
+        bankName: banksTable.name,
+      })
+      .from(bankFundAdditionsTable)
+      .leftJoin(banksTable, eq(bankFundAdditionsTable.bankId, banksTable.id))
+      .where(fundAddConds.length > 0 ? and(...fundAddConds) : undefined)
+      .orderBy(bankFundAdditionsTable.createdAt);
+
+    // OUTFLOWS — container expense disbursements
+    const cepConds: SQL[] = [];
+    if (fromDate) cepConds.push(gte(containerExpensePaymentsTable.paidAt, fromDate));
+    if (toDate)   cepConds.push(lte(containerExpensePaymentsTable.paidAt, toDate));
+    if (bankIdNum !== null) cepConds.push(eq(containerExpensePaymentsTable.bankId, bankIdNum));
+
+    const cepRows = await db
+      .select({
+        id: containerExpensePaymentsTable.id,
+        amount: containerExpensePaymentsTable.amount,
+        paidAt: containerExpensePaymentsTable.paidAt,
+        section: containerExpensePaymentsTable.section,
+        narration: containerExpensePaymentsTable.narration,
+        reference: containerExpensePaymentsTable.reference,
+        bankId: containerExpensePaymentsTable.bankId,
+        bankName: banksTable.name,
+        containerNumber: containersTable.containerNumber,
+      })
+      .from(containerExpensePaymentsTable)
+      .leftJoin(banksTable, eq(containerExpensePaymentsTable.bankId, banksTable.id))
+      .leftJoin(containersTable, eq(containerExpensePaymentsTable.containerId, containersTable.id))
+      .where(cepConds.length > 0 ? and(...cepConds) : undefined)
+      .orderBy(containerExpensePaymentsTable.paidAt);
+
     type Txn = {
       id: string;
       date: string;
-      type: "invoice_payment" | "client_deposit" | "overhead_expense" | "duty_payment";
+      type: "invoice_payment" | "client_deposit" | "overhead_expense" | "duty_payment" | "fund_addition" | "container_expense" | "bank_transfer";
       direction: "in" | "out";
       description: string;
       category: string | null;
@@ -862,6 +908,105 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
       });
     }
 
+    for (const r of fundAddRows) {
+      inflows.push({
+        id: `fa-${r.id}`,
+        date: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+        type: "fund_addition",
+        direction: "in",
+        description: r.narration || "Bank fund addition",
+        category: "Fund Addition",
+        bankId: r.bankId ?? null,
+        bankName: r.bankName ?? null,
+        reference: r.reference ?? null,
+        amount: parseFloat(r.amount as string ?? "0"),
+      });
+    }
+
+    for (const r of cepRows) {
+      const sectionLabel = r.section
+        ? r.section.charAt(0).toUpperCase() + r.section.slice(1)
+        : "Container Expense";
+      outflows.push({
+        id: `cep-${r.id}`,
+        date: r.paidAt instanceof Date ? r.paidAt.toISOString() : String(r.paidAt),
+        type: "container_expense",
+        direction: "out",
+        description: `${sectionLabel} disbursement${r.containerNumber ? ` — ${r.containerNumber}` : ""}${r.narration ? ` (${r.narration})` : ""}`,
+        category: sectionLabel,
+        bankId: r.bankId ?? null,
+        bankName: r.bankName ?? null,
+        reference: r.reference ?? null,
+        amount: parseFloat(r.amount as string ?? "0"),
+      });
+    }
+
+    // Bank transfers — only for specific-bank view (inter-bank transfers net to zero across all banks)
+    if (bankIdNum !== null) {
+      const xferTimeConds = (primary: SQL): SQL[] => {
+        const c: SQL[] = [primary];
+        if (fromDate) c.push(gte(bankTransfersTable.createdAt, fromDate));
+        if (toDate)   c.push(lte(bankTransfersTable.createdAt, toDate));
+        return c;
+      };
+      const fromBankAlias = alias(banksTable, "from_bank");
+      const toBankAlias = alias(banksTable, "to_bank");
+      const [xferIn, xferOut] = await Promise.all([
+        db.select({
+            id: bankTransfersTable.id,
+            amount: bankTransfersTable.amount,
+            createdAt: bankTransfersTable.createdAt,
+            narration: bankTransfersTable.narration,
+            reference: bankTransfersTable.reference,
+            counterpartName: fromBankAlias.name,
+          })
+          .from(bankTransfersTable)
+          .leftJoin(fromBankAlias, eq(bankTransfersTable.fromBankId, fromBankAlias.id))
+          .where(and(...xferTimeConds(eq(bankTransfersTable.toBankId, bankIdNum))))
+          .orderBy(bankTransfersTable.createdAt),
+        db.select({
+            id: bankTransfersTable.id,
+            amount: bankTransfersTable.amount,
+            createdAt: bankTransfersTable.createdAt,
+            narration: bankTransfersTable.narration,
+            reference: bankTransfersTable.reference,
+            counterpartName: toBankAlias.name,
+          })
+          .from(bankTransfersTable)
+          .leftJoin(toBankAlias, eq(bankTransfersTable.toBankId, toBankAlias.id))
+          .where(and(...xferTimeConds(eq(bankTransfersTable.fromBankId, bankIdNum))))
+          .orderBy(bankTransfersTable.createdAt),
+      ]);
+      for (const r of xferIn) {
+        inflows.push({
+          id: `xfi-${r.id}`,
+          date: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+          type: "bank_transfer",
+          direction: "in",
+          description: `Transfer in${r.counterpartName ? ` from ${r.counterpartName}` : ""}${r.narration ? ` — ${r.narration}` : ""}`,
+          category: "Bank Transfer",
+          bankId: bankIdNum,
+          bankName: null,
+          reference: r.reference ?? null,
+          amount: parseFloat(r.amount as string ?? "0"),
+        });
+      }
+      for (const r of xferOut) {
+        outflows.push({
+          id: `xfo-${r.id}`,
+          date: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+          type: "bank_transfer",
+          direction: "out",
+          description: `Transfer out${r.counterpartName ? ` to ${r.counterpartName}` : ""}${r.narration ? ` — ${r.narration}` : ""}`,
+          category: "Bank Transfer",
+          bankId: bankIdNum,
+          bankName: null,
+          reference: r.reference ?? null,
+          amount: parseFloat(r.amount as string ?? "0"),
+        });
+      }
+    }
+
     inflows.sort((a, b) => a.date.localeCompare(b.date));
     outflows.sort((a, b) => a.date.localeCompare(b.date));
 
@@ -877,18 +1022,29 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
       if (bankIdNum !== null) prevDepConds.push(eq(clientDepositsTable.bankId, bankIdNum));
       const prevOhConds: SQL[] = [lt(overheadExpensesTable.paidAt, fromDate)];
       if (bankIdNum !== null) prevOhConds.push(eq(overheadExpensesTable.bankId, bankIdNum));
+      const prevFundAddConds: SQL[] = [lt(bankFundAdditionsTable.createdAt, fromDate)];
+      if (bankIdNum !== null) prevFundAddConds.push(eq(bankFundAdditionsTable.bankId, bankIdNum));
+      const prevCepConds: SQL[] = [lt(containerExpensePaymentsTable.paidAt, fromDate)];
+      if (bankIdNum !== null) prevCepConds.push(eq(containerExpensePaymentsTable.bankId, bankIdNum));
 
-      const [prevInvPay, prevDep, prevOh] = await Promise.all([
+      const promises: Promise<Array<{ s: string }>>[] = [
         db.select({ s: sql<string>`coalesce(sum(${invoicePaymentsTable.amount}), 0)` })
           .from(invoicePaymentsTable).where(and(...prevInvPayConds)),
         db.select({ s: sql<string>`coalesce(sum(${clientDepositsTable.amount}), 0)` })
           .from(clientDepositsTable).where(and(...prevDepConds)),
         db.select({ s: sql<string>`coalesce(sum(${overheadExpensesTable.amount}), 0)` })
           .from(overheadExpensesTable).where(and(...prevOhConds)),
-      ]);
+        db.select({ s: sql<string>`coalesce(sum(${bankFundAdditionsTable.amount}), 0)` })
+          .from(bankFundAdditionsTable).where(and(...prevFundAddConds)),
+        db.select({ s: sql<string>`coalesce(sum(${containerExpensePaymentsTable.amount}), 0)` })
+          .from(containerExpensePaymentsTable).where(and(...prevCepConds)),
+      ];
+      const [prevInvPay, prevDep, prevOh, prevFundAdd, prevCep] = await Promise.all(promises);
       openingBalance += parseFloat(prevInvPay[0]?.s ?? "0");
       openingBalance += parseFloat(prevDep[0]?.s ?? "0");
       openingBalance -= parseFloat(prevOh[0]?.s ?? "0");
+      openingBalance += parseFloat(prevFundAdd[0]?.s ?? "0");
+      openingBalance -= parseFloat(prevCep[0]?.s ?? "0");
 
       // Duty has no bank attribution — only include in all-banks view
       if (bankIdNum === null) {
@@ -897,6 +1053,18 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
           .from(customsChargesTable)
           .where(and(gt(customsChargesTable.dutyPaid, "0"), lt(customsChargesTable.updatedAt, fromDate)));
         openingBalance -= parseFloat(prevDuty[0]?.s ?? "0");
+      }
+
+      // Bank transfers (specific-bank view only)
+      if (bankIdNum !== null) {
+        const [prevXferIn, prevXferOut] = await Promise.all([
+          db.select({ s: sql<string>`coalesce(sum(${bankTransfersTable.amount}), 0)` })
+            .from(bankTransfersTable).where(and(eq(bankTransfersTable.toBankId, bankIdNum), lt(bankTransfersTable.createdAt, fromDate))),
+          db.select({ s: sql<string>`coalesce(sum(${bankTransfersTable.amount}), 0)` })
+            .from(bankTransfersTable).where(and(eq(bankTransfersTable.fromBankId, bankIdNum), lt(bankTransfersTable.createdAt, fromDate))),
+        ]);
+        openingBalance += parseFloat(prevXferIn[0]?.s ?? "0");
+        openingBalance -= parseFloat(prevXferOut[0]?.s ?? "0");
       }
     }
     const closingBalance = openingBalance + totalIn - totalOut;
@@ -924,6 +1092,8 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
     const inflowByType: Record<string, number> = {
       invoice_payment: 0,
       client_deposit: 0,
+      fund_addition: 0,
+      bank_transfer: 0,
     };
     for (const t of inflows) inflowByType[t.type] = (inflowByType[t.type] ?? 0) + t.amount;
 

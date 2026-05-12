@@ -19,8 +19,11 @@ function useQueryParams() {
 const TYPE_LABEL: Record<CashFlowTxn["type"], string> = {
   invoice_payment: "Invoice Payment",
   client_deposit: "Wallet Deposit",
-  overhead_expense: "Overhead",
+  overhead_expense: "Overhead Expense",
   duty_payment: "Customs Duty",
+  fund_addition: "Fund Addition",
+  container_expense: "Container Disbursement",
+  bank_transfer: "Bank Transfer",
 };
 
 function downloadCsv(rows: CashFlowTxn[], filename: string) {
@@ -199,14 +202,30 @@ export default function CashFlowPrint() {
             <div className="lbl">Cash received in period</div>
             <div className="val" style={{ color: "#059669" }}>{fmt(totals.totalIn)}</div>
           </div>
-          <div className="stmt-row sub">
-            <div className="lbl">Invoice payments received</div>
-            <div className="val">{fmt(breakdown.inflowByType.invoice_payment ?? 0)}</div>
-          </div>
-          <div className="stmt-row sub">
-            <div className="lbl">Wallet / client deposits</div>
-            <div className="val">{fmt(breakdown.inflowByType.client_deposit ?? 0)}</div>
-          </div>
+          {(breakdown.inflowByType.invoice_payment ?? 0) > 0 && (
+            <div className="stmt-row sub">
+              <div className="lbl">Invoice payments received</div>
+              <div className="val">{fmt(breakdown.inflowByType.invoice_payment ?? 0)}</div>
+            </div>
+          )}
+          {(breakdown.inflowByType.client_deposit ?? 0) > 0 && (
+            <div className="stmt-row sub">
+              <div className="lbl">Wallet / client deposits</div>
+              <div className="val">{fmt(breakdown.inflowByType.client_deposit ?? 0)}</div>
+            </div>
+          )}
+          {(breakdown.inflowByType.fund_addition ?? 0) > 0 && (
+            <div className="stmt-row sub">
+              <div className="lbl">Fund additions</div>
+              <div className="val">{fmt(breakdown.inflowByType.fund_addition ?? 0)}</div>
+            </div>
+          )}
+          {(breakdown.inflowByType.bank_transfer ?? 0) > 0 && (
+            <div className="stmt-row sub">
+              <div className="lbl">Bank transfers in</div>
+              <div className="val">{fmt(breakdown.inflowByType.bank_transfer ?? 0)}</div>
+            </div>
+          )}
           <div className="stmt-row heading">
             <div className="lbl">Cash paid out in period</div>
             <div className="val" style={{ color: "#dc2626" }}>({fmt(totals.totalOut)})</div>
@@ -228,14 +247,30 @@ export default function CashFlowPrint() {
           <div className="grid-2">
             <div className="breakdown-box">
               <h4>Inflow by Source</h4>
-              <div className="breakdown-row">
-                <div className="lbl">Invoice Payments</div>
-                <div className="val" style={{ color: "#059669" }}>{fmt(breakdown.inflowByType.invoice_payment ?? 0)}</div>
-              </div>
-              <div className="breakdown-row">
-                <div className="lbl">Wallet Deposits</div>
-                <div className="val" style={{ color: "#059669" }}>{fmt(breakdown.inflowByType.client_deposit ?? 0)}</div>
-              </div>
+              {(breakdown.inflowByType.invoice_payment ?? 0) > 0 && (
+                <div className="breakdown-row">
+                  <div className="lbl">Invoice Payments</div>
+                  <div className="val" style={{ color: "#059669" }}>{fmt(breakdown.inflowByType.invoice_payment ?? 0)}</div>
+                </div>
+              )}
+              {(breakdown.inflowByType.client_deposit ?? 0) > 0 && (
+                <div className="breakdown-row">
+                  <div className="lbl">Wallet Deposits</div>
+                  <div className="val" style={{ color: "#059669" }}>{fmt(breakdown.inflowByType.client_deposit ?? 0)}</div>
+                </div>
+              )}
+              {(breakdown.inflowByType.fund_addition ?? 0) > 0 && (
+                <div className="breakdown-row">
+                  <div className="lbl">Fund Additions</div>
+                  <div className="val" style={{ color: "#059669" }}>{fmt(breakdown.inflowByType.fund_addition ?? 0)}</div>
+                </div>
+              )}
+              {(breakdown.inflowByType.bank_transfer ?? 0) > 0 && (
+                <div className="breakdown-row">
+                  <div className="lbl">Bank Transfers In</div>
+                  <div className="val" style={{ color: "#059669" }}>{fmt(breakdown.inflowByType.bank_transfer ?? 0)}</div>
+                </div>
+              )}
             </div>
             <div className="breakdown-box">
               <h4>Outflow by Category</h4>
