@@ -1070,8 +1070,10 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
     for (const sec of SECTIONS) {
       aggSections[sec] = { budgeted: aggBudgeted[sec], disbursed: aggDisbursed[sec], variance: aggDisbursed[sec] - aggBudgeted[sec] };
     }
-    const aggTotalBudgeted  = SECTIONS.reduce((s, sec) => s + aggBudgeted[sec],  0);
-    const aggTotalDisbursed = SECTIONS.reduce((s, sec) => s + aggDisbursed[sec], 0);
+    // Totals derived from rows to guarantee consistency: sum(rows.totals.X) === aggregate.totals.X
+    // aggDisbursed only tracks 5 named sections; rows.totals.disbursed includes all sections (incl. null/"other")
+    const aggTotalBudgeted  = rows.reduce((s, r) => s + r.totals.budgeted,  0);
+    const aggTotalDisbursed = rows.reduce((s, r) => s + r.totals.disbursed, 0);
 
     return res.json({
       period: { from: from ?? null, to: to ?? null, status: status ?? null },
