@@ -6,7 +6,8 @@ import {
   useAddInvoiceItem, useEditInvoiceItem, useRemoveInvoiceItem,
   useListActiveBanks, useApplyClientCredit, useGetClientWalletSummary,
   useGetClientDeposits, useAllocateDeposit,
-  type RecordPaymentBody, type InvoiceItem,
+  useRaiseCreditNote, useWriteOffInvoice,
+  type RecordPaymentBody, type InvoiceItem, type CreditNote,
 } from "@workspace/api-client-react";
 import { useListContainers, getListContainersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -29,7 +30,7 @@ import {
   FileText, ArrowLeft, Phone, Loader2, Trash2, CheckCircle2,
   Clock, AlertTriangle, CreditCard, Send, PlusCircle, Building2,
   Box, Calendar, StickyNote, MessageCircle, Bell, ChevronDown, ChevronUp, Printer, Receipt,
-  Pencil, ChevronsUpDown, Check, Banknote,
+  Pencil, ChevronsUpDown, Check, Banknote, FileX, ReceiptText,
 } from "lucide-react";
 
 function ApplyDepositDialog({
@@ -199,6 +200,88 @@ function ApplyCreditDialog({
   );
 }
 
+function RaiseCreditNoteDialog({
+  open, onClose, invoiceId, outstanding,
+}: {
+  open: boolean; onClose: () => void;
+  invoiceId: number; outstanding: number;
+}) {
+  const { toast } = useToast();
+  const raise = useRaiseCreditNote();
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+
+  const handleClose = () => { setAmount(""); setReason(""); onClose(); };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) { toast({ variant: "destructive", title: "Enter a valid amount" }); return; }
+    if (!reason.trim()) { toast({ variant: "destructive", title: "Reason is required" }); return; }
+    try {
+      const cn = await raise.mutateAsync({ invoiceId, data: { amount: amt, reason: reason.trim() } });
+      toast({ title: `Credit note ${cn.creditNoteNumber} raised for ${formatCurrency(cn.amount)}` });
+      handleClose();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: err?.message ?? "Failed to raise credit note" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ReceiptText className="w-4 h-4 text-cyan-400" />
+            Raise Credit Note
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div className="bg-muted/40 border border-border/40 rounded-lg p-3 text-sm">
+            <p className="text-xs text-muted-foreground mb-0.5">Outstanding Balance</p>
+            <p className="font-mono font-bold text-amber-400">{formatCurrency(outstanding)}</p>
+          </div>
+          <div>
+            <Label htmlFor="cn-amount">Amount (₦) *</Label>
+            <Input
+              id="cn-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              max={outstanding}
+              placeholder={`Max ${formatCurrency(outstanding)}`}
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="mt-1 font-mono"
+            />
+          </div>
+          <div>
+            <Label htmlFor="cn-reason">Reason *</Label>
+            <Textarea
+              id="cn-reason"
+              rows={3}
+              placeholder="e.g. Overcharge on clearing fees, billing error..."
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            A credit note reduces the outstanding balance. The original invoice is preserved for audit purposes.
+          </p>
+          <div className="flex gap-2 justify-end pt-1">
+            <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
+            <Button type="submit" disabled={raise.isPending} className="gap-2 bg-cyan-600 hover:bg-cyan-700">
+              {raise.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ReceiptText className="w-4 h-4" />}
+              Raise Credit Note
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function statusConfig(status: string) {
   switch (status) {
     case "paid":
@@ -209,6 +292,8 @@ function statusConfig(status: string) {
       return { label: "Sent", color: "bg-amber-500/20 text-amber-400 border-amber-500/50", icon: Clock };
     case "overdue":
       return { label: "Overdue", color: "bg-red-500/20 text-red-400 border-red-500/50", icon: AlertTriangle };
+    case "written_off":
+      return { label: "Written Off", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/50", icon: FileX };
     default:
       return { label: "Draft", color: "bg-slate-500/20 text-slate-400 border-slate-500/50", icon: FileText };
   }
@@ -497,9 +582,6 @@ function AddItemDialog({
                 <span className="text-muted-foreground">Clearing Charges</span>
                 <span className="font-mono font-semibold text-foreground">{formatCurrency(selected.clearingCharges ?? 0)}</span>
               </div>
-              <p className="text-xs text-muted-foreground pt-1">
-                The clearing charges from this container's record will be added as the line-item amount. No manual entry needed.
-              </p>
             </div>
           )}
 
@@ -604,10 +686,12 @@ export default function InvoiceDetailPage() {
   const sendReminderMutation = useSendInvoiceReminder();
   const sendReceiptMutation = useSendInvoiceReceipt();
   const removeItemMutation = useRemoveInvoiceItem();
+  const writeOffMutation = useWriteOffInvoice();
   const { data: whatsappLog } = useGetInvoiceWhatsAppLog(isNaN(invoiceId) ? null : invoiceId);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [creditOpen, setCreditOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
+  const [creditNoteOpen, setCreditNoteOpen] = useState(false);
   const [whatsappLogOpen, setWhatsappLogOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InvoiceItem | null>(null);
@@ -668,6 +752,17 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  const handleWriteOff = async () => {
+    if (!confirm(`Write off invoice ${invoice?.invoiceNumber}? This will create a Bad Debt expense entry and mark the invoice as unrecoverable. This cannot be undone.`)) return;
+    try {
+      await writeOffMutation.mutateAsync({ invoiceId });
+      toast({ title: "Invoice written off", description: "A Bad Debt expense entry has been created." });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to write off invoice";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -691,6 +786,12 @@ export default function InvoiceDetailPage() {
   const paidPct = invoice.total > 0 ? Math.min(100, (invoice.totalPaid / invoice.total) * 100) : 0;
   const hasPhone = !!invoice.clientPhone;
   const waIsPending = sendWhatsAppMutation.isPending || sendReminderMutation.isPending || sendReceiptMutation.isPending;
+  const isWrittenOff = invoice.status === "written_off";
+  const canRaiseCreditNote = isAdmin && !isWrittenOff && invoice.status !== "draft" && invoice.outstanding > 0;
+  const canWriteOff = isAdmin && !isWrittenOff && invoice.status !== "paid" && invoice.outstanding > 0;
+
+  const regularPayments = (invoice.payments ?? []).filter(p => p.paymentMethod !== "credit_note");
+  const creditNotePayments = (invoice.payments ?? []).filter(p => p.paymentMethod === "credit_note");
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
@@ -710,6 +811,16 @@ export default function InvoiceDetailPage() {
         </Badge>
       </div>
 
+      {isWrittenOff && (
+        <div className="bg-zinc-500/10 border border-zinc-500/30 rounded-lg p-4 flex items-center gap-3">
+          <FileX className="w-5 h-5 text-zinc-400 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-zinc-300">This invoice has been written off as a bad debt.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">It is excluded from the active accounts receivable balance. A Bad Debt expense entry has been recorded.</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-border/50">
           <CardHeader className="pb-2">
@@ -721,7 +832,7 @@ export default function InvoiceDetailPage() {
                 <div className="flex items-center gap-2 text-sm mb-2">
                   <Box className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground font-medium">Containers ({invoice.items.length})</span>
-                  {isAdmin && (
+                  {isAdmin && !isWrittenOff && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -741,7 +852,7 @@ export default function InvoiceDetailPage() {
                         <th className="text-left text-muted-foreground font-medium pb-1.5 pr-3">B/L Number</th>
                         <th className="text-left text-muted-foreground font-medium pb-1.5 pr-3">Description</th>
                         <th className="text-right text-muted-foreground font-medium pb-1.5">Amount</th>
-                        {isAdmin && <th className="pb-1.5 w-16" />}
+                        {isAdmin && !isWrittenOff && <th className="pb-1.5 w-16" />}
                       </tr>
                     </thead>
                     <tbody>
@@ -757,7 +868,7 @@ export default function InvoiceDetailPage() {
                           <td className="py-2 pr-3 font-mono text-muted-foreground">{item.blNumber ?? "—"}</td>
                           <td className="py-2 pr-3 text-foreground">{item.description}</td>
                           <td className="py-2 text-right font-mono font-semibold text-foreground">{formatCurrency(item.amount)}</td>
-                          {isAdmin && (
+                          {isAdmin && !isWrittenOff && (
                             <td className="py-2 pl-2">
                               <div className="flex items-center gap-1 justify-end">
                                 <Tooltip>
@@ -868,9 +979,17 @@ export default function InvoiceDetailPage() {
               <span className="text-muted-foreground">Total Paid</span>
               <span className="text-emerald-400 font-semibold">{formatCurrency(invoice.totalPaid)}</span>
             </div>
+            {creditNotePayments.length > 0 && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Credit Notes Applied</span>
+                <span className="text-cyan-400 font-semibold">
+                  {formatCurrency(creditNotePayments.reduce((s, p) => s + p.amount, 0))}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Outstanding</span>
-              <span className={`font-bold ${invoice.outstanding > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+              <span className={`font-bold ${invoice.outstanding > 0 ? (isWrittenOff ? "text-zinc-400" : "text-amber-400") : "text-emerald-400"}`}>
                 {formatCurrency(invoice.outstanding)}
               </span>
             </div>
@@ -890,185 +1009,199 @@ export default function InvoiceDetailPage() {
         </Card>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => setPaymentOpen(true)} className="gap-2">
-          <PlusCircle className="w-4 h-4" />
-          Record Payment
-        </Button>
-
-        {isAdmin && invoice.outstanding > 0 && (
-          <Button
-            variant="outline"
-            className="gap-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
-            onClick={() => setDepositOpen(true)}
-          >
-            <CreditCard className="w-4 h-4" />
-            Apply Deposit
+      {!isWrittenOff && (
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setPaymentOpen(true)} className="gap-2">
+            <PlusCircle className="w-4 h-4" />
+            Record Payment
           </Button>
-        )}
 
-        {isAdmin && invoice.outstanding > 0 && (
-          <Button
-            variant="outline"
-            className="gap-2 border-violet-500/50 text-violet-400 hover:bg-violet-500/10"
-            onClick={() => setCreditOpen(true)}
-          >
-            <Banknote className="w-4 h-4" />
-            Apply Credit
-          </Button>
-        )}
-
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => window.open(`${window.location.pathname}/print`, "_blank")}
-        >
-          <Printer className="w-4 h-4" />
-          Print Receipt
-        </Button>
-
-        {isAdmin && invoice.totalPaid > 0 && (
-          hasPhone ? (
+          {canRaiseCreditNote && (
             <Button
               variant="outline"
-              className="gap-2 border-teal-600 text-teal-500 hover:bg-teal-500/10"
-              onClick={handleSendReceipt}
-              disabled={waIsPending}
+              className="gap-2 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10"
+              onClick={() => setCreditNoteOpen(true)}
             >
-              {sendReceiptMutation.isPending
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Receipt className="w-4 h-4" />
-              }
-              Send Receipt
+              <ReceiptText className="w-4 h-4" />
+              Raise Credit Note
             </Button>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span tabIndex={0}>
-                  <Button
-                    variant="outline"
-                    className="gap-2 border-teal-600/40 text-teal-500/40 cursor-not-allowed"
-                    disabled
-                  >
-                    <Receipt className="w-4 h-4" />
-                    Send Receipt
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Add a phone number to this client first</TooltipContent>
-            </Tooltip>
-          )
-        )}
+          )}
 
-        {isAdmin && (
-          hasPhone ? (
+          {isAdmin && invoice.outstanding > 0 && (
             <Button
               variant="outline"
-              className="gap-2 border-green-600 text-green-500 hover:bg-green-500/10"
-              onClick={() => handleSendWhatsApp("invoice")}
-              disabled={waIsPending}
+              className="gap-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+              onClick={() => setDepositOpen(true)}
             >
-              {sendWhatsAppMutation.isPending
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <MessageCircle className="w-4 h-4" />
-              }
-              Send Invoice
+              <CreditCard className="w-4 h-4" />
+              Apply Deposit
             </Button>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span tabIndex={0}>
-                  <Button
-                    variant="outline"
-                    className="gap-2 border-green-600/40 text-green-500/40 cursor-not-allowed"
-                    disabled
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    Send Invoice
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Add a phone number to this client first</TooltipContent>
-            </Tooltip>
-          )
-        )}
+          )}
 
-        {isAdmin && invoice.outstanding > 0 && (
-          hasPhone ? (
+          {isAdmin && invoice.outstanding > 0 && (
             <Button
               variant="outline"
-              className="gap-2 border-amber-600 text-amber-500 hover:bg-amber-500/10"
-              onClick={() => handleSendWhatsApp("reminder")}
-              disabled={waIsPending}
+              className="gap-2 border-violet-500/50 text-violet-400 hover:bg-violet-500/10"
+              onClick={() => setCreditOpen(true)}
             >
-              {sendReminderMutation.isPending
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Bell className="w-4 h-4" />
-              }
-              Send Reminder
+              <Banknote className="w-4 h-4" />
+              Apply Credit
             </Button>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span tabIndex={0}>
-                  <Button
-                    variant="outline"
-                    className="gap-2 border-amber-600/40 text-amber-500/40 cursor-not-allowed"
-                    disabled
-                  >
-                    <Bell className="w-4 h-4" />
-                    Send Reminder
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Add a phone number to this client first</TooltipContent>
-            </Tooltip>
-          )
-        )}
+          )}
 
-        {isAdmin && invoice.status === "draft" && (
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => handleStatusChange("sent")}
-            disabled={updateMutation.isPending}
+            onClick={() => window.open(`${window.location.pathname}/print`, "_blank")}
           >
-            <Send className="w-4 h-4" />
-            Mark as Sent
+            <Printer className="w-4 h-4" />
+            Print Receipt
           </Button>
-        )}
-        {isAdmin && invoice.status !== "overdue" && invoice.outstanding > 0 && invoice.status !== "draft" && (
-          <Button
-            variant="outline"
-            className="gap-2 border-red-600 text-red-500 hover:bg-red-500/10"
-            onClick={() => handleStatusChange("overdue")}
-            disabled={updateMutation.isPending}
-          >
-            <AlertTriangle className="w-4 h-4" />
-            Mark as Overdue
-          </Button>
-        )}
-      </div>
+
+          {isAdmin && invoice.totalPaid > 0 && (
+            hasPhone ? (
+              <Button
+                variant="outline"
+                className="gap-2 border-teal-600 text-teal-500 hover:bg-teal-500/10"
+                onClick={handleSendReceipt}
+                disabled={waIsPending}
+              >
+                {sendReceiptMutation.isPending
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Receipt className="w-4 h-4" />
+                }
+                Send Receipt
+              </Button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button variant="outline" className="gap-2 border-teal-600/40 text-teal-500/40 cursor-not-allowed" disabled>
+                      <Receipt className="w-4 h-4" />
+                      Send Receipt
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Add a phone number to this client first</TooltipContent>
+              </Tooltip>
+            )
+          )}
+
+          {isAdmin && (
+            hasPhone ? (
+              <Button
+                variant="outline"
+                className="gap-2 border-green-600 text-green-500 hover:bg-green-500/10"
+                onClick={() => handleSendWhatsApp("invoice")}
+                disabled={waIsPending}
+              >
+                {sendWhatsAppMutation.isPending
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <MessageCircle className="w-4 h-4" />
+                }
+                Send Invoice
+              </Button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button variant="outline" className="gap-2 border-green-600/40 text-green-500/40 cursor-not-allowed" disabled>
+                      <MessageCircle className="w-4 h-4" />
+                      Send Invoice
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Add a phone number to this client first</TooltipContent>
+              </Tooltip>
+            )
+          )}
+
+          {isAdmin && invoice.outstanding > 0 && (
+            hasPhone ? (
+              <Button
+                variant="outline"
+                className="gap-2 border-amber-600 text-amber-500 hover:bg-amber-500/10"
+                onClick={() => handleSendWhatsApp("reminder")}
+                disabled={waIsPending}
+              >
+                {sendReminderMutation.isPending
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Bell className="w-4 h-4" />
+                }
+                Send Reminder
+              </Button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button variant="outline" className="gap-2 border-amber-600/40 text-amber-500/40 cursor-not-allowed" disabled>
+                      <Bell className="w-4 h-4" />
+                      Send Reminder
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Add a phone number to this client first</TooltipContent>
+              </Tooltip>
+            )
+          )}
+
+          {isAdmin && invoice.status === "draft" && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => handleStatusChange("sent")}
+              disabled={updateMutation.isPending}
+            >
+              <Send className="w-4 h-4" />
+              Mark as Sent
+            </Button>
+          )}
+
+          {isAdmin && invoice.status !== "overdue" && invoice.outstanding > 0 && invoice.status !== "draft" && (
+            <Button
+              variant="outline"
+              className="gap-2 border-red-600 text-red-500 hover:bg-red-500/10"
+              onClick={() => handleStatusChange("overdue")}
+              disabled={updateMutation.isPending}
+            >
+              <AlertTriangle className="w-4 h-4" />
+              Mark as Overdue
+            </Button>
+          )}
+
+          {canWriteOff && (
+            <Button
+              variant="outline"
+              className="gap-2 border-zinc-500/60 text-zinc-400 hover:bg-zinc-500/10"
+              onClick={handleWriteOff}
+              disabled={writeOffMutation.isPending}
+            >
+              {writeOffMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileX className="w-4 h-4" />}
+              Write Off
+            </Button>
+          )}
+        </div>
+      )}
 
       <Card className="border-border/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <CreditCard className="w-4 h-4" />
             Payment History
-            {invoice.payments.length > 0 && (
-              <Badge variant="secondary" className="ml-1">{invoice.payments.length}</Badge>
+            {regularPayments.length > 0 && (
+              <Badge variant="secondary" className="ml-1">{regularPayments.length}</Badge>
             )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {invoice.payments.length === 0 ? (
+          {regularPayments.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <CreditCard className="w-8 h-8 mx-auto opacity-30 mb-2" />
               <p className="text-sm">No payments recorded yet.</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {invoice.payments.map(payment => (
+              {regularPayments.map(payment => (
                 <div
                   key={payment.id}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/30 border border-border/30"
@@ -1110,6 +1243,46 @@ export default function InvoiceDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {(invoice.creditNotes ?? []).length > 0 && (
+        <Card className="border-cyan-500/30 bg-cyan-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-cyan-400 flex items-center gap-2">
+              <ReceiptText className="w-4 h-4" />
+              Credit Notes
+              <Badge variant="secondary" className="ml-1">{invoice.creditNotes.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {invoice.creditNotes.map((cn: CreditNote) => (
+                <div
+                  key={cn.id}
+                  className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20"
+                >
+                  <div className="w-7 h-7 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">
+                    <ReceiptText className="w-3.5 h-3.5 text-cyan-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-mono font-semibold text-cyan-400">{cn.creditNoteNumber}</span>
+                      <span className="text-sm font-semibold text-foreground">{formatCurrency(cn.amount)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(cn.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                      </span>
+                      {cn.reason && (
+                        <span className="text-xs text-muted-foreground">· {cn.reason}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {(whatsappLog && whatsappLog.length > 0) && (
         <Card className="border-border/50">
@@ -1195,6 +1368,13 @@ export default function InvoiceDetailPage() {
           invoiceOutstanding={invoice.outstanding}
         />
       )}
+
+      <RaiseCreditNoteDialog
+        open={creditNoteOpen}
+        onClose={() => setCreditNoteOpen(false)}
+        invoiceId={invoiceId}
+        outstanding={invoice.outstanding}
+      />
 
       <AddItemDialog
         open={addItemOpen}

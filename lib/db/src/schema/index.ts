@@ -18,6 +18,7 @@ export * from "./whatsapp";
 export * from "./migrations";
 export * from "./user-client-assignments";
 export * from "./overhead-expenses";
+export * from "./credit-notes";
 export * from "./bank-fund-additions";
 export * from "./expense-categories";
 export * from "./expense-payments";

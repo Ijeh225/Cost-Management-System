@@ -44,10 +44,19 @@ export type InvoicePayment = {
   createdAt: string;
 };
 
+export type CreditNote = {
+  id: number;
+  invoiceId: number;
+  creditNoteNumber: string;
+  reason: string;
+  amount: number;
+  createdAt: string;
+};
+
 export type Invoice = {
   id: number;
   invoiceNumber: string;
-  status: "draft" | "sent" | "paid" | "partial" | "overdue";
+  status: "draft" | "sent" | "paid" | "partial" | "overdue" | "written_off";
   containerId: number | null;
   containerNumber: string | null;
   blNumber: string | null;
@@ -65,6 +74,7 @@ export type Invoice = {
   updatedAt: string;
   items: InvoiceItem[];
   payments: InvoicePayment[];
+  creditNotes: CreditNote[];
 };
 
 export type CreateInvoiceBody = {
@@ -339,6 +349,46 @@ export function useRemoveInvoiceItem() {
     onSuccess: (_, { invoiceId }) => {
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
       qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
+    },
+  });
+}
+
+export function useRaiseCreditNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId, data }: { invoiceId: number; data: { amount: number; reason: string } }) =>
+      customFetch<CreditNote>(`/api/invoices/${invoiceId}/credit-note`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_, { invoiceId }) => {
+      qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
+    },
+  });
+}
+
+export function useGetInvoiceCreditNotes(invoiceId: number | null) {
+  return useQuery<CreditNote[]>({
+    queryKey: [...INVOICES_QUERY_KEY, invoiceId, "credit-notes"],
+    queryFn: () => customFetch<CreditNote[]>(`/api/invoices/${invoiceId}/credit-notes`),
+    enabled: !!invoiceId,
+  });
+}
+
+export function useWriteOffInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId }: { invoiceId: number }) =>
+      customFetch<{ success: boolean; overheadExpenseId: number }>(`/api/invoices/${invoiceId}/write-off`, {
+        method: "POST",
+      }),
+    onSuccess: (_, { invoiceId }) => {
+      qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
     },
   });
 }

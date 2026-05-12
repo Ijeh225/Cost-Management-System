@@ -16,6 +16,7 @@ import {
 import {
   FileText, Search, Loader2, Trash2, ChevronRight, Plus,
   CheckCircle2, Clock, AlertTriangle, CreditCard, Package,
+  ChevronUp, ChevronDown,
 } from "lucide-react";
 
 function statusConfig(status: string) {
@@ -28,6 +29,8 @@ function statusConfig(status: string) {
       return { label: "Sent", color: "bg-amber-500/20 text-amber-400 border-amber-500/50", icon: Clock };
     case "overdue":
       return { label: "Overdue", color: "bg-red-500/20 text-red-400 border-red-500/50", icon: AlertTriangle };
+    case "written_off":
+      return { label: "Written Off", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/50", icon: FileText };
     default:
       return { label: "Draft", color: "bg-slate-500/20 text-slate-400 border-slate-500/50", icon: FileText };
   }
@@ -161,8 +164,13 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
+  const [writtenOffOpen, setWrittenOffOpen] = useState(false);
 
-  const filtered = (invoices ?? []).filter(inv => {
+  const allInvoices = invoices ?? [];
+  const activeInvoices = allInvoices.filter(i => i.status !== "written_off");
+  const writtenOffInvoices = allInvoices.filter(i => i.status === "written_off");
+
+  const filtered = activeInvoices.filter(inv => {
     const q = search.toLowerCase();
     const containerNums = inv.items?.map(it => it.containerNumber ?? "").join(" ") ?? (inv.containerNumber ?? "");
     const matchesSearch = (
@@ -174,10 +182,22 @@ export default function InvoicesPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const totalOutstanding = (invoices ?? []).reduce((s, i) => s + i.outstanding, 0);
-  const totalPaid = (invoices ?? []).reduce((s, i) => s + i.totalPaid, 0);
-  const paidCount = (invoices ?? []).filter(i => i.status === "paid").length;
-  const overdueCount = (invoices ?? []).filter(i => i.status === "overdue").length;
+  const filteredWrittenOff = writtenOffInvoices.filter(inv => {
+    const q = search.toLowerCase();
+    const containerNums = inv.items?.map(it => it.containerNumber ?? "").join(" ") ?? (inv.containerNumber ?? "");
+    return (
+      inv.invoiceNumber.toLowerCase().includes(q) ||
+      (inv.clientName ?? "").toLowerCase().includes(q) ||
+      containerNums.toLowerCase().includes(q)
+    );
+  });
+
+  const totalOutstanding = activeInvoices.reduce((s, i) => s + i.outstanding, 0);
+  const totalPaid = activeInvoices.reduce((s, i) => s + i.totalPaid, 0);
+  const paidCount = activeInvoices.filter(i => i.status === "paid").length;
+  const overdueCount = activeInvoices.filter(i => i.status === "overdue").length;
+
+  const showWrittenOffSection = (statusFilter === "all" || statusFilter === "written_off") && filteredWrittenOff.length > 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -235,6 +255,8 @@ export default function InvoicesPage() {
             <SelectItem value="sent">Sent</SelectItem>
             <SelectItem value="partial">Partial</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+            <SelectItem value="written_off">Written Off</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -243,7 +265,20 @@ export default function InvoicesPage() {
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-7 h-7 animate-spin text-primary" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : statusFilter === "written_off" ? (
+        filteredWrittenOff.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground space-y-2">
+            <FileText className="w-10 h-10 mx-auto opacity-30" />
+            <p className="text-sm">No written-off invoices.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredWrittenOff.map(inv => (
+              <InvoiceRow key={inv.id} invoice={inv} isAdmin={!!isAdmin} />
+            ))}
+          </div>
+        )
+      ) : filtered.length === 0 && !showWrittenOffSection ? (
         <div className="text-center py-16 text-muted-foreground space-y-2">
           <FileText className="w-10 h-10 mx-auto opacity-30" />
           <p className="text-sm">
@@ -251,11 +286,39 @@ export default function InvoicesPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map(inv => (
-            <InvoiceRow key={inv.id} invoice={inv} isAdmin={!!isAdmin} />
-          ))}
-        </div>
+        <>
+          {filtered.length > 0 && (
+            <div className="space-y-2">
+              {filtered.map(inv => (
+                <InvoiceRow key={inv.id} invoice={inv} isAdmin={!!isAdmin} />
+              ))}
+            </div>
+          )}
+
+          {showWrittenOffSection && (
+            <div className="space-y-2">
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-500/30 bg-zinc-500/5 text-zinc-400 text-sm font-medium hover:bg-zinc-500/10 transition-colors"
+                onClick={() => setWrittenOffOpen(o => !o)}
+              >
+                <FileText className="w-4 h-4" />
+                Written Off ({filteredWrittenOff.length})
+                <span className="ml-auto">
+                  {writtenOffOpen
+                    ? <ChevronUp className="w-4 h-4" />
+                    : <ChevronDown className="w-4 h-4" />}
+                </span>
+              </button>
+              {writtenOffOpen && (
+                <div className="space-y-2 pl-2">
+                  {filteredWrittenOff.map(inv => (
+                    <InvoiceRow key={inv.id} invoice={inv} isAdmin={!!isAdmin} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       <CreateInvoiceDialog

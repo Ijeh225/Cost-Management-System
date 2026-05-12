@@ -7,6 +7,7 @@ export const OVERHEAD_CATEGORIES = [
   "Bank Charges",
   "Utilities",
   "Maintenance",
+  "Bad Debt",
   "Other",
 ] as const;
 

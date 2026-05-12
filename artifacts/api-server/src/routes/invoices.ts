@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable } from "@workspace/db";
-import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull } from "drizzle-orm";
+import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable } from "@workspace/db";
+import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio } from "../lib/whatsapp.js";
 
@@ -84,7 +84,24 @@ async function fetchPaymentsWithBank(invoiceId: number) {
     .orderBy(invoicePaymentsTable.paidAt);
 }
 
-async function formatInvoice(inv: any, payments: any[], items?: any[]) {
+async function generateCreditNoteNumber(): Promise<string> {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const prefix = `CN-${yyyy}${mm}-`;
+  const rows = await db
+    .select({ creditNoteNumber: creditNotesTable.creditNoteNumber })
+    .from(creditNotesTable)
+    .where(sql`${creditNotesTable.creditNoteNumber} LIKE ${prefix + "%"}`)
+    .orderBy(desc(creditNotesTable.creditNoteNumber))
+    .limit(1);
+  if (rows.length === 0) return `${prefix}001`;
+  const last = rows[0].creditNoteNumber;
+  const seq = parseInt(last.replace(prefix, ""), 10) || 0;
+  return `${prefix}${pad(seq + 1)}`;
+}
+
+async function formatInvoice(inv: any, payments: any[], items?: any[], creditNotes?: any[]) {
   const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
   const total = parseFloat(inv.total ?? "0");
   const outstanding = Math.max(0, total - totalPaid);
@@ -129,6 +146,14 @@ async function formatInvoice(inv: any, payments: any[], items?: any[]) {
       bankId: p.bankId ?? null,
       bankName: p.bankName ?? null,
       createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+    })),
+    creditNotes: (creditNotes ?? []).map(cn => ({
+      id: cn.id,
+      invoiceId: cn.invoiceId,
+      creditNoteNumber: cn.creditNoteNumber,
+      reason: cn.reason,
+      amount: parseFloat(cn.amount ?? "0"),
+      createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
     })),
   };
 }
@@ -298,7 +323,7 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
     const fromDate = from ? new Date(from) : null;
     const toDate = to ? new Date(to + "T23:59:59") : null;
 
-    const conditions = [];
+    const conditions: any[] = [ne(invoicesTable.status, "written_off")];
     if (fromDate) conditions.push(gte(invoicesTable.createdAt, fromDate));
     if (toDate) conditions.push(lte(invoicesTable.createdAt, toDate));
 
@@ -315,7 +340,7 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
       })
       .from(invoicesTable)
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(invoicesTable.createdAt));
 
     const invoiceIds = rows.map(r => r.id);
@@ -511,11 +536,11 @@ router.get("/invoices/:id", requireAuth, async (req, res) => {
     if (!row) return res.status(404).json({ error: "Invoice not found" });
 
     const payments = await fetchPaymentsWithBank(id);
-
     const itemsMap = await fetchItemsForInvoices([id]);
     const items = itemsMap.get(id) ?? [];
+    const creditNoteRows = await db.select().from(creditNotesTable).where(eq(creditNotesTable.invoiceId, id)).orderBy(creditNotesTable.createdAt);
 
-    res.json(await formatInvoice(row, payments, items));
+    res.json(await formatInvoice(row, payments, items, creditNoteRows));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch invoice" });
@@ -1351,6 +1376,144 @@ router.get("/invoices/:id/whatsapp-log", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch WhatsApp log" });
+  }
+});
+
+// ─── Credit Notes ────────────────────────────────────────────────────────────
+
+router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id, 10);
+    if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
+
+    const { amount: rawAmount, reason } = req.body as { amount?: number; reason?: string };
+    const amount = parseFloat(String(rawAmount ?? 0));
+    if (isNaN(amount) || amount <= 0) return res.status(400).json({ error: "Valid amount is required" });
+    if (!reason?.trim()) return res.status(400).json({ error: "Reason is required" });
+
+    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!inv) return res.status(404).json({ error: "Invoice not found" });
+    if (inv.status === "written_off") return res.status(400).json({ error: "Cannot raise credit note on a written-off invoice" });
+    if (inv.status === "draft") return res.status(400).json({ error: "Cannot raise credit note on a draft invoice" });
+
+    const existingPayments = await db.select({ amount: invoicePaymentsTable.amount })
+      .from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+    const invoiceTotal = parseFloat(inv.total ?? "0");
+    const outstanding = Math.max(0, invoiceTotal - totalPaid);
+
+    if (amount > outstanding) {
+      return res.status(400).json({ error: `Credit note amount (₦${amount.toLocaleString()}) exceeds outstanding balance (₦${outstanding.toLocaleString()})` });
+    }
+
+    const creditNoteNumber = await generateCreditNoteNumber();
+
+    const [cn] = await db.transaction(async (tx) => {
+      const [inserted] = await tx.insert(creditNotesTable).values({
+        invoiceId,
+        creditNoteNumber,
+        reason: reason.trim(),
+        amount: String(amount),
+        createdBy: (req as any).user?.id ?? null,
+      }).returning();
+
+      await tx.insert(invoicePaymentsTable).values({
+        invoiceId,
+        amount: String(amount),
+        paymentMethod: "credit_note",
+        reference: creditNoteNumber,
+        notes: `Credit note: ${reason.trim()}`,
+        paidAt: new Date(),
+        bankId: null,
+      });
+
+      const newTotalPaid = totalPaid + amount;
+      let newStatus = inv.status;
+      if (newTotalPaid >= invoiceTotal) newStatus = "paid";
+      else if (newTotalPaid > 0) newStatus = "partial";
+      await tx.update(invoicesTable)
+        .set({ status: newStatus, updatedAt: new Date() })
+        .where(eq(invoicesTable.id, invoiceId));
+
+      return [inserted];
+    });
+
+    res.status(201).json({
+      id: cn.id,
+      invoiceId: cn.invoiceId,
+      creditNoteNumber: cn.creditNoteNumber,
+      reason: cn.reason,
+      amount: parseFloat(cn.amount ?? "0"),
+      createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
+    });
+  } catch (err) {
+    console.error("POST /invoices/:id/credit-note error:", err);
+    res.status(500).json({ error: "Failed to raise credit note" });
+  }
+});
+
+router.get("/invoices/:id/credit-notes", requireAuth, async (req, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id, 10);
+    if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
+
+    const rows = await db.select().from(creditNotesTable)
+      .where(eq(creditNotesTable.invoiceId, invoiceId))
+      .orderBy(creditNotesTable.createdAt);
+
+    res.json(rows.map(cn => ({
+      id: cn.id,
+      invoiceId: cn.invoiceId,
+      creditNoteNumber: cn.creditNoteNumber,
+      reason: cn.reason,
+      amount: parseFloat(cn.amount ?? "0"),
+      createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
+    })));
+  } catch (err) {
+    console.error("GET /invoices/:id/credit-notes error:", err);
+    res.status(500).json({ error: "Failed to fetch credit notes" });
+  }
+});
+
+// ─── Bad Debt Write-off ───────────────────────────────────────────────────────
+
+router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id, 10);
+    if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
+
+    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!inv) return res.status(404).json({ error: "Invoice not found" });
+    if (inv.status === "written_off") return res.status(400).json({ error: "Invoice is already written off" });
+    if (inv.status === "paid") return res.status(400).json({ error: "Invoice is already fully paid" });
+
+    const existingPayments = await db.select({ amount: invoicePaymentsTable.amount })
+      .from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+    const invoiceTotal = parseFloat(inv.total ?? "0");
+    const outstanding = Math.max(0, invoiceTotal - totalPaid);
+
+    let expenseId = 0;
+    await db.transaction(async (tx) => {
+      await tx.update(invoicesTable)
+        .set({ status: "written_off", updatedAt: new Date() })
+        .where(eq(invoicesTable.id, invoiceId));
+
+      const [exp] = await tx.insert(overheadExpensesTable).values({
+        category: "Bad Debt",
+        description: `Bad Debt Write-off: ${inv.invoiceNumber}`,
+        amount: String(outstanding > 0 ? outstanding : invoiceTotal),
+        reference: inv.invoiceNumber,
+        recordedBy: (req as any).user?.id ?? null,
+        paidAt: new Date(),
+      }).returning({ id: overheadExpensesTable.id });
+      expenseId = exp.id;
+    });
+
+    res.status(201).json({ success: true, overheadExpenseId: expenseId });
+  } catch (err) {
+    console.error("POST /invoices/:id/write-off error:", err);
+    res.status(500).json({ error: "Failed to write off invoice" });
   }
 });
 
