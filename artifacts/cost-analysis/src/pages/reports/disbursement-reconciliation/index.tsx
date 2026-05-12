@@ -169,7 +169,8 @@ export default function DisbursementReconciliationPage() {
           to: applied.to || undefined,
           status: applied.status !== "all" ? applied.status : undefined,
         }
-      : { from: undefined, to: undefined, status: undefined }
+      : { from: undefined, to: undefined, status: undefined },
+    { enabled: generated }
   );
 
   const handleGenerate = () => {
@@ -325,6 +326,9 @@ export default function DisbursementReconciliationPage() {
               />
             ))}
           </div>
+          <p className="text-[11px] text-muted-foreground/70 -mt-1">
+            Section cards show the 5 standard cost categories. The grand total below includes any payments recorded without a category (unallocated disbursements).
+          </p>
 
           {/* Grand total bar */}
           <div className="bg-card/40 border border-border/40 rounded-lg p-4 flex flex-wrap gap-6 items-center">

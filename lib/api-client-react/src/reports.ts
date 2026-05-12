@@ -209,9 +209,14 @@ export type DisbursementReconciliationResponse = {
   };
 };
 
-export function useGetDisbursementReconciliation(params: { from?: string; to?: string; status?: string }) {
+export function useGetDisbursementReconciliation(
+  params: { from?: string; to?: string; status?: string },
+  options?: { enabled?: boolean }
+) {
+  const { enabled = true } = options ?? {};
   return useQuery<DisbursementReconciliationResponse>({
     queryKey: ["/api/reports/disbursement-reconciliation", params.from, params.to, params.status],
+    enabled,
     queryFn: async () => {
       const qs = new URLSearchParams();
       if (params.from) qs.set("from", params.from);
