@@ -57,7 +57,7 @@ import { TasksTab } from "@/components/containers/TasksTab";
 import { DocumentsTab } from "@/components/containers/DocumentsTab";
 import { EditSectionsTab } from "@/components/containers/EditSectionsTab";
 import { EditContainerDetailsDialog } from "@/components/containers/edit-container-details-dialog";
-import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY, useListInvoices, useGetContainerExpensePayments } from "@workspace/api-client-react";
+import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY, useListInvoices, useGetContainerExpensePayments, useGetContainerExpensePaymentsBySection, type ContainerSectionSummary } from "@workspace/api-client-react";
 import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -669,7 +669,7 @@ function ExtraBuiltinFieldsSection({
 function ChargeSectionForm({
   containerId, sectionKey, title, schema, initialData, isRecordLocked, isSectionLocked, isEditable, isAdmin,
   approval, onSubmitSection, onApproveSection, onRejectSection, onToggleSectionLock, sectionSettings,
-  extraFields, customValuesMap,
+  extraFields, customValuesMap, sectionPayment,
 }: {
   containerId: number;
   sectionKey: string;
@@ -688,6 +688,7 @@ function ChargeSectionForm({
   onToggleSectionLock: (section: string, lock: boolean) => void;
   extraFields?: BuiltinExtraField[];
   customValuesMap?: Record<number, string>;
+  sectionPayment?: ContainerSectionSummary;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -753,7 +754,24 @@ function ChargeSectionForm({
                 </span>
               )}
             </div>
-            <span className="font-mono text-primary font-medium">{formatCurrency(total)}</span>
+            <div className="flex items-center gap-4">
+              {isAdmin && sectionPayment && sectionPayment.paid > 0 && (
+                <div className="flex items-center gap-3 text-[11px]">
+                  <span className="text-muted-foreground">
+                    Paid: <span className="font-mono font-semibold text-emerald-400">{formatCurrency(sectionPayment.paid)}</span>
+                  </span>
+                  {sectionPayment.outstanding > 0 && (
+                    <span className="text-muted-foreground">
+                      Due: <span className="font-mono font-semibold text-amber-400">{formatCurrency(sectionPayment.outstanding)}</span>
+                    </span>
+                  )}
+                  {sectionPayment.outstanding === 0 && sectionPayment.charged > 0 && (
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold">Settled</span>
+                  )}
+                </div>
+              )}
+              <span className="font-mono text-primary font-medium">{formatCurrency(total)}</span>
+            </div>
           </div>
         </AccordionTrigger>
         <AccordionContent className="pt-2 pb-6">
@@ -1355,6 +1373,9 @@ export default function ContainerDetail() {
     { key: "delivery",   title: sn.delivery   ?? BUILT_IN_SECTION_DEFAULTS.delivery,   schema: deliverySchema,   data: charges.delivery },
     { key: "operations", title: sn.operations ?? BUILT_IN_SECTION_DEFAULTS.operations, schema: operationsSchema, data: charges.operations },
   ];
+
+  const { data: sectionPaymentsData = [] } = useGetContainerExpensePaymentsBySection(isAdmin ? containerId : null);
+  const sectionPaymentsMap = Object.fromEntries(sectionPaymentsData.map((s: ContainerSectionSummary) => [s.section, s]));
 
   const customSections = ((customSectionsRaw ?? []) as CustomSectionWithFields[]).filter(s => !s.isArchived);
   const customValuesMap: Record<number, string> = {};
@@ -2188,6 +2209,7 @@ export default function ContainerDetail() {
                       extraFields={builtinExtrasMap[s.key] ?? []}
                       customValuesMap={customValuesMap}
                       sectionSettings={sn}
+                      sectionPayment={sectionPaymentsMap[s.key]}
                     />
                   </div>
                 ))}

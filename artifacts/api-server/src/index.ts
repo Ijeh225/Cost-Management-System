@@ -245,6 +245,26 @@ async function runStartupMigrations() {
         )
       `);
     });
+
+    await runMigration("add_section_to_container_expense_payments_v2", async () => {
+      await pool.query(`
+        ALTER TABLE container_expense_payments
+        ADD COLUMN IF NOT EXISTS section TEXT
+      `);
+      await pool.query(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'container_expense_payments'
+              AND column_name = 'category_id'
+              AND is_nullable = 'NO'
+          ) THEN
+            ALTER TABLE container_expense_payments ALTER COLUMN category_id DROP NOT NULL;
+          END IF;
+        END $$;
+      `);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

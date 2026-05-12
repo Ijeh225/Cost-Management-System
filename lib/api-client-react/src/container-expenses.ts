@@ -71,11 +71,33 @@ export type ContainerExpenseCategory = {
   createdAt: string;
 };
 
+export type PaymentSection = "shipping" | "customs" | "terminal" | "delivery" | "operations";
+
+export const PAYMENT_SECTION_LABELS: Record<PaymentSection, string> = {
+  shipping: "Shipping",
+  customs: "Customs",
+  terminal: "Terminal",
+  delivery: "Delivery",
+  operations: "Operations",
+};
+
+export const ALL_PAYMENT_SECTIONS: PaymentSection[] = ["shipping", "customs", "terminal", "delivery", "operations"];
+
+export type ContainerSectionSummary = {
+  section: PaymentSection;
+  label: string;
+  charged: number;
+  paid: number;
+  outstanding: number;
+};
+
 export type ContainerExpensePayment = {
   id: number;
   containerId: number;
-  categoryId: number;
+  categoryId: number | null;
   categoryName: string;
+  section: PaymentSection | null;
+  sectionLabel: string | null;
   amount: number;
   paymentMethod: "cash" | "bank";
   bankId: number | null;
@@ -105,7 +127,8 @@ export type BatchContainerExpensePaymentItem = {
 
 export type BatchContainerExpensePaymentPayload = {
   items: BatchContainerExpensePaymentItem[];
-  categoryId: number;
+  section?: PaymentSection | null;
+  categoryId?: number | null;
   bankId?: number | null;
   paymentMethod: "cash" | "bank";
   reference?: string;
@@ -116,7 +139,8 @@ export type BatchContainerExpensePaymentPayload = {
 export type BatchCreatedExpensePayment = {
   id: number;
   containerId: number;
-  categoryId: number;
+  categoryId: number | null;
+  section: PaymentSection | null;
   amount: number;
   paymentMethod: "cash" | "bank";
   bankId: number | null;
@@ -166,6 +190,14 @@ export function useGetContainerExpensePayments(containerId: number | null) {
   return useQuery<ContainerExpensePaymentsResponse>({
     queryKey: ["/api/containers", containerId, "expense-payments"],
     queryFn: () => customFetch<ContainerExpensePaymentsResponse>(`/api/containers/${containerId}/expense-payments`),
+    enabled: containerId !== null && containerId > 0,
+  });
+}
+
+export function useGetContainerExpensePaymentsBySection(containerId: number | null) {
+  return useQuery<ContainerSectionSummary[]>({
+    queryKey: ["/api/containers", containerId, "expense-payments", "by-section"],
+    queryFn: () => customFetch<ContainerSectionSummary[]>(`/api/containers/${containerId}/expense-payments/by-section`),
     enabled: containerId !== null && containerId > 0,
   });
 }

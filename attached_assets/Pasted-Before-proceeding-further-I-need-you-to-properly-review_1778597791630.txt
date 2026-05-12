@@ -1,0 +1,84 @@
+Before proceeding further, I need you to properly review and redesign how the Container Expenses and Payment system is connected, because the current workflow is not functioning the way I want it to.
+
+This is how I expect the system to work:
+
+🔄 Container Payment & Expense Synchronization Logic
+
+When a user opens the Container Payment page:
+
+The user searches and selects a container
+Once the container is selected, the Payment Details section should automatically connect to the existing Container Breakdown of Charges already available in the container module
+
+At the moment, we already have a Breakdown of Charges structure inside the container section.
+
+I want that same breakdown structure to synchronize directly into the Container Payment page.
+
+📑 Breakdown-Based Payment Structure
+
+For example:
+If the payment relates to:
+
+Shipping
+Terminal Charges
+Duty
+Trucking
+Storage
+Handling Fees
+
+Then:
+
+Once the user selects a category like “Shipping,”
+The related fields and payment records under Shipping should appear automatically
+
+The payment process should be tied directly to those breakdown categories.
+
+⚠️ Current Problem
+
+Right now, when a payment is added from the Container Payment page:
+
+The payment is not reflecting inside the Breakdown of Charges
+It is just recorded independently
+
+This is incorrect because:
+
+The Breakdown of Charges already contains:
+Cost structure
+Account summaries
+Financial tracking
+
+Everything is supposed to be synchronized together automatically.
+
+🏦 Required Synchronization
+
+Every payment made should automatically connect and synchronize with:
+
+Container Breakdown of Charges
+Bank Accounts
+Accounting Records
+Expense Ledger
+Account Summary
+Container Profitability
+Financial Reports
+🧠 Expected Professional Accounting Structure
+
+I need you to approach this like a professional Chartered Accountant designing an ERP accounting workflow.
+
+The objective is to ensure:
+
+Every container expense is tied to the correct breakdown category
+Every payment affects the correct bank account
+Every transaction updates the accounting records automatically
+No duplicate or disconnected records exist
+The account summaries remain accurate in real time
+🎯 Final Goal
+
+The system should function as one fully synchronized financial ecosystem where:
+
+Container operations
+Expense breakdowns
+Payments
+Bank transactions
+Accounting summaries
+Profitability analysis
+
+are all connected and updated automatically from a single transaction flow.
