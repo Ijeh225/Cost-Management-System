@@ -547,18 +547,43 @@ function DeliveryReportSection() {
   );
 }
 
+type FxSortKey = "containerNumber" | "section" | "usdAmount" | "exchangeRate" | "ngnEquivalent" | "recordedAt";
+
 function FxHistorySection() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [applied, setApplied] = useState<{ from: string; to: string }>({ from: "", to: "" });
+  const [sortKey, setSortKey] = useState<FxSortKey>("recordedAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const { toast } = useToast();
 
   const { data, isLoading } = useGetFxHistory(
     { from: applied.from || undefined, to: applied.to || undefined }
   );
 
-  const entries = data?.entries ?? [];
+  const rawEntries = data?.entries ?? [];
   const totals = data?.totals ?? { totalUsd: 0, totalNgn: 0 };
+
+  const entries = [...rawEntries].sort((a, b) => {
+    let av: any = a[sortKey];
+    let bv: any = b[sortKey];
+    if (typeof av === "string" && typeof bv === "string") {
+      av = av.toLowerCase(); bv = bv.toLowerCase();
+    }
+    if (av < bv) return sortDir === "asc" ? -1 : 1;
+    if (av > bv) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const handleSort = (key: FxSortKey) => {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+  };
+
+  const SortIcon = ({ col }: { col: FxSortKey }) => {
+    if (sortKey !== col) return <span className="opacity-20 ml-1">↕</span>;
+    return <span className="ml-1 text-blue-400">{sortDir === "asc" ? "↑" : "↓"}</span>;
+  };
 
   const SECTION_LABELS: Record<string, string> = {
     shipping: "Shipping",
@@ -656,12 +681,12 @@ function FxHistorySection() {
               <table className="w-full text-sm min-w-[640px]">
                 <thead className="border-b border-border/50 bg-secondary/20 text-xs text-muted-foreground uppercase tracking-wider">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">Container</th>
-                    <th className="px-4 py-3 text-left font-medium">Section</th>
-                    <th className="px-4 py-3 text-right font-medium">USD Amount</th>
-                    <th className="px-4 py-3 text-right font-medium">Rate (₦/$)</th>
-                    <th className="px-4 py-3 text-right font-medium">NGN Equivalent</th>
-                    <th className="px-4 py-3 text-left font-medium">Recorded</th>
+                    <th className="px-4 py-3 text-left font-medium cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("containerNumber")}>Container<SortIcon col="containerNumber" /></th>
+                    <th className="px-4 py-3 text-left font-medium cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("section")}>Section<SortIcon col="section" /></th>
+                    <th className="px-4 py-3 text-right font-medium cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("usdAmount")}>USD Amount<SortIcon col="usdAmount" /></th>
+                    <th className="px-4 py-3 text-right font-medium cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("exchangeRate")}>Rate (₦/$)<SortIcon col="exchangeRate" /></th>
+                    <th className="px-4 py-3 text-right font-medium cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("ngnEquivalent")}>NGN Equivalent<SortIcon col="ngnEquivalent" /></th>
+                    <th className="px-4 py-3 text-left font-medium cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("recordedAt")}>Recorded<SortIcon col="recordedAt" /></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">

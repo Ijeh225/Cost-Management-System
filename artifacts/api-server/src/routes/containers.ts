@@ -1241,7 +1241,7 @@ router.get("/containers/:id", requireAuth, async (req, res) => {
       .where(eq(containerExtraChargesTable.containerId, id))
       .orderBy(containerExtraChargesTable.sortOrder, containerExtraChargesTable.createdAt);
     const extraTotal = extraChargeRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
-    const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations) + extraTotal;
+    const totalCost = calcTotalCost(charges.shipping as any, charges.customs as any, charges.terminal as any, charges.delivery as any, charges.operations as any) + extraTotal;
     const dutyNotPaid = parseFloat(charges.customs.dutyNotPaid ?? "0");
 
     const containerFormatted = {
@@ -1705,7 +1705,7 @@ router.get("/containers/:id/charges", requireAuth, async (req, res) => {
     const extraRows = await db.select().from(containerExtraChargesTable)
       .where(eq(containerExtraChargesTable.containerId, id));
     const extraTotal = extraRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
-    const baseTotal = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations);
+    const baseTotal = calcTotalCost(charges.shipping as any, charges.customs as any, charges.terminal as any, charges.delivery as any, charges.operations as any);
     const totalCost = baseTotal + extraTotal;
     res.json({
       containerId: id,
@@ -1757,6 +1757,36 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       return out;
     };
 
+    const FX_META = new Set(["usdAmount", "exchangeRate", "id", "containerId", "updatedAt"]);
+    const validateFx = (obj: any, sectionName: string): string | null => {
+      if (!obj || obj.usdAmount == null || obj.exchangeRate == null) return null;
+      const usd = parseFloat(obj.usdAmount);
+      const rate = parseFloat(obj.exchangeRate);
+      if (isNaN(usd) || isNaN(rate) || usd <= 0 || rate <= 0) return null;
+      const expected = usd * rate;
+      const ngnTotal = Object.entries(obj)
+        .filter(([k, v]) => !FX_META.has(k) && v != null && !isNaN(parseFloat(String(v))))
+        .reduce((s, [, v]) => s + parseFloat(String(v as any)), 0);
+      if (ngnTotal === 0) return null;
+      const ratio = Math.abs(expected - ngnTotal) / ngnTotal;
+      if (ratio > 0.05) {
+        const fmt = (n: number) => n.toLocaleString("en-NG", { maximumFractionDigits: 0 });
+        return `${sectionName}: USD conversion (₦${fmt(expected)}) doesn't match section total (₦${fmt(ngnTotal)}) — verify the exchange rate`;
+      }
+      return null;
+    };
+
+    const fxErrors: string[] = [];
+    if (section === "shipping" && shipping) { const e = validateFx(shipping, "Shipping"); if (e) fxErrors.push(e); }
+    if (section === "customs" && customs)   { const e = validateFx(customs, "Customs");  if (e) fxErrors.push(e); }
+    if (section === "terminal" && terminal) { const e = validateFx(terminal, "Terminal"); if (e) fxErrors.push(e); }
+    if (section === "delivery" && delivery) { const e = validateFx(delivery, "Delivery"); if (e) fxErrors.push(e); }
+    if (section === "operations" && operations) { const e = validateFx(operations, "Operations"); if (e) fxErrors.push(e); }
+    if (fxErrors.length > 0) {
+      res.status(422).json({ error: fxErrors.join("; ") });
+      return;
+    }
+
     if (section === "shipping" && shipping) {
       await db.insert(shippingChargesTable)
         .values({ containerId: id, ...strNums(shipping) })
@@ -1801,7 +1831,7 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
     const [updated] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     const extraRows = await db.select().from(containerExtraChargesTable).where(eq(containerExtraChargesTable.containerId, id));
     const extraTotal = extraRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
-    const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations) + extraTotal;
+    const totalCost = calcTotalCost(charges.shipping as any, charges.customs as any, charges.terminal as any, charges.delivery as any, charges.operations as any) + extraTotal;
     res.json({
       containerId: id,
       shipping: numericToObj(charges.shipping),
