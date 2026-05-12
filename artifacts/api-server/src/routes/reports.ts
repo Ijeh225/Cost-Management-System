@@ -814,6 +814,10 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
       .where(cepConds.length > 0 ? and(...cepConds) : undefined)
       .orderBy(containerExpensePaymentsTable.paidAt);
 
+    // List of banks — queried early so builders can look up names by id
+    const allBanks = await db.select({ id: banksTable.id, name: banksTable.name }).from(banksTable);
+    const bankNameById = (id: number | null) => allBanks.find(b => b.id === id)?.name ?? null;
+
     type Txn = {
       id: string;
       date: string;
@@ -953,7 +957,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
           description: `Transfer in${r.counterpartName ? ` from ${r.counterpartName}` : ""}${r.narration ? ` — ${r.narration}` : ""}`,
           category: "Bank Transfer",
           bankId: bankIdNum,
-          bankName: null,
+          bankName: bankNameById(bankIdNum),
           reference: r.reference ?? null,
           amount: parseFloat(r.amount as string ?? "0"),
         });
@@ -967,7 +971,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
           description: `Transfer out${r.counterpartName ? ` to ${r.counterpartName}` : ""}${r.narration ? ` — ${r.narration}` : ""}`,
           category: "Bank Transfer",
           bankId: bankIdNum,
-          bankName: null,
+          bankName: bankNameById(bankIdNum),
           reference: r.reference ?? null,
           amount: parseFloat(r.amount as string ?? "0"),
         });
@@ -1054,9 +1058,6 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
       bank_transfer: 0,
     };
     for (const t of inflows) inflowByType[t.type] = (inflowByType[t.type] ?? 0) + t.amount;
-
-    // List of banks (for filter dropdown convenience)
-    const allBanks = await db.select({ id: banksTable.id, name: banksTable.name }).from(banksTable);
 
     return res.json({
       period: { from: from ?? null, to: to ?? null },

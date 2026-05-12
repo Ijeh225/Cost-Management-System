@@ -712,7 +712,11 @@ function PrintableReportsSection() {
             <Button
               size="sm"
               className="w-full gap-2 text-xs h-8"
-              onClick={() => setLocation("/reports/cashflow")}
+              onClick={() => {
+                const p = new URLSearchParams({ from: cfFrom, to: cfTo });
+                if (cfBankId && cfBankId !== "all") p.set("bankId", cfBankId);
+                setLocation(`/reports/cashflow?${p.toString()}`);
+              }}
             >
               <ArrowRight className="w-3.5 h-3.5" /> View Cash Flow Report
             </Button>
