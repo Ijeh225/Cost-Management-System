@@ -201,10 +201,10 @@ function ApplyCreditDialog({
 }
 
 function RaiseCreditNoteDialog({
-  open, onClose, invoiceId, outstanding,
+  open, onClose, invoiceId, outstanding, invoiceTotal,
 }: {
   open: boolean; onClose: () => void;
-  invoiceId: number; outstanding: number;
+  invoiceId: number; outstanding: number; invoiceTotal: number;
 }) {
   const { toast } = useToast();
   const raise = useRaiseCreditNote();
@@ -213,10 +213,13 @@ function RaiseCreditNoteDialog({
 
   const handleClose = () => { setAmount(""); setReason(""); onClose(); };
 
+  const amt = parseFloat(amount);
+  const excessCredit = !isNaN(amt) && amt > outstanding ? Math.max(0, amt - outstanding) : 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) { toast({ variant: "destructive", title: "Enter a valid amount" }); return; }
+    if (amt > invoiceTotal) { toast({ variant: "destructive", title: `Amount cannot exceed invoice total (${formatCurrency(invoiceTotal)})` }); return; }
     if (!reason.trim()) { toast({ variant: "destructive", title: "Reason is required" }); return; }
     try {
       const cn = await raise.mutateAsync({ invoiceId, data: { amount: amt, reason: reason.trim() } });
@@ -237,9 +240,15 @@ function RaiseCreditNoteDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div className="bg-muted/40 border border-border/40 rounded-lg p-3 text-sm">
-            <p className="text-xs text-muted-foreground mb-0.5">Outstanding Balance</p>
-            <p className="font-mono font-bold text-amber-400">{formatCurrency(outstanding)}</p>
+          <div className="bg-muted/40 border border-border/40 rounded-lg p-3 text-sm grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">Outstanding Balance</p>
+              <p className="font-mono font-bold text-amber-400">{formatCurrency(outstanding)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">Invoice Total</p>
+              <p className="font-mono font-semibold text-foreground">{formatCurrency(invoiceTotal)}</p>
+            </div>
           </div>
           <div>
             <Label htmlFor="cn-amount">Amount (₦) *</Label>
@@ -248,12 +257,17 @@ function RaiseCreditNoteDialog({
               type="number"
               min="0.01"
               step="0.01"
-              max={outstanding}
-              placeholder={`Max ${formatCurrency(outstanding)}`}
+              max={invoiceTotal}
+              placeholder={`Up to ${formatCurrency(invoiceTotal)}`}
               value={amount}
               onChange={e => setAmount(e.target.value)}
               className="mt-1 font-mono"
             />
+            {excessCredit > 0 && (
+              <p className="text-xs text-cyan-400 mt-1">
+                {formatCurrency(outstanding)} applied to invoice · {formatCurrency(excessCredit)} posted to client credit balance
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="cn-reason">Reason *</Label>
@@ -267,7 +281,7 @@ function RaiseCreditNoteDialog({
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            A credit note reduces the outstanding balance. The original invoice is preserved for audit purposes.
+            Credit notes up to the invoice total are allowed. Any amount beyond the current outstanding is posted to the client's credit balance.
           </p>
           <div className="flex gap-2 justify-end pt-1">
             <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
@@ -1375,6 +1389,7 @@ export default function InvoiceDetailPage() {
         onClose={() => setCreditNoteOpen(false)}
         invoiceId={invoiceId}
         outstanding={invoice.outstanding}
+        invoiceTotal={invoice.total}
       />
 
       <AddItemDialog

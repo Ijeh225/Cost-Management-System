@@ -591,6 +591,13 @@ router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
       total?: number;
     };
 
+    // written_off is a controlled transition that must go through POST /invoices/:id/write-off
+    // (which enforces overdue check, creates overhead expense, and writes audit log).
+    // Allowing arbitrary status mutations would bypass all those invariants.
+    if (status === "written_off") {
+      return res.status(400).json({ error: "Use POST /invoices/:id/write-off to write off an invoice" });
+    }
+
     const updates: Record<string, any> = { updatedAt: new Date() };
     if (status !== undefined) updates.status = status;
     if (dueDate !== undefined) updates.dueDate = dueDate;
