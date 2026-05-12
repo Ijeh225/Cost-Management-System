@@ -47,9 +47,12 @@ export type InvoicePayment = {
 export type CreditNote = {
   id: number;
   invoiceId: number;
+  invoiceNumber: string | null;
+  clientName: string | null;
   creditNoteNumber: string;
   reason: string;
   amount: number;
+  createdBy: number | null;
   createdAt: string;
 };
 
@@ -270,6 +273,15 @@ export type ArClientRow = {
   creditBalance: number;
 };
 
+export type ArWrittenOffInvoice = {
+  id: number;
+  invoiceNumber: string;
+  clientId: number | null;
+  clientName: string | null;
+  total: number;
+  createdAt: string;
+};
+
 export type ArLedgerResponse = {
   summary: {
     totalInvoiced: number;
@@ -280,9 +292,12 @@ export type ArLedgerResponse = {
     totalOverdue: number;
     totalUnallocatedDeposits: number;
     totalCreditBalance: number;
+    totalWrittenOff: number;
+    writtenOffCount: number;
   };
   aging: ArAgingBuckets;
   clients: ArClientRow[];
+  writtenOffInvoices: ArWrittenOffInvoice[];
 };
 
 export const AR_QUERY_KEY = "/api/invoices/accounts-receivable";
@@ -350,6 +365,24 @@ export function useRemoveInvoiceItem() {
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
       qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
     },
+  });
+}
+
+const CREDIT_NOTES_KEY = "/api/credit-notes";
+
+export function useGetAllCreditNotes(invoiceId?: number) {
+  const url = invoiceId ? `${CREDIT_NOTES_KEY}?invoiceId=${invoiceId}` : CREDIT_NOTES_KEY;
+  return useQuery<CreditNote[]>({
+    queryKey: invoiceId ? [CREDIT_NOTES_KEY, { invoiceId }] : [CREDIT_NOTES_KEY],
+    queryFn: () => customFetch<CreditNote[]>(url),
+  });
+}
+
+export function useGetCreditNoteById(id: number | null) {
+  return useQuery<CreditNote>({
+    queryKey: [CREDIT_NOTES_KEY, id],
+    queryFn: () => customFetch<CreditNote>(`${CREDIT_NOTES_KEY}/${id}`),
+    enabled: !!id,
   });
 }
 

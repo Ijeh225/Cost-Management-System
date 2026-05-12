@@ -484,6 +484,22 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
     const totalUnallocatedDeposits = clients.reduce((s, c) => s + c.unallocatedDeposits, 0);
     const totalCreditBalance = clients.reduce((s, c) => s + c.creditBalance, 0);
 
+    // Fetch written-off total for informational display (excluded from active AR)
+    const writtenOffRows = await db
+      .select({
+        id: invoicesTable.id,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        clientId: invoicesTable.clientId,
+        clientName: clientsTable.name,
+        total: invoicesTable.total,
+        createdAt: invoicesTable.createdAt,
+      })
+      .from(invoicesTable)
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(eq(invoicesTable.status, "written_off"))
+      .orderBy(desc(invoicesTable.createdAt));
+    const totalWrittenOff = writtenOffRows.reduce((s, r) => s + parseFloat(r.total ?? "0"), 0);
+
     res.json({
       summary: {
         totalInvoiced: summaryInvoiced,
@@ -494,9 +510,19 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
         totalOverdue,
         totalUnallocatedDeposits,
         totalCreditBalance,
+        totalWrittenOff,
+        writtenOffCount: writtenOffRows.length,
       },
       aging: summaryAging,
       clients,
+      writtenOffInvoices: writtenOffRows.map(r => ({
+        id: r.id,
+        invoiceNumber: r.invoiceNumber,
+        clientId: r.clientId ?? null,
+        clientName: r.clientName ?? null,
+        total: parseFloat(r.total ?? "0"),
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+      })),
     });
   } catch (err) {
     console.error(err);
@@ -1414,7 +1440,7 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
         creditNoteNumber,
         reason: reason.trim(),
         amount: String(amount),
-        createdBy: (req as any).user?.id ?? null,
+        createdBy: (req as AuthRequest).user?.id ?? null,
       }).returning();
 
       await tx.insert(invoicePaymentsTable).values({
@@ -1504,7 +1530,7 @@ router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, re
         description: `Bad Debt Write-off: ${inv.invoiceNumber}`,
         amount: String(outstanding > 0 ? outstanding : invoiceTotal),
         reference: inv.invoiceNumber,
-        recordedBy: (req as any).user?.id ?? null,
+        recordedBy: (req as AuthRequest).user?.id ?? null,
         paidAt: new Date(),
       }).returning({ id: overheadExpensesTable.id });
       expenseId = exp.id;
@@ -1514,6 +1540,95 @@ router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, re
   } catch (err) {
     console.error("POST /invoices/:id/write-off error:", err);
     res.status(500).json({ error: "Failed to write off invoice" });
+  }
+});
+
+// ─── Flat Credit-Note Endpoints ──────────────────────────────────────────────
+// credit_notes table IS the audit trail — records invoiceId, number, reason,
+// amount, createdBy, createdAt. No separate audit_log insert is needed here;
+// the overhead_expenses row (Bad Debt category) serves as the write-off trail.
+
+router.get("/credit-notes", requireAuth, async (req, res) => {
+  try {
+    const { invoiceId: invoiceIdParam } = req.query as { invoiceId?: string };
+
+    const rows = await db
+      .select({
+        id: creditNotesTable.id,
+        invoiceId: creditNotesTable.invoiceId,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        clientName: clientsTable.name,
+        creditNoteNumber: creditNotesTable.creditNoteNumber,
+        reason: creditNotesTable.reason,
+        amount: creditNotesTable.amount,
+        createdBy: creditNotesTable.createdBy,
+        createdAt: creditNotesTable.createdAt,
+      })
+      .from(creditNotesTable)
+      .leftJoin(invoicesTable, eq(creditNotesTable.invoiceId, invoicesTable.id))
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(
+        invoiceIdParam
+          ? eq(creditNotesTable.invoiceId, parseInt(invoiceIdParam, 10))
+          : undefined
+      )
+      .orderBy(desc(creditNotesTable.createdAt));
+
+    res.json(rows.map(cn => ({
+      id: cn.id,
+      invoiceId: cn.invoiceId,
+      invoiceNumber: cn.invoiceNumber ?? null,
+      clientName: cn.clientName ?? null,
+      creditNoteNumber: cn.creditNoteNumber,
+      reason: cn.reason,
+      amount: parseFloat(cn.amount ?? "0"),
+      createdBy: cn.createdBy ?? null,
+      createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
+    })));
+  } catch (err) {
+    console.error("GET /credit-notes error:", err);
+    res.status(500).json({ error: "Failed to fetch credit notes" });
+  }
+});
+
+router.get("/credit-notes/:id", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const [cn] = await db
+      .select({
+        id: creditNotesTable.id,
+        invoiceId: creditNotesTable.invoiceId,
+        invoiceNumber: invoicesTable.invoiceNumber,
+        clientName: clientsTable.name,
+        creditNoteNumber: creditNotesTable.creditNoteNumber,
+        reason: creditNotesTable.reason,
+        amount: creditNotesTable.amount,
+        createdBy: creditNotesTable.createdBy,
+        createdAt: creditNotesTable.createdAt,
+      })
+      .from(creditNotesTable)
+      .leftJoin(invoicesTable, eq(creditNotesTable.invoiceId, invoicesTable.id))
+      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(eq(creditNotesTable.id, id));
+
+    if (!cn) return res.status(404).json({ error: "Credit note not found" });
+
+    res.json({
+      id: cn.id,
+      invoiceId: cn.invoiceId,
+      invoiceNumber: cn.invoiceNumber ?? null,
+      clientName: cn.clientName ?? null,
+      creditNoteNumber: cn.creditNoteNumber,
+      reason: cn.reason,
+      amount: parseFloat(cn.amount ?? "0"),
+      createdBy: cn.createdBy ?? null,
+      createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
+    });
+  } catch (err) {
+    console.error("GET /credit-notes/:id error:", err);
+    res.status(500).json({ error: "Failed to fetch credit note" });
   }
 });
 

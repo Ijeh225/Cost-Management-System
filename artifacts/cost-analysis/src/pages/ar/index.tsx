@@ -5,6 +5,7 @@ import {
   type ArClientRow,
   type ArUnpaidInvoice,
   type ArAgingBuckets,
+  type ArWrittenOffInvoice,
 } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   BookOpen, Download, Search, ChevronDown, ChevronRight,
   AlertTriangle, Loader2, ExternalLink, Calendar,
-  Wallet, CreditCard, ReceiptText, TrendingUp, Banknote,
+  Wallet, CreditCard, ReceiptText, TrendingUp, Banknote, FileX,
 } from "lucide-react";
 
 function rowHighlight(aging: ArAgingBuckets): string {
@@ -183,6 +184,7 @@ export default function AccountsReceivablePage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
+  const [writtenOffOpen, setWrittenOffOpen] = useState(false);
 
   const { data, isLoading, isError } = useGetArLedger(
     fromDate || toDate ? { from: fromDate || undefined, to: toDate || undefined } : undefined
@@ -191,6 +193,7 @@ export default function AccountsReceivablePage() {
   const clients = data?.clients ?? [];
   const summary = data?.summary;
   const aging = data?.aging;
+  const writtenOffInvoices: ArWrittenOffInvoice[] = data?.writtenOffInvoices ?? [];
 
   const filtered = useMemo(() => {
     if (!search.trim()) return clients;
@@ -492,6 +495,70 @@ export default function AccountsReceivablePage() {
           Red row = has 90+ day outstanding
         </span>
       </div>
+
+      {writtenOffInvoices.length > 0 && (
+        <div className="space-y-2">
+          <button
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg border border-zinc-500/30 bg-zinc-500/5 text-zinc-400 text-sm font-medium hover:bg-zinc-500/10 transition-colors"
+            onClick={() => setWrittenOffOpen(o => !o)}
+          >
+            <FileX className="w-4 h-4" />
+            Written Off — Bad Debt ({writtenOffInvoices.length} invoice{writtenOffInvoices.length !== 1 ? "s" : ""})
+            <span className="font-mono font-semibold ml-1">
+              {formatCurrency(summary?.totalWrittenOff ?? 0)}
+            </span>
+            <span className="ml-auto text-muted-foreground/60 text-xs">
+              Excluded from active AR
+            </span>
+            <span>
+              {writtenOffOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </span>
+          </button>
+
+          {writtenOffOpen && (
+            <Card className="border-zinc-500/30 bg-zinc-500/5">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-500/20 bg-zinc-500/10">
+                      <th className="py-2 px-4 text-left text-xs font-semibold text-zinc-400/80 uppercase tracking-wider">Invoice #</th>
+                      <th className="py-2 px-4 text-left text-xs font-semibold text-zinc-400/80 uppercase tracking-wider">Client</th>
+                      <th className="py-2 px-4 text-right text-xs font-semibold text-zinc-400/80 uppercase tracking-wider">Amount Written Off</th>
+                      <th className="py-2 px-4 text-right text-xs font-semibold text-zinc-400/80 uppercase tracking-wider">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {writtenOffInvoices.map(inv => (
+                      <tr key={inv.id} className="border-b border-zinc-500/10 last:border-0">
+                        <td className="py-2 px-4">
+                          <Link href={`/invoices/${inv.id}`} className="flex items-center gap-1 text-xs font-mono text-zinc-400 hover:text-zinc-200">
+                            {inv.invoiceNumber}
+                            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                          </Link>
+                        </td>
+                        <td className="py-2 px-4 text-xs text-zinc-400">{inv.clientName ?? "—"}</td>
+                        <td className="py-2 px-4 text-right font-mono text-xs text-zinc-300">{formatCurrency(inv.total)}</td>
+                        <td className="py-2 px-4 text-right text-xs text-zinc-500">
+                          {new Date(inv.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-zinc-500/20 bg-zinc-500/10">
+                      <td colSpan={2} className="py-2 px-4 text-xs font-semibold text-zinc-400">Total</td>
+                      <td className="py-2 px-4 text-right font-mono text-sm font-bold text-zinc-300">
+                        {formatCurrency(summary?.totalWrittenOff ?? 0)}
+                      </td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }
