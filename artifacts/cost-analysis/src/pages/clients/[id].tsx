@@ -751,10 +751,18 @@ export default function ClientDetailPage() {
                       <tr key={inv.id} className={`hover:bg-accent/10 transition-colors ${inv.outstanding === 0 && inv.paid > 0 ? "opacity-70" : ""}`}>
                         <td className="px-3 py-2 font-mono text-primary">{inv.invoiceNumber}</td>
                         <td className="px-3 py-2 text-muted-foreground">
-                          {inv.containerNumber ? (
+                          {inv.containerId && inv.containerNumber ? (
                             <Link href={`/containers/${inv.containerId}`} className="hover:text-primary transition-colors">
                               {inv.containerNumber}
                             </Link>
+                          ) : inv.items && inv.items.filter(it => it.containerId).length > 0 ? (
+                            <span className="flex flex-wrap gap-1">
+                              {inv.items.filter(it => it.containerId).map(it => (
+                                <Link key={it.containerId} href={`/containers/${it.containerId}`} className="hover:text-primary transition-colors font-mono text-xs">
+                                  {it.containerNumber ?? `#${it.containerId}`}
+                                </Link>
+                              ))}
+                            </span>
                           ) : "—"}
                         </td>
                         <td className="px-3 py-2 text-right font-mono">{formatCurrency(inv.total)}</td>
@@ -804,10 +812,18 @@ export default function ClientDetailPage() {
                             </td>
                             <td className="px-3 py-2 font-mono text-primary">{p.invoiceNumber}</td>
                             <td className="px-3 py-2 text-muted-foreground">
-                              {p.containerNumber ? (
+                              {p.containerId && p.containerNumber ? (
                                 <Link href={`/containers/${p.containerId}`} className="hover:text-primary transition-colors">
                                   {p.containerNumber}
                                 </Link>
+                              ) : p.containers && p.containers.length > 0 ? (
+                                <span className="flex flex-wrap gap-1">
+                                  {p.containers.map(c => (
+                                    <Link key={c.containerId} href={`/containers/${c.containerId}`} className="hover:text-primary transition-colors font-mono text-xs">
+                                      {c.containerNumber ?? `#${c.containerId}`}
+                                    </Link>
+                                  ))}
+                                </span>
                               ) : "—"}
                             </td>
                             <td className="px-3 py-2 text-right font-mono text-emerald-400 font-semibold">

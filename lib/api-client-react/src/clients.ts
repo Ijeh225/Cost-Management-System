@@ -60,6 +60,14 @@ export type ClientReceivablesInvoice = {
     reference: string | null;
     notes: string | null;
   }>;
+  items: Array<{
+    id: number;
+    containerId: number | null;
+    containerNumber: string | null;
+    description: string;
+    amount: number;
+    sortOrder: number;
+  }>;
 };
 
 export type PaymentHistoryEntry = {
@@ -73,6 +81,7 @@ export type PaymentHistoryEntry = {
   invoiceNumber: string;
   containerId: number | null;
   containerNumber: string | null;
+  containers: Array<{ containerId: number; containerNumber: string | null }>;
 };
 
 export type ClientReceivables = {

@@ -193,14 +193,38 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
       .orderBy(invoicesTable.createdAt);
 
     const invoiceIds = invoices.map(i => i.id);
-    const payments = invoiceIds.length > 0
-      ? await db.select().from(invoicePaymentsTable).where(inArray(invoicePaymentsTable.invoiceId, invoiceIds)).orderBy(invoicePaymentsTable.paidAt)
-      : [];
+    const [payments, allStatementItems] = await Promise.all([
+      invoiceIds.length > 0
+        ? db.select().from(invoicePaymentsTable).where(inArray(invoicePaymentsTable.invoiceId, invoiceIds)).orderBy(invoicePaymentsTable.paidAt)
+        : Promise.resolve([] as Array<{ id: number; invoiceId: number; amount: string; paidAt: Date; paymentMethod: string; reference: string; notes: string; bankId: number | null; createdAt: Date }>),
+      invoiceIds.length > 0
+        ? db.select({
+            id: invoiceItemsTable.id,
+            invoiceId: invoiceItemsTable.invoiceId,
+            containerId: invoiceItemsTable.containerId,
+            containerNumber: containersTable.containerNumber,
+            blNumber: containersTable.blNumber,
+            description: invoiceItemsTable.description,
+            amount: invoiceItemsTable.amount,
+            sortOrder: invoiceItemsTable.sortOrder,
+          })
+          .from(invoiceItemsTable)
+          .leftJoin(containersTable, eq(invoiceItemsTable.containerId, containersTable.id))
+          .where(inArray(invoiceItemsTable.invoiceId, invoiceIds))
+          .orderBy(invoiceItemsTable.sortOrder)
+        : Promise.resolve([] as Array<{ id: number; invoiceId: number; containerId: number | null; containerNumber: string | null; blNumber: string | null; description: string; amount: string; sortOrder: number }>),
+    ]);
 
     const paymentsByInvoice = new Map<number, typeof payments>();
     for (const p of payments) {
       if (!paymentsByInvoice.has(p.invoiceId)) paymentsByInvoice.set(p.invoiceId, []);
       paymentsByInvoice.get(p.invoiceId)!.push(p);
+    }
+
+    const statementItemsByInvoice = new Map<number, typeof allStatementItems>();
+    for (const item of allStatementItems) {
+      if (!statementItemsByInvoice.has(item.invoiceId)) statementItemsByInvoice.set(item.invoiceId, []);
+      statementItemsByInvoice.get(item.invoiceId)!.push(item);
     }
 
     let totalInvoiced = 0;
@@ -214,6 +238,16 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
       const outstanding = inv.status === "written_off" ? 0 : Math.max(0, total - paid);
       totalInvoiced += total;
       totalPaid += paid;
+
+      const items = (statementItemsByInvoice.get(inv.id) ?? []).map(it => ({
+        id: it.id,
+        containerId: it.containerId ?? null,
+        containerNumber: it.containerNumber ?? null,
+        blNumber: it.blNumber ?? null,
+        description: it.description,
+        amount: parseFloat(it.amount ?? "0"),
+        sortOrder: it.sortOrder,
+      }));
 
       return {
         id: inv.id,
@@ -235,6 +269,7 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
           reference: p.reference,
           notes: p.notes,
         })),
+        items,
       };
     });
 

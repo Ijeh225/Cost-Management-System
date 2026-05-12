@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-  db, clientsTable, containersTable, invoicesTable, invoicePaymentsTable,
+  db, clientsTable, containersTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable,
   clientDepositsTable, shippingChargesTable, customsChargesTable,
   terminalChargesTable, deliveryChargesTable, operationsChargesTable,
   usersTable, banksTable,
@@ -209,7 +209,6 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
         invoiceNumber: invoicesTable.invoiceNumber,
         status: invoicesTable.status,
         containerId: invoicesTable.containerId,
-        containerNumber: containersTable.containerNumber,
         subtotal: invoicesTable.subtotal,
         vatAmount: invoicesTable.vatAmount,
         total: invoicesTable.total,
@@ -217,15 +216,40 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
         createdAt: invoicesTable.createdAt,
       })
       .from(invoicesTable)
-      .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
       .where(eq(invoicesTable.clientId, clientId))
       .orderBy(desc(invoicesTable.createdAt));
 
-    const allPayments = await db.select().from(invoicePaymentsTable);
+    const invoiceIds = clientInvoices.map(i => i.id);
+
+    const [allPayments, allItems] = await Promise.all([
+      db.select().from(invoicePaymentsTable),
+      invoiceIds.length > 0
+        ? db.select({
+            id: invoiceItemsTable.id,
+            invoiceId: invoiceItemsTable.invoiceId,
+            containerId: invoiceItemsTable.containerId,
+            containerNumber: containersTable.containerNumber,
+            description: invoiceItemsTable.description,
+            amount: invoiceItemsTable.amount,
+            sortOrder: invoiceItemsTable.sortOrder,
+          })
+          .from(invoiceItemsTable)
+          .leftJoin(containersTable, eq(invoiceItemsTable.containerId, containersTable.id))
+          .where(inArray(invoiceItemsTable.invoiceId, invoiceIds))
+          .orderBy(invoiceItemsTable.sortOrder)
+        : Promise.resolve([] as Array<{ id: number; invoiceId: number; containerId: number | null; containerNumber: string | null; description: string; amount: string; sortOrder: number }>),
+    ]);
+
     const paymentsByInvoice = new Map<number, typeof allPayments>();
     for (const p of allPayments) {
       if (!paymentsByInvoice.has(p.invoiceId)) paymentsByInvoice.set(p.invoiceId, []);
       paymentsByInvoice.get(p.invoiceId)!.push(p);
+    }
+
+    const itemsByInvoice = new Map<number, typeof allItems>();
+    for (const item of allItems) {
+      if (!itemsByInvoice.has(item.invoiceId)) itemsByInvoice.set(item.invoiceId, []);
+      itemsByInvoice.get(item.invoiceId)!.push(item);
     }
 
     let totalInvoiced = 0;
@@ -238,12 +262,20 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
       const outstanding = Math.max(0, total - paid);
       totalInvoiced += total;
       totalCollected += paid;
+      const items = (itemsByInvoice.get(inv.id) ?? []).map(it => ({
+        id: it.id,
+        containerId: it.containerId ?? null,
+        containerNumber: it.containerNumber ?? null,
+        description: it.description,
+        amount: parseFloat(it.amount ?? "0"),
+        sortOrder: it.sortOrder,
+      }));
       return {
         id: inv.id,
         invoiceNumber: inv.invoiceNumber,
         status: inv.status,
-        containerId: inv.containerId,
-        containerNumber: inv.containerNumber ?? null,
+        containerId: inv.containerId ?? null,
+        containerNumber: items.length === 1 ? (items[0].containerNumber ?? null) : null,
         subtotal: parseFloat(inv.subtotal ?? "0"),
         vatAmount: parseFloat(inv.vatAmount ?? "0"),
         total,
@@ -259,17 +291,32 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
           reference: p.reference,
           notes: p.notes,
         })),
+        items,
       };
     });
+
+    // Build invoice items lookup for payment history (containerId -> first item containers per invoice)
+    const invoiceContainersMap = new Map<number, Array<{ containerId: number; containerNumber: string | null }>>();
+    for (const [invId, items] of itemsByInvoice) {
+      invoiceContainersMap.set(
+        invId,
+        items.filter(it => it.containerId != null).map(it => ({
+          containerId: it.containerId as number,
+          containerNumber: it.containerNumber ?? null,
+        }))
+      );
+    }
 
     // Build consolidated payment history sorted by paidAt
     const paymentHistory: Array<{
       id: number; amount: number; paidAt: string; paymentMethod: string | null;
       reference: string | null; notes: string | null; invoiceId: number;
       invoiceNumber: string; containerId: number | null; containerNumber: string | null;
+      containers: Array<{ containerId: number; containerNumber: string | null }>;
     }> = [];
     for (const inv of clientInvoices) {
       const payments = paymentsByInvoice.get(inv.id) ?? [];
+      const containers = invoiceContainersMap.get(inv.id) ?? [];
       for (const p of payments) {
         paymentHistory.push({
           id: p.id,
@@ -281,7 +328,8 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
           invoiceId: inv.id,
           invoiceNumber: inv.invoiceNumber ?? "",
           containerId: inv.containerId ?? null,
-          containerNumber: inv.containerNumber ?? null,
+          containerNumber: containers.length === 1 ? (containers[0].containerNumber ?? null) : null,
+          containers,
         });
       }
     }
