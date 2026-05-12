@@ -267,14 +267,17 @@ function SectionPanel({
           </Form>
         </div>
 
-        {/* ── Record Payment ───────────────────────────────────────────── */}
+        {/* ── Log Disbursement ─────────────────────────────────────────── */}
         <div className={`rounded-xl border ${style.border} ${style.bg} p-4`}>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-1">
             <CreditCard className={`w-3.5 h-3.5 ${style.text}`} />
             <p className={`text-xs font-semibold uppercase tracking-wider ${style.text}`}>
-              Record Payment
+              Log Disbursement
             </p>
           </div>
+          <p className="text-[10px] text-muted-foreground mb-3">
+            Record money paid <span className="font-semibold">out</span> to vendors/agencies for this section — not the client's payment to you.
+          </p>
           <div className="space-y-3">
 
             {/* Amount + Date */}
@@ -360,7 +363,7 @@ function SectionPanel({
               {payPending
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <CheckCircle2 className="w-4 h-4" />}
-              Record {title} Payment
+              Log {title} Disbursement
             </Button>
           </div>
         </div>
@@ -420,7 +423,7 @@ function ContainerView({
       <div className="flex items-center gap-2 px-1">
         <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center border border-primary/30 shrink-0">2</span>
         <p className="text-sm font-semibold">Breakdown Sections</p>
-        <span className="text-xs text-muted-foreground">— click a section to edit charges and record payments</span>
+        <span className="text-xs text-muted-foreground">— edit charges (syncs to container record) and log money paid out</span>
       </div>
 
       {isLoading ? (
@@ -486,7 +489,7 @@ export default function ContainerPaymentsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Container Payments</h1>
           <p className="text-sm text-muted-foreground">
-            Edit charges and record payments — fully synchronized with Breakdown of Charges
+            Log disbursements per section · charges sync live with Breakdown of Charges
           </p>
         </div>
       </div>

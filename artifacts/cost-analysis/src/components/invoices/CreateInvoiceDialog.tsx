@@ -198,7 +198,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
                           className="shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-mono font-semibold text-foreground">
                               {c.containerNumber}
                             </span>
@@ -207,14 +207,22 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
                                 Invoiced
                               </Badge>
                             )}
+                            {(!c.clearingCharges || parseFloat(c.clearingCharges) === 0) && (
+                              <Badge className="text-[10px] px-1.5 py-0 bg-destructive/15 text-destructive border border-destructive/30">
+                                No charge set
+                              </Badge>
+                            )}
                           </div>
                           {c.blNumber && (
                             <p className="text-xs text-muted-foreground font-mono">B/L: {c.blNumber}</p>
                           )}
                         </div>
-                        <span className="text-sm font-semibold text-foreground shrink-0 font-mono">
-                          {formatCurrency(parseFloat(c.clearingCharges ?? "0"))}
-                        </span>
+                        <div className="text-right shrink-0">
+                          <span className={`text-sm font-semibold font-mono ${(!c.clearingCharges || parseFloat(c.clearingCharges) === 0) ? "text-muted-foreground/50" : "text-foreground"}`}>
+                            {formatCurrency(parseFloat(c.clearingCharges ?? "0"))}
+                          </span>
+                          <p className="text-[10px] text-muted-foreground">clearing charge</p>
+                        </div>
                       </label>
                     );
                   })}

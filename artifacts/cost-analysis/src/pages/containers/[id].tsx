@@ -1388,6 +1388,10 @@ export default function ContainerDetail() {
       .reduce((s2, f) => s2 + (parseFloat(customValuesMap[f.id] ?? "0") || 0), 0);
   }, 0);
 
+  const combinedExpenses = (charges.totalCost ?? 0) + customTotal;
+  const totalDisbursed = (sectionPaymentsData as ContainerSectionSummary[]).reduce((s, p) => s + (p.paid ?? 0), 0);
+  const stillToDisburse = Math.max(0, combinedExpenses - totalDisbursed);
+
   const pendingApprovals = sectionApprovals.filter((a: SectionApproval) => a.status === "submitted").length;
 
   return (
@@ -2317,8 +2321,29 @@ export default function ContainerDetail() {
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Total Actual Cost</p>
-                    <p className="text-2xl font-mono font-bold text-foreground">{formatCurrency((charges.totalCost ?? 0) + customTotal)}</p>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Total Expenses</p>
+                    <p className="text-2xl font-mono font-bold text-foreground">{formatCurrency(combinedExpenses)}</p>
+                    {isAdmin && (
+                      <div className="mt-2.5 space-y-1.5 border-t border-border/30 pt-2.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] text-muted-foreground">Disbursed (Paid Out)</span>
+                          <span className={`font-mono text-xs font-semibold ${totalDisbursed > 0 ? "text-red-400" : "text-muted-foreground/50"}`}>
+                            {totalDisbursed > 0 ? `-${formatCurrency(totalDisbursed)}` : "—"}
+                          </span>
+                        </div>
+                        {stillToDisburse > 0 ? (
+                          <div className="flex justify-between items-center">
+                            <span className="text-[11px] text-muted-foreground">Still to Disburse</span>
+                            <span className="font-mono text-xs font-semibold text-amber-400">{formatCurrency(stillToDisburse)}</span>
+                          </div>
+                        ) : totalDisbursed > 0 ? (
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                            <span className="text-[11px] text-emerald-400 font-semibold">All expenses disbursed</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
@@ -2359,8 +2384,7 @@ export default function ContainerDetail() {
                   </div>
                   <div className="pt-6 border-t border-border/40">
                     {(() => {
-                      const combinedCost = (charges.totalCost ?? 0) + customTotal;
-                      const combinedProfit = (charges.clearingCharges ?? 0) - combinedCost;
+                      const combinedProfit = (charges.clearingCharges ?? 0) - combinedExpenses;
                       return (
                         <>
                           <p className="text-sm font-medium text-muted-foreground flex justify-between mb-2">
@@ -2382,9 +2406,10 @@ export default function ContainerDetail() {
                     const totalInvoiced = containerInvoices.reduce((s, inv) => s + (inv.total ?? 0), 0);
                     const totalCollected = containerInvoices.reduce((s, inv) => s + (inv.totalPaid ?? 0), 0);
                     const totalOutstanding = containerInvoices.reduce((s, inv) => s + (inv.outstanding ?? 0), 0);
+                    const cashPnL = totalCollected - totalDisbursed;
                     return (
                       <div className="pt-4 border-t border-border/40 space-y-2">
-                        <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Collections</p>
+                        <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Client Collections</p>
                         <div className="flex justify-between items-center">
                           <span className="text-xs text-muted-foreground">Invoiced</span>
                           <span className="font-mono text-sm font-semibold text-foreground">{formatCurrency(totalInvoiced)}</span>
@@ -2394,14 +2419,33 @@ export default function ContainerDetail() {
                           <span className="font-mono text-sm font-semibold text-emerald-400">{formatCurrency(totalCollected)}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-xs text-muted-foreground">Outstanding</span>
+                          <span className="text-xs text-muted-foreground">Client Owes</span>
                           <span className={`font-mono text-sm font-bold ${totalOutstanding > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
                             {formatCurrency(totalOutstanding)}
                           </span>
                         </div>
+                        {totalDisbursed > 0 && totalCollected > 0 && (
+                          <div className="flex justify-between items-center border-t border-border/30 pt-2 mt-1">
+                            <span className="text-xs text-muted-foreground">Cash P&L (Collected − Disbursed)</span>
+                            <span className={`font-mono text-xs font-bold ${cashPnL >= 0 ? "text-emerald-400" : "text-destructive"}`}>
+                              {formatCurrency(cashPnL)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
+                  {containerInvoices.length === 0 && isAdmin && (
+                    <div className="pt-4 border-t border-border/40 flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground/80">Client Invoicing</p>
+                        <p className="text-[10px] text-muted-foreground/50">No invoice raised yet</p>
+                      </div>
+                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1 shrink-0" onClick={() => setInvoiceDialog(true)}>
+                        <PlusCircle className="w-3 h-3" /> Raise Invoice
+                      </Button>
+                    </div>
+                  )}
                   {charges.customs?.dutyNotPaid !== undefined && charges.customs.dutyNotPaid > 0 && (
                     <div className="p-3 bg-amber-500/10 rounded border border-amber-500/20 flex justify-between items-center">
                       <span className="text-xs font-semibold text-amber-500">Unpaid Duty:</span>
