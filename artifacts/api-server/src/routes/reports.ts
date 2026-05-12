@@ -399,16 +399,18 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
     }
     const invoicedIds = [...containerToInvoiceDate.keys()];
 
-    // Step 2: All containers ever invoiced (used to identify truly uninvoiced ones)
+    // Step 2: All containers that have at least one NON-DRAFT invoice item (used to identify uninvoiced ones).
+    // Containers linked only to draft invoices are treated as uninvoiced until a real invoice is issued.
     const allInvoicedRows = await db
       .select({ containerId: invoiceItemsTable.containerId })
       .from(invoiceItemsTable)
-      .where(isNotNull(invoiceItemsTable.containerId));
+      .innerJoin(invoicesTable, eq(invoiceItemsTable.invoiceId, invoicesTable.id))
+      .where(and(isNotNull(invoiceItemsTable.containerId), ne(invoicesTable.status, "draft")));
     const allInvoicedContainerIds = new Set(
       allInvoicedRows.map(r => r.containerId).filter((v): v is number => v !== null)
     );
 
-    // Step 3: Uninvoiced containers created in the period (no invoice ever raised)
+    // Step 3: Uninvoiced containers created in the period (no non-draft invoice ever raised)
     const uninvConds: SQL[] = [];
     if (fromDate) uninvConds.push(gte(containersTable.createdAt, fromDate));
     if (toDate)   uninvConds.push(lte(containersTable.createdAt, toDate));
@@ -424,11 +426,14 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
       uninvoicedContainers.map(c => [c.id, c.createdAt instanceof Date ? c.createdAt : new Date(c.createdAt)])
     );
 
-    // Combined set of container IDs to fetch charges for
+    // All container IDs we need charges for (invoiced + uninvoiced)
     const allCostIds = [...new Set([...invoicedIds, ...uninvoicedIds])];
     const containerCount = allCostIds.length;
+    const invoicedIdSet = new Set(invoicedIds);
 
+    // Section cost accumulators — only for INVOICED containers (recognized COGS matching revenue)
     let costShipping = 0, costCustoms = 0, costTerminal = 0, costDelivery = 0, costOperations = 0, costExtras = 0;
+    // Uninvoiced COGS is informational — not included in totalCostOfSales / grossProfit
     let uninvoicedCogs = 0;
     const extrasByContainer: Map<number, number> = new Map();
     const totalCostByContainer: Map<number, number> = new Map();
@@ -449,16 +454,18 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
       const dMap2 = new Map<number, any>(allD.map(r => [r.containerId, r]));
       const oMap2 = new Map<number, any>(allO.map(r => [r.containerId, r]));
 
-      for (const r of allS) costShipping   += sumShipping(r as any);
-      for (const r of allC) costCustoms    += sumCustoms(r as any);
-      for (const r of allT) costTerminal   += sumTerminal(r as any);
-      for (const r of allD) costDelivery   += sumDelivery(r as any);
-      for (const r of allO) costOperations += sumOperations(r as any);
+      // Section totals: ONLY count invoiced containers so they match the recognized revenue
+      for (const r of allS) { if (invoicedIdSet.has(r.containerId)) costShipping   += sumShipping(r as any); }
+      for (const r of allC) { if (invoicedIdSet.has(r.containerId)) costCustoms    += sumCustoms(r as any); }
+      for (const r of allT) { if (invoicedIdSet.has(r.containerId)) costTerminal   += sumTerminal(r as any); }
+      for (const r of allD) { if (invoicedIdSet.has(r.containerId)) costDelivery   += sumDelivery(r as any); }
+      for (const r of allO) { if (invoicedIdSet.has(r.containerId)) costOperations += sumOperations(r as any); }
       for (const r of allE) {
         const amt = parseFloat(r.amount as string ?? "0");
-        costExtras += amt;
         extrasByContainer.set(r.containerId, (extrasByContainer.get(r.containerId) ?? 0) + amt);
+        if (invoicedIdSet.has(r.containerId)) costExtras += amt;
       }
+      // Per-container totals (used for monthly attribution and uninvoicedCogs)
       for (const id of allCostIds) {
         const base = calcTotalCost(sMap2.get(id) ?? {}, cMap2.get(id) ?? {}, tMap2.get(id) ?? {}, dMap2.get(id) ?? {}, oMap2.get(id) ?? {});
         const extras = extrasByContainer.get(id) ?? 0;
@@ -467,6 +474,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
       }
     }
 
+    // totalCostOfSales = only invoiced containers' costs (aligned with recognized revenue)
     const totalCostOfSales = costShipping + costCustoms + costTerminal + costDelivery + costOperations + costExtras;
     const grossProfit = totalRevenue - totalCostOfSales;
     const grossMarginPct = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
