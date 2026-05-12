@@ -246,6 +246,18 @@ async function runStartupMigrations() {
       `);
     });
 
+    await runMigration("overhead_paid_at_drop_not_null", async () => {
+      await pool.query(`
+        ALTER TABLE overhead_expenses ALTER COLUMN paid_at DROP NOT NULL
+      `);
+    });
+
+    await runMigration("overhead_paid_at_drop_default", async () => {
+      await pool.query(`
+        ALTER TABLE overhead_expenses ALTER COLUMN paid_at DROP DEFAULT
+      `);
+    });
+
     await runMigration("add_section_to_container_expense_payments_v2", async () => {
       await pool.query(`
         ALTER TABLE container_expense_payments

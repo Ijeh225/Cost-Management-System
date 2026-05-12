@@ -19,7 +19,7 @@ export const overheadExpensesTable = pgTable("overhead_expenses", {
   description: text("description").notNull(),
   amount: numeric("amount", { precision: 18, scale: 2 }).notNull().default("0"),
   bankId: integer("bank_id"),
-  paidAt: timestamp("paid_at").notNull().defaultNow(),
+  paidAt: timestamp("paid_at"),
   reference: text("reference"),
   recordedBy: integer("recorded_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

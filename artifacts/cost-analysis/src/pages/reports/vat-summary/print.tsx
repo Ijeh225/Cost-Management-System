@@ -1,4 +1,5 @@
 import { useGetVatSummary } from "@workspace/api-client-react";
+import { useMemo } from "react";
 
 const fmt = (n: number) =>
   "\u20a6" + Number(n).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -44,6 +45,20 @@ export default function VatSummaryPrint() {
   const vatRate = totals.totalSubtotal > 0 && totals.totalVat > 0
     ? ((totals.totalVat / totals.totalSubtotal) * 100).toFixed(1)
     : null;
+
+  const quarterlyBreakdown = useMemo(() => {
+    const map: Record<string, { label: string; vatCollected: number; taxableAmount: number; count: number }> = {};
+    for (const inv of invoices) {
+      const d = new Date(inv.createdAt);
+      const q = Math.floor(d.getMonth() / 3) + 1;
+      const key = `Q${q} ${d.getFullYear()}`;
+      if (!map[key]) map[key] = { label: key, vatCollected: 0, taxableAmount: 0, count: 0 };
+      map[key].vatCollected += inv.vatAmount;
+      map[key].taxableAmount += inv.subtotal;
+      map[key].count++;
+    }
+    return Object.values(map).sort((a, b) => a.label.localeCompare(b.label));
+  }, [invoices]);
 
   return (
     <>
@@ -126,6 +141,40 @@ export default function VatSummaryPrint() {
             VAT payable to FIRS for period {periodLabel}: <strong>{fmt(totals.totalVat)}</strong>
             {vatRate && ` (effective rate: ${vatRate}%)`}
           </div>
+        )}
+
+        {quarterlyBreakdown.length > 1 && (
+          <>
+            <div className="section-heading">Quarterly VAT Breakdown</div>
+            <table style={{ marginBottom: 24 }}>
+              <thead>
+                <tr>
+                  <th>Quarter</th>
+                  <th className="right">Invoices</th>
+                  <th className="right">Taxable Turnover (₦)</th>
+                  <th className="right">VAT Collected (₦)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quarterlyBreakdown.map(q => (
+                  <tr key={q.label}>
+                    <td style={{ fontWeight: 600 }}>{q.label}</td>
+                    <td className="right">{q.count}</td>
+                    <td className="right">{fmt(q.taxableAmount)}</td>
+                    <td className="right" style={{ color: "#1d4ed8", fontWeight: 600 }}>{fmt(q.vatCollected)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td style={{ fontWeight: 700, color: "#475569" }}>TOTAL</td>
+                  <td className="right">{invoices.length}</td>
+                  <td className="right">{fmt(totals.totalSubtotal)}</td>
+                  <td className="right" style={{ color: "#1d4ed8" }}>{fmt(totals.totalVat)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </>
         )}
 
         <div className="section-heading">Invoice Breakdown</div>

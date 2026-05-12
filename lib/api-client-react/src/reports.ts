@@ -314,3 +314,31 @@ export function useDeliveryAnalyticsReport(
     queryFn: async () => customFetch(`/api/analytics/deliveries?${qs}`),
   });
 }
+
+export type VatLiabilityQuarter = {
+  label: string;
+  year: number;
+  quarter: number;
+  from: string;
+  to: string;
+  vatCollected: number;
+  taxableAmount: number;
+  invoiceCount: number;
+};
+
+export type VatLiabilityResponse = {
+  currentQuarter: VatLiabilityQuarter;
+  quarters: VatLiabilityQuarter[];
+  currentYearTotal: {
+    vatCollected: number;
+    taxableAmount: number;
+    invoiceCount: number;
+  };
+};
+
+export function useGetVatLiability() {
+  return useQuery<VatLiabilityResponse>({
+    queryKey: ["/api/reports/vat-liability"],
+    queryFn: async () => customFetch("/api/reports/vat-liability"),
+  });
+}

@@ -203,7 +203,7 @@ overheadExpensesRouter.post("/overhead-expenses", requireAdmin, async (req: Auth
     }
     const [row] = await db.insert(overheadExpensesTable).values({
       category, description, amount: String(amount),
-      bankId: null, paidAt: new Date(),
+      bankId: null,
       reference: reference || null, recordedBy: req.user?.id ?? null,
     }).returning();
     const [built] = await buildExpensesWithPayments([row]);

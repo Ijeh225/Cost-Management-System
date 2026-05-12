@@ -345,6 +345,75 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireAdmin, async (req:
   }
 });
 
+reportsRouter.get("/reports/vat-liability", requireAuth, requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentQuarterNum = Math.floor(currentMonth / 3) + 1;
+
+    const quarterDefs: Array<{ label: string; year: number; quarter: number; from: Date; to: Date }> = [];
+    for (let i = 0; i < 5; i++) {
+      let q = currentQuarterNum - i;
+      let y = currentYear;
+      while (q <= 0) { q += 4; y--; }
+      const qStartMonth = (q - 1) * 3;
+      const from = new Date(y, qStartMonth, 1);
+      const to = new Date(y, qStartMonth + 3, 0, 23, 59, 59, 999);
+      quarterDefs.push({ label: `Q${q} ${y}`, year: y, quarter: q, from, to });
+    }
+
+    const earliestFrom = quarterDefs[quarterDefs.length - 1].from;
+
+    const invoices = await db.select({
+      subtotal: invoicesTable.subtotal,
+      vatAmount: invoicesTable.vatAmount,
+      status: invoicesTable.status,
+      createdAt: invoicesTable.createdAt,
+    })
+      .from(invoicesTable)
+      .where(
+        and(
+          gte(invoicesTable.createdAt, earliestFrom),
+          ne(invoicesTable.status, "draft"),
+          ne(invoicesTable.status, "cancelled"),
+        )
+      );
+
+    const quarterData = quarterDefs.map(q => {
+      const qInvs = invoices.filter(inv => {
+        const d = inv.createdAt instanceof Date ? inv.createdAt : new Date(inv.createdAt!);
+        return d >= q.from && d <= q.to;
+      });
+      const vatCollected = qInvs.reduce((s, inv) => s + parseFloat(inv.vatAmount ?? "0"), 0);
+      const taxableAmount = qInvs.reduce((s, inv) => s + parseFloat(inv.subtotal ?? "0"), 0);
+      return {
+        label: q.label,
+        year: q.year,
+        quarter: q.quarter,
+        from: q.from.toISOString().slice(0, 10),
+        to: q.to.toISOString().slice(0, 10),
+        vatCollected,
+        taxableAmount,
+        invoiceCount: qInvs.length,
+      };
+    });
+
+    const currentQuarter = quarterData[0];
+    const currentYearQuarters = quarterData.filter(q => q.year === currentYear);
+    const currentYearTotal = {
+      vatCollected: currentYearQuarters.reduce((s, q) => s + q.vatCollected, 0),
+      taxableAmount: currentYearQuarters.reduce((s, q) => s + q.taxableAmount, 0),
+      invoiceCount: currentYearQuarters.reduce((s, q) => s + q.invoiceCount, 0),
+    };
+
+    return res.json({ currentQuarter, quarters: quarterData, currentYearTotal });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
 reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { from, to, clientId, costBasis } = req.query as Record<string, string>;

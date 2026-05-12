@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks } from "@workspace/api-client-react";
+import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks, useGetVatLiability } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import {
   Box, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity,
   FileText, CheckCircle2, ArrowRight, ClipboardCheck, ListTodo,
   Brain, ShieldAlert, Clock, ExternalLink, X, ChevronDown, ChevronUp,
-  Wallet, CreditCard, ReceiptText, ShieldCheck, Landmark,
+  Wallet, CreditCard, ReceiptText, ShieldCheck, Landmark, Percent,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -368,6 +368,7 @@ export default function Dashboard() {
 
   const { data: stats, isLoading, isError } = useGetDashboardStats();
   const { data: arData } = useGetArLedger();
+  const { data: vatLiability } = useGetVatLiability();
   const { data: recentData, isLoading: recentLoading } = useListContainers(
     { page: 1, limit: 5 }
   );
@@ -530,6 +531,61 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </Link>
+      )}
+
+      {/* VAT Liability Widget — admin only */}
+      {isAdmin && vatLiability && (
+        <Card className="border-blue-500/25 bg-blue-500/5 backdrop-blur-sm">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Percent className="w-4 h-4 text-blue-400" />
+              VAT Liability
+              <span className="text-[11px] font-normal text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                {vatLiability.currentQuarter.label}
+              </span>
+            </CardTitle>
+            <Link href="/reports" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+              View VAT Report <ArrowRight className="w-3 h-3" />
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+              <div className="rounded-lg p-3 bg-blue-500/10 border border-blue-500/20 sm:col-span-2">
+                <div className="text-[10px] text-muted-foreground font-medium mb-1">Current Quarter VAT</div>
+                <div className="text-xl font-bold font-mono text-blue-400">
+                  {formatCurrency(vatLiability.currentQuarter.vatCollected)}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">
+                  on {formatCurrency(vatLiability.currentQuarter.taxableAmount)} taxable turnover · {vatLiability.currentQuarter.invoiceCount} invoice{vatLiability.currentQuarter.invoiceCount !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <div className="rounded-lg p-3 bg-muted/30 border border-border/20">
+                <div className="text-[10px] text-muted-foreground font-medium mb-1">{new Date().getFullYear()} YTD VAT</div>
+                <div className="text-base font-bold font-mono text-foreground">
+                  {formatCurrency(vatLiability.currentYearTotal.vatCollected)}
+                </div>
+              </div>
+              <div className="rounded-lg p-3 bg-muted/30 border border-border/20">
+                <div className="text-[10px] text-muted-foreground font-medium mb-1">Filing Reminder</div>
+                <div className="text-[11px] text-amber-400 font-medium leading-snug mt-0.5">
+                  FIRS VAT due 21st of following month
+                </div>
+              </div>
+            </div>
+            {vatLiability.quarters.filter(q => q.vatCollected > 0 || q.label === vatLiability.currentQuarter.label).length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {vatLiability.quarters.slice(0, 4).map(q => (
+                  <div key={q.label} className={`shrink-0 rounded-lg px-3 py-2 border text-center min-w-[90px] ${q.label === vatLiability.currentQuarter.label ? "bg-blue-500/15 border-blue-500/30" : "bg-muted/20 border-border/20"}`}>
+                    <div className="text-[10px] text-muted-foreground font-medium">{q.label}</div>
+                    <div className={`text-xs font-bold font-mono mt-0.5 ${q.label === vatLiability.currentQuarter.label ? "text-blue-400" : "text-foreground"}`}>
+                      {formatCurrency(q.vatCollected)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Monthly Revenue vs Cost Trend */}
