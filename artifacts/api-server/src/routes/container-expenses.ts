@@ -181,6 +181,28 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, 
         }))
       ).returning();
 
+      // Sync dutyPaid in customs_charges when a customs section disbursement is recorded.
+      // This keeps the Duty Payments page in sync with Container Payments.
+      if (resolvedSection === "customs") {
+        for (const item of items) {
+          const cid = Number(item.containerId);
+          const amt = Number(item.amount);
+          const [customs] = await tx
+            .select({ duty: customsChargesTable.duty, dutyPaid: customsChargesTable.dutyPaid })
+            .from(customsChargesTable)
+            .where(eq(customsChargesTable.containerId, cid));
+          if (customs) {
+            const duty = parseFloat(customs.duty ?? "0");
+            const currentPaid = parseFloat(customs.dutyPaid ?? "0");
+            const newPaid = currentPaid + amt;
+            const newOutstanding = duty > 0 ? Math.max(duty - newPaid, 0) : 0;
+            await tx.update(customsChargesTable)
+              .set({ dutyPaid: String(newPaid), dutyNotPaid: String(newOutstanding), updatedAt: new Date() })
+              .where(eq(customsChargesTable.containerId, cid));
+          }
+        }
+      }
+
       if (actorId && payments.length > 0) {
         await tx.insert(auditLogTable).values(
           payments.map(p => ({
