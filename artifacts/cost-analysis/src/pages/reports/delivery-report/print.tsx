@@ -98,8 +98,8 @@ export default function DeliveryReportPrint() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ background: "#f1f5f9", borderBottom: "2px solid #e2e8f0" }}>
-                {["#", "Container / BL", "Customer", "Truck / Driver", "Date Delivered", "Days", "Revenue (₦)", "Status"].map(h => (
-                  <th key={h} style={{ padding: "8px 10px", textAlign: h === "Revenue (₦)" || h === "Days" ? "right" : "left", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8, color: "#64748b" }}>{h}</th>
+                {["#", "Container / BL", "Customer", "Truck / Driver", "Date Delivered", "Days", "Gate-In Date", "Empty Return", "Custody", "Revenue (₦)", "Status"].map(h => (
+                  <th key={h} style={{ padding: "8px 10px", textAlign: h === "Revenue (₦)" || h === "Days" || h === "Custody" ? "right" : "left", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8, color: "#64748b" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -124,6 +124,13 @@ export default function DeliveryReportPrint() {
                     )}
                   </td>
                   <td style={{ padding: "7px 10px", textAlign: "right", fontFamily: "monospace" }}>{item.daysToComplete !== null ? item.daysToComplete : "—"}</td>
+                  <td style={{ padding: "7px 10px", fontFamily: "monospace", color: "#64748b", fontSize: 11 }}>{fmtShort((item as any).gateInDate) || "—"}</td>
+                  <td style={{ padding: "7px 10px", fontFamily: "monospace", fontSize: 11, color: (item as any).emptyReturnDate ? "#059669" : "#d97706" }}>
+                    {(item as any).emptyReturnDate ? fmtShort((item as any).emptyReturnDate) : "Pending"}
+                  </td>
+                  <td style={{ padding: "7px 10px", textAlign: "right", fontFamily: "monospace", fontSize: 11, color: (item as any).custodyClosed ? "#94a3b8" : (item as any).totalCustodyDays >= 21 ? "#dc2626" : (item as any).totalCustodyDays >= 14 ? "#d97706" : "#0d9488" }}>
+                    {(item as any).totalCustodyDays != null ? `${(item as any).totalCustodyDays}d${!(item as any).custodyClosed ? " ▶" : ""}` : "—"}
+                  </td>
                   <td style={{ padding: "7px 10px", textAlign: "right", fontFamily: "monospace", color: "#1e40af" }}>{fmt(item.clearingCharges)}</td>
                   <td style={{ padding: "7px 10px" }}>
                     <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: item.status === "closed" ? "#059669" : "#64748b", background: item.status === "closed" ? "#d1fae5" : "#f1f5f9", border: `1px solid ${item.status === "closed" ? "#a7f3d0" : "#e2e8f0"}`, borderRadius: 10, padding: "2px 8px" }}>
@@ -135,7 +142,7 @@ export default function DeliveryReportPrint() {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: "2px solid #e2e8f0", background: "#f8fafc", fontWeight: 700 }}>
-                <td colSpan={6} style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, color: "#475569" }}>Total Revenue</td>
+                <td colSpan={9} style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, color: "#475569" }}>Total Revenue</td>
                 <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: "monospace", color: "#1e40af" }}>{fmt(data.totalRevenue)}</td>
                 <td></td>
               </tr>

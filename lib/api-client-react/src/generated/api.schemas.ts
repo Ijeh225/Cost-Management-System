@@ -180,6 +180,11 @@ export interface Container {
   earlyStartReason?: string | null;
   gateInDate?: string | null;
   gateOutDate?: string | null;
+  emptyGateInDate?: string | null;
+  emptyGateOutDate?: string | null;
+  stageEnteredAt?: string | null;
+  lifespanDays?: number | null;
+  lifespanClosed?: boolean;
 }
 
 export interface ContainerListResponse {

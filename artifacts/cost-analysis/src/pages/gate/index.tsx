@@ -4,6 +4,8 @@ import {
   useListContainers,
   useGateIn,
   useGateOut,
+  useEmptyGateIn,
+  useEmptyGateOut,
   useGetGateLog,
   type GateLogEntry,
 } from "@workspace/api-client-react";
@@ -16,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   ShieldCheck, Search, LogIn, LogOut, X, RefreshCw,
   Download, Calendar, Clock, Loader2, ExternalLink, Lock,
+  PackageCheck, PackageOpen,
 } from "lucide-react";
 import { getStatusColor, getStatusLabel } from "@/lib/format";
 
@@ -45,6 +48,8 @@ type SelectedContainer = {
   status: string;
   gateInDate: string | null;
   gateOutDate: string | null;
+  emptyGateInDate: string | null;
+  emptyGateOutDate: string | null;
 };
 
 export default function GatePage() {
@@ -57,6 +62,9 @@ export default function GatePage() {
   const [showDropdown, setShowDropdown] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  const emptyGateIn = useEmptyGateIn();
+  const emptyGateOut = useEmptyGateOut();
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -107,6 +115,8 @@ export default function GatePage() {
       status: c.status,
       gateInDate: c.gateInDate ?? null,
       gateOutDate: c.gateOutDate ?? null,
+      emptyGateInDate: c.emptyGateInDate ?? null,
+      emptyGateOutDate: c.emptyGateOutDate ?? null,
     });
     setSearch(c.containerNumber);
     setShowDropdown(false);
@@ -143,6 +153,30 @@ export default function GatePage() {
     }
   };
 
+  const handleEmptyGateIn = async () => {
+    if (!selected) return;
+    try {
+      const updated = await emptyGateIn.mutateAsync({ id: selected.id });
+      setSelected(prev => prev ? { ...prev, emptyGateInDate: (updated as any).emptyGateInDate ?? prev.emptyGateInDate } : null);
+      toast({ title: "Empty Gate-In recorded", description: `${selected.containerNumber} — empty container returned to terminal` });
+      refetchLog();
+    } catch (err) {
+      toast({ variant: "destructive", title: "Empty Gate-In failed", description: err instanceof Error ? err.message : "Server error" });
+    }
+  };
+
+  const handleEmptyGateOut = async () => {
+    if (!selected) return;
+    try {
+      const updated = await emptyGateOut.mutateAsync({ id: selected.id });
+      setSelected(prev => prev ? { ...prev, emptyGateOutDate: (updated as any).emptyGateOutDate ?? prev.emptyGateOutDate } : null);
+      toast({ title: "Empty Gate-Out recorded", description: `${selected.containerNumber} — empty container returned to port, custody closed` });
+      refetchLog();
+    } catch (err) {
+      toast({ variant: "destructive", title: "Empty Gate-Out failed", description: err instanceof Error ? err.message : "Server error" });
+    }
+  };
+
   const handleCsvDownload = () => {
     const qs = new URLSearchParams();
     qs.set("csv", "1");
@@ -155,6 +189,10 @@ export default function GatePage() {
     ? !selected.gateInDate && ["shipping", "pull_out", "gate_in", "examination", "final_release"].includes(selected.status)
     : false;
   const canGateOut = selected ? !!selected.gateInDate && !selected.gateOutDate : false;
+  // Empty gate events: only available after gate-out (container delivered and left)
+  const canEmptyGateIn = selected ? !!selected.gateOutDate && !selected.emptyGateInDate : false;
+  const canEmptyGateOut = selected ? !!selected.emptyGateInDate && !selected.emptyGateOutDate : false;
+  const showEmptyGateSection = selected ? !!(selected.gateOutDate) : false;
 
   const allEntries: GateLogEntry[] = logData?.entries ?? [];
   const expectedEntries = allEntries.filter(e => e.earlyStartAuthorized && !e.gateInDate);
@@ -255,7 +293,7 @@ export default function GatePage() {
                 <StatusBadge status={selected.status} />
               </div>
 
-              {/* Timestamp grid */}
+              {/* Timestamp grid — Gate-In / Gate-Out */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className={`rounded-lg border p-3 ${selected.gateInDate ? "border-emerald-500/30 bg-emerald-500/5" : "border-border/30 bg-muted/20"}`}>
                   <div className="flex items-center gap-1.5 mb-1">
@@ -276,6 +314,56 @@ export default function GatePage() {
                   </p>
                 </div>
               </div>
+
+              {/* Empty return tracking — only visible after Gate-Out */}
+              {showEmptyGateSection && (
+                <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3 space-y-2">
+                  <p className="text-[11px] font-semibold text-violet-400/80 uppercase tracking-wider mb-2">Empty Container Return</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className={`rounded-md border p-2.5 ${selected.emptyGateInDate ? "border-violet-500/30 bg-violet-500/5" : "border-border/20 bg-muted/10"}`}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <PackageOpen className={`w-3 h-3 ${selected.emptyGateInDate ? "text-violet-400" : "text-muted-foreground/50"}`} />
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Empty Gate-In</span>
+                      </div>
+                      <p className={`text-xs font-mono ${selected.emptyGateInDate ? "text-violet-300 font-semibold" : "text-muted-foreground/40 italic"}`}>
+                        {selected.emptyGateInDate ? fmt(selected.emptyGateInDate) : "Not yet recorded"}
+                      </p>
+                    </div>
+                    <div className={`rounded-md border p-2.5 ${selected.emptyGateOutDate ? "border-green-500/30 bg-green-500/5" : "border-border/20 bg-muted/10"}`}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <PackageCheck className={`w-3 h-3 ${selected.emptyGateOutDate ? "text-green-400" : "text-muted-foreground/50"}`} />
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Empty Gate-Out (to Port)</span>
+                      </div>
+                      <p className={`text-xs font-mono ${selected.emptyGateOutDate ? "text-green-400 font-semibold" : "text-muted-foreground/40 italic"}`}>
+                        {selected.emptyGateOutDate ? fmt(selected.emptyGateOutDate) : "Not yet recorded"}
+                      </p>
+                    </div>
+                  </div>
+                  {canOperate && (
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-40 text-xs"
+                        disabled={!canEmptyGateIn || emptyGateIn.isPending || emptyGateOut.isPending}
+                        onClick={handleEmptyGateIn}
+                      >
+                        {emptyGateIn.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <PackageOpen className="w-3.5 h-3.5 mr-1.5" />}
+                        Record Empty Gate-In
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-400 disabled:opacity-40 text-xs"
+                        disabled={!canEmptyGateOut || emptyGateIn.isPending || emptyGateOut.isPending}
+                        onClick={handleEmptyGateOut}
+                      >
+                        {emptyGateOut.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <PackageCheck className="w-3.5 h-3.5 mr-1.5" />}
+                        Record Empty Gate-Out to Port
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Action buttons */}
               {canOperate && (
@@ -373,6 +461,8 @@ export default function GatePage() {
                     <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2.5">Status</th>
                     <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2.5">Gate-In</th>
                     <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2.5">Gate-Out</th>
+                    <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2.5">Empty Gate-In</th>
+                    <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2.5">Empty Gate-Out</th>
                     <th className="px-4 py-2.5" />
                   </tr>
                 </thead>
@@ -410,6 +500,26 @@ export default function GatePage() {
                           <span className="text-xs text-muted-foreground/40 italic">
                             {e.gateInDate ? <span className="text-emerald-400/60 text-[11px] font-medium">In terminal</span> : "—"}
                           </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {e.emptyGateInDate ? (
+                          <div className="flex items-center gap-1.5">
+                            <PackageOpen className="w-3 h-3 text-violet-400 shrink-0" />
+                            <span className="text-xs text-violet-300 font-mono">{fmt(e.emptyGateInDate)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/30 italic">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {e.emptyGateOutDate ? (
+                          <div className="flex items-center gap-1.5">
+                            <PackageCheck className="w-3 h-3 text-green-400 shrink-0" />
+                            <span className="text-xs text-green-400 font-mono">{fmt(e.emptyGateOutDate)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/30 italic">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">

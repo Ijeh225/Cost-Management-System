@@ -74,6 +74,11 @@ export const containersTable = pgTable("containers", {
   // Gate-In / Gate-Out tracking (Security personnel)
   gateInDate: timestamp("gate_in_date"),
   gateOutDate: timestamp("gate_out_date"),
+  // Empty container return tracking (after delivery, empty box returns to terminal then to port)
+  emptyGateInDate: timestamp("empty_gate_in_date"),
+  emptyGateOutDate: timestamp("empty_gate_out_date"),
+  // Stage timing — set whenever container moves to a new pipeline stage (fixes daysInStage accuracy)
+  stageEnteredAt: timestamp("stage_entered_at"),
   // Early Start authorization (allows operations to begin before documentation completes)
   earlyStartAuthorized: boolean("early_start_authorized").notNull().default(false),
   earlyStartAuthorizedById: integer("early_start_authorized_by_id").references(() => usersTable.id),

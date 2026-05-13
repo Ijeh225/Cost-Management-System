@@ -300,6 +300,9 @@ export type DeliveryAnalyticsItem = {
   deliveryLocation: string | null;
   offloadingConfirmed: boolean;
   emptyReturnDate: string | null;
+  gateInDate: string | null;
+  totalCustodyDays: number | null;
+  custodyClosed: boolean;
 };
 
 export type DeliveryAnalyticsResponse = {

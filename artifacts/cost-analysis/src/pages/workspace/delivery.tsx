@@ -362,6 +362,22 @@ function DeliveryChargesPanel({ containerId }: { containerId: number }) {
   );
 }
 
+function CustodyChip({ days, closed }: { days: number | null | undefined; closed?: boolean }) {
+  if (days == null) return null;
+  const color = closed
+    ? "text-slate-400 border-slate-500/30 bg-slate-500/10"
+    : days >= 21
+      ? "text-red-400 border-red-500/30 bg-red-500/10"
+      : days >= 14
+        ? "text-amber-400 border-amber-500/30 bg-amber-500/10"
+        : "text-teal-400 border-teal-500/30 bg-teal-500/10";
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border ${color}`}>
+      Custody: {days}d{!closed && " ▶"}
+    </span>
+  );
+}
+
 function ContainerJobCard({
   c,
   isClose,
@@ -369,7 +385,7 @@ function ContainerJobCard({
   onSubmit,
   isSubmitting,
 }: {
-  c: { id: number; containerNumber: string; blNumber?: string | null; customerName: string; daysInStage: number };
+  c: { id: number; containerNumber: string; blNumber?: string | null; customerName: string; daysInStage: number; lifespanDays?: number | null; lifespanClosed?: boolean };
   isClose: boolean;
   stage: string;
   onSubmit: () => void;
@@ -385,6 +401,7 @@ function ContainerJobCard({
             <span className="font-semibold text-sm font-mono">{c.containerNumber}</span>
             <span className="text-muted-foreground text-xs font-mono">BL: {c.blNumber}</span>
             <DaysChip days={c.daysInStage} />
+            <CustodyChip days={c.lifespanDays} closed={c.lifespanClosed} />
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">{c.customerName}</p>
         </div>

@@ -490,6 +490,9 @@ function DeliveryReportSection() {
                         <th className="px-4 py-2.5 text-left font-medium">Dispatch</th>
                         <th className="px-4 py-2.5 text-left font-medium">Delivered</th>
                         <th className="px-4 py-2.5 text-right font-medium">Days</th>
+                        <th className="px-4 py-2.5 text-left font-medium">Gate-In Date</th>
+                        <th className="px-4 py-2.5 text-left font-medium">Empty Return</th>
+                        <th className="px-4 py-2.5 text-right font-medium">Custody</th>
                         <th className="px-4 py-2.5 text-right font-medium">Revenue (₦)</th>
                         <th className="px-4 py-2.5 text-left font-medium">Status</th>
                       </tr>
@@ -521,6 +524,28 @@ function DeliveryReportSection() {
                           </td>
                           <td className="px-4 py-2.5 text-right font-mono text-xs">
                             {item.daysToComplete !== null ? item.daysToComplete : "—"}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">
+                            {(item as any).gateInDate
+                              ? new Date((item as any).gateInDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })
+                              : <span className="text-muted-foreground/30">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs font-mono">
+                            {(item as any).emptyReturnDate
+                              ? <span className="text-green-400">{new Date((item as any).emptyReturnDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span>
+                              : <span className="text-amber-400/60 text-[10px]">Pending</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono text-xs">
+                            {(item as any).totalCustodyDays != null ? (
+                              <span className={
+                                (item as any).custodyClosed ? "text-slate-400" :
+                                (item as any).totalCustodyDays >= 21 ? "text-red-400 font-semibold" :
+                                (item as any).totalCustodyDays >= 14 ? "text-amber-400 font-semibold" :
+                                "text-teal-400"
+                              }>
+                                {(item as any).totalCustodyDays}d{!(item as any).custodyClosed && " ▶"}
+                              </span>
+                            ) : "—"}
                           </td>
                           <td className="px-4 py-2.5 text-right font-mono text-xs text-primary">{formatCurrency(item.clearingCharges)}</td>
                           <td className="px-4 py-2.5">

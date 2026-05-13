@@ -1391,6 +1391,70 @@ function OperationalForm({
       </Card>
       )}
 
+      {/* Container Lifespan — shown whenever a gate-in date exists */}
+      {container.gateInDate && (() => {
+        const gateIn = new Date(container.gateInDate!);
+        const emptyReturn = container.emptyReturnDate ? new Date(container.emptyReturnDate) : null;
+        const lifespanDays = Math.max(0, Math.floor(((emptyReturn ?? new Date()).getTime() - gateIn.getTime()) / 86_400_000));
+        const closed = !!container.emptyReturnDate;
+        const lifespanColor = closed
+          ? "text-slate-300"
+          : lifespanDays >= 21
+            ? "text-red-400"
+            : lifespanDays >= 14
+              ? "text-amber-400"
+              : "text-emerald-400";
+        const borderColor = closed
+          ? "border-slate-500/30 bg-slate-500/5"
+          : lifespanDays >= 21
+            ? "border-red-500/30 bg-red-500/5"
+            : lifespanDays >= 14
+              ? "border-amber-500/30 bg-amber-500/5"
+              : "border-emerald-500/30 bg-emerald-500/5";
+        const fmtDate = (iso: string | null | undefined) => iso
+          ? new Date(iso).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })
+          : "—";
+        return (
+          <Card className={`border backdrop-blur-sm ${borderColor}`}>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Activity className="w-4 h-4 text-primary" />
+                Container Lifespan
+                <span className={`text-lg font-bold ml-auto ${lifespanColor}`}>
+                  {lifespanDays}d{!closed && " ▶"}
+                </span>
+                {closed
+                  ? <span className="text-[10px] font-semibold text-slate-400 bg-slate-500/10 border border-slate-500/30 px-2 py-0.5 rounded-full">Closed</span>
+                  : <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">Running</span>}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                {[
+                  { label: "Gate-In", value: fmtDate(container.gateInDate), color: "text-emerald-400" },
+                  { label: "Gate-Out", value: fmtDate(container.gateOutDate), color: "text-amber-400" },
+                  { label: "Empty Gate-In", value: fmtDate((container as any).emptyGateInDate), color: "text-violet-400" },
+                  { label: "Empty Return to Port", value: fmtDate(container.emptyReturnDate), color: "text-green-400" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="rounded-md border border-border/30 bg-card/40 p-2.5">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
+                    <p className={`font-medium ${value === "—" ? "text-muted-foreground/40 italic" : color}`}>{value}</p>
+                  </div>
+                ))}
+              </div>
+              {!closed && lifespanDays >= 14 && (
+                <p className={`mt-3 text-xs font-medium flex items-center gap-1.5 ${lifespanDays >= 21 ? "text-red-400" : "text-amber-400"}`}>
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  {lifespanDays >= 21
+                    ? "Custody exceeds 21 days — escalate empty container return"
+                    : "Custody approaching 21-day limit — follow up on empty return"}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* Submit to Next Stage — not shown for terminal/pull_out stages; those actions belong in /workspace/terminal-ops */}
       {isEditable && nextStage && !["terminal", "pull_out"].includes(container.status) && (!deptScope || isAdmin) && (() => {
         const deptRole = isDocumentationUser ? "documentation_user"

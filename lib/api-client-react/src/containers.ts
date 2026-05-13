@@ -30,6 +30,11 @@ export type PipelineContainer = {
   tdoReleasedAt?: string | null;
   expectedPulloutDate?: string | null;
   pulloutReleasedAt?: string | null;
+  gateInDate?: string | null;
+  emptyReturnDate?: string | null;
+  emptyReturnDueDate?: string | null;
+  lifespanDays?: number | null;
+  lifespanClosed?: boolean;
 };
 
 export type PipelineResponse = {
@@ -498,6 +503,31 @@ export function useGateOut() {
   });
 }
 
+export function useEmptyGateIn() {
+  const qc = useQueryClient();
+  return useMutation<Record<string, unknown>, Error, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch(`/api/containers/${id}/empty-gate-in`, { method: "POST" }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["containers", "gate-log"] });
+    },
+  });
+}
+
+export function useEmptyGateOut() {
+  const qc = useQueryClient();
+  return useMutation<Record<string, unknown>, Error, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch(`/api/containers/${id}/empty-gate-out`, { method: "POST" }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: ["containers", "gate-log"] });
+      qc.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
+    },
+  });
+}
+
 export type GateLogEntry = {
   id: number;
   containerNumber: string;
@@ -508,6 +538,9 @@ export type GateLogEntry = {
   status: string;
   gateInDate: string | null;
   gateOutDate: string | null;
+  emptyGateInDate?: string | null;
+  emptyGateOutDate?: string | null;
+  emptyReturnDate?: string | null;
   earlyStartAuthorized?: boolean;
   earlyStartReason?: string | null;
 };

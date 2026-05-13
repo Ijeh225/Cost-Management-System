@@ -254,6 +254,7 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
       deliveryLocation: containersTable.deliveryLocation,
       offloadingConfirmed: containersTable.offloadingConfirmed,
       emptyReturnDate: containersTable.emptyReturnDate,
+      gateInDate: containersTable.gateInDate,
     }).from(containersTable).where(where);
 
     let totalRevenue = 0;
@@ -277,6 +278,11 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
         totalDays += daysToComplete;
         countWithDays++;
       }
+      const gateIn = c.gateInDate instanceof Date ? c.gateInDate : (c.gateInDate ? new Date(c.gateInDate) : null);
+      const emptyRet = c.emptyReturnDate instanceof Date ? c.emptyReturnDate : (c.emptyReturnDate ? new Date(c.emptyReturnDate) : null);
+      const totalCustodyDays = gateIn
+        ? Math.max(0, Math.floor(((emptyRet ?? new Date()).getTime() - gateIn.getTime()) / 86_400_000))
+        : null;
       return {
         id: c.id,
         containerNumber: c.containerNumber,
@@ -294,7 +300,10 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
         deliveryStatus: c.deliveryStatus ?? "pending",
         deliveryLocation: c.deliveryLocation ?? null,
         offloadingConfirmed: c.offloadingConfirmed ?? false,
-        emptyReturnDate: c.emptyReturnDate instanceof Date ? c.emptyReturnDate.toISOString() : (c.emptyReturnDate ?? null),
+        emptyReturnDate: emptyRet ? emptyRet.toISOString() : null,
+        gateInDate: gateIn ? gateIn.toISOString() : null,
+        totalCustodyDays,
+        custodyClosed: !!(c.emptyReturnDate),
       };
     });
 

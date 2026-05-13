@@ -108,6 +108,18 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     earlyStartReason: c.earlyStartReason ?? null,
     gateInDate: c.gateInDate instanceof Date ? c.gateInDate.toISOString() : (c.gateInDate ?? null),
     gateOutDate: c.gateOutDate instanceof Date ? c.gateOutDate.toISOString() : (c.gateOutDate ?? null),
+    emptyGateInDate: c.emptyGateInDate instanceof Date ? c.emptyGateInDate.toISOString() : (c.emptyGateInDate ?? null),
+    emptyGateOutDate: c.emptyGateOutDate instanceof Date ? c.emptyGateOutDate.toISOString() : (c.emptyGateOutDate ?? null),
+    stageEnteredAt: c.stageEnteredAt instanceof Date ? c.stageEnteredAt.toISOString() : (c.stageEnteredAt ?? null),
+    // Computed: total custody days from gate-in to empty return (or running if not yet returned)
+    lifespanDays: (() => {
+      const start = c.gateInDate instanceof Date ? c.gateInDate : (c.gateInDate ? new Date(c.gateInDate) : null);
+      if (!start) return null;
+      const end = c.emptyReturnDate instanceof Date ? c.emptyReturnDate : (c.emptyReturnDate ? new Date(c.emptyReturnDate) : null);
+      const ref = end ?? new Date();
+      return Math.max(0, Math.floor((ref.getTime() - start.getTime()) / 86_400_000));
+    })(),
+    lifespanClosed: !!(c.emptyReturnDate),
   };
 }
 
@@ -555,6 +567,7 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       customerName: containersTable.customerName,
       status: containersTable.status,
       updatedAt: containersTable.updatedAt,
+      stageEnteredAt: containersTable.stageEnteredAt,
       assignedStaffName: usersTable.name,
       stageOwner: containersTable.stageOwner,
       nextAction: containersTable.nextAction,
@@ -574,6 +587,9 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       releaseDelayReason: containersTable.releaseDelayReason,
       releaseFinalDate: containersTable.releaseFinalDate,
       tdoReleasedAt: containersTable.tdoReleasedAt,
+      gateInDate: containersTable.gateInDate,
+      emptyReturnDate: containersTable.emptyReturnDate,
+      emptyReturnDueDate: containersTable.emptyReturnDueDate,
     })
       .from(containersTable)
       .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id))
@@ -619,9 +635,15 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
     }>> = {};
 
     for (const c of rows) {
+      // Use stageEnteredAt for accuracy — falls back to updatedAt for legacy rows
+      const stageStart = c.stageEnteredAt ?? c.updatedAt;
       const daysInStage = Math.floor(
-        (now.getTime() - new Date(c.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+        (now.getTime() - new Date(stageStart).getTime()) / (1000 * 60 * 60 * 24)
       );
+      // Compute lifespan: gate-in → empty return (or running)
+      const gateIn = c.gateInDate instanceof Date ? c.gateInDate : (c.gateInDate ? new Date(c.gateInDate) : null);
+      const emptyReturn = c.emptyReturnDate instanceof Date ? c.emptyReturnDate : (c.emptyReturnDate ? new Date(c.emptyReturnDate) : null);
+      const lifespanDays = gateIn ? Math.max(0, Math.floor(((emptyReturn ?? now).getTime() - gateIn.getTime()) / 86_400_000)) : null;
       if (!stages[c.status]) stages[c.status] = [];
       const duty = parseFloat(c.duty ?? "0") || 0;
       const dutyPaid = parseFloat(c.dutyPaid ?? "0") || 0;
@@ -650,6 +672,11 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
         releaseDelayReason: c.releaseDelayReason ?? null,
         releaseFinalDate: c.releaseFinalDate instanceof Date ? c.releaseFinalDate.toISOString() : (c.releaseFinalDate ?? null),
         tdoReleasedAt: c.tdoReleasedAt instanceof Date ? c.tdoReleasedAt.toISOString() : (c.tdoReleasedAt ?? null),
+        gateInDate: c.gateInDate instanceof Date ? c.gateInDate.toISOString() : (c.gateInDate ?? null),
+        emptyReturnDate: c.emptyReturnDate instanceof Date ? c.emptyReturnDate.toISOString() : (c.emptyReturnDate ?? null),
+        emptyReturnDueDate: c.emptyReturnDueDate instanceof Date ? c.emptyReturnDueDate.toISOString() : (c.emptyReturnDueDate ?? null),
+        lifespanDays,
+        lifespanClosed: !!(c.emptyReturnDate),
       };
       stages[c.status].push(entry);
 
@@ -850,7 +877,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
       }
     }
     const [updated] = await db.update(containersTable)
-      .set({ status: nextStatus, updatedAt: new Date(), nextAction: null, nextActionDueDate: null })
+      .set({ status: nextStatus, updatedAt: new Date(), stageEnteredAt: new Date(), nextAction: null, nextActionDueDate: null })
       .where(eq(containersTable.id, id))
       .returning();
     await db.insert(auditLogTable).values({
@@ -1102,15 +1129,18 @@ router.get("/containers/gate-log", requireAuth, async (req: AuthRequest, res) =>
       status: c.status,
       gateInDate: c.gateInDate instanceof Date ? c.gateInDate.toISOString() : (c.gateInDate ?? null),
       gateOutDate: c.gateOutDate instanceof Date ? c.gateOutDate.toISOString() : (c.gateOutDate ?? null),
+      emptyGateInDate: c.emptyGateInDate instanceof Date ? c.emptyGateInDate.toISOString() : (c.emptyGateInDate ?? null),
+      emptyGateOutDate: c.emptyGateOutDate instanceof Date ? c.emptyGateOutDate.toISOString() : (c.emptyGateOutDate ?? null),
+      emptyReturnDate: c.emptyReturnDate instanceof Date ? c.emptyReturnDate.toISOString() : (c.emptyReturnDate ?? null),
       earlyStartAuthorized: c.earlyStartAuthorized ?? false,
       earlyStartReason: c.earlyStartReason ?? null,
     }));
 
     if (csv) {
-      const header = "Container No,B/L No,Customer,Size,Command,Status,Gate-In Date,Gate-Out Date\r\n";
+      const header = "Container No,B/L No,Customer,Size,Command,Status,Gate-In Date,Gate-Out Date,Empty Gate-In Date,Empty Gate-Out Date\r\n";
       const rowsCsv = data.map(r =>
         [r.containerNumber, r.blNumber, r.customerName, r.size, r.command, r.status,
-          r.gateInDate ?? "", r.gateOutDate ?? ""]
+          r.gateInDate ?? "", r.gateOutDate ?? "", r.emptyGateInDate ?? "", r.emptyGateOutDate ?? ""]
           .map(v => `"${String(v).replace(/"/g, '""')}"`)
           .join(",")
       ).join("\r\n");
@@ -1206,6 +1236,85 @@ router.post("/containers/:id/gate-out", requireAuth, async (req: AuthRequest, re
       action: "gate_out_recorded",
       section: "basic_info",
       reason: `Gate-Out recorded at ${now.toISOString()} by security`,
+    });
+    res.json(formatContainer(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /containers/:id/empty-gate-in — Security records empty container return to terminal (Scenario B step 1)
+router.post("/containers/:id/empty-gate-in", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const userRole = req.user!.role;
+    const isAdmin = userRole === "admin" || userRole === "super_admin";
+    const userRoles: string[] = (req.user as any).roles ?? [userRole];
+    const isSecurityUser = userRoles.includes("security_user");
+    if (!isAdmin && !isSecurityUser) {
+      res.status(403).json({ error: "Only security personnel or administrators can record Empty Gate-In" });
+      return;
+    }
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    if (existing.emptyGateInDate) {
+      res.status(409).json({ error: "Empty Gate-In has already been recorded for this container" });
+      return;
+    }
+    const now = new Date();
+    const [updated] = await db.update(containersTable)
+      .set({ emptyGateInDate: now, updatedAt: now })
+      .where(eq(containersTable.id, id))
+      .returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "empty_gate_in_recorded",
+      section: "basic_info",
+      reason: `Empty Gate-In recorded at ${now.toISOString()} by security — empty container returned to terminal`,
+    });
+    res.json(formatContainer(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /containers/:id/empty-gate-out — Security records empty container exit to port (Scenario B step 2 — auto-sets emptyReturnDate)
+router.post("/containers/:id/empty-gate-out", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const userRole = req.user!.role;
+    const isAdmin = userRole === "admin" || userRole === "super_admin";
+    const userRoles: string[] = (req.user as any).roles ?? [userRole];
+    const isSecurityUser = userRoles.includes("security_user");
+    if (!isAdmin && !isSecurityUser) {
+      res.status(403).json({ error: "Only security personnel or administrators can record Empty Gate-Out" });
+      return;
+    }
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    if (!existing.emptyGateInDate) {
+      res.status(409).json({ error: "Empty Gate-In must be recorded before Empty Gate-Out" });
+      return;
+    }
+    if (existing.emptyGateOutDate) {
+      res.status(409).json({ error: "Empty Gate-Out has already been recorded for this container" });
+      return;
+    }
+    const now = new Date();
+    // Auto-set emptyReturnDate: empty has left terminal, custody lifespan closes
+    const [updated] = await db.update(containersTable)
+      .set({ emptyGateOutDate: now, emptyReturnDate: now, updatedAt: now })
+      .where(eq(containersTable.id, id))
+      .returning();
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      userId: req.user!.id,
+      action: "empty_gate_out_recorded",
+      section: "basic_info",
+      reason: `Empty Gate-Out recorded at ${now.toISOString()} by security — empty container returned to port, custody closed`,
     });
     res.json(formatContainer(updated));
   } catch (err) {
