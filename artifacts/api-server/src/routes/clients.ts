@@ -69,7 +69,9 @@ clientsRouter.post("/clients", requireAuth, async (req: AuthRequest, res) => {
     const [client] = await db.insert(clientsTable).values({
       name: name.trim(), contactName, contactEmail, contactPhone, address, notes,
       agreedClearingRate: rate,
-      branchId: req.user!.branchId,
+      branchId: req.user!.role === "super_admin" && req.body.branchId
+        ? Number(req.body.branchId)
+        : req.user!.branchId,
     }).returning();
     return res.status(201).json({
       ...client,

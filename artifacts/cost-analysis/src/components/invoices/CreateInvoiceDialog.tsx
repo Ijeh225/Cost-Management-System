@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/layout/auth-provider";
+import { useBranches } from "@/pages/branches";
 import { Loader2, PlusCircle, Package, AlertCircle, ChevronRight } from "lucide-react";
 
 type Props = {
@@ -41,6 +43,9 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
   const { data: clientDetails, isLoading: containersLoading } = useGetClient(selectedClientId);
   const { data: allInvoices } = useListInvoices();
   const createMutation = useCreateInvoice();
+  const { isSuperAdmin, user } = useAuth();
+  const { data: branches } = useBranches();
+  const [branchId, setBranchId] = useState<number | null>((user as any)?.branchId ?? null);
 
   useEffect(() => {
     if (open) {
@@ -96,7 +101,8 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
         vatRate: vatRate ? parseFloat(vatRate) : undefined,
         dueDate: dueDate || undefined,
         notes: notes || undefined,
-      });
+        ...(isSuperAdmin && branchId != null && { branchId }),
+      } as any);
       toast({ title: "Invoice created", description: inv.invoiceNumber });
       onClose();
       setLocation(`/invoices/${inv.id}`);
@@ -275,6 +281,24 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
                 />
               </div>
             </div>
+
+            {isSuperAdmin && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Branch</Label>
+                <Select
+                  value={branchId != null ? String(branchId) : ""}
+                  onValueChange={(v) => setBranchId(v ? Number(v) : null)}
+                >
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select branch…" /></SelectTrigger>
+                  <SelectContent>
+                    {(branches ?? []).filter((b) => b.isActive).map((b) => (
+                      <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">Defaults to your active branch.</p>
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Notes</Label>

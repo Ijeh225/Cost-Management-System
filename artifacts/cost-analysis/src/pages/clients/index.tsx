@@ -22,6 +22,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useBranches } from "@/pages/branches";
 import {
   Users, Plus, Search, Loader2, Trash2, ChevronRight, ChevronDown,
   Phone, Mail, MapPin, Building2, Upload, Download, AlertTriangle,
@@ -123,6 +125,9 @@ function ClientCard({ client, isAdmin }: { client: Client; isAdmin: boolean }) {
 function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const createMutation = useCreateClient();
+  const { isSuperAdmin, user } = useAuth();
+  const { data: branches } = useBranches();
+  const [branchId, setBranchId] = useState<number | null>((user as any)?.branchId ?? null);
   const [form, setForm] = useState({
     name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "", agreedClearingRate: "",
   });
@@ -132,10 +137,11 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
   const handleSubmit = async () => {
     if (!form.name.trim()) return;
     try {
-      const payload = {
+      const payload: any = {
         ...form,
         agreedClearingRate: form.agreedClearingRate !== "" ? parseFloat(form.agreedClearingRate) : undefined,
       };
+      if (isSuperAdmin && branchId != null) payload.branchId = branchId;
       await createMutation.mutateAsync(payload);
       toast({ title: "Client created" });
       setForm({ name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "", agreedClearingRate: "" });
@@ -191,6 +197,23 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
             />
             <p className="text-[11px] text-muted-foreground">When set, this rate auto-fills container clearing charges on new invoices.</p>
           </div>
+          {isSuperAdmin && (
+            <div className="space-y-1">
+              <Label className="text-xs">Branch</Label>
+              <Select
+                value={branchId != null ? String(branchId) : ""}
+                onValueChange={(v) => setBranchId(v ? Number(v) : null)}
+              >
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select branch…" /></SelectTrigger>
+                <SelectContent>
+                  {(branches ?? []).filter((b) => b.isActive).map((b) => (
+                    <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">Defaults to your active branch.</p>
+            </div>
+          )}
           <div className="space-y-1">
             <Label className="text-xs">Notes</Label>
             <Textarea value={form.notes} onChange={e => set({ notes: e.target.value })} placeholder="Any additional notes..." rows={2} className="resize-none" />

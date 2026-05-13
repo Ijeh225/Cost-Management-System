@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useCreateContainer, useListClients } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/layout/auth-provider";
+import { useBranches } from "@/pages/branches";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +38,11 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
   const { toast } = useToast();
   const createMutation = useCreateContainer();
   const { data: clients } = useListClients();
+  const { isSuperAdmin, user } = useAuth();
+  const { data: branches } = useBranches();
+  const [branchId, setBranchId] = useState<number | null>(
+    (user as any)?.branchId ?? null,
+  );
 
   const [form, setForm] = useState({
     customerName: "",
@@ -115,7 +122,8 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
           clientId: form.clientId !== NO_CLIENT ? Number(form.clientId) : null,
           ...(form.eta && { eta: form.eta }),
           ...(form.consignee.trim() && { consignee: form.consignee.trim() }),
-        },
+          ...(isSuperAdmin && branchId != null && { branchId } as any),
+        } as any,
       });
       toast({ title: "Container created", description: `${container.containerNumber} has been added.` });
       onOpenChange(false);
@@ -310,6 +318,28 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
                 </SelectContent>
               </Select>
             </div>
+
+            {isSuperAdmin && (
+              <div className="col-span-2 space-y-1.5">
+                <Label htmlFor="branch">Branch</Label>
+                <Select
+                  value={branchId != null ? String(branchId) : ""}
+                  onValueChange={(v) => setBranchId(v ? Number(v) : null)}
+                >
+                  <SelectTrigger id="branch">
+                    <SelectValue placeholder="Select branch…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(branches ?? []).filter((b) => b.isActive).map((b) => (
+                      <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Defaults to your active branch. Select another only when creating on behalf of a different branch.
+                </p>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="pt-2">

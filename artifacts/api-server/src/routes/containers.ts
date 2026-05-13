@@ -127,7 +127,14 @@ async function getOrCreateSectionApproval(containerId: number, section: string) 
   let [row] = await db.select().from(sectionApprovalsTable)
     .where(and(eq(sectionApprovalsTable.containerId, containerId), eq(sectionApprovalsTable.section, section)));
   if (!row) {
-    [row] = await db.insert(sectionApprovalsTable).values({ containerId, section, status: "draft" }).returning();
+    // Derive branchId from the parent container so the section_approval row
+    // is stamped with the correct branch (not the DB-default fallback).
+    const [parent] = await db.select({ branchId: containersTable.branchId })
+      .from(containersTable).where(eq(containersTable.id, containerId));
+    const branchId = parent?.branchId ?? 1;
+    [row] = await db.insert(sectionApprovalsTable)
+      .values({ containerId, section, status: "draft", branchId })
+      .returning();
   }
   return row;
 }
@@ -394,7 +401,9 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       clientId: parsedClientId,
       eta: eta ? new Date(eta) : null,
       consignee: consignee || null,
-      branchId: req.user!.branchId,
+      branchId: req.user!.role === "super_admin" && req.body.branchId
+        ? Number(req.body.branchId)
+        : req.user!.branchId,
     }).returning();
     await getOrCreateCharges(container.id);
     // Notify: new job created

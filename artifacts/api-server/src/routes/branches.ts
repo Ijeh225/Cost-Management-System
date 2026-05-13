@@ -1,20 +1,46 @@
 import { Router } from "express";
-import { db, branchesTable, usersTable, containersTable, clientsTable, invoicesTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import {
+  db, branchesTable, usersTable, containersTable, clientsTable, invoicesTable,
+} from "@workspace/db";
+import { eq, and, sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin, AuthRequest } from "../lib/auth.js";
 
 const router = Router();
 
+function serialize(b: any) {
+  return {
+    ...b,
+    createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt,
+    updatedAt: b.updatedAt instanceof Date ? b.updatedAt.toISOString() : b.updatedAt,
+  };
+}
+
+// GET /branches — list with operational counts.
+// Any authenticated user may list branches (creation forms, pickers, users page).
 router.get("/branches", requireAuth, async (req: AuthRequest, res) => {
-  // Any authenticated user may list branches (needed by /users page,
-  // creation forms, branch-pickers, etc.). Only mutations are super-admin.
   void req;
   try {
     const rows = await db.select().from(branchesTable).orderBy(branchesTable.id);
+
+    const userCounts = await db
+      .select({ branchId: usersTable.branchId, c: sql<number>`count(*)` })
+      .from(usersTable)
+      .groupBy(usersTable.branchId);
+    const containerCounts = await db
+      .select({ branchId: containersTable.branchId, c: sql<number>`count(*)` })
+      .from(containersTable)
+      .where(sql`${containersTable.status} <> 'archived'`)
+      .groupBy(containersTable.branchId);
+
+    const userMap = new Map<number, number>();
+    for (const r of userCounts) userMap.set(r.branchId, Number(r.c ?? 0));
+    const containerMap = new Map<number, number>();
+    for (const r of containerCounts) containerMap.set(r.branchId, Number(r.c ?? 0));
+
     res.json(rows.map((b) => ({
-      ...b,
-      createdAt: b.createdAt.toISOString(),
-      updatedAt: b.updatedAt.toISOString(),
+      ...serialize(b),
+      userCount: userMap.get(b.id) ?? 0,
+      activeContainerCount: containerMap.get(b.id) ?? 0,
     })));
   } catch (err) {
     console.error("[branches] list error:", err);
@@ -22,6 +48,21 @@ router.get("/branches", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// GET /branches/:id
+router.get("/branches/:id", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
+    const [row] = await db.select().from(branchesTable).where(eq(branchesTable.id, id));
+    if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
+    res.json(serialize(row));
+  } catch (err) {
+    console.error("[branches] get error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /branches — create
 router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { name, shortCode, location, contactEmail, contactPhone } = req.body;
@@ -37,11 +78,7 @@ router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res) => {
       contactPhone: (contactPhone ?? "").toString().trim(),
       isActive: true,
     }).returning();
-    res.status(201).json({
-      ...row,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    });
+    res.status(201).json(serialize(row));
   } catch (err: any) {
     if (err?.code === "23505") {
       res.status(400).json({ error: "A branch with this name already exists" });
@@ -52,38 +89,30 @@ router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res) => {
   }
 });
 
-router.put("/branches/:id", requireSuperAdmin, async (req, res) => {
+async function applyBranchUpdate(id: number, body: any, res: any) {
+  const { name, shortCode, location, contactEmail, contactPhone } = body;
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (name !== undefined) {
+    const trimmed = String(name).trim();
+    if (!trimmed) { res.status(400).json({ error: "Branch name cannot be empty" }); return; }
+    updates.name = trimmed;
+  }
+  if (shortCode !== undefined) updates.shortCode = String(shortCode).trim();
+  if (location !== undefined) updates.location = String(location).trim();
+  if (contactEmail !== undefined) updates.contactEmail = String(contactEmail).trim();
+  if (contactPhone !== undefined) updates.contactPhone = String(contactPhone).trim();
+  const [row] = await db.update(branchesTable).set(updates).where(eq(branchesTable.id, id)).returning();
+  if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
+  res.json(serialize(row));
+}
+
+// PATCH /branches/:id — rename / change code / location / contact info
+// PUT kept as alias for clients that already wired PUT.
+async function updateHandler(req: any, res: any) {
   try {
     const id = parseInt(String(req.params.id));
-    if (isNaN(id)) {
-      res.status(400).json({ error: "Invalid branch ID" });
-      return;
-    }
-    const { name, shortCode, location, contactEmail, contactPhone, isActive } = req.body;
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    if (name !== undefined) {
-      const trimmed = String(name).trim();
-      if (!trimmed) {
-        res.status(400).json({ error: "Branch name cannot be empty" });
-        return;
-      }
-      updates.name = trimmed;
-    }
-    if (shortCode !== undefined) updates.shortCode = String(shortCode).trim();
-    if (location !== undefined) updates.location = String(location).trim();
-    if (contactEmail !== undefined) updates.contactEmail = String(contactEmail).trim();
-    if (contactPhone !== undefined) updates.contactPhone = String(contactPhone).trim();
-    if (isActive !== undefined) updates.isActive = !!isActive;
-    const [row] = await db.update(branchesTable).set(updates).where(eq(branchesTable.id, id)).returning();
-    if (!row) {
-      res.status(404).json({ error: "Branch not found" });
-      return;
-    }
-    res.json({
-      ...row,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    });
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
+    await applyBranchUpdate(id, req.body, res);
   } catch (err: any) {
     if (err?.code === "23505") {
       res.status(400).json({ error: "A branch with this name already exists" });
@@ -92,44 +121,51 @@ router.put("/branches/:id", requireSuperAdmin, async (req, res) => {
     console.error("[branches] update error:", err);
     res.status(500).json({ error: "Server error" });
   }
-});
+}
+router.patch("/branches/:id", requireSuperAdmin, updateHandler);
+router.put("/branches/:id", requireSuperAdmin, updateHandler);
 
-router.delete("/branches/:id", requireSuperAdmin, async (req, res) => {
+// POST /branches/:id/deactivate — soft delete (data is never deleted).
+router.post("/branches/:id/deactivate", requireSuperAdmin, async (req, res) => {
   try {
     const id = parseInt(String(req.params.id));
-    if (isNaN(id)) {
-      res.status(400).json({ error: "Invalid branch ID" });
-      return;
-    }
-    // Branch id=1 is the always-present "Head Office" used as the table-default
-    // fallback for legacy insert sites that haven't yet been updated to stamp
-    // the active branch. Removing it would break those inserts with FK errors.
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
     if (id === 1) {
       res.status(400).json({
-        error: "The default branch cannot be deleted. You may rename or deactivate it instead.",
+        error: "The default branch (Head Office) cannot be deactivated; it is the system fallback.",
       });
       return;
     }
-    // Refuse to delete a branch that still has any data attached.
-    const counts = await Promise.all([
-      db.select({ c: sql<number>`count(*)` }).from(usersTable).where(eq(usersTable.branchId, id)),
-      db.select({ c: sql<number>`count(*)` }).from(containersTable).where(eq(containersTable.branchId, id)),
-      db.select({ c: sql<number>`count(*)` }).from(clientsTable).where(eq(clientsTable.branchId, id)),
-      db.select({ c: sql<number>`count(*)` }).from(invoicesTable).where(eq(invoicesTable.branchId, id)),
-    ]);
-    const total = counts.reduce((s, [r]) => s + Number(r?.c ?? 0), 0);
-    if (total > 0) {
-      res.status(400).json({
-        error: "Cannot delete a branch that still has users, containers, clients, or invoices. Deactivate it instead.",
-      });
-      return;
-    }
-    await db.delete(branchesTable).where(eq(branchesTable.id, id));
-    res.json({ ok: true });
+    const [row] = await db.update(branchesTable)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(branchesTable.id, id))
+      .returning();
+    if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
+    res.json(serialize(row));
   } catch (err) {
-    console.error("[branches] delete error:", err);
+    console.error("[branches] deactivate error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
+
+// POST /branches/:id/reactivate
+router.post("/branches/:id/reactivate", requireSuperAdmin, async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
+    const [row] = await db.update(branchesTable)
+      .set({ isActive: true, updatedAt: new Date() })
+      .where(eq(branchesTable.id, id))
+      .returning();
+    if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
+    res.json(serialize(row));
+  } catch (err) {
+    console.error("[branches] reactivate error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+void and; // imported for future use
+void clientsTable; void invoicesTable;
 
 export { router as branchesRouter };
