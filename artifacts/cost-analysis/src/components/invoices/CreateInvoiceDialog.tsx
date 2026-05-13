@@ -44,7 +44,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
   const { data: allInvoices } = useListInvoices();
   const createMutation = useCreateInvoice();
   const { isSuperAdmin, user } = useAuth();
-  const { data: branches } = useBranches();
+  const { data: branches } = useBranches({ enabled: isSuperAdmin });
   const [branchId, setBranchId] = useState<number | null>((user as any)?.branchId ?? null);
 
   useEffect(() => {

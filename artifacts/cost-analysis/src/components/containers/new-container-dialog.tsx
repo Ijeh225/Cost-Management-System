@@ -39,7 +39,7 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
   const createMutation = useCreateContainer();
   const { data: clients } = useListClients();
   const { isSuperAdmin, user } = useAuth();
-  const { data: branches } = useBranches();
+  const { data: branches } = useBranches({ enabled: isSuperAdmin });
   const [branchId, setBranchId] = useState<number | null>(
     (user as any)?.branchId ?? null,
   );

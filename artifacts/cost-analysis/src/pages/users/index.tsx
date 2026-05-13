@@ -600,7 +600,7 @@ export default function Users() {
   const { isAdmin, isSuperAdmin, user: currentUser } = useAuth();
   const [, setLocation] = useLocation();
   const { data: users, isLoading } = useListUsers();
-  const { data: branches } = useBranches();
+  const { data: branches } = useBranches({ enabled: isSuperAdmin });
   const branchNameById = new Map((branches ?? []).map(b => [b.id, b.name]));
   const updateMutation = useUpdateUser();
   const queryClient = useQueryClient();
@@ -644,7 +644,7 @@ export default function Users() {
               <tr>
                 <th className="px-6 py-4 font-medium">User</th>
                 <th className="px-6 py-4 font-medium">Role</th>
-                <th className="px-6 py-4 font-medium">Branch</th>
+                {isSuperAdmin && <th className="px-6 py-4 font-medium">Branch</th>}
                 <th className="px-6 py-4 font-medium">Section Access</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Created</th>
@@ -653,9 +653,9 @@ export default function Users() {
             </thead>
             <tbody className="divide-y divide-border/50">
               {isLoading ? (
-                <tr><td colSpan={7} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></td></tr>
+                <tr><td colSpan={isSuperAdmin ? 7 : 6} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></td></tr>
               ) : users?.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-muted-foreground text-sm">No users found.</td></tr>
+                <tr><td colSpan={isSuperAdmin ? 7 : 6} className="px-6 py-12 text-center text-muted-foreground text-sm">No users found.</td></tr>
               ) : (
                 users?.map((u) => (
                   <tr key={u.id} className={`transition-colors ${u.isActive ? "hover:bg-accent/50" : "opacity-60 hover:bg-accent/30"}`}>
@@ -684,17 +684,19 @@ export default function Users() {
                         })}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      {(() => {
-                        const bid = (u as UserRow).branchId;
-                        const name = bid != null ? branchNameById.get(bid) : null;
-                        return name ? (
-                          <Badge variant="outline" className="border-border text-foreground/80">{name}</Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        );
-                      })()}
-                    </td>
+                    {isSuperAdmin && (
+                      <td className="px-6 py-4">
+                        {(() => {
+                          const bid = (u as UserRow).branchId;
+                          const name = bid != null ? branchNameById.get(bid) : null;
+                          return name ? (
+                            <Badge variant="outline" className="border-border text-foreground/80">{name}</Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          );
+                        })()}
+                      </td>
+                    )}
                     <td className="px-6 py-4 max-w-xs">
                       <span className="text-xs text-foreground/70 line-clamp-2">{formatPermissionsSummary(u as UserRow)}</span>
                     </td>

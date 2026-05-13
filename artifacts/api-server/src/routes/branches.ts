@@ -1,13 +1,23 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import {
-  db, branchesTable, usersTable, containersTable, clientsTable, invoicesTable,
+  db, branchesTable, usersTable, containersTable,
 } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
-import { requireAuth, requireSuperAdmin, AuthRequest } from "../lib/auth.js";
+import { eq, sql } from "drizzle-orm";
+import { requireSuperAdmin, AuthRequest } from "../lib/auth.js";
 
 const router = Router();
 
-function serialize(b: any) {
+type BranchRow = typeof branchesTable.$inferSelect;
+
+type BranchPayload = {
+  name?: string;
+  shortCode?: string | null;
+  location?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+};
+
+function serialize(b: BranchRow) {
   return {
     ...b,
     createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt,
@@ -15,10 +25,8 @@ function serialize(b: any) {
   };
 }
 
-// GET /branches — list with operational counts.
-// Any authenticated user may list branches (creation forms, pickers, users page).
-router.get("/branches", requireAuth, async (req: AuthRequest, res) => {
-  void req;
+// GET /branches — list with operational counts. Super-admin only.
+router.get("/branches", requireSuperAdmin, async (_req: AuthRequest, res: Response) => {
   try {
     const rows = await db.select().from(branchesTable).orderBy(branchesTable.id);
 
@@ -48,8 +56,8 @@ router.get("/branches", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-// GET /branches/:id
-router.get("/branches/:id", requireAuth, async (req, res) => {
+// GET /branches/:id — super-admin only.
+router.get("/branches/:id", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
@@ -63,9 +71,9 @@ router.get("/branches/:id", requireAuth, async (req, res) => {
 });
 
 // POST /branches — create
-router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res) => {
+router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const { name, shortCode, location, contactEmail, contactPhone } = req.body;
+    const { name, shortCode, location, contactEmail, contactPhone } = req.body as BranchPayload;
     if (!name || typeof name !== "string" || name.trim() === "") {
       res.status(400).json({ error: "Branch name is required" });
       return;
@@ -79,8 +87,8 @@ router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res) => {
       isActive: true,
     }).returning();
     res.status(201).json(serialize(row));
-  } catch (err: any) {
-    if (err?.code === "23505") {
+  } catch (err) {
+    if ((err as { code?: string })?.code === "23505") {
       res.status(400).json({ error: "A branch with this name already exists" });
       return;
     }
@@ -89,32 +97,34 @@ router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res) => {
   }
 });
 
-async function applyBranchUpdate(id: number, body: any, res: any) {
+async function applyBranchUpdate(id: number, body: BranchPayload, res: Response) {
   const { name, shortCode, location, contactEmail, contactPhone } = body;
-  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  const updates: Partial<typeof branchesTable.$inferInsert> & { updatedAt: Date } = {
+    updatedAt: new Date(),
+  };
   if (name !== undefined) {
     const trimmed = String(name).trim();
     if (!trimmed) { res.status(400).json({ error: "Branch name cannot be empty" }); return; }
     updates.name = trimmed;
   }
-  if (shortCode !== undefined) updates.shortCode = String(shortCode).trim();
-  if (location !== undefined) updates.location = String(location).trim();
-  if (contactEmail !== undefined) updates.contactEmail = String(contactEmail).trim();
-  if (contactPhone !== undefined) updates.contactPhone = String(contactPhone).trim();
+  if (shortCode !== undefined) updates.shortCode = String(shortCode ?? "").trim();
+  if (location !== undefined) updates.location = String(location ?? "").trim();
+  if (contactEmail !== undefined) updates.contactEmail = String(contactEmail ?? "").trim();
+  if (contactPhone !== undefined) updates.contactPhone = String(contactPhone ?? "").trim();
   const [row] = await db.update(branchesTable).set(updates).where(eq(branchesTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
   res.json(serialize(row));
 }
 
-// PATCH /branches/:id — rename / change code / location / contact info
-// PUT kept as alias for clients that already wired PUT.
-async function updateHandler(req: any, res: any) {
+// PATCH /branches/:id — rename / change code / location / contact info.
+// PUT kept as alias so the existing client (which already uses PUT) keeps working.
+async function updateHandler(req: Request, res: Response) {
   try {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
-    await applyBranchUpdate(id, req.body, res);
-  } catch (err: any) {
-    if (err?.code === "23505") {
+    await applyBranchUpdate(id, req.body as BranchPayload, res);
+  } catch (err) {
+    if ((err as { code?: string })?.code === "23505") {
       res.status(400).json({ error: "A branch with this name already exists" });
       return;
     }
@@ -125,8 +135,8 @@ async function updateHandler(req: any, res: any) {
 router.patch("/branches/:id", requireSuperAdmin, updateHandler);
 router.put("/branches/:id", requireSuperAdmin, updateHandler);
 
-// POST /branches/:id/deactivate — soft delete (data is never deleted).
-router.post("/branches/:id/deactivate", requireSuperAdmin, async (req, res) => {
+// POST /branches/:id/deactivate — soft delete; data is never removed.
+router.post("/branches/:id/deactivate", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
@@ -149,7 +159,7 @@ router.post("/branches/:id/deactivate", requireSuperAdmin, async (req, res) => {
 });
 
 // POST /branches/:id/reactivate
-router.post("/branches/:id/reactivate", requireSuperAdmin, async (req, res) => {
+router.post("/branches/:id/reactivate", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
@@ -164,8 +174,5 @@ router.post("/branches/:id/reactivate", requireSuperAdmin, async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-
-void and; // imported for future use
-void clientsTable; void invoicesTable;
 
 export { router as branchesRouter };

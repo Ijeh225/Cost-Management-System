@@ -40,11 +40,12 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function useBranches() {
+export function useBranches(opts?: { enabled?: boolean }) {
   return useQuery<Branch[]>({
     queryKey: ["/api/branches"],
     queryFn: () => api<Branch[]>("/branches"),
     staleTime: 60_000,
+    enabled: opts?.enabled ?? true,
   });
 }
 
