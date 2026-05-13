@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "wouter";
+import { BranchChip } from "@/components/layout/branch-chip";
 import {
   Landmark, Plus, Pencil, Trash2, Loader2, ToggleLeft, ToggleRight, Building2,
   ArrowLeftRight, ArrowRight, User, Calendar, FileText, PlusCircle,
@@ -349,7 +350,7 @@ function BankCard({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-semibold text-foreground truncate">{bank.name}</p>
+                  <p className="font-semibold text-foreground truncate flex items-center">{bank.name}<BranchChip branchId={(bank as { branchId?: number }).branchId} /></p>
                   {bank.isActive
                     ? <Badge className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-400 border-emerald-500/30">Active</Badge>
                     : <Badge className="text-[10px] px-1.5 py-0 bg-muted/60 text-muted-foreground border-border/40">Inactive</Badge>

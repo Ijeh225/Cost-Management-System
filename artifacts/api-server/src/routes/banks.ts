@@ -539,8 +539,12 @@ banksRouter.post("/banks/:id/fund-additions", requireAdmin, async (req: AuthRequ
     }
 
     const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, bankId));
-    if (!bank) { res.status(404).json({ error: "Bank not found" }); return; }
-    if (!userCanAccessBranch(req, bank.branchId)) { res.status(403).json({ error: "Bank belongs to another branch." }); return; }
+    if (!bank || !userCanAccessBranch(req, bank.branchId)) { res.status(404).json({ error: "Bank not found" }); return; }
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && bank.branchId !== _scope) { res.status(404).json({ error: "Bank not found" }); return; }
+      if (_scope === null && req.user?.role === "super_admin") { res.status(400).json({ error: "Select a specific branch to fund a bank." }); return; }
+    }
 
     const userId = req.user?.id ?? null;
     const [addition] = await db.insert(bankFundAdditionsTable).values({
@@ -583,16 +587,21 @@ banksRouter.post("/banks/transfers", requireAdmin, async (req: AuthRequest, res)
     }
 
     const [fromBank] = await db.select().from(banksTable).where(eq(banksTable.id, fromBankId));
-    if (!fromBank) { res.status(404).json({ error: "Source bank not found" }); return; }
+    if (!fromBank || !userCanAccessBranch(req, fromBank.branchId)) { res.status(404).json({ error: "Source bank not found" }); return; }
 
     const [toBank] = await db.select().from(banksTable).where(eq(banksTable.id, toBankId));
-    if (!toBank) { res.status(404).json({ error: "Destination bank not found" }); return; }
+    if (!toBank || !userCanAccessBranch(req, toBank.branchId)) { res.status(404).json({ error: "Destination bank not found" }); return; }
 
-    // Branch guard (Task #149): both legs must belong to the user's branch and
-    // to the same branch as each other — no cross-branch transfers.
-    if (!userCanAccessBranch(req, fromBank.branchId) || !userCanAccessBranch(req, toBank.branchId)) {
-      res.status(403).json({ error: "One of the banks belongs to another branch." });
-      return;
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && (fromBank.branchId !== _scope || toBank.branchId !== _scope)) {
+        res.status(404).json({ error: "Bank not found" });
+        return;
+      }
+      if (_scope === null && req.user?.role === "super_admin") {
+        res.status(400).json({ error: "Select a specific branch to record a transfer." });
+        return;
+      }
     }
     if (fromBank.branchId !== toBank.branchId) {
       res.status(400).json({ error: "Cross-branch transfers are not allowed." });

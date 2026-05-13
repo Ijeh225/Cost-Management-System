@@ -4,6 +4,7 @@ import { useGetPipeline, useAdvanceContainerStatus, type PipelineContainer } fro
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/hooks/use-toast";
 import { WORKFLOW_STAGES, getNextStage, getStatusColor, getStatusLabel } from "@/lib/format";
+import { BranchChip } from "@/components/layout/branch-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,8 +102,8 @@ function ContainerCard({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="font-mono font-semibold text-sm text-foreground leading-tight truncate">
-              {container.containerNumber}
+            <p className="font-mono font-semibold text-sm text-foreground leading-tight truncate flex items-center">
+              {container.containerNumber}<BranchChip branchId={(container as { branchId?: number }).branchId} />
             </p>
             {container.blNumber && (
               <p className="font-mono text-[11px] text-muted-foreground truncate mt-0.5">

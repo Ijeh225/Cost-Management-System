@@ -22,6 +22,7 @@ function formatContainer(c: any, staffName?: string | null) {
     lockedSections,
     assignedStaffId: c.assignedStaffId ?? null,
     assignedStaffName: staffName ?? null,
+    branchId: c.branchId ?? null,
     totalCost: 0,
     clearingCharges: parseFloat(c.clearingCharges ?? "0"),
     grossProfit: 0,

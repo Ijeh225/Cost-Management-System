@@ -928,12 +928,10 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
     }
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!inv) return res.status(404).json({ error: "Invoice not found" });
-
-    // Cross-branch posting guard: non super-admin users may only post payments
-    // against invoices in their own branch (Task #149).
-    if (req.user!.role !== "super_admin" && req.user!.branchId !== inv.branchId) {
-      return res.status(403).json({ error: "Cannot record a payment against an invoice in another branch." });
+    if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && inv.branchId !== _scope) return res.status(404).json({ error: "Invoice not found" });
     }
     // Bank guard: the chosen bank must also belong to the invoice's branch.
     if (bankId) {

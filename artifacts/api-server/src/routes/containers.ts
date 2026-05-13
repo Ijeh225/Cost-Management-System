@@ -45,6 +45,7 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     lockedSections,
     assignedStaffId: c.assignedStaffId ?? null,
     assignedStaffName: staffName ?? null,
+    branchId: c.branchId ?? null,
     clientId: c.clientId ?? null,
     clientName: clientName ?? null,
     totalCost: parseFloat(c.totalCost ?? "0"),
@@ -623,6 +624,7 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
       gateInDate: containersTable.gateInDate,
       emptyReturnDate: containersTable.emptyReturnDate,
       emptyReturnDueDate: containersTable.emptyReturnDueDate,
+      branchId: containersTable.branchId,
     })
       .from(containersTable)
       .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id))
@@ -667,6 +669,7 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
       releaseDelayReason?: string | null;
       releaseFinalDate?: string | null;
       tdoReleasedAt?: string | null;
+      branchId?: number | null;
     }>> = {};
 
     for (const c of rows) {
@@ -712,6 +715,7 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
         emptyReturnDueDate: c.emptyReturnDueDate instanceof Date ? c.emptyReturnDueDate.toISOString() : (c.emptyReturnDueDate ?? null),
         lifespanDays,
         lifespanClosed: !!(c.emptyReturnDate),
+        branchId: c.branchId ?? null,
       };
       stages[c.status].push(entry);
 

@@ -19,6 +19,7 @@ router.get("/approvals", requireAdmin, async (req: AuthRequest, res) => {
       updatedAt: sectionApprovalsTable.updatedAt,
       containerNumber: containersTable.containerNumber,
       customerName: containersTable.customerName,
+      branchId: containersTable.branchId,
     })
       .from(sectionApprovalsTable)
       .innerJoin(containersTable, eq(sectionApprovalsTable.containerId, containersTable.id))
@@ -41,6 +42,7 @@ router.get("/approvals", requireAdmin, async (req: AuthRequest, res) => {
       containerId: r.containerId,
       containerNumber: r.containerNumber,
       customerName: r.customerName,
+      branchId: r.branchId,
       section: r.section,
       status: r.status,
       submittedByName: r.submittedById ? (nameMap[r.submittedById] ?? null) : null,

@@ -28,6 +28,7 @@ import {
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/format";
+import { BranchChip } from "@/components/layout/branch-chip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

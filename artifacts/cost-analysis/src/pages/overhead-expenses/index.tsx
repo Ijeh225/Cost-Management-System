@@ -22,6 +22,7 @@ import {
   CreditCard, Banknote, ChevronDown, ChevronRight, Lock, Tag,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+import { BranchChip } from "@/components/layout/branch-chip";
 
 const STATUS_COLORS: Record<string, string> = {
   unpaid:  "border-red-500/30 text-red-400 bg-red-500/10",
@@ -120,7 +121,7 @@ function MakePaymentDialog({ expense, onOpenChange, onSubmit, isPending }: {
         <div className="rounded-lg border border-border/40 bg-muted/30 p-3 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-sm font-medium">{expense.description}</p>
+              <p className="text-sm font-medium flex items-center">{expense.description}<BranchChip branchId={(expense as { branchId?: number }).branchId} /></p>
               <p className="text-xs text-muted-foreground">{expense.category}</p>
             </div>
             <Badge variant="outline" className={`text-[10px] shrink-0 ${STATUS_COLORS[expense.status]}`}>{STATUS_LABELS[expense.status]}</Badge>

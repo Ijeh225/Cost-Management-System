@@ -221,6 +221,12 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
   try {
     const clientId = parseInt(req.params.id);
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
+    const [_c] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
+    if (!_c || !userCanAccessBranch(req, _c.branchId)) return res.status(404).json({ error: "Client not found" });
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && _c.branchId !== _scope) return res.status(404).json({ error: "Client not found" });
+    }
 
     const clientInvoices = await db
       .select({
@@ -371,6 +377,8 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
 
 clientsRouter.post("/clients/bulk", requireAuth, async (req: AuthRequest, res) => {
   try {
+    const targetBranchId = resolveCreateBranch(req, res);
+    if (targetBranchId === null) return;
     const { rows } = req.body as { rows: Array<{ name: string; contactName?: string; contactEmail?: string; contactPhone?: string; address?: string; notes?: string }> };
     if (!Array.isArray(rows)) return res.status(400).json({ error: "rows must be an array" });
     let created = 0;
@@ -386,7 +394,7 @@ clientsRouter.post("/clients/bulk", requireAuth, async (req: AuthRequest, res) =
           contactPhone: row.contactPhone ?? "",
           address: row.address ?? "",
           notes: row.notes ?? "",
-          branchId: req.user!.branchId,
+          branchId: targetBranchId,
         });
         created++;
       } catch (err: any) {
@@ -410,6 +418,12 @@ clientsRouter.get("/clients/:id/deposits", requireAuth, async (req: AuthRequest,
   try {
     const clientId = parseInt(req.params.id);
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
+    const [_c] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
+    if (!_c || !userCanAccessBranch(req, _c.branchId)) return res.status(404).json({ error: "Client not found" });
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && _c.branchId !== _scope) return res.status(404).json({ error: "Client not found" });
+    }
     const deposits = await db
       .select({
         id: clientDepositsTable.id,
@@ -646,7 +660,11 @@ clientsRouter.get("/clients/:id/wallet-summary", requireAuth, async (req: AuthRe
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
 
     const [clientRow] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
-    if (!clientRow) return res.status(404).json({ error: "Client not found" });
+    if (!clientRow || !userCanAccessBranch(req, clientRow.branchId)) return res.status(404).json({ error: "Client not found" });
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && clientRow.branchId !== _scope) return res.status(404).json({ error: "Client not found" });
+    }
 
     const resetAt: Date | null = clientRow.walletResetAt ?? null;
 
@@ -703,7 +721,11 @@ clientsRouter.post("/clients/:id/wallet/reset", requireAuth, requireAdmin, async
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
 
     const [clientRow] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
-    if (!clientRow) return res.status(404).json({ error: "Client not found" });
+    if (!clientRow || !userCanAccessBranch(req, clientRow.branchId)) return res.status(404).json({ error: "Client not found" });
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && clientRow.branchId !== _scope) return res.status(404).json({ error: "Client not found" });
+    }
 
     const { adminPassword } = req.body as { adminPassword?: string };
     if (!adminPassword || adminPassword.trim() === "") {

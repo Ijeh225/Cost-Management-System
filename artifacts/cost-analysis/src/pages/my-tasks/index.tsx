@@ -13,6 +13,7 @@ import { Loader2, ListTodo, Box, AlertTriangle, ClipboardCheck, CheckCircle2, XC
 import { getStatusColor, getStatusLabel, getApprovalStatusColor, getApprovalStatusLabel, SECTION_LABELS, formatCurrency } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { BranchChip } from "@/components/layout/branch-chip";
 
 type CorrectionTask = {
   id: number;
@@ -174,8 +175,8 @@ export default function MyTasksPage() {
                       <div key={a.id} className="flex items-center justify-between px-6 py-4 gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 flex-wrap">
-                            <Link href={`/containers/${a.containerId}`} className="font-mono text-primary hover:underline text-sm font-semibold">
-                              {container?.containerNumber ?? `#${a.containerId}`}
+                            <Link href={`/containers/${a.containerId}`} className="font-mono text-primary hover:underline text-sm font-semibold flex items-center">
+                              {container?.containerNumber ?? `#${a.containerId}`}<BranchChip branchId={(container as { branchId?: number } | undefined)?.branchId} />
                             </Link>
                             <span className="text-sm text-foreground/80 font-medium">{container?.customerName}</span>
                             {container && (

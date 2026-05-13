@@ -54,6 +54,7 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
       description: e.description,
       amount: totalAmount,
       reference: e.reference ?? null,
+      branchId: e.branchId,
       recordedBy: e.recordedBy ?? null,
       recordedByName: e.recordedBy ? (userMap[e.recordedBy] ?? null) : null,
       createdAt: e.createdAt instanceof Date ? e.createdAt.toISOString() : String(e.createdAt),

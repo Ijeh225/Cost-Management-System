@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, containersTable, customsChargesTable, auditLogTable } from "@workspace/db";
 import { eq, and, gte, lte, ilike, or, desc, sql, type SQL } from "drizzle-orm";
-import { requireAuth, AuthRequest, getBranchScope } from "../lib/auth.js";
+import { requireAuth, AuthRequest, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 
 export const dutyPaymentsRouter = Router();
 
@@ -94,6 +94,7 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
         dutyPaid:        customsChargesTable.dutyPaid,
         dutyNotPaid:     customsChargesTable.dutyNotPaid,
         customsUpdated:  customsChargesTable.updatedAt,
+        branchId:        containersTable.branchId,
       })
       .from(containersTable)
       .leftJoin(customsChargesTable, eq(customsChargesTable.containerId, containersTable.id));
@@ -114,6 +115,7 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
       dutyStatus: "paid" | "partial" | "unpaid" | "not_assessed";
       updatedAt: string | null;
       createdAt: string;
+      branchId: number;
     };
 
     const allRows: Row[] = baseRows.map(r => {
@@ -133,6 +135,7 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
         dutyStatus: deriveDutyStatus(duty, paid, outstanding),
         updatedAt: r.customsUpdated instanceof Date ? r.customsUpdated.toISOString() : (r.customsUpdated ?? null),
         createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+        branchId: r.branchId,
       };
     });
 
@@ -212,7 +215,7 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
         createdAt:       containersTable.createdAt,
         branchId:        containersTable.branchId,
       }).from(containersTable).where(eq(containersTable.id, containerId));
-      if (!container) return { error: { code: 404, message: "Container not found" } } as const;
+      if (!container || !userCanAccessBranch(req, container.branchId)) return { error: { code: 404, message: "Container not found" } } as const;
 
       // Lock or insert the customs row to prevent concurrent duplicate writes.
       type CustomsRow = { duty: string | null; dutyPaid: string | null; duty_paid?: string | null };

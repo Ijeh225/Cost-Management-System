@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { getApprovalStatusColor, getApprovalStatusLabel, SECTION_LABELS } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { BranchChip } from "@/components/layout/branch-chip";
 
 function RejectDialog({
   open,
@@ -145,8 +146,8 @@ export default function ApprovalsPage() {
                     <div key={item.id} className="flex items-center justify-between px-6 py-4 hover:bg-accent/30 transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 flex-wrap">
-                          <Link href={`/containers/${item.containerId}`} className="font-mono font-medium text-primary hover:underline text-sm">
-                            {item.containerNumber}
+                          <Link href={`/containers/${item.containerId}`} className="font-mono font-medium text-primary hover:underline text-sm flex items-center">
+                            {item.containerNumber}<BranchChip branchId={(item as { branchId?: number }).branchId} />
                           </Link>
                           <span className="text-muted-foreground text-sm">{item.customerName}</span>
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${getApprovalStatusColor(item.section)}`}>

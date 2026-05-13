@@ -14,6 +14,7 @@ import {
   Loader2, AlertCircle, ChevronLeft, ChevronRight, ShieldAlert,
 } from "lucide-react";
 import { useAuth } from "@/components/layout/auth-provider";
+import { BranchChip } from "@/components/layout/branch-chip";
 import { useToast } from "@/hooks/use-toast";
 import {
   formatCurrency, getStatusColor, getStatusLabel,
@@ -491,8 +492,8 @@ export default function DutyPaymentsPage() {
                   return (
                     <tr key={r.containerId} className="hover:bg-accent/40 transition-colors" data-testid={`row-${r.containerNumber}`}>
                       <td className="px-4 py-3">
-                        <div className="font-mono font-semibold text-sm cursor-pointer hover:text-primary" onClick={() => setLocation(`/containers/${r.containerId}`)}>
-                          {r.containerNumber}
+                        <div className="font-mono font-semibold text-sm cursor-pointer hover:text-primary flex items-center" onClick={() => setLocation(`/containers/${r.containerId}`)}>
+                          {r.containerNumber}<BranchChip branchId={(r as { branchId?: number }).branchId} />
                         </div>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.blNumber}</td>
