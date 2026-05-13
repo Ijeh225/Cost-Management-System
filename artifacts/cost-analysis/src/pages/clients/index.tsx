@@ -127,7 +127,7 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
   const createMutation = useCreateClient();
   const { isSuperAdmin, user } = useAuth();
   const { data: branches } = useBranches({ enabled: isSuperAdmin });
-  const [branchId, setBranchId] = useState<number | null>((user as any)?.branchId ?? null);
+  const [branchId, setBranchId] = useState<number | null>(user?.branchId ?? null);
   const [form, setForm] = useState({
     name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "", agreedClearingRate: "",
   });

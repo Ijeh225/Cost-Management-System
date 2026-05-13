@@ -1159,6 +1159,12 @@ components:
           nullable: true
         isActive:
           type: boolean
+        branchId:
+          type: integer
+          nullable: true
+        branchName:
+          type: string
+          nullable: true
         createdAt:
           type: string
       required: [id, email, name, role, isActive, createdAt]
@@ -1180,6 +1186,9 @@ components:
           nullable: true
         sectionPermissions:
           type: string
+          nullable: true
+        branchId:
+          type: integer
           nullable: true
       required: [email, name, password, role]
 
@@ -1300,6 +1309,8 @@ components:
         clientId:
           type: integer
           nullable: true
+        branchId:
+          type: integer
       required: [customerName, containerNumber, blNumber]
 
     UpdateContainerRequest:

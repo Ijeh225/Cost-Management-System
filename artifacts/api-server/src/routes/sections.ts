@@ -37,7 +37,7 @@ sectionsRouter.post("/custom-sections", requireAuth, async (req: AuthRequest, re
       : isNull(customSectionsTable.containerId);
     const maxOrder = await db.select({ sectionOrder: customSectionsTable.sectionOrder }).from(customSectionsTable).where(whereClause).orderBy(asc(customSectionsTable.sectionOrder));
     const nextOrder = maxOrder.length > 0 ? (maxOrder[maxOrder.length - 1].sectionOrder + 1) : 0;
-    const [section] = await db.insert(customSectionsTable).values({ containerId: containerIdNum, name, slug: `${slug}_${Date.now()}`, color, icon, isRequired, sectionOrder: nextOrder, createdById: req.user!.id }).returning();
+    const [section] = await db.insert(customSectionsTable).values({ containerId: containerIdNum, branchId: req.user!.branchId, name, slug: `${slug}_${Date.now()}`, color, icon, isRequired, sectionOrder: nextOrder, createdById: req.user!.id }).returning();
     return res.status(201).json({ ...section, fields: [] });
   } catch (err) {
     console.error(err);
@@ -85,7 +85,7 @@ sectionsRouter.post("/custom-sections/:id/fields", requireAuth, requireAdmin, as
   try {
     const existing = await db.select({ fieldOrder: customFieldsTable.fieldOrder }).from(customFieldsTable).where(eq(customFieldsTable.sectionId, sectionId)).orderBy(asc(customFieldsTable.fieldOrder));
     const nextOrder = existing.length > 0 ? (existing[existing.length - 1].fieldOrder + 1) : 0;
-    const [field] = await db.insert(customFieldsTable).values({ sectionId, name, fieldType, placeholder, helpText, defaultValue, isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions, fieldOrder: nextOrder }).returning();
+    const [field] = await db.insert(customFieldsTable).values({ sectionId, branchId: (req as AuthRequest).user!.branchId, name, fieldType, placeholder, helpText, defaultValue, isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions, fieldOrder: nextOrder }).returning();
     return res.status(201).json(field);
   } catch (err) {
     console.error(err);
@@ -148,6 +148,8 @@ sectionsRouter.post("/containers/:containerId/custom-values", requireAuth, async
   const { values } = req.body as { values: Array<{ fieldId: number; value: string }> };
   if (!Array.isArray(values)) return res.status(400).json({ error: "values array required" });
   try {
+    const [container] = await db.select().from(containersTable).where(eq(containersTable.id, containerId));
+    if (!container) return res.status(404).json({ error: "Container not found" });
     for (const { fieldId, value } of values) {
       const existing = await db.select().from(customFieldValuesTable)
         .where(and(eq(customFieldValuesTable.fieldId, fieldId), eq(customFieldValuesTable.containerId, containerId)));
@@ -155,7 +157,7 @@ sectionsRouter.post("/containers/:containerId/custom-values", requireAuth, async
         await db.update(customFieldValuesTable).set({ value, updatedById: req.user!.id, updatedAt: new Date() })
           .where(eq(customFieldValuesTable.id, existing[0].id));
       } else {
-        await db.insert(customFieldValuesTable).values({ containerId, fieldId, value, updatedById: req.user!.id });
+        await db.insert(customFieldValuesTable).values({ containerId, branchId: container.branchId, fieldId, value, updatedById: req.user!.id });
       }
     }
     return res.json({ success: true });
@@ -198,7 +200,8 @@ sectionsRouter.post("/builtin-extras", requireAuth, requireAdmin, async (req: Au
       .orderBy(asc(customFieldsTable.fieldOrder));
     const nextOrder = existing.length > 0 ? (existing[existing.length - 1].fieldOrder + 1) : 0;
     const [field] = await db.insert(customFieldsTable).values({
-      builtinSectionKey, name, fieldType, placeholder, helpText, defaultValue,
+      builtinSectionKey, branchId: req.user!.branchId,
+      name, fieldType, placeholder, helpText, defaultValue,
       isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions, fieldOrder: nextOrder,
     }).returning();
     return res.status(201).json(field);

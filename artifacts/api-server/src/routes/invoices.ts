@@ -1177,6 +1177,7 @@ router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req, res) => {
         total: invoicesTable.total,
         outstanding: sql<number>`(${invoicesTable.total}::numeric - COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0))`,
         dueDate: invoicesTable.dueDate,
+        branchId: invoicesTable.branchId,
       })
       .from(invoicesTable)
       .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
@@ -1205,6 +1206,7 @@ router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req, res) => {
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,
+      branchId: row.branchId,
       clientId: row.clientId ?? null,
       messageType: "invoice",
       phone,
@@ -1247,6 +1249,7 @@ router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
         outstanding: sql<number>`(${invoicesTable.total}::numeric - COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0))`,
         dueDate: invoicesTable.dueDate,
         status: invoicesTable.status,
+        branchId: invoicesTable.branchId,
       })
       .from(invoicesTable)
       .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
@@ -1279,6 +1282,7 @@ router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,
+      branchId: row.branchId,
       clientId: row.clientId ?? null,
       messageType: "reminder",
       phone,
@@ -1320,6 +1324,7 @@ router.post("/invoices/:id/send-receipt", requireAdmin, async (req, res) => {
         total: invoicesTable.total,
         outstanding: sql<number>`(${invoicesTable.total}::numeric - COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0))`,
         totalPaid: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0)`,
+        branchId: invoicesTable.branchId,
       })
       .from(invoicesTable)
       .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
@@ -1380,6 +1385,7 @@ router.post("/invoices/:id/send-receipt", requireAdmin, async (req, res) => {
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,
+      branchId: row.branchId,
       clientId: row.clientId ?? null,
       messageType: "receipt",
       phone,

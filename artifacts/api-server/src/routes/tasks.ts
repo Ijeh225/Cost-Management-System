@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containerTasksTable, usersTable } from "@workspace/db";
+import { db, containerTasksTable, containersTable, usersTable } from "@workspace/db";
 import { eq, asc, desc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth.js";
 
@@ -44,8 +44,12 @@ tasksRouter.post("/containers/:id/tasks", requireAuth, async (req: AuthRequest, 
   const { title, assignedStaffId, dueDate, priority = "medium", notes = "" } = req.body;
   if (!title) return res.status(400).json({ error: "title required" });
   try {
+    const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, containerId));
+    if (!container) return res.status(404).json({ error: "Container not found" });
     const [task] = await db.insert(containerTasksTable).values({
-      containerId, title,
+      containerId,
+      branchId: container.branchId,
+      title,
       assignedStaffId: assignedStaffId ? parseInt(assignedStaffId) : null,
       dueDate: dueDate ? new Date(dueDate) : null,
       priority, notes, status: "pending",

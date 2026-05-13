@@ -240,7 +240,7 @@ function CreateUserDialog() {
   const { user: currentUser } = useAuth();
   const { data: branches } = useBranches();
   const [branchId, setBranchId] = useState<number | null>(
-    (currentUser as any)?.branchId ?? null
+    currentUser?.branchId ?? null
   );
   const createMutation = useCreateUser();
   const queryClient = useQueryClient();

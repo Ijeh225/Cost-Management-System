@@ -185,7 +185,7 @@ router.get("/users/:id/client-assignments", requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/users/:id/client-assignments", requireAdmin, async (req, res) => {
+router.post("/users/:id/client-assignments", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
@@ -196,7 +196,7 @@ router.post("/users/:id/client-assignments", requireAdmin, async (req, res) => {
       .from(userClientAssignmentsTable)
       .where(and(eq(userClientAssignmentsTable.userId, userId), eq(userClientAssignmentsTable.clientId, clientId)));
     if (existing.length > 0) { res.status(409).json({ error: "Already assigned" }); return; }
-    const [row] = await db.insert(userClientAssignmentsTable).values({ userId, clientId }).returning();
+    const [row] = await db.insert(userClientAssignmentsTable).values({ userId, clientId, branchId: req.user!.branchId }).returning();
     res.status(201).json(row);
   } catch {
     res.status(500).json({ error: "Server error" });

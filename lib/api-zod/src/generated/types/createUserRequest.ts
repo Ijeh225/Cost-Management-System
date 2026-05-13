@@ -14,4 +14,5 @@ export interface CreateUserRequest {
   role: CreateUserRequestRole;
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
+  branchId?: number | null;
 }

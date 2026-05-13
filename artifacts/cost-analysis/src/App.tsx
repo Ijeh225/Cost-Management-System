@@ -148,6 +148,37 @@ function AdminGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function SuperAdminGuard({ children }: { children: ReactNode }) {
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
+  const isSuperAdmin = user?.role === "admin" && user?.branchId === 1;
+  const confirmed = useRef(false);
+
+  if (isSuperAdmin && !confirmed.current) {
+    confirmed.current = true;
+  }
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (confirmed.current) return;
+    if (!isAuthenticated) {
+      setLocation("/login");
+    } else if (!isSuperAdmin) {
+      setLocation("/");
+    }
+  }, [isSuperAdmin, isLoading, isAuthenticated, setLocation]);
+
+  if (!confirmed.current) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function Router() {
   return (
     <Switch>
@@ -223,7 +254,7 @@ function Router() {
                 <AdminGuard><SettingsPage /></AdminGuard>
               </Route>
               <Route path="/settings/branches">
-                <AdminGuard><BranchesPage /></AdminGuard>
+                <SuperAdminGuard><BranchesPage /></SuperAdminGuard>
               </Route>
               <Route component={NotFound} />
             </Switch>

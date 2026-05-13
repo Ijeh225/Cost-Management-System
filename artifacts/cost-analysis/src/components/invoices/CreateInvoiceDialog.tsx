@@ -45,7 +45,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
   const createMutation = useCreateInvoice();
   const { isSuperAdmin, user } = useAuth();
   const { data: branches } = useBranches({ enabled: isSuperAdmin });
-  const [branchId, setBranchId] = useState<number | null>((user as any)?.branchId ?? null);
+  const [branchId, setBranchId] = useState<number | null>(user?.branchId ?? null);
 
   useEffect(() => {
     if (open) {
@@ -102,7 +102,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
         dueDate: dueDate || undefined,
         notes: notes || undefined,
         ...(isSuperAdmin && branchId != null && { branchId }),
-      } as any);
+      });
       toast({ title: "Invoice created", description: inv.invoiceNumber });
       onClose();
       setLocation(`/invoices/${inv.id}`);

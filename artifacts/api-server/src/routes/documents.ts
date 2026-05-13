@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { db, containerDocumentsTable, usersTable } from "@workspace/db";
+import { db, containerDocumentsTable, containersTable, usersTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth.js";
 
@@ -55,8 +55,11 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
   const section = req.body.section || null;
   try {
+    const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, containerId));
+    if (!container) return res.status(404).json({ error: "Container not found" });
     const [doc] = await db.insert(containerDocumentsTable).values({
       containerId,
+      branchId: container.branchId,
       section,
       filename: req.file.filename,
       originalName: req.file.originalname,

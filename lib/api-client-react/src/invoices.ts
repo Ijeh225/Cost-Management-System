@@ -95,6 +95,7 @@ export type CreateInvoiceBody = {
   vatRate?: number;
   dueDate?: string;
   notes?: string;
+  branchId?: number;
 };
 
 export type UpdateInvoiceBody = {

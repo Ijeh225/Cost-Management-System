@@ -76,6 +76,7 @@ containerExpensesRouter.post("/container-expense-categories", requireAdmin, asyn
     }
     const [row] = await db.insert(containerExpenseCategoriesTable).values({
       name: name.trim(), isDefault: false, createdBy: req.user?.id ?? null,
+      branchId: req.user!.branchId,
     }).returning();
     res.status(201).json({
       id: row.id, name: row.name, isDefault: row.isDefault,
@@ -165,10 +166,19 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, 
     const resolvedSection = section ?? null;
     const actorId = req.user?.id ?? null;
 
+    const containerIds = Array.from(new Set(items.map(i => Number(i.containerId))));
+    const containerRows = await db.select({ id: containersTable.id, branchId: containersTable.branchId })
+      .from(containersTable).where(inArray(containersTable.id, containerIds));
+    const branchByContainer = new Map<number, number>(containerRows.map(c => [c.id, c.branchId]));
+    if (branchByContainer.size !== containerIds.length) {
+      res.status(404).json({ error: "One or more containers not found" }); return;
+    }
+
     const inserted = await db.transaction(async (tx) => {
       const payments = await tx.insert(containerExpensePaymentsTable).values(
         items.map(item => ({
           containerId: Number(item.containerId),
+          branchId: branchByContainer.get(Number(item.containerId))!,
           categoryId: resolvedCategoryId,
           section: resolvedSection,
           amount: String(item.amount),
@@ -207,6 +217,7 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, 
         await tx.insert(auditLogTable).values(
           payments.map(p => ({
             containerId: p.containerId,
+            branchId: branchByContainer.get(p.containerId)!,
             userId: actorId,
             action: "expense_payment_recorded" as const,
             section: resolvedSection ?? "payments",

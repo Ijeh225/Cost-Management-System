@@ -15,5 +15,7 @@ export interface User {
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
   isActive: boolean;
+  branchId?: number | null;
+  branchName?: string | null;
   createdAt: string;
 }

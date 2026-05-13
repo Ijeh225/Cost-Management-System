@@ -31,6 +31,8 @@ export const LoginResponse = zod.object({
     sectionPermission: zod.string().nullish(),
     sectionPermissions: zod.string().nullish(),
     isActive: zod.boolean(),
+    branchId: zod.number().nullish(),
+    branchName: zod.string().nullish(),
     createdAt: zod.string(),
   }),
   message: zod.string(),
@@ -54,6 +56,8 @@ export const GetCurrentUserResponse = zod.object({
   sectionPermission: zod.string().nullish(),
   sectionPermissions: zod.string().nullish(),
   isActive: zod.boolean(),
+  branchId: zod.number().nullish(),
+  branchName: zod.string().nullish(),
   createdAt: zod.string(),
 });
 
@@ -68,6 +72,8 @@ export const ListUsersResponseItem = zod.object({
   sectionPermission: zod.string().nullish(),
   sectionPermissions: zod.string().nullish(),
   isActive: zod.boolean(),
+  branchId: zod.number().nullish(),
+  branchName: zod.string().nullish(),
   createdAt: zod.string(),
 });
 export const ListUsersResponse = zod.array(ListUsersResponseItem);
@@ -82,6 +88,7 @@ export const CreateUserBody = zod.object({
   role: zod.enum(["admin", "staff"]),
   sectionPermission: zod.string().nullish(),
   sectionPermissions: zod.string().nullish(),
+  branchId: zod.number().nullish(),
 });
 
 /**
@@ -99,6 +106,8 @@ export const GetUserResponse = zod.object({
   sectionPermission: zod.string().nullish(),
   sectionPermissions: zod.string().nullish(),
   isActive: zod.boolean(),
+  branchId: zod.number().nullish(),
+  branchName: zod.string().nullish(),
   createdAt: zod.string(),
 });
 
@@ -127,6 +136,8 @@ export const UpdateUserResponse = zod.object({
   sectionPermission: zod.string().nullish(),
   sectionPermissions: zod.string().nullish(),
   isActive: zod.boolean(),
+  branchId: zod.number().nullish(),
+  branchName: zod.string().nullish(),
   createdAt: zod.string(),
 });
 
@@ -204,6 +215,7 @@ export const CreateContainerBody = zod.object({
   vessel: zod.string().optional(),
   clearingCharges: zod.number().optional(),
   clientId: zod.number().nullish(),
+  branchId: zod.number().optional(),
 });
 
 /**

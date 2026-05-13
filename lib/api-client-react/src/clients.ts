@@ -37,6 +37,7 @@ export type CreateClientBody = {
   address?: string;
   notes?: string;
   agreedClearingRate?: number | null;
+  branchId?: number;
 };
 
 export type ClientReceivablesInvoice = {

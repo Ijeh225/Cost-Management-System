@@ -409,6 +409,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
     // Notify: new job created
     await db.insert(workflowNotificationsTable).values({
       type: "new_job",
+      branchId: container.branchId,
       message: `New job created: ${containerNumber} (${resolvedCustomerName})`,
       containerId: container.id,
       containerNumber: container.containerNumber,
@@ -753,6 +754,7 @@ router.post("/containers/:id/early-start", requireAdmin, async (req: AuthRequest
       .returning();
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "early_start_authorized",
       section: "basic_info",
@@ -782,6 +784,7 @@ router.delete("/containers/:id/early-start", requireAdmin, async (req: AuthReque
       .returning();
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "early_start_revoked",
       section: "basic_info",
@@ -893,6 +896,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
       .returning();
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "status_advanced",
       section: "basic_info",
@@ -913,6 +917,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
         type: "stage_complete",
         message: `${existing.containerNumber} advanced from ${fromLabel} → ${toLabel}`,
         containerId: id,
+        branchId: existing.branchId,
         containerNumber: existing.containerNumber,
       });
     } catch {}
@@ -941,6 +946,7 @@ router.post("/containers/:id/verify", requireAdmin, async (req: AuthRequest, res
       .returning();
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "container_verified",
       section: "basic_info",
@@ -974,6 +980,7 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
       .returning();
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "berthing_confirmed",
       section: "basic_info",
@@ -1066,6 +1073,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
     const [updated] = await db.update(containersTable).set(updates).where(eq(containersTable.id, id)).returning();
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "stage_control",
       section: "basic_info",
@@ -1078,6 +1086,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
         type: action === "mark_released" ? "stage_complete" : "delay_recorded",
         message: notifMsg,
         containerId: id,
+        branchId: existing.branchId,
         containerNumber: existing.containerNumber,
       });
     }
@@ -1197,6 +1206,7 @@ router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res
       .returning();
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "gate_in_recorded",
       section: "basic_info",
@@ -1208,6 +1218,7 @@ router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res
         type: "gate_in",
         message: `${existing.containerNumber} gated in — ready for terminal processing`,
         containerId: id,
+        branchId: existing.branchId,
         containerNumber: existing.containerNumber,
       });
     } catch {}
@@ -1243,6 +1254,7 @@ router.post("/containers/:id/gate-out", requireAuth, async (req: AuthRequest, re
       .returning();
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "gate_out_recorded",
       section: "basic_info",
@@ -1280,6 +1292,7 @@ router.post("/containers/:id/empty-gate-in", requireAuth, async (req: AuthReques
       .returning();
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "empty_gate_in_recorded",
       section: "basic_info",
@@ -1322,6 +1335,7 @@ router.post("/containers/:id/empty-gate-out", requireAuth, async (req: AuthReque
       .returning();
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "empty_gate_out_recorded",
       section: "basic_info",
@@ -1460,6 +1474,7 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     // Audit log
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "update_container",
       section: "basic_info",
@@ -1618,6 +1633,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     reasons.push(...changed);
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: existing.branchId,
       userId: req.user!.id,
       action: "update_container",
       section: "basic_info",
@@ -1628,6 +1644,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       const statusLabel: Record<string, string> = { pending: "Pending", in_transit: "In Transit", delivered: "Delivered" };
       timelineEntries.push({
         containerId: id,
+        branchId: existing.branchId,
         userId: req.user!.id,
         title: `Delivery status changed to "${statusLabel[deliveryStatus] ?? deliveryStatus}"`,
         eventType: "delivery",
@@ -1639,6 +1656,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       if (stageOwner !== undefined && (existing.stageOwner ?? null) !== (stageOwner || null)) {
         timelineEntries.push({
           containerId: id,
+          branchId: existing.branchId,
           userId: req.user!.id,
           title: stageOwner ? `Stage owner set to "${stageOwner}"` : "Stage owner cleared",
           eventType: "stage_control",
@@ -1649,6 +1667,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       if (nextAction !== undefined && (existing.nextAction ?? null) !== (nextAction || null)) {
         timelineEntries.push({
           containerId: id,
+          branchId: existing.branchId,
           userId: req.user!.id,
           title: nextAction ? `Next action set: "${nextAction}"` : "Next action cleared",
           eventType: "stage_control",
@@ -1659,6 +1678,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       if (delayReason !== undefined && (existing.delayReason ?? null) !== (delayReason || null)) {
         timelineEntries.push({
           containerId: id,
+          branchId: existing.branchId,
           userId: req.user!.id,
           title: delayReason ? `Delay reason recorded` : "Delay reason cleared",
           eventType: "stage_control",
@@ -1692,6 +1712,7 @@ router.post("/containers/:id/lock", requireAdmin, async (req: AuthRequest, res) 
     }
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: updated.branchId,
       userId: req.user!.id,
       action: locked ? "locked" : "unlocked",
       reason: reason ?? null,
@@ -1739,7 +1760,7 @@ router.post("/containers/:id/extra-charges", requireAuth, async (req: AuthReques
     if (!label || typeof label !== "string" || !label.trim()) return res.status(400).json({ error: "Label is required" });
     const parsedAmount = parseFloat(String(amount ?? 0)) || 0;
     const [row] = await db.insert(containerExtraChargesTable)
-      .values({ containerId: id, section, label: label.trim(), amount: parsedAmount.toFixed(2) })
+      .values({ containerId: id, branchId: container.branchId, section, label: label.trim(), amount: parsedAmount.toFixed(2) })
       .returning();
     return res.status(201).json({
       id: row.id, containerId: row.containerId, section: row.section, label: row.label,
@@ -1946,6 +1967,7 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
     // Audit log
     await db.insert(auditLogTable).values({
       containerId: id,
+      branchId: c.branchId,
       userId: req.user!.id,
       action: "update_charges",
       section: section,
@@ -1989,7 +2011,7 @@ router.post("/containers/:id/sections/:section/submit", requireAuth, async (req:
       .set({ status: "submitted", submittedById: user.id, submittedAt: new Date(), reviewedById: null, reviewedAt: null, rejectionReason: null, updatedAt: new Date() })
       .where(eq(sectionApprovalsTable.id, approval.id))
       .returning();
-    await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_submitted", section });
+    await db.insert(auditLogTable).values({ containerId: id, branchId: approval.branchId, userId: user.id, action: "section_submitted", section });
     res.json(await formatSectionApproval(updated));
   } catch (err) {
     console.error(err);
@@ -2028,7 +2050,7 @@ router.post("/containers/:id/sections/:section/approve", requireAdmin, async (re
         }
       }
     }
-    await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_approved", section });
+    await db.insert(auditLogTable).values({ containerId: id, branchId: approval.branchId, userId: user.id, action: "section_approved", section });
     res.json(await formatSectionApproval(updated));
   } catch (err) {
     console.error(err);
@@ -2055,7 +2077,7 @@ router.post("/containers/:id/sections/:section/reject", requireAdmin, async (req
       .set({ status: "rejected", reviewedById: user.id, reviewedAt: new Date(), rejectionReason: reason, updatedAt: new Date() })
       .where(eq(sectionApprovalsTable.id, approval.id))
       .returning();
-    await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_rejected", section, reason });
+    await db.insert(auditLogTable).values({ containerId: id, branchId: approval.branchId, userId: user.id, action: "section_rejected", section, reason });
 
     const CHARGE_SECTION_NAME: Record<string, string> = {
       shipping: "Shipping", customs: "Customs", terminal: "Terminal",
@@ -2066,6 +2088,7 @@ router.post("/containers/:id/sections/:section/reject", requireAdmin, async (req
       const dueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
       await db.insert(containerTasksTable).values({
         containerId: id,
+        branchId: approval.branchId,
         title: `Resubmit ${sectionLabel} — correction needed`,
         assignedStaffId: approval.submittedById,
         createdById: user.id,
@@ -2096,7 +2119,7 @@ router.post("/containers/:id/sections/:section/lock", requireAdmin, async (req: 
       lockedSections.push(section);
       await db.update(containersTable).set({ lockedSections: JSON.stringify(lockedSections), updatedAt: new Date() }).where(eq(containersTable.id, id));
     }
-    await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_locked", section });
+    await db.insert(auditLogTable).values({ containerId: id, branchId: container.branchId, userId: user.id, action: "section_locked", section });
     res.json({ message: `Section "${section}" locked` });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
@@ -2114,7 +2137,7 @@ router.post("/containers/:id/sections/:section/unlock", requireAdmin, async (req
     try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
     lockedSections = lockedSections.filter(s => s !== section);
     await db.update(containersTable).set({ lockedSections: JSON.stringify(lockedSections), updatedAt: new Date() }).where(eq(containersTable.id, id));
-    await db.insert(auditLogTable).values({ containerId: id, userId: user.id, action: "section_unlocked", section });
+    await db.insert(auditLogTable).values({ containerId: id, branchId: container.branchId, userId: user.id, action: "section_unlocked", section });
     res.json({ message: `Section "${section}" unlocked` });
   } catch (err) {
     res.status(500).json({ error: "Server error" });

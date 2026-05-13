@@ -35,8 +35,12 @@ timelineRouter.post("/containers/:id/timeline", requireAuth, async (req: AuthReq
   const { title, eventType = "note", description = "", status = "completed" } = req.body;
   if (!title) return res.status(400).json({ error: "title required" });
   try {
+    const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, containerId));
+    if (!container) return res.status(404).json({ error: "Container not found" });
     const [event] = await db.insert(containerTimelineTable).values({
-      containerId, title, eventType, description, status,
+      containerId,
+      branchId: container.branchId,
+      title, eventType, description, status,
       userId: req.user!.id,
     }).returning();
     return res.status(201).json({ ...event, createdAt: event.createdAt.toISOString() });

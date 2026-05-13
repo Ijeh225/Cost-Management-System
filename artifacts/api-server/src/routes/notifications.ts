@@ -319,8 +319,9 @@ async function computeAlerts(userId?: number, role?: string) {
 
 notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
   try {
-    const userId = (req as AuthRequest).user.id;
-    const role   = (req as AuthRequest).user.role;
+    const userId = (req as AuthRequest).user!.id;
+    const role   = (req as AuthRequest).user!.role;
+    const branchId = (req as AuthRequest).user!.branchId;
     // Always compute against ALL alerts (no role filter) for history persistence
     const allAlerts = await computeAlerts(userId, role);
     const now = new Date();
@@ -331,6 +332,7 @@ notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
         await db.insert(systemAlertsHistoryTable)
           .values(allAlerts.map(a => ({
             alertKey: a.alertKey,
+            branchId,
             type: a.type,
             severity: a.severity,
             message: a.message,
@@ -402,11 +404,12 @@ notificationsRouter.get("/notifications/history", requireAuth, async (req, res) 
 
 notificationsRouter.post("/notifications/:alertKey/read", requireAuth, async (req, res) => {
   try {
-    const userId = (req as AuthRequest).user.id;
+    const userId = (req as AuthRequest).user!.id;
+    const branchId = (req as AuthRequest).user!.branchId;
     const { alertKey } = req.params;
     const now = new Date();
     await db.insert(notificationsReadTable)
-      .values({ alertKey, userId, isRead: true, readAt: now })
+      .values({ alertKey, userId, branchId, isRead: true, readAt: now })
       .onConflictDoUpdate({
         target: [notificationsReadTable.alertKey, notificationsReadTable.userId],
         set: { isRead: true, readAt: now },
@@ -420,14 +423,15 @@ notificationsRouter.post("/notifications/:alertKey/read", requireAuth, async (re
 
 notificationsRouter.post("/notifications/read-all", requireAuth, async (req, res) => {
   try {
-    const userId = (req as AuthRequest).user.id;
-    const role   = (req as AuthRequest).user.role;
+    const userId = (req as AuthRequest).user!.id;
+    const role   = (req as AuthRequest).user!.role;
+    const branchId = (req as AuthRequest).user!.branchId;
     const alerts = await computeAlerts(userId, role);
     if (alerts.length === 0) return res.json({ success: true });
 
     const now = new Date();
     await db.insert(notificationsReadTable)
-      .values(alerts.map(a => ({ alertKey: a.alertKey, userId, isRead: true, readAt: now })))
+      .values(alerts.map(a => ({ alertKey: a.alertKey, userId, branchId, isRead: true, readAt: now })))
       .onConflictDoUpdate({
         target: [notificationsReadTable.alertKey, notificationsReadTable.userId],
         set: { isRead: true, readAt: now },
@@ -533,14 +537,15 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
 
 notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, res) => {
   try {
-    const userId = (req as AuthRequest).user.id;
-    const role   = (req as AuthRequest).user.role;
+    const userId = (req as AuthRequest).user!.id;
+    const role   = (req as AuthRequest).user!.role;
+    const branchId = (req as AuthRequest).user!.branchId;
     const alerts = await computeAlerts(userId, role);
     if (alerts.length === 0) return res.json({ success: true, marked: 0 });
 
     const now = new Date();
     await db.insert(notificationsReadTable)
-      .values(alerts.map(a => ({ alertKey: a.alertKey, userId, isRead: true, readAt: now })))
+      .values(alerts.map(a => ({ alertKey: a.alertKey, userId, branchId, isRead: true, readAt: now })))
       .onConflictDoUpdate({
         target: [notificationsReadTable.alertKey, notificationsReadTable.userId],
         set: { isRead: true, readAt: sql`CASE WHEN ${notificationsReadTable.isRead} THEN ${notificationsReadTable.readAt} ELSE ${now} END` },
@@ -596,6 +601,7 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
               type: "overdue",
               message,
               containerId: c.id,
+              branchId: c.branchId,
               containerNumber: c.containerNumber,
             });
           }

@@ -41,7 +41,7 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
   const { isSuperAdmin, user } = useAuth();
   const { data: branches } = useBranches({ enabled: isSuperAdmin });
   const [branchId, setBranchId] = useState<number | null>(
-    (user as any)?.branchId ?? null,
+    user?.branchId ?? null,
   );
 
   const [form, setForm] = useState({
@@ -122,8 +122,8 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
           clientId: form.clientId !== NO_CLIENT ? Number(form.clientId) : null,
           ...(form.eta && { eta: form.eta }),
           ...(form.consignee.trim() && { consignee: form.consignee.trim() }),
-          ...(isSuperAdmin && branchId != null && { branchId } as any),
-        } as any,
+          ...(isSuperAdmin && branchId != null && { branchId }),
+        },
       });
       toast({ title: "Container created", description: `${container.containerNumber} has been added.` });
       onOpenChange(false);
