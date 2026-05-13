@@ -208,6 +208,7 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
         customerName:    containersTable.customerName,
         status:          containersTable.status,
         createdAt:       containersTable.createdAt,
+        branchId:        containersTable.branchId,
       }).from(containersTable).where(eq(containersTable.id, containerId));
       if (!container) return { error: { code: 404, message: "Container not found" } } as const;
 
@@ -223,7 +224,7 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
       let customs: CustomsRow | undefined = await lockOnce();
       if (!customs) {
         try {
-          const [inserted] = await tx.insert(customsChargesTable).values({ containerId }).returning();
+          const [inserted] = await tx.insert(customsChargesTable).values({ containerId, branchId: container.branchId }).returning();
           customs = { duty: inserted.duty, dutyPaid: inserted.dutyPaid };
         } catch {
           // Lost insert race — re-select with lock.

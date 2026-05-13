@@ -286,6 +286,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
         description: "Clearing Charges",
         amount: String(itemAmountFor(c)),
         sortOrder: idx,
+        branchId: inv.branchId,
       }));
       const insertedItems = await tx.insert(invoiceItemsTable).values(itemRows).returning();
 
@@ -721,12 +722,14 @@ router.post("/invoices/:id/items", requireAuth, async (req: AuthRequest, res) =>
     const maxSort = existingItems.reduce((m, it) => Math.max(m, it.sortOrder), -1);
 
     await db.transaction(async (tx) => {
+      const [parentInv] = await tx.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
       await tx.insert(invoiceItemsTable).values({
         invoiceId,
         containerId: containerId ?? null,
         description: resolvedDescription,
         amount: String(resolvedAmount),
         sortOrder: maxSort + 1,
+        branchId: parentInv!.branchId,
       });
       await recalcInvoiceTotals(tx, invoiceId);
     });
@@ -905,6 +908,7 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       notes: notes ?? "",
       paidAt: paidAt ? new Date(paidAt) : new Date(),
       bankId: bankId ?? null,
+      branchId: inv.branchId,
     });
 
     const totalPaid = prevTotalPaid + amount;
@@ -985,6 +989,7 @@ router.post("/invoices/:id/apply-credit", requireAdmin, async (req: AuthRequest,
         notes: `Applied from client credit balance`,
         paidAt: new Date(),
         bankId: null,
+        branchId: inv.branchId,
       });
 
       await tx.update(clientsTable)
@@ -1491,6 +1496,7 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
           notes: `Credit note adjustment: ${reason.trim()}`,
           paidAt: new Date(),
           bankId: null,
+          branchId: inv.branchId,
         });
       }
 

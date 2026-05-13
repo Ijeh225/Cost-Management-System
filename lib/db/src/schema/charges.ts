@@ -24,6 +24,7 @@ const numericField = () => numeric({ precision: 15, scale: 2 }).notNull().defaul
 
 export const shippingChargesTable = pgTable("shipping_charges", {
   id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   containerId: integer("container_id").notNull().references(() => containersTable.id, { onDelete: "cascade" }).unique(),
   shippingCompany: numericField(),
   shippingPaymentVat: numericField(),
@@ -39,6 +40,7 @@ export const shippingChargesTable = pgTable("shipping_charges", {
 
 export const customsChargesTable = pgTable("customs_charges", {
   id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   containerId: integer("container_id").notNull().references(() => containersTable.id, { onDelete: "cascade" }).unique(),
   duty: numericField(),
   dutyPaid: numericField(),
@@ -64,6 +66,7 @@ export const customsChargesTable = pgTable("customs_charges", {
 
 export const terminalChargesTable = pgTable("terminal_charges", {
   id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   containerId: integer("container_id").notNull().references(() => containersTable.id, { onDelete: "cascade" }).unique(),
   terminalCharges: numericField(),
   terminalAdditions1: numericField(),
@@ -83,6 +86,7 @@ export const terminalChargesTable = pgTable("terminal_charges", {
 
 export const deliveryChargesTable = pgTable("delivery_charges", {
   id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   containerId: integer("container_id").notNull().references(() => containersTable.id, { onDelete: "cascade" }).unique(),
   passingOfTruck: numericField(),
   passingOfTruckForEmptyReturn: numericField(),
@@ -102,6 +106,7 @@ export const deliveryChargesTable = pgTable("delivery_charges", {
 
 export const operationsChargesTable = pgTable("operations_charges", {
   id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   containerId: integer("container_id").notNull().references(() => containersTable.id, { onDelete: "cascade" }).unique(),
   fouBooking: numericField(),
   fou: numericField(),

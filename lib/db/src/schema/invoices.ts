@@ -23,6 +23,7 @@ export const invoicesTable = pgTable("invoices", {
 
 export const invoiceItemsTable = pgTable("invoice_items", {
   id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   invoiceId: integer("invoice_id").notNull().references(() => invoicesTable.id, { onDelete: "cascade" }),
   containerId: integer("container_id").references(() => containersTable.id, { onDelete: "set null" }),
   description: text("description").notNull().default("Clearing Charges"),
@@ -33,6 +34,7 @@ export const invoiceItemsTable = pgTable("invoice_items", {
 
 export const invoicePaymentsTable = pgTable("invoice_payments", {
   id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   invoiceId: integer("invoice_id").notNull().references(() => invoicesTable.id, { onDelete: "cascade" }),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   paidAt: timestamp("paid_at").notNull().defaultNow(),

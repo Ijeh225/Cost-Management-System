@@ -462,6 +462,89 @@ async function runStartupMigrations() {
       }
       console.log(`[migration] Multi-branch foundation v2: branched ${V2_TABLES.length} finance tables to branch id=${defaultBranchId}`);
     });
+
+    // v3: extend the foundation to remaining business tables — section charge
+    // tables (each container has one row per section) and invoice line/payment
+    // tables. Same column shape and backfill semantics as v1/v2.
+    await runMigration("multi_branch_foundation_v3_charges_and_invoice_lines", async () => {
+      const { rows: branchRows } = await pool.query<{ id: number }>(
+        `SELECT id FROM branches ORDER BY id ASC LIMIT 1`
+      );
+      const defaultBranchId = branchRows[0]?.id;
+      if (!defaultBranchId) {
+        throw new Error("Failed to locate default branch for v3 migration");
+      }
+
+      const V3_TABLES = [
+        "shipping_charges",
+        "customs_charges",
+        "terminal_charges",
+        "delivery_charges",
+        "operations_charges",
+        "invoice_items",
+        "invoice_payments",
+      ];
+
+      for (const tbl of V3_TABLES) {
+        const { rows: tableExists } = await pool.query<{ exists: boolean }>(
+          `SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = $1
+          ) AS "exists"`,
+          [tbl]
+        );
+        if (!tableExists[0]?.exists) {
+          console.log(`[migration] v3: Skipping ${tbl} (table does not exist yet)`);
+          continue;
+        }
+
+        await pool.query(`ALTER TABLE ${tbl} ADD COLUMN IF NOT EXISTS branch_id INTEGER`);
+        // Backfill from parent: charges and invoice_items derive via container,
+        // invoice_payments derives via invoice. Falls back to default branch
+        // for orphaned rows.
+        if (tbl === "invoice_payments") {
+          await pool.query(`
+            UPDATE invoice_payments p SET branch_id = i.branch_id
+            FROM invoices i WHERE p.invoice_id = i.id AND p.branch_id IS NULL
+          `);
+        } else if (tbl === "invoice_items") {
+          await pool.query(`
+            UPDATE invoice_items it SET branch_id = i.branch_id
+            FROM invoices i WHERE it.invoice_id = i.id AND it.branch_id IS NULL
+          `);
+        } else {
+          // section charge tables — derive from containers via container_id
+          await pool.query(`
+            UPDATE ${tbl} t SET branch_id = c.branch_id
+            FROM containers c WHERE t.container_id = c.id AND t.branch_id IS NULL
+          `);
+        }
+        await pool.query(
+          `UPDATE ${tbl} SET branch_id = $1 WHERE branch_id IS NULL`,
+          [defaultBranchId]
+        );
+        await pool.query(
+          `ALTER TABLE ${tbl} ALTER COLUMN branch_id SET DEFAULT ${defaultBranchId}`
+        );
+        await pool.query(`ALTER TABLE ${tbl} ALTER COLUMN branch_id SET NOT NULL`);
+        await pool.query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint WHERE conname = '${tbl}_branch_id_fk'
+            ) THEN
+              ALTER TABLE ${tbl}
+                ADD CONSTRAINT ${tbl}_branch_id_fk
+                FOREIGN KEY (branch_id) REFERENCES branches(id);
+            END IF;
+          END $$;
+        `);
+        await pool.query(
+          `CREATE INDEX IF NOT EXISTS ${tbl}_branch_id_idx ON ${tbl}(branch_id)`
+        );
+      }
+      console.log(`[migration] Multi-branch foundation v3: branched ${V3_TABLES.length} charge/invoice-line tables`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

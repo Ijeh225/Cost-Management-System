@@ -566,6 +566,7 @@ clientsRouter.post("/client-deposits/:id/allocate", requireAdmin, async (req: Au
         notes: `Applied from deposit #${depositId}${deposit.notes ? ` — ${deposit.notes}` : ""}`,
         paidAt: new Date(),
         bankId: deposit.bankId ?? null,
+        branchId: inv.branchId,
       });
 
       const newAllocated = alreadyAllocated + allocationAmount;

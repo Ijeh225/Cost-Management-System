@@ -163,25 +163,27 @@ async function formatSectionApproval(row: any) {
 }
 
 async function getOrCreateCharges(containerId: number) {
+  const [parent] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, containerId));
+  const branchId = parent?.branchId ?? 1;
   let [shipping] = await db.select().from(shippingChargesTable).where(eq(shippingChargesTable.containerId, containerId));
   if (!shipping) {
-    [shipping] = await db.insert(shippingChargesTable).values({ containerId }).returning();
+    [shipping] = await db.insert(shippingChargesTable).values({ containerId, branchId }).returning();
   }
   let [customs] = await db.select().from(customsChargesTable).where(eq(customsChargesTable.containerId, containerId));
   if (!customs) {
-    [customs] = await db.insert(customsChargesTable).values({ containerId }).returning();
+    [customs] = await db.insert(customsChargesTable).values({ containerId, branchId }).returning();
   }
   let [terminal] = await db.select().from(terminalChargesTable).where(eq(terminalChargesTable.containerId, containerId));
   if (!terminal) {
-    [terminal] = await db.insert(terminalChargesTable).values({ containerId }).returning();
+    [terminal] = await db.insert(terminalChargesTable).values({ containerId, branchId }).returning();
   }
   let [delivery] = await db.select().from(deliveryChargesTable).where(eq(deliveryChargesTable.containerId, containerId));
   if (!delivery) {
-    [delivery] = await db.insert(deliveryChargesTable).values({ containerId }).returning();
+    [delivery] = await db.insert(deliveryChargesTable).values({ containerId, branchId }).returning();
   }
   let [operations] = await db.select().from(operationsChargesTable).where(eq(operationsChargesTable.containerId, containerId));
   if (!operations) {
-    [operations] = await db.insert(operationsChargesTable).values({ containerId }).returning();
+    [operations] = await db.insert(operationsChargesTable).values({ containerId, branchId }).returning();
   }
   return { shipping, customs, terminal, delivery, operations };
 }
@@ -1936,27 +1938,27 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
 
     if (section === "shipping" && shipping) {
       await db.insert(shippingChargesTable)
-        .values({ containerId: id, ...strNums(shipping) })
+        .values({ containerId: id, branchId: c.branchId, ...strNums(shipping) })
         .onConflictDoUpdate({ target: shippingChargesTable.containerId, set: { ...strNums(shipping), updatedAt: new Date() } });
     }
     if (section === "customs" && customs) {
       await db.insert(customsChargesTable)
-        .values({ containerId: id, ...strNums(customs) })
+        .values({ containerId: id, branchId: c.branchId, ...strNums(customs) })
         .onConflictDoUpdate({ target: customsChargesTable.containerId, set: { ...strNums(customs), updatedAt: new Date() } });
     }
     if (section === "terminal" && terminal) {
       await db.insert(terminalChargesTable)
-        .values({ containerId: id, ...strNums(terminal) })
+        .values({ containerId: id, branchId: c.branchId, ...strNums(terminal) })
         .onConflictDoUpdate({ target: terminalChargesTable.containerId, set: { ...strNums(terminal), updatedAt: new Date() } });
     }
     if (section === "delivery" && delivery) {
       await db.insert(deliveryChargesTable)
-        .values({ containerId: id, ...strNums(delivery) })
+        .values({ containerId: id, branchId: c.branchId, ...strNums(delivery) })
         .onConflictDoUpdate({ target: deliveryChargesTable.containerId, set: { ...strNums(delivery), updatedAt: new Date() } });
     }
     if (section === "operations" && operations) {
       await db.insert(operationsChargesTable)
-        .values({ containerId: id, ...strNums(operations) })
+        .values({ containerId: id, branchId: c.branchId, ...strNums(operations) })
         .onConflictDoUpdate({ target: operationsChargesTable.containerId, set: { ...strNums(operations), updatedAt: new Date() } });
     }
 
