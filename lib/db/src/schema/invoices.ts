@@ -2,9 +2,11 @@ import { pgTable, serial, integer, text, numeric, timestamp, date } from "drizzl
 import { containersTable } from "./containers";
 import { clientsTable } from "./clients";
 import { banksTable } from "./banks";
+import { branchesTable } from "./branches";
 
 export const invoicesTable = pgTable("invoices", {
   id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   containerId: integer("container_id").references(() => containersTable.id, { onDelete: "set null" }),
   clientId: integer("client_id").references(() => clientsTable.id, { onDelete: "set null" }),
   invoiceNumber: text("invoice_number").notNull().unique(),

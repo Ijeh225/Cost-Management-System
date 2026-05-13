@@ -2,12 +2,14 @@ import { pgTable, serial, integer, numeric, text, timestamp } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { containersTable } from "./containers";
+import { branchesTable } from "./branches";
 
 export const EXTRA_CHARGE_SECTIONS = ["shipping", "customs", "terminal", "delivery", "operations"] as const;
 export type ExtraChargeSection = typeof EXTRA_CHARGE_SECTIONS[number];
 
 export const containerExtraChargesTable = pgTable("container_extra_charges", {
   id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   containerId: integer("container_id").notNull().references(() => containersTable.id, { onDelete: "cascade" }),
   section: text("section").notNull(),
   label: text("label").notNull(),

@@ -3,9 +3,11 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { containersTable } from "./containers";
 import { usersTable } from "./users";
+import { branchesTable } from "./branches";
 
 export const sectionApprovalsTable = pgTable("section_approvals", {
   id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   containerId: integer("container_id").notNull().references(() => containersTable.id, { onDelete: "cascade" }),
   section: text("section").notNull(),
   status: text("status").notNull().default("draft"),

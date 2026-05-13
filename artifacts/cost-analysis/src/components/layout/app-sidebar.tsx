@@ -80,6 +80,7 @@ export function AppSidebar() {
     { title: "Overhead Expenses", url: "/overhead-expenses",     icon: TrendingDown    },
     { title: "Upload Data",      url: "/containers/upload",      icon: UploadCloud     },
     { title: "User Management",  url: "/users",                  icon: Users           },
+    ...(isSuperAdmin ? [{ title: "Branches", url: "/settings/branches", icon: Building2 }] : []),
     ...(isSuperAdmin ? [{ title: "Settings", url: "/settings", icon: Settings }] : []),
   ];
 

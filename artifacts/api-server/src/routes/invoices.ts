@@ -275,6 +275,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
         total: String(total),
         dueDate: dueDate ?? null,
         notes: notes ?? "",
+        branchId: req.user!.branchId,
       }).returning();
 
       const itemRows = containers.map((c, idx) => ({

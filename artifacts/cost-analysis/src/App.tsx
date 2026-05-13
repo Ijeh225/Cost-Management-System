@@ -58,6 +58,7 @@ import ProfitLossPrint from "@/pages/reports/pl/print";
 import DeliveryReportPrint from "@/pages/reports/delivery-report/print";
 import DisbursementReconciliationPage from "@/pages/reports/disbursement-reconciliation/index";
 import CreditNotePrintPage from "@/pages/credit-notes/print/[id]";
+import BranchesPage from "@/pages/branches/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -220,6 +221,9 @@ function Router() {
               <Route path="/invoices/:id" component={InvoiceDetailPage} />
               <Route path="/settings">
                 <AdminGuard><SettingsPage /></AdminGuard>
+              </Route>
+              <Route path="/settings/branches">
+                <AdminGuard><BranchesPage /></AdminGuard>
               </Route>
               <Route component={NotFound} />
             </Switch>

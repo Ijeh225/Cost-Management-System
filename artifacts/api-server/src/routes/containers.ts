@@ -394,6 +394,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       clientId: parsedClientId,
       eta: eta ? new Date(eta) : null,
       consignee: consignee || null,
+      branchId: req.user!.branchId,
     }).returning();
     await getOrCreateCharges(container.id);
     // Notify: new job created
@@ -502,6 +503,7 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
           clientId: linkedClientId,
           eta: etaDate,
           consignee: row.consignee ?? null,
+          branchId: req.user!.branchId,
         }).returning();
         await getOrCreateCharges(container.id);
         created++;

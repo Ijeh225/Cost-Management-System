@@ -69,6 +69,7 @@ clientsRouter.post("/clients", requireAuth, async (req: AuthRequest, res) => {
     const [client] = await db.insert(clientsTable).values({
       name: name.trim(), contactName, contactEmail, contactPhone, address, notes,
       agreedClearingRate: rate,
+      branchId: req.user!.branchId,
     }).returning();
     return res.status(201).json({
       ...client,
@@ -367,6 +368,7 @@ clientsRouter.post("/clients/bulk", requireAuth, async (req: AuthRequest, res) =
           contactPhone: row.contactPhone ?? "",
           address: row.address ?? "",
           notes: row.notes ?? "",
+          branchId: req.user!.branchId,
         });
         created++;
       } catch (err: any) {

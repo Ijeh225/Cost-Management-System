@@ -284,6 +284,110 @@ async function runStartupMigrations() {
         await pool.query(`ALTER TABLE ${tbl} ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(15,6)`);
       }
     });
+
+    // Multi-Branch Foundation (Task #73): create branches table, seed default
+    // "Head Office" branch, and add a branch_id FK to every business table so
+    // each branch's data can be cleanly isolated downstream (Task #74).
+    await runMigration("multi_branch_foundation_v1", async () => {
+      // 1. Create branches table.
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS branches (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE,
+          short_code TEXT NOT NULL DEFAULT '',
+          location TEXT NOT NULL DEFAULT '',
+          contact_email TEXT NOT NULL DEFAULT '',
+          contact_phone TEXT NOT NULL DEFAULT '',
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+
+      // 2. Seed the default "Head Office" branch.
+      await pool.query(`
+        INSERT INTO branches (name, short_code, location)
+        VALUES ('Head Office', 'HQ', '')
+        ON CONFLICT (name) DO NOTHING
+      `);
+      const { rows: branchRows } = await pool.query<{ id: number }>(
+        `SELECT id FROM branches ORDER BY id ASC LIMIT 1`
+      );
+      const defaultBranchId = branchRows[0]?.id;
+      if (!defaultBranchId) {
+        throw new Error("Failed to create or locate default branch");
+      }
+
+      // 3. Add branch_id (nullable), backfill, then lock down with NOT NULL + FK + index.
+      const BRANCHED_TABLES = [
+        "users",
+        "containers",
+        "clients",
+        "invoices",
+        "container_tasks",
+        "section_approvals",
+        "container_documents",
+        "container_timeline",
+        "container_extra_charges",
+        "container_expense_payments",
+        "container_expense_categories",
+        "custom_sections",
+        "custom_fields",
+        "custom_field_values",
+        "notifications_read",
+        "system_alerts_history",
+        "audit_log",
+        "user_client_assignments",
+        "whatsapp_messages",
+        "workflow_notifications",
+      ];
+
+      for (const tbl of BRANCHED_TABLES) {
+        // Skip silently if the table doesn't exist yet (e.g. fresh deploy where
+        // drizzle-kit push hasn't created it). On the next push the column
+        // will already be in the schema definition and get added correctly.
+        const { rows: tableExists } = await pool.query<{ exists: boolean }>(
+          `SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = $1
+          ) AS "exists"`,
+          [tbl]
+        );
+        if (!tableExists[0]?.exists) {
+          console.log(`[migration] Skipping ${tbl} (table does not exist yet)`);
+          continue;
+        }
+
+        await pool.query(`ALTER TABLE ${tbl} ADD COLUMN IF NOT EXISTS branch_id INTEGER`);
+        await pool.query(
+          `UPDATE ${tbl} SET branch_id = $1 WHERE branch_id IS NULL`,
+          [defaultBranchId]
+        );
+        // Set DEFAULT so legacy insert sites that don't pass branch_id still work.
+        // Task #74 will remove these defaults once every insert site stamps the
+        // active branch explicitly.
+        await pool.query(
+          `ALTER TABLE ${tbl} ALTER COLUMN branch_id SET DEFAULT ${defaultBranchId}`
+        );
+        await pool.query(`ALTER TABLE ${tbl} ALTER COLUMN branch_id SET NOT NULL`);
+        await pool.query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint WHERE conname = '${tbl}_branch_id_fk'
+            ) THEN
+              ALTER TABLE ${tbl}
+                ADD CONSTRAINT ${tbl}_branch_id_fk
+                FOREIGN KEY (branch_id) REFERENCES branches(id);
+            END IF;
+          END $$;
+        `);
+        await pool.query(
+          `CREATE INDEX IF NOT EXISTS ${tbl}_branch_id_idx ON ${tbl}(branch_id)`
+        );
+      }
+      console.log(`[migration] Multi-branch foundation: assigned all existing data to branch id=${defaultBranchId}`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

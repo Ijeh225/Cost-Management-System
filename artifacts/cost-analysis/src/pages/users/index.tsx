@@ -18,6 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { SECTION_LABELS, CHARGE_SECTIONS, parseSectionPermissions, type SectionPermLevel } from "@/lib/format";
 import { Switch } from "@/components/ui/switch";
+import { useBranches, type Branch } from "@/pages/branches/index";
 
 type SectionPermissionsMap = Record<string, SectionPermLevel>;
 
@@ -126,8 +127,41 @@ type UserRow = {
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
   canUpload?: boolean;
+  branchId?: number | null;
   isActive: boolean; createdAt: string;
 };
+
+function BranchSelectField({
+  branches, value, onChange, disabled,
+}: {
+  branches: Branch[] | undefined;
+  value: number | null;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-sm font-medium leading-none">Branch</label>
+      <Select
+        value={value != null ? String(value) : undefined}
+        onValueChange={(v) => onChange(Number(v))}
+        disabled={disabled}
+      >
+        <SelectTrigger><SelectValue placeholder="Select a branch..." /></SelectTrigger>
+        <SelectContent>
+          {(branches ?? []).filter(b => b.isActive || b.id === value).map(b => (
+            <SelectItem key={b.id} value={String(b.id)}>
+              {b.name}{b.shortCode ? ` (${b.shortCode})` : ""}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">
+        The user will only see data belonging to this branch.
+      </p>
+    </div>
+  );
+}
 
 const WORKSPACE_ROLES: { value: string; label: string; color: string }[] = [
   { value: "transire_user",  label: "Transire",     color: "border-violet-500 text-violet-400 bg-violet-500/10" },
@@ -203,6 +237,11 @@ function CreateUserDialog() {
   const [sectionPerms, setSectionPerms] = useState<SectionPermissionsMap>({});
   const [canUpload, setCanUpload] = useState(false);
   const [workspaceRoles, setWorkspaceRoles] = useState<string[]>([]);
+  const { user: currentUser } = useAuth();
+  const { data: branches } = useBranches();
+  const [branchId, setBranchId] = useState<number | null>(
+    (currentUser as any)?.branchId ?? null
+  );
   const createMutation = useCreateUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -221,6 +260,7 @@ function CreateUserDialog() {
       name: data.name, email: data.email, password: data.password,
       role: data.role, roles: allRoles,
     };
+    if (branchId != null) payload.branchId = branchId;
     if (data.role === "staff") {
       payload.sectionPermissions = JSON.stringify(sectionPerms);
       payload.canUpload = canUpload;
@@ -284,6 +324,7 @@ function CreateUserDialog() {
                 <FormMessage />
               </FormItem>
             )} />
+            <BranchSelectField branches={branches} value={branchId} onChange={setBranchId} />
             {isNonElevated && (
               <WorkspaceRoleCheckboxes
                 selected={workspaceRoles}
@@ -334,6 +375,8 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
   const updateMutation = useUpdateUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { data: branches } = useBranches();
+  const [branchId, setBranchId] = useState<number | null>(user.branchId ?? null);
 
   const initialPerms = parseSectionPermissions(user.sectionPermissions);
   const [sectionPerms, setSectionPerms] = useState<SectionPermissionsMap>(initialPerms);
@@ -354,6 +397,7 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
   const onSubmit = (data: any) => {
     const allRoles = [...new Set([data.role, ...workspaceRoles])];
     const payload: any = { name: data.name, role: data.role, roles: allRoles };
+    if (branchId != null && branchId !== user.branchId) payload.branchId = branchId;
     if (data.password) payload.password = data.password;
     if (data.role === "staff") {
       payload.sectionPermissions = JSON.stringify(sectionPerms);
@@ -408,6 +452,7 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
               <FormMessage />
             </FormItem>
           )} />
+          <BranchSelectField branches={branches} value={branchId} onChange={setBranchId} />
           {isNonElevated && (
             <WorkspaceRoleCheckboxes
               selected={[...new Set([...(WORKSPACE_ROLES.some(w => w.value === watchedRole) ? [watchedRole] : []), ...workspaceRoles])]}
@@ -555,6 +600,8 @@ export default function Users() {
   const { isAdmin, isSuperAdmin, user: currentUser } = useAuth();
   const [, setLocation] = useLocation();
   const { data: users, isLoading } = useListUsers();
+  const { data: branches } = useBranches();
+  const branchNameById = new Map((branches ?? []).map(b => [b.id, b.name]));
   const updateMutation = useUpdateUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -597,6 +644,7 @@ export default function Users() {
               <tr>
                 <th className="px-6 py-4 font-medium">User</th>
                 <th className="px-6 py-4 font-medium">Role</th>
+                <th className="px-6 py-4 font-medium">Branch</th>
                 <th className="px-6 py-4 font-medium">Section Access</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Created</th>
@@ -605,9 +653,9 @@ export default function Users() {
             </thead>
             <tbody className="divide-y divide-border/50">
               {isLoading ? (
-                <tr><td colSpan={6} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></td></tr>
+                <tr><td colSpan={7} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></td></tr>
               ) : users?.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-muted-foreground text-sm">No users found.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-muted-foreground text-sm">No users found.</td></tr>
               ) : (
                 users?.map((u) => (
                   <tr key={u.id} className={`transition-colors ${u.isActive ? "hover:bg-accent/50" : "opacity-60 hover:bg-accent/30"}`}>
@@ -635,6 +683,17 @@ export default function Users() {
                           );
                         })}
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {(() => {
+                        const bid = (u as UserRow).branchId;
+                        const name = bid != null ? branchNameById.get(bid) : null;
+                        return name ? (
+                          <Badge variant="outline" className="border-border text-foreground/80">{name}</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 max-w-xs">
                       <span className="text-xs text-foreground/70 line-clamp-2">{formatPermissionsSummary(u as UserRow)}</span>

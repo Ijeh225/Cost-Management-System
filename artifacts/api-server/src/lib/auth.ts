@@ -72,6 +72,7 @@ export interface AuthRequest extends Request {
     sectionPermission: string | null;
     sectionPermissions: string | null;
     canUpload: boolean;
+    branchId: number;
   };
 }
 
@@ -103,6 +104,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       sectionPermission: user.sectionPermission ?? null,
       sectionPermissions: user.sectionPermissions ?? null,
       canUpload: isElevated ? true : (user.canUpload ?? false),
+      branchId: user.branchId,
     };
     next();
   } catch {

@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, usersTable, clientsTable, userClientAssignmentsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { db, usersTable, clientsTable, userClientAssignmentsTable, branchesTable } from "@workspace/db";
+import { eq, and, asc } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest, hashPassword, parseRoles } from "../lib/auth.js";
 
 const router = Router();
@@ -16,6 +16,7 @@ const userFields = {
   canUpload: usersTable.canUpload,
   isActive: usersTable.isActive,
   createdAt: usersTable.createdAt,
+  branchId: usersTable.branchId,
 };
 
 type UserRow = {
@@ -29,6 +30,7 @@ type UserRow = {
   canUpload: boolean;
   isActive: boolean;
   createdAt: Date;
+  branchId: number;
 };
 
 const ELEVATED_ROLES = new Set(["admin", "super_admin"]);
@@ -52,15 +54,40 @@ router.get("/users", requireAdmin, async (_req, res) => {
   }
 });
 
-router.post("/users", requireSuperAdmin, async (req, res) => {
+router.post("/users", requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
-    const { email, name, password, role, roles, sectionPermission, sectionPermissions, canUpload } = req.body;
+    const { email, name, password, role, roles, sectionPermission, sectionPermissions, canUpload, branchId } = req.body;
     if (!email || !name || !password || !role) {
       res.status(400).json({ error: "All fields required" });
       return;
     }
     if (typeof password !== "string" || password.length < 8) {
       res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+    // Resolve target branch: caller-supplied branchId (Super Admin only path),
+    // else fall back to the requester's branch, else the first branch.
+    let resolvedBranchId: number | null = null;
+    if (branchId != null) {
+      const parsed = Number(branchId);
+      if (!Number.isInteger(parsed)) {
+        res.status(400).json({ error: "Invalid branchId" });
+        return;
+      }
+      const [b] = await db.select().from(branchesTable).where(eq(branchesTable.id, parsed)).limit(1);
+      if (!b) {
+        res.status(400).json({ error: "Branch not found" });
+        return;
+      }
+      resolvedBranchId = b.id;
+    } else if (req.user?.branchId) {
+      resolvedBranchId = req.user.branchId;
+    } else {
+      const [first] = await db.select().from(branchesTable).orderBy(asc(branchesTable.id)).limit(1);
+      resolvedBranchId = first?.id ?? null;
+    }
+    if (!resolvedBranchId) {
+      res.status(400).json({ error: "No branch available to assign user to" });
       return;
     }
     const passwordHash = await hashPassword(password);
@@ -72,6 +99,7 @@ router.post("/users", requireSuperAdmin, async (req, res) => {
       sectionPermissions: sectionPermissions ?? null,
       canUpload: ELEVATED_ROLES.has(role) ? true : (canUpload === true),
       isActive: true,
+      branchId: resolvedBranchId,
     }).returning();
     res.status(201).json(formatUser(user));
   } catch (err) {
@@ -103,7 +131,7 @@ router.put("/users/:id", requireSuperAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
-    const { name, role, roles, isActive, password, sectionPermission, sectionPermissions, canUpload } = req.body;
+    const { name, role, roles, isActive, password, sectionPermission, sectionPermissions, canUpload, branchId } = req.body;
     if (password !== undefined && (typeof password !== "string" || password.length < 8)) {
       res.status(400).json({ error: "Password must be at least 8 characters" });
       return;
@@ -121,6 +149,19 @@ router.put("/users/:id", requireSuperAdmin, async (req, res) => {
     if (sectionPermission !== undefined) updates.sectionPermission = sectionPermission || null;
     if (sectionPermissions !== undefined) updates.sectionPermissions = sectionPermissions || null;
     if (canUpload !== undefined) updates.canUpload = ELEVATED_ROLES.has(updates.role ?? "") ? true : (canUpload === true);
+    if (branchId !== undefined) {
+      const parsed = Number(branchId);
+      if (!Number.isInteger(parsed)) {
+        res.status(400).json({ error: "Invalid branchId" });
+        return;
+      }
+      const [b] = await db.select().from(branchesTable).where(eq(branchesTable.id, parsed)).limit(1);
+      if (!b) {
+        res.status(400).json({ error: "Branch not found" });
+        return;
+      }
+      updates.branchId = b.id;
+    }
     const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     res.json(formatUser(user));

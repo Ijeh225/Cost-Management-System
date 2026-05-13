@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import { db, usersTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { db, usersTable, branchesTable } from "@workspace/db";
+import { eq, sql, asc } from "drizzle-orm";
 import {
   hashPassword,
   verifyPassword,
@@ -63,6 +63,7 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
         if (Array.isArray(arr) && arr.length > 0) parsedRoles = arr;
       } catch {}
     }
+    const [loginBranch] = await db.select().from(branchesTable).where(eq(branchesTable.id, user.branchId)).limit(1);
     res.json({
       user: {
         id: user.id,
@@ -72,6 +73,8 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
         roles: parsedRoles,
         isActive: user.isActive,
         createdAt: user.createdAt.toISOString(),
+        branchId: user.branchId,
+        branchName: loginBranch?.name ?? null,
       },
       message: "Login successful",
     });
@@ -96,9 +99,10 @@ router.post("/auth/logout", requireAuth, async (req: AuthRequest, res) => {
   res.json({ message: "Logged out" });
 });
 
-router.get("/auth/me", requireAuth, (req: AuthRequest, res) => {
-  const user = req.user!;
-  db.select().from(usersTable).where(eq(usersTable.id, user.id)).limit(1).then(([u]) => {
+router.get("/auth/me", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const user = req.user!;
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, user.id)).limit(1);
     if (!u) {
       res.status(401).json({ error: "Not authenticated" });
       return;
@@ -110,6 +114,7 @@ router.get("/auth/me", requireAuth, (req: AuthRequest, res) => {
         if (Array.isArray(arr) && arr.length > 0) parsedRoles = arr;
       } catch {}
     }
+    const [meBranch] = await db.select().from(branchesTable).where(eq(branchesTable.id, u.branchId)).limit(1);
     res.json({
       id: u.id,
       email: u.email,
@@ -121,8 +126,12 @@ router.get("/auth/me", requireAuth, (req: AuthRequest, res) => {
       canUpload: (u.role === "admin" || u.role === "super_admin") ? true : (u.canUpload ?? false),
       isActive: u.isActive,
       createdAt: u.createdAt.toISOString(),
+      branchId: u.branchId,
+      branchName: meBranch?.name ?? null,
     });
-  }).catch(() => res.status(500).json({ error: "Server error" }));
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 router.get("/auth/setup-required", async (_req, res) => {
@@ -152,6 +161,13 @@ router.post("/auth/setup", async (req, res) => {
     }
     const passwordHash = await hashPassword(password);
     const sessionToken = generateSessionToken();
+    // Setup runs after the multi-branch migration, so the default
+    // "Head Office" branch exists. Assign the first super_admin to it.
+    const [defaultBranch] = await db.select().from(branchesTable).orderBy(asc(branchesTable.id)).limit(1);
+    if (!defaultBranch) {
+      res.status(500).json({ error: "No branches exist. Please restart the server." });
+      return;
+    }
     const [user] = await db.insert(usersTable).values({
       name,
       email,
@@ -159,6 +175,7 @@ router.post("/auth/setup", async (req, res) => {
       role: "super_admin",
       isActive: true,
       sessionToken,
+      branchId: defaultBranch.id,
     }).returning();
 
     const token = signToken(user.id, sessionToken);
