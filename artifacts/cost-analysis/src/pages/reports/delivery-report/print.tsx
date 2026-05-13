@@ -67,7 +67,7 @@ export default function DeliveryReportPrint() {
             <div>
               <div style={{ fontSize: 22, fontWeight: 700, color: "#1e293b", letterSpacing: -0.5 }}>Delivery Report</div>
               <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>Period: {periodLabel}</div>
-              <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Branch: {(data as any)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
+              <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Branch: {(data as { branchScope?: { name: string } } | undefined)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 12, color: "#94a3b8" }}>Generated on</div>

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Building2, Download, Loader2, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
+import { Building2, Download, Loader2, AlertTriangle, TrendingUp, TrendingDown, ChevronUp, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,8 +50,29 @@ export default function BranchComparisonPage() {
     },
   });
 
-  const rows = data?.rows ?? [];
+  type SortKey = "branchName" | "containers" | "revenue" | "costs" | "grossProfit" | "marginPct" | "avgTurnaroundDays" | "outstandingReceivables";
+  const [sortKey, setSortKey] = useState<SortKey>("revenue");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const handleSort = (k: SortKey) => {
+    if (sortKey === k) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(k); setSortDir("desc"); }
+  };
+  const SortIcon = ({ col }: { col: SortKey }) =>
+    sortKey === col ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3 inline ml-0.5" /> : <ChevronDown className="w-3 h-3 inline ml-0.5" />) : null;
+
   const totals = data?.totals;
+  const rows = useMemo(() => {
+    const r = [...(data?.rows ?? [])];
+    r.sort((a, b) => {
+      const av = a[sortKey] as number | string;
+      const bv = b[sortKey] as number | string;
+      if (typeof av === "string" && typeof bv === "string") {
+        return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+    });
+    return r;
+  }, [data?.rows, sortKey, sortDir]);
 
   const chartData = useMemo(
     () => rows.map(r => ({ name: r.branchName, Revenue: r.revenue, Costs: r.costs, "Gross Profit": r.grossProfit })),
@@ -175,14 +196,14 @@ export default function BranchComparisonPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground">
                     <tr>
-                      <th className="px-4 py-3 text-left font-semibold">Branch</th>
-                      <th className="px-4 py-3 text-right font-semibold">Containers</th>
-                      <th className="px-4 py-3 text-right font-semibold">Revenue</th>
-                      <th className="px-4 py-3 text-right font-semibold">Costs</th>
-                      <th className="px-4 py-3 text-right font-semibold">Gross Profit</th>
-                      <th className="px-4 py-3 text-right font-semibold">Margin %</th>
-                      <th className="px-4 py-3 text-right font-semibold">Avg Turnaround</th>
-                      <th className="px-4 py-3 text-right font-semibold">Outstanding AR</th>
+                      <th className="px-4 py-3 text-left font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("branchName")}>Branch<SortIcon col="branchName" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("containers")}>Containers<SortIcon col="containers" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("revenue")}>Revenue<SortIcon col="revenue" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("costs")}>Costs<SortIcon col="costs" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("grossProfit")}>Gross Profit<SortIcon col="grossProfit" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("marginPct")}>Margin %<SortIcon col="marginPct" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("avgTurnaroundDays")}>Avg Turnaround<SortIcon col="avgTurnaroundDays" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("outstandingReceivables")}>Outstanding AR<SortIcon col="outstandingReceivables" /></th>
                     </tr>
                   </thead>
                   <tbody>

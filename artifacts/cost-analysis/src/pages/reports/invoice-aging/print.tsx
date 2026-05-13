@@ -125,7 +125,7 @@ export default function InvoiceAgingPrint() {
           </div>
           <div>
             <div className="report-title">Invoice Aging Report</div>
-            <div className="report-sub">Branch: {(data as any)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
+            <div className="report-sub">Branch: {(data as { branchScope?: { name: string } } | undefined)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
             <div className="report-sub">As at {fmtDate(generatedAt)}</div>
             <div className="report-sub">{totalUnpaidCount} unpaid invoice{totalUnpaidCount !== 1 ? "s" : ""}</div>
           </div>

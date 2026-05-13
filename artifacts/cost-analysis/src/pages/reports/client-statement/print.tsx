@@ -124,7 +124,7 @@ export default function ClientStatementPrint() {
           <div>
             <div className="report-title">Client Statement</div>
             <div className="report-sub">{periodLabel}</div>
-            <div className="report-sub">Branch: {(data as any)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
+            <div className="report-sub">Branch: {(data as { branchScope?: { name: string } } | undefined)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
             <div className="report-sub">Generated: {fmtDate(new Date().toISOString())}</div>
           </div>
         </div>

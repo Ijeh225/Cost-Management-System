@@ -336,7 +336,7 @@ function DashboardScopeLabel() {
   if (!isSuperAdmin) return null;
   const label = activeBranchId === "all"
     ? "All Branches — Consolidated"
-    : (branches.find(b => b.id === activeBranchId)?.name ?? `Branch #${activeBranchId}`);
+    : (branches.find((b: { id: number; name: string }) => b.id === activeBranchId)?.name ?? `Branch #${activeBranchId}`);
   return (
     <span className="ml-2 text-[11px] uppercase tracking-wider text-primary/80 font-semibold">
       · Scope: {label}

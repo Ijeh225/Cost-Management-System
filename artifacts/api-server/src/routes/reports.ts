@@ -204,14 +204,18 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireBranchAdminOr
     const id = parseInt(clientId, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid clientId" });
 
+    const branchScope = await resolveBranchScopeInfo(req);
+
+    // Branch-scope the client lookup so non-super-admins cannot read client
+    // metadata for clients in other branches.
+    const clientConds: SQL[] = [eq(clientsTable.id, id)];
+    if (branchScope.id !== null) clientConds.push(eq(clientsTable.branchId, branchScope.id));
     const [client] = await db
       .select({ id: clientsTable.id, name: clientsTable.name, contactName: clientsTable.contactName, contactPhone: clientsTable.contactPhone, contactEmail: clientsTable.contactEmail, address: clientsTable.address })
       .from(clientsTable)
-      .where(eq(clientsTable.id, id));
+      .where(and(...clientConds));
 
     if (!client) return res.status(404).json({ error: "Client not found" });
-
-    const branchScope = await resolveBranchScopeInfo(req);
     const conditions: SQL[] = [eq(invoicesTable.clientId, id)];
     if (from) conditions.push(gte(invoicesTable.createdAt, new Date(from)));
     if (to) {
@@ -1728,7 +1732,11 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       if (isNaN(toDate.getTime())) return res.status(400).json({ error: "Invalid 'to' date" });
     }
 
-    const branches = await db.select({ id: branchesTable.id, name: branchesTable.name, isActive: branchesTable.isActive }).from(branchesTable);
+    // Active branches only — inactive branches are not part of the comparison.
+    const branches = await db
+      .select({ id: branchesTable.id, name: branchesTable.name, isActive: branchesTable.isActive })
+      .from(branchesTable)
+      .where(eq(branchesTable.isActive, true));
 
     // Container counts + revenue + costs per branch
     const containerConds: SQL[] = [];
@@ -1742,6 +1750,8 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       status: containersTable.status,
       createdAt: containersTable.createdAt,
       closedAt: containersTable.closedAt,
+      gateInDate: containersTable.gateInDate,
+      deliveredAt: containersTable.deliveredAt,
     }).from(containersTable).where(containerConds.length > 0 ? and(...containerConds) : undefined);
 
     const containerIds = containers.map(c => c.id);
@@ -1794,12 +1804,14 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       const grossProfit = revenue - costs;
       const marginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
-      const closed = branchContainers.filter(c => c.status === "closed" && c.closedAt);
-      const turnaroundDays = closed.length > 0
-        ? closed.reduce((s, c) => {
-            const days = (new Date(c.closedAt as any).getTime() - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24);
-            return s + days;
-          }, 0) / closed.length
+      // Turnaround = gate-in → delivered (operational lifecycle), not created → closed.
+      const delivered = branchContainers.filter(c => c.gateInDate !== null && c.deliveredAt !== null);
+      const turnaroundDays = delivered.length > 0
+        ? delivered.reduce((s, c) => {
+            const gateIn = c.gateInDate as Date;
+            const delivAt = c.deliveredAt as Date;
+            return s + (delivAt.getTime() - gateIn.getTime()) / (1000 * 60 * 60 * 24);
+          }, 0) / delivered.length
         : 0;
 
       return {

@@ -117,7 +117,7 @@ export default function VatSummaryPrint() {
           <div>
             <div className="report-title">VAT Summary Report</div>
             <div className="report-sub">For FIRS Filing · {periodLabel}</div>
-            <div className="report-sub">Branch: {(data as any)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
+            <div className="report-sub">Branch: {(data as { branchScope?: { name: string } } | undefined)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
             <div className="report-sub">Generated: {fmtDate(new Date().toISOString())}</div>
           </div>
         </div>

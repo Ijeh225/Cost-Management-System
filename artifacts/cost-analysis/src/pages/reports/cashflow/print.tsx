@@ -164,7 +164,7 @@ export default function CashFlowPrint() {
             <div className="report-title">Cash Flow Statement</div>
             <div className="report-sub">{periodLabel}</div>
             <div className="report-sub">Bank: {bankLabel}</div>
-            <div className="report-sub">Branch: {(data as any)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
+            <div className="report-sub">Branch: {(data as { branchScope?: { name: string } } | undefined)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
             <div className="report-sub">Generated: {fmtDate(new Date().toISOString())}</div>
           </div>
         </div>

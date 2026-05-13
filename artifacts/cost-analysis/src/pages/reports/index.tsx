@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, useGetFxHistory, type DeliveryAnalyticsResponse, type FxHistoryEntry } from "@workspace/api-client-react";
 import { useBranchScope } from "@/components/layout/branch-provider";
 import { useLocation } from "wouter";
+
+type WithBranchName = { branchName?: string | null };
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,7 +92,7 @@ function ContainersTable({ rows, showBranch }: { rows: ReportRow[]; showBranch?:
               {showBranch && (
                 <td className="px-5 py-3 text-xs">
                   <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">
-                    {(c as any).branchName ?? "—"}
+                    {(c as ReportRow & WithBranchName).branchName ?? "—"}
                   </span>
                 </td>
               )}
@@ -733,7 +735,7 @@ function FxHistorySection() {
                       {showBranchColumn && (
                         <td className="px-4 py-3 text-xs">
                           <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">
-                            {(e as any).branchName ?? "—"}
+                            {(e as FxHistoryEntry & WithBranchName).branchName ?? "—"}
                           </span>
                         </td>
                       )}
@@ -1057,7 +1059,7 @@ export default function ReportsPage() {
   const { activeBranchId, isSuperAdmin } = useBranchScope();
   const showBranchColumn = isSuperAdmin && activeBranchId === "all";
 
-  const allRows = ((data as any)?.containers ?? []) as ReportRow[];
+  const allRows = (((data as { containers?: ReportRow[] } | undefined)?.containers) ?? []) as ReportRow[];
   const filteredRows = allRows.filter((c: ReportRow) => {
     if (containerTab === "loss") return c.grossProfit < 0;
     if (containerTab === "profitable") return c.grossProfit > 0;
