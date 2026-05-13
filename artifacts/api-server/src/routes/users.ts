@@ -70,13 +70,23 @@ router.post("/users", requireSuperAdmin, async (req: AuthRequest, res) => {
       res.status(400).json({ error: "Password must be at least 8 characters" });
       return;
     }
-    // Resolve target branch: caller-supplied branchId (Super Admin only path),
-    // else fall back to the requester's branch, else the first branch.
+    // Resolve target branch: must use active branch scope (super-admin must
+    // pick a specific branch via the switcher; caller-supplied branchId must
+    // match the active scope).
+    const _scope = getBranchScope(req);
+    if (_scope === null && req.user?.role === "super_admin") {
+      res.status(400).json({ error: "Select a specific branch from the switcher before creating a user." });
+      return;
+    }
     let resolvedBranchId: number | null = null;
     if (branchId != null) {
       const parsed = Number(branchId);
       if (!Number.isInteger(parsed)) {
         res.status(400).json({ error: "Invalid branchId" });
+        return;
+      }
+      if (_scope !== null && parsed !== _scope) {
+        res.status(400).json({ error: "branchId must match the active branch scope." });
         return;
       }
       const [b] = await db.select().from(branchesTable).where(eq(branchesTable.id, parsed)).limit(1);
@@ -85,11 +95,8 @@ router.post("/users", requireSuperAdmin, async (req: AuthRequest, res) => {
         return;
       }
       resolvedBranchId = b.id;
-    } else if (req.user?.branchId) {
-      resolvedBranchId = req.user.branchId;
     } else {
-      const [first] = await db.select().from(branchesTable).orderBy(asc(branchesTable.id)).limit(1);
-      resolvedBranchId = first?.id ?? null;
+      resolvedBranchId = _scope ?? req.user?.branchId ?? null;
     }
     if (!resolvedBranchId) {
       res.status(400).json({ error: "No branch available to assign user to" });
