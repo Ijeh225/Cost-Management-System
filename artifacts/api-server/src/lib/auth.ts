@@ -94,6 +94,26 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       res.status(401).json({ error: "Session expired. Please log in again." });
       return;
     }
+    // Task #74: hard-fail when branch scope inputs are invalid. Non-super-admin
+    // users must have a branchId; super-admin's X-Branch-Id header (if any)
+    // must be "all", empty, or a positive integer — never silently fall back.
+    if (user.role !== "super_admin" && (user.branchId == null || !Number.isFinite(user.branchId))) {
+      res.status(403).json({ error: "Account is not assigned to a branch. Contact a super admin." });
+      return;
+    }
+    if (user.role === "super_admin") {
+      const hdr = req.header("x-branch-id") ?? req.header("X-Branch-Id");
+      if (hdr != null) {
+        const t = String(hdr).trim();
+        if (t !== "" && t.toLowerCase() !== "all") {
+          const n = Number(t);
+          if (!Number.isInteger(n) || n <= 0) {
+            res.status(400).json({ error: "Invalid X-Branch-Id header. Use 'all' or a positive branch id." });
+            return;
+          }
+        }
+      }
+    }
     const isElevated = user.role === "admin" || user.role === "super_admin";
     req.user = {
       id: user.id,
