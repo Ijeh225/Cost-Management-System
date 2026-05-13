@@ -1,8 +1,15 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, sectionApprovalsTable } from "@workspace/db";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, sectionApprovalsTable, branchesTable } from "@workspace/db";
 import { eq, desc, gte, lte, and, inArray, isNotNull, type SQL } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
+
+async function resolveBranchScopeInfo(req: AuthRequest): Promise<{ id: number | null; name: string }> {
+  const id = getBranchScope(req);
+  if (id === null) return { id: null, name: "All Branches — Consolidated" };
+  const [b] = await db.select({ name: branchesTable.name }).from(branchesTable).where(eq(branchesTable.id, id)).limit(1);
+  return { id, name: b?.name ?? `Branch ${id}` };
+}
 
 export const analyticsRouter = Router();
 
@@ -237,9 +244,9 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireBranchAdminOrAb
       return;
     }
 
-    const _scope = getBranchScope(req);
+    const branchScope = await resolveBranchScopeInfo(req);
     const conditions: SQL[] = [isNotNull(containersTable.deliveredAt)];
-    if (_scope !== null) conditions.push(eq(containersTable.branchId, _scope));
+    if (branchScope.id !== null) conditions.push(eq(containersTable.branchId, branchScope.id));
     if (fromDate) conditions.push(gte(containersTable.deliveredAt, fromDate));
     if (toDate) {
       toDate.setHours(23, 59, 59, 999);
@@ -265,7 +272,9 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireBranchAdminOrAb
       offloadingConfirmed: containersTable.offloadingConfirmed,
       emptyReturnDate: containersTable.emptyReturnDate,
       gateInDate: containersTable.gateInDate,
-    }).from(containersTable).where(where);
+      branchId: containersTable.branchId,
+      branchName: branchesTable.name,
+    }).from(containersTable).leftJoin(branchesTable, eq(containersTable.branchId, branchesTable.id)).where(where);
 
     let totalRevenue = 0;
     let totalDays = 0;
@@ -314,6 +323,8 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireBranchAdminOrAb
         gateInDate: gateIn ? gateIn.toISOString() : null,
         totalCustodyDays,
         custodyClosed: !!(c.emptyReturnDate),
+        branchId: c.branchId,
+        branchName: c.branchName ?? null,
       };
     });
 
@@ -324,6 +335,7 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireBranchAdminOrAb
       totalRevenue,
       avgDays: countWithDays > 0 ? Math.round(totalDays / countWithDays) : null,
       items,
+      branchScope: { id: branchScope.id, name: branchScope.name },
     });
   } catch (err) {
     console.error(err);

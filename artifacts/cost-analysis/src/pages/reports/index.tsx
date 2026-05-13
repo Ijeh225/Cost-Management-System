@@ -412,6 +412,8 @@ function MonthlySummary({ rows }: { rows: ReportRow[] }) {
 }
 
 function DeliveryReportSection() {
+  const { activeBranchId, isSuperAdmin } = useBranchScope();
+  const showBranchColumn = isSuperAdmin && activeBranchId === "all";
   const [drFrom, setDrFrom] = useState("");
   const [drTo, setDrTo] = useState("");
   const [applied, setApplied] = useState<{ from: string; to: string }>({ from: "", to: "" });
@@ -496,6 +498,7 @@ function DeliveryReportSection() {
                     <thead className="border-b border-border/50 bg-secondary/20 text-xs text-muted-foreground uppercase tracking-wider">
                       <tr>
                         <th className="px-4 py-2.5 text-left font-medium">Container / BL</th>
+                        {showBranchColumn && <th className="px-4 py-2.5 text-left font-medium">Branch</th>}
                         <th className="px-4 py-2.5 text-left font-medium">Customer</th>
                         <th className="px-4 py-2.5 text-left font-medium">Truck / Driver</th>
                         <th className="px-4 py-2.5 text-left font-medium">Dispatch</th>
@@ -515,6 +518,13 @@ function DeliveryReportSection() {
                             <div className="font-mono font-medium text-primary text-xs">{item.containerNumber}</div>
                             <div className="text-[11px] text-muted-foreground">{item.blNumber}</div>
                           </td>
+                          {showBranchColumn && (
+                            <td className="px-4 py-2.5 text-xs">
+                              <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                                {item.branchName ?? "—"}
+                              </span>
+                            </td>
+                          )}
                           <td className="px-4 py-2.5 font-medium">{item.clientName}</td>
                           <td className="px-4 py-2.5">
                             {item.truckNumber

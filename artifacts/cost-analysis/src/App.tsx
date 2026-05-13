@@ -235,13 +235,13 @@ function Router() {
                 <SuperAdminGuard><BranchComparisonPage /></SuperAdminGuard>
               </Route>
               <Route path="/reports">
-                <AdminGuard><ReportsPage /></AdminGuard>
+                <BranchAdminOrAboveGuard><ReportsPage /></BranchAdminOrAboveGuard>
               </Route>
               <Route path="/reports/cashflow">
-                <AdminGuard><CashFlowPage /></AdminGuard>
+                <BranchAdminOrAboveGuard><CashFlowPage /></BranchAdminOrAboveGuard>
               </Route>
               <Route path="/reports/disbursement-reconciliation">
-                <AdminGuard><DisbursementReconciliationPage /></AdminGuard>
+                <BranchAdminOrAboveGuard><DisbursementReconciliationPage /></BranchAdminOrAboveGuard>
               </Route>
               <Route path="/clients" component={ClientsPage} />
               <Route path="/clients/:id" component={ClientDetailPage} />

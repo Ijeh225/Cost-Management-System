@@ -67,7 +67,7 @@ export default function DeliveryReportPrint() {
             <div>
               <div style={{ fontSize: 22, fontWeight: 700, color: "#1e293b", letterSpacing: -0.5 }}>Delivery Report</div>
               <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>Period: {periodLabel}</div>
-              <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Branch: {(data as { branchScope?: { name: string } } | undefined)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
+              <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Branch: {(data as { branchScope?: { name: string } } | undefined)?.branchScope?.name ?? "—"}</div>
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 12, color: "#94a3b8" }}>Generated on</div>
@@ -95,11 +95,14 @@ export default function DeliveryReportPrint() {
           <div style={{ textAlign: "center", padding: "40px 0", color: "#94a3b8", fontSize: 14 }}>
             No deliveries found for the selected period.
           </div>
-        ) : (
+        ) : (() => {
+          const showBranchCol = (data as { branchScope?: { id: number | null } } | undefined)?.branchScope?.id === null;
+          const headers = ["#", "Container / BL", ...(showBranchCol ? ["Branch"] : []), "Customer", "Truck / Driver", "Date Delivered", "Days", "Gate-In Date", "Empty Return", "Custody", "Revenue (₦)", "Status"];
+          return (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ background: "#f1f5f9", borderBottom: "2px solid #e2e8f0" }}>
-                {["#", "Container / BL", "Customer", "Truck / Driver", "Date Delivered", "Days", "Gate-In Date", "Empty Return", "Custody", "Revenue (₦)", "Status"].map(h => (
+                {headers.map(h => (
                   <th key={h} style={{ padding: "8px 10px", textAlign: h === "Revenue (₦)" || h === "Days" || h === "Custody" ? "right" : "left", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8, color: "#64748b" }}>{h}</th>
                 ))}
               </tr>
@@ -112,6 +115,11 @@ export default function DeliveryReportPrint() {
                     <div style={{ fontFamily: "monospace", fontWeight: 600, color: "#1e40af" }}>{item.containerNumber}</div>
                     <div style={{ color: "#94a3b8", fontSize: 11 }}>{item.blNumber}</div>
                   </td>
+                  {showBranchCol && (
+                    <td style={{ padding: "7px 10px", fontSize: 11, color: "#1e40af" }}>
+                      {(item as { branchName?: string | null }).branchName ?? "—"}
+                    </td>
+                  )}
                   <td style={{ padding: "7px 10px", fontWeight: 500 }}>{item.clientName}</td>
                   <td style={{ padding: "7px 10px" }}>
                     {item.truckNumber ? <div style={{ fontWeight: 600, color: "#374151" }}>{item.truckNumber}</div> : <span style={{ color: "#cbd5e1" }}>—</span>}
@@ -143,13 +151,14 @@ export default function DeliveryReportPrint() {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: "2px solid #e2e8f0", background: "#f8fafc", fontWeight: 700 }}>
-                <td colSpan={9} style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, color: "#475569" }}>Total Revenue</td>
+                <td colSpan={showBranchCol ? 10 : 9} style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, color: "#475569" }}>Total Revenue</td>
                 <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: "monospace", color: "#1e40af" }}>{fmt(data.totalRevenue)}</td>
                 <td></td>
               </tr>
             </tfoot>
           </table>
-        )}
+          );
+        })()}
 
         {/* Footer */}
         <div style={{ marginTop: 40, borderTop: "1px solid #e2e8f0", paddingTop: 12, display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8" }}>

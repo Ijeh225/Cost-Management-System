@@ -309,7 +309,8 @@ export type DeliveryAnalyticsResponse = {
   count: number;
   totalRevenue: number;
   avgDays: number | null;
-  items: DeliveryAnalyticsItem[];
+  items: (DeliveryAnalyticsItem & { branchId?: number | null; branchName?: string | null })[];
+  branchScope?: { id: number | null; name: string };
 };
 
 export function useDeliveryAnalyticsReport(
