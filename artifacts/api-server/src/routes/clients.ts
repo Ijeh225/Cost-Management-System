@@ -6,7 +6,7 @@ import {
   usersTable, banksTable,
 } from "@workspace/db";
 import { eq, desc, sum, inArray, gte, and, isNull, isNotNull, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, verifyPassword } from "../lib/auth.js";
+import { requireAuth, requireAdmin, AuthRequest, verifyPassword, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
 export const clientsRouter = Router();
@@ -454,6 +454,15 @@ clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthReques
     }
     const [client] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
     if (!client) return res.status(404).json({ error: "Client not found" });
+    if (!userCanAccessBranch(req, client.branchId)) {
+      return res.status(403).json({ error: "Client belongs to another branch." });
+    }
+    if (bankId) {
+      const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, Number(bankId)));
+      if (bk && bk.branchId !== client.branchId) {
+        return res.status(400).json({ error: "Selected bank belongs to a different branch than the client." });
+      }
+    }
     const [deposit] = await db.insert(clientDepositsTable).values({
       clientId,
       amount: String(parseFloat(amount)),
@@ -499,6 +508,9 @@ clientsRouter.delete("/clients/:id/deposits/:depositId", requireAdmin, async (re
     const [existing] = await db.select().from(clientDepositsTable)
       .where(eq(clientDepositsTable.id, depositId));
     if (!existing || existing.clientId !== clientId) return res.status(404).json({ error: "Deposit not found" });
+    if (!userCanAccessBranch(req, existing.branchId)) {
+      return res.status(403).json({ error: "Deposit belongs to another branch." });
+    }
     const allocatedAmount = parseFloat(existing.allocatedAmount ?? "0");
     if (allocatedAmount > 0) {
       return res.status(400).json({ error: "Cannot remove a deposit that has been allocated to an invoice. Remove the invoice payment first." });
@@ -527,6 +539,9 @@ clientsRouter.post("/client-deposits/:id/allocate", requireAdmin, async (req: Au
 
     const [deposit] = await db.select().from(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
     if (!deposit) return res.status(404).json({ error: "Deposit not found" });
+    if (!userCanAccessBranch(req, deposit.branchId)) {
+      return res.status(403).json({ error: "Deposit belongs to another branch." });
+    }
 
     const depositTotal = parseFloat(deposit.amount);
     const alreadyAllocated = parseFloat(deposit.allocatedAmount ?? "0");
@@ -541,6 +556,12 @@ clientsRouter.post("/client-deposits/:id/allocate", requireAdmin, async (req: Au
     if (!inv) return res.status(404).json({ error: "Invoice not found" });
     if (inv.clientId !== deposit.clientId) {
       return res.status(400).json({ error: "Deposit and invoice must belong to the same client" });
+    }
+    if (inv.branchId !== deposit.branchId) {
+      return res.status(400).json({ error: "Deposit and invoice belong to different branches — cross-branch allocation is not allowed." });
+    }
+    if (!userCanAccessBranch(req, inv.branchId)) {
+      return res.status(403).json({ error: "Invoice belongs to another branch." });
     }
     if (inv.status === "draft") return res.status(400).json({ error: "Cannot allocate a deposit against a draft invoice" });
 

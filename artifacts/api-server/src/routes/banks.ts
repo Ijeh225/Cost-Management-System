@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable } from "@workspace/db";
-import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull } from "drizzle-orm";
+import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
 
 export const banksRouter = Router();
@@ -129,8 +129,19 @@ banksRouter.delete("/banks/:id", requireAdmin, async (req: AuthRequest, res) => 
 
 // ─── Bank Transfers ────────────────────────────────────────────────────────
 
-banksRouter.get("/banks/transfers", requireAuth, async (_req, res) => {
+banksRouter.get("/banks/transfers", requireAuth, async (req: AuthRequest, res) => {
   try {
+    // Branch-scoped: regular users only see their branch's transfers.
+    // Super-admin sees all unless ?branchId=N is provided.
+    let branchFilter: SQL | undefined;
+    if (req.user?.role !== "super_admin") {
+      branchFilter = eq(bankTransfersTable.branchId, req.user!.branchId);
+    } else {
+      const q = req.query.branchId;
+      if (typeof q === "string" && q !== "all" && !isNaN(Number(q))) {
+        branchFilter = eq(bankTransfersTable.branchId, Number(q));
+      }
+    }
     const rows = await db
       .select({
         id: bankTransfersTable.id,
@@ -145,6 +156,7 @@ banksRouter.get("/banks/transfers", requireAuth, async (_req, res) => {
       })
       .from(bankTransfersTable)
       .leftJoin(usersTable, eq(bankTransfersTable.createdBy, usersTable.id))
+      .where(branchFilter ?? sql`TRUE`)
       .orderBy(desc(bankTransfersTable.createdAt));
 
     const bankRows = await db.select({ id: banksTable.id, name: banksTable.name }).from(banksTable);
