@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { db, sectionApprovalsTable, containersTable, usersTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { requireAdmin, AuthRequest, getBranchScope } from "../lib/auth.js";
+import { requireBranchAdminOrAbove, AuthRequest, getBranchScope } from "../lib/auth.js";
 
 const router = Router();
 
-router.get("/approvals", requireAdmin, async (req: AuthRequest, res) => {
+router.get("/approvals", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const branchScope = getBranchScope(req);
     const baseQuery = db.select({

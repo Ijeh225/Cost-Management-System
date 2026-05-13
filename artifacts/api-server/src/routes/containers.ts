@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
 
@@ -773,7 +773,7 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
 });
 
 // POST /containers/:id/early-start — authorize early start (admin only)
-router.post("/containers/:id/early-start", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/containers/:id/early-start", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const reason: string | undefined = req.body?.reason?.trim();
@@ -808,7 +808,7 @@ router.post("/containers/:id/early-start", requireAdmin, async (req: AuthRequest
 });
 
 // DELETE /containers/:id/early-start — revoke early start (admin only)
-router.delete("/containers/:id/early-start", requireAdmin, async (req: AuthRequest, res) => {
+router.delete("/containers/:id/early-start", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
@@ -969,7 +969,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
   }
 });
 
-router.post("/containers/:id/verify", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/containers/:id/verify", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
@@ -1747,7 +1747,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
 });
 
 
-router.post("/containers/:id/lock", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/containers/:id/lock", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const { locked, reason } = req.body;
@@ -2075,7 +2075,7 @@ router.post("/containers/:id/sections/:section/submit", requireAuth, async (req:
   }
 });
 
-router.post("/containers/:id/sections/:section/approve", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/containers/:id/sections/:section/approve", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const section = req.params.section;
@@ -2116,7 +2116,7 @@ router.post("/containers/:id/sections/:section/approve", requireAdmin, async (re
   }
 });
 
-router.post("/containers/:id/sections/:section/reject", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/containers/:id/sections/:section/reject", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const section = req.params.section;
@@ -2166,7 +2166,7 @@ router.post("/containers/:id/sections/:section/reject", requireAdmin, async (req
   }
 });
 
-router.post("/containers/:id/sections/:section/lock", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/containers/:id/sections/:section/lock", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const section = req.params.section;
@@ -2186,7 +2186,7 @@ router.post("/containers/:id/sections/:section/lock", requireAdmin, async (req: 
   }
 });
 
-router.post("/containers/:id/sections/:section/unlock", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/containers/:id/sections/:section/unlock", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const section = req.params.section;
@@ -2453,7 +2453,7 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.delete("/containers/bulk", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+router.delete("/containers/bulk", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   const { ids } = req.body as { ids?: unknown };
   if (!Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: "ids must be a non-empty array" });

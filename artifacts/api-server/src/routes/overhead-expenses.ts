@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, overheadExpensesTable, expenseCategoriesTable, expensePaymentsTable, banksTable, usersTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, inArray } from "drizzle-orm";
-import { requireAdmin, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
 export const overheadExpensesRouter = Router();
 
@@ -81,7 +81,7 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 
-overheadExpensesRouter.get("/overhead-expenses/categories", requireAdmin, async (_req, res) => {
+overheadExpensesRouter.get("/overhead-expenses/categories", requireBranchAdminOrAbove, async (_req, res) => {
   try {
     const bScope = getBranchScope(_req as AuthRequest);
     const rows = await db.select().from(expenseCategoriesTable)
@@ -97,7 +97,7 @@ overheadExpensesRouter.get("/overhead-expenses/categories", requireAdmin, async 
   }
 });
 
-overheadExpensesRouter.post("/overhead-expenses/categories", requireAdmin, async (req: AuthRequest, res) => {
+overheadExpensesRouter.post("/overhead-expenses/categories", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { name } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -117,7 +117,7 @@ overheadExpensesRouter.post("/overhead-expenses/categories", requireAdmin, async
   }
 });
 
-overheadExpensesRouter.patch("/overhead-expenses/categories/:id", requireAdmin, async (_req: AuthRequest, res) => {
+overheadExpensesRouter.patch("/overhead-expenses/categories/:id", requireBranchAdminOrAbove, async (_req: AuthRequest, res) => {
   try {
     const id = Number(_req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -139,7 +139,7 @@ overheadExpensesRouter.patch("/overhead-expenses/categories/:id", requireAdmin, 
   }
 });
 
-overheadExpensesRouter.delete("/overhead-expenses/categories/:id", requireAdmin, async (_req: AuthRequest, res) => {
+overheadExpensesRouter.delete("/overhead-expenses/categories/:id", requireBranchAdminOrAbove, async (_req: AuthRequest, res) => {
   try {
     const id = Number(_req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -156,7 +156,7 @@ overheadExpensesRouter.delete("/overhead-expenses/categories/:id", requireAdmin,
 
 // ─── Expenses ────────────────────────────────────────────────────────────────
 
-overheadExpensesRouter.get("/overhead-expenses", requireAdmin, async (req: AuthRequest, res) => {
+overheadExpensesRouter.get("/overhead-expenses", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const category = req.query.category as string | undefined;
     const from = req.query.from as string | undefined;
@@ -208,7 +208,7 @@ overheadExpensesRouter.get("/overhead-expenses", requireAdmin, async (req: AuthR
   }
 });
 
-overheadExpensesRouter.post("/overhead-expenses", requireAdmin, async (req: AuthRequest, res) => {
+overheadExpensesRouter.post("/overhead-expenses", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { category, description, amount, reference } = req.body;
     if (!category || !description || amount === undefined) {
@@ -230,7 +230,7 @@ overheadExpensesRouter.post("/overhead-expenses", requireAdmin, async (req: Auth
   }
 });
 
-overheadExpensesRouter.patch("/overhead-expenses/:id", requireAdmin, async (req: AuthRequest, res) => {
+overheadExpensesRouter.patch("/overhead-expenses/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -253,7 +253,7 @@ overheadExpensesRouter.patch("/overhead-expenses/:id", requireAdmin, async (req:
   }
 });
 
-overheadExpensesRouter.delete("/overhead-expenses/:id", requireAdmin, async (_req: AuthRequest, res) => {
+overheadExpensesRouter.delete("/overhead-expenses/:id", requireBranchAdminOrAbove, async (_req: AuthRequest, res) => {
   try {
     const id = Number(_req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -269,7 +269,7 @@ overheadExpensesRouter.delete("/overhead-expenses/:id", requireAdmin, async (_re
 
 // ─── Payments ────────────────────────────────────────────────────────────────
 
-overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireAdmin, async (req: AuthRequest, res) => {
+overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const expenseId = Number(req.params.id);
     if (isNaN(expenseId)) { res.status(400).json({ error: "Invalid id" }); return; }

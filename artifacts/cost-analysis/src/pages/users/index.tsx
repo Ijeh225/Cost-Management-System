@@ -84,16 +84,19 @@ function GranularPermissionsEditor({
 }
 
 const ALL_ROLES = [
-  "super_admin", "admin", "staff",
+  "super_admin", "admin", "branch_admin", "staff",
   "documentation_user", "accounts_user", "operations_user",
   "transire_user", "shipping_user", "terminal_user", "pull_out_user",
   "shipping_terminal_user",
   "terminal_manager", "delivery_user", "security_user",
 ] as const;
 
+const ELEVATED_ROLES = ["super_admin", "admin", "branch_admin"];
+
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
   admin: "Administrator",
+  branch_admin: "Branch Admin",
   staff: "Staff",
   documentation_user: "Documentation",
   accounts_user: "Accounts",
@@ -252,7 +255,8 @@ function CreateUserDialog() {
   });
 
   const watchedRole = form.watch("role");
-  const isNonElevated = !["super_admin", "admin"].includes(watchedRole);
+  const isNonElevated = !ELEVATED_ROLES.includes(watchedRole);
+  const { isBranchAdmin } = useAuth();
 
   const onSubmit = (data: any) => {
     const allRoles = [...new Set([data.role, ...workspaceRoles])];
@@ -305,8 +309,9 @@ function CreateUserDialog() {
                 <Select onValueChange={(v) => { field.onChange(v); setWorkspaceRoles([]); }} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                   <SelectContent>
-                    <SelectItem value="super_admin">Super Admin</SelectItem>
-                    <SelectItem value="admin">Administrator</SelectItem>
+                    {!isBranchAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
+                    {!isBranchAdmin && <SelectItem value="admin">Administrator</SelectItem>}
+                    {!isBranchAdmin && <SelectItem value="branch_admin">Branch Admin</SelectItem>}
                     <SelectItem value="staff">Staff</SelectItem>
                     <SelectItem value="documentation_user">Documentation</SelectItem>
                     <SelectItem value="accounts_user">Accounts</SelectItem>
@@ -324,7 +329,9 @@ function CreateUserDialog() {
                 <FormMessage />
               </FormItem>
             )} />
-            <BranchSelectField branches={branches} value={branchId} onChange={setBranchId} />
+            {!isBranchAdmin && (
+              <BranchSelectField branches={branches} value={branchId} onChange={setBranchId} />
+            )}
             {isNonElevated && (
               <WorkspaceRoleCheckboxes
                 selected={workspaceRoles}
@@ -392,12 +399,20 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
   });
 
   const watchedRole = form.watch("role");
-  const isNonElevated = !["super_admin", "admin"].includes(watchedRole);
+  const isNonElevated = !ELEVATED_ROLES.includes(watchedRole);
+  const { isBranchAdmin, user: currentUser } = useAuth();
+  const isSelf = currentUser?.id === user.id;
+  const targetIsElevated = ELEVATED_ROLES.includes(user.role);
 
   const onSubmit = (data: any) => {
     const allRoles = [...new Set([data.role, ...workspaceRoles])];
     const payload: any = { name: data.name, role: data.role, roles: allRoles };
     if (branchId != null && branchId !== user.branchId) payload.branchId = branchId;
+    if (isSelf) {
+      delete payload.role;
+      delete payload.roles;
+      delete payload.branchId;
+    }
     if (data.password) payload.password = data.password;
     if (data.role === "staff") {
       payload.sectionPermissions = JSON.stringify(sectionPerms);
@@ -430,11 +445,12 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
           <FormField control={form.control} name="role" render={({ field }) => (
             <FormItem>
               <FormLabel>Primary Role</FormLabel>
-              <Select onValueChange={(v) => { field.onChange(v); setWorkspaceRoles([]); }} defaultValue={field.value}>
+              <Select onValueChange={(v) => { field.onChange(v); setWorkspaceRoles([]); }} defaultValue={field.value} disabled={isSelf || (isBranchAdmin && targetIsElevated)}>
                 <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                 <SelectContent>
-                  <SelectItem value="super_admin">Super Admin</SelectItem>
-                  <SelectItem value="admin">Administrator</SelectItem>
+                  {!isBranchAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
+                  {!isBranchAdmin && <SelectItem value="admin">Administrator</SelectItem>}
+                  {!isBranchAdmin && <SelectItem value="branch_admin">Branch Admin</SelectItem>}
                   <SelectItem value="staff">Staff</SelectItem>
                   <SelectItem value="documentation_user">Documentation</SelectItem>
                   <SelectItem value="accounts_user">Accounts</SelectItem>
@@ -452,7 +468,9 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
               <FormMessage />
             </FormItem>
           )} />
-          <BranchSelectField branches={branches} value={branchId} onChange={setBranchId} />
+          {!isBranchAdmin && (
+            <BranchSelectField branches={branches} value={branchId} onChange={setBranchId} disabled={isSelf} />
+          )}
           {isNonElevated && (
             <WorkspaceRoleCheckboxes
               selected={[...new Set([...(WORKSPACE_ROLES.some(w => w.value === watchedRole) ? [watchedRole] : []), ...workspaceRoles])]}
@@ -597,7 +615,7 @@ function AssignClientsDialog({ user, onClose }: { user: UserRow; onClose: () => 
 }
 
 export default function Users() {
-  const { isAdmin, isSuperAdmin, user: currentUser } = useAuth();
+  const { isAdmin, isSuperAdmin, isAdminOrAbove, user: currentUser } = useAuth();
   const [, setLocation] = useLocation();
   const { data: users, isLoading } = useListUsers();
   const { data: branches } = useBranches({ enabled: isSuperAdmin });
@@ -608,7 +626,7 @@ export default function Users() {
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [assigningUser, setAssigningUser] = useState<UserRow | null>(null);
 
-  if (!isAdmin) { setLocation("/"); return null; }
+  if (!isAdminOrAbove) { setLocation("/"); return null; }
 
   const handleToggleActive = (u: UserRow) => {
     if (u.id === currentUser?.id) {
@@ -673,11 +691,13 @@ export default function Users() {
                                 ? "border-yellow-500 text-yellow-400 bg-yellow-500/10"
                                 : r === "admin"
                                 ? "border-primary text-primary bg-primary/10"
+                                : r === "branch_admin"
+                                ? "border-orange-500 text-orange-400 bg-orange-500/10"
                                 : wsRole
                                 ? wsRole.color
                                 : "border-border text-muted-foreground"
                             }>
-                              {(r === "super_admin" || r === "admin") ? <Shield className="w-3 h-3 mr-1" /> : <UserIcon className="w-3 h-3 mr-1" />}
+                              {ELEVATED_ROLES.includes(r) ? <Shield className="w-3 h-3 mr-1" /> : <UserIcon className="w-3 h-3 mr-1" />}
                               {ROLE_LABELS[r] ?? r}
                             </Badge>
                           );

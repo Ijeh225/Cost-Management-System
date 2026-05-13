@@ -6,7 +6,7 @@ import {
   usersTable, banksTable,
 } from "@workspace/db";
 import { eq, desc, sum, inArray, gte, and, isNull, isNotNull, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, verifyPassword, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, AuthRequest, verifyPassword, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
 export const clientsRouter = Router();
@@ -168,7 +168,7 @@ clientsRouter.patch("/clients/:id", requireAuth, async (req: AuthRequest, res) =
   }
 });
 
-clientsRouter.delete("/clients/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+clientsRouter.delete("/clients/:id", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
@@ -183,7 +183,7 @@ clientsRouter.delete("/clients/:id", requireAuth, requireAdmin, async (req: Auth
   }
 });
 
-clientsRouter.patch("/clients/:id/link-container", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+clientsRouter.patch("/clients/:id/link-container", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const clientId = parseInt(req.params.id);
     const { containerId } = req.body as { containerId: number };
@@ -203,7 +203,7 @@ clientsRouter.patch("/clients/:id/link-container", requireAuth, requireAdmin, as
   }
 });
 
-clientsRouter.patch("/containers/:id/unlink-client", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+clientsRouter.patch("/containers/:id/unlink-client", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
@@ -471,7 +471,7 @@ clientsRouter.get("/clients/:id/deposits", requireAuth, async (req: AuthRequest,
 
 const ALLOWED_PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque"] as const;
 
-clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthRequest, res) => {
+clientsRouter.post("/clients/:id/deposits", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const clientId = parseInt(req.params.id);
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
@@ -534,7 +534,7 @@ clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthReques
   }
 });
 
-clientsRouter.delete("/clients/:id/deposits/:depositId", requireAdmin, async (req: AuthRequest, res) => {
+clientsRouter.delete("/clients/:id/deposits/:depositId", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const clientId = parseInt(req.params.id);
     const depositId = parseInt(req.params.depositId);
@@ -563,7 +563,7 @@ clientsRouter.delete("/clients/:id/deposits/:depositId", requireAdmin, async (re
 
 // ─── Deposit Allocation ─────────────────────────────────────────────────────
 
-clientsRouter.post("/client-deposits/:id/allocate", requireAdmin, async (req: AuthRequest, res) => {
+clientsRouter.post("/client-deposits/:id/allocate", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const depositId = parseInt(req.params.id);
     if (isNaN(depositId)) return res.status(400).json({ error: "Invalid deposit ID" });
@@ -727,7 +727,7 @@ clientsRouter.get("/clients/:id/wallet-summary", requireAuth, async (req: AuthRe
   }
 });
 
-clientsRouter.post("/clients/:id/wallet/reset", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+clientsRouter.post("/clients/:id/wallet/reset", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const clientId = parseInt(req.params.id);
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });

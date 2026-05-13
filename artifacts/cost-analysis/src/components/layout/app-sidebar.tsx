@@ -46,7 +46,7 @@ function NotificationsBadge({ count }: { count: number }) {
 export function AppSidebar() {
   const [location] = useLocation();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser } = useAuth();
+  const { isAdmin, isSuperAdmin, isBranchAdmin, isAdminOrAbove, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { activeBranchId, setActiveBranch, branches } = useBranchScope();
   const userBranchName = user?.branchName
@@ -83,7 +83,7 @@ export function AppSidebar() {
     { title: "Approval Queue",   url: "/approvals",              icon: ClipboardCheck },
     { title: "Pipeline Board",   url: "/pipeline",               icon: Kanban          },
     { title: "Analytics",        url: "/analytics",              icon: BarChart2       },
-    { title: "Reports",          url: "/reports",                icon: FileDown        },
+    ...(isAdmin ? [{ title: "Reports", url: "/reports", icon: FileDown }] : []),
     { title: "Bank Management",  url: "/banks",                  icon: Landmark        },
     { title: "Container Payments", url: "/container-payments",  icon: CreditCard      },
     { title: "Overhead Expenses", url: "/overhead-expenses",     icon: TrendingDown    },
@@ -91,6 +91,7 @@ export function AppSidebar() {
     { title: "User Management",  url: "/users",                  icon: Users           },
     ...(isSuperAdmin ? [{ title: "Branches", url: "/settings/branches", icon: Building2 }] : []),
     ...(isSuperAdmin ? [{ title: "Settings", url: "/settings", icon: Settings }] : []),
+    ...(isBranchAdmin ? [{ title: "Branch Settings", url: "/branch-settings", icon: Settings }] : []),
   ];
 
   const adminWorkspaceNav: NavItem[] = [
@@ -196,7 +197,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {isAdmin && (
+        {isAdminOrAbove && (
           <SidebarGroup className="mt-6">
             <SidebarGroupLabel className="flex items-center gap-2 text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">
               <ShieldAlert className="w-3 h-3" /> Administration

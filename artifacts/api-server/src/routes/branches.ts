@@ -3,7 +3,7 @@ import {
   db, branchesTable, usersTable, containersTable,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { requireSuperAdmin, AuthRequest } from "../lib/auth.js";
+import { requireSuperAdmin, requireBranchAdminOrAbove, AuthRequest } from "../lib/auth.js";
 
 const router = Router();
 
@@ -58,6 +58,59 @@ router.get("/branches", requireSuperAdmin, async (_req: AuthRequest, res: Respon
   } catch (err) {
     console.error("[branches] list error:", err);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET /my-branch — Task #75. Branch admin (or admin/super_admin) reads their
+// own branch (super_admin must have an active branch scope set). Used by the
+// Branch Settings page so a branch_admin can view/edit their branch's comm
+// settings without the super-admin-only /branches list.
+router.get("/my-branch", requireBranchAdminOrAbove, async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.user?.role === "super_admin"
+      ? Number(req.header("x-branch-id") ?? req.header("X-Branch-Id"))
+      : req.user?.branchId;
+    if (!id || !Number.isFinite(id)) {
+      res.status(400).json({ error: "Select a specific branch first." });
+      return;
+    }
+    const [row] = await db.select().from(branchesTable).where(eq(branchesTable.id, id));
+    if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
+    res.json(serialize(row));
+  } catch (err) {
+    console.error("[branches] my-branch error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// PATCH /my-branch — Task #75. Branch admin can edit comm settings + contact
+// info on their own branch only. Cannot rename, change shortCode, or toggle
+// active. admin/super_admin can use this too (acts on their active scope).
+router.patch("/my-branch", requireBranchAdminOrAbove, async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.user?.role === "super_admin"
+      ? Number(req.header("x-branch-id") ?? req.header("X-Branch-Id"))
+      : req.user?.branchId;
+    if (!id || !Number.isFinite(id)) {
+      res.status(400).json({ error: "Select a specific branch first." });
+      return;
+    }
+    // Strip name / shortCode — these are super-admin-only via /branches/:id.
+    const body = req.body as BranchPayload;
+    const safe: BranchPayload = {
+      location: body.location,
+      contactEmail: body.contactEmail,
+      contactPhone: body.contactPhone,
+      whatsappMode: body.whatsappMode,
+      whatsappNumber: body.whatsappNumber,
+      emailMode: body.emailMode,
+      emailFromAddress: body.emailFromAddress,
+      emailReplyTo: body.emailReplyTo,
+    };
+    await applyBranchUpdate(id, safe, res);
+  } catch (err) {
+    console.error("[branches] my-branch update error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Server error" });
   }
 });
 

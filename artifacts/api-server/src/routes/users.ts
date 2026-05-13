@@ -1,7 +1,23 @@
 import { Router } from "express";
 import { db, usersTable, clientsTable, userClientAssignmentsTable, branchesTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest, hashPassword, parseRoles, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
+import { requireAuth, requireAdmin, requireSuperAdmin, requireBranchAdminOrAbove, AuthRequest, hashPassword, parseRoles, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
+
+// Roles a branch_admin is permitted to assign to users they create/edit (Task #75).
+// Explicitly excludes super_admin, admin, and branch_admin itself — branch admins
+// can never elevate users to peer or higher privilege levels.
+const BRANCH_ADMIN_ASSIGNABLE_ROLES = new Set([
+  "staff",
+  "documentation_user", "accounts_user", "operations_user",
+  "transire_user", "shipping_user", "terminal_user", "pull_out_user",
+  "shipping_terminal_user", "terminal_manager", "delivery_user", "security_user",
+]);
+
+function rolesAllowedForActor(actorRole: string | undefined): (role: string) => boolean {
+  if (actorRole === "branch_admin") return (r) => BRANCH_ADMIN_ASSIGNABLE_ROLES.has(r);
+  // admin / super_admin can assign any role (existing behavior).
+  return () => true;
+}
 
 const router = Router();
 
@@ -44,7 +60,7 @@ const formatUser = (u: UserRow) => ({
   createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
 });
 
-router.get("/users", requireAdmin, async (req: AuthRequest, res) => {
+router.get("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     // Branch isolation (Task #74): use shared getBranchScope helper.
     const branchScope = getBranchScope(req);
@@ -59,7 +75,7 @@ router.get("/users", requireAdmin, async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/users", requireSuperAdmin, async (req: AuthRequest, res) => {
+router.post("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { email, name, password, role, roles, sectionPermission, sectionPermissions, canUpload, branchId } = req.body;
     if (!email || !name || !password || !role) {
@@ -69,6 +85,17 @@ router.post("/users", requireSuperAdmin, async (req: AuthRequest, res) => {
     if (typeof password !== "string" || password.length < 8) {
       res.status(400).json({ error: "Password must be at least 8 characters" });
       return;
+    }
+    // Task #75: branch_admin can only assign non-elevated roles.
+    const allowRole = rolesAllowedForActor(req.user?.role);
+    if (!allowRole(role)) {
+      res.status(403).json({ error: "You are not allowed to assign that role." });
+      return;
+    }
+    if (Array.isArray(roles)) {
+      for (const r of roles) {
+        if (!allowRole(r)) { res.status(403).json({ error: "You are not allowed to assign that role." }); return; }
+      }
     }
     // Resolve target branch: must use active branch scope (super-admin must
     // pick a specific branch via the switcher; caller-supplied branchId must
@@ -100,6 +127,11 @@ router.post("/users", requireSuperAdmin, async (req: AuthRequest, res) => {
     }
     if (!resolvedBranchId) {
       res.status(400).json({ error: "No branch available to assign user to" });
+      return;
+    }
+    // Task #75: branch_admin can never create users in another branch.
+    if (req.user?.role === "branch_admin" && resolvedBranchId !== req.user.branchId) {
+      res.status(403).json({ error: "You can only create users within your own branch." });
       return;
     }
     const passwordHash = await hashPassword(password);
@@ -139,13 +171,47 @@ router.get("/users/:id", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.put("/users/:id", requireSuperAdmin, async (req: AuthRequest, res) => {
+router.put("/users/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
-    const [_target] = await db.select({ branchId: usersTable.branchId }).from(usersTable).where(eq(usersTable.id, id));
+    const [_target] = await db.select({ branchId: usersTable.branchId, role: usersTable.role }).from(usersTable).where(eq(usersTable.id, id));
     if (!_target || !userCanAccessBranch(req, _target.branchId)) { res.status(404).json({ error: "User not found" }); return; }
     const { name, role, roles, isActive, password, sectionPermission, sectionPermissions, canUpload, branchId } = req.body;
+    // Task #75: branch_admin restrictions.
+    //  - Cannot edit users with admin/super_admin/branch_admin role.
+    //  - Cannot assign elevated roles.
+    //  - Cannot move users to another branch.
+    //  - Cannot edit own role / branch / active status.
+    if (req.user?.role === "branch_admin") {
+      if (["admin", "super_admin", "branch_admin"].includes(_target.role)) {
+        res.status(403).json({ error: "You cannot edit a user with this role." });
+        return;
+      }
+      const allowRole = rolesAllowedForActor("branch_admin");
+      if (role !== undefined && !allowRole(role)) {
+        res.status(403).json({ error: "You are not allowed to assign that role." }); return;
+      }
+      if (Array.isArray(roles)) {
+        for (const r of roles) {
+          if (!allowRole(r)) { res.status(403).json({ error: "You are not allowed to assign that role." }); return; }
+        }
+      }
+      if (branchId !== undefined && Number(branchId) !== req.user.branchId) {
+        res.status(403).json({ error: "You cannot move users to another branch." }); return;
+      }
+    }
+    if (req.user?.id === id) {
+      if (role !== undefined && role !== _target.role) {
+        res.status(400).json({ error: "You cannot change your own role." }); return;
+      }
+      if (branchId !== undefined && Number(branchId) !== _target.branchId) {
+        res.status(400).json({ error: "You cannot change your own branch assignment." }); return;
+      }
+      if (isActive === false) {
+        res.status(400).json({ error: "You cannot deactivate your own account." }); return;
+      }
+    }
     if (password !== undefined && (typeof password !== "string" || password.length < 8)) {
       res.status(400).json({ error: "Password must be at least 8 characters" });
       return;
@@ -184,7 +250,7 @@ router.put("/users/:id", requireSuperAdmin, async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/users/:id/client-assignments", requireAdmin, async (req: AuthRequest, res) => {
+router.get("/users/:id/client-assignments", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
@@ -201,7 +267,7 @@ router.get("/users/:id/client-assignments", requireAdmin, async (req: AuthReques
   }
 });
 
-router.post("/users/:id/client-assignments", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/users/:id/client-assignments", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
@@ -224,7 +290,7 @@ router.post("/users/:id/client-assignments", requireAdmin, async (req: AuthReque
   }
 });
 
-router.delete("/users/:id/client-assignments/:clientId", requireAdmin, async (req: AuthRequest, res) => {
+router.delete("/users/:id/client-assignments/:clientId", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const userId = parseInt(req.params.id);
     const clientId = parseInt(req.params.clientId);

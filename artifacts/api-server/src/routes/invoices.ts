@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio, resolveBranchWhatsAppFrom } from "../lib/whatsapp.js";
 
 const router = Router();
@@ -687,7 +687,7 @@ router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.delete("/invoices/:id", requireAdmin, async (req: AuthRequest, res) => {
+router.delete("/invoices/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -856,7 +856,7 @@ router.patch("/invoices/:id/items/:itemId", requireAuth, async (req: AuthRequest
   }
 });
 
-router.delete("/invoices/:id/items/:itemId", requireAdmin, async (req: AuthRequest, res) => {
+router.delete("/invoices/:id/items/:itemId", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     const itemId = parseInt(req.params.itemId, 10);
@@ -998,7 +998,7 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
 
 // ─── Apply Client Credit to Invoice ─────────────────────────────────────────
 
-router.post("/invoices/:id/apply-credit", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/invoices/:id/apply-credit", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
@@ -1070,7 +1070,7 @@ router.post("/invoices/:id/apply-credit", requireAdmin, async (req: AuthRequest,
   }
 });
 
-router.delete("/invoices/:id/payments/:paymentId", requireAdmin, async (req: AuthRequest, res) => {
+router.delete("/invoices/:id/payments/:paymentId", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     const paymentId = parseInt(req.params.paymentId, 10);
@@ -1213,7 +1213,7 @@ function buildReminderMessage(inv: {
   return lines.join("\n");
 }
 
-router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/invoices/:id/send-whatsapp", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -1288,7 +1288,7 @@ router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req: AuthRequest
   }
 });
 
-router.post("/invoices/:id/send-reminder", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/invoices/:id/send-reminder", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -1368,7 +1368,7 @@ router.post("/invoices/:id/send-reminder", requireAdmin, async (req: AuthRequest
   }
 });
 
-router.post("/invoices/:id/send-receipt", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/invoices/:id/send-receipt", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -1508,7 +1508,7 @@ router.get("/invoices/:id/whatsapp-log", requireAuth, async (req: AuthRequest, r
 
 // ─── Credit Notes ────────────────────────────────────────────────────────────
 
-router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/invoices/:id/credit-note", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
@@ -1646,7 +1646,7 @@ router.get("/invoices/:id/credit-notes", requireAuth, async (req: AuthRequest, r
 
 // ─── Bad Debt Write-off ───────────────────────────────────────────────────────
 
-router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, res) => {
+router.post("/invoices/:id/write-off", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });

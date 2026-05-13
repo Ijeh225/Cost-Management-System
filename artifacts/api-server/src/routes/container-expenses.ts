@@ -6,7 +6,7 @@ import {
   deliveryChargesTable, operationsChargesTable, containerExtraChargesTable,
 } from "@workspace/db";
 import { eq, desc, inArray, sql } from "drizzle-orm";
-import { requireAdmin, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
 export const containerExpensesRouter = Router();
 
@@ -52,7 +52,7 @@ async function getSectionChargedTotals(containerId: number): Promise<Record<stri
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 
-containerExpensesRouter.get("/container-expense-categories", requireAdmin, async (_req, res) => {
+containerExpensesRouter.get("/container-expense-categories", requireBranchAdminOrAbove, async (_req, res) => {
   try {
     const branchScope = getBranchScope(_req as AuthRequest);
     const rows = await db.select().from(containerExpenseCategoriesTable)
@@ -71,7 +71,7 @@ containerExpensesRouter.get("/container-expense-categories", requireAdmin, async
   }
 });
 
-containerExpensesRouter.post("/container-expense-categories", requireAdmin, async (req: AuthRequest, res) => {
+containerExpensesRouter.post("/container-expense-categories", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { name } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -95,7 +95,7 @@ containerExpensesRouter.post("/container-expense-categories", requireAdmin, asyn
   }
 });
 
-containerExpensesRouter.delete("/container-expense-categories/:id", requireAdmin, async (req: AuthRequest, res) => {
+containerExpensesRouter.delete("/container-expense-categories/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -112,7 +112,7 @@ containerExpensesRouter.delete("/container-expense-categories/:id", requireAdmin
 
 // ─── Batch Payment ────────────────────────────────────────────────────────────
 
-containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, async (req: AuthRequest, res) => {
+containerExpensesRouter.post("/container-expense-payments/batch", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { items, categoryId, section, bankId, paymentMethod, reference, narration, paidAt } = req.body as {
       items: { containerId: number; amount: number }[];
@@ -309,7 +309,7 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, 
 
 // ─── Section Payment Summary ──────────────────────────────────────────────────
 
-containerExpensesRouter.get("/containers/:id/expense-payments/by-section", requireAdmin, async (req: AuthRequest, res) => {
+containerExpensesRouter.get("/containers/:id/expense-payments/by-section", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const containerId = Number(req.params.id);
     if (isNaN(containerId)) { res.status(400).json({ error: "Invalid container id" }); return; }
@@ -366,7 +366,7 @@ containerExpensesRouter.get("/containers/:id/expense-payments/by-section", requi
 
 // ─── Container Payment History ────────────────────────────────────────────────
 
-containerExpensesRouter.get("/containers/:id/expense-payments", requireAdmin, async (req: AuthRequest, res) => {
+containerExpensesRouter.get("/containers/:id/expense-payments", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const containerId = Number(req.params.id);
     if (isNaN(containerId)) { res.status(400).json({ error: "Invalid container id" }); return; }
@@ -452,7 +452,7 @@ containerExpensesRouter.get("/containers/:id/expense-payments", requireAdmin, as
 
 // ─── Recent Payments ──────────────────────────────────────────────────────────
 
-containerExpensesRouter.get("/container-expense-payments/recent", requireAdmin, async (req: AuthRequest, res) => {
+containerExpensesRouter.get("/container-expense-payments/recent", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const limit = Math.min(Number(req.query.limit ?? 50), 100);
     const _scope = getBranchScope(req);
@@ -532,7 +532,7 @@ containerExpensesRouter.get("/container-expense-payments/recent", requireAdmin, 
 
 // ─── GET /containers/:id/reconciliation ──────────────────────────────────────
 
-containerExpensesRouter.get("/containers/:id/reconciliation", requireAdmin, async (req: AuthRequest, res) => {
+containerExpensesRouter.get("/containers/:id/reconciliation", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   const containerId = Number(req.params.id);
   if (!Number.isFinite(containerId) || containerId <= 0) {
     return res.status(400).json({ error: "Invalid containerId" });

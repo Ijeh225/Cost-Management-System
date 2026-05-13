@@ -132,6 +132,24 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   }
 }
 
+/**
+ * Allow admin / super_admin / branch_admin (Task #75). Use for operational
+ * routes (containers, clients, invoices, banks, expenses, sections,
+ * approvals, reports, etc.) that should be accessible to a branch admin
+ * within their own branch. Branch scoping is enforced separately via
+ * getBranchScope / userCanAccessBranch on each handler.
+ */
+export async function requireBranchAdminOrAbove(req: AuthRequest, res: Response, next: NextFunction) {
+  await requireAuth(req, res, () => {
+    const role = req.user?.role;
+    if (role !== "admin" && role !== "super_admin" && role !== "branch_admin") {
+      res.status(403).json({ error: "Admin access required" });
+      return;
+    }
+    next();
+  });
+}
+
 export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {
     const role = req.user?.role;

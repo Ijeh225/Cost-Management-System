@@ -11,6 +11,8 @@ export type AuthContextType = {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isBranchAdmin: boolean;
+  isAdminOrAbove: boolean;
   userRole: string | null;
   userRoles: string[];
   isDepartmentUser: boolean;
@@ -47,6 +49,8 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   isAdmin: false,
   isSuperAdmin: false,
+  isBranchAdmin: false,
+  isAdminOrAbove: false,
 });
 
 async function checkSetupRequired(): Promise<{ required: boolean }> {
@@ -147,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const role = effectiveUser?.role ?? "";
+  const role: string = (effectiveUser as any)?.role ?? "";
   const roles: string[] = (effectiveUser as any)?.roles ?? [role];
   const hasRole = (r: string) => roles.includes(r);
 
@@ -159,6 +163,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!effectiveUser,
         isSuperAdmin: role === "super_admin",
         isAdmin: role === "admin" || role === "super_admin",
+        isBranchAdmin: role === "branch_admin",
+        isAdminOrAbove: role === "admin" || role === "super_admin" || role === "branch_admin",
         userRole: role || null,
         userRoles: roles,
         isDocumentationUser: hasRole("documentation_user"),

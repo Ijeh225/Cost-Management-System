@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, sectionApprovalsTable } from "@workspace/db";
-import { eq, desc, gte, lte, and, isNotNull, type SQL } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { eq, desc, gte, lte, and, inArray, isNotNull, type SQL } from "drizzle-orm";
+import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
 export const analyticsRouter = Router();
@@ -10,8 +10,9 @@ function sumFields(obj: Record<string, any>, keys: string[]): number {
   return keys.reduce((s, k) => s + parseFloat(obj?.[k] ?? "0"), 0);
 }
 
-analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+analyticsRouter.get("/analytics", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
+    const _scope = getBranchScope(req);
     const allContainers = await db.select({
       id: containersTable.id,
       containerNumber: containersTable.containerNumber,
@@ -21,7 +22,7 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
       clearingCharges: containersTable.clearingCharges,
       assignedStaffId: containersTable.assignedStaffId,
       createdAt: containersTable.createdAt,
-    }).from(containersTable);
+    }).from(containersTable).where(_scope === null ? undefined : eq(containersTable.branchId, _scope));
 
     if (allContainers.length === 0) {
       return res.json({
@@ -31,14 +32,16 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
       });
     }
 
+    const containerIds = allContainers.map(c => c.id);
+    const inIds = (col: any) => inArray(col, containerIds);
     const [allShipping, allCustoms, allTerminal, allDelivery, allOps, allExtrasRaw] = await Promise.all([
-      db.select().from(shippingChargesTable),
-      db.select().from(customsChargesTable),
-      db.select().from(terminalChargesTable),
-      db.select().from(deliveryChargesTable),
-      db.select().from(operationsChargesTable),
+      db.select().from(shippingChargesTable).where(inIds(shippingChargesTable.containerId)),
+      db.select().from(customsChargesTable).where(inIds(customsChargesTable.containerId)),
+      db.select().from(terminalChargesTable).where(inIds(terminalChargesTable.containerId)),
+      db.select().from(deliveryChargesTable).where(inIds(deliveryChargesTable.containerId)),
+      db.select().from(operationsChargesTable).where(inIds(operationsChargesTable.containerId)),
       db.select({ containerId: containerExtraChargesTable.containerId, amount: containerExtraChargesTable.amount })
-        .from(containerExtraChargesTable),
+        .from(containerExtraChargesTable).where(inIds(containerExtraChargesTable.containerId)),
     ]);
 
     const idx = (arr: any[]) => { const m: Record<number, any> = {}; arr.forEach(r => { m[r.containerId] = r; }); return m; };
@@ -124,14 +127,19 @@ analyticsRouter.get("/analytics", requireAuth, requireAdmin, async (req: AuthReq
       });
     }
 
-    // Staff productivity
+    // Staff productivity — scope users by branch when scope is set.
+    const userWhere = _scope === null
+      ? eq(usersTable.isActive, true)
+      : and(eq(usersTable.isActive, true), eq(usersTable.branchId, _scope));
     const allUsers = await db.select({
       id: usersTable.id,
       name: usersTable.name,
       role: usersTable.role,
-    }).from(usersTable).where(eq(usersTable.isActive, true));
+    }).from(usersTable).where(userWhere);
 
-    const allApprovals = await db.select().from(sectionApprovalsTable);
+    const allApprovals = containerIds.length > 0
+      ? await db.select().from(sectionApprovalsTable).where(inArray(sectionApprovalsTable.containerId, containerIds))
+      : [];
     const staffProductivity = allUsers
       .filter(u => u.role === "staff")
       .map(u => {
@@ -213,7 +221,7 @@ function parseIsoDate(val: string | undefined): Date | null | "invalid" {
   return d;
 }
 
-analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+analyticsRouter.get("/analytics/deliveries", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const fromStr = req.query.from as string | undefined;
     const toStr = req.query.to as string | undefined;
@@ -229,7 +237,9 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireAdmin, async (r
       return;
     }
 
+    const _scope = getBranchScope(req);
     const conditions: SQL[] = [isNotNull(containersTable.deliveredAt)];
+    if (_scope !== null) conditions.push(eq(containersTable.branchId, _scope));
     if (fromDate) conditions.push(gte(containersTable.deliveredAt, fromDate));
     if (toDate) {
       toDate.setHours(23, 59, 59, 999);

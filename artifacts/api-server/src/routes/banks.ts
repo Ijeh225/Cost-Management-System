@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
 export const banksRouter = Router();
 
@@ -62,7 +62,7 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-banksRouter.post("/banks", requireAdmin, async (req: AuthRequest, res) => {
+banksRouter.post("/banks", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { name, accountNumber, bankCode } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -85,7 +85,7 @@ banksRouter.post("/banks", requireAdmin, async (req: AuthRequest, res) => {
   }
 });
 
-banksRouter.patch("/banks/:id", requireAdmin, async (req: AuthRequest, res) => {
+banksRouter.patch("/banks/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -106,7 +106,7 @@ banksRouter.patch("/banks/:id", requireAdmin, async (req: AuthRequest, res) => {
   }
 });
 
-banksRouter.delete("/banks/:id", requireAdmin, async (req: AuthRequest, res) => {
+banksRouter.delete("/banks/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -170,7 +170,7 @@ banksRouter.get("/banks/transfers", requireAuth, async (req: AuthRequest, res) =
 
 // ─── Bank Detail ───────────────────────────────────────────────────────────
 
-banksRouter.get("/banks/:id", requireAdmin, async (req: AuthRequest, res) => {
+banksRouter.get("/banks/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -185,7 +185,7 @@ banksRouter.get("/banks/:id", requireAdmin, async (req: AuthRequest, res) => {
 
 // ─── Bank Transaction History ───────────────────────────────────────────────
 
-banksRouter.get("/banks/:id/transactions", requireAdmin, async (req: AuthRequest, res) => {
+banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -522,7 +522,7 @@ banksRouter.get("/banks/:id/transactions", requireAdmin, async (req: AuthRequest
 
 // ─── Fund Additions ──────────────────────────────────────────────────────────
 
-banksRouter.post("/banks/:id/fund-additions", requireAdmin, async (req: AuthRequest, res) => {
+banksRouter.post("/banks/:id/fund-additions", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const bankId = Number(req.params.id);
     if (isNaN(bankId)) { res.status(400).json({ error: "Invalid bank id" }); return; }
@@ -563,7 +563,7 @@ banksRouter.post("/banks/:id/fund-additions", requireAdmin, async (req: AuthRequ
   }
 });
 
-banksRouter.post("/banks/transfers", requireAdmin, async (req: AuthRequest, res) => {
+banksRouter.post("/banks/transfers", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { fromBankId, toBankId, amount, narration, reference } = req.body as {
       fromBankId: number;

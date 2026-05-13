@@ -60,6 +60,7 @@ import DeliveryReportPrint from "@/pages/reports/delivery-report/print";
 import DisbursementReconciliationPage from "@/pages/reports/disbursement-reconciliation/index";
 import CreditNotePrintPage from "@/pages/credit-notes/print/[id]";
 import BranchesPage from "@/pages/branches/index";
+import BranchSettingsPage from "@/pages/branch-settings/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -149,6 +150,27 @@ function AdminGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function BranchAdminOrAboveGuard({ children }: { children: ReactNode }) {
+  const { isLoading, isAuthenticated, isAdminOrAbove } = useAuth();
+  const [, setLocation] = useLocation();
+  const confirmed = useRef(false);
+  if (isAdminOrAbove && !confirmed.current) confirmed.current = true;
+  useEffect(() => {
+    if (isLoading) return;
+    if (confirmed.current) return;
+    if (!isAuthenticated) setLocation("/login");
+    else if (!isAdminOrAbove) setLocation("/");
+  }, [isAdminOrAbove, isLoading, isAuthenticated, setLocation]);
+  if (!confirmed.current) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 function SuperAdminGuard({ children }: { children: ReactNode }) {
   const { user, isLoading, isAuthenticated, isSuperAdmin } = useAuth();
   const [, setLocation] = useLocation();
@@ -206,7 +228,7 @@ function Router() {
               <Route path="/approvals" component={ApprovalsPage} />
               <Route path="/my-tasks" component={MyTasksPage} />
               <Route path="/analytics">
-                <AdminGuard><AnalyticsPage /></AdminGuard>
+                <BranchAdminOrAboveGuard><AnalyticsPage /></BranchAdminOrAboveGuard>
               </Route>
               <Route path="/reports">
                 <AdminGuard><ReportsPage /></AdminGuard>
@@ -227,16 +249,16 @@ function Router() {
               <Route path="/accounts-receivable" component={ArPage} />
               <Route path="/duty-payments" component={DutyPaymentsPage} />
               <Route path="/banks">
-                <AdminGuard><BanksPage /></AdminGuard>
+                <BranchAdminOrAboveGuard><BanksPage /></BranchAdminOrAboveGuard>
               </Route>
               <Route path="/banks/:id">
-                <AdminGuard><BankDetailPage /></AdminGuard>
+                <BranchAdminOrAboveGuard><BankDetailPage /></BranchAdminOrAboveGuard>
               </Route>
               <Route path="/overhead-expenses">
-                <AdminGuard><OverheadExpensesPage /></AdminGuard>
+                <BranchAdminOrAboveGuard><OverheadExpensesPage /></BranchAdminOrAboveGuard>
               </Route>
               <Route path="/container-payments">
-                <AdminGuard><ContainerPaymentsPage /></AdminGuard>
+                <BranchAdminOrAboveGuard><ContainerPaymentsPage /></BranchAdminOrAboveGuard>
               </Route>
               <Route path="/workspace/documentation" component={() => { const [, nav] = useLocation(); nav("/documentation", { replace: true }); return null; }} />
               <Route path="/workspace/accounts" component={AccountsWorkspace} />
@@ -256,6 +278,9 @@ function Router() {
               </Route>
               <Route path="/settings/branches">
                 <SuperAdminGuard><BranchesPage /></SuperAdminGuard>
+              </Route>
+              <Route path="/branch-settings">
+                <BranchAdminOrAboveGuard><BranchSettingsPage /></BranchAdminOrAboveGuard>
               </Route>
               <Route component={NotFound} />
             </Switch>

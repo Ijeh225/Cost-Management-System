@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable, systemAlertsHistoryTable } from "@workspace/db";
 import { eq, lt, sql, max, isNotNull, desc, inArray, notInArray, and } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery } from "../lib/calculations.js";
 
 export const notificationsRouter = Router();
@@ -479,7 +479,7 @@ notificationsRouter.post("/notifications/read-all", requireAuth, async (req, res
   }
 });
 
-notificationsRouter.post("/notifications/send-email-digest", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+notificationsRouter.post("/notifications/send-email-digest", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     // Branch isolation (Task #74): scope alert computation. Super-admin must
     // pick a specific branch via X-Branch-Id; non-super-admins are pinned to
