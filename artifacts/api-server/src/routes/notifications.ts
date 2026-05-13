@@ -481,6 +481,13 @@ notificationsRouter.post("/notifications/read-all", requireAuth, async (req, res
 
 notificationsRouter.post("/notifications/send-email-digest", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
+    // Branch isolation (Task #74): scope alert computation. Super-admin must
+    // pick a specific branch via X-Branch-Id; non-super-admins are pinned to
+    // their own branch.
+    const branchScope = getBranchScope(req);
+    if (branchScope === null && req.user?.role === "super_admin") {
+      return res.status(400).json({ error: "Select a specific branch before sending the digest." });
+    }
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: "Email service is not configured. Please set up the Resend integration in Settings." });
@@ -493,7 +500,7 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
       return res.status(400).json({ error: "No email recipients configured. Add recipients in Settings." });
     }
     const to = emailTo.split(",").map(e => e.trim()).filter(Boolean);
-    const alerts = await computeAlerts();
+    const alerts = await computeAlerts(req.user?.id, req.user?.role, branchScope);
     const agingTypes = ["aging_warn", "aging_high", "aging_critical", "inactive", "negative_profit"];
     const relevant = alerts.filter(a => agingTypes.includes(a.type));
     const criticalAlerts = relevant.filter(a => a.severity === "critical");
