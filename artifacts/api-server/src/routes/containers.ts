@@ -2371,8 +2371,8 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       monthlyTrend.push({ month: monthKey, label, revenue: mRevenue, cost: mCost, grossProfit: mRevenue - mCost });
     }
 
-    // Recent activity
-    const recentLogs = await db.select({
+    // Recent activity (branch-scoped)
+    const recentLogsBase = db.select({
       id: auditLogTable.id,
       containerId: auditLogTable.containerId,
       userId: auditLogTable.userId,
@@ -2385,9 +2385,10 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       reason: auditLogTable.reason,
       createdAt: auditLogTable.createdAt,
     }).from(auditLogTable)
-      .leftJoin(usersTable, eq(auditLogTable.userId, usersTable.id))
-      .orderBy(desc(auditLogTable.createdAt))
-      .limit(10);
+      .leftJoin(usersTable, eq(auditLogTable.userId, usersTable.id));
+    const recentLogs = _scope === null
+      ? await recentLogsBase.orderBy(desc(auditLogTable.createdAt)).limit(10)
+      : await recentLogsBase.where(eq(auditLogTable.branchId, _scope)).orderBy(desc(auditLogTable.createdAt)).limit(10);
 
     // Role-aware: pendingApprovals and myPendingSections
     const user = (req as AuthRequest).user!;
