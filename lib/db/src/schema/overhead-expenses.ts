@@ -1,4 +1,5 @@
 import { pgTable, serial, text, numeric, integer, timestamp } from "drizzle-orm/pg-core";
+import { branchesTable } from "./branches";
 
 export const OVERHEAD_CATEGORIES = [
   "Salaries",
@@ -22,6 +23,7 @@ export const overheadExpensesTable = pgTable("overhead_expenses", {
   paidAt: timestamp("paid_at"),
   reference: text("reference"),
   recordedBy: integer("recorded_by"),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -452,6 +452,8 @@ clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthReques
     if (!paymentMethod || !ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
       return res.status(400).json({ error: `Payment method must be one of: ${ALLOWED_PAYMENT_METHODS.join(", ")}` });
     }
+    const [client] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
+    if (!client) return res.status(404).json({ error: "Client not found" });
     const [deposit] = await db.insert(clientDepositsTable).values({
       clientId,
       amount: String(parseFloat(amount)),
@@ -459,6 +461,7 @@ clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthReques
       reference: reference ?? null,
       notes: notes ?? null,
       bankId: bankId ?? null,
+      branchId: client.branchId,
     }).returning();
     let bankName: string | null = null;
     if (deposit.bankId) {

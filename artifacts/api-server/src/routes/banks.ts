@@ -71,6 +71,7 @@ banksRouter.post("/banks", requireAdmin, async (req: AuthRequest, res) => {
       accountNumber: accountNumber?.trim() || null,
       bankCode: bankCode?.trim() || null,
       isActive: true,
+      branchId: req.user!.branchId,
     }).returning();
     res.status(201).json(bank);
   } catch (err) {
@@ -532,6 +533,7 @@ banksRouter.post("/banks/:id/fund-additions", requireAdmin, async (req: AuthRequ
       narration: narration ?? "",
       reference: reference ?? null,
       addedBy: userId,
+      branchId: bank.branchId,
     }).returning();
 
     res.status(201).json(addition);
@@ -579,6 +581,7 @@ banksRouter.post("/banks/transfers", requireAdmin, async (req: AuthRequest, res)
       narration: narration ?? "",
       reference: reference ?? null,
       createdBy: userId,
+      branchId: fromBank.branchId,
     }).returning();
 
     let createdByName: string | null = null;

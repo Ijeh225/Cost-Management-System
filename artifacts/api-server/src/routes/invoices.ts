@@ -1478,6 +1478,7 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
         amount: String(amount),
         status: "active",
         createdBy: userId,
+        branchId: inv.branchId,
       }).returning();
 
       // Apply portion to invoice balance (first-class adjustment recorded separately from cash)
@@ -1514,6 +1515,7 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
         action: "credit_note_raised",
         details: `${creditNoteNumber} — ₦${amount.toLocaleString()} total (₦${applyToInvoice.toLocaleString()} applied to invoice${excessCredit > 0 ? `, ₦${excessCredit.toLocaleString()} to client credit` : ""}) — ${reason.trim()}`,
         performedBy: userId,
+        branchId: inv.branchId,
       });
 
       return [inserted];
@@ -1598,6 +1600,7 @@ router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, re
         reference: inv.invoiceNumber,
         recordedBy: writeOffUserId,
         paidAt: new Date(),
+        branchId: inv.branchId,
       }).returning({ id: overheadExpensesTable.id });
       expenseId = exp.id;
 
@@ -1606,6 +1609,7 @@ router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, re
         action: "written_off",
         details: `Bad debt write-off — ₦${writeOffAmount.toLocaleString()} — overhead expense #${exp.id}`,
         performedBy: writeOffUserId,
+        branchId: inv.branchId,
       });
     });
 

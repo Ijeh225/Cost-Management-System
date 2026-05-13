@@ -1,6 +1,7 @@
 import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
 import { invoicesTable } from "./invoices";
 import { usersTable } from "./users";
+import { branchesTable } from "./branches";
 
 export const invoiceAuditLogTable = pgTable("invoice_audit_log", {
   id: serial("id").primaryKey(),
@@ -8,6 +9,7 @@ export const invoiceAuditLogTable = pgTable("invoice_audit_log", {
   action: text("action").notNull(),
   details: text("details"),
   performedBy: integer("performed_by").references(() => usersTable.id, { onDelete: "set null" }),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

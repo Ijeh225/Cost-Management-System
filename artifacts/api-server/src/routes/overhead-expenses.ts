@@ -101,6 +101,7 @@ overheadExpensesRouter.post("/overhead-expenses/categories", requireAdmin, async
     }
     const [row] = await db.insert(expenseCategoriesTable).values({
       name: name.trim(), isDefault: false, createdBy: req.user?.id ?? null,
+      branchId: req.user!.branchId,
     }).returning();
     res.status(201).json({ id: row.id, name: row.name, isDefault: row.isDefault, createdBy: row.createdBy ?? null, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt) });
   } catch (err: any) {
@@ -205,6 +206,7 @@ overheadExpensesRouter.post("/overhead-expenses", requireAdmin, async (req: Auth
       category, description, amount: String(amount),
       bankId: null,
       reference: reference || null, recordedBy: req.user?.id ?? null,
+      branchId: req.user!.branchId,
     }).returning();
     const [built] = await buildExpensesWithPayments([row]);
     res.status(201).json(built);
@@ -279,6 +281,7 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireAdmin, asy
       paidAt: paymentDate,
       notes: notes || null,
       recordedBy: req.user?.id ?? null,
+      branchId: expense.branchId,
     }).returning();
 
     // Set paidAt on the parent expense to the date of the first payment recorded

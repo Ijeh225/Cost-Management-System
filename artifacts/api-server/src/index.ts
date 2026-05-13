@@ -340,6 +340,15 @@ async function runStartupMigrations() {
         "user_client_assignments",
         "whatsapp_messages",
         "workflow_notifications",
+        "banks",
+        "bank_fund_additions",
+        "bank_transfers",
+        "client_deposits",
+        "credit_notes",
+        "expense_categories",
+        "expense_payments",
+        "invoice_audit_log",
+        "overhead_expenses",
       ];
 
       for (const tbl of BRANCHED_TABLES) {
@@ -387,6 +396,71 @@ async function runStartupMigrations() {
         );
       }
       console.log(`[migration] Multi-branch foundation: assigned all existing data to branch id=${defaultBranchId}`);
+    });
+
+    // v2: extend the foundation to additional finance/banking business tables.
+    // Same column shape (branch_id INTEGER NOT NULL DEFAULT <head office> + FK + index)
+    // and backfill semantics — applied only to tables added after v1 ran.
+    await runMigration("multi_branch_foundation_v2_finance_tables", async () => {
+      const { rows: branchRows } = await pool.query<{ id: number }>(
+        `SELECT id FROM branches ORDER BY id ASC LIMIT 1`
+      );
+      const defaultBranchId = branchRows[0]?.id;
+      if (!defaultBranchId) {
+        throw new Error("Failed to locate default branch for v2 migration");
+      }
+
+      const V2_TABLES = [
+        "banks",
+        "bank_fund_additions",
+        "bank_transfers",
+        "client_deposits",
+        "credit_notes",
+        "expense_categories",
+        "expense_payments",
+        "invoice_audit_log",
+        "overhead_expenses",
+      ];
+
+      for (const tbl of V2_TABLES) {
+        const { rows: tableExists } = await pool.query<{ exists: boolean }>(
+          `SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = $1
+          ) AS "exists"`,
+          [tbl]
+        );
+        if (!tableExists[0]?.exists) {
+          console.log(`[migration] v2: Skipping ${tbl} (table does not exist yet)`);
+          continue;
+        }
+
+        await pool.query(`ALTER TABLE ${tbl} ADD COLUMN IF NOT EXISTS branch_id INTEGER`);
+        await pool.query(
+          `UPDATE ${tbl} SET branch_id = $1 WHERE branch_id IS NULL`,
+          [defaultBranchId]
+        );
+        await pool.query(
+          `ALTER TABLE ${tbl} ALTER COLUMN branch_id SET DEFAULT ${defaultBranchId}`
+        );
+        await pool.query(`ALTER TABLE ${tbl} ALTER COLUMN branch_id SET NOT NULL`);
+        await pool.query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint WHERE conname = '${tbl}_branch_id_fk'
+            ) THEN
+              ALTER TABLE ${tbl}
+                ADD CONSTRAINT ${tbl}_branch_id_fk
+                FOREIGN KEY (branch_id) REFERENCES branches(id);
+            END IF;
+          END $$;
+        `);
+        await pool.query(
+          `CREATE INDEX IF NOT EXISTS ${tbl}_branch_id_idx ON ${tbl}(branch_id)`
+        );
+      }
+      console.log(`[migration] Multi-branch foundation v2: branched ${V2_TABLES.length} finance tables to branch id=${defaultBranchId}`);
     });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);

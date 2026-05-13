@@ -2,6 +2,7 @@ import { pgTable, serial, integer, numeric, text, timestamp } from "drizzle-orm/
 import { clientsTable } from "./clients";
 import { banksTable } from "./banks";
 import { invoicesTable } from "./invoices";
+import { branchesTable } from "./branches";
 
 export const clientDepositsTable = pgTable("client_deposits", {
   id: serial("id").primaryKey(),
@@ -13,6 +14,7 @@ export const clientDepositsTable = pgTable("client_deposits", {
   bankId: integer("bank_id").references(() => banksTable.id, { onDelete: "set null" }),
   allocatedInvoiceId: integer("allocated_invoice_id").references(() => invoicesTable.id, { onDelete: "set null" }),
   allocatedAmount: numeric("allocated_amount", { precision: 15, scale: 2 }).notNull().default("0"),
+  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
