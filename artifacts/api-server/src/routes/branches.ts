@@ -140,9 +140,15 @@ router.post("/branches/:id/deactivate", requireSuperAdmin, async (req: Request, 
   try {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
-    if (id === 1) {
+    // Protect the system fallback branch by identity (lowest-id active row)
+    // rather than a hardcoded id=1 — survives reseeded/imported environments.
+    const [fallback] = await db.select({ id: branchesTable.id })
+      .from(branchesTable)
+      .orderBy(branchesTable.id)
+      .limit(1);
+    if (fallback && id === fallback.id) {
       res.status(400).json({
-        error: "The default branch (Head Office) cannot be deactivated; it is the system fallback.",
+        error: "The default branch (system fallback) cannot be deactivated.",
       });
       return;
     }
