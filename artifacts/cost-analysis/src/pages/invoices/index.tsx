@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
+import { BranchChip } from "@/components/layout/branch-chip";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -93,7 +94,7 @@ function InvoiceRow({ invoice, isAdmin }: { invoice: Invoice; isAdmin: boolean }
 
         <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-5 gap-1 sm:gap-4 items-center">
           <div className="sm:col-span-1">
-            <p className="text-sm font-mono font-semibold text-foreground">{invoice.invoiceNumber}</p>
+            <p className="text-sm font-mono font-semibold text-foreground flex items-center">{invoice.invoiceNumber}<BranchChip branchId={(invoice as { branchId?: number }).branchId} /></p>
             <div className="flex items-center gap-1 flex-wrap">
               {isMulti && (
                 <Badge className="text-[10px] px-1.5 py-0 bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center gap-0.5">

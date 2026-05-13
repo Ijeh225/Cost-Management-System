@@ -24,6 +24,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBranches } from "@/pages/branches";
+import { BranchChip } from "@/components/layout/branch-chip";
 import {
   Users, Plus, Search, Loader2, Trash2, ChevronRight, ChevronDown,
   Phone, Mail, MapPin, Building2, Upload, Download, AlertTriangle,
@@ -89,7 +90,7 @@ function ClientCard({ client, isAdmin }: { client: Client; isAdmin: boolean }) {
               )}
             </div>
           </div>
-          <h3 className="font-semibold text-sm text-foreground mb-1 truncate">{client.name}</h3>
+          <h3 className="font-semibold text-sm text-foreground mb-1 truncate flex items-center">{client.name}<BranchChip branchId={(client as { branchId?: number }).branchId} /></h3>
           {client.contactName && (
             <p className="text-xs text-muted-foreground truncate mb-2">{client.contactName}</p>
           )}

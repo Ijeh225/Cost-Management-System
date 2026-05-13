@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { exportContainersToExcel, exportContainersToPdf } from "@/lib/exportContainers";
+import { BranchChip } from "@/components/layout/branch-chip";
 
 type SortField = "containerNumber" | "customerName" | "declaration" | "status" | "clearingCharges" | "totalCost" | "grossProfit";
 type SortDir = "asc" | "desc";
@@ -523,6 +524,7 @@ export default function Containers() {
                       <td className="px-4 py-4">
                         <div className="font-mono font-medium text-foreground group-hover:text-primary transition-colors">
                           {container.containerNumber}
+                          <BranchChip branchId={(container as { branchId?: number }).branchId} />
                         </div>
                         <div className="text-xs text-muted-foreground mt-0.5">BL: {container.blNumber}</div>
                       </td>

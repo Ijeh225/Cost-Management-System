@@ -100,8 +100,7 @@ containerExpensesRouter.delete("/container-expense-categories/:id", requireAdmin
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const [cat] = await db.select().from(containerExpenseCategoriesTable).where(eq(containerExpenseCategoriesTable.id, id));
-    if (!cat) { res.status(404).json({ error: "Category not found" }); return; }
-    if (!userCanAccessBranch(req, cat.branchId)) { res.status(403).json({ error: "Category belongs to another branch." }); return; }
+    if (!cat || !userCanAccessBranch(req, cat.branchId)) { res.status(404).json({ error: "Category not found" }); return; }
     if (cat.isDefault) { res.status(400).json({ error: "Cannot delete default categories" }); return; }
     await db.delete(containerExpenseCategoriesTable).where(eq(containerExpenseCategoriesTable.id, id));
     res.json({ ok: true });

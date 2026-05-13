@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, clientsTable, userClientAssignmentsTable, branchesTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest, hashPassword, parseRoles } from "../lib/auth.js";
+import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest, hashPassword, parseRoles, getBranchScope } from "../lib/auth.js";
 
 const router = Router();
 
@@ -46,17 +46,8 @@ const formatUser = (u: UserRow) => ({
 
 router.get("/users", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    // Branch isolation (Task #74): non-super-admins see users only in their own branch.
-    // Super-admin: respects X-Branch-Id (null = all branches).
-    const u = req.user!;
-    const branchScope = u.role === "super_admin"
-      ? (() => {
-          const raw = (req.headers["x-branch-id"] as string | undefined)?.trim();
-          if (!raw || raw.toLowerCase() === "all") return null;
-          const n = Number(raw);
-          return Number.isFinite(n) ? n : null;
-        })()
-      : u.branchId;
+    // Branch isolation (Task #74): use shared getBranchScope helper.
+    const branchScope = getBranchScope(req);
     const baseQ = db.select(userFields).from(usersTable).$dynamic();
     const users = await (branchScope !== null
       ? baseQ.where(eq(usersTable.branchId, branchScope))

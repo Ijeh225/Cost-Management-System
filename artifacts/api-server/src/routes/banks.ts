@@ -1,24 +1,17 @@
 import { Router } from "express";
 import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
+import { requireAuth, requireAdmin, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
 export const banksRouter = Router();
 
 banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
   try {
     const activeOnly = req.query.active === "true";
-    // Branch scoping (Task #149): super admins may pass ?branchId=N to scope
-    // explicitly, or ?branchId=all to see every branch. Other roles always see
-    // only their own branch.
-    let branchScope: number | "all" = req.user!.branchId;
-    if (req.user!.role === "super_admin") {
-      const q = String(req.query.branchId ?? "");
-      if (q === "all") branchScope = "all";
-      else if (q && !isNaN(Number(q))) branchScope = Number(q);
-    }
+    // Branch scoping (Task #74): X-Branch-Id header → numeric scope or null = all.
+    const branchScope = getBranchScope(req);
     const allRows = await db.select().from(banksTable).orderBy(banksTable.name);
-    const scoped = branchScope === "all" ? allRows : allRows.filter(b => b.branchId === branchScope);
+    const scoped = branchScope === null ? allRows : allRows.filter(b => b.branchId === branchScope);
     const filtered = activeOnly ? scoped.filter(b => b.isActive) : scoped;
 
     // Compute current balance for each bank from all transaction sources
@@ -76,12 +69,14 @@ banksRouter.post("/banks", requireAdmin, async (req: AuthRequest, res) => {
       res.status(400).json({ error: "Bank name is required" });
       return;
     }
+    const createBranchId = resolveCreateBranch(req, res);
+    if (createBranchId == null) return;
     const [bank] = await db.insert(banksTable).values({
       name: name.trim(),
       accountNumber: accountNumber?.trim() || null,
       bankCode: bankCode?.trim() || null,
       isActive: true,
-      branchId: req.user!.branchId,
+      branchId: createBranchId,
     }).returning();
     res.status(201).json(bank);
   } catch (err) {
@@ -95,8 +90,7 @@ banksRouter.patch("/banks/:id", requireAdmin, async (req: AuthRequest, res) => {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const [existing] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Bank not found" }); return; }
-    if (!userCanAccessBranch(req, existing.branchId)) { res.status(403).json({ error: "Bank belongs to another branch." }); return; }
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Bank not found" }); return; }
     const { name, accountNumber, bankCode, isActive } = req.body;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) updates.name = name.trim();
@@ -117,8 +111,7 @@ banksRouter.delete("/banks/:id", requireAdmin, async (req: AuthRequest, res) => 
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const [existing] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Bank not found" }); return; }
-    if (!userCanAccessBranch(req, existing.branchId)) { res.status(403).json({ error: "Bank belongs to another branch." }); return; }
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Bank not found" }); return; }
     await db.delete(banksTable).where(eq(banksTable.id, id));
     res.json({ success: true });
   } catch (err) {
@@ -131,17 +124,11 @@ banksRouter.delete("/banks/:id", requireAdmin, async (req: AuthRequest, res) => 
 
 banksRouter.get("/banks/transfers", requireAuth, async (req: AuthRequest, res) => {
   try {
-    // Branch-scoped: regular users only see their branch's transfers.
-    // Super-admin sees all unless ?branchId=N is provided.
-    let branchFilter: SQL | undefined;
-    if (req.user?.role !== "super_admin") {
-      branchFilter = eq(bankTransfersTable.branchId, req.user!.branchId);
-    } else {
-      const q = req.query.branchId;
-      if (typeof q === "string" && q !== "all" && !isNaN(Number(q))) {
-        branchFilter = eq(bankTransfersTable.branchId, Number(q));
-      }
-    }
+    // Task #74: branch scope from X-Branch-Id header.
+    const bScope = getBranchScope(req);
+    const branchFilter: SQL | undefined = bScope !== null
+      ? eq(bankTransfersTable.branchId, bScope)
+      : undefined;
     const rows = await db
       .select({
         id: bankTransfersTable.id,
@@ -188,8 +175,7 @@ banksRouter.get("/banks/:id", requireAdmin, async (req: AuthRequest, res) => {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, id));
-    if (!bank) { res.status(404).json({ error: "Bank not found" }); return; }
-    if (!userCanAccessBranch(req, bank.branchId)) { res.status(403).json({ error: "Bank belongs to another branch." }); return; }
+    if (!bank || !userCanAccessBranch(req, bank.branchId)) { res.status(404).json({ error: "Bank not found" }); return; }
     res.json(bank);
   } catch (err) {
     console.error("GET /banks/:id error:", err);
@@ -205,8 +191,7 @@ banksRouter.get("/banks/:id/transactions", requireAdmin, async (req: AuthRequest
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
     const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, id));
-    if (!bank) { res.status(404).json({ error: "Bank not found" }); return; }
-    if (!userCanAccessBranch(req, bank.branchId)) { res.status(403).json({ error: "Bank belongs to another branch." }); return; }
+    if (!bank || !userCanAccessBranch(req, bank.branchId)) { res.status(404).json({ error: "Bank not found" }); return; }
 
     const fromDate = req.query.from ? new Date(req.query.from as string) : null;
     const toDate   = req.query.to   ? new Date(req.query.to as string)   : null;

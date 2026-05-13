@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, overheadExpensesTable, expenseCategoriesTable, expensePaymentsTable, banksTable, usersTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, inArray } from "drizzle-orm";
-import { requireAdmin, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
+import { requireAdmin, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
 export const overheadExpensesRouter = Router();
 
@@ -82,9 +82,9 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
 
 overheadExpensesRouter.get("/overhead-expenses/categories", requireAdmin, async (_req, res) => {
   try {
-    const u = (_req as AuthRequest).user!;
+    const bScope = getBranchScope(_req as AuthRequest);
     const rows = await db.select().from(expenseCategoriesTable)
-      .where(u.role === "super_admin" ? undefined : eq(expenseCategoriesTable.branchId, u.branchId))
+      .where(bScope !== null ? eq(expenseCategoriesTable.branchId, bScope) : undefined)
       .orderBy(expenseCategoriesTable.name);
     res.json(rows.map(r => ({
       id: r.id, name: r.name, isDefault: r.isDefault, createdBy: r.createdBy ?? null,
@@ -102,9 +102,11 @@ overheadExpensesRouter.post("/overhead-expenses/categories", requireAdmin, async
     if (!name || typeof name !== "string" || !name.trim()) {
       res.status(400).json({ error: "Category name is required" }); return;
     }
+    const createBranchId = resolveCreateBranch(req, res);
+    if (createBranchId == null) return;
     const [row] = await db.insert(expenseCategoriesTable).values({
       name: name.trim(), isDefault: false, createdBy: req.user?.id ?? null,
-      branchId: req.user!.branchId,
+      branchId: createBranchId,
     }).returning();
     res.status(201).json({ id: row.id, name: row.name, isDefault: row.isDefault, createdBy: row.createdBy ?? null, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt) });
   } catch (err: any) {
@@ -124,8 +126,7 @@ overheadExpensesRouter.patch("/overhead-expenses/categories/:id", requireAdmin, 
     }
     const [existing] = await db.select({ branchId: expenseCategoriesTable.branchId })
       .from(expenseCategoriesTable).where(eq(expenseCategoriesTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Category not found" }); return; }
-    if (!userCanAccessBranch(_req, existing.branchId)) { res.status(403).json({ error: "Category belongs to another branch." }); return; }
+    if (!existing || !userCanAccessBranch(_req, existing.branchId)) { res.status(404).json({ error: "Category not found" }); return; }
     const [row] = await db.update(expenseCategoriesTable).set({ name: name.trim() })
       .where(eq(expenseCategoriesTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Category not found" }); return; }
@@ -142,8 +143,7 @@ overheadExpensesRouter.delete("/overhead-expenses/categories/:id", requireAdmin,
     const id = Number(_req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const [cat] = await db.select().from(expenseCategoriesTable).where(eq(expenseCategoriesTable.id, id));
-    if (!cat) { res.status(404).json({ error: "Category not found" }); return; }
-    if (!userCanAccessBranch(_req, cat.branchId)) { res.status(403).json({ error: "Category belongs to another branch." }); return; }
+    if (!cat || !userCanAccessBranch(_req, cat.branchId)) { res.status(404).json({ error: "Category not found" }); return; }
     if (cat.isDefault) { res.status(400).json({ error: "Cannot delete default categories" }); return; }
     await db.delete(expenseCategoriesTable).where(eq(expenseCategoriesTable.id, id));
     res.json({ ok: true });
@@ -163,15 +163,9 @@ overheadExpensesRouter.get("/overhead-expenses", requireAdmin, async (req: AuthR
     const status = req.query.status as string | undefined;
 
     const conditions: ReturnType<typeof eq>[] = [];
-    // Branch scope: regular users see only their branch; super-admin may filter via ?branchId=N|all.
-    if (req.user!.role !== "super_admin") {
-      conditions.push(eq(overheadExpensesTable.branchId, req.user!.branchId));
-    } else {
-      const q = req.query.branchId;
-      if (typeof q === "string" && q !== "all" && !isNaN(Number(q))) {
-        conditions.push(eq(overheadExpensesTable.branchId, Number(q)));
-      }
-    }
+    // Task #74: branch scope from X-Branch-Id header.
+    const bScope = getBranchScope(req);
+    if (bScope !== null) conditions.push(eq(overheadExpensesTable.branchId, bScope));
     if (category && category !== "all") conditions.push(eq(overheadExpensesTable.category, category));
     if (from) conditions.push(gte(overheadExpensesTable.createdAt, new Date(from)));
     if (to) {
@@ -219,11 +213,13 @@ overheadExpensesRouter.post("/overhead-expenses", requireAdmin, async (req: Auth
     if (!category || !description || amount === undefined) {
       res.status(400).json({ error: "category, description and amount are required" }); return;
     }
+    const createBranchId = resolveCreateBranch(req, res);
+    if (createBranchId == null) return;
     const [row] = await db.insert(overheadExpensesTable).values({
       category, description, amount: String(amount),
       bankId: null,
       reference: reference || null, recordedBy: req.user?.id ?? null,
-      branchId: req.user!.branchId,
+      branchId: createBranchId,
     }).returning();
     const [built] = await buildExpensesWithPayments([row]);
     res.status(201).json(built);
@@ -238,8 +234,7 @@ overheadExpensesRouter.patch("/overhead-expenses/:id", requireAdmin, async (req:
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const [existing] = await db.select({ branchId: overheadExpensesTable.branchId }).from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Expense not found" }); return; }
-    if (!userCanAccessBranch(req, existing.branchId)) { res.status(403).json({ error: "Expense belongs to another branch." }); return; }
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
     const { category, description, amount, reference } = req.body;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (category !== undefined) updates.category = category;
@@ -262,8 +257,7 @@ overheadExpensesRouter.delete("/overhead-expenses/:id", requireAdmin, async (_re
     const id = Number(_req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const [existing] = await db.select({ branchId: overheadExpensesTable.branchId }).from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Expense not found" }); return; }
-    if (!userCanAccessBranch(_req, existing.branchId)) { res.status(403).json({ error: "Expense belongs to another branch." }); return; }
+    if (!existing || !userCanAccessBranch(_req, existing.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
     await db.delete(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
     res.json({ ok: true });
   } catch (err) {
@@ -292,11 +286,7 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireAdmin, asy
 
     const [expense] = await db.select().from(overheadExpensesTable)
       .where(eq(overheadExpensesTable.id, expenseId));
-    if (!expense) { res.status(404).json({ error: "Expense not found" }); return; }
-    if (!userCanAccessBranch(req, expense.branchId)) {
-      res.status(403).json({ error: "Cannot record a payment against an expense in another branch." });
-      return;
-    }
+    if (!expense || !userCanAccessBranch(req, expense.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
     if (paymentMethod === "bank" && bankId) {
       const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, Number(bankId)));
       if (bk && bk.branchId !== expense.branchId) {
