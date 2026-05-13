@@ -545,6 +545,42 @@ async function runStartupMigrations() {
       }
       console.log(`[migration] Multi-branch foundation v3: branched ${V3_TABLES.length} charge/invoice-line tables`);
     });
+
+    // v4: per-branch communications config columns and branch-scoped uniqueness.
+    await runMigration("multi_branch_foundation_v4_comms_and_uniqueness", async () => {
+      // Comm config columns on branches.
+      await pool.query(`
+        ALTER TABLE branches
+          ADD COLUMN IF NOT EXISTS whatsapp_mode TEXT NOT NULL DEFAULT 'head_office',
+          ADD COLUMN IF NOT EXISTS whatsapp_number TEXT,
+          ADD COLUMN IF NOT EXISTS email_mode TEXT NOT NULL DEFAULT 'head_office',
+          ADD COLUMN IF NOT EXISTS email_from_address TEXT,
+          ADD COLUMN IF NOT EXISTS email_reply_to TEXT
+      `);
+      // Drop legacy global-uniques on category/section names so each branch
+      // can have its own copy. Composite (branch_id, name|slug) unique replaces it.
+      const dropAndRecreate = async (table: string, col: string) => {
+        const { rows } = await pool.query<{ conname: string }>(`
+          SELECT conname FROM pg_constraint c
+          JOIN pg_class t ON t.oid = c.conrelid
+          WHERE t.relname = $1 AND c.contype = 'u'
+            AND pg_get_constraintdef(c.oid) ~ ('\\(' || $2 || '\\)$')
+        `, [table, col]);
+        for (const r of rows) {
+          await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS "${r.conname}"`);
+        }
+        await pool.query(`
+          DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${table}_${col}_branch_uniq') THEN
+              ALTER TABLE ${table} ADD CONSTRAINT ${table}_${col}_branch_uniq UNIQUE (branch_id, ${col});
+            END IF;
+          END $$;
+        `);
+      };
+      await dropAndRecreate("expense_categories", "name");
+      await dropAndRecreate("container_expense_categories", "name");
+      console.log(`[migration] Multi-branch foundation v4: comms config + per-branch uniqueness applied`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

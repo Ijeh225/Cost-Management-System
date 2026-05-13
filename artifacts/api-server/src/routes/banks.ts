@@ -5,11 +5,21 @@ import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 
 export const banksRouter = Router();
 
-banksRouter.get("/banks", requireAuth, async (req, res) => {
+banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
   try {
     const activeOnly = req.query.active === "true";
-    const rows = await db.select().from(banksTable).orderBy(banksTable.name);
-    const filtered = activeOnly ? rows.filter(b => b.isActive) : rows;
+    // Branch scoping (Task #149): super admins may pass ?branchId=N to scope
+    // explicitly, or ?branchId=all to see every branch. Other roles always see
+    // only their own branch.
+    let branchScope: number | "all" = req.user!.branchId;
+    if (req.user!.role === "super_admin") {
+      const q = String(req.query.branchId ?? "");
+      if (q === "all") branchScope = "all";
+      else if (q && !isNaN(Number(q))) branchScope = Number(q);
+    }
+    const allRows = await db.select().from(banksTable).orderBy(banksTable.name);
+    const scoped = branchScope === "all" ? allRows : allRows.filter(b => b.branchId === branchScope);
+    const filtered = activeOnly ? scoped.filter(b => b.isActive) : scoped;
 
     // Compute current balance for each bank from all transaction sources
     const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows, fundAddRows, containerExpRows] = await Promise.all([

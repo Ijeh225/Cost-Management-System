@@ -54,7 +54,10 @@ async function getSectionChargedTotals(containerId: number): Promise<Record<stri
 
 containerExpensesRouter.get("/container-expense-categories", requireAdmin, async (_req, res) => {
   try {
-    const rows = await db.select().from(containerExpenseCategoriesTable).orderBy(containerExpenseCategoriesTable.name);
+    const u = (_req as AuthRequest).user!;
+    const rows = await db.select().from(containerExpenseCategoriesTable)
+      .where(u.role === "super_admin" ? undefined : eq(containerExpenseCategoriesTable.branchId, u.branchId))
+      .orderBy(containerExpenseCategoriesTable.name);
     res.json(rows.map(r => ({
       id: r.id,
       name: r.name,
@@ -142,11 +145,13 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, 
     }
 
     let catName = "";
+    let catBranchId: number | null = null;
     if (categoryId) {
       const [cat] = await db.select().from(containerExpenseCategoriesTable)
         .where(eq(containerExpenseCategoriesTable.id, Number(categoryId)));
       if (!cat) { res.status(404).json({ error: "Category not found" }); return; }
       catName = cat.name;
+      catBranchId = cat.branchId;
     } else if (section) {
       const LABELS: Record<string, string> = {
         shipping: "Shipping", customs: "Customs", terminal: "Terminal",
@@ -172,6 +177,39 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, 
     const branchByContainer = new Map<number, number>(containerRows.map(c => [c.id, c.branchId]));
     if (branchByContainer.size !== containerIds.length) {
       res.status(404).json({ error: "One or more containers not found" }); return;
+    }
+
+    // Cross-branch posting guard (Task #149): non super-admin users may only
+    // record container payments against containers in their own branch.
+    if (req.user!.role !== "super_admin") {
+      for (const cid of containerIds) {
+        if (branchByContainer.get(cid) !== req.user!.branchId) {
+          res.status(403).json({ error: "Cannot record a payment against a container in another branch." });
+          return;
+        }
+      }
+    }
+    // Category guard: when a category is selected, it must belong to the same
+    // branch as every container being posted against (Task #149).
+    if (catBranchId !== null) {
+      for (const cid of containerIds) {
+        if (branchByContainer.get(cid) !== catBranchId) {
+          res.status(400).json({ error: "Selected category belongs to a different branch than one of the containers." });
+          return;
+        }
+      }
+    }
+    // Bank guard: chosen bank must belong to the same branch as each container.
+    if (resolvedBankId) {
+      const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, resolvedBankId));
+      if (bk) {
+        for (const cid of containerIds) {
+          if (branchByContainer.get(cid) !== bk.branchId) {
+            res.status(400).json({ error: "Selected bank belongs to a different branch than one of the containers." });
+            return;
+          }
+        }
+      }
     }
 
     const inserted = await db.transaction(async (tx) => {

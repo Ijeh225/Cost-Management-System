@@ -10,6 +10,11 @@ export const branchesTable = pgTable("branches", {
   contactEmail: text("contact_email").notNull().default(""),
   contactPhone: text("contact_phone").notNull().default(""),
   isActive: boolean("is_active").notNull().default(true),
+  whatsappMode: text("whatsapp_mode").notNull().default("head_office"),
+  whatsappNumber: text("whatsapp_number"),
+  emailMode: text("email_mode").notNull().default("head_office"),
+  emailFromAddress: text("email_from_address"),
+  emailReplyTo: text("email_reply_to"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

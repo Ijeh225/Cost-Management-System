@@ -82,7 +82,10 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
 
 overheadExpensesRouter.get("/overhead-expenses/categories", requireAdmin, async (_req, res) => {
   try {
-    const rows = await db.select().from(expenseCategoriesTable).orderBy(expenseCategoriesTable.name);
+    const u = (_req as AuthRequest).user!;
+    const rows = await db.select().from(expenseCategoriesTable)
+      .where(u.role === "super_admin" ? undefined : eq(expenseCategoriesTable.branchId, u.branchId))
+      .orderBy(expenseCategoriesTable.name);
     res.json(rows.map(r => ({
       id: r.id, name: r.name, isDefault: r.isDefault, createdBy: r.createdBy ?? null,
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),

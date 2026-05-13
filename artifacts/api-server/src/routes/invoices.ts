@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
-import { toE164Nigerian, sendViaTwilio } from "../lib/whatsapp.js";
+import { toE164Nigerian, sendViaTwilio, resolveBranchWhatsAppFrom } from "../lib/whatsapp.js";
 
 const router = Router();
 
@@ -894,6 +894,19 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!inv) return res.status(404).json({ error: "Invoice not found" });
 
+    // Cross-branch posting guard: non super-admin users may only post payments
+    // against invoices in their own branch (Task #149).
+    if (req.user!.role !== "super_admin" && req.user!.branchId !== inv.branchId) {
+      return res.status(403).json({ error: "Cannot record a payment against an invoice in another branch." });
+    }
+    // Bank guard: the chosen bank must also belong to the invoice's branch.
+    if (bankId) {
+      const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, bankId));
+      if (bk && bk.branchId !== inv.branchId) {
+        return res.status(400).json({ error: "Selected bank belongs to a different branch than the invoice." });
+      }
+    }
+
     // Capture pre-insert total so we can compute incremental overpayment
     const preInsertPayments = await db.select({ amount: invoicePaymentsTable.amount })
       .from(invoicePaymentsTable)
@@ -1165,8 +1178,8 @@ router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
 
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM) {
-      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM to environment secrets" });
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (and either set TWILIO_WHATSAPP_FROM or configure a branch-owned WhatsApp number)." });
     }
 
     const [row] = await db
@@ -1207,7 +1220,9 @@ router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req, res) => {
       items,
     });
 
-    const twilioResult = await sendViaTwilio(phone, messageBody);
+    const branchFrom = await resolveBranchWhatsAppFrom(row.branchId);
+    if (branchFrom.error) return res.status(400).json({ error: branchFrom.error });
+    const twilioResult = await sendViaTwilio(phone, messageBody, branchFrom.from);
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,
@@ -1236,8 +1251,8 @@ router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
 
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM) {
-      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM to environment secrets" });
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (and either set TWILIO_WHATSAPP_FROM or configure a branch-owned WhatsApp number)." });
     }
 
     const [row] = await db
@@ -1283,7 +1298,9 @@ router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
       items,
     });
 
-    const twilioResult = await sendViaTwilio(phone, messageBody);
+    const branchFrom = await resolveBranchWhatsAppFrom(row.branchId);
+    if (branchFrom.error) return res.status(400).json({ error: branchFrom.error });
+    const twilioResult = await sendViaTwilio(phone, messageBody, branchFrom.from);
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,
@@ -1312,8 +1329,8 @@ router.post("/invoices/:id/send-receipt", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
 
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM) {
-      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM to environment secrets" });
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (and either set TWILIO_WHATSAPP_FROM or configure a branch-owned WhatsApp number)." });
     }
 
     const [row] = await db
@@ -1386,7 +1403,9 @@ router.post("/invoices/:id/send-receipt", requireAdmin, async (req, res) => {
 
     const messageBody = lines.join("\n");
     const phone = toE164Nigerian(row.clientPhone);
-    const twilioResult = await sendViaTwilio(phone, messageBody);
+    const branchFrom = await resolveBranchWhatsAppFrom(row.branchId);
+    if (branchFrom.error) return res.status(400).json({ error: branchFrom.error });
+    const twilioResult = await sendViaTwilio(phone, messageBody, branchFrom.from);
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,

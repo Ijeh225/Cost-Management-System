@@ -20,6 +20,11 @@ export type Branch = {
   contactEmail: string | null;
   contactPhone: string | null;
   isActive: boolean;
+  whatsappMode?: "head_office" | "own";
+  whatsappNumber?: string | null;
+  emailMode?: "head_office" | "own";
+  emailFromAddress?: string | null;
+  emailReplyTo?: string | null;
   createdAt: string;
   updatedAt: string;
   userCount?: number;
@@ -55,10 +60,17 @@ type BranchFormState = {
   location: string;
   contactEmail: string;
   contactPhone: string;
+  whatsappMode: "head_office" | "own";
+  whatsappNumber: string;
+  emailMode: "head_office" | "own";
+  emailFromAddress: string;
+  emailReplyTo: string;
 };
 
 const EMPTY_FORM: BranchFormState = {
   name: "", shortCode: "", location: "", contactEmail: "", contactPhone: "",
+  whatsappMode: "head_office", whatsappNumber: "",
+  emailMode: "head_office", emailFromAddress: "", emailReplyTo: "",
 };
 
 function BranchDialog({
@@ -78,6 +90,11 @@ function BranchDialog({
       location: branch.location ?? "",
       contactEmail: branch.contactEmail ?? "",
       contactPhone: branch.contactPhone ?? "",
+      whatsappMode: branch.whatsappMode ?? "head_office",
+      whatsappNumber: branch.whatsappNumber ?? "",
+      emailMode: branch.emailMode ?? "head_office",
+      emailFromAddress: branch.emailFromAddress ?? "",
+      emailReplyTo: branch.emailReplyTo ?? "",
     } : EMPTY_FORM
   );
 
@@ -89,6 +106,11 @@ function BranchDialog({
         location: form.location.trim() || null,
         contactEmail: form.contactEmail.trim() || null,
         contactPhone: form.contactPhone.trim() || null,
+        whatsappMode: form.whatsappMode,
+        whatsappNumber: form.whatsappMode === "own" ? (form.whatsappNumber.trim() || null) : null,
+        emailMode: form.emailMode,
+        emailFromAddress: form.emailMode === "own" ? (form.emailFromAddress.trim() || null) : null,
+        emailReplyTo: form.emailMode === "own" ? (form.emailReplyTo.trim() || null) : null,
       };
       if (isEdit && branch) {
         return api<Branch>(`/branches/${branch.id}`, { method: "PATCH", body: JSON.stringify(payload) });
@@ -110,7 +132,7 @@ function BranchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-lg">
+      <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit Branch — ${branch?.name}` : "Create New Branch"}</DialogTitle>
         </DialogHeader>
@@ -146,6 +168,60 @@ function BranchDialog({
               <Input id="b-phone" value={form.contactPhone}
                 onChange={(e) => setForm(f => ({ ...f, contactPhone: e.target.value }))}
                 placeholder="+234..." />
+            </div>
+          </div>
+
+          <div className="border-t border-border/50 pt-4 space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold">Communications</h3>
+              <p className="text-xs text-muted-foreground">Where this branch's WhatsApp messages and emails go out from. Defaults to Head Office.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>WhatsApp Sender</Label>
+              <div className="flex gap-2">
+                <Button type="button" size="sm"
+                  variant={form.whatsappMode === "head_office" ? "default" : "outline"}
+                  onClick={() => setForm(f => ({ ...f, whatsappMode: "head_office" }))}>
+                  Use Head Office
+                </Button>
+                <Button type="button" size="sm"
+                  variant={form.whatsappMode === "own" ? "default" : "outline"}
+                  onClick={() => setForm(f => ({ ...f, whatsappMode: "own" }))}>
+                  Use Branch's Own
+                </Button>
+              </div>
+              {form.whatsappMode === "own" && (
+                <Input value={form.whatsappNumber}
+                  onChange={(e) => setForm(f => ({ ...f, whatsappNumber: e.target.value }))}
+                  placeholder="+2348012345678 (Twilio-registered WhatsApp number)" />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Email Sender</Label>
+              <div className="flex gap-2">
+                <Button type="button" size="sm"
+                  variant={form.emailMode === "head_office" ? "default" : "outline"}
+                  onClick={() => setForm(f => ({ ...f, emailMode: "head_office" }))}>
+                  Use Head Office
+                </Button>
+                <Button type="button" size="sm"
+                  variant={form.emailMode === "own" ? "default" : "outline"}
+                  onClick={() => setForm(f => ({ ...f, emailMode: "own" }))}>
+                  Use Branch's Own
+                </Button>
+              </div>
+              {form.emailMode === "own" && (
+                <div className="grid grid-cols-1 gap-2">
+                  <Input value={form.emailFromAddress}
+                    onChange={(e) => setForm(f => ({ ...f, emailFromAddress: e.target.value }))}
+                    placeholder="From address (e.g. lagos@yourco.com)" />
+                  <Input value={form.emailReplyTo}
+                    onChange={(e) => setForm(f => ({ ...f, emailReplyTo: e.target.value }))}
+                    placeholder="Reply-to (optional)" />
+                </div>
+              )}
             </div>
           </div>
         </div>

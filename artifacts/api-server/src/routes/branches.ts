@@ -15,6 +15,11 @@ type BranchPayload = {
   location?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  whatsappMode?: "head_office" | "own";
+  whatsappNumber?: string | null;
+  emailMode?: "head_office" | "own";
+  emailFromAddress?: string | null;
+  emailReplyTo?: string | null;
 };
 
 function serialize(b: BranchRow) {
@@ -73,9 +78,22 @@ router.get("/branches/:id", requireSuperAdmin, async (req: Request, res: Respons
 // POST /branches — create
 router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const { name, shortCode, location, contactEmail, contactPhone } = req.body as BranchPayload;
+    const {
+      name, shortCode, location, contactEmail, contactPhone,
+      whatsappMode, whatsappNumber, emailMode, emailFromAddress, emailReplyTo,
+    } = req.body as BranchPayload;
     if (!name || typeof name !== "string" || name.trim() === "") {
       res.status(400).json({ error: "Branch name is required" });
+      return;
+    }
+    const wMode = whatsappMode === "own" ? "own" : "head_office";
+    const eMode = emailMode === "own" ? "own" : "head_office";
+    if (wMode === "own" && !(whatsappNumber ?? "").trim()) {
+      res.status(400).json({ error: "WhatsApp number is required when using the branch's own number." });
+      return;
+    }
+    if (eMode === "own" && !(emailFromAddress ?? "").trim()) {
+      res.status(400).json({ error: "From address is required when using the branch's own email." });
       return;
     }
     const [row] = await db.insert(branchesTable).values({
@@ -85,6 +103,11 @@ router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res: Respon
       contactEmail: (contactEmail ?? "").toString().trim(),
       contactPhone: (contactPhone ?? "").toString().trim(),
       isActive: true,
+      whatsappMode: wMode,
+      whatsappNumber: wMode === "own" ? (whatsappNumber ?? "").trim() : null,
+      emailMode: eMode,
+      emailFromAddress: eMode === "own" ? (emailFromAddress ?? "").trim() : null,
+      emailReplyTo: eMode === "own" ? ((emailReplyTo ?? "").trim() || null) : null,
     }).returning();
     res.status(201).json(serialize(row));
   } catch (err) {
@@ -99,6 +122,11 @@ router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res: Respon
 
 async function applyBranchUpdate(id: number, body: BranchPayload, res: Response) {
   const { name, shortCode, location, contactEmail, contactPhone } = body;
+  // Look up current row so PATCH validation can consult effective mode when the
+  // payload only updates the number/address (not the mode itself). Prevents the
+  // data-integrity hole of mode='own' with empty number.
+  const [current] = await db.select().from(branchesTable).where(eq(branchesTable.id, id));
+  if (!current) { res.status(404).json({ error: "Branch not found" }); return; }
   const updates: Partial<typeof branchesTable.$inferInsert> & { updatedAt: Date } = {
     updatedAt: new Date(),
   };
@@ -111,6 +139,48 @@ async function applyBranchUpdate(id: number, body: BranchPayload, res: Response)
   if (location !== undefined) updates.location = String(location ?? "").trim();
   if (contactEmail !== undefined) updates.contactEmail = String(contactEmail ?? "").trim();
   if (contactPhone !== undefined) updates.contactPhone = String(contactPhone ?? "").trim();
+  if (body.whatsappMode !== undefined) {
+    const wMode = body.whatsappMode === "own" ? "own" : "head_office";
+    updates.whatsappMode = wMode;
+    if (wMode === "own") {
+      const num = (body.whatsappNumber ?? "").toString().trim();
+      if (!num) { res.status(400).json({ error: "WhatsApp number is required when using the branch's own number." }); return; }
+      updates.whatsappNumber = num;
+    } else {
+      updates.whatsappNumber = null;
+    }
+  } else if (body.whatsappNumber !== undefined) {
+    const next = (body.whatsappNumber ?? "").toString().trim();
+    if (current.whatsappMode === "own" && !next) {
+      res.status(400).json({ error: "WhatsApp number cannot be cleared while mode is set to the branch's own number." });
+      return;
+    }
+    updates.whatsappNumber = next || null;
+  }
+  if (body.emailFromAddress !== undefined && body.emailMode === undefined) {
+    const next = (body.emailFromAddress ?? "").toString().trim();
+    if (current.emailMode === "own" && !next) {
+      res.status(400).json({ error: "From address cannot be cleared while email mode is set to the branch's own." });
+      return;
+    }
+    updates.emailFromAddress = next || null;
+  }
+  if (body.emailReplyTo !== undefined && body.emailMode === undefined) {
+    updates.emailReplyTo = (body.emailReplyTo ?? "").toString().trim() || null;
+  }
+  if (body.emailMode !== undefined) {
+    const eMode = body.emailMode === "own" ? "own" : "head_office";
+    updates.emailMode = eMode;
+    if (eMode === "own") {
+      const addr = (body.emailFromAddress ?? "").toString().trim();
+      if (!addr) { res.status(400).json({ error: "From address is required when using the branch's own email." }); return; }
+      updates.emailFromAddress = addr;
+      updates.emailReplyTo = (body.emailReplyTo ?? "").toString().trim() || null;
+    } else {
+      updates.emailFromAddress = null;
+      updates.emailReplyTo = null;
+    }
+  }
   const [row] = await db.update(branchesTable).set(updates).where(eq(branchesTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
   res.json(serialize(row));

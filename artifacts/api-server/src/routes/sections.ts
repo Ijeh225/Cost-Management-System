@@ -6,12 +6,16 @@ import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
 export const sectionsRouter = Router();
 
 // List custom sections with their fields — filtered by containerId
-sectionsRouter.get("/custom-sections", requireAuth, async (req, res) => {
+sectionsRouter.get("/custom-sections", requireAuth, async (req: AuthRequest, res) => {
   try {
     const containerId = req.query.containerId ? parseInt(req.query.containerId as string) : null;
-    const whereClause = containerId !== null
+    const baseClause = containerId !== null
       ? eq(customSectionsTable.containerId, containerId)
       : isNull(customSectionsTable.containerId);
+    // Branch scoping: non super-admins see only their branch's templates.
+    const whereClause = req.user!.role === "super_admin"
+      ? baseClause
+      : and(baseClause, eq(customSectionsTable.branchId, req.user!.branchId));
     const sections = await db.select().from(customSectionsTable).where(whereClause).orderBy(asc(customSectionsTable.sectionOrder));
     const fields = await db.select().from(customFieldsTable).where(isNotNull(customFieldsTable.sectionId)).orderBy(asc(customFieldsTable.fieldOrder));
     const result = sections.map(s => ({
