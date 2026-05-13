@@ -433,8 +433,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/containers/check-duplicates", requireAuth, async (_req, res) => {
-  const req = _req as AuthRequest;
+router.post("/containers/check-duplicates", requireAuth, async (req: AuthRequest, res) => {
   const { containerNumbers, blNumbers } = req.body;
   if (!Array.isArray(containerNumbers) || !Array.isArray(blNumbers)) {
     res.status(400).json({ error: "containerNumbers and blNumbers must be arrays" });
