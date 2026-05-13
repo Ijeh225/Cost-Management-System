@@ -932,6 +932,9 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
     {
       const _scope = getBranchScope(req);
       if (_scope !== null && inv.branchId !== _scope) return res.status(404).json({ error: "Invoice not found" });
+      if (_scope === null && req.user?.role === "super_admin") {
+        return res.status(400).json({ error: "Select a specific branch to record a payment." });
+      }
     }
     // Bank guard: the chosen bank must also belong to the invoice's branch.
     if (bankId) {

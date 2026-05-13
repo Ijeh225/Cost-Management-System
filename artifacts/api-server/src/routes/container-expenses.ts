@@ -181,13 +181,21 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, 
       res.status(404).json({ error: "One or more containers not found" }); return;
     }
 
-    // Cross-branch posting guard (Task #149): non super-admin users may only
-    // record container payments against containers in their own branch.
-    if (req.user!.role !== "super_admin") {
-      for (const cid of containerIds) {
-        if (branchByContainer.get(cid) !== req.user!.branchId) {
-          res.status(403).json({ error: "Cannot record a payment against a container in another branch." });
-          return;
+    // Branch isolation (Task #74): all targeted containers must belong to the
+    // user's active branch scope. Super-admin in "All Branches" mode must
+    // pick a specific branch before recording payments.
+    {
+      const _scope = getBranchScope(req);
+      if (_scope === null && req.user?.role === "super_admin") {
+        res.status(400).json({ error: "Select a specific branch to record container payments." });
+        return;
+      }
+      if (_scope !== null) {
+        for (const cid of containerIds) {
+          if (branchByContainer.get(cid) !== _scope) {
+            res.status(404).json({ error: "One or more containers not found" });
+            return;
+          }
         }
       }
     }
@@ -301,10 +309,18 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireAdmin, 
 
 // ─── Section Payment Summary ──────────────────────────────────────────────────
 
-containerExpensesRouter.get("/containers/:id/expense-payments/by-section", requireAdmin, async (req, res) => {
+containerExpensesRouter.get("/containers/:id/expense-payments/by-section", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const containerId = Number(req.params.id);
     if (isNaN(containerId)) { res.status(400).json({ error: "Invalid container id" }); return; }
+
+    const [ctr] = await db.select({ branchId: containersTable.branchId })
+      .from(containersTable).where(eq(containersTable.id, containerId));
+    if (!ctr || !userCanAccessBranch(req, ctr.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && ctr.branchId !== _scope) { res.status(404).json({ error: "Container not found" }); return; }
+    }
 
     const [charged, paidRows] = await Promise.all([
       getSectionChargedTotals(containerId),
@@ -350,10 +366,18 @@ containerExpensesRouter.get("/containers/:id/expense-payments/by-section", requi
 
 // ─── Container Payment History ────────────────────────────────────────────────
 
-containerExpensesRouter.get("/containers/:id/expense-payments", requireAdmin, async (req, res) => {
+containerExpensesRouter.get("/containers/:id/expense-payments", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const containerId = Number(req.params.id);
     if (isNaN(containerId)) { res.status(400).json({ error: "Invalid container id" }); return; }
+
+    const [ctr] = await db.select({ branchId: containersTable.branchId })
+      .from(containersTable).where(eq(containersTable.id, containerId));
+    if (!ctr || !userCanAccessBranch(req, ctr.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && ctr.branchId !== _scope) { res.status(404).json({ error: "Container not found" }); return; }
+    }
 
     const payments = await db.select().from(containerExpensePaymentsTable)
       .where(eq(containerExpensePaymentsTable.containerId, containerId))
@@ -428,11 +452,13 @@ containerExpensesRouter.get("/containers/:id/expense-payments", requireAdmin, as
 
 // ─── Recent Payments ──────────────────────────────────────────────────────────
 
-containerExpensesRouter.get("/container-expense-payments/recent", requireAdmin, async (req, res) => {
+containerExpensesRouter.get("/container-expense-payments/recent", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const limit = Math.min(Number(req.query.limit ?? 50), 100);
+    const _scope = getBranchScope(req);
 
     const payments = await db.select().from(containerExpensePaymentsTable)
+      .where(_scope !== null ? eq(containerExpensePaymentsTable.branchId, _scope) : undefined)
       .orderBy(desc(containerExpensePaymentsTable.paidAt))
       .limit(limit);
 
@@ -505,12 +531,19 @@ containerExpensesRouter.get("/container-expense-payments/recent", requireAdmin, 
 
 // ─── GET /containers/:id/reconciliation ──────────────────────────────────────
 
-containerExpensesRouter.get("/containers/:id/reconciliation", requireAdmin, async (req, res) => {
+containerExpensesRouter.get("/containers/:id/reconciliation", requireAdmin, async (req: AuthRequest, res) => {
   const containerId = Number(req.params.id);
   if (!Number.isFinite(containerId) || containerId <= 0) {
     return res.status(400).json({ error: "Invalid containerId" });
   }
   try {
+    const [ctr] = await db.select({ branchId: containersTable.branchId })
+      .from(containersTable).where(eq(containersTable.id, containerId));
+    if (!ctr || !userCanAccessBranch(req, ctr.branchId)) return res.status(404).json({ error: "Container not found" });
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && ctr.branchId !== _scope) return res.status(404).json({ error: "Container not found" });
+    }
     const [budgeted, disbPayments] = await Promise.all([
       getSectionChargedTotals(containerId),
       db.select({

@@ -288,6 +288,14 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireAdmin, asy
     const [expense] = await db.select().from(overheadExpensesTable)
       .where(eq(overheadExpensesTable.id, expenseId));
     if (!expense || !userCanAccessBranch(req, expense.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && expense.branchId !== _scope) { res.status(404).json({ error: "Expense not found" }); return; }
+      if (_scope === null && req.user?.role === "super_admin") {
+        res.status(400).json({ error: "Select a specific branch to record a payment." });
+        return;
+      }
+    }
     if (paymentMethod === "bank" && bankId) {
       const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, Number(bankId)));
       if (bk && bk.branchId !== expense.branchId) {
