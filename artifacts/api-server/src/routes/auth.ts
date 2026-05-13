@@ -49,6 +49,13 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }
+    const [loginBranch] = await db.select().from(branchesTable).where(eq(branchesTable.id, user.branchId)).limit(1);
+    // Task #75: branch_admin (and any non-super_admin) cannot log in if their
+    // branch has been deactivated. Check BEFORE issuing a session cookie.
+    if (user.role !== "super_admin" && (!loginBranch || !loginBranch.isActive)) {
+      res.status(401).json({ error: "Your branch is currently disabled. Please contact an administrator." });
+      return;
+    }
     const sessionToken = generateSessionToken();
     await db
       .update(usersTable)
@@ -62,13 +69,6 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
         const arr = JSON.parse(user.roles);
         if (Array.isArray(arr) && arr.length > 0) parsedRoles = arr;
       } catch {}
-    }
-    const [loginBranch] = await db.select().from(branchesTable).where(eq(branchesTable.id, user.branchId)).limit(1);
-    // Task #75: branch_admin (and any non-super_admin) cannot log in if their
-    // branch has been deactivated.
-    if (user.role !== "super_admin" && (!loginBranch || !loginBranch.isActive)) {
-      res.status(401).json({ error: "Your branch is currently disabled. Please contact an administrator." });
-      return;
     }
     res.json({
       user: {
