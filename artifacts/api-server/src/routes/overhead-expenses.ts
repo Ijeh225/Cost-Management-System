@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, overheadExpensesTable, expenseCategoriesTable, expensePaymentsTable, banksTable, usersTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, inArray } from "drizzle-orm";
-import { requireAdmin, AuthRequest } from "../lib/auth.js";
+import { requireAdmin, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
 
 export const overheadExpensesRouter = Router();
 
@@ -122,6 +122,10 @@ overheadExpensesRouter.patch("/overhead-expenses/categories/:id", requireAdmin, 
     if (!name || typeof name !== "string" || !name.trim()) {
       res.status(400).json({ error: "Category name is required" }); return;
     }
+    const [existing] = await db.select({ branchId: expenseCategoriesTable.branchId })
+      .from(expenseCategoriesTable).where(eq(expenseCategoriesTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Category not found" }); return; }
+    if (!userCanAccessBranch(_req, existing.branchId)) { res.status(403).json({ error: "Category belongs to another branch." }); return; }
     const [row] = await db.update(expenseCategoriesTable).set({ name: name.trim() })
       .where(eq(expenseCategoriesTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Category not found" }); return; }
@@ -133,12 +137,13 @@ overheadExpensesRouter.patch("/overhead-expenses/categories/:id", requireAdmin, 
   }
 });
 
-overheadExpensesRouter.delete("/overhead-expenses/categories/:id", requireAdmin, async (_req, res) => {
+overheadExpensesRouter.delete("/overhead-expenses/categories/:id", requireAdmin, async (_req: AuthRequest, res) => {
   try {
     const id = Number(_req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const [cat] = await db.select().from(expenseCategoriesTable).where(eq(expenseCategoriesTable.id, id));
     if (!cat) { res.status(404).json({ error: "Category not found" }); return; }
+    if (!userCanAccessBranch(_req, cat.branchId)) { res.status(403).json({ error: "Category belongs to another branch." }); return; }
     if (cat.isDefault) { res.status(400).json({ error: "Cannot delete default categories" }); return; }
     await db.delete(expenseCategoriesTable).where(eq(expenseCategoriesTable.id, id));
     res.json({ ok: true });
@@ -223,6 +228,9 @@ overheadExpensesRouter.patch("/overhead-expenses/:id", requireAdmin, async (req:
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+    const [existing] = await db.select({ branchId: overheadExpensesTable.branchId }).from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Expense not found" }); return; }
+    if (!userCanAccessBranch(req, existing.branchId)) { res.status(403).json({ error: "Expense belongs to another branch." }); return; }
     const { category, description, amount, reference } = req.body;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (category !== undefined) updates.category = category;
@@ -240,10 +248,13 @@ overheadExpensesRouter.patch("/overhead-expenses/:id", requireAdmin, async (req:
   }
 });
 
-overheadExpensesRouter.delete("/overhead-expenses/:id", requireAdmin, async (_req, res) => {
+overheadExpensesRouter.delete("/overhead-expenses/:id", requireAdmin, async (_req: AuthRequest, res) => {
   try {
     const id = Number(_req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+    const [existing] = await db.select({ branchId: overheadExpensesTable.branchId }).from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Expense not found" }); return; }
+    if (!userCanAccessBranch(_req, existing.branchId)) { res.status(403).json({ error: "Expense belongs to another branch." }); return; }
     await db.delete(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
     res.json({ ok: true });
   } catch (err) {
@@ -273,6 +284,17 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireAdmin, asy
     const [expense] = await db.select().from(overheadExpensesTable)
       .where(eq(overheadExpensesTable.id, expenseId));
     if (!expense) { res.status(404).json({ error: "Expense not found" }); return; }
+    if (!userCanAccessBranch(req, expense.branchId)) {
+      res.status(403).json({ error: "Cannot record a payment against an expense in another branch." });
+      return;
+    }
+    if (paymentMethod === "bank" && bankId) {
+      const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, Number(bankId)));
+      if (bk && bk.branchId !== expense.branchId) {
+        res.status(400).json({ error: "Selected bank belongs to a different branch than the expense." });
+        return;
+      }
+    }
 
     const paymentDate = paidAt ? new Date(paidAt) : new Date();
 

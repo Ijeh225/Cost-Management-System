@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { requireAuth, requireAdmin, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
 
 export const banksRouter = Router();
 
@@ -94,6 +94,9 @@ banksRouter.patch("/banks/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+    const [existing] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Bank not found" }); return; }
+    if (!userCanAccessBranch(req, existing.branchId)) { res.status(403).json({ error: "Bank belongs to another branch." }); return; }
     const { name, accountNumber, bankCode, isActive } = req.body;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) updates.name = name.trim();
@@ -113,6 +116,9 @@ banksRouter.delete("/banks/:id", requireAdmin, async (req: AuthRequest, res) => 
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+    const [existing] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Bank not found" }); return; }
+    if (!userCanAccessBranch(req, existing.branchId)) { res.status(403).json({ error: "Bank belongs to another branch." }); return; }
     await db.delete(banksTable).where(eq(banksTable.id, id));
     res.json({ success: true });
   } catch (err) {
@@ -165,12 +171,13 @@ banksRouter.get("/banks/transfers", requireAuth, async (_req, res) => {
 
 // ─── Bank Detail ───────────────────────────────────────────────────────────
 
-banksRouter.get("/banks/:id", requireAdmin, async (req, res) => {
+banksRouter.get("/banks/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, id));
     if (!bank) { res.status(404).json({ error: "Bank not found" }); return; }
+    if (!userCanAccessBranch(req, bank.branchId)) { res.status(403).json({ error: "Bank belongs to another branch." }); return; }
     res.json(bank);
   } catch (err) {
     console.error("GET /banks/:id error:", err);
@@ -180,13 +187,14 @@ banksRouter.get("/banks/:id", requireAdmin, async (req, res) => {
 
 // ─── Bank Transaction History ───────────────────────────────────────────────
 
-banksRouter.get("/banks/:id/transactions", requireAdmin, async (req, res) => {
+banksRouter.get("/banks/:id/transactions", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
     const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, id));
     if (!bank) { res.status(404).json({ error: "Bank not found" }); return; }
+    if (!userCanAccessBranch(req, bank.branchId)) { res.status(403).json({ error: "Bank belongs to another branch." }); return; }
 
     const fromDate = req.query.from ? new Date(req.query.from as string) : null;
     const toDate   = req.query.to   ? new Date(req.query.to as string)   : null;
@@ -535,6 +543,7 @@ banksRouter.post("/banks/:id/fund-additions", requireAdmin, async (req: AuthRequ
 
     const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, bankId));
     if (!bank) { res.status(404).json({ error: "Bank not found" }); return; }
+    if (!userCanAccessBranch(req, bank.branchId)) { res.status(403).json({ error: "Bank belongs to another branch." }); return; }
 
     const userId = req.user?.id ?? null;
     const [addition] = await db.insert(bankFundAdditionsTable).values({
@@ -581,6 +590,17 @@ banksRouter.post("/banks/transfers", requireAdmin, async (req: AuthRequest, res)
 
     const [toBank] = await db.select().from(banksTable).where(eq(banksTable.id, toBankId));
     if (!toBank) { res.status(404).json({ error: "Destination bank not found" }); return; }
+
+    // Branch guard (Task #149): both legs must belong to the user's branch and
+    // to the same branch as each other — no cross-branch transfers.
+    if (!userCanAccessBranch(req, fromBank.branchId) || !userCanAccessBranch(req, toBank.branchId)) {
+      res.status(403).json({ error: "One of the banks belongs to another branch." });
+      return;
+    }
+    if (fromBank.branchId !== toBank.branchId) {
+      res.status(400).json({ error: "Cross-branch transfers are not allowed." });
+      return;
+    }
 
     const userId = req.user?.id ?? null;
 

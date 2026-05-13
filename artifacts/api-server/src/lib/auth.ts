@@ -123,6 +123,19 @@ export async function requireAdmin(req: AuthRequest, res: Response, next: NextFu
   });
 }
 
+/**
+ * Branch-scope authorization (Task #149). Returns true if the request user
+ * may operate on the given branchId. Super admins bypass; everyone else must
+ * match. When false, the caller should return 403 (this helper does NOT
+ * write to the response).
+ */
+export function userCanAccessBranch(req: AuthRequest, branchId: number | null | undefined): boolean {
+  if (!req.user) return false;
+  if (req.user.role === "super_admin") return true;
+  if (branchId == null) return false;
+  return req.user.branchId === branchId;
+}
+
 export async function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {
     if (req.user?.role !== "super_admin") {

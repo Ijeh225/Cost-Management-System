@@ -1,7 +1,13 @@
 import { Router } from "express";
 import { db, customSectionsTable, customFieldsTable, customFieldValuesTable } from "@workspace/db";
 import { eq, asc, and, isNull, isNotNull } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { requireAuth, requireAdmin, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
+
+async function loadSectionForBranchCheck(sectionId: number) {
+  const [s] = await db.select({ id: customSectionsTable.id, branchId: customSectionsTable.branchId })
+    .from(customSectionsTable).where(eq(customSectionsTable.id, sectionId));
+  return s ?? null;
+}
 
 export const sectionsRouter = Router();
 
@@ -52,6 +58,9 @@ sectionsRouter.post("/custom-sections", requireAuth, async (req: AuthRequest, re
 // Update section
 sectionsRouter.patch("/custom-sections/:id", requireAuth, async (req: AuthRequest, res) => {
   const id = parseInt(req.params.id);
+  const sec = await loadSectionForBranchCheck(id);
+  if (!sec) return res.status(404).json({ error: "Section not found" });
+  if (!userCanAccessBranch(req, sec.branchId)) return res.status(403).json({ error: "Section belongs to another branch." });
   const { name, color, icon, isRequired, isArchived, sectionOrder } = req.body;
   const updates: Record<string, any> = { updatedAt: new Date() };
   if (name !== undefined) updates.name = name;
@@ -70,8 +79,11 @@ sectionsRouter.patch("/custom-sections/:id", requireAuth, async (req: AuthReques
 });
 
 // Delete section
-sectionsRouter.delete("/custom-sections/:id", requireAuth, requireAdmin, async (req, res) => {
+sectionsRouter.delete("/custom-sections/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   const id = parseInt(req.params.id);
+  const sec = await loadSectionForBranchCheck(id);
+  if (!sec) return res.status(404).json({ error: "Section not found" });
+  if (!userCanAccessBranch(req, sec.branchId)) return res.status(403).json({ error: "Section belongs to another branch." });
   try {
     await db.delete(customSectionsTable).where(eq(customSectionsTable.id, id));
     return res.json({ success: true });
@@ -82,8 +94,11 @@ sectionsRouter.delete("/custom-sections/:id", requireAuth, requireAdmin, async (
 });
 
 // Add field to section
-sectionsRouter.post("/custom-sections/:id/fields", requireAuth, requireAdmin, async (req, res) => {
+sectionsRouter.post("/custom-sections/:id/fields", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   const sectionId = parseInt(req.params.id);
+  const sec = await loadSectionForBranchCheck(sectionId);
+  if (!sec) return res.status(404).json({ error: "Section not found" });
+  if (!userCanAccessBranch(req, sec.branchId)) return res.status(403).json({ error: "Section belongs to another branch." });
   const { name, fieldType = "text", placeholder = "", helpText = "", defaultValue = "", isRequired = false, includeInTotal = false, visibleByRole = "all", editableByRole = "all", dropdownOptions = "[]" } = req.body;
   if (!name) return res.status(400).json({ error: "name required" });
   try {
@@ -98,8 +113,12 @@ sectionsRouter.post("/custom-sections/:id/fields", requireAuth, requireAdmin, as
 });
 
 // Update field
-sectionsRouter.patch("/custom-sections/:id/fields/:fieldId", requireAuth, requireAdmin, async (req, res) => {
+sectionsRouter.patch("/custom-sections/:id/fields/:fieldId", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  const sectionId = parseInt(req.params.id);
   const fieldId = parseInt(req.params.fieldId);
+  const sec = await loadSectionForBranchCheck(sectionId);
+  if (!sec) return res.status(404).json({ error: "Section not found" });
+  if (!userCanAccessBranch(req, sec.branchId)) return res.status(403).json({ error: "Section belongs to another branch." });
   const { name, fieldType, placeholder, helpText, defaultValue, isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions, fieldOrder } = req.body;
   const updates: Record<string, any> = {};
   if (name !== undefined) updates.name = name;
@@ -123,8 +142,12 @@ sectionsRouter.patch("/custom-sections/:id/fields/:fieldId", requireAuth, requir
 });
 
 // Delete field
-sectionsRouter.delete("/custom-sections/:id/fields/:fieldId", requireAuth, requireAdmin, async (req, res) => {
+sectionsRouter.delete("/custom-sections/:id/fields/:fieldId", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  const sectionId = parseInt(req.params.id);
   const fieldId = parseInt(req.params.fieldId);
+  const sec = await loadSectionForBranchCheck(sectionId);
+  if (!sec) return res.status(404).json({ error: "Section not found" });
+  if (!userCanAccessBranch(req, sec.branchId)) return res.status(403).json({ error: "Section belongs to another branch." });
   try {
     await db.delete(customFieldsTable).where(eq(customFieldsTable.id, fieldId));
     return res.json({ success: true });
