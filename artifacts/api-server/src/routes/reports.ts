@@ -1756,16 +1756,45 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
 
     const containerIds = containers.map(c => c.id);
 
-    // Disbursed costs (actual cash spent) per container — from container_expense_payments
-    const cepRows = containerIds.length > 0
-      ? await db.select({
-          containerId: containerExpensePaymentsTable.containerId,
-          amount: containerExpensePaymentsTable.amount,
-        }).from(containerExpensePaymentsTable).where(inArray(containerExpensePaymentsTable.containerId, containerIds))
-      : [];
-    const costByContainer = new Map<number, number>();
+    // Costs = charges (shipping + customs + terminal + delivery + operations + extras)
+    //         + expenses (container_expense_payments).
+    // Charges are the contracted/budgeted cost categories per container; expenses are
+    // additional disbursed costs tied to the container outside of the standard charge sets.
+    const [sRows, cRows, tRows, dRows, oRows, exRows, cepRows] = containerIds.length > 0
+      ? await Promise.all([
+          db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, containerIds)),
+          db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, containerIds)),
+          db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, containerIds)),
+          db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, containerIds)),
+          db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, containerIds)),
+          db.select({ containerId: containerExtraChargesTable.containerId, amount: containerExtraChargesTable.amount })
+            .from(containerExtraChargesTable).where(inArray(containerExtraChargesTable.containerId, containerIds)),
+          db.select({ containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount })
+            .from(containerExpensePaymentsTable).where(inArray(containerExpensePaymentsTable.containerId, containerIds)),
+        ])
+      : [[], [], [], [], [], [], []] as const;
+
+    const sMap: Record<number, ShippingCharges> = {};   for (const r of sRows) sMap[r.containerId] = r as ShippingCharges;
+    const cMap: Record<number, CustomsCharges> = {};    for (const r of cRows) cMap[r.containerId] = r as CustomsCharges;
+    const tMap: Record<number, TerminalCharges> = {};   for (const r of tRows) tMap[r.containerId] = r as TerminalCharges;
+    const dMap: Record<number, DeliveryCharges> = {};   for (const r of dRows) dMap[r.containerId] = r as DeliveryCharges;
+    const oMap: Record<number, OperationsCharges> = {}; for (const r of oRows) oMap[r.containerId] = r as OperationsCharges;
+
+    const extrasByContainer = new Map<number, number>();
+    for (const r of exRows) {
+      extrasByContainer.set(r.containerId, (extrasByContainer.get(r.containerId) ?? 0) + parseFloat(r.amount as string ?? "0"));
+    }
+    const expensesByContainer = new Map<number, number>();
     for (const r of cepRows) {
-      costByContainer.set(r.containerId, (costByContainer.get(r.containerId) ?? 0) + parseFloat(r.amount as string ?? "0"));
+      expensesByContainer.set(r.containerId, (expensesByContainer.get(r.containerId) ?? 0) + parseFloat(r.amount as string ?? "0"));
+    }
+
+    const costByContainer = new Map<number, number>();
+    for (const c of containers) {
+      const charges = calcTotalCost(sMap[c.id] ?? {}, cMap[c.id] ?? {}, tMap[c.id] ?? {}, dMap[c.id] ?? {}, oMap[c.id] ?? {});
+      const extras  = extrasByContainer.get(c.id) ?? 0;
+      const expenses = expensesByContainer.get(c.id) ?? 0;
+      costByContainer.set(c.id, charges + extras + expenses);
     }
 
     // Outstanding receivables per branch (sum of unpaid invoice balances).
