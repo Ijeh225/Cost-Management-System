@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks, useGetVatLiability } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -330,6 +331,19 @@ function TerminalDrillDown({ list, onClose }: {
   );
 }
 
+function DashboardScopeLabel() {
+  const { isSuperAdmin, activeBranchId, branches } = useBranchScope();
+  if (!isSuperAdmin) return null;
+  const label = activeBranchId === "all"
+    ? "All Branches — Consolidated"
+    : (branches.find(b => b.id === activeBranchId)?.name ?? `Branch #${activeBranchId}`);
+  return (
+    <span className="ml-2 text-[11px] uppercase tracking-wider text-primary/80 font-semibold">
+      · Scope: {label}
+    </span>
+  );
+}
+
 function BankBalanceBar() {
   const { data: banks, isLoading } = useListBanks();
   const activeBanks = (banks ?? []).filter((b: any) => b.isActive);
@@ -413,7 +427,10 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Overview</h1>
-            <p className="text-muted-foreground mt-0.5 text-sm">Real-time insights into container logistics and financials.</p>
+            <p className="text-muted-foreground mt-0.5 text-sm">
+              Real-time insights into container logistics and financials.
+              <DashboardScopeLabel />
+            </p>
           </div>
           <AlertBeacon />
         </div>

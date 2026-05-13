@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, useGetFxHistory, type DeliveryAnalyticsResponse, type FxHistoryEntry } from "@workspace/api-client-react";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,7 +59,7 @@ function SumCard({ label, value, sub, color }: { label: string; value: string; s
   );
 }
 
-function ContainersTable({ rows }: { rows: ReportRow[] }) {
+function ContainersTable({ rows, showBranch }: { rows: ReportRow[]; showBranch?: boolean }) {
   if (rows.length === 0) return (
     <div className="py-12 text-center text-muted-foreground text-sm">No containers match the current filters.</div>
   );
@@ -68,6 +69,7 @@ function ContainersTable({ rows }: { rows: ReportRow[] }) {
         <thead className="border-b border-border/50 bg-secondary/20 text-xs text-muted-foreground uppercase tracking-wider">
           <tr>
             <th className="px-5 py-3 text-left font-medium">Container / BL</th>
+            {showBranch && <th className="px-5 py-3 text-left font-medium">Branch</th>}
             <th className="px-5 py-3 text-left font-medium">Customer</th>
             <th className="px-5 py-3 text-left font-medium">Vessel / Size</th>
             <th className="px-5 py-3 text-left font-medium">Status</th>
@@ -85,6 +87,13 @@ function ContainersTable({ rows }: { rows: ReportRow[] }) {
                 <div className="font-mono font-medium text-primary">{c.containerNumber}</div>
                 <div className="text-xs text-muted-foreground">{c.blNumber}</div>
               </td>
+              {showBranch && (
+                <td className="px-5 py-3 text-xs">
+                  <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                    {(c as any).branchName ?? "—"}
+                  </span>
+                </td>
+              )}
               <td className="px-5 py-3 font-medium">{c.customerName}</td>
               <td className="px-5 py-3 text-muted-foreground">
                 <div>{c.vessel || "—"}</div>
@@ -581,6 +590,8 @@ function FxHistorySection() {
   const [sortKey, setSortKey] = useState<FxSortKey>("recordedAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const { toast } = useToast();
+  const { activeBranchId, isSuperAdmin } = useBranchScope();
+  const showBranchColumn = isSuperAdmin && activeBranchId === "all";
 
   const { data, isLoading } = useGetFxHistory(
     { from: applied.from || undefined, to: applied.to || undefined }
@@ -707,6 +718,7 @@ function FxHistorySection() {
                 <thead className="border-b border-border/50 bg-secondary/20 text-xs text-muted-foreground uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("containerNumber")}>Container<SortIcon col="containerNumber" /></th>
+                    {showBranchColumn && <th className="px-4 py-3 text-left font-medium">Branch</th>}
                     <th className="px-4 py-3 text-left font-medium cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("section")}>Section<SortIcon col="section" /></th>
                     <th className="px-4 py-3 text-right font-medium cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("usdAmount")}>USD Amount<SortIcon col="usdAmount" /></th>
                     <th className="px-4 py-3 text-right font-medium cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("exchangeRate")}>Rate (₦/$)<SortIcon col="exchangeRate" /></th>
@@ -718,6 +730,13 @@ function FxHistorySection() {
                   {entries.map((e: FxHistoryEntry, i: number) => (
                     <tr key={i} className="hover:bg-muted/10 transition-colors">
                       <td className="px-4 py-3 font-mono text-xs font-semibold">{e.containerNumber}</td>
+                      {showBranchColumn && (
+                        <td className="px-4 py-3 text-xs">
+                          <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                            {(e as any).branchName ?? "—"}
+                          </span>
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-semibold border border-blue-500/20">
                           {SECTION_LABELS[e.section] ?? e.section}
@@ -1035,6 +1054,9 @@ export default function ReportsPage() {
     { status: applied.status || undefined, from: applied.from || undefined, to: applied.to || undefined }
   );
 
+  const { activeBranchId, isSuperAdmin } = useBranchScope();
+  const showBranchColumn = isSuperAdmin && activeBranchId === "all";
+
   const allRows = ((data as any)?.containers ?? []) as ReportRow[];
   const filteredRows = allRows.filter((c: ReportRow) => {
     if (containerTab === "loss") return c.grossProfit < 0;
@@ -1281,7 +1303,7 @@ export default function ReportsPage() {
                 </Tabs>
                 <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
                   <CardContent className="p-0">
-                    <ContainersTable rows={filteredRows} />
+                    <ContainersTable rows={filteredRows} showBranch={showBranchColumn} />
                   </CardContent>
                 </Card>
               </TabsContent>

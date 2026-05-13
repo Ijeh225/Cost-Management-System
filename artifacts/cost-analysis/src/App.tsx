@@ -58,6 +58,7 @@ import CashFlowPage from "@/pages/reports/cashflow/index";
 import ProfitLossPrint from "@/pages/reports/pl/print";
 import DeliveryReportPrint from "@/pages/reports/delivery-report/print";
 import DisbursementReconciliationPage from "@/pages/reports/disbursement-reconciliation/index";
+import BranchComparisonPage from "@/pages/reports/branch-comparison/index";
 import CreditNotePrintPage from "@/pages/credit-notes/print/[id]";
 import BranchesPage from "@/pages/branches/index";
 import BranchSettingsPage from "@/pages/branch-settings/index";
@@ -229,6 +230,9 @@ function Router() {
               <Route path="/my-tasks" component={MyTasksPage} />
               <Route path="/analytics">
                 <BranchAdminOrAboveGuard><AnalyticsPage /></BranchAdminOrAboveGuard>
+              </Route>
+              <Route path="/reports/branch-comparison">
+                <SuperAdminGuard><BranchComparisonPage /></SuperAdminGuard>
               </Route>
               <Route path="/reports">
                 <AdminGuard><ReportsPage /></AdminGuard>

@@ -1,15 +1,33 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, requireSuperAdmin, getBranchScope, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
 
 export const reportsRouter = Router();
 
-reportsRouter.get("/reports/containers", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+// ─── Branch scope helper ────────────────────────────────────────────────────
+// Resolves the active branch scope for a report request. Returns:
+//   { id: null, name: "All Branches — Consolidated" } when super-admin in All mode
+//   { id: <n>,  name: <branch name> }                  otherwise.
+async function resolveBranchScopeInfo(req: AuthRequest): Promise<{ id: number | null; name: string }> {
+  const id = getBranchScope(req);
+  if (id === null) return { id: null, name: "All Branches — Consolidated" };
+  const [b] = await db.select({ name: branchesTable.name }).from(branchesTable).where(eq(branchesTable.id, id)).limit(1);
+  return { id, name: b?.name ?? `Branch ${id}` };
+}
+
+// Cached lookup of branch id → name (used for itemised report rows in All mode).
+async function loadBranchNameMap(): Promise<Map<number, string>> {
+  const rows = await db.select({ id: branchesTable.id, name: branchesTable.name }).from(branchesTable);
+  return new Map(rows.map(r => [r.id, r.name]));
+}
+
+reportsRouter.get("/reports/containers", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { status, from, to } = req.query as Record<string, string>;
+    const branchScope = await resolveBranchScopeInfo(req);
 
     const conditions: SQL[] = [];
     if (status) conditions.push(eq(containersTable.status, status));
@@ -19,6 +37,7 @@ reportsRouter.get("/reports/containers", requireAuth, requireAdmin, async (req: 
       toDate.setHours(23, 59, 59, 999);
       conditions.push(lte(containersTable.createdAt, toDate));
     }
+    if (branchScope.id !== null) conditions.push(eq(containersTable.branchId, branchScope.id));
 
     const containers = await db.select({
       id: containersTable.id,
@@ -31,10 +50,12 @@ reportsRouter.get("/reports/containers", requireAuth, requireAdmin, async (req: 
       clearingCharges: containersTable.clearingCharges,
       assignedStaffId: containersTable.assignedStaffId,
       isLocked: containersTable.isLocked,
+      branchId: containersTable.branchId,
       createdAt: containersTable.createdAt,
     }).from(containersTable).where(conditions.length > 0 ? and(...conditions) : undefined);
 
-    if (containers.length === 0) return res.json({ containers: [] });
+    if (containers.length === 0) return res.json({ containers: [], branchScope });
+    const branchNameMap = branchScope.id === null ? await loadBranchNameMap() : null;
 
     const ids = containers.map(c => c.id);
 
@@ -74,20 +95,23 @@ reportsRouter.get("/reports/containers", requireAuth, requireAdmin, async (req: 
         deliveryCost: calcTotalCost({}, {}, {}, dMap[c.id] ?? {}, {}),
         operationsCost: calcTotalCost({}, {}, {}, {}, oMap[c.id] ?? {}),
         dutyNotPaid: parseFloat(cMap[c.id]?.dutyNotPaid ?? "0"),
+        branchId: c.branchId,
+        branchName: branchNameMap ? (branchNameMap.get(c.branchId) ?? null) : branchScope.name,
         createdAt: c.createdAt.toISOString().slice(0, 10),
       };
     });
 
-    return res.json({ containers: rows });
+    return res.json({ containers: rows, branchScope });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
   }
 });
 
-reportsRouter.get("/reports/export", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/export", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { status, from, to } = req.query as Record<string, string>;
+    const branchScope = await resolveBranchScopeInfo(req);
 
     const conditions: SQL[] = [];
     if (status) conditions.push(eq(containersTable.status, status));
@@ -97,6 +121,7 @@ reportsRouter.get("/reports/export", requireAuth, requireAdmin, async (req: Auth
       toDate.setHours(23, 59, 59, 999);
       conditions.push(lte(containersTable.createdAt, toDate));
     }
+    if (branchScope.id !== null) conditions.push(eq(containersTable.branchId, branchScope.id));
 
     const containers = await db.select().from(containersTable)
       .where(conditions.length > 0 ? and(...conditions) : undefined);
@@ -171,7 +196,7 @@ reportsRouter.get("/reports/export", requireAuth, requireAdmin, async (req: Auth
   }
 });
 
-reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/client-statement", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { clientId, from, to } = req.query as Record<string, string>;
     if (!clientId) return res.status(400).json({ error: "clientId is required" });
@@ -186,12 +211,14 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
 
     if (!client) return res.status(404).json({ error: "Client not found" });
 
+    const branchScope = await resolveBranchScopeInfo(req);
     const conditions: SQL[] = [eq(invoicesTable.clientId, id)];
     if (from) conditions.push(gte(invoicesTable.createdAt, new Date(from)));
     if (to) {
       const toDate = new Date(to + "T23:59:59");
       conditions.push(lte(invoicesTable.createdAt, toDate));
     }
+    if (branchScope.id !== null) conditions.push(eq(invoicesTable.branchId, branchScope.id));
 
     const invoices = await db
       .select({
@@ -318,6 +345,7 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
     return res.json({
       client,
       period: { from: from ?? null, to: to ?? null },
+      branchScope,
       invoices: formattedInvoices,
       totals: {
         totalInvoiced,
@@ -336,9 +364,10 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireAdmin, async 
   }
 });
 
-reportsRouter.get("/reports/vat-summary", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/vat-summary", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to } = req.query as Record<string, string>;
+    const branchScope = await resolveBranchScopeInfo(req);
 
     const conditions: SQL[] = [];
     if (from) conditions.push(gte(invoicesTable.createdAt, new Date(from)));
@@ -346,6 +375,7 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireAdmin, async (req:
       const toDate = new Date(to + "T23:59:59");
       conditions.push(lte(invoicesTable.createdAt, toDate));
     }
+    if (branchScope.id !== null) conditions.push(eq(invoicesTable.branchId, branchScope.id));
 
     const invoices = await db
       .select({
@@ -388,6 +418,7 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireAdmin, async (req:
 
     return res.json({
       period: { from: from ?? null, to: to ?? null },
+      branchScope,
       invoices: rows,
       totals: { totalSubtotal, totalVat, totalInvoiced },
     });
@@ -397,8 +428,9 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireAdmin, async (req:
   }
 });
 
-reportsRouter.get("/reports/vat-liability", requireAuth, requireAdmin, async (_req: AuthRequest, res) => {
+reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
+    const branchScope = await resolveBranchScopeInfo(req);
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
@@ -432,6 +464,7 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireAdmin, async (_r
           gte(invoicesTable.createdAt, earliestFrom),
           ne(invoicesTable.status, "draft"),
           ne(invoicesTable.status, "cancelled"),
+          ...(branchScope.id !== null ? [eq(invoicesTable.branchId, branchScope.id)] : []),
         )
       );
 
@@ -554,16 +587,17 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireAdmin, async (_r
       invoiceCount: currentYearQuarters.reduce((s, q) => s + q.invoiceCount, 0),
     };
 
-    return res.json({ currentQuarter, quarters: quarterData, currentYearTotal });
+    return res.json({ currentQuarter, quarters: quarterData, currentYearTotal, branchScope });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
   }
 });
 
-reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/pl", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to, clientId, costBasis } = req.query as Record<string, string>;
+    const branchScope = await resolveBranchScopeInfo(req);
 
     let fromDate: Date | null = null;
     let toDate: Date | null = null;
@@ -591,6 +625,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
     if (fromDate) invConds.push(gte(invoicesTable.createdAt, fromDate));
     if (toDate)   invConds.push(lte(invoicesTable.createdAt, toDate));
     if (clientIdNum !== null) invConds.push(eq(invoicesTable.clientId, clientIdNum));
+    if (branchScope.id !== null) invConds.push(eq(invoicesTable.branchId, branchScope.id));
 
     const invoiceRows = await db
       .select({
@@ -632,6 +667,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
     // appears on multiple invoices across different periods.
     const allInvoiceItemConds: SQL[] = [isNotNull(invoiceItemsTable.containerId), ne(invoicesTable.status, "draft")];
     if (clientIdNum !== null) allInvoiceItemConds.push(eq(invoicesTable.clientId, clientIdNum));
+    if (branchScope.id !== null) allInvoiceItemConds.push(eq(invoicesTable.branchId, branchScope.id));
 
     const allNonDraftInvoiceItemRows = await db
       .select({
@@ -669,6 +705,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
     if (fromDate) uninvConds.push(gte(containersTable.createdAt, fromDate));
     if (toDate)   uninvConds.push(lte(containersTable.createdAt, toDate));
     if (clientIdNum !== null) uninvConds.push(eq(containersTable.clientId, clientIdNum));
+    if (branchScope.id !== null) uninvConds.push(eq(containersTable.branchId, branchScope.id));
 
     const allPeriodContainers = await db
       .select({ id: containersTable.id, createdAt: containersTable.createdAt })
@@ -779,6 +816,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
     const ohConds: SQL[] = [];
     if (fromDate) ohConds.push(gte(overheadExpensesTable.paidAt, fromDate));
     if (toDate)   ohConds.push(lte(overheadExpensesTable.paidAt, toDate));
+    if (branchScope.id !== null) ohConds.push(eq(overheadExpensesTable.branchId, branchScope.id));
 
     const overheadRows = await db
       .select({
@@ -845,6 +883,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
 
     return res.json({
       period: { from: from ?? null, to: to ?? null },
+      branchScope,
       filters: { clientId: clientIdNum },
       costBasis: costBasis === "disbursements" ? "disbursements" : "budgeted",
       revenue: {
@@ -887,9 +926,10 @@ reportsRouter.get("/reports/pl", requireAuth, requireAdmin, async (req: AuthRequ
   }
 });
 
-reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/cashflow", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to, bankId } = req.query as Record<string, string>;
+    const branchScope = await resolveBranchScopeInfo(req);
 
     let fromDate: Date | null = null;
     let toDate: Date | null = null;
@@ -917,6 +957,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
     if (fromDate) invPayConds.push(gte(invoicePaymentsTable.paidAt, fromDate));
     if (toDate)   invPayConds.push(lte(invoicePaymentsTable.paidAt, toDate));
     if (bankIdNum !== null) invPayConds.push(eq(invoicePaymentsTable.bankId, bankIdNum));
+    if (branchScope.id !== null) invPayConds.push(eq(invoicePaymentsTable.branchId, branchScope.id));
 
     const invoicePaymentRows = await db
       .select({
@@ -943,6 +984,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
     if (fromDate) depConds.push(gte(clientDepositsTable.createdAt, fromDate));
     if (toDate)   depConds.push(lte(clientDepositsTable.createdAt, toDate));
     if (bankIdNum !== null) depConds.push(eq(clientDepositsTable.bankId, bankIdNum));
+    if (branchScope.id !== null) depConds.push(eq(clientDepositsTable.branchId, branchScope.id));
 
     const depositRows = await db
       .select({
@@ -967,6 +1009,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
     if (fromDate) ohConds.push(gte(expensePaymentsTable.paidAt, fromDate));
     if (toDate)   ohConds.push(lte(expensePaymentsTable.paidAt, toDate));
     if (bankIdNum !== null) ohConds.push(eq(expensePaymentsTable.bankId, bankIdNum));
+    if (branchScope.id !== null) ohConds.push(eq(expensePaymentsTable.branchId, branchScope.id));
 
     const overheadRows = await db
       .select({
@@ -990,6 +1033,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
     if (fromDate) fundAddConds.push(gte(bankFundAdditionsTable.createdAt, fromDate));
     if (toDate)   fundAddConds.push(lte(bankFundAdditionsTable.createdAt, toDate));
     if (bankIdNum !== null) fundAddConds.push(eq(bankFundAdditionsTable.bankId, bankIdNum));
+    if (branchScope.id !== null) fundAddConds.push(eq(bankFundAdditionsTable.branchId, branchScope.id));
 
     const fundAddRows = await db
       .select({
@@ -1011,6 +1055,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
     if (fromDate) cepConds.push(gte(containerExpensePaymentsTable.paidAt, fromDate));
     if (toDate)   cepConds.push(lte(containerExpensePaymentsTable.paidAt, toDate));
     if (bankIdNum !== null) cepConds.push(eq(containerExpensePaymentsTable.bankId, bankIdNum));
+    if (branchScope.id !== null) cepConds.push(eq(containerExpensePaymentsTable.branchId, branchScope.id));
 
     const cepRows = await db
       .select({
@@ -1134,6 +1179,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
         const c: SQL[] = [primary];
         if (fromDate) c.push(gte(bankTransfersTable.createdAt, fromDate));
         if (toDate)   c.push(lte(bankTransfersTable.createdAt, toDate));
+        if (branchScope.id !== null) c.push(eq(bankTransfersTable.branchId, branchScope.id));
         return c;
       };
       const fromBankAlias = alias(banksTable, "from_bank");
@@ -1205,14 +1251,19 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
     if (fromDate) {
       const prevInvPayConds: SQL[] = [lt(invoicePaymentsTable.paidAt, fromDate)];
       if (bankIdNum !== null) prevInvPayConds.push(eq(invoicePaymentsTable.bankId, bankIdNum));
+      if (branchScope.id !== null) prevInvPayConds.push(eq(invoicePaymentsTable.branchId, branchScope.id));
       const prevDepConds: SQL[] = [lt(clientDepositsTable.createdAt, fromDate)];
       if (bankIdNum !== null) prevDepConds.push(eq(clientDepositsTable.bankId, bankIdNum));
+      if (branchScope.id !== null) prevDepConds.push(eq(clientDepositsTable.branchId, branchScope.id));
       const prevOhConds: SQL[] = [lt(expensePaymentsTable.paidAt, fromDate)];
       if (bankIdNum !== null) prevOhConds.push(eq(expensePaymentsTable.bankId, bankIdNum));
+      if (branchScope.id !== null) prevOhConds.push(eq(expensePaymentsTable.branchId, branchScope.id));
       const prevFundAddConds: SQL[] = [lt(bankFundAdditionsTable.createdAt, fromDate)];
       if (bankIdNum !== null) prevFundAddConds.push(eq(bankFundAdditionsTable.bankId, bankIdNum));
+      if (branchScope.id !== null) prevFundAddConds.push(eq(bankFundAdditionsTable.branchId, branchScope.id));
       const prevCepConds: SQL[] = [lt(containerExpensePaymentsTable.paidAt, fromDate)];
       if (bankIdNum !== null) prevCepConds.push(eq(containerExpensePaymentsTable.bankId, bankIdNum));
+      if (branchScope.id !== null) prevCepConds.push(eq(containerExpensePaymentsTable.branchId, branchScope.id));
 
       const promises: Promise<Array<{ s: string }>>[] = [
         db.select({ s: sql<string>`coalesce(sum(${invoicePaymentsTable.amount}), 0)` })
@@ -1235,11 +1286,12 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
 
       // Bank transfers (specific-bank view only)
       if (bankIdNum !== null) {
+        const xferBranchCond = branchScope.id !== null ? [eq(bankTransfersTable.branchId, branchScope.id)] : [];
         const [prevXferIn, prevXferOut] = await Promise.all([
           db.select({ s: sql<string>`coalesce(sum(${bankTransfersTable.amount}), 0)` })
-            .from(bankTransfersTable).where(and(eq(bankTransfersTable.toBankId, bankIdNum), lt(bankTransfersTable.createdAt, fromDate))),
+            .from(bankTransfersTable).where(and(eq(bankTransfersTable.toBankId, bankIdNum), lt(bankTransfersTable.createdAt, fromDate), ...xferBranchCond)),
           db.select({ s: sql<string>`coalesce(sum(${bankTransfersTable.amount}), 0)` })
-            .from(bankTransfersTable).where(and(eq(bankTransfersTable.fromBankId, bankIdNum), lt(bankTransfersTable.createdAt, fromDate))),
+            .from(bankTransfersTable).where(and(eq(bankTransfersTable.fromBankId, bankIdNum), lt(bankTransfersTable.createdAt, fromDate), ...xferBranchCond)),
         ]);
         openingBalance += parseFloat(prevXferIn[0]?.s ?? "0");
         openingBalance -= parseFloat(prevXferOut[0]?.s ?? "0");
@@ -1277,6 +1329,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
 
     return res.json({
       period: { from: from ?? null, to: to ?? null },
+      branchScope,
       filters: { bankId: bankIdNum },
       inflows,
       outflows,
@@ -1302,9 +1355,10 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireAdmin, async (req: Au
 
 // ─── GET /reports/disbursement-reconciliation ────────────────────────────────
 
-reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to, status } = req.query as Record<string, string>;
+    const branchScope = await resolveBranchScopeInfo(req);
 
     let fromDate: Date | null = null;
     let toDate: Date | null = null;
@@ -1335,6 +1389,7 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
     // Fetch containers, filtered by status if provided
     const containerConds: SQL[] = [];
     if (status) containerConds.push(eq(containersTable.status, status));
+    if (branchScope.id !== null) containerConds.push(eq(containersTable.branchId, branchScope.id));
     const allContainers = await db
       .select({
         id: containersTable.id,
@@ -1348,7 +1403,7 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
       .orderBy(containersTable.id);
 
     if (allContainers.length === 0) {
-      return res.json(emptyResponse);
+      return res.json({ ...emptyResponse, branchScope });
     }
 
     const allIds = allContainers.map(c => c.id);
@@ -1470,6 +1525,7 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
 
     return res.json({
       period: { from: from ?? null, to: to ?? null, status: status ?? null },
+      branchScope,
       rows,
       aggregate: {
         sections: aggSections,
@@ -1482,8 +1538,10 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireAd
   }
 });
 
-reportsRouter.get("/reports/invoice-aging", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/invoice-aging", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
+    const branchScope = await resolveBranchScopeInfo(req);
+    const branchNameMap = branchScope.id === null ? await loadBranchNameMap() : null;
     const now = new Date();
 
     const invoices = await db
@@ -1494,10 +1552,12 @@ reportsRouter.get("/reports/invoice-aging", requireAuth, requireAdmin, async (re
         clientName: clientsTable.name,
         total: invoicesTable.total,
         dueDate: invoicesTable.dueDate,
+        branchId: invoicesTable.branchId,
         createdAt: invoicesTable.createdAt,
       })
       .from(invoicesTable)
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .where(branchScope.id !== null ? eq(invoicesTable.branchId, branchScope.id) : undefined)
       .orderBy(invoicesTable.dueDate);
 
     const invoiceIds = invoices.map(i => i.id);
@@ -1510,7 +1570,7 @@ reportsRouter.get("/reports/invoice-aging", requireAuth, requireAdmin, async (re
       paidMap.set(p.invoiceId, (paidMap.get(p.invoiceId) ?? 0) + parseFloat(p.amount ?? "0"));
     }
 
-    type AgingRow = { id: number; invoiceNumber: string; clientName: string; total: number; outstanding: number; dueDate: string | null; daysOverdue: number; createdAt: string };
+    type AgingRow = { id: number; invoiceNumber: string; clientName: string; total: number; outstanding: number; dueDate: string | null; daysOverdue: number; createdAt: string; branchId: number; branchName: string | null };
     const buckets: Record<"current" | "days1to30" | "days31to60" | "days61to90" | "days90plus", AgingRow[]> = {
       current: [], days1to30: [], days31to60: [], days61to90: [], days90plus: [],
     };
@@ -1544,6 +1604,8 @@ reportsRouter.get("/reports/invoice-aging", requireAuth, requireAdmin, async (re
         dueDate,
         daysOverdue: Math.max(0, daysOverdue),
         createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : String(inv.createdAt),
+        branchId: inv.branchId,
+        branchName: branchNameMap ? (branchNameMap.get(inv.branchId) ?? null) : branchScope.name,
       };
       buckets[bucket].push(row);
       bucketTotals[bucket] += outstanding;
@@ -1553,6 +1615,7 @@ reportsRouter.get("/reports/invoice-aging", requireAuth, requireAdmin, async (re
 
     return res.json({
       generatedAt: now.toISOString(),
+      branchScope,
       buckets,
       totals: { ...bucketTotals, grandTotal },
     });
@@ -1562,9 +1625,11 @@ reportsRouter.get("/reports/invoice-aging", requireAuth, requireAdmin, async (re
   }
 });
 
-reportsRouter.get("/reports/fx-history", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/fx-history", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to } = req.query as Record<string, string>;
+    const branchScope = await resolveBranchScopeInfo(req);
+    const branchNameMap = branchScope.id === null ? await loadBranchNameMap() : null;
 
     const sections: Array<{ table: typeof shippingChargesTable | typeof customsChargesTable | typeof terminalChargesTable | typeof deliveryChargesTable | typeof operationsChargesTable; name: string }> = [
       { table: shippingChargesTable, name: "shipping" },
@@ -1582,9 +1647,13 @@ reportsRouter.get("/reports/fx-history", requireAuth, requireAdmin, async (req: 
       exchangeRate: number;
       ngnEquivalent: number;
       recordedAt: string;
+      branchId: number;
+      branchName: string | null;
     }> = [];
 
     await Promise.all(sections.map(async ({ table, name }) => {
+      const fxConds: SQL[] = [isNotNull(table.usdAmount), isNotNull(table.exchangeRate)];
+      if (branchScope.id !== null) fxConds.push(eq(containersTable.branchId, branchScope.id));
       const rows = await db
         .select({
           containerId: table.containerId,
@@ -1592,10 +1661,11 @@ reportsRouter.get("/reports/fx-history", requireAuth, requireAdmin, async (req: 
           usdAmount: table.usdAmount,
           exchangeRate: table.exchangeRate,
           updatedAt: table.updatedAt,
+          branchId: containersTable.branchId,
         })
         .from(table)
         .innerJoin(containersTable, eq(table.containerId, containersTable.id))
-        .where(and(isNotNull(table.usdAmount), isNotNull(table.exchangeRate)));
+        .where(and(...fxConds));
 
       for (const row of rows) {
         const usd = parseFloat(row.usdAmount!);
@@ -1609,6 +1679,8 @@ reportsRouter.get("/reports/fx-history", requireAuth, requireAdmin, async (req: 
           exchangeRate: rate,
           ngnEquivalent: usd * rate,
           recordedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : String(row.updatedAt),
+          branchId: row.branchId,
+          branchName: branchNameMap ? (branchNameMap.get(row.branchId) ?? null) : branchScope.name,
         });
       }
     }));
@@ -1631,10 +1703,135 @@ reportsRouter.get("/reports/fx-history", requireAuth, requireAdmin, async (req: 
     return res.json({
       entries,
       period: { from: from ?? null, to: to ?? null },
+      branchScope,
       totals: { totalUsd, totalNgn },
     });
   } catch (err) {
     console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── GET /reports/branch-comparison (super-admin only) ──────────────────────
+// Cross-branch aggregate KPIs for the executive overview.
+reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { from, to } = req.query as Record<string, string>;
+    let fromDate: Date | null = null;
+    let toDate: Date | null = null;
+    if (from) {
+      fromDate = new Date(from);
+      if (isNaN(fromDate.getTime())) return res.status(400).json({ error: "Invalid 'from' date" });
+    }
+    if (to) {
+      toDate = new Date(to + "T23:59:59");
+      if (isNaN(toDate.getTime())) return res.status(400).json({ error: "Invalid 'to' date" });
+    }
+
+    const branches = await db.select({ id: branchesTable.id, name: branchesTable.name, isActive: branchesTable.isActive }).from(branchesTable);
+
+    // Container counts + revenue + costs per branch
+    const containerConds: SQL[] = [];
+    if (fromDate) containerConds.push(gte(containersTable.createdAt, fromDate));
+    if (toDate)   containerConds.push(lte(containersTable.createdAt, toDate));
+
+    const containers = await db.select({
+      id: containersTable.id,
+      branchId: containersTable.branchId,
+      clearingCharges: containersTable.clearingCharges,
+      status: containersTable.status,
+      createdAt: containersTable.createdAt,
+      closedAt: containersTable.closedAt,
+    }).from(containersTable).where(containerConds.length > 0 ? and(...containerConds) : undefined);
+
+    const containerIds = containers.map(c => c.id);
+
+    // Disbursed costs (actual cash spent) per container — from container_expense_payments
+    const cepRows = containerIds.length > 0
+      ? await db.select({
+          containerId: containerExpensePaymentsTable.containerId,
+          amount: containerExpensePaymentsTable.amount,
+        }).from(containerExpensePaymentsTable).where(inArray(containerExpensePaymentsTable.containerId, containerIds))
+      : [];
+    const costByContainer = new Map<number, number>();
+    for (const r of cepRows) {
+      costByContainer.set(r.containerId, (costByContainer.get(r.containerId) ?? 0) + parseFloat(r.amount as string ?? "0"));
+    }
+
+    // Outstanding receivables per branch (sum of unpaid invoice balances).
+    // Period-filtered to match container metrics: only invoices issued within range.
+    const arInvoiceConds: SQL[] = [ne(invoicesTable.status, "draft"), ne(invoicesTable.status, "cancelled")];
+    if (fromDate) arInvoiceConds.push(gte(invoicesTable.createdAt, fromDate));
+    if (toDate)   arInvoiceConds.push(lte(invoicesTable.createdAt, toDate));
+    const arInvoices = await db.select({
+      id: invoicesTable.id,
+      branchId: invoicesTable.branchId,
+      total: invoicesTable.total,
+    }).from(invoicesTable).where(and(...arInvoiceConds));
+
+    const invoiceIds = arInvoices.map(i => i.id);
+    const arPayments = invoiceIds.length > 0
+      ? await db.select({ invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount })
+          .from(invoicePaymentsTable).where(inArray(invoicePaymentsTable.invoiceId, invoiceIds))
+      : [];
+    const paidByInvoice = new Map<number, number>();
+    for (const p of arPayments) {
+      paidByInvoice.set(p.invoiceId, (paidByInvoice.get(p.invoiceId) ?? 0) + parseFloat(p.amount as string ?? "0"));
+    }
+    const outstandingByBranch = new Map<number, number>();
+    for (const inv of arInvoices) {
+      const paid = paidByInvoice.get(inv.id) ?? 0;
+      const out = Math.max(0, parseFloat(inv.total ?? "0") - paid);
+      if (out > 0) outstandingByBranch.set(inv.branchId, (outstandingByBranch.get(inv.branchId) ?? 0) + out);
+    }
+
+    // Build per-branch rows
+    const rows = branches.map(b => {
+      const branchContainers = containers.filter(c => c.branchId === b.id);
+      const containerCount = branchContainers.length;
+      const revenue = branchContainers.reduce((s, c) => s + parseFloat(c.clearingCharges ?? "0"), 0);
+      const costs = branchContainers.reduce((s, c) => s + (costByContainer.get(c.id) ?? 0), 0);
+      const grossProfit = revenue - costs;
+      const marginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+
+      const closed = branchContainers.filter(c => c.status === "closed" && c.closedAt);
+      const turnaroundDays = closed.length > 0
+        ? closed.reduce((s, c) => {
+            const days = (new Date(c.closedAt as any).getTime() - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+            return s + days;
+          }, 0) / closed.length
+        : 0;
+
+      return {
+        branchId: b.id,
+        branchName: b.name,
+        isActive: b.isActive,
+        containers: containerCount,
+        revenue,
+        costs,
+        grossProfit,
+        marginPct,
+        avgTurnaroundDays: Math.round(turnaroundDays * 10) / 10,
+        outstandingReceivables: outstandingByBranch.get(b.id) ?? 0,
+      };
+    });
+
+    const totals = {
+      containers: rows.reduce((s, r) => s + r.containers, 0),
+      revenue: rows.reduce((s, r) => s + r.revenue, 0),
+      costs: rows.reduce((s, r) => s + r.costs, 0),
+      grossProfit: rows.reduce((s, r) => s + r.grossProfit, 0),
+      outstandingReceivables: rows.reduce((s, r) => s + r.outstandingReceivables, 0),
+    };
+
+    return res.json({
+      period: { from: from ?? null, to: to ?? null },
+      rows,
+      totals,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("GET /reports/branch-comparison error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 });

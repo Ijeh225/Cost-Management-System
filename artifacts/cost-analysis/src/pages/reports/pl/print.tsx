@@ -177,6 +177,7 @@ export default function ProfitLossPrint() {
             <div className="report-title">Profit &amp; Loss Statement</div>
             <div className="report-sub">{periodLabel}</div>
             <div className="report-sub">Client: {clientLabel}</div>
+            <div className="report-sub">Branch: {(data as any)?.branchScope?.name ?? "All Branches — Consolidated"}</div>
             <div className="report-sub">Generated: {fmtDate(new Date().toISOString())}</div>
           </div>
         </div>
