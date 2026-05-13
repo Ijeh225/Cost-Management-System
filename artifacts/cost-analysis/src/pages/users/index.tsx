@@ -615,7 +615,7 @@ function AssignClientsDialog({ user, onClose }: { user: UserRow; onClose: () => 
 }
 
 export default function Users() {
-  const { isAdmin, isSuperAdmin, isAdminOrAbove, user: currentUser } = useAuth();
+  const { isAdmin, isSuperAdmin, isAdminOrAbove, isBranchAdmin, user: currentUser } = useAuth();
   const [, setLocation] = useLocation();
   const { data: users, isLoading } = useListUsers();
   const { data: branches } = useBranches({ enabled: isSuperAdmin });
@@ -652,7 +652,7 @@ export default function Users() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">User Management</h1>
           <p className="text-muted-foreground text-sm mt-1">Manage system access, roles, and section permissions.</p>
         </div>
-        {isSuperAdmin && <CreateUserDialog />}
+        {isAdminOrAbove && <CreateUserDialog />}
       </div>
 
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm shadow-lg overflow-hidden">
@@ -736,7 +736,7 @@ export default function Users() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {isSuperAdmin && (
+                        {(isSuperAdmin || (isAdminOrAbove && !(isBranchAdmin && ELEVATED_ROLES.includes(u.role)))) && (
                           <Dialog open={editingUser?.id === u.id} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
                             <DialogTrigger asChild>
                               <Button variant="ghost" size="sm" onClick={() => setEditingUser(u as UserRow)}
@@ -762,7 +762,7 @@ export default function Users() {
                             )}
                           </Dialog>
                         )}
-                        {isSuperAdmin && (
+                        {(isSuperAdmin || (isAdminOrAbove && !(isBranchAdmin && ELEVATED_ROLES.includes(u.role)))) && (
                           <Button variant="ghost" size="sm" onClick={() => handleToggleActive(u as UserRow)}
                             disabled={updateMutation.isPending || u.id === currentUser?.id}
                             className={`h-8 px-3 text-xs ${u.isActive ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-emerald-500/10 hover:text-emerald-500"}`}>

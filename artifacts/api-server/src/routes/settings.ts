@@ -14,7 +14,7 @@ const BUILT_IN_SECTION_DEFAULTS: Record<string, string> = {
   operations: "Operations & Misc.",
 };
 
-settingsRouter.get("/settings", requireAuth, async (_req, res) => {
+settingsRouter.get("/settings", requireAdmin, async (_req, res) => {
   try {
     const rows = await db.select().from(settingsTable);
     const map: Record<string, string> = { ...BUILT_IN_SECTION_DEFAULTS };
