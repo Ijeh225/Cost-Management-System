@@ -521,6 +521,7 @@ containerExpensesRouter.get("/container-expense-payments/recent", requireAdmin, 
         recordedBy: p.recordedBy ?? null,
         recordedByName: p.recordedBy ? (userMap[p.recordedBy] ?? null) : null,
         createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
+        branchId: p.branchId,
       };
     }));
   } catch (err) {

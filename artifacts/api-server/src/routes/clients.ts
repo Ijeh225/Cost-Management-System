@@ -482,10 +482,14 @@ clientsRouter.post("/clients/:id/deposits", requireAdmin, async (req: AuthReques
     if (!paymentMethod || !ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
       return res.status(400).json({ error: `Payment method must be one of: ${ALLOWED_PAYMENT_METHODS.join(", ")}` });
     }
+    const _scope = getBranchScope(req);
+    if (_scope === null && req.user?.role === "super_admin") {
+      return res.status(400).json({ error: "Select a specific branch from the switcher before recording a deposit." });
+    }
     const [client] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
     if (!client) return res.status(404).json({ error: "Client not found" });
     if (!userCanAccessBranch(req, client.branchId)) {
-      return res.status(403).json({ error: "Client belongs to another branch." });
+      return res.status(404).json({ error: "Client not found" });
     }
     if (bankId) {
       const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, Number(bankId)));
@@ -539,7 +543,11 @@ clientsRouter.delete("/clients/:id/deposits/:depositId", requireAdmin, async (re
       .where(eq(clientDepositsTable.id, depositId));
     if (!existing || existing.clientId !== clientId) return res.status(404).json({ error: "Deposit not found" });
     if (!userCanAccessBranch(req, existing.branchId)) {
-      return res.status(403).json({ error: "Deposit belongs to another branch." });
+      return res.status(404).json({ error: "Deposit not found" });
+    }
+    const _scope = getBranchScope(req);
+    if (_scope === null && req.user?.role === "super_admin") {
+      return res.status(400).json({ error: "Select a specific branch from the switcher before deleting a deposit." });
     }
     const allocatedAmount = parseFloat(existing.allocatedAmount ?? "0");
     if (allocatedAmount > 0) {
@@ -567,10 +575,14 @@ clientsRouter.post("/client-deposits/:id/allocate", requireAdmin, async (req: Au
       return res.status(400).json({ error: "Allocation amount must be a positive number" });
     }
 
+    const _scope = getBranchScope(req);
+    if (_scope === null && req.user?.role === "super_admin") {
+      return res.status(400).json({ error: "Select a specific branch from the switcher before allocating a deposit." });
+    }
     const [deposit] = await db.select().from(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
     if (!deposit) return res.status(404).json({ error: "Deposit not found" });
     if (!userCanAccessBranch(req, deposit.branchId)) {
-      return res.status(403).json({ error: "Deposit belongs to another branch." });
+      return res.status(404).json({ error: "Deposit not found" });
     }
 
     const depositTotal = parseFloat(deposit.amount);

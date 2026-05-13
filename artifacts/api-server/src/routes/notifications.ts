@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable, systemAlertsHistoryTable } from "@workspace/db";
 import { eq, lt, sql, max, isNotNull, desc, inArray, notInArray, and } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, getBranchScope } from "../lib/auth.js";
+import { requireAuth, requireAdmin, AuthRequest, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery } from "../lib/calculations.js";
 
 export const notificationsRouter = Router();
@@ -555,8 +555,9 @@ notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, 
   try {
     const userId = (req as AuthRequest).user!.id;
     const role   = (req as AuthRequest).user!.role;
-    const branchId = (req as AuthRequest).user!.branchId;
-    const alerts = await computeAlerts(userId, role);
+    const branchScope = getBranchScope(req as AuthRequest);
+    const branchId = branchScope ?? (req as AuthRequest).user!.branchId;
+    const alerts = await computeAlerts(userId, role, branchScope);
     if (alerts.length === 0) return res.json({ success: true, marked: 0 });
 
     const now = new Date();
@@ -577,9 +578,12 @@ notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, 
 notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res) => {
   try {
     const role = (req as AuthRequest).user.role;
+    const branchScope = getBranchScope(req as AuthRequest);
 
     // Check for overdue stages and auto-create notifications (deduplicated by checking recent ones)
-    const containers = await db.select().from(containersTable);
+    const containers = branchScope !== null
+      ? await db.select().from(containersTable).where(eq(containersTable.branchId, branchScope))
+      : await db.select().from(containersTable);
     const today = new Date(); today.setUTCHours(0, 0, 0, 0);
     const STAGE_OVERDUE_CHECK: Array<{
       stage: string;
@@ -625,10 +629,16 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
       }
     }
 
-    const allWorkflow = await db.select()
-      .from(workflowNotificationsTable)
-      .orderBy(desc(workflowNotificationsTable.createdAt))
-      .limit(500);
+    const allWorkflow = branchScope !== null
+      ? await db.select()
+          .from(workflowNotificationsTable)
+          .where(eq(workflowNotificationsTable.branchId, branchScope))
+          .orderBy(desc(workflowNotificationsTable.createdAt))
+          .limit(500)
+      : await db.select()
+          .from(workflowNotificationsTable)
+          .orderBy(desc(workflowNotificationsTable.createdAt))
+          .limit(500);
 
     // Deduplicate: keep only the latest notification per container — one message per job
     const seenContainers = new Set<number>();
@@ -653,9 +663,14 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
   }
 });
 
-notificationsRouter.post("/workflow-notifications/:id/read", requireAuth, async (req, res) => {
+notificationsRouter.post("/workflow-notifications/:id/read", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
+    const [existing] = await db.select({ branchId: workflowNotificationsTable.branchId })
+      .from(workflowNotificationsTable).where(eq(workflowNotificationsTable.id, id));
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
     await db.update(workflowNotificationsTable)
       .set({ isRead: true, readAt: new Date() })
       .where(eq(workflowNotificationsTable.id, id));
@@ -666,11 +681,15 @@ notificationsRouter.post("/workflow-notifications/:id/read", requireAuth, async 
   }
 });
 
-notificationsRouter.post("/workflow-notifications/read-all", requireAuth, async (_req, res) => {
+notificationsRouter.post("/workflow-notifications/read-all", requireAuth, async (req: AuthRequest, res) => {
   try {
+    const branchScope = getBranchScope(req);
+    const whereClause = branchScope !== null
+      ? and(eq(workflowNotificationsTable.isRead, false), eq(workflowNotificationsTable.branchId, branchScope))
+      : eq(workflowNotificationsTable.isRead, false);
     await db.update(workflowNotificationsTable)
       .set({ isRead: true, readAt: new Date() })
-      .where(eq(workflowNotificationsTable.isRead, false));
+      .where(whereClause);
     return res.json({ success: true });
   } catch (err) {
     console.error(err);

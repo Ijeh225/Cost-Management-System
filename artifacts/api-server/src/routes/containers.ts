@@ -400,6 +400,14 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
     }
     const createBranchId = resolveCreateBranch(req, res);
     if (createBranchId == null) return;
+    if (parsedClientId) {
+      const [linkedClient] = await db.select({ branchId: clientsTable.branchId })
+        .from(clientsTable).where(eq(clientsTable.id, parsedClientId));
+      if (!linkedClient || linkedClient.branchId !== createBranchId) {
+        res.status(400).json({ error: "Selected client belongs to a different branch." });
+        return;
+      }
+    }
     const [container] = await db.insert(containersTable).values({
       customerName: resolvedCustomerName,
       containerNumber,
@@ -484,6 +492,13 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
       return;
     }
     const linkedClientId = clientId ? parseInt(clientId) : null;
+    if (linkedClientId) {
+      const [linkedClient] = await db.select({ branchId: clientsTable.branchId })
+        .from(clientsTable).where(eq(clientsTable.id, linkedClientId));
+      if (!linkedClient || linkedClient.branchId !== uploadBranchId) {
+        return res.status(400).json({ error: "Selected client belongs to a different branch." });
+      }
+    }
     let created = 0;
     const duplicates: string[] = [];
     const errors: string[] = [];

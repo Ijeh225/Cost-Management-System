@@ -710,6 +710,7 @@ export default function ContainerPaymentsPage() {
                             <div className="text-right shrink-0">
                               <p className="text-[11px] font-mono font-bold text-red-400">-{formatCurrency(p.amount)}</p>
                               <p className="text-[9px] text-muted-foreground">{formatDate(p.paidAt)}</p>
+                              <BranchChip branchId={p.branchId ?? null} className="mt-0.5" />
                             </div>
                           </div>
                           {p.reference && (

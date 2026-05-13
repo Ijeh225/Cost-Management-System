@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, customSectionsTable, customFieldsTable, customFieldValuesTable } from "@workspace/db";
+import { db, customSectionsTable, customFieldsTable, customFieldValuesTable, containersTable } from "@workspace/db";
 import { eq, asc, and, isNull, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
@@ -167,9 +167,11 @@ sectionsRouter.delete("/custom-sections/:id/fields/:fieldId", requireAuth, requi
 });
 
 // Get field values for a container
-sectionsRouter.get("/containers/:containerId/custom-values", requireAuth, async (req, res) => {
+sectionsRouter.get("/containers/:containerId/custom-values", requireAuth, async (req: AuthRequest, res) => {
   const containerId = parseInt(req.params.containerId);
   try {
+    const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, containerId));
+    if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
     const values = await db.select().from(customFieldValuesTable).where(eq(customFieldValuesTable.containerId, containerId));
     return res.json(values);
   } catch (err) {
@@ -185,7 +187,7 @@ sectionsRouter.post("/containers/:containerId/custom-values", requireAuth, async
   if (!Array.isArray(values)) return res.status(400).json({ error: "values array required" });
   try {
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, containerId));
-    if (!container) return res.status(404).json({ error: "Container not found" });
+    if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
     for (const { fieldId, value } of values) {
       const existing = await db.select().from(customFieldValuesTable)
         .where(and(eq(customFieldValuesTable.fieldId, fieldId), eq(customFieldValuesTable.containerId, containerId)));

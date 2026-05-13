@@ -49,7 +49,8 @@ export function AppSidebar() {
   const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { activeBranchId, setActiveBranch, branches } = useBranchScope();
-  const userBranchName = branches.find(b => b.id === user?.branchId)?.name
+  const userBranchName = user?.branchName
+    ?? branches.find(b => b.id === user?.branchId)?.name
     ?? (user?.branchId ? `Branch ${user.branchId}` : "");
 
   const { data: notifData } = useGetNotifications<NotificationsResponse>({
