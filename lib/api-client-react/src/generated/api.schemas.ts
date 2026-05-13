@@ -25,9 +25,14 @@ export interface LoginRequest {
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 export const UserRole = {
-  admin: "admin",
   super_admin: "super_admin",
+  admin: "admin",
   staff: "staff",
+  documentation_user: "documentation_user",
+  accounts_user: "accounts_user",
+  operations_user: "operations_user",
+  terminal_manager: "terminal_manager",
+  delivery_user: "delivery_user",
 } as const;
 
 export interface User {
@@ -37,6 +42,7 @@ export interface User {
   role: UserRole;
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
+  canUpload?: boolean;
   isActive: boolean;
   branchId?: number | null;
   branchName?: string | null;
@@ -90,16 +96,20 @@ export type ContainerStatus =
   (typeof ContainerStatus)[keyof typeof ContainerStatus];
 
 export const ContainerStatus = {
-  new_upload: "new_upload",
-  documentation_review: "documentation_review",
-  shipping_entry: "shipping_entry",
-  customs_entry: "customs_entry",
-  terminal_entry: "terminal_entry",
-  delivery_entry: "delivery_entry",
-  accounting_review: "accounting_review",
-  management_approval: "management_approval",
-  completed: "completed",
-  closed: "closed",
+  pending_verification:      "pending_verification",
+  registered:                "registered",
+  documentation:             "documentation",
+  duty_assessment:           "duty_assessment",
+  duty_payment:              "duty_payment",
+  transire_processing:       "transire_processing",
+  shipping_terminal_payment: "shipping_terminal_payment",
+  pull_out:                  "pull_out",
+  gate_in:                   "gate_in",
+  examination:               "examination",
+  final_release:             "final_release",
+  delivery:                  "delivery",
+  empty_return:              "empty_return",
+  closed:                    "closed",
 } as const;
 
 export interface Container {
@@ -119,14 +129,67 @@ export interface Container {
   clearingCharges: number;
   grossProfit: number;
   dutyNotPaid: number;
-  duty?: number;
-  dutyPaid?: number;
   clientId?: number | null;
   clientName?: string | null;
   deliveredAt?: string | null;
   deliveredAtEstimated?: boolean;
+  stageOwner?: string | null;
+  nextAction?: string | null;
+  nextActionDueDate?: string | null;
+  delayReason?: string | null;
+  paarOfficer?: string | null;
+  paarReleasedAt?: string | null;
+  paarDelayReason?: string | null;
+  eta?: string | null;
+  command?: string | null;
+  consignee?: string | null;
+  berthed?: boolean;
+  berthingConfirmedAt?: string | null;
+  berthingConfirmedById?: number | null;
+  berthingConfirmedByName?: string | null;
   createdAt: string;
   updatedAt: string;
+  expectedTransireDate?: string | null;
+  transireReleasedAt?: string | null;
+  transireDelayReason?: string | null;
+  transireFinalDate?: string | null;
+  expectedDoDate?: string | null;
+  doReleasedAt?: string | null;
+  doDelayReason?: string | null;
+  doFinalDate?: string | null;
+  expectedTdoDate?: string | null;
+  tdoReleasedAt?: string | null;
+  tdoDelayReason?: string | null;
+  tdoFinalDate?: string | null;
+  expectedPulloutDate?: string | null;
+  pulloutReleasedAt?: string | null;
+  pulloutDelayReason?: string | null;
+  pulloutFinalDate?: string | null;
+  expectedReleaseDate?: string | null;
+  releaseConfirmedAt?: string | null;
+  releaseDelayReason?: string | null;
+  releaseFinalDate?: string | null;
+  deliveryTime?: string | null;
+  deliveryLocation?: string | null;
+  truckNumber?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  dispatchOfficer?: string | null;
+  deliveryStatus?: string | null;
+  offloadingConfirmed?: boolean | null;
+  emptyReturnDueDate?: string | null;
+  emptyReturnDate?: string | null;
+  earlyStartAuthorized?: boolean;
+  earlyStartAuthorizedById?: number | null;
+  earlyStartAuthorizedAt?: string | null;
+  earlyStartReason?: string | null;
+  gateInDate?: string | null;
+  gateOutDate?: string | null;
+  emptyGateInDate?: string | null;
+  emptyGateOutDate?: string | null;
+  stageEnteredAt?: string | null;
+  lifespanDays?: number | null;
+  lifespanClosed?: boolean;
 }
 
 export interface ContainerListResponse {
@@ -140,12 +203,14 @@ export interface CreateContainerRequest {
   customerName: string;
   containerNumber: string;
   blNumber: string;
+  command: string;
   declaration?: string;
   size?: string;
   vessel?: string;
   clearingCharges?: number;
   clientId?: number | null;
-  branchId?: number;
+  eta?: string | null;
+  consignee?: string | null;
 }
 
 export interface UpdateContainerRequest {
@@ -159,16 +224,28 @@ export interface UpdateContainerRequest {
   assignedStaffId?: number | null;
   clearingCharges?: number;
   deliveredAt?: string | null;
+  stageOwner?: string | null;
+  nextAction?: string | null;
+  nextActionDueDate?: string | null;
+  delayReason?: string | null;
+  paarOfficer?: string | null;
+  paarReleasedAt?: string | null;
+  paarDelayReason?: string | null;
+  eta?: string | null;
+  consignee?: string | null;
 }
 
 export interface UploadRow {
   customerName: string;
   containerNumber: string;
   blNumber: string;
+  command: string;
   declaration?: string;
   size?: string;
   vessel?: string;
   clearingCharges?: number;
+  eta?: string;
+  consignee?: string;
 }
 
 export interface UploadContainersRequest {
@@ -195,6 +272,8 @@ export interface ShippingCharges {
   telexCharge?: number;
   shippingRunnings?: number;
   shippingDetentionToBePaidByCustomer?: number;
+  usdAmount?: number | null;
+  exchangeRate?: number | null;
 }
 
 export interface CustomsCharges {
@@ -215,6 +294,8 @@ export interface CustomsCharges {
   soncap?: number;
   alerts?: number;
   examinationBonus?: number;
+  usdAmount?: number | null;
+  exchangeRate?: number | null;
 }
 
 export interface TerminalCharges {
@@ -229,6 +310,8 @@ export interface TerminalCharges {
   tincanBond?: number;
   bond?: number;
   manifest?: number;
+  usdAmount?: number | null;
+  exchangeRate?: number | null;
 }
 
 export interface DeliveryCharges {
@@ -243,6 +326,8 @@ export interface DeliveryCharges {
   pulloutExpenses?: number;
   transferToIkorodu?: number;
   transportAllowance?: number;
+  usdAmount?: number | null;
+  exchangeRate?: number | null;
 }
 
 export interface OperationsCharges {
@@ -258,6 +343,8 @@ export interface OperationsCharges {
   transireRunnings?: number;
   officePtml?: number;
   freshPayment?: number;
+  usdAmount?: number | null;
+  exchangeRate?: number | null;
 }
 
 export interface ContainerCharges {
@@ -389,6 +476,8 @@ export interface DashboardStats {
   totalCollected?: number;
   totalOutstanding?: number;
   monthlyTrend?: DashboardStatsMonthlyTrendItem[];
+  containersInTerminal?: number;
+  containersInTerminalList?: { id: number; containerNumber: string; blNumber: string; customerName: string; size: string; command: string | null; status: string; gateInDate: string | null }[];
 }
 
 export type ApprovalQueueItemStatus =
@@ -703,6 +792,46 @@ export interface IntelligenceResponse {
   insights: IntelligenceInsight[];
 }
 
+export type ListContainersParams = {
+  search?: string;
+  status?: string;
+  berthed?: string;
+  command?: string;
+  dutyPaymentStatus?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type GetDeliveryAnalyticsParams = {
+  /**
+   * Filter deliveries from this date (inclusive)
+   */
+  from?: string;
+  /**
+   * Filter deliveries up to this date (inclusive)
+   */
+  to?: string;
+};
+
+export type GetContainerReportParams = {
+  status?: string;
+  from?: string;
+  to?: string;
+};
+
+export type ExportContainersCSVParams = {
+  status?: string;
+  from?: string;
+  to?: string;
+};
+
+export type GetCustomSectionsParams = {
+  /**
+   * Filter sections by container ID
+   */
+  containerId?: number;
+};
+
 export type DutyPaymentRowDutyStatus =
   (typeof DutyPaymentRowDutyStatus)[keyof typeof DutyPaymentRowDutyStatus];
 
@@ -750,48 +879,6 @@ export interface RecordDutyPaymentRequest {
   paymentDate?: string | null;
   notes?: string | null;
 }
-
-export type ListContainersParams = {
-  search?: string;
-  status?: string;
-  berthed?: string;
-  /**
-   * Filter by duty-payment status: paid, partial, unpaid, not_assessed
-   */
-  dutyPaymentStatus?: string;
-  page?: number;
-  limit?: number;
-};
-
-export type GetDeliveryAnalyticsParams = {
-  /**
-   * Filter deliveries from this date (inclusive)
-   */
-  from?: string;
-  /**
-   * Filter deliveries up to this date (inclusive)
-   */
-  to?: string;
-};
-
-export type GetContainerReportParams = {
-  status?: string;
-  from?: string;
-  to?: string;
-};
-
-export type ExportContainersCSVParams = {
-  status?: string;
-  from?: string;
-  to?: string;
-};
-
-export type GetCustomSectionsParams = {
-  /**
-   * Filter sections by container ID
-   */
-  containerId?: number;
-};
 
 export type ListDutyPaymentsParams = {
   /**

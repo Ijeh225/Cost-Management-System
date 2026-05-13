@@ -196,7 +196,9 @@ router.post("/users/:id/client-assignments", requireAdmin, async (req: AuthReque
       .from(userClientAssignmentsTable)
       .where(and(eq(userClientAssignmentsTable.userId, userId), eq(userClientAssignmentsTable.clientId, clientId)));
     if (existing.length > 0) { res.status(409).json({ error: "Already assigned" }); return; }
-    const [row] = await db.insert(userClientAssignmentsTable).values({ userId, clientId, branchId: req.user!.branchId }).returning();
+    const [client] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
+    if (!client) { res.status(404).json({ error: "Client not found" }); return; }
+    const [row] = await db.insert(userClientAssignmentsTable).values({ userId, clientId, branchId: client.branchId }).returning();
     res.status(201).json(row);
   } catch {
     res.status(500).json({ error: "Server error" });

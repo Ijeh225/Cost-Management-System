@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListClients, useCreateClient, useDeleteClient, useCreateClientsBulk,
-  type Client,
+  type Client, type CreateClientBody,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { motion } from "framer-motion";
@@ -137,11 +137,11 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
   const handleSubmit = async () => {
     if (!form.name.trim()) return;
     try {
-      const payload: any = {
+      const payload: CreateClientBody = {
         ...form,
         agreedClearingRate: form.agreedClearingRate !== "" ? parseFloat(form.agreedClearingRate) : undefined,
+        ...(isSuperAdmin && branchId != null ? { branchId } : {}),
       };
-      if (isSuperAdmin && branchId != null) payload.branchId = branchId;
       await createMutation.mutateAsync(payload);
       toast({ title: "Client created" });
       setForm({ name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "", agreedClearingRate: "" });

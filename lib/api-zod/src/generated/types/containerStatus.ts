@@ -10,14 +10,18 @@ export type ContainerStatus =
   (typeof ContainerStatus)[keyof typeof ContainerStatus];
 
 export const ContainerStatus = {
-  new_upload: "new_upload",
-  documentation_review: "documentation_review",
-  shipping_entry: "shipping_entry",
-  customs_entry: "customs_entry",
-  terminal_entry: "terminal_entry",
-  delivery_entry: "delivery_entry",
-  accounting_review: "accounting_review",
-  management_approval: "management_approval",
-  completed: "completed",
-  closed: "closed",
+  pending_verification:      "pending_verification",
+  registered:                "registered",
+  documentation:             "documentation",
+  duty_assessment:           "duty_assessment",
+  duty_payment:              "duty_payment",
+  transire_processing:       "transire_processing",
+  shipping_terminal_payment: "shipping_terminal_payment",
+  pull_out:                  "pull_out",
+  gate_in:                   "gate_in",
+  examination:               "examination",
+  final_release:             "final_release",
+  delivery:                  "delivery",
+  empty_return:              "empty_return",
+  closed:                    "closed",
 } as const;
