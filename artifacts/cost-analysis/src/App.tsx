@@ -149,9 +149,9 @@ function AdminGuard({ children }: { children: ReactNode }) {
 }
 
 function SuperAdminGuard({ children }: { children: ReactNode }) {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, isSuperAdmin } = useAuth();
   const [, setLocation] = useLocation();
-  const isSuperAdmin = user?.role === "admin" && user?.branchId === 1;
+  void user;
   const confirmed = useRef(false);
 
   if (isSuperAdmin && !confirmed.current) {
