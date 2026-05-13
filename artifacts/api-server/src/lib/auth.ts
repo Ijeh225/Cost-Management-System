@@ -131,9 +131,16 @@ export async function requireAdmin(req: AuthRequest, res: Response, next: NextFu
  */
 export function userCanAccessBranch(req: AuthRequest, branchId: number | null | undefined): boolean {
   if (!req.user) return false;
-  if (req.user.role === "super_admin") return true;
   if (branchId == null) return false;
-  return req.user.branchId === branchId;
+  // Task #74: enforce active branch scope on every access. For super-admin in
+  // "All Branches" mode (scope === null) any branch is allowed; otherwise the
+  // record's branchId must match the resolved scope.
+  const scope = getBranchScope(req);
+  if (scope === null) {
+    // Only super-admin can be in null scope (non-super-admin always has scope).
+    return req.user.role === "super_admin";
+  }
+  return scope === branchId;
 }
 
 /**
