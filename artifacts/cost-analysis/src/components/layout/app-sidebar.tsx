@@ -2,6 +2,11 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "./auth-provider";
 import { useTheme } from "./theme-provider";
+import { useBranchScope } from "./branch-provider";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { useGetNotifications, type NotificationsResponse } from "@workspace/api-client-react";
 import {
   Sidebar,
@@ -43,6 +48,9 @@ export function AppSidebar() {
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const { isAdmin, isSuperAdmin, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { activeBranchId, setActiveBranch, branches } = useBranchScope();
+  const userBranchName = branches.find(b => b.id === user?.branchId)?.name
+    ?? (user?.branchId ? `Branch ${user.branchId}` : "");
 
   const { data: notifData } = useGetNotifications<NotificationsResponse>({
     query: { refetchInterval: 60_000, enabled: !!isAuthenticated },
@@ -115,11 +123,36 @@ export function AppSidebar() {
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" className="border-r border-border/50">
-      <SidebarHeader className="h-16 flex items-center justify-center px-4 border-b border-border/50">
-        <div className="flex items-center gap-2 w-full font-bold text-lg text-primary tracking-tight overflow-hidden">
+      <SidebarHeader className="flex flex-col items-stretch px-4 py-3 gap-2 border-b border-border/50">
+        <div className="flex items-center gap-2 w-full font-bold text-lg text-primary tracking-tight overflow-hidden h-10">
           <Box className="w-6 h-6 shrink-0 text-primary" />
           <span className="truncate group-data-[collapsible=icon]:hidden">COST</span>
         </div>
+        {isAuthenticated && (
+          <div className="group-data-[collapsible=icon]:hidden">
+            {isSuperAdmin ? (
+              <Select
+                value={activeBranchId === "all" ? "all" : String(activeBranchId)}
+                onValueChange={(v) => setActiveBranch(v === "all" ? "all" : Number(v))}
+              >
+                <SelectTrigger className="h-8 text-xs" data-testid="branch-switcher">
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All branches</SelectItem>
+                  {branches.filter(b => b.isActive).map((b) => (
+                    <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Badge variant="outline" className="w-full justify-center text-xs font-medium" data-testid="branch-badge">
+                <Building2 className="w-3 h-3 mr-1" />
+                {userBranchName}
+              </Badge>
+            )}
+          </div>
+        )}
       </SidebarHeader>
 
       <SidebarContent className="py-4">

@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { db, sectionApprovalsTable, containersTable, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
-import { requireAdmin } from "../lib/auth.js";
+import { eq, and } from "drizzle-orm";
+import { requireAdmin, AuthRequest, getBranchScope } from "../lib/auth.js";
 
 const router = Router();
 
-router.get("/approvals", requireAdmin, async (_req, res) => {
+router.get("/approvals", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const rows = await db.select({
+    const branchScope = getBranchScope(req);
+    const baseQuery = db.select({
       id: sectionApprovalsTable.id,
       containerId: sectionApprovalsTable.containerId,
       section: sectionApprovalsTable.section,
@@ -21,7 +22,10 @@ router.get("/approvals", requireAdmin, async (_req, res) => {
     })
       .from(sectionApprovalsTable)
       .innerJoin(containersTable, eq(sectionApprovalsTable.containerId, containersTable.id))
-      .orderBy(sectionApprovalsTable.updatedAt);
+      .$dynamic();
+    const rows = await (branchScope !== null
+      ? baseQuery.where(eq(containersTable.branchId, branchScope))
+      : baseQuery).orderBy(sectionApprovalsTable.updatedAt);
 
     const submitterIds = [...new Set(rows.map(r => r.submittedById).filter(Boolean))] as number[];
     const nameMap: Record<number, string> = {};

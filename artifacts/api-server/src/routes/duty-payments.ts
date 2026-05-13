@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, containersTable, customsChargesTable, auditLogTable } from "@workspace/db";
 import { eq, and, gte, lte, ilike, or, desc, sql, type SQL } from "drizzle-orm";
-import { requireAuth, AuthRequest } from "../lib/auth.js";
+import { requireAuth, AuthRequest, getBranchScope } from "../lib/auth.js";
 
 export const dutyPaymentsRouter = Router();
 
@@ -76,6 +76,8 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
     }
     if (dateFromObj) conds.push(gte(containersTable.createdAt, dateFromObj));
     if (dateToObj)   conds.push(lte(containersTable.createdAt, dateToObj));
+    const branchScope = getBranchScope(req);
+    if (branchScope !== null) conds.push(eq(containersTable.branchId, branchScope) as SQL);
     const whereClause: SQL | undefined =
       conds.length === 0 ? undefined : (conds.length === 1 ? conds[0] : and(...conds));
 

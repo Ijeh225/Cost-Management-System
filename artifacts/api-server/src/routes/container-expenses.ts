@@ -6,7 +6,7 @@ import {
   deliveryChargesTable, operationsChargesTable, containerExtraChargesTable,
 } from "@workspace/db";
 import { eq, desc, inArray, sql } from "drizzle-orm";
-import { requireAdmin, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
+import { requireAdmin, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
 export const containerExpensesRouter = Router();
 
@@ -54,9 +54,9 @@ async function getSectionChargedTotals(containerId: number): Promise<Record<stri
 
 containerExpensesRouter.get("/container-expense-categories", requireAdmin, async (_req, res) => {
   try {
-    const u = (_req as AuthRequest).user!;
+    const branchScope = getBranchScope(_req as AuthRequest);
     const rows = await db.select().from(containerExpenseCategoriesTable)
-      .where(u.role === "super_admin" ? undefined : eq(containerExpenseCategoriesTable.branchId, u.branchId))
+      .where(branchScope !== null ? eq(containerExpenseCategoriesTable.branchId, branchScope) : undefined)
       .orderBy(containerExpenseCategoriesTable.name);
     res.json(rows.map(r => ({
       id: r.id,
@@ -77,9 +77,11 @@ containerExpensesRouter.post("/container-expense-categories", requireAdmin, asyn
     if (!name || typeof name !== "string" || !name.trim()) {
       res.status(400).json({ error: "Category name is required" }); return;
     }
+    const createBranchId = resolveCreateBranch(req, res);
+    if (createBranchId == null) return;
     const [row] = await db.insert(containerExpenseCategoriesTable).values({
       name: name.trim(), isDefault: false, createdBy: req.user?.id ?? null,
-      branchId: req.user!.branchId,
+      branchId: createBranchId,
     }).returning();
     res.status(201).json({
       id: row.id, name: row.name, isDefault: row.isDefault,

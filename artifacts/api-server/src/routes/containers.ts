@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { requireAuth, requireAdmin, AuthRequest, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
 
@@ -227,6 +227,12 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
 
     const conditions: any[] = [];
 
+    // Branch scoping (Task #74)
+    const branchScope = getBranchScope(req);
+    if (branchScope !== null) {
+      conditions.push(eq(containersTable.branchId, branchScope));
+    }
+
     // If non-admin user has client assignments, restrict to assigned clients only
     if (req.user && req.user.role !== "admin" && req.user.role !== "super_admin") {
       const assignments = await db
@@ -391,6 +397,8 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       res.status(400).json({ error: "customerName is required (or pick a client to auto-fill)" });
       return;
     }
+    const createBranchId = resolveCreateBranch(req, res);
+    if (createBranchId == null) return;
     const [container] = await db.insert(containersTable).values({
       customerName: resolvedCustomerName,
       containerNumber,
@@ -403,9 +411,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       clientId: parsedClientId,
       eta: eta ? new Date(eta) : null,
       consignee: consignee || null,
-      branchId: req.user!.role === "super_admin" && req.body.branchId
-        ? Number(req.body.branchId)
-        : req.user!.branchId,
+      branchId: createBranchId,
     }).returning();
     await getOrCreateCharges(container.id);
     // Notify: new job created
@@ -462,6 +468,8 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
   if (!req.user!.canUpload) {
     return res.status(403).json({ error: "You don't have permission to upload data." });
   }
+  const uploadBranchId = resolveCreateBranch(req, res);
+  if (uploadBranchId == null) return;
   try {
     const { rows, clientId } = req.body;
     if (!Array.isArray(rows)) {
@@ -515,7 +523,7 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
           clientId: linkedClientId,
           eta: etaDate,
           consignee: row.consignee ?? null,
-          branchId: req.user!.branchId,
+          branchId: uploadBranchId,
         }).returning();
         await getOrCreateCharges(container.id);
         created++;
@@ -1350,11 +1358,17 @@ router.post("/containers/:id/empty-gate-out", requireAuth, async (req: AuthReque
   }
 });
 
-router.get("/containers/:id", requireAuth, async (req, res) => {
+router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const [c] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!c) {
+      res.status(404).json({ error: "Container not found" });
+      return;
+    }
+    // Branch scoping (Task #74) — return 404, not 403, on cross-branch reads
+    const branchScope = getBranchScope(req);
+    if (branchScope !== null && c.branchId !== branchScope) {
       res.status(404).json({ error: "Container not found" });
       return;
     }

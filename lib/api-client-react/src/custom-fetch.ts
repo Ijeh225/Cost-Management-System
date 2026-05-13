@@ -301,6 +301,22 @@ export async function customFetch<T = unknown>(
     headers.set("accept", DEFAULT_JSON_ACCEPT);
   }
 
+  // Branch scoping (Task #74): inject X-Branch-Id from localStorage when set.
+  // Super-admin's branch switcher writes "all" or a numeric id under
+  // `cost_analysis_active_branch`. We forward only numeric values; "all" /
+  // missing means no header (server falls back to user's own branch, or
+  // unfiltered for super-admin).
+  if (!headers.has("x-branch-id") && typeof window !== "undefined") {
+    try {
+      const v = window.localStorage?.getItem("cost_analysis_active_branch");
+      if (v && v !== "all" && /^\d+$/.test(v)) {
+        headers.set("x-branch-id", v);
+      }
+    } catch {
+      /* ignore storage access errors (e.g. private mode) */
+    }
+  }
+
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });

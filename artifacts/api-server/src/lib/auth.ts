@@ -136,6 +136,41 @@ export function userCanAccessBranch(req: AuthRequest, branchId: number | null | 
   return req.user.branchId === branchId;
 }
 
+/**
+ * Resolve the active branch scope for a request (Task #74).
+ *
+ * - Non super-admin: always returns the user's own branchId.
+ * - Super admin: reads the X-Branch-Id header.
+ *     - missing / "" / "all" → null  (All-Branches mode, no filter)
+ *     - numeric value        → that branch id
+ *
+ * Returns null only when the super admin is in All-Branches mode.
+ */
+export function getBranchScope(req: AuthRequest): number | null {
+  if (!req.user) return null;
+  if (req.user.role !== "super_admin") return req.user.branchId;
+  const raw = req.header("x-branch-id") ?? req.header("X-Branch-Id");
+  if (!raw) return null;
+  const trimmed = String(raw).trim();
+  if (!trimmed || trimmed.toLowerCase() === "all") return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * Used by POST/create endpoints. If the resolved scope is null (super admin
+ * in All-Branches mode), responds with 400 and returns false. Otherwise
+ * returns the resolved branch id.
+ */
+export function resolveCreateBranch(req: AuthRequest, res: Response): number | null {
+  const scope = getBranchScope(req);
+  if (scope == null) {
+    res.status(400).json({ error: "Select a specific branch to create records." });
+    return null;
+  }
+  return scope;
+}
+
 export async function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {
     if (req.user?.role !== "super_admin") {

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable, systemAlertsHistoryTable } from "@workspace/db";
-import { eq, lt, sql, max, isNotNull, desc, inArray, notInArray } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { eq, lt, sql, max, isNotNull, desc, inArray, notInArray, and } from "drizzle-orm";
+import { requireAuth, requireAdmin, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery } from "../lib/calculations.js";
 
 export const notificationsRouter = Router();
@@ -80,8 +80,10 @@ async function getAgingThresholds() {
   };
 }
 
-async function computeAlerts(userId?: number, role?: string) {
-  const allContainers = await db.select().from(containersTable);
+async function computeAlerts(userId?: number, role?: string, branchScope?: number | null) {
+  const allContainers = branchScope != null
+    ? await db.select().from(containersTable).where(eq(containersTable.branchId, branchScope))
+    : await db.select().from(containersTable);
   if (allContainers.length === 0) return [];
 
   const allShipping = await db.select().from(shippingChargesTable);
@@ -271,13 +273,22 @@ async function computeAlerts(userId?: number, role?: string) {
     });
   }
 
-  const overdueTasks = await db.select({ id: containerTasksTable.id, containerId: containerTasksTable.containerId, title: containerTasksTable.title })
-    .from(containerTasksTable).where(lt(containerTasksTable.dueDate, new Date()));
+  // Branch isolation (Task #74): scope tasks/approvals to the same containers
+  // already filtered above. Without this, a branch-scoped user would receive
+  // overdue-task and stale-approval alerts derived from other branches.
+  const scopedContainerIds = allContainers.map(c => c.id);
+  const overdueTasks = scopedContainerIds.length > 0
+    ? await db.select({ id: containerTasksTable.id, containerId: containerTasksTable.containerId, title: containerTasksTable.title })
+        .from(containerTasksTable)
+        .where(and(lt(containerTasksTable.dueDate, new Date()), inArray(containerTasksTable.containerId, scopedContainerIds)))
+    : [];
   for (const t of overdueTasks) {
     alerts.push({ alertKey: `overdue_task_${t.id}`, type: "overdue_task", severity: "warning", message: `Overdue task: "${t.title}"`, containerId: t.containerId ?? undefined, generatedAt: now });
   }
 
-  const allApprovals = await db.select().from(sectionApprovalsTable);
+  const allApprovals = scopedContainerIds.length > 0
+    ? await db.select().from(sectionApprovalsTable).where(inArray(sectionApprovalsTable.containerId, scopedContainerIds))
+    : [];
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
   const stalePending = allApprovals.filter(a => a.status === "submitted" && a.submittedAt && new Date(a.submittedAt) < threeDaysAgo);
   if (stalePending.length > 0) {
@@ -321,9 +332,13 @@ notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
   try {
     const userId = (req as AuthRequest).user!.id;
     const role   = (req as AuthRequest).user!.role;
-    const branchId = (req as AuthRequest).user!.branchId;
+    const branchScope = getBranchScope(req as AuthRequest);
+    // Persist alerts under the active scope so /notifications/history filtering
+    // returns the correct slice (Task #74). Super-admin in "All" mode falls
+    // back to user.branchId so the row still satisfies the NOT NULL column.
+    const persistBranchId = branchScope ?? (req as AuthRequest).user!.branchId;
     // Always compute against ALL alerts (no role filter) for history persistence
-    const allAlerts = await computeAlerts(userId, role);
+    const allAlerts = await computeAlerts(userId, role, branchScope);
     const now = new Date();
 
     // Persist every active alert into history (upsert: first_seen_at stays, last_seen_at updated)
@@ -332,7 +347,7 @@ notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
         await db.insert(systemAlertsHistoryTable)
           .values(allAlerts.map(a => ({
             alertKey: a.alertKey,
-            branchId,
+            branchId: persistBranchId,
             type: a.type,
             severity: a.severity,
             message: a.message,
@@ -372,14 +387,14 @@ notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
 });
 
 // Full historical log of all system alerts ever detected
-notificationsRouter.get("/notifications/history", requireAuth, async (req, res) => {
+notificationsRouter.get("/notifications/history", requireAuth, async (req: AuthRequest, res) => {
   try {
     const staleThresholdMs = 2 * 60 * 60 * 1000; // 2 hours — alert not seen recently = resolved
-    const rows = await db
-      .select()
-      .from(systemAlertsHistoryTable)
-      .orderBy(desc(systemAlertsHistoryTable.lastSeenAt))
-      .limit(500);
+    const branchScope = getBranchScope(req);
+    const baseQ = db.select().from(systemAlertsHistoryTable).$dynamic();
+    const rows = await (branchScope !== null
+      ? baseQ.where(eq(systemAlertsHistoryTable.branchId, branchScope))
+      : baseQ).orderBy(desc(systemAlertsHistoryTable.lastSeenAt)).limit(500);
 
     const now = Date.now();
     const alerts = rows.map(r => ({
@@ -426,7 +441,8 @@ notificationsRouter.post("/notifications/read-all", requireAuth, async (req, res
     const userId = (req as AuthRequest).user!.id;
     const role   = (req as AuthRequest).user!.role;
     const branchId = (req as AuthRequest).user!.branchId;
-    const alerts = await computeAlerts(userId, role);
+    const branchScope = getBranchScope(req as AuthRequest);
+    const alerts = await computeAlerts(userId, role, branchScope);
     if (alerts.length === 0) return res.json({ success: true });
 
     const now = new Date();

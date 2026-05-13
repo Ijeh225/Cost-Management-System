@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, sectionApprovalsTable, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerTasksTable } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
-import { requireAuth, AuthRequest } from "../lib/auth.js";
+import { eq, inArray, and } from "drizzle-orm";
+import { requireAuth, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
 const router = Router();
@@ -53,10 +53,16 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
       }
     }
 
-    // Get containers assigned to this user
-    const assignedContainerRows = (user.role === "admin" || user.role === "super_admin")
-      ? await db.select().from(containersTable).limit(50)
-      : await db.select().from(containersTable).where(eq(containersTable.assignedStaffId, user.id));
+    // Get containers assigned to this user (scoped by branch — Task #74)
+    const branchScope = getBranchScope(req);
+    const isElevated = user.role === "admin" || user.role === "super_admin";
+    const conds: any[] = [];
+    if (!isElevated) conds.push(eq(containersTable.assignedStaffId, user.id));
+    if (branchScope !== null) conds.push(eq(containersTable.branchId, branchScope));
+    const whereExpr = conds.length === 0 ? undefined : (conds.length === 1 ? conds[0] : and(...conds));
+    const baseSel = db.select().from(containersTable).$dynamic();
+    const filtered = whereExpr ? baseSel.where(whereExpr) : baseSel;
+    const assignedContainerRows = isElevated ? await filtered.limit(50) : await filtered;
 
     const containerIds = assignedContainerRows.map(c => c.id);
     const staffMap: Record<number, string> = {};

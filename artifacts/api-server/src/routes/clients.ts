@@ -6,7 +6,7 @@ import {
   usersTable, banksTable,
 } from "@workspace/db";
 import { eq, desc, sum, inArray, gte, and, isNull, isNotNull, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, verifyPassword, userCanAccessBranch } from "../lib/auth.js";
+import { requireAuth, requireAdmin, AuthRequest, verifyPassword, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
 export const clientsRouter = Router();
@@ -14,7 +14,10 @@ export const clientsRouter = Router();
 clientsRouter.get("/clients", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { search } = req.query as Record<string, string>;
-    let rows = await db.select().from(clientsTable).orderBy(desc(clientsTable.createdAt));
+    const branchScope = getBranchScope(req);
+    let rows = branchScope !== null
+      ? await db.select().from(clientsTable).where(eq(clientsTable.branchId, branchScope)).orderBy(desc(clientsTable.createdAt))
+      : await db.select().from(clientsTable).orderBy(desc(clientsTable.createdAt));
     if (search) {
       const term = search.toLowerCase();
       rows = rows.filter(c =>
@@ -66,12 +69,12 @@ clientsRouter.post("/clients", requireAuth, async (req: AuthRequest, res) => {
       if (isNaN(parsed) || parsed < 0) return res.status(400).json({ error: "Agreed clearing rate must be a non-negative number" });
       rate = String(parsed);
     }
+    const createBranchId = resolveCreateBranch(req, res);
+    if (createBranchId == null) return;
     const [client] = await db.insert(clientsTable).values({
       name: name.trim(), contactName, contactEmail, contactPhone, address, notes,
       agreedClearingRate: rate,
-      branchId: req.user!.role === "super_admin" && req.body.branchId
-        ? Number(req.body.branchId)
-        : req.user!.branchId,
+      branchId: createBranchId,
     }).returning();
     return res.status(201).json({
       ...client,
@@ -90,6 +93,10 @@ clientsRouter.get("/clients/:id", requireAuth, async (req: AuthRequest, res) => 
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
     const [raw] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
     if (!raw) return res.status(404).json({ error: "Client not found" });
+    const branchScope = getBranchScope(req);
+    if (branchScope !== null && raw.branchId !== branchScope) {
+      return res.status(404).json({ error: "Client not found" });
+    }
     const client = {
       ...raw,
       agreedClearingRate: raw.agreedClearingRate != null ? parseFloat(raw.agreedClearingRate) : null,

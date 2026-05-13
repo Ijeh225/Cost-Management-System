@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable } from "@workspace/db";
-import { eq, lt } from "drizzle-orm";
-import { requireAuth, AuthRequest } from "../lib/auth.js";
+import { eq, lt, inArray } from "drizzle-orm";
+import { requireAuth, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery, sumCustoms } from "../lib/calculations.js";
 
 export const intelligenceRouter = Router();
@@ -12,14 +12,21 @@ const NEGATIVE_PROFIT_THRESHOLD = 0;
 
 intelligenceRouter.get("/intelligence/alerts", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const allContainers = await db.select().from(containersTable);
+    const branchScope = getBranchScope(req);
+    const allContainers = branchScope !== null
+      ? await db.select().from(containersTable).where(eq(containersTable.branchId, branchScope))
+      : await db.select().from(containersTable);
     if (allContainers.length === 0) return res.json({ alerts: [], insights: [] });
+    const containerIds = allContainers.map(c => c.id);
 
-    const allShipping   = await db.select().from(shippingChargesTable);
-    const allCustoms    = await db.select().from(customsChargesTable);
-    const allTerminal   = await db.select().from(terminalChargesTable);
-    const allDelivery   = await db.select().from(deliveryChargesTable);
-    const allOps        = await db.select().from(operationsChargesTable);
+    const filterByContainer = (table: any) => containerIds.length > 0
+      ? db.select().from(table).where(inArray(table.containerId, containerIds))
+      : Promise.resolve([] as any[]);
+    const allShipping   = await filterByContainer(shippingChargesTable);
+    const allCustoms    = await filterByContainer(customsChargesTable);
+    const allTerminal   = await filterByContainer(terminalChargesTable);
+    const allDelivery   = await filterByContainer(deliveryChargesTable);
+    const allOps        = await filterByContainer(operationsChargesTable);
 
     const idx = (arr: any[]) => { const m: Record<number, any> = {}; arr.forEach(r => { m[r.containerId] = r; }); return m; };
     const sMap = idx(allShipping); const cMap = idx(allCustoms); const tMap = idx(allTerminal);
@@ -82,18 +89,23 @@ intelligenceRouter.get("/intelligence/alerts", requireAuth, async (req: AuthRequ
       }
     }
 
-    // Overdue tasks
-    const overdueTasks = await db.select({ containerId: containerTasksTable.containerId, title: containerTasksTable.title })
-      .from(containerTasksTable)
-      .where(lt(containerTasksTable.dueDate, new Date()));
+    // Overdue tasks (scoped to branch via container ids — Task #74)
+    const overdueTasks = containerIds.length > 0
+      ? await db.select({ containerId: containerTasksTable.containerId, title: containerTasksTable.title })
+          .from(containerTasksTable)
+          .where(lt(containerTasksTable.dueDate, new Date()))
+          .then(rows => rows.filter(r => r.containerId != null && containerIds.includes(r.containerId)))
+      : [];
     for (const t of overdueTasks) {
       if (["pending", "in_progress"].includes(t.title)) {
         alerts.push({ type: "overdue_task", severity: "warning", message: `Overdue task on container #${t.containerId}: ${t.title}` });
       }
     }
 
-    // Pending approvals > 3 days
-    const allApprovals = await db.select().from(sectionApprovalsTable);
+    // Pending approvals > 3 days (scoped to branch — Task #74)
+    const allApprovals = containerIds.length > 0
+      ? await db.select().from(sectionApprovalsTable).where(inArray(sectionApprovalsTable.containerId, containerIds))
+      : [];
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
     const stalePending = allApprovals.filter(a => a.status === "submitted" && a.submittedAt && new Date(a.submittedAt) < threeDaysAgo);
     if (stalePending.length > 0) {

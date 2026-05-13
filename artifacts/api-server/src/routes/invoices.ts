@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest } from "../lib/auth.js";
+import { requireAuth, requireAdmin, AuthRequest, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio, resolveBranchWhatsAppFrom } from "../lib/whatsapp.js";
 
 const router = Router();
@@ -158,9 +158,10 @@ async function formatInvoice(inv: any, payments: any[], items?: any[], creditNot
   };
 }
 
-router.get("/invoices", requireAuth, async (req, res) => {
+router.get("/invoices", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const rows = await db
+    const branchScope = getBranchScope(req);
+    const baseQuery = db
       .select({
         id: invoicesTable.id,
         invoiceNumber: invoicesTable.invoiceNumber,
@@ -182,7 +183,10 @@ router.get("/invoices", requireAuth, async (req, res) => {
       .from(invoicesTable)
       .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
-      .orderBy(desc(invoicesTable.createdAt));
+      .$dynamic();
+    const rows = await (branchScope !== null
+      ? baseQuery.where(eq(invoicesTable.branchId, branchScope))
+      : baseQuery).orderBy(desc(invoicesTable.createdAt));
 
     const allPayments = await db.select().from(invoicePaymentsTable);
     const paymentsByInvoice = new Map<number, typeof allPayments>();
@@ -264,6 +268,15 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
     const singleContainerId = containers.length === 1 ? containers[0].id : null;
     const containerMap = Object.fromEntries(containers.map(c => [c.id, c]));
 
+    const createBranchId = resolveCreateBranch(req, res);
+    if (createBranchId == null) return;
+
+    // Cross-branch link guard: containers must belong to the active branch.
+    const wrongBranch = containers.find(c => c.branchId !== createBranchId);
+    if (wrongBranch) {
+      return res.status(400).json({ error: "All containers must belong to the active branch." });
+    }
+
     const { inv, items } = await db.transaction(async (tx) => {
       const [inv] = await tx.insert(invoicesTable).values({
         containerId: singleContainerId,
@@ -275,9 +288,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
         total: String(total),
         dueDate: dueDate ?? null,
         notes: notes ?? "",
-        branchId: req.user!.role === "super_admin" && req.body.branchId
-          ? Number(req.body.branchId)
-          : req.user!.branchId,
+        branchId: createBranchId,
       }).returning();
 
       const itemRows = containers.map((c, idx) => ({
@@ -327,7 +338,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
+router.get("/invoices/accounts-receivable", requireAuth, async (req: AuthRequest, res) => {
   try {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -336,7 +347,9 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
     const fromDate = from ? new Date(from) : null;
     const toDate = to ? new Date(to + "T23:59:59") : null;
 
+    const branchScope = getBranchScope(req);
     const conditions: any[] = [ne(invoicesTable.status, "written_off")];
+    if (branchScope !== null) conditions.push(eq(invoicesTable.branchId, branchScope));
     if (fromDate) conditions.push(gte(invoicesTable.createdAt, fromDate));
     if (toDate) conditions.push(lte(invoicesTable.createdAt, toDate));
 
@@ -366,10 +379,14 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
         }).from(invoicePaymentsTable).where(inArray(invoicePaymentsTable.invoiceId, invoiceIds))
       : [];
 
+    // Branch-scoped this-month collections (Task #74).
+    const monthPaymentConds: any[] = [gte(invoicePaymentsTable.paidAt, monthStart)];
+    if (branchScope !== null) monthPaymentConds.push(eq(invoicePaymentsTable.branchId, branchScope));
     const allPaymentsForMonth = await db.select({
       amount: invoicePaymentsTable.amount,
       paidAt: invoicePaymentsTable.paidAt,
-    }).from(invoicePaymentsTable).where(gte(invoicePaymentsTable.paidAt, monthStart));
+    }).from(invoicePaymentsTable)
+      .where(monthPaymentConds.length === 1 ? monthPaymentConds[0] : and(...monthPaymentConds));
     const collectedThisMonth = allPaymentsForMonth.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
 
     const paymentsByInvoice = new Map<number, typeof allPayments>();
@@ -459,14 +476,15 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
       }
     }
 
-    // Fetch unallocated deposits per client (for informational display on AR)
-    const allDeposits = await db
-      .select({
-        clientId: clientDepositsTable.clientId,
-        amount: clientDepositsTable.amount,
-        allocatedAmount: clientDepositsTable.allocatedAmount,
-      })
-      .from(clientDepositsTable);
+    // Fetch unallocated deposits per client (branch-scoped — Task #74)
+    const depositsBase = db.select({
+      clientId: clientDepositsTable.clientId,
+      amount: clientDepositsTable.amount,
+      allocatedAmount: clientDepositsTable.allocatedAmount,
+    }).from(clientDepositsTable).$dynamic();
+    const allDeposits = await (branchScope !== null
+      ? depositsBase.where(eq(clientDepositsTable.branchId, branchScope))
+      : depositsBase);
 
     const unallocatedByClient = new Map<number, number>();
     for (const d of allDeposits) {
@@ -477,10 +495,12 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
       }
     }
 
-    // Fetch credit balances per client
-    const allClientRows = await db
-      .select({ id: clientsTable.id, creditBalance: clientsTable.creditBalance })
-      .from(clientsTable);
+    // Fetch credit balances per client (branch-scoped — Task #74)
+    const clientsBase = db.select({ id: clientsTable.id, creditBalance: clientsTable.creditBalance })
+      .from(clientsTable).$dynamic();
+    const allClientRows = await (branchScope !== null
+      ? clientsBase.where(eq(clientsTable.branchId, branchScope))
+      : clientsBase);
     const creditBalanceMap = new Map<number, number>();
     for (const c of allClientRows) {
       creditBalanceMap.set(c.id, parseFloat(c.creditBalance ?? "0"));
@@ -497,7 +517,9 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
     const totalUnallocatedDeposits = clients.reduce((s, c) => s + c.unallocatedDeposits, 0);
     const totalCreditBalance = clients.reduce((s, c) => s + c.creditBalance, 0);
 
-    // Fetch written-off total for informational display (excluded from active AR)
+    // Fetch written-off total for informational display (branch-scoped — Task #74)
+    const writtenOffConds: any[] = [eq(invoicesTable.status, "written_off")];
+    if (branchScope !== null) writtenOffConds.push(eq(invoicesTable.branchId, branchScope));
     const writtenOffRows = await db
       .select({
         id: invoicesTable.id,
@@ -510,7 +532,7 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
       })
       .from(invoicesTable)
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
-      .where(eq(invoicesTable.status, "written_off"))
+      .where(writtenOffConds.length === 1 ? writtenOffConds[0] : and(...writtenOffConds))
       .orderBy(desc(invoicesTable.createdAt));
     // Use the stored writtenOffAmount (outstanding at write-off time); fall back to total for legacy rows
     const totalWrittenOff = writtenOffRows.reduce((s, r) =>
@@ -547,7 +569,7 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/invoices/:id", requireAuth, async (req, res) => {
+router.get("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -570,6 +592,7 @@ router.get("/invoices/:id", requireAuth, async (req, res) => {
         notes: invoicesTable.notes,
         createdAt: invoicesTable.createdAt,
         updatedAt: invoicesTable.updatedAt,
+        branchId: invoicesTable.branchId,
       })
       .from(invoicesTable)
       .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
@@ -577,6 +600,10 @@ router.get("/invoices/:id", requireAuth, async (req, res) => {
       .where(eq(invoicesTable.id, id));
 
     if (!row) return res.status(404).json({ error: "Invoice not found" });
+    const branchScope = getBranchScope(req);
+    if (branchScope !== null && row.branchId !== branchScope) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
 
     const payments = await fetchPaymentsWithBank(id);
     const itemsMap = await fetchItemsForInvoices([id]);

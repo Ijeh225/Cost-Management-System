@@ -44,9 +44,23 @@ const formatUser = (u: UserRow) => ({
   createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
 });
 
-router.get("/users", requireAdmin, async (_req, res) => {
+router.get("/users", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const users = await db.select(userFields).from(usersTable).orderBy(usersTable.createdAt);
+    // Branch isolation (Task #74): non-super-admins see users only in their own branch.
+    // Super-admin: respects X-Branch-Id (null = all branches).
+    const u = req.user!;
+    const branchScope = u.role === "super_admin"
+      ? (() => {
+          const raw = (req.headers["x-branch-id"] as string | undefined)?.trim();
+          if (!raw || raw.toLowerCase() === "all") return null;
+          const n = Number(raw);
+          return Number.isFinite(n) ? n : null;
+        })()
+      : u.branchId;
+    const baseQ = db.select(userFields).from(usersTable).$dynamic();
+    const users = await (branchScope !== null
+      ? baseQ.where(eq(usersTable.branchId, branchScope))
+      : baseQ).orderBy(usersTable.createdAt);
     res.json(users.map(formatUser));
   } catch (err) {
     console.error(err);
