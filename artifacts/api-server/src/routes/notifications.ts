@@ -341,21 +341,40 @@ notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
     const allAlerts = await computeAlerts(userId, role, branchScope);
     const now = new Date();
 
-    // Persist every active alert into history (upsert: first_seen_at stays, last_seen_at updated)
+    // Persist every active alert into history (upsert: first_seen_at stays, last_seen_at updated).
+    // Task #74: each row's branchId must reflect the alert's true branch — never bucket
+    // cross-branch alerts under the super-admin's home branch.
     if (allAlerts.length > 0) {
       try {
+        const alertContainerIds = Array.from(new Set(allAlerts.map(a => a.containerId).filter((x): x is number => x != null)));
+        const containerBranchMap = new Map<number, number>();
+        if (alertContainerIds.length > 0) {
+          const rows = await db.select({ id: containersTable.id, branchId: containersTable.branchId })
+            .from(containersTable).where(inArray(containersTable.id, alertContainerIds));
+          for (const r of rows) containerBranchMap.set(r.id, r.branchId);
+        }
+        const valuesToInsert = allAlerts
+          .map(a => {
+            const trueBranch = a.containerId != null ? containerBranchMap.get(a.containerId) : undefined;
+            const branchId = trueBranch ?? branchScope ?? null;
+            return branchId == null ? null : {
+              alertKey: a.alertKey,
+              branchId,
+              type: a.type,
+              severity: a.severity,
+              message: a.message,
+              containerId: a.containerId ?? null,
+              containerNumber: a.containerNumber ?? null,
+              firstSeenAt: now,
+              lastSeenAt: now,
+            };
+          })
+          .filter((v): v is NonNullable<typeof v> => v !== null);
+        if (valuesToInsert.length === 0) {
+          // nothing safe to persist (e.g. super-admin all-mode aggregate-only alerts)
+        } else {
         await db.insert(systemAlertsHistoryTable)
-          .values(allAlerts.map(a => ({
-            alertKey: a.alertKey,
-            branchId: persistBranchId,
-            type: a.type,
-            severity: a.severity,
-            message: a.message,
-            containerId: a.containerId ?? null,
-            containerNumber: a.containerNumber ?? null,
-            firstSeenAt: now,
-            lastSeenAt: now,
-          })))
+          .values(valuesToInsert)
           .onConflictDoUpdate({
             target: systemAlertsHistoryTable.alertKey,
             set: {
@@ -365,6 +384,7 @@ notificationsRouter.get("/notifications", requireAuth, async (req, res) => {
               severity: sql`EXCLUDED.severity`,
             },
           });
+        }
       } catch { /* non-fatal — history write should not break the response */ }
     }
 
