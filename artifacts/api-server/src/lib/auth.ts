@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { Request, Response, NextFunction } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, branchesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -100,6 +100,15 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
     if (user.role !== "super_admin" && (user.branchId == null || !Number.isFinite(user.branchId))) {
       res.status(403).json({ error: "Account is not assigned to a branch. Contact a super admin." });
       return;
+    }
+    // Task #75: reject sessions for non-super-admin users whose branch was
+    // deactivated after they logged in.
+    if (user.role !== "super_admin") {
+      const [b] = await db.select({ isActive: branchesTable.isActive }).from(branchesTable).where(eq(branchesTable.id, user.branchId)).limit(1);
+      if (!b || !b.isActive) {
+        res.status(401).json({ error: "Your branch is currently disabled. Please contact an administrator." });
+        return;
+      }
     }
     if (user.role === "super_admin") {
       const hdr = req.header("x-branch-id") ?? req.header("X-Branch-Id");

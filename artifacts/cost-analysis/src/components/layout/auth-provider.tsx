@@ -151,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const role: string = (effectiveUser as any)?.role ?? "";
+  const role: string = effectiveUser?.role ?? "";
   const roles: string[] = (effectiveUser as any)?.roles ?? [role];
   const hasRole = (r: string) => roles.includes(r);
 
