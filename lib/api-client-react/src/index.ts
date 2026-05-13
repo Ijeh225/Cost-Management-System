@@ -1,5 +1,7 @@
 export * from "./generated/api";
 export * from "./generated/api.schemas";
+export { customFetch, ApiError, ResponseParseError } from "./custom-fetch";
+export type { CustomFetchOptions, ErrorType, BodyType } from "./custom-fetch";
 export * from "./banks";
 export * from "./clients";
 export * from "./settings";

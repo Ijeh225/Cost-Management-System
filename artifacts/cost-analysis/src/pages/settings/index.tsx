@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetSettings, useUpdateSettings } from "@workspace/api-client-react";
+import { useGetSettings, useUpdateSettings, customFetch } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,8 +100,7 @@ export default function SettingsPage() {
     }
     setSendingEmail(true);
     try {
-      const res = await fetch("/api/notifications/send-email-digest", { method: "POST", credentials: "include" });
-      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Server error"); }
+      await customFetch("/api/notifications/send-email-digest", { method: "POST" });
       const now = new Date().toISOString();
       setDigestLastSentAt(now);
       toast({ title: "Email digest sent", description: `Alert summary sent to ${emailTo}` });

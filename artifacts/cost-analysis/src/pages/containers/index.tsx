@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListContainers } from "@workspace/api-client-react";
+import { useListContainers, customFetch, ApiError } from "@workspace/api-client-react";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES, getDutyPaymentStatus, dutyPaymentChipClass, dutyPaymentLabel, type DutyPaymentStatus } from "@/lib/format";
 import { useLocation } from "wouter";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -168,20 +168,18 @@ export default function Containers() {
     if (!confirmDelete) { setConfirmDelete(true); return; }
     setIsDeleting(true);
     try {
-      const res = await fetch("/api/containers/bulk", {
+      const { deleted } = await customFetch<{ deleted: number }>("/api/containers/bulk", {
         method: "DELETE",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [...selected] }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Delete failed");
-      const { deleted } = await res.json();
       toast({ title: `${deleted} container${deleted !== 1 ? "s" : ""} deleted` });
       setSelected(new Set());
       setConfirmDelete(false);
       qc.invalidateQueries({ queryKey: ["/api/containers"] });
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Delete failed", description: err.message });
+      const msg = err instanceof ApiError && (err.data as any)?.error ? (err.data as any).error : err?.message ?? "Delete failed";
+      toast({ variant: "destructive", title: "Delete failed", description: msg });
     } finally {
       setIsDeleting(false);
     }
