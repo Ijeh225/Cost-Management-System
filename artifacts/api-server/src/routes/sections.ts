@@ -104,7 +104,10 @@ sectionsRouter.post("/custom-sections/:id/fields", requireAuth, requireAdmin, as
   try {
     const existing = await db.select({ fieldOrder: customFieldsTable.fieldOrder }).from(customFieldsTable).where(eq(customFieldsTable.sectionId, sectionId)).orderBy(asc(customFieldsTable.fieldOrder));
     const nextOrder = existing.length > 0 ? (existing[existing.length - 1].fieldOrder + 1) : 0;
-    const [field] = await db.insert(customFieldsTable).values({ sectionId, branchId: (req as AuthRequest).user!.branchId, name, fieldType, placeholder, helpText, defaultValue, isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions, fieldOrder: nextOrder }).returning();
+    const createBranchId = resolveCreateBranch(req, res);
+    if (createBranchId == null) return;
+    if (createBranchId !== sec.branchId) return res.status(400).json({ error: "Active branch does not match the parent section's branch." });
+    const [field] = await db.insert(customFieldsTable).values({ sectionId, branchId: createBranchId, name, fieldType, placeholder, helpText, defaultValue, isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions, fieldOrder: nextOrder }).returning();
     return res.status(201).json(field);
   } catch (err) {
     console.error(err);
@@ -118,12 +121,12 @@ sectionsRouter.patch("/custom-sections/:id/fields/:fieldId", requireAuth, requir
   const fieldId = parseInt(req.params.fieldId);
   const sec = await loadSectionForBranchCheck(sectionId);
   if (!sec) return res.status(404).json({ error: "Section not found" });
-  if (!userCanAccessBranch(req, sec.branchId)) return res.status(403).json({ error: "Section belongs to another branch." });
+  if (!userCanAccessBranch(req, sec.branchId)) return res.status(404).json({ error: "Section not found" });
   // Bind fieldId to its parent section to prevent cross-section IDOR via mismatched IDs.
   const [fieldRow] = await db.select({ id: customFieldsTable.id, sectionId: customFieldsTable.sectionId, branchId: customFieldsTable.branchId })
     .from(customFieldsTable).where(eq(customFieldsTable.id, fieldId));
   if (!fieldRow || fieldRow.sectionId !== sectionId) return res.status(404).json({ error: "Field not found in this section" });
-  if (!userCanAccessBranch(req, fieldRow.branchId)) return res.status(403).json({ error: "Field belongs to another branch." });
+  if (!userCanAccessBranch(req, fieldRow.branchId)) return res.status(404).json({ error: "Field not found in this section" });
   const { name, fieldType, placeholder, helpText, defaultValue, isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions, fieldOrder } = req.body;
   const updates: Record<string, any> = {};
   if (name !== undefined) updates.name = name;
@@ -152,11 +155,11 @@ sectionsRouter.delete("/custom-sections/:id/fields/:fieldId", requireAuth, requi
   const fieldId = parseInt(req.params.fieldId);
   const sec = await loadSectionForBranchCheck(sectionId);
   if (!sec) return res.status(404).json({ error: "Section not found" });
-  if (!userCanAccessBranch(req, sec.branchId)) return res.status(403).json({ error: "Section belongs to another branch." });
+  if (!userCanAccessBranch(req, sec.branchId)) return res.status(404).json({ error: "Section not found" });
   const [fieldRow] = await db.select({ id: customFieldsTable.id, sectionId: customFieldsTable.sectionId, branchId: customFieldsTable.branchId })
     .from(customFieldsTable).where(eq(customFieldsTable.id, fieldId));
   if (!fieldRow || fieldRow.sectionId !== sectionId) return res.status(404).json({ error: "Field not found in this section" });
-  if (!userCanAccessBranch(req, fieldRow.branchId)) return res.status(403).json({ error: "Field belongs to another branch." });
+  if (!userCanAccessBranch(req, fieldRow.branchId)) return res.status(404).json({ error: "Field not found in this section" });
   try {
     await db.delete(customFieldsTable).where(and(eq(customFieldsTable.id, fieldId), eq(customFieldsTable.sectionId, sectionId)));
     return res.json({ success: true });
@@ -210,9 +213,10 @@ sectionsRouter.post("/containers/:containerId/custom-values", requireAuth, async
 // GET all extra fields for builtin sections, grouped by sectionKey
 sectionsRouter.get("/builtin-extras", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const branchPredicate = req.user!.role === "super_admin"
+    const bScope = getBranchScope(req);
+    const branchPredicate = bScope === null
       ? isNotNull(customFieldsTable.builtinSectionKey)
-      : and(isNotNull(customFieldsTable.builtinSectionKey), eq(customFieldsTable.branchId, req.user!.branchId));
+      : and(isNotNull(customFieldsTable.builtinSectionKey), eq(customFieldsTable.branchId, bScope));
     const fields = await db.select().from(customFieldsTable)
       .where(branchPredicate)
       .orderBy(asc(customFieldsTable.fieldOrder));
@@ -240,8 +244,10 @@ sectionsRouter.post("/builtin-extras", requireAuth, requireAdmin, async (req: Au
       .where(eq(customFieldsTable.builtinSectionKey, builtinSectionKey))
       .orderBy(asc(customFieldsTable.fieldOrder));
     const nextOrder = existing.length > 0 ? (existing[existing.length - 1].fieldOrder + 1) : 0;
+    const createBranchId = resolveCreateBranch(req, res);
+    if (createBranchId == null) return;
     const [field] = await db.insert(customFieldsTable).values({
-      builtinSectionKey, branchId: req.user!.branchId,
+      builtinSectionKey, branchId: createBranchId,
       name, fieldType, placeholder, helpText, defaultValue,
       isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions, fieldOrder: nextOrder,
     }).returning();
@@ -258,7 +264,7 @@ sectionsRouter.patch("/builtin-extras/:fieldId", requireAuth, requireAdmin, asyn
   const [fieldRow] = await db.select({ id: customFieldsTable.id, branchId: customFieldsTable.branchId, builtinSectionKey: customFieldsTable.builtinSectionKey })
     .from(customFieldsTable).where(eq(customFieldsTable.id, fieldId));
   if (!fieldRow || !fieldRow.builtinSectionKey) return res.status(404).json({ error: "Builtin extra field not found" });
-  if (!userCanAccessBranch(req, fieldRow.branchId)) return res.status(403).json({ error: "Field belongs to another branch." });
+  if (!userCanAccessBranch(req, fieldRow.branchId)) return res.status(404).json({ error: "Builtin extra field not found" });
   const { name, fieldType, placeholder, helpText, defaultValue, isRequired, includeInTotal, visibleByRole, editableByRole, dropdownOptions } = req.body;
   const updates: Record<string, any> = {};
   if (name !== undefined) updates.name = name;
@@ -286,7 +292,7 @@ sectionsRouter.delete("/builtin-extras/:fieldId", requireAuth, requireAdmin, asy
   const [fieldRow] = await db.select({ id: customFieldsTable.id, branchId: customFieldsTable.branchId, builtinSectionKey: customFieldsTable.builtinSectionKey })
     .from(customFieldsTable).where(eq(customFieldsTable.id, fieldId));
   if (!fieldRow || !fieldRow.builtinSectionKey) return res.status(404).json({ error: "Builtin extra field not found" });
-  if (!userCanAccessBranch(req, fieldRow.branchId)) return res.status(403).json({ error: "Field belongs to another branch." });
+  if (!userCanAccessBranch(req, fieldRow.branchId)) return res.status(404).json({ error: "Builtin extra field not found" });
   try {
     await db.delete(customFieldsTable).where(eq(customFieldsTable.id, fieldId));
     return res.json({ success: true });
