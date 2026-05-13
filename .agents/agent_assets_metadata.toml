@@ -12,3 +12,9 @@ id = "5opPWsMBvwe_IBMbqwQU4"
 uri = "file://Cost_Analysis_Per_Container_Full_Guide.pdf"
 type = "pdf"
 title = "Cost Analysis Per Container — Full System Guide"
+
+[[outputs]]
+id = "0eQjnSMDTaWaW7qMDEl03"
+uri = "file://docs/COST-App-User-Guide.pdf"
+type = "pdf"
+title = "COST App — Complete User Guide (A–Z)"
