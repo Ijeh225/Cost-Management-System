@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { requireAuth, requireAdmin, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio, resolveBranchWhatsAppFrom } from "../lib/whatsapp.js";
 
 const router = Router();
@@ -621,6 +621,8 @@ router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
 
     const { status, dueDate, notes, subtotal, vatAmount, total } = req.body as {
       status?: string;
@@ -685,10 +687,12 @@ router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.delete("/invoices/:id", requireAdmin, async (req, res) => {
+router.delete("/invoices/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
     await db.delete(invoicesTable).where(eq(invoicesTable.id, id));
     res.json({ success: true });
   } catch (err) {
@@ -724,13 +728,14 @@ router.post("/invoices/:id/items", requireAuth, async (req: AuthRequest, res) =>
     };
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!inv) return res.status(404).json({ error: "Invoice not found" });
+    if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
 
     let resolvedAmount = amount;
     let resolvedDescription = description ?? "Clearing Charges";
     if (containerId) {
       const [container] = await db.select().from(containersTable).where(eq(containersTable.id, containerId));
-      if (!container) return res.status(404).json({ error: "Container not found" });
+      if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
+      if (container.branchId !== inv.branchId) return res.status(400).json({ error: "Container and invoice must belong to the same branch" });
       if (resolvedAmount === undefined) {
         // Prefer client's agreed clearing rate over container's own rate.
         // Use container's linked clientId first; fall back to invoice's clientId.
@@ -802,6 +807,8 @@ router.patch("/invoices/:id/items/:itemId", requireAuth, async (req: AuthRequest
 
     const { description, amount } = req.body as { description?: string; amount?: number };
 
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
     const [item] = await db.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.id, itemId));
     if (!item || item.invoiceId !== invoiceId) return res.status(404).json({ error: "Item not found" });
 
@@ -849,12 +856,14 @@ router.patch("/invoices/:id/items/:itemId", requireAuth, async (req: AuthRequest
   }
 });
 
-router.delete("/invoices/:id/items/:itemId", requireAdmin, async (req, res) => {
+router.delete("/invoices/:id/items/:itemId", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     const itemId = parseInt(req.params.itemId, 10);
     if (isNaN(invoiceId) || isNaN(itemId)) return res.status(400).json({ error: "Invalid id" });
 
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
     const existingItems = await db.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, invoiceId));
     if (existingItems.length <= 1) {
       return res.status(400).json({ error: "Cannot remove the last line item from an invoice. Delete the invoice instead." });
@@ -1000,11 +1009,12 @@ router.post("/invoices/:id/apply-credit", requireAdmin, async (req: AuthRequest,
     }
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!inv) return res.status(404).json({ error: "Invoice not found" });
+    if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
     if (!inv.clientId) return res.status(400).json({ error: "Invoice has no linked client" });
 
     const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, inv.clientId));
-    if (!client) return res.status(404).json({ error: "Client not found" });
+    if (!client || !userCanAccessBranch(req, client.branchId)) return res.status(404).json({ error: "Client not found" });
+    if (client.branchId !== inv.branchId) return res.status(400).json({ error: "Invoice and client must belong to the same branch" });
 
     const creditBalance = parseFloat(client.creditBalance ?? "0");
     if (creditBalance <= 0) return res.status(400).json({ error: "Client has no credit balance" });
@@ -1059,12 +1069,14 @@ router.post("/invoices/:id/apply-credit", requireAdmin, async (req: AuthRequest,
   }
 });
 
-router.delete("/invoices/:id/payments/:paymentId", requireAdmin, async (req, res) => {
+router.delete("/invoices/:id/payments/:paymentId", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     const paymentId = parseInt(req.params.paymentId, 10);
     if (isNaN(invoiceId) || isNaN(paymentId)) return res.status(400).json({ error: "Invalid id" });
 
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
     const [payment] = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.id, paymentId));
     if (!payment) return res.status(404).json({ error: "Payment not found" });
     if (payment.invoiceId !== invoiceId) return res.status(400).json({ error: "Payment does not belong to this invoice" });
@@ -1200,10 +1212,12 @@ function buildReminderMessage(inv: {
   return lines.join("\n");
 }
 
-router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req, res) => {
+router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
 
     if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
       return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (and either set TWILIO_WHATSAPP_FROM or configure a branch-owned WhatsApp number)." });
@@ -1273,10 +1287,12 @@ router.post("/invoices/:id/send-whatsapp", requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
+router.post("/invoices/:id/send-reminder", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
 
     if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
       return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (and either set TWILIO_WHATSAPP_FROM or configure a branch-owned WhatsApp number)." });
@@ -1351,10 +1367,12 @@ router.post("/invoices/:id/send-reminder", requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/invoices/:id/send-receipt", requireAdmin, async (req, res) => {
+router.post("/invoices/:id/send-receipt", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
 
     if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
       return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (and either set TWILIO_WHATSAPP_FROM or configure a branch-owned WhatsApp number)." });
@@ -1456,10 +1474,12 @@ router.post("/invoices/:id/send-receipt", requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/invoices/:id/whatsapp-log", requireAuth, async (req, res) => {
+router.get("/invoices/:id/whatsapp-log", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
 
     const rows = await db
       .select()
@@ -1498,9 +1518,15 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
     if (!reason?.trim()) return res.status(400).json({ error: "Reason is required" });
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!inv) return res.status(404).json({ error: "Invoice not found" });
+    if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
     if (inv.status === "written_off") return res.status(400).json({ error: "Cannot raise credit note on a written-off invoice" });
     if (inv.status === "draft") return res.status(400).json({ error: "Cannot raise credit note on a draft invoice" });
+    if (inv.clientId) {
+      const [cnClient] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, inv.clientId));
+      if (cnClient && cnClient.branchId !== inv.branchId) {
+        return res.status(400).json({ error: "Invoice and client must belong to the same branch" });
+      }
+    }
 
     const existingPayments = await db.select({ amount: invoicePaymentsTable.amount })
       .from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
@@ -1590,10 +1616,12 @@ router.post("/invoices/:id/credit-note", requireAdmin, async (req: AuthRequest, 
   }
 });
 
-router.get("/invoices/:id/credit-notes", requireAuth, async (req, res) => {
+router.get("/invoices/:id/credit-notes", requireAuth, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
 
     const rows = await db.select().from(creditNotesTable)
       .where(eq(creditNotesTable.invoiceId, invoiceId))
@@ -1623,7 +1651,7 @@ router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, re
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!inv) return res.status(404).json({ error: "Invoice not found" });
+    if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
     if (inv.status === "written_off") return res.status(400).json({ error: "Invoice is already written off" });
     if (inv.status === "paid") return res.status(400).json({ error: "Invoice is already fully paid" });
     if (!inv.dueDate) return res.status(400).json({ error: "Cannot write off an invoice without a due date" });
@@ -1674,10 +1702,12 @@ router.post("/invoices/:id/write-off", requireAdmin, async (req: AuthRequest, re
 
 // ─── Invoice Audit Log ───────────────────────────────────────────────────────
 
-router.get("/invoices/:id/audit-log", requireAuth, async (req, res) => {
+router.get("/invoices/:id/audit-log", requireAuth, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(req.params.id, 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
 
     const rows = await db
       .select({
@@ -1704,9 +1734,14 @@ router.get("/invoices/:id/audit-log", requireAuth, async (req, res) => {
 
 // ─── Flat Credit-Note Endpoints ──────────────────────────────────────────────
 
-router.get("/credit-notes", requireAuth, async (req, res) => {
+router.get("/credit-notes", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { invoiceId: invoiceIdParam } = req.query as { invoiceId?: string };
+    const _scope = getBranchScope(req);
+
+    const filters: any[] = [];
+    if (invoiceIdParam) filters.push(eq(creditNotesTable.invoiceId, parseInt(invoiceIdParam, 10)));
+    if (_scope !== null) filters.push(eq(creditNotesTable.branchId, _scope));
 
     const rows = await db
       .select({
@@ -1724,11 +1759,7 @@ router.get("/credit-notes", requireAuth, async (req, res) => {
       .from(creditNotesTable)
       .leftJoin(invoicesTable, eq(creditNotesTable.invoiceId, invoicesTable.id))
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
-      .where(
-        invoiceIdParam
-          ? eq(creditNotesTable.invoiceId, parseInt(invoiceIdParam, 10))
-          : undefined
-      )
+      .where(filters.length === 0 ? undefined : filters.length === 1 ? filters[0] : and(...filters))
       .orderBy(desc(creditNotesTable.createdAt));
 
     res.json(rows.map(cn => ({
@@ -1749,7 +1780,7 @@ router.get("/credit-notes", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/credit-notes/:id", requireAuth, async (req, res) => {
+router.get("/credit-notes/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -1766,13 +1797,18 @@ router.get("/credit-notes/:id", requireAuth, async (req, res) => {
         status: creditNotesTable.status,
         createdBy: creditNotesTable.createdBy,
         createdAt: creditNotesTable.createdAt,
+        branchId: creditNotesTable.branchId,
       })
       .from(creditNotesTable)
       .leftJoin(invoicesTable, eq(creditNotesTable.invoiceId, invoicesTable.id))
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
       .where(eq(creditNotesTable.id, id));
 
-    if (!cn) return res.status(404).json({ error: "Credit note not found" });
+    if (!cn || !userCanAccessBranch(req, cn.branchId)) return res.status(404).json({ error: "Credit note not found" });
+    {
+      const _scope = getBranchScope(req);
+      if (_scope !== null && cn.branchId !== _scope) return res.status(404).json({ error: "Credit note not found" });
+    }
 
     res.json({
       id: cn.id,

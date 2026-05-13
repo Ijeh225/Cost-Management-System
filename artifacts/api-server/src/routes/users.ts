@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, clientsTable, userClientAssignmentsTable, branchesTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest, hashPassword, parseRoles, getBranchScope } from "../lib/auth.js";
+import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest, hashPassword, parseRoles, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 
 const router = Router();
 
@@ -125,17 +125,19 @@ router.get("/users/:id", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
     const [user] = await db.select(userFields).from(usersTable).where(eq(usersTable.id, id));
-    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (!user || !userCanAccessBranch(req, user.branchId)) { res.status(404).json({ error: "User not found" }); return; }
     res.json(formatUser(user));
   } catch {
     res.status(500).json({ error: "Server error" });
   }
 });
 
-router.put("/users/:id", requireSuperAdmin, async (req, res) => {
+router.put("/users/:id", requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
+    const [_target] = await db.select({ branchId: usersTable.branchId }).from(usersTable).where(eq(usersTable.id, id));
+    if (!_target || !userCanAccessBranch(req, _target.branchId)) { res.status(404).json({ error: "User not found" }); return; }
     const { name, role, roles, isActive, password, sectionPermission, sectionPermissions, canUpload, branchId } = req.body;
     if (password !== undefined && (typeof password !== "string" || password.length < 8)) {
       res.status(400).json({ error: "Password must be at least 8 characters" });
@@ -175,10 +177,12 @@ router.put("/users/:id", requireSuperAdmin, async (req, res) => {
   }
 });
 
-router.get("/users/:id/client-assignments", requireAdmin, async (req, res) => {
+router.get("/users/:id/client-assignments", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
+    const [_target] = await db.select({ branchId: usersTable.branchId }).from(usersTable).where(eq(usersTable.id, userId));
+    if (!_target || !userCanAccessBranch(req, _target.branchId)) { res.status(404).json({ error: "User not found" }); return; }
     const rows = await db
       .select({ id: clientsTable.id, name: clientsTable.name })
       .from(userClientAssignmentsTable)
@@ -196,13 +200,16 @@ router.post("/users/:id/client-assignments", requireAdmin, async (req: AuthReque
     if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
     const { clientId } = req.body;
     if (!clientId) { res.status(400).json({ error: "clientId required" }); return; }
+    const [_target] = await db.select({ branchId: usersTable.branchId }).from(usersTable).where(eq(usersTable.id, userId));
+    if (!_target || !userCanAccessBranch(req, _target.branchId)) { res.status(404).json({ error: "User not found" }); return; }
     const existing = await db
       .select()
       .from(userClientAssignmentsTable)
       .where(and(eq(userClientAssignmentsTable.userId, userId), eq(userClientAssignmentsTable.clientId, clientId)));
     if (existing.length > 0) { res.status(409).json({ error: "Already assigned" }); return; }
     const [client] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
-    if (!client) { res.status(404).json({ error: "Client not found" }); return; }
+    if (!client || !userCanAccessBranch(req, client.branchId)) { res.status(404).json({ error: "Client not found" }); return; }
+    if (client.branchId !== _target.branchId) { res.status(400).json({ error: "User and client must belong to the same branch" }); return; }
     const [row] = await db.insert(userClientAssignmentsTable).values({ userId, clientId, branchId: client.branchId }).returning();
     res.status(201).json(row);
   } catch {
@@ -210,11 +217,13 @@ router.post("/users/:id/client-assignments", requireAdmin, async (req: AuthReque
   }
 });
 
-router.delete("/users/:id/client-assignments/:clientId", requireAdmin, async (req, res) => {
+router.delete("/users/:id/client-assignments/:clientId", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const userId = parseInt(req.params.id);
     const clientId = parseInt(req.params.clientId);
     if (isNaN(userId) || isNaN(clientId)) { res.status(400).json({ error: "Invalid IDs" }); return; }
+    const [_target] = await db.select({ branchId: usersTable.branchId }).from(usersTable).where(eq(usersTable.id, userId));
+    if (!_target || !userCanAccessBranch(req, _target.branchId)) { res.status(404).json({ error: "User not found" }); return; }
     await db
       .delete(userClientAssignmentsTable)
       .where(and(eq(userClientAssignmentsTable.userId, userId), eq(userClientAssignmentsTable.clientId, clientId)));

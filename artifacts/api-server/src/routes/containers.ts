@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { requireAuth, requireAdmin, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
 
@@ -440,18 +440,25 @@ router.post("/containers/check-duplicates", requireAuth, async (_req, res) => {
     return;
   }
   try {
+    const _scope = getBranchScope(req);
+    const _conFilter = _scope === null
+      ? inArray(containersTable.containerNumber, containerNumbers)
+      : and(inArray(containersTable.containerNumber, containerNumbers), eq(containersTable.branchId, _scope));
+    const _blFilter = _scope === null
+      ? inArray(containersTable.blNumber, blNumbers)
+      : and(inArray(containersTable.blNumber, blNumbers), eq(containersTable.branchId, _scope));
     const [existingCons, existingBls] = await Promise.all([
       containerNumbers.length > 0
         ? db
             .select({ containerNumber: containersTable.containerNumber })
             .from(containersTable)
-            .where(inArray(containersTable.containerNumber, containerNumbers))
+            .where(_conFilter)
         : Promise.resolve([]),
       blNumbers.length > 0
         ? db
             .select({ blNumber: containersTable.blNumber })
             .from(containersTable)
-            .where(inArray(containersTable.blNumber, blNumbers))
+            .where(_blFilter)
         : Promise.resolve([]),
     ]);
     res.json({
@@ -543,8 +550,9 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
   }
 });
 
-router.get("/containers/paar-status", requireAuth, async (req, res) => {
+router.get("/containers/paar-status", requireAuth, async (req: AuthRequest, res) => {
   try {
+    const _scope = getBranchScope(req);
     const rows = await db
       .select({
         id: containersTable.id,
@@ -558,7 +566,9 @@ router.get("/containers/paar-status", requireAuth, async (req, res) => {
         createdAt: containersTable.createdAt,
       })
       .from(containersTable)
-      .where(isNotNull(containersTable.verifiedAt))
+      .where(_scope === null
+        ? isNotNull(containersTable.verifiedAt)
+        : and(isNotNull(containersTable.verifiedAt), eq(containersTable.branchId, _scope)))
       .orderBy(desc(containersTable.createdAt));
 
     const items = rows.map(r => ({
@@ -579,8 +589,9 @@ router.get("/containers/paar-status", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/containers/pipeline", requireAuth, async (req, res) => {
+router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) => {
   try {
+    const _scope = getBranchScope(req);
     const now = new Date();
     const rows = await db.select({
       id: containersTable.id,
@@ -616,7 +627,9 @@ router.get("/containers/pipeline", requireAuth, async (req, res) => {
       .from(containersTable)
       .leftJoin(usersTable, eq(containersTable.assignedStaffId, usersTable.id))
       .leftJoin(customsChargesTable, eq(customsChargesTable.containerId, containersTable.id))
-      .where(isNotNull(containersTable.verifiedAt));
+      .where(_scope === null
+        ? isNotNull(containersTable.verifiedAt)
+        : and(isNotNull(containersTable.verifiedAt), eq(containersTable.branchId, _scope)));
 
     // The three field-ops stages run in parallel — a container in any one of them
     // appears in all three tabs of the ops workspace simultaneously.
@@ -751,7 +764,7 @@ router.post("/containers/:id/early-start", requireAdmin, async (req: AuthRequest
       return;
     }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const [updated] = await db.update(containersTable)
       .set({
         earlyStartAuthorized: true,
@@ -781,7 +794,7 @@ router.delete("/containers/:id/early-start", requireAdmin, async (req: AuthReque
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const [updated] = await db.update(containersTable)
       .set({
         earlyStartAuthorized: false,
@@ -857,7 +870,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
     const requestedStatus: string | undefined = req.body?.status;
 
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) {
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       res.status(404).json({ error: "Container not found" });
       return;
     }
@@ -942,7 +955,7 @@ router.post("/containers/:id/verify", requireAdmin, async (req: AuthRequest, res
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) {
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       res.status(404).json({ error: "Container not found" });
       return;
     }
@@ -977,7 +990,7 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) {
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       res.status(404).json({ error: "Container not found" });
       return;
     }
@@ -1019,7 +1032,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) {
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       res.status(404).json({ error: "Container not found" });
       return;
     }
@@ -1122,13 +1135,15 @@ router.get("/containers/gate-log", requireAuth, async (req: AuthRequest, res) =>
     const toStr = req.query.to as string | undefined;
     const csv = req.query.csv === "1";
 
+    const _scope = getBranchScope(req);
+    const _gateLogFilter = or(
+      isNotNull(containersTable.gateInDate),
+      isNotNull(containersTable.gateOutDate),
+      inArray(containersTable.status, ["gate_in", "examination", "final_release"]),
+      eq(containersTable.earlyStartAuthorized, true),
+    );
     let rows = await db.select().from(containersTable)
-      .where(or(
-        isNotNull(containersTable.gateInDate),
-        isNotNull(containersTable.gateOutDate),
-        inArray(containersTable.status, ["gate_in", "examination", "final_release"]),
-        eq(containersTable.earlyStartAuthorized, true),
-      ))
+      .where(_scope === null ? _gateLogFilter : and(_gateLogFilter, eq(containersTable.branchId, _scope)))
       .orderBy(desc(containersTable.gateInDate));
 
     if (fromStr) {
@@ -1199,7 +1214,7 @@ router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res
       return;
     }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
 
     const now = new Date();
     let nextStatus = existing.status;
@@ -1252,7 +1267,7 @@ router.post("/containers/:id/gate-out", requireAuth, async (req: AuthRequest, re
       return;
     }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     if (existing.gateOutDate) {
       res.status(409).json({ error: "Gate-Out has already been recorded for this container" });
       return;
@@ -1290,7 +1305,7 @@ router.post("/containers/:id/empty-gate-in", requireAuth, async (req: AuthReques
       return;
     }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     if (existing.emptyGateInDate) {
       res.status(409).json({ error: "Empty Gate-In has already been recorded for this container" });
       return;
@@ -1328,7 +1343,7 @@ router.post("/containers/:id/empty-gate-out", requireAuth, async (req: AuthReque
       return;
     }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Container not found" }); return; }
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     if (!existing.emptyGateInDate) {
       res.status(409).json({ error: "Empty Gate-In must be recorded before Empty Gate-Out" });
       return;
@@ -1442,7 +1457,7 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) {
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       res.status(404).json({ error: "Container not found" });
       return;
     }
@@ -1507,7 +1522,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing) {
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       res.status(404).json({ error: "Container not found" });
       return;
     }
@@ -1718,6 +1733,11 @@ router.post("/containers/:id/lock", requireAdmin, async (req: AuthRequest, res) 
   try {
     const id = parseInt(req.params.id);
     const { locked, reason } = req.body;
+    const [pre] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
+    if (!pre || !userCanAccessBranch(req, pre.branchId)) {
+      res.status(404).json({ error: "Container not found" });
+      return;
+    }
     const [updated] = await db.update(containersTable)
       .set({ isLocked: locked, updatedAt: new Date() })
       .where(eq(containersTable.id, id))
@@ -1742,8 +1762,8 @@ router.post("/containers/:id/lock", requireAdmin, async (req: AuthRequest, res) 
 router.get("/containers/:id/extra-charges", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [container] = await db.select({ id: containersTable.id }).from(containersTable).where(eq(containersTable.id, id));
-    if (!container) return res.status(404).json({ error: "Container not found" });
+    const [container] = await db.select({ id: containersTable.id, branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
+    if (!container || !userCanAccessBranch(req as AuthRequest, container.branchId)) return res.status(404).json({ error: "Container not found" });
     const rows = await db.select().from(containerExtraChargesTable)
       .where(eq(containerExtraChargesTable.containerId, id))
       .orderBy(containerExtraChargesTable.sortOrder, containerExtraChargesTable.createdAt);
@@ -1764,7 +1784,7 @@ router.post("/containers/:id/extra-charges", requireAuth, async (req: AuthReques
   try {
     const id = parseInt(req.params.id);
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!container) return res.status(404).json({ error: "Container not found" });
+    if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
     const { section, label, amount } = req.body;
     if (!section || !VALID_SECTIONS.has(section)) return res.status(400).json({ error: "Invalid section" });
@@ -1794,7 +1814,7 @@ router.put("/containers/:id/extra-charges/:rowId", requireAuth, async (req: Auth
     const id = parseInt(req.params.id);
     const rowId = parseInt(req.params.rowId);
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!container) return res.status(404).json({ error: "Container not found" });
+    if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
     const [existing] = await db.select().from(containerExtraChargesTable)
       .where(and(eq(containerExtraChargesTable.id, rowId), eq(containerExtraChargesTable.containerId, id)));
@@ -1831,7 +1851,7 @@ router.delete("/containers/:id/extra-charges/:rowId", requireAuth, async (req: A
     const id = parseInt(req.params.id);
     const rowId = parseInt(req.params.rowId);
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!container) return res.status(404).json({ error: "Container not found" });
+    if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
     // Fetch the row to know its section for lock check
     const [existing] = await db.select().from(containerExtraChargesTable)
@@ -1855,7 +1875,7 @@ router.get("/containers/:id/charges", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [c] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!c) {
+    if (!c || !userCanAccessBranch(req as AuthRequest, c.branchId)) {
       res.status(404).json({ error: "Container not found" });
       return;
     }
@@ -1885,7 +1905,7 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
   try {
     const id = parseInt(req.params.id);
     const [c] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!c) {
+    if (!c || !userCanAccessBranch(req, c.branchId)) {
       res.status(404).json({ error: "Container not found" });
       return;
     }
@@ -2018,6 +2038,8 @@ router.post("/containers/:id/sections/:section/submit", requireAuth, async (req:
     const id = parseInt(req.params.id);
     const section = req.params.section;
     const user = req.user!;
+    const [_branchCheck] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
+    if (!_branchCheck || !userCanAccessBranch(req, _branchCheck.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const approval = await getOrCreateSectionApproval(id, section);
     if (approval.status === "submitted") {
       res.status(400).json({ error: "Section already submitted" });
@@ -2040,6 +2062,8 @@ router.post("/containers/:id/sections/:section/approve", requireAdmin, async (re
     const id = parseInt(req.params.id);
     const section = req.params.section;
     const user = req.user!;
+    const [_branchCheck] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
+    if (!_branchCheck || !userCanAccessBranch(req, _branchCheck.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const approval = await getOrCreateSectionApproval(id, section);
     if (approval.status !== "submitted") {
       res.status(400).json({ error: "Section must be submitted before approval" });
@@ -2084,6 +2108,8 @@ router.post("/containers/:id/sections/:section/reject", requireAdmin, async (req
       res.status(400).json({ error: "Rejection reason is required" });
       return;
     }
+    const [_branchCheck] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
+    if (!_branchCheck || !userCanAccessBranch(req, _branchCheck.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const approval = await getOrCreateSectionApproval(id, section);
     if (approval.status !== "submitted") {
       res.status(400).json({ error: "Section must be submitted before rejection" });
@@ -2128,7 +2154,7 @@ router.post("/containers/:id/sections/:section/lock", requireAdmin, async (req: 
     const section = req.params.section;
     const user = req.user!;
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!container) { res.status(404).json({ error: "Container not found" }); return; }
+    if (!container || !userCanAccessBranch(req, container.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     let lockedSections: string[] = [];
     try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
     if (!lockedSections.includes(section)) {
@@ -2148,7 +2174,7 @@ router.post("/containers/:id/sections/:section/unlock", requireAdmin, async (req
     const section = req.params.section;
     const user = req.user!;
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!container) { res.status(404).json({ error: "Container not found" }); return; }
+    if (!container || !userCanAccessBranch(req, container.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     let lockedSections: string[] = [];
     try { lockedSections = JSON.parse(container.lockedSections ?? "[]"); } catch {}
     lockedSections = lockedSections.filter(s => s !== section);
@@ -2160,9 +2186,11 @@ router.post("/containers/:id/sections/:section/unlock", requireAdmin, async (req
   }
 });
 
-router.get("/containers/:id/audit", requireAuth, async (req, res) => {
+router.get("/containers/:id/audit", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
+    const [_c] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
+    if (!_c || !userCanAccessBranch(req, _c.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const logs = await db.select({
       id: auditLogTable.id,
       containerId: auditLogTable.containerId,
@@ -2188,7 +2216,10 @@ router.get("/containers/:id/audit", requireAuth, async (req, res) => {
 
 router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const allContainers = await db.select().from(containersTable);
+    const _scope = getBranchScope(req);
+    const allContainers = _scope === null
+      ? await db.select().from(containersTable)
+      : await db.select().from(containersTable).where(eq(containersTable.branchId, _scope));
     const totalContainers = allContainers.length;
     const inProgress = allContainers.filter(c => c.status !== "closed").length;
     const completed = 0;
@@ -2222,11 +2253,11 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     let oMap: Record<number, any> = {};
 
     if (containerIds.length > 0) {
-      const allShipping = await db.select().from(shippingChargesTable);
-      const allCustoms = await db.select().from(customsChargesTable);
-      const allTerminal = await db.select().from(terminalChargesTable);
-      const allDelivery = await db.select().from(deliveryChargesTable);
-      const allOps = await db.select().from(operationsChargesTable);
+      const allShipping = await db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, containerIds));
+      const allCustoms = await db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, containerIds));
+      const allTerminal = await db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, containerIds));
+      const allDelivery = await db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, containerIds));
+      const allOps = await db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, containerIds));
 
       const indexBy = (arr: any[]) => { const m: Record<number, any> = {}; arr.forEach(r => { m[r.containerId] = r; }); return m; };
       sMap = indexBy(allShipping);
@@ -2277,8 +2308,13 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       .slice(0, 10);
 
     // Invoice AR metrics
-    const allInvoices = await db.select().from(invoicesTable);
-    const allPayments = await db.select().from(invoicePaymentsTable);
+    const allInvoices = _scope === null
+      ? await db.select().from(invoicesTable)
+      : await db.select().from(invoicesTable).where(eq(invoicesTable.branchId, _scope));
+    const _invoiceIds = allInvoices.map(i => i.id);
+    const allPayments = _invoiceIds.length > 0
+      ? await db.select().from(invoicePaymentsTable).where(inArray(invoicePaymentsTable.invoiceId, _invoiceIds))
+      : [];
     const paymentsByInvoice = new Map<number, typeof allPayments>();
     for (const p of allPayments) {
       if (!paymentsByInvoice.has(p.invoiceId)) paymentsByInvoice.set(p.invoiceId, []);
@@ -2341,7 +2377,10 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     let myPendingSections = 0;
     let mySections: string[] = [];
 
-    const allApprovals = await db.select().from(sectionApprovalsTable);
+    const _approvalsContainerIds = containerIds;
+    const allApprovals = _approvalsContainerIds.length > 0
+      ? await db.select().from(sectionApprovalsTable).where(inArray(sectionApprovalsTable.containerId, _approvalsContainerIds))
+      : [];
     pendingApprovals = allApprovals.filter(a => a.status === "submitted").length;
 
     if (user.role !== "admin" && user.role !== "super_admin") {
@@ -2400,10 +2439,19 @@ router.delete("/containers/bulk", requireAuth, requireAdmin, async (req: AuthReq
   if (!Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: "ids must be a non-empty array" });
   }
-  const numIds = ids.map(Number).filter(n => Number.isFinite(n) && n > 0);
+  let numIds = ids.map(Number).filter(n => Number.isFinite(n) && n > 0);
   if (numIds.length === 0) return res.status(400).json({ error: "No valid ids provided" });
 
   try {
+    // Branch isolation: filter ids to those within the user's branch scope
+    const _scope = getBranchScope(req);
+    if (_scope !== null) {
+      const accessible = await db.select({ id: containersTable.id })
+        .from(containersTable)
+        .where(and(inArray(containersTable.id, numIds), eq(containersTable.branchId, _scope)));
+      numIds = accessible.map(r => r.id);
+      if (numIds.length === 0) return res.status(404).json({ error: "No containers found" });
+    }
     await db.delete(customFieldValuesTable).where(inArray(customFieldValuesTable.containerId, numIds));
     await db.delete(containerDocumentsTable).where(inArray(containerDocumentsTable.containerId, numIds));
     await db.delete(containerTimelineTable).where(inArray(containerTimelineTable.containerId, numIds));

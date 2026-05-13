@@ -124,6 +124,8 @@ clientsRouter.patch("/clients/:id", requireAuth, async (req: AuthRequest, res) =
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+    const [_existing] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, id));
+    if (!_existing || !userCanAccessBranch(req, _existing.branchId)) return res.status(404).json({ error: "Client not found" });
     const { name, contactName, contactEmail, contactPhone, address, notes, agreedClearingRate } = req.body;
     if (name !== undefined && (typeof name !== "string" || name.trim() === "")) {
       return res.status(400).json({ error: "Client name cannot be empty" });
@@ -170,6 +172,8 @@ clientsRouter.delete("/clients/:id", requireAuth, requireAdmin, async (req: Auth
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+    const [_existing] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, id));
+    if (!_existing || !userCanAccessBranch(req, _existing.branchId)) return res.status(404).json({ error: "Client not found" });
     await db.update(containersTable).set({ clientId: null }).where(eq(containersTable.clientId, id));
     await db.delete(clientsTable).where(eq(clientsTable.id, id));
     return res.json({ success: true });
@@ -184,8 +188,11 @@ clientsRouter.patch("/clients/:id/link-container", requireAuth, requireAdmin, as
     const clientId = parseInt(req.params.id);
     const { containerId } = req.body as { containerId: number };
     if (isNaN(clientId) || !containerId) return res.status(400).json({ error: "Invalid IDs" });
-    const [client] = await db.select({ name: clientsTable.name }).from(clientsTable).where(eq(clientsTable.id, clientId));
-    if (!client) return res.status(404).json({ error: "Client not found" });
+    const [client] = await db.select({ name: clientsTable.name, branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
+    if (!client || !userCanAccessBranch(req, client.branchId)) return res.status(404).json({ error: "Client not found" });
+    const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, containerId));
+    if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
+    if (container.branchId !== client.branchId) return res.status(400).json({ error: "Container and client must belong to the same branch" });
     await db.update(containersTable)
       .set({ clientId, customerName: client.name, updatedAt: new Date() })
       .where(eq(containersTable.id, containerId));
@@ -200,6 +207,8 @@ clientsRouter.patch("/containers/:id/unlink-client", requireAuth, requireAdmin, 
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+    const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
+    if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
     await db.update(containersTable).set({ clientId: null, updatedAt: new Date() }).where(eq(containersTable.id, id));
     return res.json({ success: true });
   } catch (err) {
