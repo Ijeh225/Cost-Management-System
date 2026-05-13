@@ -163,6 +163,15 @@ overheadExpensesRouter.get("/overhead-expenses", requireAdmin, async (req: AuthR
     const status = req.query.status as string | undefined;
 
     const conditions: ReturnType<typeof eq>[] = [];
+    // Branch scope: regular users see only their branch; super-admin may filter via ?branchId=N|all.
+    if (req.user!.role !== "super_admin") {
+      conditions.push(eq(overheadExpensesTable.branchId, req.user!.branchId));
+    } else {
+      const q = req.query.branchId;
+      if (typeof q === "string" && q !== "all" && !isNaN(Number(q))) {
+        conditions.push(eq(overheadExpensesTable.branchId, Number(q)));
+      }
+    }
     if (category && category !== "all") conditions.push(eq(overheadExpensesTable.category, category));
     if (from) conditions.push(gte(overheadExpensesTable.createdAt, new Date(from)));
     if (to) {
