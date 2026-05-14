@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, overheadExpensesTable, expenseCategoriesTable, expensePaymentsTable, banksTable, usersTable } from "@workspace/db";
+import { db, overheadExpensesTable, expenseCategoriesTable, expensePaymentsTable, banksTable, usersTable, branchesTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, inArray } from "drizzle-orm";
 import { requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
@@ -34,6 +34,14 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
     users.forEach(u => { userMap[u.id] = u.name; });
   }
 
+  const branchIds = [...new Set(expenseRows.map(r => r.branchId).filter(Boolean) as number[])];
+  const branchMap: Record<number, string> = {};
+  if (branchIds.length > 0) {
+    const branchRows = await db.select({ id: branchesTable.id, name: branchesTable.name })
+      .from(branchesTable).where(inArray(branchesTable.id, branchIds));
+    branchRows.forEach(b => { branchMap[b.id] = b.name; });
+  }
+
   const paymentsByExpense: Record<number, typeof allPayments> = {};
   for (const p of allPayments) {
     if (!paymentsByExpense[p.expenseId]) paymentsByExpense[p.expenseId] = [];
@@ -55,6 +63,7 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
       amount: totalAmount,
       reference: e.reference ?? null,
       branchId: e.branchId,
+      branchName: e.branchId ? (branchMap[e.branchId] ?? null) : null,
       recordedBy: e.recordedBy ?? null,
       recordedByName: e.recordedBy ? (userMap[e.recordedBy] ?? null) : null,
       createdAt: e.createdAt instanceof Date ? e.createdAt.toISOString() : String(e.createdAt),

@@ -29,6 +29,8 @@ export type OverheadExpense = {
   description: string;
   amount: number;
   reference: string | null;
+  branchId: number | null;
+  branchName: string | null;
   recordedBy: number | null;
   recordedByName: string | null;
   createdAt: string;

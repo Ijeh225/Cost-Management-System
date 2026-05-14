@@ -122,7 +122,7 @@ function MakePaymentDialog({ expense, onOpenChange, onSubmit, isPending }: {
         <div className="rounded-lg border border-border/40 bg-muted/30 p-3 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-sm font-medium flex items-center">{expense.description}<BranchChip branchId={(expense as { branchId?: number }).branchId} /></p>
+              <p className="text-sm font-medium flex items-center">{expense.description}<BranchChip branchId={expense.branchId} /></p>
               <p className="text-xs text-muted-foreground">{expense.category}</p>
             </div>
             <Badge variant="outline" className={`text-[10px] shrink-0 ${STATUS_COLORS[expense.status]}`}>{STATUS_LABELS[expense.status]}</Badge>
@@ -418,7 +418,7 @@ export default function OverheadExpensesPage() {
                                 <span className="text-sm font-medium text-foreground">{e.description}</span>
                                 <Badge variant="outline" className={`text-[10px] font-medium shrink-0 ${catColor(e.category)}`}>{e.category}</Badge>
                                 <Badge variant="outline" className={`text-[10px] font-medium shrink-0 ${STATUS_COLORS[e.status]}`}>{STATUS_LABELS[e.status]}</Badge>
-                                {showBranchColumn && <BranchChip branchId={(e as { branchId?: number }).branchId} />}
+                                {showBranchColumn && <BranchChip branchId={e.branchId} />}
                               </div>
                               <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
                                 {e.reference && <span>Ref: {e.reference}</span>}
