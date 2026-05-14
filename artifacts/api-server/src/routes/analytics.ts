@@ -342,3 +342,68 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireBranchMemberOrA
     return res.status(500).json({ error: "Server error" });
   }
 });
+
+analyticsRouter.get("/analytics/berthing", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const branchScope = await resolveBranchScopeInfo(req);
+    const now = new Date();
+    const in7Days = new Date(now);
+    in7Days.setDate(in7Days.getDate() + 7);
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const conditions: SQL[] = [];
+    if (branchScope.id !== null) conditions.push(eq(containersTable.branchId, branchScope.id));
+
+    const rows = await db.select({
+      id:                  containersTable.id,
+      containerNumber:     containersTable.containerNumber,
+      customerName:        containersTable.customerName,
+      vessel:              containersTable.vessel,
+      eta:                 containersTable.eta,
+      berthed:             containersTable.berthed,
+      berthingConfirmedAt: containersTable.berthingConfirmedAt,
+      status:              containersTable.status,
+      branchId:            containersTable.branchId,
+    }).from(containersTable)
+      .where(
+        conditions.length > 0
+          ? and(isNotNull(containersTable.eta), ...conditions)
+          : isNotNull(containersTable.eta)
+      );
+
+    const awaiting = rows
+      .filter(r => !r.berthed && r.eta && new Date(r.eta as Date) <= in7Days)
+      .sort((a, b) => new Date(a.eta as Date).getTime() - new Date(b.eta as Date).getTime());
+
+    const berthed = rows
+      .filter(r => r.berthed && r.berthingConfirmedAt && new Date(r.berthingConfirmedAt as Date) >= startOfToday)
+      .sort((a, b) => new Date(b.berthingConfirmedAt as Date).getTime() - new Date(a.berthingConfirmedAt as Date).getTime());
+
+    const upcoming = rows
+      .filter(r => !r.berthed && r.eta && new Date(r.eta as Date) > in7Days)
+      .sort((a, b) => new Date(a.eta as Date).getTime() - new Date(b.eta as Date).getTime())
+      .slice(0, 5);
+
+    const fmt = (r: typeof rows[0]) => ({
+      id:                  r.id,
+      containerNumber:     r.containerNumber,
+      customerName:        r.customerName,
+      vessel:              r.vessel || null,
+      eta:                 r.eta instanceof Date ? r.eta.toISOString() : (r.eta ?? null),
+      berthed:             r.berthed,
+      berthingConfirmedAt: r.berthingConfirmedAt instanceof Date ? r.berthingConfirmedAt.toISOString() : (r.berthingConfirmedAt ?? null),
+      status:              r.status,
+    });
+
+    return res.json({
+      awaiting:   awaiting.map(fmt),
+      berthed:    berthed.map(fmt),
+      upcoming:   upcoming.map(fmt),
+      branchScope: { id: branchScope.id, name: branchScope.name },
+    });
+  } catch (err) {
+    console.error("[analytics/berthing]", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks, useGetVatLiability } from "@workspace/api-client-react";
+import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks, useGetVatLiability, useGetBerthingOverview, type BerthingRow } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useBranchScope } from "@/components/layout/branch-provider";
@@ -14,6 +14,7 @@ import {
   FileText, CheckCircle2, ArrowRight, ClipboardCheck, ListTodo,
   Brain, ShieldAlert, Clock, ExternalLink, X, ChevronDown, ChevronUp,
   Wallet, CreditCard, ReceiptText, ShieldCheck, Landmark, Percent,
+  Anchor, Ship,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -253,6 +254,108 @@ function AlertBeacon() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function BerthingWidget() {
+  const { data, isLoading } = useGetBerthingOverview();
+
+  if (isLoading) {
+    return (
+      <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
+        <CardHeader className="pb-3">
+          <Skeleton className="h-4 w-40" />
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data) return null;
+
+  const { awaiting, berthed, upcoming } = data;
+  const totalVisible = awaiting.length + berthed.length;
+  if (totalVisible === 0 && upcoming.length === 0) return null;
+
+  const fmtDate = (iso: string | null) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
+  };
+
+  const Row = ({ row, group }: { row: BerthingRow; group: "awaiting" | "berthed" | "upcoming" }) => (
+    <Link href={`/containers/${row.id}`} asChild>
+      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer group/row">
+        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+          group === "berthed"  ? "bg-emerald-400" :
+          group === "awaiting" ? "bg-amber-400"   : "bg-muted-foreground/40"
+        }`} />
+        <div className="flex-1 min-w-0">
+          <span className="font-mono text-sm font-semibold group-hover/row:text-primary transition-colors">{row.containerNumber}</span>
+          <span className="text-xs text-muted-foreground ml-2 truncate">{row.customerName}</span>
+          {row.vessel && <span className="text-[11px] text-muted-foreground/70 ml-2">· {row.vessel}</span>}
+        </div>
+        <div className="text-right flex-shrink-0">
+          {group === "berthed" ? (
+            <span className="text-xs text-emerald-400 font-medium">Berthed {fmtDate(row.berthingConfirmedAt)}</span>
+          ) : (
+            <span className={`text-xs font-medium ${group === "awaiting" ? "text-amber-400" : "text-muted-foreground"}`}>
+              ETA {fmtDate(row.eta)}
+            </span>
+          )}
+        </div>
+        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover/row:text-primary transition-colors flex-shrink-0" />
+      </div>
+    </Link>
+  );
+
+  return (
+    <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Anchor className="w-4 h-4 text-cyan-400" />
+          Berthing Overview
+          <span className="text-[11px] font-normal text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">Next 7 days</span>
+        </CardTitle>
+        <Link href="/containers?status=registered" className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors">
+          All containers <ArrowRight className="w-3 h-3" />
+        </Link>
+      </CardHeader>
+      <CardContent className="space-y-1 pb-4">
+        {berthed.length > 0 && (
+          <div className="mb-1">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">
+              <Ship className="w-3 h-3" /> Berthed Today ({berthed.length})
+            </div>
+            {berthed.map(r => <Row key={r.id} row={r} group="berthed" />)}
+          </div>
+        )}
+
+        {awaiting.length > 0 && (
+          <div className="mb-1">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-amber-400 uppercase tracking-wider">
+              <Clock className="w-3 h-3" /> Awaiting Berth — within 7 days ({awaiting.length})
+            </div>
+            {awaiting.map(r => <Row key={r.id} row={r} group="awaiting" />)}
+          </div>
+        )}
+
+        {upcoming.length > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              Upcoming ({upcoming.length})
+            </div>
+            {upcoming.map(r => <Row key={r.id} row={r} group="upcoming" />)}
+          </div>
+        )}
+
+        {totalVisible === 0 && upcoming.length > 0 && (
+          <p className="text-xs text-muted-foreground text-center py-3">No vessels due this week — next arrivals shown above</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -561,6 +664,9 @@ export default function Dashboard() {
           </Card>
         </Link>
       )}
+
+      {/* Berthing Overview Widget */}
+      <BerthingWidget />
 
       {/* VAT Liability Widget — admin only */}
       {isAdmin && vatLiability && (
