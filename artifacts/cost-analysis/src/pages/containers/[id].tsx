@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { getShippingLine, normalizeContainerNumber, formatTrackingDate, formatTrackingDateTime, isMaerskContainer, type TrackingResult } from "@/lib/tracking";
+import { trackRecentItem } from "@/lib/recent-items";
 import {
   useGetContainer, useUpdateContainerCharges,
   useLockContainer, useUpdateContainer, useGetContainerAuditLog,
@@ -1127,6 +1128,18 @@ export default function ContainerDetail() {
   const { data: sectionSettings } = useGetSettings();
   const { data: builtinExtrasMap = {} } = useGetBuiltinExtras();
   const { data: sectionPaymentsData = [] } = useGetContainerExpensePaymentsBySection(isAdmin ? containerId : null);
+
+  useEffect(() => {
+    const container = (data as any)?.container;
+    if (!container?.containerNumber) return;
+    trackRecentItem({
+      type: "container",
+      id: containerId,
+      label: container.containerNumber,
+      sub: container.customerName ?? "",
+      href: `/operations/${containerId}`,
+    });
+  }, [(data as any)?.container?.containerNumber]);
 
   const handleLinkClient = () => {
     if (!selectedClientId) return;

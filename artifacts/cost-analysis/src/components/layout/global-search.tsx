@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Search, Loader2, Package, Users, FileText, X } from "lucide-react";
-import { useSearch, type SearchResponse } from "@workspace/api-client-react";
+import { Search, Loader2, Package, FileText, X, Clock, Trash2 } from "lucide-react";
+import { useSearch } from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
+import { getRecentItems, clearRecentItems, type RecentItem } from "@/lib/recent-items";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
@@ -23,12 +24,17 @@ function formatCurrency(val: string | number) {
   return "₦" + n.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
+function isMac() {
+  return typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+}
+
 export function GlobalSearch() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [, navigate] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,7 +71,9 @@ export function GlobalSearch() {
   ];
 
   const isEmpty = query.trim().length >= 2 && !isFetching && allResults.length === 0;
-  const showDropdown = open && query.trim().length >= 2;
+  const showResults = open && query.trim().length >= 2;
+  const showRecents = open && query.trim().length === 0 && recentItems.length > 0;
+  const showDropdown = showResults || showRecents;
 
   const handleNavigate = useCallback((href: string) => {
     setQuery("");
@@ -76,7 +84,7 @@ export function GlobalSearch() {
   }, [navigate]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showDropdown) return;
+    if (!showResults) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActiveIndex(i => Math.min(i + 1, allResults.length - 1));
@@ -115,9 +123,37 @@ export function GlobalSearch() {
     }
   }, [mobileExpanded]);
 
+  useEffect(() => {
+    const handleGlobalKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        if (inputRef.current) {
+          setMobileExpanded(true);
+          inputRef.current.focus();
+          setOpen(true);
+          setRecentItems(getRecentItems());
+        }
+      }
+    };
+    document.addEventListener("keydown", handleGlobalKey);
+    return () => document.removeEventListener("keydown", handleGlobalKey);
+  }, []);
+
+  const handleFocus = () => {
+    setOpen(true);
+    setRecentItems(getRecentItems());
+  };
+
+  const handleClearRecents = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearRecentItems();
+    setRecentItems([]);
+  };
+
   const typeIcon = (type: string) => {
     if (type === "container") return <Package className="w-3.5 h-3.5 text-primary/70 shrink-0" />;
-    if (type === "client") return <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />;
+    if (type === "client") return <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />;
     return <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />;
   };
 
@@ -129,6 +165,7 @@ export function GlobalSearch() {
 
   const groups = ["container", "client", "invoice"] as const;
   const groupLabel: Record<string, string> = { container: "Containers", client: "Clients", invoice: "Invoices" };
+  const mac = isMac();
 
   return (
     <div ref={containerRef} className="relative flex items-center">
@@ -154,79 +191,136 @@ export function GlobalSearch() {
             ref={inputRef}
             value={query}
             onChange={e => { setQuery(e.target.value); setOpen(true); }}
-            onFocus={() => setOpen(true)}
+            onFocus={handleFocus}
             onKeyDown={handleKeyDown}
             placeholder="Search containers, clients, invoices…"
-            className="pl-9 pr-8 h-9 text-sm bg-accent/20 border-border/50 focus:border-primary/50 focus:bg-background transition-colors w-full rounded-lg"
+            className="pl-9 pr-16 h-9 text-sm bg-accent/20 border-border/50 focus:border-primary/50 focus:bg-background transition-colors w-full rounded-lg"
             autoComplete="off"
           />
-          {isFetching && (
-            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-muted-foreground" />
-          )}
-          {!isFetching && query && (
-            <button
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              onClick={() => { setQuery(""); setOpen(false); }}
-              tabIndex={-1}
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {isFetching && (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            )}
+            {!isFetching && query && (
+              <button
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => { setQuery(""); setOpen(false); }}
+                tabIndex={-1}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {!query && (
+              <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono text-muted-foreground/60 bg-muted/40 border border-border/40 select-none pointer-events-none">
+                {mac ? "⌘K" : "Ctrl+K"}
+              </kbd>
+            )}
+          </div>
         </div>
 
         {/* Dropdown */}
         {showDropdown && (
           <div className="absolute right-0 top-full mt-2 w-80 bg-popover border border-border/60 rounded-xl shadow-xl z-50 overflow-hidden">
-            {isFetching && allResults.length === 0 && (
-              <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Searching…
-              </div>
-            )}
-            {isEmpty && (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                No results found for <span className="font-medium text-foreground">"{query}"</span>
-              </div>
-            )}
-            {!isFetching && allResults.length > 0 && (
-              <div className="py-1 max-h-96 overflow-y-auto">
-                {groups.map(group => {
-                  const groupItems = allResults.filter(r => r.type === group);
-                  if (groupItems.length === 0) return null;
-                  return (
-                    <div key={group}>
-                      <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 bg-accent/20">
-                        {groupLabel[group]}
+
+            {/* Recents panel */}
+            {showRecents && (
+              <div>
+                <div className="flex items-center justify-between px-3 py-1.5 bg-accent/20">
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+                    <Clock className="w-3 h-3" />
+                    Recent
+                  </span>
+                  <button
+                    className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                    onMouseDown={handleClearRecents}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Clear
+                  </button>
+                </div>
+                <div className="py-1 max-h-72 overflow-y-auto">
+                  {recentItems.slice(0, 5).map(item => (
+                    <button
+                      key={item.href}
+                      className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-accent/40 text-foreground transition-colors"
+                      onMouseDown={e => { e.preventDefault(); handleNavigate(item.href); }}
+                    >
+                      <span className="mt-0.5">
+                        {item.type === "container"
+                          ? <Package className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                          : <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        }
+                      </span>
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm truncate">{item.label}</div>
+                        {item.sub && (
+                          <div className="text-[11px] text-muted-foreground truncate">{item.sub}</div>
+                        )}
                       </div>
-                      {groupItems.map(item => {
-                        const globalIdx = allResults.indexOf(item);
-                        const isActive = globalIdx === activeIndex;
-                        return (
-                          <button
-                            key={`${item.type}-${item.id}`}
-                            className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left transition-colors ${
-                              isActive ? "bg-primary/10 text-foreground" : "hover:bg-accent/40 text-foreground"
-                            }`}
-                            onMouseEnter={() => setActiveIndex(globalIdx)}
-                            onMouseDown={e => { e.preventDefault(); handleNavigate(item.href); }}
-                          >
-                            <span className="mt-0.5">{typeIcon(item.type)}</span>
-                            <div className="min-w-0">
-                              <div className="font-medium text-sm truncate">{item.label}</div>
-                              {item.sub && (
-                                <div className="text-[11px] text-muted-foreground truncate">{item.sub}</div>
-                              )}
-                            </div>
-                            <span className="ml-auto text-[10px] text-muted-foreground/50 uppercase tracking-wide shrink-0 pt-0.5">
-                              {typeLabel(item.type)}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
+                      <span className="ml-auto text-[10px] text-muted-foreground/50 uppercase tracking-wide shrink-0 pt-0.5">
+                        {item.type === "container" ? "Container" : "Invoice"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
+            )}
+
+            {/* Search results panel */}
+            {showResults && (
+              <>
+                {isFetching && allResults.length === 0 && (
+                  <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Searching…
+                  </div>
+                )}
+                {isEmpty && (
+                  <div className="py-6 text-center text-sm text-muted-foreground">
+                    No results found for <span className="font-medium text-foreground">"{query}"</span>
+                  </div>
+                )}
+                {!isFetching && allResults.length > 0 && (
+                  <div className="py-1 max-h-96 overflow-y-auto">
+                    {groups.map(group => {
+                      const groupItems = allResults.filter(r => r.type === group);
+                      if (groupItems.length === 0) return null;
+                      return (
+                        <div key={group}>
+                          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 bg-accent/20">
+                            {groupLabel[group]}
+                          </div>
+                          {groupItems.map(item => {
+                            const globalIdx = allResults.indexOf(item);
+                            const isActive = globalIdx === activeIndex;
+                            return (
+                              <button
+                                key={`${item.type}-${item.id}`}
+                                className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left transition-colors ${
+                                  isActive ? "bg-primary/10 text-foreground" : "hover:bg-accent/40 text-foreground"
+                                }`}
+                                onMouseEnter={() => setActiveIndex(globalIdx)}
+                                onMouseDown={e => { e.preventDefault(); handleNavigate(item.href); }}
+                              >
+                                <span className="mt-0.5">{typeIcon(item.type)}</span>
+                                <div className="min-w-0">
+                                  <div className="font-medium text-sm truncate">{item.label}</div>
+                                  {item.sub && (
+                                    <div className="text-[11px] text-muted-foreground truncate">{item.sub}</div>
+                                  )}
+                                </div>
+                                <span className="ml-auto text-[10px] text-muted-foreground/50 uppercase tracking-wide shrink-0 pt-0.5">
+                                  {typeLabel(item.type)}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
 import {
   useGetInvoice, useUpdateInvoice, useRecordPayment, useDeletePayment,
@@ -12,6 +12,7 @@ import {
 import { useListContainers, getListContainersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { formatCurrency } from "@/lib/format";
+import { trackRecentItem } from "@/lib/recent-items";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -711,6 +712,17 @@ export default function InvoiceDetailPage() {
   const [whatsappLogOpen, setWhatsappLogOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InvoiceItem | null>(null);
+
+  useEffect(() => {
+    if (!invoice?.invoiceNumber) return;
+    trackRecentItem({
+      type: "invoice",
+      id: invoiceId,
+      label: invoice.invoiceNumber,
+      sub: invoice.clientName ?? "",
+      href: `/invoices/${invoiceId}`,
+    });
+  }, [invoice?.invoiceNumber]);
 
   const handleStatusChange = async (status: string) => {
     try {
