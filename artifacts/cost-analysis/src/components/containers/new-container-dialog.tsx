@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useCreateContainer, useListClients } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/layout/auth-provider";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import { useBranches } from "@/pages/branches";
 import {
   Dialog,
@@ -39,10 +40,19 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
   const createMutation = useCreateContainer();
   const { data: clients } = useListClients();
   const { isSuperAdmin, user } = useAuth();
+  const { activeBranchId } = useBranchScope();
   const { data: branches } = useBranches({ enabled: isSuperAdmin });
-  const [branchId, setBranchId] = useState<number | null>(
-    user?.branchId ?? null,
-  );
+  const [branchId, setBranchId] = useState<number | null>(user?.branchId ?? null);
+
+  useEffect(() => {
+    if (open) {
+      setBranchId(
+        isSuperAdmin && activeBranchId === "all"
+          ? null
+          : (user?.branchId ?? null),
+      );
+    }
+  }, [open]);
 
   const [form, setForm] = useState({
     customerName: "",
@@ -97,6 +107,7 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
     if (!form.containerNumber.trim()) e.containerNumber = "Container number is required";
     if (!form.blNumber.trim()) e.blNumber = "B/L number is required";
     if (!form.command) e.command = "Command is required";
+    if (isSuperAdmin && branchId === null) e.branch = "Branch is required";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -321,12 +332,17 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
 
             {isSuperAdmin && (
               <div className="col-span-2 space-y-1.5">
-                <Label htmlFor="branch">Branch</Label>
+                <Label htmlFor="branch">
+                  Branch {activeBranchId === "all" && <span className="text-destructive">*</span>}
+                </Label>
                 <Select
                   value={branchId != null ? String(branchId) : ""}
-                  onValueChange={(v) => setBranchId(v ? Number(v) : null)}
+                  onValueChange={(v) => {
+                    setBranchId(v ? Number(v) : null);
+                    if (errors.branch) setErrors(prev => { const { branch, ...rest } = prev; return rest; });
+                  }}
                 >
-                  <SelectTrigger id="branch">
+                  <SelectTrigger id="branch" className={errors.branch ? "border-destructive" : ""}>
                     <SelectValue placeholder="Select branch…" />
                   </SelectTrigger>
                   <SelectContent>
@@ -335,9 +351,14 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground">
-                  Defaults to your active branch. Select another only when creating on behalf of a different branch.
-                </p>
+                {errors.branch
+                  ? <p className="text-xs text-destructive">{errors.branch}</p>
+                  : <p className="text-[11px] text-muted-foreground">
+                      {activeBranchId === "all"
+                        ? "Required — select which branch this container belongs to."
+                        : "Defaults to your active branch. Change only when creating for another branch."}
+                    </p>
+                }
               </div>
             )}
           </div>

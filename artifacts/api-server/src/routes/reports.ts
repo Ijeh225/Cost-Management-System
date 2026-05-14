@@ -1401,8 +1401,11 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
         customerName: containersTable.customerName,
         blNumber: containersTable.blNumber,
         status: containersTable.status,
+        branchId: containersTable.branchId,
+        branchName: branchesTable.name,
       })
       .from(containersTable)
+      .leftJoin(branchesTable, eq(containersTable.branchId, branchesTable.id))
       .where(containerConds.length > 0 ? and(...containerConds) : undefined)
       .orderBy(containersTable.id);
 
@@ -1491,6 +1494,8 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
         customerName: c?.customerName ?? "",
         blNumber: c?.blNumber ?? null,
         status: c?.status ?? "",
+        branchId: c?.branchId ?? null,
+        branchName: c?.branchName ?? null,
         sections,
         totals: { budgeted: totalBudgeted, disbursed: totalDisbursed, variance: totalDisbursed - totalBudgeted },
       };

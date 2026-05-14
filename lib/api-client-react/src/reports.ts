@@ -79,10 +79,13 @@ export type AgingRow = {
   dueDate: string | null;
   daysOverdue: number;
   createdAt: string;
+  branchId?: number;
+  branchName?: string | null;
 };
 
 export type InvoiceAgingResponse = {
   generatedAt: string;
+  branchScope?: { id: number | null; name: string };
   buckets: {
     current: AgingRow[];
     days1to30: AgingRow[];
@@ -128,9 +131,11 @@ export function useGetVatSummary(params: { from?: string; to?: string }) {
   });
 }
 
-export function useGetInvoiceAging() {
+export function useGetInvoiceAging(options?: { enabled?: boolean }) {
+  const { enabled = true } = options ?? {};
   return useQuery<InvoiceAgingResponse>({
     queryKey: ["/api/reports/invoice-aging"],
+    enabled,
     queryFn: async () => customFetch("/api/reports/invoice-aging"),
   });
 }
@@ -205,6 +210,8 @@ export type DisbursementReconciliationRow = {
   customerName: string;
   blNumber: string | null;
   status: string;
+  branchId?: number | null;
+  branchName?: string | null;
   sections: Record<string, DisbursementReconciliationSection>;
   totals: { budgeted: number; disbursed: number; variance: number };
 };

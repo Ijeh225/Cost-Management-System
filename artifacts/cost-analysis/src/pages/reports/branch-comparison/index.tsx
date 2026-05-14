@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Building2, Download, Loader2, AlertTriangle, TrendingUp, TrendingDown, ChevronUp, ChevronDown } from "lucide-react";
+import { Building2, Download, Loader2, AlertTriangle, TrendingUp, TrendingDown, ChevronUp, ChevronDown, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -124,9 +124,26 @@ export default function BranchComparisonPage() {
             Cross-branch executive overview — revenue, costs, profit, and operations side-by-side.
           </p>
         </div>
-        <Button onClick={exportCSV} disabled={!rows.length} variant="outline" size="sm" className="gap-2">
-          <Download className="w-3.5 h-3.5" /> Export CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={exportCSV} disabled={!rows.length} variant="outline" size="sm" className="gap-2">
+            <Download className="w-3.5 h-3.5" /> Export CSV
+          </Button>
+          <Button
+            disabled={!rows.length}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => {
+              const qs = new URLSearchParams();
+              if (applied.from) qs.set("from", applied.from);
+              if (applied.to) qs.set("to", applied.to);
+              const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+              window.open(`${base}/reports/branch-comparison/print?${qs}`, "_blank", "noopener");
+            }}
+          >
+            <Printer className="w-3.5 h-3.5" /> Print
+          </Button>
+        </div>
       </div>
 
       <Card className="border-border/40 bg-card/40 backdrop-blur-sm">

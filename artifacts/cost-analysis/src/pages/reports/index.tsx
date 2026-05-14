@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, useGetFxHistory, type DeliveryAnalyticsResponse, type FxHistoryEntry } from "@workspace/api-client-react";
+import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, useGetFxHistory, useGetInvoiceAging, type DeliveryAnalyticsResponse, type FxHistoryEntry, type AgingRow } from "@workspace/api-client-react";
 import { useBranchScope } from "@/components/layout/branch-provider";
 import { useLocation } from "wouter";
 
@@ -778,6 +778,138 @@ function FxHistorySection() {
   );
 }
 
+function InvoiceAgingSection() {
+  const { activeBranchId, isSuperAdmin } = useBranchScope();
+  const showBranchColumn = isSuperAdmin && activeBranchId === "all";
+  const [generated, setGenerated] = useState(false);
+  const { data, isLoading, isError, refetch } = useGetInvoiceAging({ enabled: generated });
+
+  const openReport = (path: string, params: Record<string, string>) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v); });
+    const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+    window.open(`${base}${path}?${qs}`, "_blank", "noopener");
+  };
+
+  const fmtDate = (d: string | null) =>
+    d ? new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+  const BUCKET_DEFS = [
+    { key: "current" as const, label: "Current (Not Yet Overdue)", color: "text-emerald-400", badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
+    { key: "days1to30" as const, label: "1–30 Days Overdue", color: "text-amber-400", badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/30" },
+    { key: "days31to60" as const, label: "31–60 Days Overdue", color: "text-orange-400", badgeClass: "bg-orange-500/10 text-orange-400 border-orange-500/30" },
+    { key: "days61to90" as const, label: "61–90 Days Overdue", color: "text-red-400", badgeClass: "bg-red-500/10 text-red-400 border-red-500/30" },
+    { key: "days90plus" as const, label: "90+ Days Overdue", color: "text-destructive", badgeClass: "bg-destructive/10 text-destructive border-destructive/30" },
+  ] as const;
+
+  const buckets = data?.buckets;
+  const totals = data?.totals;
+  const totalCount = buckets ? Object.values(buckets).reduce((s, rows) => s + rows.length, 0) : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-base font-bold text-foreground flex items-center gap-2 mb-1">
+            <Clock className="w-4 h-4 text-amber-400" /> Invoice Aging Analysis
+          </h2>
+          <p className="text-xs text-muted-foreground">Live snapshot of all unpaid invoices grouped by days overdue.</p>
+        </div>
+        <div className="flex gap-2">
+          {data && (
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => openReport("/reports/invoice-aging/print", {})}>
+              <ExternalLink className="w-3.5 h-3.5" /> Print
+            </Button>
+          )}
+          <Button
+            size="sm"
+            className="h-8 text-xs gap-1.5"
+            disabled={isLoading}
+            onClick={() => { if (!generated) setGenerated(true); else refetch(); }}
+          >
+            {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Filter className="w-3 h-3" />}
+            {generated ? "Refresh" : "Generate Aging Report"}
+          </Button>
+        </div>
+      </div>
+
+      {isError && (
+        <div className="flex items-center gap-3 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+          <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+          <p className="text-xs text-destructive">Failed to load aging data. Please retry.</p>
+        </div>
+      )}
+
+      {data && totalCount === 0 && (
+        <div className="py-8 text-center">
+          <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-400/50 mb-2" />
+          <p className="text-sm text-muted-foreground">No outstanding invoices — all invoices are current or paid.</p>
+        </div>
+      )}
+
+      {data && totalCount > 0 && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {BUCKET_DEFS.map(b => (
+              <SumCard key={b.key} label={b.label} value={formatCurrency(totals![b.key])} color={b.color} />
+            ))}
+          </div>
+
+          {BUCKET_DEFS.map(b => {
+            const rows: AgingRow[] = buckets![b.key];
+            if (rows.length === 0) return null;
+            return (
+              <div key={b.key}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className={`text-[10px] ${b.badgeClass}`}>{b.label}</Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {rows.length} invoice{rows.length !== 1 ? "s" : ""} — {formatCurrency(totals![b.key])} outstanding
+                  </span>
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-border/30">
+                  <table className="w-full text-xs min-w-[500px]">
+                    <thead className="bg-secondary/20 border-b border-border/30 text-muted-foreground uppercase tracking-wider">
+                      <tr>
+                        <th className="px-4 py-2.5 text-left font-medium">Invoice</th>
+                        <th className="px-4 py-2.5 text-left font-medium">Client</th>
+                        <th className="px-4 py-2.5 text-right font-medium">Outstanding</th>
+                        <th className="px-4 py-2.5 text-right font-medium">Due Date</th>
+                        <th className="px-4 py-2.5 text-right font-medium">Days Overdue</th>
+                        {showBranchColumn && <th className="px-4 py-2.5 text-left font-medium">Branch</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/20">
+                      {rows.map(r => (
+                        <tr key={r.id} className="hover:bg-muted/5">
+                          <td className="px-4 py-2.5 font-mono font-medium text-primary">{r.invoiceNumber}</td>
+                          <td className="px-4 py-2.5 text-foreground">{r.clientName}</td>
+                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-amber-400">{formatCurrency(r.outstanding)}</td>
+                          <td className="px-4 py-2.5 text-right text-muted-foreground">{fmtDate(r.dueDate)}</td>
+                          <td className={`px-4 py-2.5 text-right font-semibold ${b.color}`}>
+                            {r.daysOverdue > 0 ? `${r.daysOverdue}d` : "—"}
+                          </td>
+                          {showBranchColumn && (
+                            <td className="px-4 py-2.5 text-muted-foreground">{r.branchName ?? "—"}</td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+
+          <p className="text-[11px] text-muted-foreground text-right">
+            Grand total outstanding: <span className="font-semibold text-foreground">{formatCurrency(totals!.grandTotal)}</span>
+            {data.generatedAt && ` · Generated ${new Date(data.generatedAt).toLocaleString()}`}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function PrintableReportsSection() {
   const { data: clients = [] } = useListClients();
   const { data: banks = [] } = useListBanks();
@@ -1386,6 +1518,11 @@ export default function ReportsPage() {
         {/* FX Rate History Section */}
         <div className="border-t border-border/40 pt-6">
           <FxHistorySection />
+        </div>
+
+        {/* Invoice Aging Section */}
+        <div className="border-t border-border/40 pt-6">
+          <InvoiceAgingSection />
         </div>
 
         {/* Printable Reports Section */}

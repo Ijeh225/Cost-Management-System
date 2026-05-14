@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import {
   useGetOverheadExpenses, useCreateOverheadExpense, useUpdateOverheadExpense,
   useDeleteOverheadExpense, useCreateExpensePayment, useGetExpenseCategories,
@@ -187,6 +188,8 @@ function MakePaymentDialog({ expense, onOpenChange, onSubmit, isPending }: {
 
 export default function OverheadExpensesPage() {
   const { isAdmin } = useAuth();
+  const { activeBranchId, isSuperAdmin } = useBranchScope();
+  const showBranchColumn = isSuperAdmin && activeBranchId === "all";
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -415,6 +418,7 @@ export default function OverheadExpensesPage() {
                                 <span className="text-sm font-medium text-foreground">{e.description}</span>
                                 <Badge variant="outline" className={`text-[10px] font-medium shrink-0 ${catColor(e.category)}`}>{e.category}</Badge>
                                 <Badge variant="outline" className={`text-[10px] font-medium shrink-0 ${STATUS_COLORS[e.status]}`}>{STATUS_LABELS[e.status]}</Badge>
+                                {showBranchColumn && <BranchChip branchId={(e as { branchId?: number }).branchId} />}
                               </div>
                               <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
                                 {e.reference && <span>Ref: {e.reference}</span>}

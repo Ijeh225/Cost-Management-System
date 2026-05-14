@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useGetDisbursementReconciliation, type DisbursementReconciliationRow } from "@workspace/api-client-react";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,10 +66,11 @@ function AggCard({ label, budgeted, disbursed, variance }: { label: string; budg
   );
 }
 
-function ContainerRow({ row }: { row: DisbursementReconciliationRow }) {
+function ContainerRow({ row, showBranch }: { row: DisbursementReconciliationRow; showBranch?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const over = row.totals.variance > 0;
   const under = row.totals.variance < 0;
+  const colCount = showBranch ? 7 : 6;
   return (
     <>
       <tr
@@ -83,6 +85,9 @@ function ContainerRow({ row }: { row: DisbursementReconciliationRow }) {
         <td className="px-4 py-3">
           <Badge className="text-[9px] capitalize">{row.status?.replace(/_/g, " ")}</Badge>
         </td>
+        {showBranch && (
+          <td className="px-4 py-3 text-xs text-muted-foreground">{row.branchName ?? "—"}</td>
+        )}
         <td className="px-4 py-3 text-right font-mono text-sm text-muted-foreground">{formatCurrency(row.totals.budgeted)}</td>
         <td className="px-4 py-3 text-right font-mono text-sm">{formatCurrency(row.totals.disbursed)}</td>
         <td className="px-4 py-3 text-right">
@@ -94,7 +99,7 @@ function ContainerRow({ row }: { row: DisbursementReconciliationRow }) {
       </tr>
       {expanded && (
         <tr className="border-b border-border/10 bg-muted/5">
-          <td colSpan={6} className="px-6 py-3">
+          <td colSpan={colCount} className="px-6 py-3">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-muted-foreground">
@@ -154,6 +159,8 @@ function exportCsv(rows: DisbursementReconciliationRow[], filename: string) {
 
 export default function DisbursementReconciliationPage() {
   const { toast } = useToast();
+  const { activeBranchId, isSuperAdmin } = useBranchScope();
+  const showBranchColumn = isSuperAdmin && activeBranchId === "all";
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -381,6 +388,9 @@ export default function DisbursementReconciliationPage() {
                         <th className={thClass} onClick={() => handleSort("status")}>
                           Status <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />
                         </th>
+                        {showBranchColumn && (
+                          <th className={thClass}>Branch</th>
+                        )}
                         <th className={thRClass} onClick={() => handleSort("budgeted")}>
                           Budgeted (₦) <SortIcon col="budgeted" sortKey={sortKey} sortDir={sortDir} />
                         </th>
@@ -395,12 +405,12 @@ export default function DisbursementReconciliationPage() {
                     </thead>
                     <tbody>
                       {sortedRows.map(row => (
-                        <ContainerRow key={row.containerId} row={row} />
+                        <ContainerRow key={row.containerId} row={row} showBranch={showBranchColumn} />
                       ))}
                     </tbody>
                     <tfoot className="border-t-2 border-border/40 bg-muted/10">
                       <tr>
-                        <td className="px-4 py-3 font-bold text-sm" colSpan={2}>Totals ({sortedRows.length} containers)</td>
+                        <td className="px-4 py-3 font-bold text-sm" colSpan={showBranchColumn ? 3 : 2}>Totals ({sortedRows.length} containers)</td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-muted-foreground">{formatCurrency(agg.totals.budgeted)}</td>
                         <td className="px-4 py-3 text-right font-mono font-bold">{formatCurrency(agg.totals.disbursed)}</td>
                         <td className="px-4 py-3 text-right">

@@ -5,6 +5,7 @@ import {
   type Bank, type BankTransfer,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";

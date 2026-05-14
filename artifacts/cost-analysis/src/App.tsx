@@ -59,6 +59,7 @@ import ProfitLossPrint from "@/pages/reports/pl/print";
 import DeliveryReportPrint from "@/pages/reports/delivery-report/print";
 import DisbursementReconciliationPage from "@/pages/reports/disbursement-reconciliation/index";
 import BranchComparisonPage from "@/pages/reports/branch-comparison/index";
+import BranchComparisonPrint from "@/pages/reports/branch-comparison/print";
 import CreditNotePrintPage from "@/pages/credit-notes/print/[id]";
 import BranchesPage from "@/pages/branches/index";
 import BranchSettingsPage from "@/pages/branch-settings/index";
@@ -217,6 +218,7 @@ function Router() {
       <Route path="/reports/cashflow/print" component={CashFlowPrint} />
       <Route path="/reports/pl/print" component={ProfitLossPrint} />
       <Route path="/reports/delivery-report/print" component={DeliveryReportPrint} />
+      <Route path="/reports/branch-comparison/print" component={BranchComparisonPrint} />
       <Route>
         <AppLayout>
           <PageErrorBoundary>
