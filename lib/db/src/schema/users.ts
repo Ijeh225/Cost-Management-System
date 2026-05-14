@@ -1,11 +1,10 @@
 import { pgTable, serial, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { branchesTable } from "./branches";
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),

@@ -1,7 +1,6 @@
 import { pgTable, serial, integer, numeric, text, timestamp } from "drizzle-orm/pg-core";
 import { banksTable } from "./banks";
 import { usersTable } from "./users";
-import { branchesTable } from "./branches";
 
 export const bankTransfersTable = pgTable("bank_transfers", {
   id: serial("id").primaryKey(),
@@ -11,7 +10,7 @@ export const bankTransfersTable = pgTable("bank_transfers", {
   narration: text("narration").notNull().default(""),
   reference: text("reference"),
   createdBy: integer("created_by").references(() => usersTable.id, { onDelete: "set null" }),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

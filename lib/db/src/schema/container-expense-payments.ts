@@ -1,5 +1,4 @@
 import { pgTable, serial, integer, numeric, text, timestamp } from "drizzle-orm/pg-core";
-import { branchesTable } from "./branches";
 
 export const PAYMENT_SECTIONS = ["shipping", "customs", "terminal", "delivery", "operations"] as const;
 export type PaymentSection = typeof PAYMENT_SECTIONS[number];
@@ -14,7 +13,7 @@ export const PAYMENT_SECTION_LABELS: Record<PaymentSection, string> = {
 
 export const containerExpensePaymentsTable = pgTable("container_expense_payments", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   containerId: integer("container_id").notNull(),
   categoryId: integer("category_id"),
   section: text("section"),

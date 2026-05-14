@@ -1,11 +1,10 @@
 import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
 import { invoicesTable } from "./invoices";
 import { clientsTable } from "./clients";
-import { branchesTable } from "./branches";
 
 export const whatsappMessagesTable = pgTable("whatsapp_messages", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   invoiceId: integer("invoice_id").notNull().references(() => invoicesTable.id, { onDelete: "cascade" }),
   clientId: integer("client_id").references(() => clientsTable.id, { onDelete: "set null" }),
   messageType: text("message_type").notNull(),

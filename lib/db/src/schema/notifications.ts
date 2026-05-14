@@ -1,11 +1,10 @@
 import { pgTable, serial, integer, text, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 import { containersTable } from "./containers";
-import { branchesTable } from "./branches";
 
 export const notificationsReadTable = pgTable("notifications_read", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   alertKey: text("alert_key").notNull(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   isRead: boolean("is_read").notNull().default(false),
@@ -17,7 +16,7 @@ export const notificationsReadTable = pgTable("notifications_read", {
 
 export const workflowNotificationsTable = pgTable("workflow_notifications", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   type: text("type").notNull(), // new_job | stage_complete | overdue | delay_recorded
   message: text("message").notNull(),
   containerId: integer("container_id").references(() => containersTable.id, { onDelete: "cascade" }),
@@ -32,7 +31,7 @@ export const workflowNotificationsTable = pgTable("workflow_notifications", {
 // When an alert is no longer detected it is automatically considered resolved.
 export const systemAlertsHistoryTable = pgTable("system_alerts_history", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   alertKey: text("alert_key").notNull().unique(),
   type: text("type").notNull(),
   severity: text("severity").notNull(),

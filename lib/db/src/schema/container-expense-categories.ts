@@ -1,9 +1,8 @@
 import { pgTable, serial, text, boolean, integer, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { branchesTable } from "./branches";
 
 export const containerExpenseCategoriesTable = pgTable("container_expense_categories", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   name: text("name").notNull(),
   isDefault: boolean("is_default").notNull().default(false),
   createdBy: integer("created_by"),

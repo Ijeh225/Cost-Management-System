@@ -3,11 +3,10 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { containersTable } from "./containers";
 import { usersTable } from "./users";
-import { branchesTable } from "./branches";
 
 export const containerTasksTable = pgTable("container_tasks", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   containerId: integer("container_id").notNull().references(() => containersTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   assignedStaffId: integer("assigned_staff_id").references(() => usersTable.id),

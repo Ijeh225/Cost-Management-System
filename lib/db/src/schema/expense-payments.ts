@@ -1,5 +1,4 @@
 import { pgTable, serial, integer, numeric, text, timestamp } from "drizzle-orm/pg-core";
-import { branchesTable } from "./branches";
 
 export const expensePaymentsTable = pgTable("expense_payments", {
   id: serial("id").primaryKey(),
@@ -10,7 +9,7 @@ export const expensePaymentsTable = pgTable("expense_payments", {
   paidAt: timestamp("paid_at").notNull().defaultNow(),
   notes: text("notes"),
   recordedBy: integer("recorded_by"),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

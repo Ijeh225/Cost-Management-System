@@ -3,11 +3,10 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { containersTable } from "./containers";
-import { branchesTable } from "./branches";
 
 export const customSectionsTable = pgTable("custom_sections", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   containerId: integer("container_id").references(() => containersTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
@@ -24,7 +23,7 @@ export const customSectionsTable = pgTable("custom_sections", {
 
 export const customFieldsTable = pgTable("custom_fields", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   sectionId: integer("section_id").references(() => customSectionsTable.id, { onDelete: "cascade" }),
   builtinSectionKey: text("builtin_section_key"),
   name: text("name").notNull(),
@@ -43,7 +42,7 @@ export const customFieldsTable = pgTable("custom_fields", {
 
 export const customFieldValuesTable = pgTable("custom_field_values", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   containerId: integer("container_id").notNull(),
   fieldId: integer("field_id").notNull().references(() => customFieldsTable.id, { onDelete: "cascade" }),
   value: text("value").notNull().default(""),

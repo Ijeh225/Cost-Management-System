@@ -1,11 +1,10 @@
 import { pgTable, serial, integer, timestamp } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 import { clientsTable } from "./clients";
-import { branchesTable } from "./branches";
 
 export const userClientAssignmentsTable = pgTable("user_client_assignments", {
   id: serial("id").primaryKey(),
-  branchId: integer("branch_id").notNull().default(1).references(() => branchesTable.id),
+  branchId: integer("branch_id").notNull().default(1),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   clientId: integer("client_id").notNull().references(() => clientsTable.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
