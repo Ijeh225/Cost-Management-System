@@ -196,7 +196,7 @@ reportsRouter.get("/reports/export", requireAuth, requireBranchMemberOrAbove, as
   }
 });
 
-reportsRouter.get("/reports/client-statement", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/client-statement", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const { clientId, from, to } = req.query as Record<string, string>;
     if (!clientId) return res.status(400).json({ error: "clientId is required" });

@@ -1198,7 +1198,7 @@ export default function ReportsPage() {
     { status: applied.status || undefined, from: applied.from || undefined, to: applied.to || undefined }
   );
 
-  const { activeBranchId, isSuperAdmin } = useBranchScope();
+  const { activeBranchId, isSuperAdmin, branches, setActiveBranch } = useBranchScope();
   const showBranchColumn = isSuperAdmin && activeBranchId === "all";
 
   const allRows = (((data as { containers?: ReportRow[] } | undefined)?.containers) ?? []) as ReportRow[];
@@ -1355,7 +1355,7 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 items-end">
               <div className="space-y-1.5">
                 <Label className="text-xs">Status</Label>
                 <Select value={status || "all"} onValueChange={v => setStatus(v === "all" ? "" : v)}>
@@ -1374,6 +1374,18 @@ export default function ReportsPage() {
                 <Label className="text-xs">To Date</Label>
                 <Input type="date" value={to} onChange={e => setTo(e.target.value)} className="h-9 text-sm" />
               </div>
+              {showBranchColumn && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Branch</Label>
+                  <Select value={String(activeBranchId)} onValueChange={v => setActiveBranch(v === "all" ? "all" : Number(v))}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Branches</SelectItem>
+                      {branches.map(b => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button onClick={handleApply} size="sm" className="flex-1 h-9">Apply</Button>
                 <Button onClick={handleReset} size="sm" variant="outline" className="h-9 px-3">

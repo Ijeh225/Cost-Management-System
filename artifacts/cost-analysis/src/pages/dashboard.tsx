@@ -256,12 +256,13 @@ function AlertBeacon() {
   );
 }
 
-function StatCard({ title, value, icon: Icon, isCurrency = false, colorClass = "" }: {
+function StatCard({ title, value, icon: Icon, isCurrency = false, colorClass = "", branchLabel }: {
   title: string;
   value: number;
   icon: React.ElementType;
   isCurrency?: boolean;
   colorClass?: string;
+  branchLabel?: string;
 }) {
   return (
     <Card className="border-border/40 bg-card/40 backdrop-blur-sm overflow-hidden relative group">
@@ -276,6 +277,9 @@ function StatCard({ title, value, icon: Icon, isCurrency = false, colorClass = "
         <div className={`text-2xl font-bold tracking-tight ${colorClass ? colorClass : "text-foreground"}`}>
           {isCurrency ? formatCurrency(value) : formatNumber(value)}
         </div>
+        {branchLabel && (
+          <p className="text-[10px] text-muted-foreground/60 mt-1 truncate" title={branchLabel}>{branchLabel}</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -378,6 +382,12 @@ function BankBalanceBar() {
 
 export default function Dashboard() {
   const { isAdmin } = useAuth();
+  const { isSuperAdmin: scopeIsSuperAdmin, activeBranchId, branches } = useBranchScope();
+  const branchLabel = scopeIsSuperAdmin
+    ? (activeBranchId === "all"
+        ? "All Branches — Consolidated"
+        : (branches.find((b: { id: number; name: string }) => b.id === activeBranchId)?.name ?? `Branch #${activeBranchId}`))
+    : undefined;
   const [terminalDrillOpen, setTerminalDrillOpen] = useState(false);
 
   const { data: stats, isLoading, isError } = useGetDashboardStats();
@@ -439,26 +449,28 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard title="Total Containers"       value={stats.totalContainers}        icon={Box} />
-        <StatCard title="In Progress"            value={stats.inProgress}             icon={Activity}    colorClass="text-blue-400" />
-        <StatCard title="Completed"              value={stats.completed}              icon={CheckCircle2} colorClass="text-emerald-400" />
-        <StatCard title="Total Cost"             value={stats.totalCost}              icon={DollarSign}  isCurrency />
-        <StatCard title="Total Clearing Charges" value={stats.totalClearingCharges}   icon={FileText}    isCurrency />
+        <StatCard title="Total Containers"       value={stats.totalContainers}        icon={Box}         branchLabel={branchLabel} />
+        <StatCard title="In Progress"            value={stats.inProgress}             icon={Activity}    colorClass="text-blue-400" branchLabel={branchLabel} />
+        <StatCard title="Completed"              value={stats.completed}              icon={CheckCircle2} colorClass="text-emerald-400" branchLabel={branchLabel} />
+        <StatCard title="Total Cost"             value={stats.totalCost}              icon={DollarSign}  isCurrency branchLabel={branchLabel} />
+        <StatCard title="Total Clearing Charges" value={stats.totalClearingCharges}   icon={FileText}    isCurrency branchLabel={branchLabel} />
         <StatCard
           title="Gross Profit"
           value={grossProfit}
           icon={grossProfit >= 0 ? TrendingUp : TrendingDown}
           isCurrency
           colorClass={grossProfit >= 0 ? "text-emerald-400" : "text-destructive"}
+          branchLabel={branchLabel}
         />
-        <StatCard title="Total Invoiced"         value={stats.totalInvoiced ?? 0}     icon={ReceiptText} isCurrency />
-        <StatCard title="Total Collected"        value={stats.totalCollected ?? 0}    icon={Wallet}      isCurrency colorClass="text-emerald-400" />
+        <StatCard title="Total Invoiced"         value={stats.totalInvoiced ?? 0}     icon={ReceiptText} isCurrency branchLabel={branchLabel} />
+        <StatCard title="Total Collected"        value={stats.totalCollected ?? 0}    icon={Wallet}      isCurrency colorClass="text-emerald-400" branchLabel={branchLabel} />
         <StatCard
           title="Outstanding Receivables"
           value={stats.totalOutstanding ?? 0}
           icon={CreditCard}
           isCurrency
           colorClass={(stats.totalOutstanding ?? 0) > 0 ? "text-amber-400" : "text-muted-foreground"}
+          branchLabel={branchLabel}
         />
         {/* Containers in Terminal KPI — clickable drill-down */}
         <button type="button" className="text-left w-full" onClick={() => setTerminalDrillOpen(true)}>

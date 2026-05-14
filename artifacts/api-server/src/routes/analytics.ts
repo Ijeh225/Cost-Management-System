@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, sectionApprovalsTable, branchesTable } from "@workspace/db";
 import { eq, desc, gte, lte, and, inArray, isNotNull, type SQL } from "drizzle-orm";
-import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
 async function resolveBranchScopeInfo(req: AuthRequest): Promise<{ id: number | null; name: string }> {
@@ -228,7 +228,7 @@ function parseIsoDate(val: string | undefined): Date | null | "invalid" {
   return d;
 }
 
-analyticsRouter.get("/analytics/deliveries", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+analyticsRouter.get("/analytics/deliveries", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const fromStr = req.query.from as string | undefined;
     const toStr = req.query.to as string | undefined;
