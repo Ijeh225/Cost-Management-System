@@ -1374,7 +1374,7 @@ export default function ReportsPage() {
                 <Label className="text-xs">To Date</Label>
                 <Input type="date" value={to} onChange={e => setTo(e.target.value)} className="h-9 text-sm" />
               </div>
-              {showBranchColumn && (
+              {isSuperAdmin && branches.length > 0 && (
                 <div className="space-y-1.5">
                   <Label className="text-xs">Branch</Label>
                   <Select value={String(activeBranchId)} onValueChange={v => setActiveBranch(v === "all" ? "all" : Number(v))}>

@@ -334,7 +334,7 @@ export default function CashFlowPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {isSuperAdmin && branches.length > 0 && (
+              {isSuperAdmin && (
                 <div className="space-y-1">
                   <Label className="text-xs">Branch</Label>
                   <Select value={String(activeBranchId)} onValueChange={v => setActiveBranch(v === "all" ? "all" : Number(v))}>

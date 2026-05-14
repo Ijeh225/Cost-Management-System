@@ -239,7 +239,7 @@ export default function DisbursementReconciliationPage() {
       <Card className="border-border/40 bg-card/40">
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-3 items-end">
-            {isSuperAdmin && branches.length > 0 && (
+            {isSuperAdmin && (
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-1"><Building2 className="w-3 h-3" /> Branch</Label>
                 <Select value={String(activeBranchId)} onValueChange={v => setActiveBranch(v === "all" ? "all" : Number(v))}>
