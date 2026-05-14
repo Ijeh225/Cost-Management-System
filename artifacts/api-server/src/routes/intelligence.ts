@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable } from "@workspace/db";
 import { eq, lt, inArray } from "drizzle-orm";
-import { requireAuth, AuthRequest, getBranchScope } from "../lib/auth.js";
+import { requireAuth, requireBranchMemberOrAbove, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery, sumCustoms } from "../lib/calculations.js";
 
 export const intelligenceRouter = Router();
@@ -10,7 +10,7 @@ const AVG_THRESHOLD = 1.5;
 const LOW_MARGIN_PCT = 0.15;
 const NEGATIVE_PROFIT_THRESHOLD = 0;
 
-intelligenceRouter.get("/intelligence/alerts", requireAuth, async (req: AuthRequest, res) => {
+intelligenceRouter.get("/intelligence/alerts", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const branchScope = getBranchScope(req);
     const allContainers = branchScope !== null

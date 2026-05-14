@@ -96,7 +96,7 @@ export default function BranchComparisonPrint() {
     <div style={styles.page}>
       <div style={styles.header}>
         <p style={styles.companyName}>Branch Performance Comparison</p>
-        <p style={styles.reportTitle}>Cross-Branch Executive Overview — All Branches Side-by-Side</p>
+        <p style={styles.reportTitle}>Cross-Branch Executive Overview — All Branches — Consolidated</p>
         <div style={styles.metaRow}>
           <span>Period: <strong>{periodLabel}</strong></span>
           <span>Generated: {new Date(data.generatedAt).toLocaleString("en-NG")}</span>
