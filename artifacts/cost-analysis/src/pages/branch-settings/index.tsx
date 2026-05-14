@@ -30,12 +30,17 @@ type FormState = {
   emailMode: "head_office" | "own";
   emailFromAddress: string;
   emailReplyTo: string;
+  alertAdminNumber: string;
+  alertOnStuck: boolean;
+  alertOnOverdue: boolean;
+  alertOnNegativeProfit: boolean;
 };
 
 const EMPTY: FormState = {
   location: "", contactEmail: "", contactPhone: "",
   whatsappMode: "head_office", whatsappNumber: "",
   emailMode: "head_office", emailFromAddress: "", emailReplyTo: "",
+  alertAdminNumber: "", alertOnStuck: false, alertOnOverdue: false, alertOnNegativeProfit: false,
 };
 
 export default function BranchSettingsPage() {
@@ -58,6 +63,10 @@ export default function BranchSettingsPage() {
       emailMode: branch.emailMode ?? "head_office",
       emailFromAddress: branch.emailFromAddress ?? "",
       emailReplyTo: branch.emailReplyTo ?? "",
+      alertAdminNumber: (branch as any).alertAdminNumber ?? "",
+      alertOnStuck: (branch as any).alertOnStuck === "true" || (branch as any).alertOnStuck === true,
+      alertOnOverdue: (branch as any).alertOnOverdue === "true" || (branch as any).alertOnOverdue === true,
+      alertOnNegativeProfit: (branch as any).alertOnNegativeProfit === "true" || (branch as any).alertOnNegativeProfit === true,
     });
   }, [branch]);
 
@@ -73,6 +82,10 @@ export default function BranchSettingsPage() {
         emailMode: form.emailMode,
         emailFromAddress: form.emailMode === "own" ? (form.emailFromAddress.trim() || null) : null,
         emailReplyTo: form.emailMode === "own" ? (form.emailReplyTo.trim() || null) : null,
+        alertAdminNumber: form.alertAdminNumber.trim() || null,
+        alertOnStuck: form.alertOnStuck,
+        alertOnOverdue: form.alertOnOverdue,
+        alertOnNegativeProfit: form.alertOnNegativeProfit,
       }),
     }),
     onSuccess: () => {
@@ -175,6 +188,37 @@ export default function BranchSettingsPage() {
             </div>
           </div>
         )}
+      </Card>
+
+      <Card className="p-6 space-y-4 bg-card/95 border-border/50">
+        <h2 className="text-sm font-mono uppercase tracking-wider text-muted-foreground">Alert Digest (WhatsApp)</h2>
+        <p className="text-xs text-muted-foreground">
+          When you trigger the daily digest from the dashboard, alerts are sent to this number. No messages are sent automatically.
+        </p>
+        <div className="space-y-2">
+          <Label htmlFor="alert-num">Admin Alert Number</Label>
+          <Input id="alert-num" placeholder="+234..." value={form.alertAdminNumber}
+            onChange={(e) => setForm(f => ({ ...f, alertAdminNumber: e.target.value }))} />
+          <p className="text-[11px] text-muted-foreground">International format, e.g. +2348012345678</p>
+        </div>
+        <div className="space-y-3">
+          <Label>Alert Types to Include</Label>
+          {([
+            { key: "alertOnStuck" as const, label: "Stuck containers (in same stage 30+ days)" },
+            { key: "alertOnOverdue" as const, label: "Overdue next-action dates" },
+            { key: "alertOnNegativeProfit" as const, label: "Containers running at a loss" },
+          ] as const).map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-3 cursor-pointer group">
+              <div
+                className={`w-9 h-5 rounded-full transition-colors relative ${form[key] ? "bg-primary" : "bg-muted"}`}
+                onClick={() => setForm(f => ({ ...f, [key]: !f[key] }))}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form[key] ? "translate-x-4" : "translate-x-0.5"}`} />
+              </div>
+              <span className="text-sm">{label}</span>
+            </label>
+          ))}
+        </div>
       </Card>
 
       <div className="flex justify-end">

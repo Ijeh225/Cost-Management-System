@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { db, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable } from "@workspace/db";
-import { eq, lt, inArray } from "drizzle-orm";
+import { db, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, branchesTable, intelligenceAlertLogTable } from "@workspace/db";
+import { eq, lt, inArray, and, gte } from "drizzle-orm";
 import { requireAuth, requireBranchMemberOrAbove, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery, sumCustoms } from "../lib/calculations.js";
+import { sendViaTwilio, resolveBranchWhatsAppFrom, toE164Nigerian } from "../lib/whatsapp.js";
 
 export const intelligenceRouter = Router();
 
@@ -122,6 +123,102 @@ intelligenceRouter.get("/intelligence/alerts", requireAuth, requireBranchMemberO
     insights.push({ type: "avg_profit_margin", value: totals.revenue > 0 ? Math.round(((totals.revenue - totals.cost) / totals.revenue) * 100) : 0 });
 
     return res.json({ alerts: alerts.slice(0, 50), insights });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+intelligenceRouter.post("/intelligence/send-digest", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const branchScope = getBranchScope(req);
+    const branchId = branchScope ?? req.user?.branchId ?? null;
+    if (!branchId) return res.status(400).json({ error: "No branch scope" });
+
+    const [branch] = await db.select().from(branchesTable).where(eq(branchesTable.id, branchId));
+    if (!branch) return res.status(404).json({ error: "Branch not found" });
+
+    const adminNumber = branch.alertAdminNumber?.trim();
+    if (!adminNumber) return res.status(400).json({ error: "No alert admin number configured. Set one in Branch Settings → Alerts." });
+
+    const sendOnStuck = branch.alertOnStuck === "true";
+    const sendOnOverdue = branch.alertOnOverdue === "true";
+    const sendOnNegProfit = branch.alertOnNegativeProfit === "true";
+
+    if (!sendOnStuck && !sendOnOverdue && !sendOnNegProfit) {
+      return res.status(400).json({ error: "No alert types enabled. Enable at least one in Branch Settings → Alerts." });
+    }
+
+    const allContainers = await db.select().from(containersTable).where(and(eq(containersTable.branchId, branchId)));
+    const activeContainers = allContainers.filter(c => c.status !== "closed");
+
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const recentlySent = await db.select().from(intelligenceAlertLogTable)
+      .where(and(eq(intelligenceAlertLogTable.branchId, branchId), gte(intelligenceAlertLogTable.sentAt, twentyFourHoursAgo)));
+    const sentKey = (containerId: number, alertType: string) => `${containerId}:${alertType}`;
+    const alreadySent = new Set(recentlySent.map(r => sentKey(r.containerId, r.alertType)));
+
+    const containerIds = activeContainers.map(c => c.id);
+    const allShipping = containerIds.length > 0 ? await db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, containerIds)) : [];
+    const allCustoms  = containerIds.length > 0 ? await db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, containerIds)) : [];
+    const allTerminal = containerIds.length > 0 ? await db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, containerIds)) : [];
+    const allDelivery = containerIds.length > 0 ? await db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, containerIds)) : [];
+    const allOps      = containerIds.length > 0 ? await db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, containerIds)) : [];
+    const idx = (arr: any[]) => { const m: Record<number, any> = {}; arr.forEach(r => { m[r.containerId] = r; }); return m; };
+    const sMap = idx(allShipping); const cMap = idx(allCustoms); const tMap = idx(allTerminal); const dMap = idx(allDelivery); const oMap = idx(allOps);
+
+    const messages: { containerId: number; alertType: string; text: string }[] = [];
+
+    for (const c of activeContainers) {
+      if (sendOnStuck && new Date(c.createdAt) < thirtyDaysAgo) {
+        const k = sentKey(c.id, "stuck");
+        if (!alreadySent.has(k)) {
+          const days = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+          messages.push({ containerId: c.id, alertType: "stuck", text: `🚨 STUCK: ${c.containerNumber} (${c.customerName ?? "—"}) has been in stage "${c.status}" for ${days} days.` });
+        }
+      }
+      if (sendOnOverdue && c.nextActionDueDate) {
+        const due = new Date(c.nextActionDueDate);
+        if (due < startOfToday) {
+          const k = sentKey(c.id, "overdue");
+          if (!alreadySent.has(k)) {
+            const days = Math.floor((Date.now() - due.getTime()) / (1000 * 60 * 60 * 24));
+            messages.push({ containerId: c.id, alertType: "overdue", text: `⚠️ OVERDUE: ${c.containerNumber} next action is overdue by ${days} day${days === 1 ? "" : "s"}. Owner: ${c.stageOwner ?? "unassigned"}.` });
+          }
+        }
+      }
+      if (sendOnNegProfit) {
+        const s = sMap[c.id] ?? {}; const cu = cMap[c.id] ?? {}; const t = tMap[c.id] ?? {}; const d = dMap[c.id] ?? {}; const o = oMap[c.id] ?? {};
+        const totalCost = calcTotalCost(s, cu, t, d, o);
+        const revenue = parseFloat(c.clearingCharges as string ?? "0");
+        if (revenue - totalCost < 0) {
+          const k = sentKey(c.id, "neg_profit");
+          if (!alreadySent.has(k)) {
+            messages.push({ containerId: c.id, alertType: "neg_profit", text: `📉 LOSS: ${c.containerNumber} (${c.customerName ?? "—"}) is running at a loss. Revenue ₦${revenue.toLocaleString("en-NG", { maximumFractionDigits: 0 })} vs Cost ₦${totalCost.toLocaleString("en-NG", { maximumFractionDigits: 0 })}.` });
+          }
+        }
+      }
+    }
+
+    if (messages.length === 0) return res.json({ sent: 0, skipped: 0, errors: [] });
+
+    const { from: fromOverride, error: fromErr } = await resolveBranchWhatsAppFrom(branchId);
+    if (fromErr) return res.status(400).json({ error: fromErr });
+
+    const toNumber = toE164Nigerian(adminNumber);
+    const fullBody = `*${branch.name} — Daily Alert Digest*\n${new Date().toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}\n\n` + messages.map(m => m.text).join("\n\n");
+
+    const result = await sendViaTwilio(toNumber, fullBody, fromOverride);
+    if (!result.success) return res.status(500).json({ error: result.error ?? "Failed to send WhatsApp message" });
+
+    await db.insert(intelligenceAlertLogTable).values(
+      messages.map(m => ({ containerId: m.containerId, alertType: m.alertType, branchId: branchId! }))
+    );
+
+    return res.json({ sent: messages.length, skipped: recentlySent.length, errors: [] });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });

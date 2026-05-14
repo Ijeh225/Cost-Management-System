@@ -58,10 +58,105 @@ import { TasksTab } from "@/components/containers/TasksTab";
 import { DocumentsTab } from "@/components/containers/DocumentsTab";
 import { EditSectionsTab } from "@/components/containers/EditSectionsTab";
 import { EditContainerDetailsDialog } from "@/components/containers/edit-container-details-dialog";
-import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY, useListInvoices, useGetContainerExpensePayments, useGetContainerExpensePaymentsBySection, type ContainerSectionSummary } from "@workspace/api-client-react";
+import { useListClients, useLinkContainerToClient, CLIENTS_QUERY_KEY, useListInvoices, useGetContainerExpensePayments, useGetContainerExpensePaymentsBySection, type ContainerSectionSummary, useListUsers, useGetStageNotes, useAddStageNote } from "@workspace/api-client-react";
 import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+
+function StageOwnerSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data: users } = useListUsers();
+  const list = (users as any[] | undefined) ?? [];
+  return (
+    <Select value={value || "__none__"} onValueChange={v => onChange(v === "__none__" ? "" : v)}>
+      <SelectTrigger className="h-7 text-xs border-border/60">
+        <SelectValue placeholder="Unassigned" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__"><span className="text-muted-foreground italic">Unassigned</span></SelectItem>
+        {list.map((u: any) => (
+          <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function StageNotesPanel({ containerId, stage }: { containerId: number; stage: string }) {
+  const { data: notes, isLoading } = useGetStageNotes(containerId);
+  const addNote = useAddStageNote();
+  const [draft, setDraft] = useState("");
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+
+  const handleAdd = async () => {
+    if (!draft.trim()) return;
+    try {
+      await addNote.mutateAsync({ containerId, stage, note: draft.trim() });
+      setDraft("");
+      toast({ title: "Note added." });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to add note" });
+    }
+  };
+
+  const list = notes ?? [];
+
+  return (
+    <div className="border-t border-border/30 pt-3 mt-3">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <span className="uppercase tracking-wider">Stage Notes</span>
+        {list.length > 0 && (
+          <span className="bg-muted/60 text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
+            {list.length}
+          </span>
+        )}
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {isLoading ? (
+            <p className="text-xs text-muted-foreground/50">Loading…</p>
+          ) : list.length === 0 ? (
+            <p className="text-xs text-muted-foreground/40 italic">No notes for this container yet.</p>
+          ) : (
+            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              {list.map((n: any) => (
+                <div key={n.id} className="bg-muted/30 rounded-md px-2.5 py-1.5 text-xs">
+                  <p className="text-foreground/90">{n.note}</p>
+                  <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+                    {n.authorName} · {n.stage} · {new Date(n.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-1.5">
+            <Input
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              placeholder="Add a note for this stage…"
+              className="h-7 text-xs flex-1 border-border/50"
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAdd(); } }}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs"
+              onClick={handleAdd}
+              disabled={addNote.isPending || !draft.trim()}
+            >
+              {addNote.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function PaymentHistoryTab({ containerId }: { containerId: number }) {
   const { data, isLoading } = useGetContainerExpensePayments(containerId);
@@ -2042,12 +2137,7 @@ export default function ContainerDetail() {
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <Label className="text-[10px] text-muted-foreground mb-1 block">Stage Owner</Label>
-                            <Input
-                              value={scOwner}
-                              onChange={e => setScOwner(e.target.value)}
-                              placeholder="e.g. John Doe"
-                              className="h-7 text-xs border-border/60"
-                            />
+                            <StageOwnerSelect value={scOwner} onChange={setScOwner} />
                           </div>
                           <div>
                             <Label className="text-[10px] text-muted-foreground mb-1 block">Next Action Due Date</Label>
@@ -2125,6 +2215,7 @@ export default function ContainerDetail() {
                         )}
                       </div>
                     )}
+                    <StageNotesPanel containerId={container.id} stage={container.status} />
                   </div>
                 </div>
                 {!editingStageControl && (

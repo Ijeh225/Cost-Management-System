@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks, useGetVatLiability, useGetBerthingOverview, type BerthingRow } from "@workspace/api-client-react";
+import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks, useGetVatLiability, useGetBerthingOverview, useSendAlertDigest, type BerthingRow } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useBranchScope } from "@/components/layout/branch-provider";
@@ -77,6 +77,7 @@ type RawAlert = {
 function AlertBeacon() {
   const { data, isLoading } = useGetIntelligenceAlerts();
   const rawAlerts: RawAlert[] = (data as any)?.alerts ?? [];
+  const sendDigest = useSendAlertDigest();
 
   const [open, setOpen] = useState(false);
   const [seenKey, setSeenKeyState] = useState(getSeenKey);
@@ -245,10 +246,30 @@ function AlertBeacon() {
               })}
             </div>
 
-            <div className="px-4 py-2.5 border-t border-border/50 bg-card/60">
-              <p className="text-[11px] text-muted-foreground/60 text-center">
-                Auto-refreshes every 60 seconds · Click any container to investigate
+            <div className="px-4 py-2.5 border-t border-border/50 bg-card/60 flex items-center justify-between gap-2">
+              <p className="text-[11px] text-muted-foreground/60">
+                Auto-refreshes every 60 s · Click any container to investigate
               </p>
+              <button
+                onClick={async () => {
+                  try {
+                    const r = await sendDigest.mutateAsync(undefined as any);
+                    alert(`Digest sent: ${r.sent} alert${r.sent !== 1 ? "s" : ""} dispatched via WhatsApp.`);
+                  } catch (e: any) {
+                    alert(`Error: ${e?.message ?? "Failed to send digest"}`);
+                  }
+                }}
+                disabled={sendDigest.isPending}
+                className="shrink-0 flex items-center gap-1.5 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                title="Send WhatsApp alert digest to admin"
+              >
+                {sendDigest.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Send className="w-3 h-3" />
+                )}
+                Send Digest
+              </button>
             </div>
           </motion.div>
         )}

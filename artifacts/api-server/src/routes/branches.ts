@@ -20,6 +20,10 @@ type BranchPayload = {
   emailMode?: "head_office" | "own";
   emailFromAddress?: string | null;
   emailReplyTo?: string | null;
+  alertAdminNumber?: string | null;
+  alertOnStuck?: boolean;
+  alertOnOverdue?: boolean;
+  alertOnNegativeProfit?: boolean;
 };
 
 function serialize(b: BranchRow) {
@@ -106,6 +110,10 @@ router.patch("/my-branch", requireBranchAdminOrAbove, async (req: AuthRequest, r
       emailMode: body.emailMode,
       emailFromAddress: body.emailFromAddress,
       emailReplyTo: body.emailReplyTo,
+      alertAdminNumber: body.alertAdminNumber,
+      alertOnStuck: body.alertOnStuck,
+      alertOnOverdue: body.alertOnOverdue,
+      alertOnNegativeProfit: body.alertOnNegativeProfit,
     };
     await applyBranchUpdate(id, safe, res);
   } catch (err) {
@@ -234,6 +242,10 @@ async function applyBranchUpdate(id: number, body: BranchPayload, res: Response)
       updates.emailReplyTo = null;
     }
   }
+  if (body.alertAdminNumber !== undefined) updates.alertAdminNumber = (body.alertAdminNumber ?? "").toString().trim() || null;
+  if (body.alertOnStuck !== undefined) updates.alertOnStuck = body.alertOnStuck ? "true" : "false";
+  if (body.alertOnOverdue !== undefined) updates.alertOnOverdue = body.alertOnOverdue ? "true" : "false";
+  if (body.alertOnNegativeProfit !== undefined) updates.alertOnNegativeProfit = body.alertOnNegativeProfit ? "true" : "false";
   const [row] = await db.update(branchesTable).set(updates).where(eq(branchesTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
   res.json(serialize(row));

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable, workflowNotificationsTable } from "@workspace/db";
+import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable, workflowNotificationsTable, containerStageNotesTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
@@ -2487,6 +2487,45 @@ router.delete("/containers/bulk", requireAuth, requireBranchAdminOrAbove, async 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/:id/stage-notes", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const containerId = parseInt(req.params.id, 10);
+    if (isNaN(containerId)) return res.status(400).json({ error: "Invalid container id" });
+    const notes = await db
+      .select()
+      .from(containerStageNotesTable)
+      .where(eq(containerStageNotesTable.containerId, containerId))
+      .orderBy(desc(containerStageNotesTable.createdAt));
+    return res.json(notes.map(n => ({ ...n, createdAt: n.createdAt instanceof Date ? n.createdAt.toISOString() : n.createdAt })));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/:id/stage-notes", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const containerId = parseInt(req.params.id, 10);
+    if (isNaN(containerId)) return res.status(400).json({ error: "Invalid container id" });
+    const { stage, note } = req.body;
+    if (!stage || !note?.trim()) return res.status(400).json({ error: "stage and note are required" });
+    const authorId = req.user!.id;
+    const authorName = req.user!.name;
+    const branchId = req.user!.branchId ?? 1;
+    const [row] = await db.insert(containerStageNotesTable).values({
+      containerId, stage, note: note.trim(), authorId, authorName, branchId,
+    }).returning();
+    await db.insert(containerTimelineTable).values({
+      containerId, title: `Stage note added (${stage})`, description: note.trim(),
+      eventType: "note", userId: authorId, userName: authorName, branchId,
+    } as any);
+    return res.json({ ...row, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

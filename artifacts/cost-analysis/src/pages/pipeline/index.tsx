@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useGetPipeline, useAdvanceContainerStatus } from "@workspace/api-client-react";
+import { useState, useMemo } from "react";
+import { useGetPipeline, useAdvanceContainerStatus, useListUsers } from "@workspace/api-client-react";
 import type { PipelineContainer } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { WORKFLOW_STAGES, getNextStage } from "@/lib/format";
@@ -7,6 +7,7 @@ import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, ArrowRight, Clock, RefreshCw, User } from "lucide-react";
 
@@ -75,12 +76,14 @@ function ContainerCard({
         <AgingBadge days={c.daysInStage} />
       </div>
       <div className="text-xs text-muted-foreground truncate">{c.customerName}</div>
-      {(c.stageOwnerName ?? c.assignedStaffName) && (
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
-          <User className="w-2.5 h-2.5 shrink-0" />
-          <span className="truncate">{c.stageOwnerName ?? c.assignedStaffName}</span>
-        </div>
-      )}
+      <div className="flex items-center gap-1 text-[11px]">
+        <User className="w-2.5 h-2.5 shrink-0 text-muted-foreground/40" />
+        {(c.stageOwnerName ?? c.assignedStaffName) ? (
+          <span className="truncate text-muted-foreground/70">{c.stageOwnerName ?? c.assignedStaffName}</span>
+        ) : (
+          <span className="text-muted-foreground/30 italic">Unassigned</span>
+        )}
+      </div>
       {canAdvance && (
         <Button
           size="sm"
@@ -111,8 +114,22 @@ export default function PipelinePage() {
   const advanceMutation = useAdvanceContainerStatus();
   const { toast } = useToast();
   const [advancing, setAdvancing] = useState<number | null>(null);
+  const [ownerFilter, setOwnerFilter] = useState("__all__");
+  const { data: users } = useListUsers();
+  const userList = (users as any[] | undefined) ?? [];
 
-  const stages = data?.stages ?? {};
+  const rawStages = data?.stages ?? {};
+  const stages = useMemo(() => {
+    if (ownerFilter === "__all__") return rawStages;
+    if (ownerFilter === "__unassigned__") {
+      return Object.fromEntries(
+        Object.entries(rawStages).map(([k, arr]) => [k, (arr as PipelineContainer[]).filter(c => !c.stageOwnerName && !c.assignedStaffName)])
+      );
+    }
+    return Object.fromEntries(
+      Object.entries(rawStages).map(([k, arr]) => [k, (arr as PipelineContainer[]).filter(c => (c.stageOwnerName ?? c.assignedStaffName) === ownerFilter)])
+    );
+  }, [rawStages, ownerFilter]);
   const total = data?.total ?? 0;
 
   const handleAdvance = async (c: PipelineContainer) => {
@@ -170,6 +187,18 @@ export default function PipelinePage() {
               14+ days stuck
             </span>
           </div>
+          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+            <SelectTrigger className="h-8 text-xs w-[160px]">
+              <SelectValue placeholder="All owners" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All owners</SelectItem>
+              <SelectItem value="__unassigned__"><span className="italic text-muted-foreground">Unassigned</span></SelectItem>
+              {userList.map((u: any) => (
+                <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="sm"

@@ -15,6 +15,10 @@ export const branchesTable = pgTable("branches", {
   emailMode: text("email_mode").notNull().default("head_office"),
   emailFromAddress: text("email_from_address"),
   emailReplyTo: text("email_reply_to"),
+  alertAdminNumber: text("alert_admin_number"),
+  alertOnStuck: text("alert_on_stuck").notNull().default("false"),
+  alertOnOverdue: text("alert_on_overdue").notNull().default("false"),
+  alertOnNegativeProfit: text("alert_on_negative_profit").notNull().default("false"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

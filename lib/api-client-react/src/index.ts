@@ -14,3 +14,4 @@ export * from "./user-client-assignments";
 export * from "./overhead-expenses";
 export * from "./container-expenses";
 export * from "./analytics";
+export * from "./stage-notes";

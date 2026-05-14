@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
 
 export type BerthingRow = {
@@ -24,5 +24,21 @@ export function useGetBerthingOverview() {
     queryKey: ["analytics", "berthing"],
     queryFn: () => customFetch("/api/analytics/berthing"),
     staleTime: 60_000,
+  });
+}
+
+export type DigestResult = {
+  sent: number;
+  skipped: number;
+  errors: string[];
+};
+
+export function useSendAlertDigest() {
+  return useMutation<DigestResult, Error>({
+    mutationFn: () =>
+      customFetch<DigestResult>("/api/intelligence/send-digest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }),
   });
 }
