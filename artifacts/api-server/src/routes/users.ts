@@ -97,14 +97,11 @@ router.post("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) =
         if (!allowRole(r)) { res.status(403).json({ error: "You are not allowed to assign that role." }); return; }
       }
     }
-    // Resolve target branch: must use active branch scope (super-admin must
-    // pick a specific branch via the switcher; caller-supplied branchId must
-    // match the active scope).
+    // Resolve target branch. If the caller explicitly supplies branchId in the
+    // body (form branch picker), use it directly — no need to also have the
+    // global switcher set to a specific branch. When branchId is omitted, fall
+    // back to the active scope from the switcher, then the actor's own branch.
     const _scope = getBranchScope(req);
-    if (_scope === null && req.user?.role === "super_admin") {
-      res.status(400).json({ error: "Select a specific branch from the switcher before creating a user." });
-      return;
-    }
     let resolvedBranchId: number | null = null;
     if (branchId != null) {
       const parsed = Number(branchId);
@@ -123,6 +120,10 @@ router.post("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) =
       }
       resolvedBranchId = b.id;
     } else {
+      if (_scope === null && req.user?.role === "super_admin") {
+        res.status(400).json({ error: "Select a specific branch from the switcher before creating a user." });
+        return;
+      }
       resolvedBranchId = _scope ?? req.user?.branchId ?? null;
     }
     if (!resolvedBranchId) {
