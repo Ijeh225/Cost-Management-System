@@ -1754,7 +1754,6 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       clearingCharges: containersTable.clearingCharges,
       status: containersTable.status,
       createdAt: containersTable.createdAt,
-      closedAt: containersTable.closedAt,
       gateInDate: containersTable.gateInDate,
       deliveredAt: containersTable.deliveredAt,
     }).from(containersTable).where(containerConds.length > 0 ? and(...containerConds) : undefined);

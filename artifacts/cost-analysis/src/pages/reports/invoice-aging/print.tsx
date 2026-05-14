@@ -14,8 +14,9 @@ const BUCKET_CONFIG = [
   { key: "days90plus" as const, label: "Over 90 Days Overdue",     color: "#7f1d1d", bg: "#fef2f2" },
 ];
 
-function AgingBucket({ label, rows, total, color, bg }: { label: string; rows: AgingRow[]; total: number; color: string; bg: string }) {
+function AgingBucket({ label, rows, total, color, bg, showBranch }: { label: string; rows: AgingRow[]; total: number; color: string; bg: string; showBranch?: boolean }) {
   if (rows.length === 0) return null;
+  const colSpanSubtotal = showBranch ? 6 : 5;
   return (
     <div style={{ marginBottom: 32 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 14px", background: bg, border: `1px solid ${color}40`, borderRadius: "6px 6px 0 0", marginBottom: 0 }}>
@@ -27,6 +28,7 @@ function AgingBucket({ label, rows, total, color, bg }: { label: string; rows: A
           <tr>
             <th style={{ padding: "7px 10px", textAlign: "left", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.5px", color: "#64748b" }}>Invoice #</th>
             <th style={{ padding: "7px 10px", textAlign: "left", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.5px", color: "#64748b" }}>Client</th>
+            {showBranch && <th style={{ padding: "7px 10px", textAlign: "left", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.5px", color: "#64748b" }}>Branch</th>}
             <th style={{ padding: "7px 10px", textAlign: "left", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.5px", color: "#64748b" }}>Due Date</th>
             <th style={{ padding: "7px 10px", textAlign: "right", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.5px", color: "#64748b" }}>Days Overdue</th>
             <th style={{ padding: "7px 10px", textAlign: "right", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.5px", color: "#64748b" }}>Invoice Amt (₦)</th>
@@ -38,6 +40,7 @@ function AgingBucket({ label, rows, total, color, bg }: { label: string; rows: A
             <tr key={r.id}>
               <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", fontFamily: "monospace", color: "#0f766e" }}>{r.invoiceNumber}</td>
               <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", fontWeight: 600 }}>{r.clientName}</td>
+              {showBranch && <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", color: "#64748b", fontSize: 11 }}>{r.branchName ?? "—"}</td>}
               <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", color: "#64748b" }}>{fmtDate(r.dueDate)}</td>
               <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "right", fontWeight: 700, color: r.daysOverdue > 60 ? "#b91c1c" : r.daysOverdue > 30 ? "#c2410c" : r.daysOverdue > 0 ? "#854d0e" : "#15803d" }}>
                 {r.daysOverdue > 0 ? `${r.daysOverdue}d` : "\u2014"}
@@ -47,7 +50,7 @@ function AgingBucket({ label, rows, total, color, bg }: { label: string; rows: A
             </tr>
           ))}
           <tr>
-            <td colSpan={5} style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, fontSize: 12, color: "#475569", borderTop: "1px solid #e2e8f0" }}>Bucket Subtotal</td>
+            <td colSpan={colSpanSubtotal} style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, fontSize: 12, color: "#475569", borderTop: "1px solid #e2e8f0" }}>Bucket Subtotal</td>
             <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: "monospace", fontWeight: 800, color, borderTop: "1px solid #e2e8f0" }}>{fmt(total)}</td>
           </tr>
         </tbody>
@@ -58,6 +61,7 @@ function AgingBucket({ label, rows, total, color, bg }: { label: string; rows: A
 
 export default function InvoiceAgingPrint() {
   const { data, isLoading, isError } = useGetInvoiceAging();
+  const showBranch = !(data as { branchScope?: { id: number } } | undefined)?.branchScope?.id;
 
   if (isLoading) {
     return (
@@ -154,6 +158,7 @@ export default function InvoiceAgingPrint() {
             total={totals[b.key]}
             color={b.color}
             bg={b.bg}
+            showBranch={showBranch}
           />
         ))}
 
