@@ -15,7 +15,7 @@ import {
   Search, ChevronLeft, ChevronRight,
   AlertCircle, FileSpreadsheet, ChevronsUpDown, ChevronUp, ChevronDown,
   X, Filter, Trash2, Loader2, Plus, ShieldCheck, FileCheck2, Clock,
-  Download, FileText,
+  Download, FileText, Anchor,
 } from "lucide-react";
 import { getShippingLine } from "@/lib/tracking";
 import { motion, AnimatePresence } from "framer-motion";
@@ -197,7 +197,7 @@ export default function Containers() {
     </th>
   );
 
-  const colSpan = isAdmin ? 11 : 10;
+  const colSpan = isAdmin ? 12 : 11;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -451,6 +451,7 @@ export default function Containers() {
                 <Th field="customerName"    label="Customer" />
                 <Th field="declaration"     label="Declaration" />
                 <th className="px-4 py-3 font-medium text-left">Vessel / Size</th>
+                <th className="px-4 py-3 font-medium text-left">ETA / Berthing</th>
                 <th className="px-4 py-3 font-medium text-left">Shipping Line</th>
                 <Th field="status"          label="Status" />
                 <th className="px-4 py-3 font-medium text-left">Control</th>
@@ -533,6 +534,39 @@ export default function Containers() {
                       <td className="px-4 py-4">
                         <div className="text-foreground">{container.vessel || "—"}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">{container.size || "—"}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {(() => {
+                          const eta = container.eta;
+                          const berthed = container.berthed;
+                          if (berthed) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                <Anchor className="w-2.5 h-2.5" /> Berthed
+                              </span>
+                            );
+                          }
+                          if (!eta) {
+                            return <span className="text-muted-foreground/40 text-xs italic">—</span>;
+                          }
+                          const etaDate = new Date(eta);
+                          const isOverdue = etaDate < new Date();
+                          const formatted = etaDate.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
+                          return (
+                            <div className="space-y-0.5">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                isOverdue
+                                  ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                                  : "bg-secondary text-muted-foreground border-border/50"
+                              }`}>
+                                <Clock className="w-2.5 h-2.5" /> {formatted}
+                              </span>
+                              {isOverdue && (
+                                <div className="text-[10px] text-amber-400/80 font-medium pl-0.5">Overdue</div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-4">
                         {(() => {
