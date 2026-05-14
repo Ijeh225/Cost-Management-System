@@ -13,6 +13,7 @@ export type AuthContextType = {
   isSuperAdmin: boolean;
   isBranchAdmin: boolean;
   isAdminOrAbove: boolean;
+  isBranchMember: boolean;
   userRole: string | null;
   userRoles: string[];
   isDepartmentUser: boolean;
@@ -51,6 +52,7 @@ const AuthContext = createContext<AuthContextType>({
   isSuperAdmin: false,
   isBranchAdmin: false,
   isAdminOrAbove: false,
+  isBranchMember: false,
 });
 
 async function checkSetupRequired(): Promise<{ required: boolean }> {
@@ -165,6 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin: role === "admin" || role === "super_admin",
         isBranchAdmin: role === "branch_admin",
         isAdminOrAbove: role === "admin" || role === "super_admin" || role === "branch_admin",
+        isBranchMember: role === "admin" || role === "super_admin" || role === "branch_admin" || role === "staff",
         userRole: role || null,
         userRoles: roles,
         isDocumentationUser: hasRole("documentation_user"),

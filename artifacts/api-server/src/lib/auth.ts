@@ -159,6 +159,22 @@ export async function requireBranchAdminOrAbove(req: AuthRequest, res: Response,
   });
 }
 
+/**
+ * Allow admin / super_admin / branch_admin / staff (Task #76). Use for report
+ * routes that should be readable by all branch members (staff included),
+ * with data automatically scoped to their branch via getBranchScope.
+ */
+export async function requireBranchMemberOrAbove(req: AuthRequest, res: Response, next: NextFunction) {
+  await requireAuth(req, res, () => {
+    const role = req.user?.role;
+    if (role !== "admin" && role !== "super_admin" && role !== "branch_admin" && role !== "staff") {
+      res.status(403).json({ error: "Branch member access required" });
+      return;
+    }
+    next();
+  });
+}
+
 export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {
     const role = req.user?.role;

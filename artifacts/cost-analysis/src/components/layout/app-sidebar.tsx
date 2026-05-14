@@ -46,7 +46,7 @@ function NotificationsBadge({ count }: { count: number }) {
 export function AppSidebar() {
   const [location] = useLocation();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const { isAdmin, isSuperAdmin, isBranchAdmin, isAdminOrAbove, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser } = useAuth();
+  const { isAdmin, isSuperAdmin, isBranchAdmin, isAdminOrAbove, isBranchMember, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { activeBranchId, setActiveBranch, branches } = useBranchScope();
   const userBranchName = user?.branchName
@@ -83,7 +83,7 @@ export function AppSidebar() {
     { title: "Approval Queue",   url: "/approvals",              icon: ClipboardCheck },
     { title: "Pipeline Board",   url: "/pipeline",               icon: Kanban          },
     { title: "Analytics",        url: "/analytics",              icon: BarChart2       },
-    ...(isAdminOrAbove ? [{ title: "Reports", url: "/reports", icon: FileDown }] : []),
+    ...(isBranchMember ? [{ title: "Reports", url: "/reports", icon: FileDown }] : []),
     ...(isSuperAdmin ? [{ title: "Branch Comparison", url: "/reports/branch-comparison", icon: BarChart2 }] : []),
     { title: "Bank Management",  url: "/banks",                  icon: Landmark        },
     { title: "Container Payments", url: "/container-payments",  icon: CreditCard      },

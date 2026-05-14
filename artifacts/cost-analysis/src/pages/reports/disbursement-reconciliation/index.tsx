@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Building2 } from "lucide-react";
 import { Loader2, Filter, TrendingUp, TrendingDown, Scale, AlertTriangle, RefreshCw, Download, ChevronsUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { WORKFLOW_STAGES } from "@/lib/format";
@@ -159,7 +160,7 @@ function exportCsv(rows: DisbursementReconciliationRow[], filename: string) {
 
 export default function DisbursementReconciliationPage() {
   const { toast } = useToast();
-  const { activeBranchId, isSuperAdmin } = useBranchScope();
+  const { activeBranchId, isSuperAdmin, branches, setActiveBranch } = useBranchScope();
   const showBranchColumn = isSuperAdmin && activeBranchId === "all";
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -238,6 +239,22 @@ export default function DisbursementReconciliationPage() {
       <Card className="border-border/40 bg-card/40">
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-3 items-end">
+            {isSuperAdmin && branches.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><Building2 className="w-3 h-3" /> Branch</Label>
+                <Select value={String(activeBranchId)} onValueChange={v => setActiveBranch(v === "all" ? "all" : Number(v))}>
+                  <SelectTrigger className="h-8 text-xs border-border/50 w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Branches</SelectItem>
+                    {branches.map(b => (
+                      <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs">Payment Date From</Label>
               <Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="h-8 text-xs w-40" />

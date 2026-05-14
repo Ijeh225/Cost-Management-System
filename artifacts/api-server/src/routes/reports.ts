@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { requireAuth, requireBranchAdminOrAbove, requireSuperAdmin, getBranchScope, AuthRequest } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, requireSuperAdmin, getBranchScope, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
 
 export const reportsRouter = Router();
@@ -24,7 +24,7 @@ async function loadBranchNameMap(): Promise<Map<number, string>> {
   return new Map(rows.map(r => [r.id, r.name]));
 }
 
-reportsRouter.get("/reports/containers", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/containers", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const { status, from, to } = req.query as Record<string, string>;
     const branchScope = await resolveBranchScopeInfo(req);
@@ -108,7 +108,7 @@ reportsRouter.get("/reports/containers", requireAuth, requireBranchAdminOrAbove,
   }
 });
 
-reportsRouter.get("/reports/export", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/export", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const { status, from, to } = req.query as Record<string, string>;
     const branchScope = await resolveBranchScopeInfo(req);
@@ -368,7 +368,7 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireBranchAdminOr
   }
 });
 
-reportsRouter.get("/reports/vat-summary", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/vat-summary", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to } = req.query as Record<string, string>;
     const branchScope = await resolveBranchScopeInfo(req);
@@ -432,7 +432,7 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireBranchAdminOrAbove
   }
 });
 
-reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const branchScope = await resolveBranchScopeInfo(req);
     const now = new Date();
@@ -598,7 +598,7 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchAdminOrAbo
   }
 });
 
-reportsRouter.get("/reports/pl", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to, clientId, costBasis } = req.query as Record<string, string>;
     const branchScope = await resolveBranchScopeInfo(req);
@@ -930,7 +930,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchAdminOrAbove, async (
   }
 });
 
-reportsRouter.get("/reports/cashflow", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to, bankId } = req.query as Record<string, string>;
     const branchScope = await resolveBranchScopeInfo(req);
@@ -1359,7 +1359,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchAdminOrAbove, a
 
 // ─── GET /reports/disbursement-reconciliation ────────────────────────────────
 
-reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to, status } = req.query as Record<string, string>;
     const branchScope = await resolveBranchScopeInfo(req);
@@ -1547,7 +1547,7 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
   }
 });
 
-reportsRouter.get("/reports/invoice-aging", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/invoice-aging", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const branchScope = await resolveBranchScopeInfo(req);
     const branchNameMap = branchScope.id === null ? await loadBranchNameMap() : null;
@@ -1634,7 +1634,7 @@ reportsRouter.get("/reports/invoice-aging", requireAuth, requireBranchAdminOrAbo
   }
 });
 
-reportsRouter.get("/reports/fx-history", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+reportsRouter.get("/reports/fx-history", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to } = req.query as Record<string, string>;
     const branchScope = await resolveBranchScopeInfo(req);

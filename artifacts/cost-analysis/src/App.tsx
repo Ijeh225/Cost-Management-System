@@ -173,6 +173,27 @@ function BranchAdminOrAboveGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function BranchMemberOrAboveGuard({ children }: { children: ReactNode }) {
+  const { isLoading, isAuthenticated, isBranchMember } = useAuth();
+  const [, setLocation] = useLocation();
+  const confirmed = useRef(false);
+  if (isBranchMember && !confirmed.current) confirmed.current = true;
+  useEffect(() => {
+    if (isLoading) return;
+    if (confirmed.current) return;
+    if (!isAuthenticated) setLocation("/login");
+    else if (!isBranchMember) setLocation("/");
+  }, [isBranchMember, isLoading, isAuthenticated, setLocation]);
+  if (!confirmed.current) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 function SuperAdminGuard({ children }: { children: ReactNode }) {
   const { user, isLoading, isAuthenticated, isSuperAdmin } = useAuth();
   const [, setLocation] = useLocation();
@@ -237,13 +258,13 @@ function Router() {
                 <SuperAdminGuard><BranchComparisonPage /></SuperAdminGuard>
               </Route>
               <Route path="/reports">
-                <BranchAdminOrAboveGuard><ReportsPage /></BranchAdminOrAboveGuard>
+                <BranchMemberOrAboveGuard><ReportsPage /></BranchMemberOrAboveGuard>
               </Route>
               <Route path="/reports/cashflow">
-                <BranchAdminOrAboveGuard><CashFlowPage /></BranchAdminOrAboveGuard>
+                <BranchMemberOrAboveGuard><CashFlowPage /></BranchMemberOrAboveGuard>
               </Route>
               <Route path="/reports/disbursement-reconciliation">
-                <BranchAdminOrAboveGuard><DisbursementReconciliationPage /></BranchAdminOrAboveGuard>
+                <BranchMemberOrAboveGuard><DisbursementReconciliationPage /></BranchMemberOrAboveGuard>
               </Route>
               <Route path="/clients" component={ClientsPage} />
               <Route path="/clients/:id" component={ClientDetailPage} />

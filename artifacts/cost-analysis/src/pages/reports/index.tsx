@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, useGetFxHistory, useGetInvoiceAging, type DeliveryAnalyticsResponse, type FxHistoryEntry, type AgingRow } from "@workspace/api-client-react";
+import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, useGetFxHistory, useGetInvoiceAging, customFetch, type DeliveryAnalyticsResponse, type FxHistoryEntry, type AgingRow } from "@workspace/api-client-react";
 import { useBranchScope } from "@/components/layout/branch-provider";
 import { useLocation } from "wouter";
 
@@ -1217,9 +1217,7 @@ export default function ReportsPage() {
     setExporting(true);
     try {
       const qs = buildQueryString({ status: applied.status, from: applied.from, to: applied.to });
-      const resp = await fetch(`/api/reports/export${qs ? `?${qs}` : ""}`, { credentials: "include" });
-      if (!resp.ok) throw new Error("Export failed");
-      const blob = await resp.blob();
+      const blob = await customFetch<Blob>(`/api/reports/export${qs ? `?${qs}` : ""}`, { responseType: "blob" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useGetCashFlow, useListBanks, type CashFlowTxn } from "@workspace/api-client-react";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -233,6 +234,7 @@ function BankBreakdownCard({ byBank, totalIn, totalOut }: {
 
 export default function CashFlowPage() {
   const [, setLocation] = useLocation();
+  const { activeBranchId, isSuperAdmin, branches, setActiveBranch } = useBranchScope();
   const { from: defaultFrom, to: defaultTo } = getDefaultDates();
   const [fromInput, setFromInput] = useState(defaultFrom);
   const [toInput, setToInput] = useState(defaultTo);
@@ -332,6 +334,22 @@ export default function CashFlowPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {isSuperAdmin && branches.length > 0 && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Branch</Label>
+                  <Select value={String(activeBranchId)} onValueChange={v => setActiveBranch(v === "all" ? "all" : Number(v))}>
+                    <SelectTrigger className="h-8 text-xs border-border/50 w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Branches</SelectItem>
+                      {branches.map(b => (
+                        <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button size="sm" className="h-8 text-xs gap-1.5" onClick={handleApply}>
                   <Filter className="w-3 h-3" /> Apply
