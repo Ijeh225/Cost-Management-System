@@ -346,7 +346,7 @@ export default function SettingsPage() {
               className="gap-2"
             >
               {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Send Digest Now
+              Send Test Digest Now
             </Button>
             <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="gap-2">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

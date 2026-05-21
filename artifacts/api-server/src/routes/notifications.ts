@@ -797,14 +797,27 @@ export async function runScheduledDigest(): Promise<void> {
     }
 
     const to = emailTo.split(",").map((e: string) => e.trim()).filter(Boolean);
+
+    // Resolve the from address: the scheduled digest is a system-wide send.
+    // Recipient/schedule settings live in the global settings table (not per-branch),
+    // so there is no single authoritative branch context. We look for a branch with
+    // emailMode="own" and a set emailFromAddress only when there is exactly one such
+    // branch — this keeps the address unambiguous. With multiple or zero own-mode
+    // branches we fall back to the system default to avoid cross-branch identity leakage.
+    const DEFAULT_FROM = "Cost Analysis <alerts@updates.costanalysis.app>";
+    let scheduledFromAddress = DEFAULT_FROM;
+    const ownBranches = await db
+      .select({ emailFromAddress: branchesTable.emailFromAddress })
+      .from(branchesTable)
+      .where(and(eq(branchesTable.emailMode, "own"), isNotNull(branchesTable.emailFromAddress)));
+    const validOwn = ownBranches.filter(b => b.emailFromAddress?.trim());
+    if (validOwn.length === 1) {
+      scheduledFromAddress = validOwn[0].emailFromAddress!.trim();
+    }
+
     const allAlerts = await computeAlerts();
     const agingTypes = ["aging_warn", "aging_high", "aging_critical", "inactive", "negative_profit"];
     const relevant = allAlerts.filter((a: any) => agingTypes.includes(a.type));
-
-    // Scheduled digest is a global (cross-branch) send — always use the
-    // system default sender. Per-branch scheduled sends are not supported;
-    // the manual endpoint handles per-branch sender resolution instead.
-    const scheduledFromAddress = "Cost Analysis <alerts@updates.costanalysis.app>";
 
     const emailRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -822,7 +835,7 @@ export async function runScheduledDigest(): Promise<void> {
       await db.insert(settingsTable)
         .values({ key: "digestLastSentAt", value: sent.toISOString(), updatedAt: sent })
         .onConflictDoUpdate({ target: settingsTable.key, set: { value: sent.toISOString(), updatedAt: sent } });
-      console.log(`[digest-scheduler] Sent to ${to.length} recipients, ${relevant.length} alerts`);
+      console.log(`[digest-scheduler] Sent to ${to.length} recipients, ${relevant.length} alerts, from: ${scheduledFromAddress}`);
     } else {
       console.error("[digest-scheduler] Resend error:", await emailRes.text().catch(() => "unknown"));
     }
