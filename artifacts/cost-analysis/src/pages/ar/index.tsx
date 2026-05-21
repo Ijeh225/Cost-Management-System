@@ -1,22 +1,34 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetArLedger,
+  useRecordPayment,
+  useListActiveBanks,
+  AR_QUERY_KEY,
   type ArClientRow,
   type ArUnpaidInvoice,
   type ArAgingBuckets,
   type ArWrittenOffInvoice,
+  type RecordPaymentBody,
 } from "@workspace/api-client-react";
+import { useAuth } from "@/components/layout/auth-provider";
 import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import {
   BookOpen, Download, Search, ChevronDown, ChevronRight,
   AlertTriangle, Loader2, ExternalLink, Calendar,
   Wallet, CreditCard, ReceiptText, TrendingUp, Banknote, FileX,
+  Printer,
 } from "lucide-react";
 
 function rowHighlight(aging: ArAgingBuckets): string {
@@ -50,7 +62,150 @@ function statusBadge(status: string) {
   );
 }
 
-function InvoiceSubRow({ inv }: { inv: ArUnpaidInvoice }) {
+function RecordPaymentDialog({
+  open, onClose, invoiceId, onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  invoiceId: number;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const recordMutation = useRecordPayment();
+  const { data: banks = [] } = useListActiveBanks();
+  const [form, setForm] = useState<RecordPaymentBody>({
+    amount: 0,
+    paymentMethod: "transfer",
+    reference: "",
+    notes: "",
+    paidAt: new Date().toISOString().split("T")[0],
+    bankId: null,
+  });
+
+  const handleClose = () => {
+    setForm({ amount: 0, paymentMethod: "transfer", reference: "", notes: "", paidAt: new Date().toISOString().split("T")[0], bankId: null });
+    onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.amount || form.amount <= 0) {
+      toast({ variant: "destructive", title: "Enter a valid amount" });
+      return;
+    }
+    try {
+      await recordMutation.mutateAsync({ invoiceId, data: form });
+      toast({ title: "Payment recorded" });
+      onSuccess();
+      handleClose();
+    } catch {
+      toast({ variant: "destructive", title: "Failed to record payment" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-primary" />
+            Record Payment
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div>
+            <Label htmlFor="ar-amount">Amount (₦) *</Label>
+            <Input
+              id="ar-amount"
+              type="number"
+              min="1"
+              step="0.01"
+              placeholder="0.00"
+              value={form.amount || ""}
+              onChange={e => setForm(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))}
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label htmlFor="ar-method">Payment Method</Label>
+            <Select value={form.paymentMethod} onValueChange={v => setForm(f => ({ ...f, paymentMethod: v, bankId: null }))}>
+              <SelectTrigger id="ar-method" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="transfer">Bank Transfer</SelectItem>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="cheque">Cheque</SelectItem>
+                <SelectItem value="pos">POS</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {form.paymentMethod === "transfer" && banks.length > 0 && (
+            <div>
+              <Label htmlFor="ar-bank">Bank Account</Label>
+              <Select
+                value={form.bankId != null ? String(form.bankId) : ""}
+                onValueChange={v => setForm(f => ({ ...f, bankId: v ? parseInt(v) : null }))}
+              >
+                <SelectTrigger id="ar-bank" className="mt-1">
+                  <SelectValue placeholder="Select bank (optional)..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {banks.map(b => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}{b.accountNumber ? ` — ${b.accountNumber}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div>
+            <Label htmlFor="ar-paidAt">Date Paid</Label>
+            <Input
+              id="ar-paidAt"
+              type="date"
+              value={form.paidAt}
+              onChange={e => setForm(f => ({ ...f, paidAt: e.target.value }))}
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label htmlFor="ar-ref">Reference / Teller Number</Label>
+            <Input
+              id="ar-ref"
+              placeholder="e.g. NXG2024112301"
+              value={form.reference}
+              onChange={e => setForm(f => ({ ...f, reference: e.target.value }))}
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label htmlFor="ar-notes">Notes</Label>
+            <Textarea
+              id="ar-notes"
+              rows={2}
+              placeholder="Optional note..."
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              className="mt-1"
+            />
+          </div>
+          <div className="flex gap-2 justify-end pt-1">
+            <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
+            <Button type="submit" disabled={recordMutation.isPending}>
+              {recordMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Record Payment
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function InvoiceSubRow({ inv, onRecordPayment }: { inv: ArUnpaidInvoice; onRecordPayment: (id: number) => void }) {
+  const canPay = inv.outstanding > 0 && inv.status !== "paid" && inv.status !== "written_off";
   return (
     <tr className="bg-muted/20 border-b border-border/20">
       <td className="pl-12 py-2">
@@ -71,14 +226,28 @@ function InvoiceSubRow({ inv }: { inv: ArUnpaidInvoice }) {
           : <span className="text-muted-foreground/40">No due date</span>}
       </td>
       <td colSpan={6} />
+      <td className="py-2 px-3 text-right">
+        {canPay && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-[10px] gap-1 border-primary/40 text-primary hover:bg-primary/10"
+            onClick={e => { e.stopPropagation(); onRecordPayment(inv.id); }}
+          >
+            <CreditCard className="w-3 h-3" /> Pay
+          </Button>
+        )}
+      </td>
     </tr>
   );
 }
 
-function ClientTableRow({ client, expanded, onToggle }: {
+function ClientTableRow({ client, expanded, onToggle, isAdmin, onRecordPayment }: {
   client: ArClientRow;
   expanded: boolean;
   onToggle: () => void;
+  isAdmin: boolean;
+  onRecordPayment: (id: number) => void;
 }) {
   const highlight = rowHighlight(client.aging);
   return (
@@ -131,9 +300,22 @@ function ClientTableRow({ client, expanded, onToggle }: {
             ? <span className="text-xs font-mono text-violet-400">{formatCurrency(client.creditBalance)}</span>
             : <span className="text-muted-foreground/40 text-xs">—</span>}
         </td>
+        <td className="py-3 px-3 text-right" onClick={e => e.stopPropagation()}>
+          {isAdmin && client.clientId != null && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+              onClick={() => window.open(`/reports/client-statement/print?clientId=${client.clientId}`, "_blank")}
+            >
+              <Printer className="w-3.5 h-3.5" />
+              Statement
+            </Button>
+          )}
+        </td>
       </tr>
       {expanded && client.unpaidInvoices.map(inv => (
-        <InvoiceSubRow key={inv.id} inv={inv} />
+        <InvoiceSubRow key={inv.id} inv={inv} onRecordPayment={onRecordPayment} />
       ))}
     </>
   );
@@ -180,11 +362,15 @@ function exportCsv(clients: ArClientRow[], fromDate: string, toDate: string) {
 }
 
 export default function AccountsReceivablePage() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [writtenOffOpen, setWrittenOffOpen] = useState(false);
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<number | null>(null);
 
   const { data, isLoading, isError } = useGetArLedger(
     fromDate || toDate ? { from: fromDate || undefined, to: toDate || undefined } : undefined
@@ -421,12 +607,13 @@ export default function AccountsReceivablePage() {
                 <th className="py-3 px-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">90+d</th>
                 <th className="py-3 px-3 text-right text-xs font-semibold text-sky-400/80 uppercase tracking-wider">Unalloc.</th>
                 <th className="py-3 px-3 text-right text-xs font-semibold text-violet-400/80 uppercase tracking-wider">Credit Bal.</th>
+                <th className="py-3 px-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-16 text-center text-muted-foreground text-sm">
+                  <td colSpan={13} className="py-16 text-center text-muted-foreground text-sm">
                     No clients match your filters.
                   </td>
                 </tr>
@@ -439,6 +626,8 @@ export default function AccountsReceivablePage() {
                       client={client}
                       expanded={expandedClients.has(key)}
                       onToggle={() => toggleClient(key)}
+                      isAdmin={isAdmin}
+                      onRecordPayment={id => setPaymentInvoiceId(id)}
                     />
                   );
                 })
@@ -478,6 +667,7 @@ export default function AccountsReceivablePage() {
                   <td className="py-3 px-3 text-right text-xs font-mono text-violet-400">
                     {formatCurrency(filtered.reduce((s, c) => s + (c.creditBalance ?? 0), 0))}
                   </td>
+                  <td />
                 </tr>
               </tfoot>
             )}
@@ -558,6 +748,14 @@ export default function AccountsReceivablePage() {
             </Card>
           )}
         </div>
+      )}
+      {paymentInvoiceId !== null && (
+        <RecordPaymentDialog
+          open={paymentInvoiceId !== null}
+          onClose={() => setPaymentInvoiceId(null)}
+          invoiceId={paymentInvoiceId}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: [AR_QUERY_KEY] })}
+        />
       )}
     </div>
   );
