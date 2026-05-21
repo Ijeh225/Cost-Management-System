@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable, systemAlertsHistoryTable } from "@workspace/db";
-import { eq, lt, sql, max, isNotNull, desc, inArray, notInArray, and } from "drizzle-orm";
+import { eq, lt, sql, max, isNotNull, isNull, or, desc, inArray, notInArray, and } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery } from "../lib/calculations.js";
 
@@ -59,19 +59,19 @@ const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
 };
 
 const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
-  delivery_user:           new Set(["overdue", "empty_gate_out", "document_uploaded"]),
-  terminal_manager:        new Set(["overdue", "stage_complete", "delay_recorded", "gate_in", "gate_out", "empty_gate_in", "empty_gate_out", "berthing_confirmed", "document_uploaded"]),
-  terminal_user:           new Set(["stage_complete", "gate_in", "gate_out", "empty_gate_in", "document_uploaded"]),
+  delivery_user:           new Set(["overdue", "empty_gate_out"]),
+  terminal_manager:        new Set(["overdue", "stage_complete", "delay_recorded", "gate_in", "gate_out", "empty_gate_in", "empty_gate_out", "berthing_confirmed"]),
+  terminal_user:           new Set(["stage_complete", "gate_in", "gate_out", "empty_gate_in"]),
   security_user:           new Set(["new_job", "stage_complete", "gate_in"]),
-  operations_user:         new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "gate_out", "empty_gate_in", "berthing_confirmed", "document_uploaded"]),
-  staff:                   new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "task_assigned", "section_submitted", "container_verified"]),
+  operations_user:         new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "gate_out", "empty_gate_in", "berthing_confirmed"]),
+  staff:                   new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
   accounts_user:           new Set(["invoice_created", "invoice_paid", "berthing_confirmed"]),
-  documentation_user:      new Set(["new_job", "section_submitted", "container_verified", "document_uploaded", "task_assigned"]),
-  shipping_user:           new Set(["new_job", "stage_complete", "berthing_confirmed", "document_uploaded"]),
-  shipping_terminal_user:  new Set(["new_job", "stage_complete", "berthing_confirmed", "gate_in", "gate_out", "document_uploaded"]),
-  customs_user:            new Set(["new_job", "stage_complete", "berthing_confirmed", "document_uploaded"]),
-  transire_user:           new Set(["new_job", "stage_complete", "document_uploaded"]),
-  pull_out_user:           new Set(["stage_complete", "gate_out", "empty_gate_out", "document_uploaded"]),
+  documentation_user:      new Set(["new_job"]),
+  shipping_user:           new Set(["new_job", "stage_complete", "berthing_confirmed"]),
+  shipping_terminal_user:  new Set(["new_job", "stage_complete", "berthing_confirmed", "gate_in", "gate_out"]),
+  customs_user:            new Set(["new_job", "stage_complete", "berthing_confirmed"]),
+  transire_user:           new Set(["new_job", "stage_complete"]),
+  pull_out_user:           new Set(["stage_complete", "gate_out", "empty_gate_out"]),
 };
 
 async function getAgingThresholds() {
@@ -673,12 +673,12 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
           .orderBy(desc(workflowNotificationsTable.createdAt))
           .limit(500);
 
-    // Deduplicate: keep only the latest notification per container — one message per job
-    const seenContainers = new Set<number>();
+    // Deduplicate: keep only the latest notification per (container, targetUser) pair
+    const seen = new Set<string>();
     const deduped = allWorkflow.filter(n => {
-      if (n.containerId == null) return true;
-      if (seenContainers.has(n.containerId)) return false;
-      seenContainers.add(n.containerId);
+      const key = `${n.containerId ?? ""}:${n.targetUserId ?? ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
 
@@ -703,10 +703,14 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
 notificationsRouter.post("/workflow-notifications/:id/read", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [existing] = await db.select({ branchId: workflowNotificationsTable.branchId })
+    const [existing] = await db.select({ branchId: workflowNotificationsTable.branchId, targetUserId: workflowNotificationsTable.targetUserId })
       .from(workflowNotificationsTable).where(eq(workflowNotificationsTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       return res.status(404).json({ error: "Notification not found" });
+    }
+    const isAdmin = ADMIN_ROLES.has(req.user!.role);
+    if (!isAdmin && existing.targetUserId != null && existing.targetUserId !== req.user!.id) {
+      return res.status(403).json({ error: "Cannot mark another user's notification as read" });
     }
     await db.update(workflowNotificationsTable)
       .set({ isRead: true, readAt: new Date() })
@@ -721,9 +725,14 @@ notificationsRouter.post("/workflow-notifications/:id/read", requireAuth, async 
 notificationsRouter.post("/workflow-notifications/read-all", requireAuth, async (req: AuthRequest, res) => {
   try {
     const branchScope = getBranchScope(req);
-    const whereClause = branchScope !== null
-      ? and(eq(workflowNotificationsTable.isRead, false), eq(workflowNotificationsTable.branchId, branchScope))
-      : eq(workflowNotificationsTable.isRead, false);
+    const isAdmin = ADMIN_ROLES.has(req.user!.role);
+    const userId = req.user!.id;
+    const ownershipClause = isAdmin
+      ? undefined
+      : or(isNull(workflowNotificationsTable.targetUserId), eq(workflowNotificationsTable.targetUserId, userId));
+    const unreadClause = eq(workflowNotificationsTable.isRead, false);
+    const branchClause = branchScope !== null ? eq(workflowNotificationsTable.branchId, branchScope) : undefined;
+    const whereClause = and(unreadClause, branchClause, ownershipClause);
     await db.update(workflowNotificationsTable)
       .set({ isRead: true, readAt: new Date() })
       .where(whereClause);
