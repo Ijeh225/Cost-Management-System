@@ -505,7 +505,7 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
     // Resolve per-branch from address (fall back to default if not set).
     // When branchScope is null (global / super_admin all-branches), use the
     // same unambiguous single-branch logic as the scheduled digest.
-    let fromAddress = "Cost Analysis <alerts@updates.costanalysis.app>";
+    let fromAddress = "Cost Analysis <onboarding@resend.dev>";
     if (branchScope !== null) {
       const [branch] = await db.select({ emailFromAddress: branchesTable.emailFromAddress, emailMode: branchesTable.emailMode })
         .from(branchesTable).where(eq(branchesTable.id, branchScope)).limit(1);
@@ -812,7 +812,7 @@ export async function runScheduledDigest(): Promise<void> {
     // emailMode="own" and a set emailFromAddress only when there is exactly one such
     // branch — this keeps the address unambiguous. With multiple or zero own-mode
     // branches we fall back to the system default to avoid cross-branch identity leakage.
-    const DEFAULT_FROM = "Cost Analysis <alerts@updates.costanalysis.app>";
+    const DEFAULT_FROM = "Cost Analysis <onboarding@resend.dev>";
     let scheduledFromAddress = DEFAULT_FROM;
     const ownBranches = await db
       .select({ emailFromAddress: branchesTable.emailFromAddress })
