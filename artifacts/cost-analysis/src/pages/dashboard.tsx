@@ -14,7 +14,7 @@ import {
   FileText, CheckCircle2, ArrowRight, ClipboardCheck, ListTodo,
   Brain, ShieldAlert, Clock, ExternalLink, X, ChevronDown, ChevronUp,
   Wallet, CreditCard, ReceiptText, ShieldCheck, Landmark, Percent,
-  Anchor, Ship,
+  Anchor, Ship, Info,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -380,19 +380,27 @@ function BerthingWidget() {
   );
 }
 
-function StatCard({ title, value, icon: Icon, isCurrency = false, colorClass = "", branchLabel }: {
+function StatCard({ title, value, icon: Icon, isCurrency = false, colorClass = "", branchLabel, tooltip }: {
   title: string;
   value: number;
   icon: React.ElementType;
   isCurrency?: boolean;
   colorClass?: string;
   branchLabel?: string;
+  tooltip?: string;
 }) {
   return (
     <Card className="border-border/40 bg-card/40 backdrop-blur-sm overflow-hidden relative group">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+          {title}
+          {tooltip && (
+            <span title={tooltip} className="cursor-help shrink-0">
+              <Info className="w-3 h-3 text-muted-foreground/40 hover:text-muted-foreground/80 transition-colors" />
+            </span>
+          )}
+        </CardTitle>
         <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center border border-border/50">
           <Icon className={`h-4 w-4 ${colorClass || "text-muted-foreground group-hover:text-primary"} transition-colors`} />
         </div>
@@ -576,8 +584,22 @@ export default function Dashboard() {
         <StatCard title="Total Containers"       value={stats.totalContainers}        icon={Box}         branchLabel={branchLabel} />
         <StatCard title="In Progress"            value={stats.inProgress}             icon={Activity}    colorClass="text-blue-400" branchLabel={branchLabel} />
         <StatCard title="Completed"              value={stats.completed}              icon={CheckCircle2} colorClass="text-emerald-400" branchLabel={branchLabel} />
-        <StatCard title="Total Cost"             value={stats.totalCost}              icon={DollarSign}  isCurrency branchLabel={branchLabel} />
-        <StatCard title="Total Clearing Charges" value={stats.totalClearingCharges}   icon={FileText}    isCurrency branchLabel={branchLabel} />
+        <StatCard
+          title="Total Cost"
+          value={stats.totalCost}
+          icon={DollarSign}
+          isCurrency
+          branchLabel={branchLabel}
+          tooltip="Sum of all actual costs across shipping, customs, terminal, delivery, and operations charges."
+        />
+        <StatCard
+          title="Total Clearing Charges"
+          value={stats.totalClearingCharges}
+          icon={FileText}
+          isCurrency
+          branchLabel={branchLabel}
+          tooltip="Budgeted clearing charge entered per container — the estimated revenue figure used on this dashboard. See the P&L Report for revenue recognised from issued invoices."
+        />
         <StatCard
           title="Gross Profit"
           value={grossProfit}
@@ -585,6 +607,7 @@ export default function Dashboard() {
           isCurrency
           colorClass={grossProfit >= 0 ? "text-emerald-400" : "text-destructive"}
           branchLabel={branchLabel}
+          tooltip="Gross profit = Clearing Charges minus actual costs. Based on budgeted revenue — does not deduct overhead expenses. See the P&L Report for net profit after overheads."
         />
         <StatCard title="Total Invoiced"         value={stats.totalInvoiced ?? 0}     icon={ReceiptText} isCurrency branchLabel={branchLabel} />
         <StatCard title="Total Collected"        value={stats.totalCollected ?? 0}    icon={Wallet}      isCurrency colorClass="text-emerald-400" branchLabel={branchLabel} />

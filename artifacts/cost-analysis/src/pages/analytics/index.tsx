@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, BarChart2, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Box, Users, ArrowRight, Clock, CreditCard, Calendar } from "lucide-react";
+import { Loader2, BarChart2, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Box, Users, ArrowRight, Clock, CreditCard, Calendar, Info } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -101,6 +101,16 @@ export default function AnalyticsPage() {
             View Reports <ArrowRight className="w-3 h-3" />
           </button>
         </Link>
+      </div>
+
+      {/* Methodology note */}
+      <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-lg border border-border/40 bg-muted/20 text-xs text-muted-foreground">
+        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-muted-foreground/60" />
+        <span>
+          Figures shown here are <strong className="text-foreground/70">gross profit based on budgeted clearing charges</strong> — the estimated revenue entered per container.
+          {" "}For net profit after overhead expenses and revenue recognised from <em>issued invoices</em>, see the{" "}
+          <a href="/reports/pl" className="text-primary underline-offset-2 hover:underline">P&amp;L Report</a>.
+        </span>
       </div>
 
       {/* Period filter — applies to operational metrics */}

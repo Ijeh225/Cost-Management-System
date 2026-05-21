@@ -182,6 +182,15 @@ export default function ProfitLossPrint() {
           </div>
         </div>
 
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px", marginBottom: 20, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, fontSize: 12, color: "#166534", lineHeight: 1.5 }}>
+          <span style={{ fontWeight: 700, flexShrink: 0 }}>ℹ</span>
+          <span>
+            Revenue is recognised from <strong>issued invoices</strong> (net of VAT). Draft invoices are excluded.
+            Net profit deducts <strong>branch overhead expenses</strong> from gross profit.
+            The Dashboard and Analytics page show gross profit based on <em>budgeted clearing charges</em> — figures may differ from this report.
+          </span>
+        </div>
+
         <div className="summary-cards">
           <div className="summary-card rev">
             <div className="lbl">Net Revenue (ex-VAT)</div>
