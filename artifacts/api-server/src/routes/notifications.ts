@@ -59,13 +59,19 @@ const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
 };
 
 const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
-  delivery_user:      new Set(["overdue", "empty_gate_out"]),
-  terminal_manager:   new Set(["overdue", "stage_complete", "delay_recorded", "gate_in", "gate_out", "empty_gate_in", "empty_gate_out", "berthing_confirmed"]),
-  security_user:      new Set(["new_job", "stage_complete", "gate_in"]),
-  operations_user:    new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "gate_out", "empty_gate_in", "berthing_confirmed", "document_uploaded"]),
-  staff:              new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "task_assigned", "section_submitted", "container_verified"]),
-  accounts_user:      new Set(["invoice_created", "invoice_paid", "berthing_confirmed"]),
-  documentation_user: new Set(["new_job", "section_submitted", "container_verified", "document_uploaded", "task_assigned"]),
+  delivery_user:           new Set(["overdue", "empty_gate_out", "document_uploaded"]),
+  terminal_manager:        new Set(["overdue", "stage_complete", "delay_recorded", "gate_in", "gate_out", "empty_gate_in", "empty_gate_out", "berthing_confirmed", "document_uploaded"]),
+  terminal_user:           new Set(["stage_complete", "gate_in", "gate_out", "empty_gate_in", "document_uploaded"]),
+  security_user:           new Set(["new_job", "stage_complete", "gate_in"]),
+  operations_user:         new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "gate_out", "empty_gate_in", "berthing_confirmed", "document_uploaded"]),
+  staff:                   new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "task_assigned", "section_submitted", "container_verified"]),
+  accounts_user:           new Set(["invoice_created", "invoice_paid", "berthing_confirmed"]),
+  documentation_user:      new Set(["new_job", "section_submitted", "container_verified", "document_uploaded", "task_assigned"]),
+  shipping_user:           new Set(["new_job", "stage_complete", "berthing_confirmed", "document_uploaded"]),
+  shipping_terminal_user:  new Set(["new_job", "stage_complete", "berthing_confirmed", "gate_in", "gate_out", "document_uploaded"]),
+  customs_user:            new Set(["new_job", "stage_complete", "berthing_confirmed", "document_uploaded"]),
+  transire_user:           new Set(["new_job", "stage_complete", "document_uploaded"]),
+  pull_out_user:           new Set(["stage_complete", "gate_out", "empty_gate_out", "document_uploaded"]),
 };
 
 async function getAgingThresholds() {
@@ -679,9 +685,11 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
     let notifications = deduped;
     if (role && !ADMIN_ROLES.has(role)) {
       const userId = req.user!.id;
-      notifications = notifications.filter(n => n.targetUserId == null || n.targetUserId === userId);
       const allowed = ROLE_WORKFLOW_TYPES[role];
-      notifications = allowed ? notifications.filter(n => allowed.has(n.type)) : [];
+      notifications = notifications.filter(n => {
+        if (n.targetUserId != null) return n.targetUserId === userId;
+        return allowed ? allowed.has(n.type) : false;
+      });
     }
 
     const unreadCount = notifications.filter(n => !n.isRead).length;

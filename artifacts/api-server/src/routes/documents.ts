@@ -3,7 +3,7 @@ import multer from "multer";
 import path from "path";
 import { randomUUID } from "crypto";
 import { db, containerDocumentsTable, containersTable, usersTable, workflowNotificationsTable } from "@workspace/db";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray, and } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth.js";
 import { objectStorageClient } from "../lib/objectStorage.js";
 
@@ -77,11 +77,37 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
     }).returning();
 
     try {
-      await db.insert(workflowNotificationsTable).values({
-        type: "document_uploaded", branchId: container.branchId,
-        message: `Document uploaded: "${req.file.originalname}" — ${container.containerNumber}`,
-        containerId, containerNumber: container.containerNumber,
-      });
+      const SECTION_ROLES: Record<string, string[]> = {
+        shipping:   ["shipping_user", "shipping_terminal_user"],
+        customs:    ["customs_user"],
+        terminal:   ["terminal_user", "terminal_manager", "shipping_terminal_user"],
+        delivery:   ["delivery_user"],
+        operations: ["operations_user"],
+      };
+      const docMsg = `Document uploaded: "${req.file.originalname}" — ${container.containerNumber}`;
+      const sectionRoles = SECTION_ROLES[section] ?? [];
+      let inserted = false;
+      if (sectionRoles.length > 0) {
+        const targetUsers = await db.select({ id: usersTable.id })
+          .from(usersTable)
+          .where(and(eq(usersTable.branchId, container.branchId), eq(usersTable.isActive, true), inArray(usersTable.role, sectionRoles)));
+        if (targetUsers.length > 0) {
+          await db.insert(workflowNotificationsTable).values(
+            targetUsers.map(u => ({
+              type: "document_uploaded", branchId: container.branchId,
+              message: docMsg, containerId, containerNumber: container.containerNumber,
+              targetUserId: u.id,
+            }))
+          );
+          inserted = true;
+        }
+      }
+      if (!inserted) {
+        await db.insert(workflowNotificationsTable).values({
+          type: "document_uploaded", branchId: container.branchId,
+          message: docMsg, containerId, containerNumber: container.containerNumber,
+        });
+      }
     } catch {}
 
     return res.status(201).json({ ...doc, createdAt: doc.createdAt.toISOString() });
