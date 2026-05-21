@@ -404,3 +404,46 @@ export function useGetFxHistory(
     queryFn: async () => customFetch(`/api/reports/fx-history?${qs}`),
   });
 }
+
+export type BranchComparisonRow = {
+  branchId: number;
+  branchName: string;
+  isActive: boolean;
+  containers: number;
+  revenue: number;
+  costs: number;
+  grossProfit: number;
+  marginPct: number;
+  avgTurnaroundDays: number;
+  outstandingReceivables: number;
+};
+
+export type BranchComparisonResponse = {
+  period: { from: string | null; to: string | null };
+  rows: BranchComparisonRow[];
+  totals: {
+    containers: number;
+    revenue: number;
+    costs: number;
+    grossProfit: number;
+    outstandingReceivables: number;
+  };
+  generatedAt: string;
+};
+
+export function useGetBranchComparison(
+  params: { from?: string; to?: string },
+  options?: { enabled?: boolean }
+) {
+  const { enabled = true } = options ?? {};
+  return useQuery<BranchComparisonResponse>({
+    queryKey: ["/api/reports/branch-comparison", params.from, params.to],
+    enabled,
+    queryFn: async () => {
+      const qs = new URLSearchParams();
+      if (params.from) qs.set("from", params.from);
+      if (params.to) qs.set("to", params.to);
+      return customFetch(`/api/reports/branch-comparison?${qs}`);
+    },
+  });
+}

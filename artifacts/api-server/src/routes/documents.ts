@@ -84,18 +84,27 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
   }
 });
 
-documentsRouter.get("/documents/*filename", requireAuth, async (req: AuthRequest, res) => {
-  const objectKey = (req.params as any).filename;
+documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, res) => {
+  const docId = parseInt(req.params.docId);
+  if (isNaN(docId)) return res.status(400).json({ error: "Invalid document id" });
   try {
-    const gcsFile = getBucket().file(objectKey);
+    const [doc] = await db.select({
+      filename: containerDocumentsTable.filename,
+      originalName: containerDocumentsTable.originalName,
+      mimeType: containerDocumentsTable.mimeType,
+    }).from(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+
+    const gcsFile = getBucket().file(doc.filename);
     const [exists] = await gcsFile.exists();
-    if (!exists) return res.status(404).json({ error: "File not found" });
+    if (!exists) return res.status(404).json({ error: "File not found in storage" });
 
     const [metadata] = await gcsFile.getMetadata();
-    const contentType = (metadata.contentType as string) || "application/octet-stream";
+    const contentType = (metadata.contentType as string) || doc.mimeType || "application/octet-stream";
 
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "private, max-age=3600");
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(doc.originalName)}"`);
     if (metadata.size) res.setHeader("Content-Length", String(metadata.size));
 
     gcsFile.createReadStream()

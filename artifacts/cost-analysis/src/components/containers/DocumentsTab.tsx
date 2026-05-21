@@ -81,7 +81,7 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
   };
 
   const handleDownload = (doc: any) => {
-    window.open(`/api/documents/${doc.filename}`, "_blank");
+    window.open(`/api/documents/${doc.id}`, "_blank");
   };
 
   return (

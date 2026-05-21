@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Building2, Download, Loader2, AlertTriangle, TrendingUp, TrendingDown, ChevronUp, ChevronDown, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,28 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
-import { customFetch } from "@workspace/api-client-react";
+import { useGetBranchComparison, type BranchComparisonRow } from "@workspace/api-client-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 
-type Row = {
-  branchId: number;
-  branchName: string;
-  isActive: boolean;
-  containers: number;
-  revenue: number;
-  costs: number;
-  grossProfit: number;
-  marginPct: number;
-  avgTurnaroundDays: number;
-  outstandingReceivables: number;
-};
-
-type Response = {
-  period: { from: string | null; to: string | null };
-  rows: Row[];
-  totals: { containers: number; revenue: number; costs: number; grossProfit: number; outstandingReceivables: number };
-  generatedAt: string;
-};
+type Row = BranchComparisonRow;
 
 export default function BranchComparisonPage() {
   const { isSuperAdmin } = useAuth();
@@ -38,17 +19,10 @@ export default function BranchComparisonPage() {
   const [to, setTo] = useState("");
   const [applied, setApplied] = useState<{ from: string; to: string }>({ from: "", to: "" });
 
-  const { data, isLoading, isError, refetch } = useQuery<Response>({
-    queryKey: ["branch-comparison", applied.from, applied.to],
-    enabled: !!isSuperAdmin,
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (applied.from) params.set("from", applied.from);
-      if (applied.to) params.set("to", applied.to);
-      const qs = params.toString();
-      return customFetch<Response>(`/api/reports/branch-comparison${qs ? `?${qs}` : ""}`, { method: "GET" });
-    },
-  });
+  const { data, isLoading, isError, refetch } = useGetBranchComparison(
+    { from: applied.from || undefined, to: applied.to || undefined },
+    { enabled: !!isSuperAdmin }
+  );
 
   type SortKey = "branchName" | "containers" | "revenue" | "costs" | "grossProfit" | "marginPct" | "avgTurnaroundDays" | "outstandingReceivables";
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
