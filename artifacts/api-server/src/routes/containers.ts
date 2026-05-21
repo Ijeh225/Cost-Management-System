@@ -558,6 +558,16 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
       }
     }
 
+    try {
+      const summary = `${created} container${created === 1 ? "" : "s"} imported` +
+        (duplicates.length ? `, ${duplicates.length} duplicate${duplicates.length === 1 ? "" : "s"} skipped` : "") +
+        (errors.length ? `, ${errors.length} error${errors.length === 1 ? "" : "s"}` : "");
+      await db.insert(workflowNotificationsTable).values({
+        type: "bulk_import", branchId: uploadBranchId,
+        message: `Bulk import complete — ${summary}`,
+        containerId: null, containerNumber: null,
+      });
+    } catch {}
     res.json({ created, duplicates, errors });
   } catch (err) {
     console.error(err);

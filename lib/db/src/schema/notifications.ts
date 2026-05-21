@@ -21,6 +21,7 @@ export const workflowNotificationsTable = pgTable("workflow_notifications", {
   message: text("message").notNull(),
   containerId: integer("container_id").references(() => containersTable.id, { onDelete: "cascade" }),
   containerNumber: text("container_number"),
+  targetUserId: integer("target_user_id").references(() => usersTable.id, { onDelete: "cascade" }),
   isRead: boolean("is_read").notNull().default(false),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

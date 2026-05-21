@@ -9,7 +9,7 @@ export const notificationsRouter = Router();
 const AVG_THRESHOLD = 1.5;
 const LOW_MARGIN_PCT = 0.15;
 
-const ADMIN_ROLES = new Set(["admin", "super_admin"]);
+const ADMIN_ROLES = new Set(["admin", "super_admin", "branch_admin"]);
 
 const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
   delivery_user: new Set([
@@ -678,8 +678,10 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
 
     let notifications = deduped;
     if (role && !ADMIN_ROLES.has(role)) {
+      const userId = req.user!.id;
+      notifications = notifications.filter(n => n.targetUserId == null || n.targetUserId === userId);
       const allowed = ROLE_WORKFLOW_TYPES[role];
-      notifications = allowed ? deduped.filter(n => allowed.has(n.type)) : [];
+      notifications = allowed ? notifications.filter(n => allowed.has(n.type)) : [];
     }
 
     const unreadCount = notifications.filter(n => !n.isRead).length;

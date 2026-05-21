@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable, workflowNotificationsTable } from "@workspace/db";
+import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable, workflowNotificationsTable, userClientAssignmentsTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio, resolveBranchWhatsAppFrom } from "../lib/whatsapp.js";
@@ -332,12 +332,26 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
     }, [], items);
 
     try {
-      await db.insert(workflowNotificationsTable).values({
-        type: "invoice_created", branchId: createBranchId,
-        message: `Invoice ${invoiceNumber} created — ₦${Math.round(total).toLocaleString("en-NG")}${clientName ? ` for ${clientName}` : ""}`,
-        containerId: singleContainerId,
-        containerNumber: containers.length === 1 ? containers[0].containerNumber : null,
-      });
+      const invoiceMsg = `Invoice ${invoiceNumber} created — ₦${Math.round(total).toLocaleString("en-NG")}${clientName ? ` for ${clientName}` : ""}`;
+      const invoiceCtrNum = containers.length === 1 ? containers[0].containerNumber : null;
+      const assignedUsers = clientId
+        ? await db.select({ userId: userClientAssignmentsTable.userId }).from(userClientAssignmentsTable).where(eq(userClientAssignmentsTable.clientId, clientId))
+        : [];
+      if (assignedUsers.length > 0) {
+        await db.insert(workflowNotificationsTable).values(
+          assignedUsers.map(a => ({
+            type: "invoice_created", branchId: createBranchId,
+            message: invoiceMsg, containerId: singleContainerId,
+            containerNumber: invoiceCtrNum, targetUserId: a.userId,
+          }))
+        );
+      } else {
+        await db.insert(workflowNotificationsTable).values({
+          type: "invoice_created", branchId: createBranchId,
+          message: invoiceMsg, containerId: singleContainerId,
+          containerNumber: invoiceCtrNum,
+        });
+      }
     } catch {}
     res.status(201).json(formatted);
   } catch (err) {

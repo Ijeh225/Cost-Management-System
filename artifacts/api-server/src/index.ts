@@ -581,6 +581,13 @@ async function runStartupMigrations() {
       await dropAndRecreate("container_expense_categories", "name");
       console.log(`[migration] Multi-branch foundation v4: comms config + per-branch uniqueness applied`);
     });
+    await runMigration("workflow_notifications_target_user_id_v1", async () => {
+      await pool.query(`
+        ALTER TABLE workflow_notifications
+          ADD COLUMN IF NOT EXISTS target_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS workflow_notifications_target_user_idx ON workflow_notifications(target_user_id)`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

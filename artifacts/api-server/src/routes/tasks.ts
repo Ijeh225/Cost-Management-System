@@ -61,6 +61,7 @@ tasksRouter.post("/containers/:id/tasks", requireAuth, async (req: AuthRequest, 
           type: "task_assigned", branchId: container.branchId,
           message: `Task assigned: "${title}" — ${container.containerNumber}`,
           containerId, containerNumber: container.containerNumber,
+          targetUserId: task.assignedStaffId,
         });
       } catch {}
     }
@@ -91,6 +92,7 @@ tasksRouter.patch("/containers/:id/tasks/:taskId", requireAuth, async (req: Auth
           type: "task_assigned", branchId: task.branchId,
           message: `Task assigned: "${task.title}" — ${c?.containerNumber ?? `#${task.containerId}`}`,
           containerId: task.containerId, containerNumber: c?.containerNumber ?? null,
+          targetUserId: parseInt(assignedStaffId),
         });
       } catch {}
     }
