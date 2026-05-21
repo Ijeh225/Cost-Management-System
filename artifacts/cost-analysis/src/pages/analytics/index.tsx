@@ -1,8 +1,8 @@
-import { useGetAnalytics } from "@workspace/api-client-react";
+import { useGetAnalytics, useGetTurnaround, useGetArSummary } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, BarChart2, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Box, Users, ArrowRight } from "lucide-react";
+import { Loader2, BarChart2, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Box, Users, ArrowRight, Clock, CreditCard } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -21,6 +21,8 @@ const PROFIT_COLOR    = "hsl(142 71% 45%)";
 const LOSS_COLOR      = "hsl(0 84% 60%)";
 const REVENUE_COLOR   = "hsl(var(--primary))";
 const COST_COLOR      = "hsl(var(--chart-2))";
+const STAGE_COLOR     = "hsl(217 91% 60%)";
+const DIST_COLOR      = "hsl(var(--chart-3))";
 
 function KpiCard({ title, value, sub, icon: Icon, colorClass = "" }: {
   title: string; value: string; sub?: string; icon: React.ElementType; colorClass?: string;
@@ -51,6 +53,8 @@ const customTooltipStyle = {
 
 export default function AnalyticsPage() {
   const { data, isLoading, isError } = useGetAnalytics();
+  const { data: turnaround } = useGetTurnaround();
+  const { data: arSummary } = useGetArSummary();
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-20">
@@ -69,6 +73,14 @@ export default function AnalyticsPage() {
 
   const isProfitable = (summary.grossProfit ?? 0) >= 0;
 
+  const avgDaysDisplay = turnaround?.avgClearanceDays != null
+    ? `${turnaround.avgClearanceDays} days`
+    : "—";
+
+  const outstandingDisplay = arSummary
+    ? formatCurrency(arSummary.outstanding)
+    : "—";
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Header */}
@@ -86,7 +98,7 @@ export default function AnalyticsPage() {
         </Link>
       </div>
 
-      {/* Summary KPIs */}
+      {/* Financial KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard title="Containers" value={String(summary.containerCount ?? 0)} icon={Box} />
         <KpiCard title="Total Revenue" value={formatCurrency(summary.totalRevenue ?? 0)} icon={DollarSign} colorClass="text-primary" />
@@ -102,6 +114,40 @@ export default function AnalyticsPage() {
           value={`${summary.profitMargin ?? 0}%`}
           icon={isProfitable ? TrendingUp : TrendingDown}
           colorClass={isProfitable ? "text-emerald-400" : "text-destructive"}
+        />
+      </div>
+
+      {/* Operational KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          title="Avg Clearance Days"
+          value={avgDaysDisplay}
+          sub={turnaround?.completedCount ? `Based on ${turnaround.completedCount} completed container${turnaround.completedCount !== 1 ? "s" : ""}` : "No completed containers yet"}
+          icon={Clock}
+          colorClass="text-sky-400"
+        />
+        <KpiCard
+          title="Outstanding AR"
+          value={outstandingDisplay}
+          sub={arSummary ? `${formatCurrency(arSummary.totalCollected)} collected of ${formatCurrency(arSummary.totalInvoiced)}` : undefined}
+          icon={CreditCard}
+          colorClass="text-amber-400"
+        />
+        <KpiCard
+          title="Total Invoiced"
+          value={arSummary ? formatCurrency(arSummary.totalInvoiced) : "—"}
+          sub={arSummary ? `${arSummary.invoiceCount} invoice${arSummary.invoiceCount !== 1 ? "s" : ""}` : undefined}
+          icon={DollarSign}
+          colorClass="text-muted-foreground"
+        />
+        <KpiCard
+          title="Collection Rate"
+          value={arSummary && arSummary.totalInvoiced > 0
+            ? `${Math.round((arSummary.totalCollected / arSummary.totalInvoiced) * 100)}%`
+            : "—"}
+          sub="Payments received vs invoiced"
+          icon={TrendingUp}
+          colorClass="text-emerald-400"
         />
       </div>
 
@@ -161,6 +207,100 @@ export default function AnalyticsPage() {
                     <Line type="monotone" dataKey="grossProfit" stroke={PROFIT_COLOR} name="Profit" strokeWidth={2} strokeDasharray="4 2" dot={{ r: 3 }} />
                     <ReferenceLine y={0} stroke="hsl(var(--border))" />
                   </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Operational Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Stage Turnaround — Horizontal Bar */}
+        <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Clock className="w-4 h-4 text-sky-400" />
+              Stage Turnaround (avg days)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!turnaround?.stageTurnaround?.length ? (
+              <div className="h-[240px] flex items-center justify-center text-muted-foreground text-sm">
+                Not enough milestone data yet.
+              </div>
+            ) : (
+              <div className="h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={turnaround.stageTurnaround}
+                    layout="vertical"
+                    margin={{ top: 5, right: 50, left: 10, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" opacity={0.4} />
+                    <XAxis
+                      type="number"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      tickFormatter={(v) => `${v}d`}
+                    />
+                    <YAxis
+                      dataKey="stage"
+                      type="category"
+                      width={100}
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                    />
+                    <Tooltip
+                      contentStyle={customTooltipStyle}
+                      formatter={(v: number, _: string, props: any) =>
+                        [`${v} days (${props.payload.sampleCount} containers)`, "Avg"]
+                      }
+                    />
+                    <Bar dataKey="avgDays" fill={STAGE_COLOR} name="Avg Days" radius={[0, 4, 4, 0]}
+                      label={{ position: "right", formatter: (v: number) => `${v}d`, fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Clearance Time Distribution — Histogram */}
+        <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-chart-3" />
+              Clearance Time Distribution
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!turnaround?.clearanceDistribution?.length || turnaround.completedCount === 0 ? (
+              <div className="h-[240px] flex items-center justify-center text-muted-foreground text-sm">
+                No completed containers yet.
+              </div>
+            ) : (
+              <div className="h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={turnaround.clearanceDistribution}
+                    margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                    <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      allowDecimals={false}
+                      label={{ value: "Containers", angle: -90, position: "insideLeft", fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    />
+                    <Tooltip
+                      contentStyle={customTooltipStyle}
+                      formatter={(v: number) => [`${v} container${v !== 1 ? "s" : ""}`, "Count"]}
+                    />
+                    <Bar dataKey="count" fill={DIST_COLOR} name="Containers" radius={[4, 4, 0, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             )}

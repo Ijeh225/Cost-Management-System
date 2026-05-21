@@ -42,3 +42,45 @@ export function useSendAlertDigest() {
       }),
   });
 }
+
+export type StageTurnaroundEntry = {
+  stage: string;
+  avgDays: number;
+  sampleCount: number;
+};
+
+export type ClearanceDistributionEntry = {
+  label: string;
+  count: number;
+};
+
+export type TurnaroundResponse = {
+  avgClearanceDays: number | null;
+  completedCount: number;
+  totalCount: number;
+  stageTurnaround: StageTurnaroundEntry[];
+  clearanceDistribution: ClearanceDistributionEntry[];
+};
+
+export function useGetTurnaround() {
+  return useQuery<TurnaroundResponse>({
+    queryKey: ["analytics", "turnaround"],
+    queryFn: () => customFetch("/api/analytics/turnaround"),
+    staleTime: 60_000,
+  });
+}
+
+export type ArSummaryResponse = {
+  totalInvoiced: number;
+  totalCollected: number;
+  outstanding: number;
+  invoiceCount: number;
+};
+
+export function useGetArSummary() {
+  return useQuery<ArSummaryResponse>({
+    queryKey: ["analytics", "ar-summary"],
+    queryFn: () => customFetch("/api/analytics/ar-summary"),
+    staleTime: 60_000,
+  });
+}

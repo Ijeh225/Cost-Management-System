@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, sectionApprovalsTable, branchesTable } from "@workspace/db";
-import { eq, desc, gte, lte, and, inArray, isNotNull, type SQL } from "drizzle-orm";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, sectionApprovalsTable, branchesTable, invoicesTable, invoicePaymentsTable } from "@workspace/db";
+import { eq, desc, gte, lte, and, inArray, isNotNull, ne, type SQL } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 
@@ -404,6 +404,132 @@ analyticsRouter.get("/analytics/berthing", requireAuth, requireBranchMemberOrAbo
     });
   } catch (err) {
     console.error("[analytics/berthing]", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+analyticsRouter.get("/analytics/turnaround", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const _scope = getBranchScope(req);
+    const DAY_MS = 86_400_000;
+    const toDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const diffDays = (a: Date | null, b: Date | null): number | null => {
+      if (!a || !b) return null;
+      return Math.max(0, Math.round((toDay(b) - toDay(a)) / DAY_MS));
+    };
+    const toDate = (v: unknown): Date | null => {
+      if (!v) return null;
+      return v instanceof Date ? v : new Date(String(v));
+    };
+
+    const rows = await db.select({
+      id: containersTable.id,
+      createdAt: containersTable.createdAt,
+      paarReleasedAt: containersTable.paarReleasedAt,
+      doReleasedAt: containersTable.doReleasedAt,
+      tdoReleasedAt: containersTable.tdoReleasedAt,
+      pulloutReleasedAt: containersTable.pulloutReleasedAt,
+      deliveredAt: containersTable.deliveredAt,
+    }).from(containersTable)
+      .where(_scope === null ? undefined : eq(containersTable.branchId, _scope));
+
+    const completedRows = rows.filter(r => r.deliveredAt != null);
+    const clearanceDays: number[] = completedRows
+      .map(r => diffDays(toDate(r.createdAt), toDate(r.deliveredAt)))
+      .filter((d): d is number => d !== null);
+
+    const avgClearanceDays = clearanceDays.length > 0
+      ? Math.round(clearanceDays.reduce((s, d) => s + d, 0) / clearanceDays.length)
+      : null;
+
+    const dist: Record<string, number> = { "0–7d": 0, "8–14d": 0, "15–30d": 0, "31–60d": 0, "60+d": 0 };
+    for (const d of clearanceDays) {
+      if (d <= 7) dist["0–7d"]++;
+      else if (d <= 14) dist["8–14d"]++;
+      else if (d <= 30) dist["15–30d"]++;
+      else if (d <= 60) dist["31–60d"]++;
+      else dist["60+d"]++;
+    }
+    const clearanceDistribution = Object.entries(dist).map(([label, count]) => ({ label, count }));
+
+    const stageAcc = [
+      { stage: "Documentation",  durations: [] as number[] },
+      { stage: "DO / Shipping",  durations: [] as number[] },
+      { stage: "TDO / Terminal", durations: [] as number[] },
+      { stage: "Pull-Out",       durations: [] as number[] },
+      { stage: "Delivery",       durations: [] as number[] },
+    ];
+
+    for (const r of rows) {
+      const created  = toDate(r.createdAt);
+      const paar     = toDate(r.paarReleasedAt);
+      const doR      = toDate(r.doReleasedAt);
+      const tdoR     = toDate(r.tdoReleasedAt);
+      const pullout  = toDate(r.pulloutReleasedAt);
+      const delivered = toDate(r.deliveredAt);
+
+      const d0 = diffDays(created, paar);
+      const d1 = diffDays(paar, doR);
+      const d2 = diffDays(doR, tdoR);
+      const d3 = diffDays(tdoR, pullout);
+      const d4 = diffDays(pullout, delivered);
+
+      if (d0 !== null) stageAcc[0].durations.push(d0);
+      if (d1 !== null) stageAcc[1].durations.push(d1);
+      if (d2 !== null) stageAcc[2].durations.push(d2);
+      if (d3 !== null) stageAcc[3].durations.push(d3);
+      if (d4 !== null) stageAcc[4].durations.push(d4);
+    }
+
+    const stageTurnaround = stageAcc
+      .map(s => ({
+        stage: s.stage,
+        avgDays: s.durations.length > 0
+          ? parseFloat((s.durations.reduce((a, b) => a + b, 0) / s.durations.length).toFixed(1))
+          : null,
+        sampleCount: s.durations.length,
+      }))
+      .filter(s => s.avgDays !== null);
+
+    return res.json({
+      avgClearanceDays,
+      completedCount: completedRows.length,
+      totalCount: rows.length,
+      stageTurnaround,
+      clearanceDistribution,
+    });
+  } catch (err) {
+    console.error("[analytics/turnaround]", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+analyticsRouter.get("/analytics/ar-summary", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const _scope = getBranchScope(req);
+    const invWhere = _scope === null
+      ? ne(invoicesTable.status, "draft")
+      : and(ne(invoicesTable.status, "draft"), eq(invoicesTable.branchId, _scope));
+
+    const invoices = await db
+      .select({ id: invoicesTable.id, total: invoicesTable.total })
+      .from(invoicesTable)
+      .where(invWhere);
+
+    const invoiceIds = invoices.map(i => i.id);
+    const payments = invoiceIds.length > 0
+      ? await db.select({ amount: invoicePaymentsTable.amount })
+          .from(invoicePaymentsTable)
+          .where(inArray(invoicePaymentsTable.invoiceId, invoiceIds))
+      : [];
+
+    const totalInvoiced = invoices.reduce((s, i) => s + parseFloat(i.total ?? "0"), 0);
+    const totalCollected = payments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+    const outstanding = Math.max(0, totalInvoiced - totalCollected);
+
+    return res.json({ totalInvoiced, totalCollected, outstanding, invoiceCount: invoices.length });
+  } catch (err) {
+    console.error("[analytics/ar-summary]", err);
     return res.status(500).json({ error: "Server error" });
   }
 });
