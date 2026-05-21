@@ -411,31 +411,43 @@ analyticsRouter.get("/analytics/berthing", requireAuth, requireBranchMemberOrAbo
 analyticsRouter.get("/analytics/turnaround", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const _scope = getBranchScope(req);
+    const { from: fromStr, to: toStr } = req.query as Record<string, string | undefined>;
+
     const DAY_MS = 86_400_000;
     const toDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
     const diffDays = (a: Date | null, b: Date | null): number | null => {
       if (!a || !b) return null;
       return Math.max(0, Math.round((toDay(b) - toDay(a)) / DAY_MS));
     };
-    const toDate = (v: unknown): Date | null => {
+    const coerceDate = (v: unknown): Date | null => {
       if (!v) return null;
       return v instanceof Date ? v : new Date(String(v));
     };
+
+    const conditions: SQL[] = [];
+    if (_scope !== null) conditions.push(eq(containersTable.branchId, _scope));
+    if (fromStr) conditions.push(gte(containersTable.createdAt, new Date(fromStr)));
+    if (toStr) {
+      const toDate = new Date(toStr);
+      toDate.setHours(23, 59, 59, 999);
+      conditions.push(lte(containersTable.createdAt, toDate));
+    }
 
     const rows = await db.select({
       id: containersTable.id,
       createdAt: containersTable.createdAt,
       paarReleasedAt: containersTable.paarReleasedAt,
+      transireReleasedAt: containersTable.transireReleasedAt,
       doReleasedAt: containersTable.doReleasedAt,
       tdoReleasedAt: containersTable.tdoReleasedAt,
       pulloutReleasedAt: containersTable.pulloutReleasedAt,
       deliveredAt: containersTable.deliveredAt,
     }).from(containersTable)
-      .where(_scope === null ? undefined : eq(containersTable.branchId, _scope));
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     const completedRows = rows.filter(r => r.deliveredAt != null);
     const clearanceDays: number[] = completedRows
-      .map(r => diffDays(toDate(r.createdAt), toDate(r.deliveredAt)))
+      .map(r => diffDays(coerceDate(r.createdAt), coerceDate(r.deliveredAt)))
       .filter((d): d is number => d !== null);
 
     const avgClearanceDays = clearanceDays.length > 0
@@ -452,33 +464,44 @@ analyticsRouter.get("/analytics/turnaround", requireAuth, requireBranchAdminOrAb
     }
     const clearanceDistribution = Object.entries(dist).map(([label, count]) => ({ label, count }));
 
+    // 6 distinct stages using consecutive milestone timestamps
     const stageAcc = [
-      { stage: "Documentation",  durations: [] as number[] },
-      { stage: "DO / Shipping",  durations: [] as number[] },
-      { stage: "TDO / Terminal", durations: [] as number[] },
-      { stage: "Pull-Out",       durations: [] as number[] },
-      { stage: "Delivery",       durations: [] as number[] },
+      { stage: "Documentation", durations: [] as number[] },
+      { stage: "Customs",       durations: [] as number[] },
+      { stage: "Shipping",      durations: [] as number[] },
+      { stage: "Terminal",      durations: [] as number[] },
+      { stage: "Pull-Out",      durations: [] as number[] },
+      { stage: "Delivery",      durations: [] as number[] },
     ];
 
     for (const r of rows) {
-      const created  = toDate(r.createdAt);
-      const paar     = toDate(r.paarReleasedAt);
-      const doR      = toDate(r.doReleasedAt);
-      const tdoR     = toDate(r.tdoReleasedAt);
-      const pullout  = toDate(r.pulloutReleasedAt);
-      const delivered = toDate(r.deliveredAt);
+      const created   = coerceDate(r.createdAt);
+      const paar      = coerceDate(r.paarReleasedAt);
+      const transire  = coerceDate(r.transireReleasedAt);
+      const doR       = coerceDate(r.doReleasedAt);
+      const tdoR      = coerceDate(r.tdoReleasedAt);
+      const pullout   = coerceDate(r.pulloutReleasedAt);
+      const delivered = coerceDate(r.deliveredAt);
 
+      // 1. Documentation: registration → PAAR released
       const d0 = diffDays(created, paar);
-      const d1 = diffDays(paar, doR);
-      const d2 = diffDays(doR, tdoR);
-      const d3 = diffDays(tdoR, pullout);
-      const d4 = diffDays(pullout, delivered);
+      // 2. Customs: PAAR → Transire released
+      const d1 = diffDays(paar, transire);
+      // 3. Shipping: Transire → DO released
+      const d2 = diffDays(transire, doR);
+      // 4. Terminal: DO → TDO released
+      const d3 = diffDays(doR, tdoR);
+      // 5. Pull-Out: TDO → Pullout released
+      const d4 = diffDays(tdoR, pullout);
+      // 6. Delivery: Pullout → Delivered
+      const d5 = diffDays(pullout, delivered);
 
       if (d0 !== null) stageAcc[0].durations.push(d0);
       if (d1 !== null) stageAcc[1].durations.push(d1);
       if (d2 !== null) stageAcc[2].durations.push(d2);
       if (d3 !== null) stageAcc[3].durations.push(d3);
       if (d4 !== null) stageAcc[4].durations.push(d4);
+      if (d5 !== null) stageAcc[5].durations.push(d5);
     }
 
     const stageTurnaround = stageAcc
@@ -507,14 +530,21 @@ analyticsRouter.get("/analytics/turnaround", requireAuth, requireBranchAdminOrAb
 analyticsRouter.get("/analytics/ar-summary", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const _scope = getBranchScope(req);
-    const invWhere = _scope === null
-      ? ne(invoicesTable.status, "draft")
-      : and(ne(invoicesTable.status, "draft"), eq(invoicesTable.branchId, _scope));
+    const { from: fromStr, to: toStr } = req.query as Record<string, string | undefined>;
+
+    const conditions: SQL[] = [ne(invoicesTable.status, "draft")];
+    if (_scope !== null) conditions.push(eq(invoicesTable.branchId, _scope));
+    if (fromStr) conditions.push(gte(invoicesTable.createdAt, new Date(fromStr)));
+    if (toStr) {
+      const toDate = new Date(toStr);
+      toDate.setHours(23, 59, 59, 999);
+      conditions.push(lte(invoicesTable.createdAt, toDate));
+    }
 
     const invoices = await db
       .select({ id: invoicesTable.id, total: invoicesTable.total })
       .from(invoicesTable)
-      .where(invWhere);
+      .where(and(...conditions));
 
     const invoiceIds = invoices.map(i => i.id);
     const payments = invoiceIds.length > 0

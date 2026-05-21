@@ -62,10 +62,14 @@ export type TurnaroundResponse = {
   clearanceDistribution: ClearanceDistributionEntry[];
 };
 
-export function useGetTurnaround() {
+export function useGetTurnaround(params?: { from?: string; to?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  const url = qs.toString() ? `/api/analytics/turnaround?${qs}` : "/api/analytics/turnaround";
   return useQuery<TurnaroundResponse>({
-    queryKey: ["analytics", "turnaround"],
-    queryFn: () => customFetch("/api/analytics/turnaround"),
+    queryKey: ["analytics", "turnaround", params?.from ?? "", params?.to ?? ""],
+    queryFn: () => customFetch(url),
     staleTime: 60_000,
   });
 }
@@ -77,10 +81,14 @@ export type ArSummaryResponse = {
   invoiceCount: number;
 };
 
-export function useGetArSummary() {
+export function useGetArSummary(params?: { from?: string; to?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  const url = qs.toString() ? `/api/analytics/ar-summary?${qs}` : "/api/analytics/ar-summary";
   return useQuery<ArSummaryResponse>({
-    queryKey: ["analytics", "ar-summary"],
-    queryFn: () => customFetch("/api/analytics/ar-summary"),
+    queryKey: ["analytics", "ar-summary", params?.from ?? "", params?.to ?? ""],
+    queryFn: () => customFetch(url),
     staleTime: 60_000,
   });
 }
