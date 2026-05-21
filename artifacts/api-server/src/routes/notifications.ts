@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable, systemAlertsHistoryTable } from "@workspace/db";
+import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable, systemAlertsHistoryTable, branchesTable } from "@workspace/db";
 import { eq, lt, sql, max, isNotNull, isNull, or, desc, inArray, notInArray, and } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery } from "../lib/calculations.js";
@@ -485,6 +485,10 @@ notificationsRouter.post("/notifications/read-all", requireAuth, async (req, res
   }
 });
 
+notificationsRouter.get("/notifications/email-status", requireAuth, requireBranchAdminOrAbove, (_req, res) => {
+  return res.json({ configured: !!process.env.RESEND_API_KEY });
+});
+
 notificationsRouter.post("/notifications/send-email-digest", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     // Branch isolation (Task #74): scope alert computation. Super-admin must
@@ -497,6 +501,16 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: "Email service is not configured. Please set up the Resend integration in Settings." });
+    }
+
+    // Resolve per-branch from address (fall back to default if not set)
+    let fromAddress = "Cost Analysis <alerts@updates.costanalysis.app>";
+    if (branchScope !== null) {
+      const [branch] = await db.select({ emailFromAddress: branchesTable.emailFromAddress, emailMode: branchesTable.emailMode })
+        .from(branchesTable).where(eq(branchesTable.id, branchScope)).limit(1);
+      if (branch?.emailMode === "own" && branch.emailFromAddress?.trim()) {
+        fromAddress = branch.emailFromAddress.trim();
+      }
     }
     const rows = await db.select().from(settingsTable);
     const settingsMap: Record<string, string> = {};
@@ -559,7 +573,7 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: "Cost Analysis <alerts@updates.costanalysis.app>",
+        from: fromAddress,
         to,
         subject: `Container Alert Digest — ${criticalAlerts.length} critical, ${warningAlerts.length} warnings`,
         html,
@@ -787,11 +801,21 @@ export async function runScheduledDigest(): Promise<void> {
     const agingTypes = ["aging_warn", "aging_high", "aging_critical", "inactive", "negative_profit"];
     const relevant = allAlerts.filter((a: any) => agingTypes.includes(a.type));
 
+    // Resolve a from address: use first branch with emailMode="own" and a set address, else default
+    let scheduledFromAddress = "Cost Analysis <alerts@updates.costanalysis.app>";
+    const [ownBranch] = await db.select({ emailFromAddress: branchesTable.emailFromAddress })
+      .from(branchesTable)
+      .where(and(eq(branchesTable.emailMode, "own"), isNotNull(branchesTable.emailFromAddress)))
+      .limit(1);
+    if (ownBranch?.emailFromAddress?.trim()) {
+      scheduledFromAddress = ownBranch.emailFromAddress.trim();
+    }
+
     const emailRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: "Cost Analysis <alerts@updates.costanalysis.app>",
+        from: scheduledFromAddress,
         to,
         subject: `[Scheduled] Container Alert Digest — ${relevant.filter((a: any) => a.severity === "critical").length} critical`,
         html: `<p>Scheduled digest: ${relevant.length} alerts. Log in to Cost Analysis to review.</p>`,

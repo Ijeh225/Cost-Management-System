@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useGetSettings, useUpdateSettings, customFetch } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2 } from "lucide-react";
+import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound } from "lucide-react";
 
 const DEFAULTS = {
   agingInactivityDays: "7",
@@ -25,6 +26,13 @@ export default function SettingsPage() {
   const { data: settings = {}, isLoading } = useGetSettings();
   const updateMutation = useUpdateSettings();
   const { toast } = useToast();
+
+  const { data: emailStatus } = useQuery<{ configured: boolean }>({
+    queryKey: ["/api/notifications/email-status"],
+    queryFn: () => customFetch("/api/notifications/email-status"),
+    staleTime: 60_000,
+  });
+  const emailServiceConfigured = emailStatus?.configured ?? true;
 
   const s = settings as Record<string, string>;
 
@@ -247,6 +255,19 @@ export default function SettingsPage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-5">
+          {!emailServiceConfigured && (
+            <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10">
+              <KeyRound className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-amber-500">Email service not configured</p>
+                <p className="text-xs text-muted-foreground">
+                  A <code className="font-mono bg-muted px-1 rounded">RESEND_API_KEY</code> secret is required to send emails.
+                  Add it in the Replit Secrets panel, then restart the server.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-background/50">
             <div>
               <p className="text-sm font-medium">Enable email alerts</p>
