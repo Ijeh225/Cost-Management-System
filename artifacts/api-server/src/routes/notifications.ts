@@ -801,15 +801,10 @@ export async function runScheduledDigest(): Promise<void> {
     const agingTypes = ["aging_warn", "aging_high", "aging_critical", "inactive", "negative_profit"];
     const relevant = allAlerts.filter((a: any) => agingTypes.includes(a.type));
 
-    // Resolve a from address: use first branch with emailMode="own" and a set address, else default
-    let scheduledFromAddress = "Cost Analysis <alerts@updates.costanalysis.app>";
-    const [ownBranch] = await db.select({ emailFromAddress: branchesTable.emailFromAddress })
-      .from(branchesTable)
-      .where(and(eq(branchesTable.emailMode, "own"), isNotNull(branchesTable.emailFromAddress)))
-      .limit(1);
-    if (ownBranch?.emailFromAddress?.trim()) {
-      scheduledFromAddress = ownBranch.emailFromAddress.trim();
-    }
+    // Scheduled digest is a global (cross-branch) send — always use the
+    // system default sender. Per-branch scheduled sends are not supported;
+    // the manual endpoint handles per-branch sender resolution instead.
+    const scheduledFromAddress = "Cost Analysis <alerts@updates.costanalysis.app>";
 
     const emailRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
