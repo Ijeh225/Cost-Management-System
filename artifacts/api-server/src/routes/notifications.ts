@@ -495,15 +495,16 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
     // pick a specific branch via X-Branch-Id; non-super-admins are pinned to
     // their own branch.
     const branchScope = getBranchScope(req);
-    if (branchScope === null && req.user?.role === "super_admin") {
-      return res.status(400).json({ error: "Select a specific branch before sending the digest." });
-    }
+    // super_admin with "All branches" selected sends a global digest — allowed.
+    // Non-super-admins are always pinned to their own branch via getBranchScope.
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: "Email service is not configured. Please set up the Resend integration in Settings." });
     }
 
-    // Resolve per-branch from address (fall back to default if not set)
+    // Resolve per-branch from address (fall back to default if not set).
+    // When branchScope is null (global / super_admin all-branches), use the
+    // same unambiguous single-branch logic as the scheduled digest.
     let fromAddress = "Cost Analysis <alerts@updates.costanalysis.app>";
     if (branchScope !== null) {
       const [branch] = await db.select({ emailFromAddress: branchesTable.emailFromAddress, emailMode: branchesTable.emailMode })
@@ -511,6 +512,13 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
       if (branch?.emailMode === "own" && branch.emailFromAddress?.trim()) {
         fromAddress = branch.emailFromAddress.trim();
       }
+    } else {
+      const ownBranches = await db
+        .select({ emailFromAddress: branchesTable.emailFromAddress })
+        .from(branchesTable)
+        .where(and(eq(branchesTable.emailMode, "own"), isNotNull(branchesTable.emailFromAddress)));
+      const validOwn = ownBranches.filter(b => b.emailFromAddress?.trim());
+      if (validOwn.length === 1) fromAddress = validOwn[0].emailFromAddress!.trim();
     }
     const rows = await db.select().from(settingsTable);
     const settingsMap: Record<string, string> = {};
