@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable } from "@workspace/db";
+import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { toE164Nigerian, sendViaTwilio, resolveBranchWhatsAppFrom } from "../lib/whatsapp.js";
@@ -331,6 +331,14 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
       clientPhone,
     }, [], items);
 
+    try {
+      await db.insert(workflowNotificationsTable).values({
+        type: "invoice_created", branchId: createBranchId,
+        message: `Invoice ${invoiceNumber} created — ₦${Math.round(total).toLocaleString("en-NG")}${clientName ? ` for ${clientName}` : ""}`,
+        containerId: singleContainerId,
+        containerNumber: containers.length === 1 ? containers[0].containerNumber : null,
+      });
+    } catch {}
     res.status(201).json(formatted);
   } catch (err) {
     console.error(err);
@@ -989,6 +997,14 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       }
     }
 
+    try {
+      await db.insert(workflowNotificationsTable).values({
+        type: "invoice_paid", branchId: inv.branchId,
+        message: `Payment of ₦${Math.round(amount).toLocaleString("en-NG")} recorded on ${inv.invoiceNumber} (${newStatus})`,
+        containerId: inv.containerId ?? null,
+        containerNumber: null,
+      });
+    } catch {}
     res.status(201).json({ success: true, totalPaid, status: newStatus, overpaymentStored });
   } catch (err) {
     console.error(err);

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containerTasksTable, containersTable, usersTable } from "@workspace/db";
+import { db, containerTasksTable, containersTable, usersTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, asc, desc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth.js";
 
@@ -44,7 +44,7 @@ tasksRouter.post("/containers/:id/tasks", requireAuth, async (req: AuthRequest, 
   const { title, assignedStaffId, dueDate, priority = "medium", notes = "" } = req.body;
   if (!title) return res.status(400).json({ error: "title required" });
   try {
-    const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, containerId));
+    const [container] = await db.select({ branchId: containersTable.branchId, containerNumber: containersTable.containerNumber }).from(containersTable).where(eq(containersTable.id, containerId));
     if (!container) return res.status(404).json({ error: "Container not found" });
     const [task] = await db.insert(containerTasksTable).values({
       containerId,
@@ -55,6 +55,15 @@ tasksRouter.post("/containers/:id/tasks", requireAuth, async (req: AuthRequest, 
       priority, notes, status: "pending",
       createdById: req.user!.id,
     }).returning();
+    if (task.assignedStaffId) {
+      try {
+        await db.insert(workflowNotificationsTable).values({
+          type: "task_assigned", branchId: container.branchId,
+          message: `Task assigned: "${title}" — ${container.containerNumber}`,
+          containerId, containerNumber: container.containerNumber,
+        });
+      } catch {}
+    }
     return res.status(201).json({ ...task, dueDate: task.dueDate?.toISOString() ?? null, createdAt: task.createdAt.toISOString(), updatedAt: task.updatedAt.toISOString() });
   } catch (err) {
     console.error(err);
@@ -75,6 +84,16 @@ tasksRouter.patch("/containers/:id/tasks/:taskId", requireAuth, async (req: Auth
     if (notes !== undefined) updates.notes = notes;
 
     const [task] = await db.update(containerTasksTable).set(updates).where(eq(containerTasksTable.id, taskId)).returning();
+    if (assignedStaffId) {
+      try {
+        const [c] = await db.select({ containerNumber: containersTable.containerNumber }).from(containersTable).where(eq(containersTable.id, task.containerId));
+        await db.insert(workflowNotificationsTable).values({
+          type: "task_assigned", branchId: task.branchId,
+          message: `Task assigned: "${task.title}" — ${c?.containerNumber ?? `#${task.containerId}`}`,
+          containerId: task.containerId, containerNumber: c?.containerNumber ?? null,
+        });
+      } catch {}
+    }
     return res.json({ ...task, dueDate: task.dueDate?.toISOString() ?? null, createdAt: task.createdAt.toISOString(), updatedAt: task.updatedAt.toISOString() });
   } catch (err) {
     console.error(err);

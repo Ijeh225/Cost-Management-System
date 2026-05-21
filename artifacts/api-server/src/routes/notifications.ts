@@ -59,13 +59,13 @@ const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
 };
 
 const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
-  delivery_user:      new Set(["overdue"]),
-  terminal_manager:   new Set(["overdue", "stage_complete", "delay_recorded", "gate_in"]),
+  delivery_user:      new Set(["overdue", "empty_gate_out"]),
+  terminal_manager:   new Set(["overdue", "stage_complete", "delay_recorded", "gate_in", "gate_out", "empty_gate_in", "empty_gate_out", "berthing_confirmed"]),
   security_user:      new Set(["new_job", "stage_complete", "gate_in"]),
-  operations_user:    new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
-  staff:              new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
-  accounts_user:      new Set([]),
-  documentation_user: new Set(["new_job"]),
+  operations_user:    new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "gate_out", "empty_gate_in", "berthing_confirmed", "document_uploaded"]),
+  staff:              new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "task_assigned", "section_submitted", "container_verified"]),
+  accounts_user:      new Set(["invoice_created", "invoice_paid", "berthing_confirmed"]),
+  documentation_user: new Set(["new_job", "section_submitted", "container_verified", "document_uploaded", "task_assigned"]),
 };
 
 async function getAgingThresholds() {

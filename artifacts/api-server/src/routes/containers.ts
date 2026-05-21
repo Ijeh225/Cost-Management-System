@@ -993,6 +993,13 @@ router.post("/containers/:id/verify", requireBranchAdminOrAbove, async (req: Aut
       section: "basic_info",
       reason: "Container verified and moved to Registered stage",
     });
+    try {
+      await db.insert(workflowNotificationsTable).values({
+        type: "container_verified", branchId: existing.branchId,
+        message: `Container verified and moved to pipeline: ${existing.containerNumber}`,
+        containerId: id, containerNumber: existing.containerNumber,
+      });
+    } catch {}
     res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
@@ -1027,6 +1034,13 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
       section: "basic_info",
       reason: `Vessel berthing confirmed by ${confirmedByName}`,
     });
+    try {
+      await db.insert(workflowNotificationsTable).values({
+        type: "berthing_confirmed", branchId: existing.branchId,
+        message: `Vessel berthed — clearing underway: ${existing.containerNumber}`,
+        containerId: id, containerNumber: existing.containerNumber,
+      });
+    } catch {}
     const { sendWhatsApp } = req.body;
     let whatsappResult: { success: boolean; sid?: string; error?: string } | null = null;
     if (sendWhatsApp && existing.clientId) {
@@ -1303,6 +1317,13 @@ router.post("/containers/:id/gate-out", requireAuth, async (req: AuthRequest, re
       section: "basic_info",
       reason: `Gate-Out recorded at ${now.toISOString()} by security`,
     });
+    try {
+      await db.insert(workflowNotificationsTable).values({
+        type: "gate_out", branchId: existing.branchId,
+        message: `Gate-Out recorded — container left terminal: ${existing.containerNumber}`,
+        containerId: id, containerNumber: existing.containerNumber,
+      });
+    } catch {}
     res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
@@ -1341,6 +1362,13 @@ router.post("/containers/:id/empty-gate-in", requireAuth, async (req: AuthReques
       section: "basic_info",
       reason: `Empty Gate-In recorded at ${now.toISOString()} by security — empty container returned to terminal`,
     });
+    try {
+      await db.insert(workflowNotificationsTable).values({
+        type: "empty_gate_in", branchId: existing.branchId,
+        message: `Empty container returned to terminal: ${existing.containerNumber}`,
+        containerId: id, containerNumber: existing.containerNumber,
+      });
+    } catch {}
     res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
@@ -1384,6 +1412,13 @@ router.post("/containers/:id/empty-gate-out", requireAuth, async (req: AuthReque
       section: "basic_info",
       reason: `Empty Gate-Out recorded at ${now.toISOString()} by security — empty container returned to port, custody closed`,
     });
+    try {
+      await db.insert(workflowNotificationsTable).values({
+        type: "empty_gate_out", branchId: existing.branchId,
+        message: `Empty container returned to port — custody closed: ${existing.containerNumber}`,
+        containerId: id, containerNumber: existing.containerNumber,
+      });
+    } catch {}
     res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
@@ -2056,7 +2091,7 @@ router.post("/containers/:id/sections/:section/submit", requireAuth, async (req:
     const id = parseInt(req.params.id);
     const section = req.params.section;
     const user = req.user!;
-    const [_branchCheck] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
+    const [_branchCheck] = await db.select({ branchId: containersTable.branchId, containerNumber: containersTable.containerNumber }).from(containersTable).where(eq(containersTable.id, id));
     if (!_branchCheck || !userCanAccessBranch(req, _branchCheck.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const approval = await getOrCreateSectionApproval(id, section);
     if (approval.status === "submitted") {
@@ -2068,6 +2103,15 @@ router.post("/containers/:id/sections/:section/submit", requireAuth, async (req:
       .where(eq(sectionApprovalsTable.id, approval.id))
       .returning();
     await db.insert(auditLogTable).values({ containerId: id, branchId: approval.branchId, userId: user.id, action: "section_submitted", section });
+    try {
+      const SECTION_LABELS: Record<string, string> = { shipping: "Shipping", customs: "Customs", terminal: "Terminal", delivery: "Delivery", operations: "Operations" };
+      const sLabel = SECTION_LABELS[section] ?? section;
+      await db.insert(workflowNotificationsTable).values({
+        type: "section_submitted", branchId: approval.branchId,
+        message: `${sLabel} section submitted for review — ${_branchCheck.containerNumber}`,
+        containerId: id, containerNumber: _branchCheck.containerNumber,
+      });
+    } catch {}
     res.json(await formatSectionApproval(updated));
   } catch (err) {
     console.error(err);

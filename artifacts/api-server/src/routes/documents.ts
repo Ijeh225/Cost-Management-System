@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import { randomUUID } from "crypto";
-import { db, containerDocumentsTable, containersTable, usersTable } from "@workspace/db";
+import { db, containerDocumentsTable, containersTable, usersTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth.js";
 import { objectStorageClient } from "../lib/objectStorage.js";
@@ -56,7 +56,7 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
   const objectKey = `documents/${Date.now()}-${randomUUID()}${ext}`;
 
   try {
-    const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, containerId));
+    const [container] = await db.select({ branchId: containersTable.branchId, containerNumber: containersTable.containerNumber }).from(containersTable).where(eq(containersTable.id, containerId));
     if (!container) return res.status(404).json({ error: "Container not found" });
 
     const gcsFile = getBucket().file(objectKey);
@@ -75,6 +75,14 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
       size: req.file.size,
       uploadedById: req.user!.id,
     }).returning();
+
+    try {
+      await db.insert(workflowNotificationsTable).values({
+        type: "document_uploaded", branchId: container.branchId,
+        message: `Document uploaded: "${req.file.originalname}" — ${container.containerNumber}`,
+        containerId, containerNumber: container.containerNumber,
+      });
+    } catch {}
 
     return res.status(201).json({ ...doc, createdAt: doc.createdAt.toISOString() });
   } catch (err) {
