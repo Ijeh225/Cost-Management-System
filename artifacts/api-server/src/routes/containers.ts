@@ -1989,6 +1989,12 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       }
     }
 
+    // Check section-level permissions (mirrors extra-charges endpoint)
+    if (section && !canUserEditSection(req.user!, section)) {
+      res.status(403).json({ error: "You do not have permission to edit this section" });
+      return;
+    }
+
     const strNums = (obj: any) => {
       if (!obj) return undefined;
       const out: any = {};

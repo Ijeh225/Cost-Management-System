@@ -892,6 +892,11 @@ function ChargeSectionForm({
                   <ShieldCheck className="w-3 h-3 mr-1" /> Locked
                 </Badge>
               )}
+              {!isEditable && !isAdmin && !isRecordLocked && !isSectionLocked && approvalStatus !== "approved" && (
+                <Badge variant="outline" className="bg-muted/30 text-muted-foreground border-border/50 text-[10px] py-0 px-1.5">
+                  <Lock className="w-3 h-3 mr-1" /> View Only
+                </Badge>
+              )}
               {approval && (
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${getApprovalStatusColor(approvalStatus)}`}>
                   {getApprovalStatusLabel(approvalStatus)}

@@ -173,11 +173,20 @@ export function getUserSectionPerm(
 }
 
 export function canEditSectionGranular(
-  _sectionKey: string,
-  _isAdmin: boolean,
-  _sectionPermissions: string | null | undefined,
-  _legacySectionPermission: string | null | undefined
+  sectionKey: string,
+  isAdmin: boolean,
+  sectionPermissions: string | null | undefined,
+  legacySectionPermission: string | null | undefined
 ): boolean {
+  if (isAdmin) return true;
+  const perms = parseSectionPermissions(sectionPermissions);
+  if (Object.keys(perms).length > 0) {
+    return perms[sectionKey] === "edit";
+  }
+  if (legacySectionPermission) {
+    return legacySectionPermission === sectionKey;
+  }
+  // No permission restrictions configured on this user: allow
   return true;
 }
 
