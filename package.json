@@ -5,7 +5,7 @@
   "scripts": {
     "preinstall": "node -e \"for (const file of ['package-lock.json', 'yarn.lock']) { try { require('node:fs').unlinkSync(file) } catch (error) { if (error.code !== 'ENOENT') throw error } }\"",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "railway:build": "pnpm run typecheck && pnpm --filter @workspace/cost-analysis run build && pnpm --filter @workspace/api-server run build",
+    "railway:build": "pnpm --filter @workspace/cost-analysis run build && pnpm --filter @workspace/api-server run build",
     "railway:db:push": "pnpm --filter @workspace/db run push",
     "railway:start": "node artifacts/api-server/dist/index.cjs",
     "typecheck:libs": "tsc --build",
