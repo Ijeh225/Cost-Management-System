@@ -571,7 +571,8 @@ async function runStartupMigrations() {
         }
         await pool.query(`
           DO $$ BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${table}_${col}_branch_uniq') THEN
+            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${table}_${col}_branch_uniq')
+              AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = '${table}_${col}_branch_uniq') THEN
               ALTER TABLE ${table} ADD CONSTRAINT ${table}_${col}_branch_uniq UNIQUE (branch_id, ${col});
             END IF;
           END $$;
