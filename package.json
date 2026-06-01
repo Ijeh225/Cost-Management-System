@@ -5,6 +5,9 @@
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "railway:build": "pnpm run typecheck && pnpm --filter @workspace/cost-analysis run build && pnpm --filter @workspace/api-server run build",
+    "railway:db:push": "pnpm --filter @workspace/db run push",
+    "railway:start": "node artifacts/api-server/dist/index.cjs",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
@@ -16,5 +19,6 @@
   "dependencies": {
     "@types/pdfkit": "^0.17.6",
     "pdfkit": "^0.18.0"
-  }
+  },
+  "packageManager": "pnpm@11.0.8+sha512.4c4097e1dd2d42372c4e7fa5a791ff28fc75a484c7ac192e64b1df0fdef17594ba982f9b4fed9adfb3c757846f565b799b2763fb3733d1de1bcb82cf46684912"
 }

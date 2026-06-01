@@ -1,0 +1,10 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "pnpm run railway:build"
+
+[deploy]
+preDeployCommand = ["pnpm run railway:db:push"]
+startCommand = "pnpm run railway:start"
+healthcheckPath = "/api/healthz"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
