@@ -161,7 +161,7 @@ async function runStartupMigrations() {
           ('Utilities', TRUE),
           ('Maintenance', TRUE),
           ('Other', TRUE)
-        ON CONFLICT (name) DO NOTHING
+        ON CONFLICT DO NOTHING
       `);
     });
 
@@ -224,7 +224,7 @@ async function runStartupMigrations() {
           ('Agency Fees', TRUE),
           ('FOU Booking', TRUE),
           ('Miscellaneous', TRUE)
-        ON CONFLICT (name) DO NOTHING
+        ON CONFLICT DO NOTHING
       `);
     });
 
