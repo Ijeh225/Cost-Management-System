@@ -220,6 +220,9 @@ function BranchDialog({
                   <Input value={form.emailReplyTo}
                     onChange={(e) => setForm(f => ({ ...f, emailReplyTo: e.target.value }))}
                     placeholder="Reply-to (optional)" />
+                  <p className="text-[11px] text-muted-foreground">
+                    From address must belong to a verified Resend domain.
+                  </p>
                 </div>
               )}
             </div>

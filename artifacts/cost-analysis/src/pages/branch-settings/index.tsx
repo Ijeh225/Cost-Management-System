@@ -180,11 +180,13 @@ export default function BranchSettingsPage() {
               <Label htmlFor="from">From Address</Label>
               <Input id="from" type="email" value={form.emailFromAddress}
                 onChange={(e) => setForm(f => ({ ...f, emailFromAddress: e.target.value }))} />
+              <p className="text-[11px] text-muted-foreground">Must belong to a verified Resend domain.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="reply">Reply-To</Label>
               <Input id="reply" type="email" value={form.emailReplyTo}
                 onChange={(e) => setForm(f => ({ ...f, emailReplyTo: e.target.value }))} />
+              <p className="text-[11px] text-muted-foreground">Optional address where client replies should go.</p>
             </div>
           </div>
         )}

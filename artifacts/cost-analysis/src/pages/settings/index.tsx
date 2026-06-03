@@ -27,12 +27,18 @@ export default function SettingsPage() {
   const updateMutation = useUpdateSettings();
   const { toast } = useToast();
 
-  const { data: emailStatus } = useQuery<{ configured: boolean }>({
+  const { data: emailStatus } = useQuery<{
+    configured: boolean;
+    fromAddress?: string;
+    productionReady?: boolean;
+    source?: "branch" | "system" | "resend_test";
+  }>({
     queryKey: ["/api/notifications/email-status"],
     queryFn: () => customFetch("/api/notifications/email-status"),
     staleTime: 60_000,
   });
   const emailServiceConfigured = emailStatus?.configured ?? true;
+  const emailProductionReady = emailStatus?.productionReady ?? false;
 
   const s = settings as Record<string, string>;
 
@@ -118,11 +124,18 @@ export default function SettingsPage() {
         digestFrequency,
         digestTime,
       });
-      await customFetch("/api/notifications/send-email-digest", { method: "POST" });
+      const result = await customFetch<{
+        sent: number;
+        fromAddress?: string;
+        productionReady?: boolean;
+      }>("/api/notifications/send-email-digest", { method: "POST" });
       const now = new Date().toISOString();
       setDigestLastSentAt(now);
       setDirty(false);
-      toast({ title: "Email digest sent", description: `Alert summary sent to ${emailTo}` });
+      toast({
+        title: "Email digest sent",
+        description: `Sent to ${result.sent ?? emailTo.split(",").filter(Boolean).length} recipient(s) from ${result.fromAddress ?? "configured sender"}`,
+      });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed to send email", description: err?.message ?? "Check that email settings are configured correctly" });
     } finally {
@@ -279,6 +292,32 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {emailServiceConfigured && !emailProductionReady && (
+            <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10">
+              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-amber-500">Production sender not verified yet</p>
+                <p className="text-xs text-muted-foreground">
+                  Current sender: <code className="font-mono bg-muted px-1 rounded">{emailStatus?.fromAddress ?? "Resend test sender"}</code>.
+                  For production, verify a domain in Resend and set <code className="font-mono bg-muted px-1 rounded">RESEND_DEFAULT_FROM</code>
+                  or configure a branch sender using that verified domain.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {emailServiceConfigured && emailProductionReady && emailStatus?.fromAddress && (
+            <div className="flex items-start gap-3 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-emerald-500">Production sender configured</p>
+                <p className="text-xs text-muted-foreground">
+                  Emails will send from <code className="font-mono bg-muted px-1 rounded">{emailStatus.fromAddress}</code>.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-background/50">
             <div>
               <p className="text-sm font-medium">Enable email alerts</p>
@@ -353,7 +392,7 @@ export default function SettingsPage() {
             <Button
               variant="outline"
               onClick={handleSendDigest}
-              disabled={sendingEmail || !emailTo.trim()}
+              disabled={sendingEmail || !emailServiceConfigured || !emailTo.trim()}
               className="gap-2"
             >
               {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

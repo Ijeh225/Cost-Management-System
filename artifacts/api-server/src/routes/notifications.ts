@@ -8,6 +8,7 @@ export const notificationsRouter = Router();
 
 const AVG_THRESHOLD = 1.5;
 const LOW_MARGIN_PCT = 0.15;
+const RESEND_TEST_FROM = "Cost Management <onboarding@resend.dev>";
 
 const ADMIN_ROLES = new Set(["admin", "super_admin", "branch_admin"]);
 
@@ -73,6 +74,76 @@ const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
   transire_user:           new Set(["new_job", "stage_complete"]),
   pull_out_user:           new Set(["stage_complete", "gate_out", "empty_gate_out"]),
 };
+
+type EmailSenderInfo = {
+  fromAddress: string;
+  replyTo: string | null;
+  productionReady: boolean;
+  source: "branch" | "system" | "resend_test";
+};
+
+function isResendTestSender(fromAddress: string): boolean {
+  return fromAddress.toLowerCase().includes("@resend.dev");
+}
+
+async function resolveEmailSender(branchScope: number | null): Promise<EmailSenderInfo> {
+  const systemFrom = process.env.RESEND_DEFAULT_FROM?.trim();
+  const systemReplyTo = process.env.RESEND_REPLY_TO?.trim() || null;
+  if (systemFrom) {
+    return {
+      fromAddress: systemFrom,
+      replyTo: systemReplyTo,
+      productionReady: !isResendTestSender(systemFrom),
+      source: "system",
+    };
+  }
+
+  if (branchScope !== null) {
+    const [branch] = await db
+      .select({
+        emailFromAddress: branchesTable.emailFromAddress,
+        emailReplyTo: branchesTable.emailReplyTo,
+        emailMode: branchesTable.emailMode,
+      })
+      .from(branchesTable)
+      .where(eq(branchesTable.id, branchScope))
+      .limit(1);
+    if (branch?.emailMode === "own" && branch.emailFromAddress?.trim()) {
+      const fromAddress = branch.emailFromAddress.trim();
+      return {
+        fromAddress,
+        replyTo: branch.emailReplyTo?.trim() || null,
+        productionReady: !isResendTestSender(fromAddress),
+        source: "branch",
+      };
+    }
+  } else {
+    const ownBranches = await db
+      .select({
+        emailFromAddress: branchesTable.emailFromAddress,
+        emailReplyTo: branchesTable.emailReplyTo,
+      })
+      .from(branchesTable)
+      .where(and(eq(branchesTable.emailMode, "own"), isNotNull(branchesTable.emailFromAddress)));
+    const validOwn = ownBranches.filter(b => b.emailFromAddress?.trim());
+    if (validOwn.length === 1) {
+      const fromAddress = validOwn[0].emailFromAddress!.trim();
+      return {
+        fromAddress,
+        replyTo: validOwn[0].emailReplyTo?.trim() || null,
+        productionReady: !isResendTestSender(fromAddress),
+        source: "branch",
+      };
+    }
+  }
+
+  return {
+    fromAddress: RESEND_TEST_FROM,
+    replyTo: systemReplyTo,
+    productionReady: false,
+    source: "resend_test",
+  };
+}
 
 async function getAgingThresholds() {
   const rows = await db.select().from(settingsTable);
@@ -485,8 +556,19 @@ notificationsRouter.post("/notifications/read-all", requireAuth, async (req: Aut
   }
 });
 
-notificationsRouter.get("/notifications/email-status", requireAuth, requireBranchAdminOrAbove, (_req, res) => {
-  return res.json({ configured: !!process.env.RESEND_API_KEY });
+notificationsRouter.get("/notifications/email-status", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const sender = await resolveEmailSender(getBranchScope(req));
+    return res.json({
+      configured: !!process.env.RESEND_API_KEY,
+      fromAddress: sender.fromAddress,
+      productionReady: sender.productionReady,
+      source: sender.source,
+    });
+  } catch (err) {
+    console.error("[email-status] error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
 });
 
 notificationsRouter.post("/notifications/send-email-digest", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
@@ -502,24 +584,7 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
       return res.status(503).json({ error: "Email service is not configured. Please set up the Resend integration in Settings." });
     }
 
-    // Resolve per-branch from address (fall back to default if not set).
-    // When branchScope is null (global / super_admin all-branches), use the
-    // same unambiguous single-branch logic as the scheduled digest.
-    let fromAddress = "Cost Analysis <onboarding@resend.dev>";
-    if (branchScope !== null) {
-      const [branch] = await db.select({ emailFromAddress: branchesTable.emailFromAddress, emailMode: branchesTable.emailMode })
-        .from(branchesTable).where(eq(branchesTable.id, branchScope)).limit(1);
-      if (branch?.emailMode === "own" && branch.emailFromAddress?.trim()) {
-        fromAddress = branch.emailFromAddress.trim();
-      }
-    } else {
-      const ownBranches = await db
-        .select({ emailFromAddress: branchesTable.emailFromAddress })
-        .from(branchesTable)
-        .where(and(eq(branchesTable.emailMode, "own"), isNotNull(branchesTable.emailFromAddress)));
-      const validOwn = ownBranches.filter(b => b.emailFromAddress?.trim());
-      if (validOwn.length === 1) fromAddress = validOwn[0].emailFromAddress!.trim();
-    }
+    const sender = await resolveEmailSender(branchScope);
     const rows = await db.select().from(settingsTable);
     const settingsMap: Record<string, string> = {};
     for (const r of rows) settingsMap[r.key] = r.value;
@@ -581,8 +646,9 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: fromAddress,
+        from: sender.fromAddress,
         to,
+        ...(sender.replyTo ? { reply_to: sender.replyTo } : {}),
         subject: `Container Alert Digest — ${criticalAlerts.length} critical, ${warningAlerts.length} warnings`,
         html,
       }),
@@ -599,7 +665,13 @@ notificationsRouter.post("/notifications/send-email-digest", requireAuth, requir
       .values({ key: "digestLastSentAt", value: nowSent.toISOString(), updatedAt: nowSent })
       .onConflictDoUpdate({ target: settingsTable.key, set: { value: nowSent.toISOString(), updatedAt: nowSent } });
 
-    return res.json({ success: true, sent: to.length, alertCount: relevant.length });
+    return res.json({
+      success: true,
+      sent: to.length,
+      alertCount: relevant.length,
+      fromAddress: sender.fromAddress,
+      productionReady: sender.productionReady,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -812,16 +884,7 @@ export async function runScheduledDigest(): Promise<void> {
     // emailMode="own" and a set emailFromAddress only when there is exactly one such
     // branch — this keeps the address unambiguous. With multiple or zero own-mode
     // branches we fall back to the system default to avoid cross-branch identity leakage.
-    const DEFAULT_FROM = "Cost Analysis <onboarding@resend.dev>";
-    let scheduledFromAddress = DEFAULT_FROM;
-    const ownBranches = await db
-      .select({ emailFromAddress: branchesTable.emailFromAddress })
-      .from(branchesTable)
-      .where(and(eq(branchesTable.emailMode, "own"), isNotNull(branchesTable.emailFromAddress)));
-    const validOwn = ownBranches.filter(b => b.emailFromAddress?.trim());
-    if (validOwn.length === 1) {
-      scheduledFromAddress = validOwn[0].emailFromAddress!.trim();
-    }
+    const sender = await resolveEmailSender(null);
 
     const allAlerts = await computeAlerts();
     const agingTypes = ["aging_warn", "aging_high", "aging_critical", "inactive", "negative_profit"];
@@ -831,8 +894,9 @@ export async function runScheduledDigest(): Promise<void> {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: scheduledFromAddress,
+        from: sender.fromAddress,
         to,
+        ...(sender.replyTo ? { reply_to: sender.replyTo } : {}),
         subject: `[Scheduled] Container Alert Digest — ${relevant.filter((a: any) => a.severity === "critical").length} critical`,
         html: `<p>Scheduled digest: ${relevant.length} alerts. Log in to Cost Analysis to review.</p>`,
       }),
@@ -843,7 +907,7 @@ export async function runScheduledDigest(): Promise<void> {
       await db.insert(settingsTable)
         .values({ key: "digestLastSentAt", value: sent.toISOString(), updatedAt: sent })
         .onConflictDoUpdate({ target: settingsTable.key, set: { value: sent.toISOString(), updatedAt: sent } });
-      console.log(`[digest-scheduler] Sent to ${to.length} recipients, ${relevant.length} alerts, from: ${scheduledFromAddress}`);
+      console.log(`[digest-scheduler] Sent to ${to.length} recipients, ${relevant.length} alerts, from: ${sender.fromAddress}, productionReady=${sender.productionReady}`);
     } else {
       console.error("[digest-scheduler] Resend error:", await emailRes.text().catch(() => "unknown"));
     }
