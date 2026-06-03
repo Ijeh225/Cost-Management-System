@@ -32,6 +32,7 @@ type NavItem = {
   url: string;
   icon: React.ElementType;
   badge?: number;
+  match?: "exact" | "prefix";
 };
 
 function NotificationsBadge({ count }: { count: number }) {
@@ -41,6 +42,14 @@ function NotificationsBadge({ count }: { count: number }) {
       {count > 99 ? "99+" : count}
     </span>
   );
+}
+
+function isNavItemActive(location: string, item: NavItem) {
+  if (item.match === "exact" || item.url === "/") {
+    return location === item.url;
+  }
+
+  return location === item.url || location.startsWith(`${item.url}/`);
 }
 
 export function AppSidebar() {
@@ -91,7 +100,7 @@ export function AppSidebar() {
     { title: "Upload Data",      url: "/containers/upload",      icon: UploadCloud     },
     { title: "User Management",  url: "/users",                  icon: Users           },
     ...(isSuperAdmin ? [{ title: "Branches", url: "/settings/branches", icon: Building2 }] : []),
-    ...(isSuperAdmin ? [{ title: "Settings", url: "/settings", icon: Settings }] : []),
+    ...(isSuperAdmin ? [{ title: "Settings", url: "/settings", icon: Settings, match: "exact" as const }] : []),
     ...(isBranchAdmin ? [{ title: "Branch Settings", url: "/branch-settings", icon: Settings }] : []),
   ];
 
@@ -103,7 +112,7 @@ export function AppSidebar() {
   ];
 
   const anyWorkspaceActive = adminWorkspaceNav.some(
-    item => location === item.url || location.startsWith(item.url)
+    item => isNavItemActive(location, item)
   );
 
   const deptNav: NavItem[] = [
@@ -166,7 +175,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url));
+                const isActive = isNavItemActive(location, item);
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
@@ -206,7 +215,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {adminNav.map((item) => {
-                  const isActive = location === item.url || location.startsWith(item.url);
+                  const isActive = isNavItemActive(location, item);
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
@@ -247,7 +256,7 @@ export function AppSidebar() {
                 </SidebarMenuItem>
 
                 {(workspaceOpen || anyWorkspaceActive) && adminWorkspaceNav.map((item) => {
-                  const isActive = location === item.url || location.startsWith(item.url);
+                  const isActive = isNavItemActive(location, item);
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
