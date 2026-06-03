@@ -114,7 +114,7 @@ const ROLE_LABELS: Record<string, string> = {
 const createSchema = z.object({
   name:     z.string().min(2, "Name required"),
   email:    z.string().email("Valid email required"),
-  password: z.string().min(6, "Min 6 characters"),
+  password: z.string().min(8, "Min 8 characters"),
   role:     z.enum(ALL_ROLES),
 });
 

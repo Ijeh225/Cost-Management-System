@@ -51,10 +51,10 @@ router.get("/approvals", requireBranchAdminOrAbove, async (req: AuthRequest, res
       updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt,
     }));
 
-    res.json(result);
+    return res.json(result);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

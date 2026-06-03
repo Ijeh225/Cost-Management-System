@@ -211,10 +211,10 @@ router.get("/invoices", requireAuth, async (req: AuthRequest, res) => {
       rows.map(r => formatInvoice(r, paymentsByInvoice.get(r.id) ?? [], itemsByInvoice.get(r.id) ?? [], cnByInvoice.get(r.id) ?? []))
     );
 
-    res.json(invoices);
+    return res.json(invoices);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch invoices" });
+    return res.status(500).json({ error: "Failed to fetch invoices" });
   }
 });
 
@@ -353,10 +353,10 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
         });
       }
     } catch {}
-    res.status(201).json(formatted);
+    return res.status(201).json(formatted);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to create invoice" });
+    return res.status(500).json({ error: "Failed to create invoice" });
   }
 });
 
@@ -560,7 +560,7 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req: AuthRequest
     const totalWrittenOff = writtenOffRows.reduce((s, r) =>
       s + parseFloat(r.writtenOffAmount ?? r.total ?? "0"), 0);
 
-    res.json({
+    return res.json({
       summary: {
         totalInvoiced: summaryInvoiced,
         totalCollected: summaryCollected,
@@ -587,13 +587,13 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req: AuthRequest
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch accounts receivable" });
+    return res.status(500).json({ error: "Failed to fetch accounts receivable" });
   }
 });
 
 router.get("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
 
     const [row] = await db
@@ -632,16 +632,16 @@ router.get("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
     const items = itemsMap.get(id) ?? [];
     const creditNoteRows = await db.select().from(creditNotesTable).where(eq(creditNotesTable.invoiceId, id)).orderBy(creditNotesTable.createdAt);
 
-    res.json(await formatInvoice(row, payments, items, creditNoteRows));
+    return res.json(await formatInvoice(row, payments, items, creditNoteRows));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch invoice" });
+    return res.status(500).json({ error: "Failed to fetch invoice" });
   }
 });
 
 router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
@@ -702,28 +702,30 @@ router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
     const itemsMap = await fetchItemsForInvoices([id]);
     const items = itemsMap.get(id) ?? [];
 
-    res.json(await formatInvoice(row, payments, items));
+    return res.json(await formatInvoice(row, payments, items));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to update invoice" });
+    return res.status(500).json({ error: "Failed to update invoice" });
   }
 });
 
 router.delete("/invoices/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
     await db.delete(invoicesTable).where(eq(invoicesTable.id, id));
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to delete invoice" });
+    return res.status(500).json({ error: "Failed to delete invoice" });
   }
 });
 
-async function recalcInvoiceTotals(tx: typeof db, invoiceId: number) {
+type InvoiceTotalsDb = Pick<typeof db, "select" | "update">;
+
+async function recalcInvoiceTotals(tx: InvoiceTotalsDb, invoiceId: number) {
   const currentInv = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
   if (!currentInv[0]) return;
   const items = await tx.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, invoiceId));
@@ -740,7 +742,7 @@ async function recalcInvoiceTotals(tx: typeof db, invoiceId: number) {
 
 router.post("/invoices/:id/items", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const invoiceId = parseInt(req.params.id, 10);
+    const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
     const { containerId, description, amount } = req.body as {
@@ -814,17 +816,17 @@ router.post("/invoices/:id/items", requireAuth, async (req: AuthRequest, res) =>
       .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
       .where(eq(invoicesTable.id, invoiceId));
-    res.status(201).json(await formatInvoice(updatedRow, payments, items));
+    return res.status(201).json(await formatInvoice(updatedRow, payments, items));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to add invoice item" });
+    return res.status(500).json({ error: "Failed to add invoice item" });
   }
 });
 
 router.patch("/invoices/:id/items/:itemId", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const invoiceId = parseInt(req.params.id, 10);
-    const itemId = parseInt(req.params.itemId, 10);
+    const invoiceId = parseInt(String(req.params.id), 10);
+    const itemId = parseInt(String(req.params.itemId), 10);
     if (isNaN(invoiceId) || isNaN(itemId)) return res.status(400).json({ error: "Invalid id" });
 
     const { description, amount } = req.body as { description?: string; amount?: number };
@@ -871,17 +873,17 @@ router.patch("/invoices/:id/items/:itemId", requireAuth, async (req: AuthRequest
       .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
       .where(eq(invoicesTable.id, invoiceId));
-    res.json(await formatInvoice(updatedRow, payments, items));
+    return res.json(await formatInvoice(updatedRow, payments, items));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to update invoice item" });
+    return res.status(500).json({ error: "Failed to update invoice item" });
   }
 });
 
 router.delete("/invoices/:id/items/:itemId", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const invoiceId = parseInt(req.params.id, 10);
-    const itemId = parseInt(req.params.itemId, 10);
+    const invoiceId = parseInt(String(req.params.id), 10);
+    const itemId = parseInt(String(req.params.itemId), 10);
     if (isNaN(invoiceId) || isNaN(itemId)) return res.status(400).json({ error: "Invalid id" });
 
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
@@ -924,16 +926,16 @@ router.delete("/invoices/:id/items/:itemId", requireBranchAdminOrAbove, async (r
       .leftJoin(containersTable, eq(invoicesTable.containerId, containersTable.id))
       .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
       .where(eq(invoicesTable.id, invoiceId));
-    res.json(await formatInvoice(updatedRow, payments, items));
+    return res.json(await formatInvoice(updatedRow, payments, items));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to remove invoice item" });
+    return res.status(500).json({ error: "Failed to remove invoice item" });
   }
 });
 
 router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const invoiceId = parseInt(req.params.id, 10);
+    const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
     const { amount, paymentMethod, reference, notes, paidAt, bankId } = req.body as {
@@ -1019,10 +1021,10 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
         containerNumber: null,
       });
     } catch {}
-    res.status(201).json({ success: true, totalPaid, status: newStatus, overpaymentStored });
+    return res.status(201).json({ success: true, totalPaid, status: newStatus, overpaymentStored });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to record payment" });
+    return res.status(500).json({ error: "Failed to record payment" });
   }
 });
 
@@ -1030,7 +1032,7 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
 
 router.post("/invoices/:id/apply-credit", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const invoiceId = parseInt(req.params.id, 10);
+    const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
     const { amount: rawAmount } = req.body as { amount?: number };
@@ -1089,21 +1091,21 @@ router.post("/invoices/:id/apply-credit", requireBranchAdminOrAbove, async (req:
     const [updatedClient] = await db.select({ creditBalance: clientsTable.creditBalance })
       .from(clientsTable).where(eq(clientsTable.id, inv.clientId));
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       appliedAmount: actualApply,
       remainingCredit: parseFloat(updatedClient?.creditBalance ?? "0"),
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to apply credit" });
+    return res.status(500).json({ error: "Failed to apply credit" });
   }
 });
 
 router.delete("/invoices/:id/payments/:paymentId", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const invoiceId = parseInt(req.params.id, 10);
-    const paymentId = parseInt(req.params.paymentId, 10);
+    const invoiceId = parseInt(String(req.params.id), 10);
+    const paymentId = parseInt(String(req.params.paymentId), 10);
     if (isNaN(invoiceId) || isNaN(paymentId)) return res.status(400).json({ error: "Invalid id" });
 
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
@@ -1163,10 +1165,10 @@ router.delete("/invoices/:id/payments/:paymentId", requireBranchAdminOrAbove, as
       }
     });
 
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to delete payment" });
+    return res.status(500).json({ error: "Failed to delete payment" });
   }
 });
 
@@ -1245,7 +1247,7 @@ function buildReminderMessage(inv: {
 
 router.post("/invoices/:id/send-whatsapp", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
@@ -1311,16 +1313,16 @@ router.post("/invoices/:id/send-whatsapp", requireBranchAdminOrAbove, async (req
       return res.status(500).json({ error: twilioResult.error ?? "Failed to send WhatsApp message" });
     }
 
-    res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
+    return res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to send WhatsApp message" });
+    return res.status(500).json({ error: "Failed to send WhatsApp message" });
   }
 });
 
 router.post("/invoices/:id/send-reminder", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
@@ -1391,16 +1393,16 @@ router.post("/invoices/:id/send-reminder", requireBranchAdminOrAbove, async (req
       return res.status(500).json({ error: twilioResult.error ?? "Failed to send reminder" });
     }
 
-    res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
+    return res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to send reminder" });
+    return res.status(500).json({ error: "Failed to send reminder" });
   }
 });
 
 router.post("/invoices/:id/send-receipt", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
@@ -1498,16 +1500,16 @@ router.post("/invoices/:id/send-receipt", requireBranchAdminOrAbove, async (req:
       return res.status(500).json({ error: twilioResult.error ?? "Failed to send receipt" });
     }
 
-    res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
+    return res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to send receipt" });
+    return res.status(500).json({ error: "Failed to send receipt" });
   }
 });
 
 router.get("/invoices/:id/whatsapp-log", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
@@ -1518,7 +1520,7 @@ router.get("/invoices/:id/whatsapp-log", requireAuth, async (req: AuthRequest, r
       .where(eq(whatsappMessagesTable.invoiceId, id))
       .orderBy(desc(whatsappMessagesTable.createdAt));
 
-    res.json(rows.map(r => ({
+    return res.json(rows.map(r => ({
       id: r.id,
       invoiceId: r.invoiceId,
       clientId: r.clientId,
@@ -1532,7 +1534,7 @@ router.get("/invoices/:id/whatsapp-log", requireAuth, async (req: AuthRequest, r
     })));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch WhatsApp log" });
+    return res.status(500).json({ error: "Failed to fetch WhatsApp log" });
   }
 });
 
@@ -1540,7 +1542,7 @@ router.get("/invoices/:id/whatsapp-log", requireAuth, async (req: AuthRequest, r
 
 router.post("/invoices/:id/credit-note", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const invoiceId = parseInt(req.params.id, 10);
+    const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
     const { amount: rawAmount, reason } = req.body as { amount?: number; reason?: string };
@@ -1630,7 +1632,7 @@ router.post("/invoices/:id/credit-note", requireBranchAdminOrAbove, async (req: 
       return [inserted];
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       id: cn.id,
       invoiceId: cn.invoiceId,
       creditNoteNumber: cn.creditNoteNumber,
@@ -1643,13 +1645,13 @@ router.post("/invoices/:id/credit-note", requireBranchAdminOrAbove, async (req: 
     });
   } catch (err) {
     console.error("POST /invoices/:id/credit-note error:", err);
-    res.status(500).json({ error: "Failed to raise credit note" });
+    return res.status(500).json({ error: "Failed to raise credit note" });
   }
 });
 
 router.get("/invoices/:id/credit-notes", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const invoiceId = parseInt(req.params.id, 10);
+    const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
@@ -1658,7 +1660,7 @@ router.get("/invoices/:id/credit-notes", requireAuth, async (req: AuthRequest, r
       .where(eq(creditNotesTable.invoiceId, invoiceId))
       .orderBy(creditNotesTable.createdAt);
 
-    res.json(rows.map(cn => ({
+    return res.json(rows.map(cn => ({
       id: cn.id,
       invoiceId: cn.invoiceId,
       creditNoteNumber: cn.creditNoteNumber,
@@ -1670,7 +1672,7 @@ router.get("/invoices/:id/credit-notes", requireAuth, async (req: AuthRequest, r
     })));
   } catch (err) {
     console.error("GET /invoices/:id/credit-notes error:", err);
-    res.status(500).json({ error: "Failed to fetch credit notes" });
+    return res.status(500).json({ error: "Failed to fetch credit notes" });
   }
 });
 
@@ -1678,7 +1680,7 @@ router.get("/invoices/:id/credit-notes", requireAuth, async (req: AuthRequest, r
 
 router.post("/invoices/:id/write-off", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const invoiceId = parseInt(req.params.id, 10);
+    const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
@@ -1724,10 +1726,10 @@ router.post("/invoices/:id/write-off", requireBranchAdminOrAbove, async (req: Au
       });
     });
 
-    res.status(201).json({ success: true, overheadExpenseId: expenseId, writtenOffAmount: writeOffAmount });
+    return res.status(201).json({ success: true, overheadExpenseId: expenseId, writtenOffAmount: writeOffAmount });
   } catch (err) {
     console.error("POST /invoices/:id/write-off error:", err);
-    res.status(500).json({ error: "Failed to write off invoice" });
+    return res.status(500).json({ error: "Failed to write off invoice" });
   }
 });
 
@@ -1735,7 +1737,7 @@ router.post("/invoices/:id/write-off", requireBranchAdminOrAbove, async (req: Au
 
 router.get("/invoices/:id/audit-log", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const invoiceId = parseInt(req.params.id, 10);
+    const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
@@ -1753,13 +1755,13 @@ router.get("/invoices/:id/audit-log", requireAuth, async (req: AuthRequest, res)
       .where(eq(invoiceAuditLogTable.invoiceId, invoiceId))
       .orderBy(desc(invoiceAuditLogTable.createdAt));
 
-    res.json(rows.map(r => ({
+    return res.json(rows.map(r => ({
       ...r,
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
     })));
   } catch (err) {
     console.error("GET /invoices/:id/audit-log error:", err);
-    res.status(500).json({ error: "Failed to fetch audit log" });
+    return res.status(500).json({ error: "Failed to fetch audit log" });
   }
 });
 
@@ -1793,7 +1795,7 @@ router.get("/credit-notes", requireAuth, async (req: AuthRequest, res) => {
       .where(filters.length === 0 ? undefined : filters.length === 1 ? filters[0] : and(...filters))
       .orderBy(desc(creditNotesTable.createdAt));
 
-    res.json(rows.map(cn => ({
+    return res.json(rows.map(cn => ({
       id: cn.id,
       invoiceId: cn.invoiceId,
       invoiceNumber: cn.invoiceNumber ?? null,
@@ -1807,13 +1809,13 @@ router.get("/credit-notes", requireAuth, async (req: AuthRequest, res) => {
     })));
   } catch (err) {
     console.error("GET /credit-notes error:", err);
-    res.status(500).json({ error: "Failed to fetch credit notes" });
+    return res.status(500).json({ error: "Failed to fetch credit notes" });
   }
 });
 
 router.get("/credit-notes/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
 
     const [cn] = await db
@@ -1841,7 +1843,7 @@ router.get("/credit-notes/:id", requireAuth, async (req: AuthRequest, res) => {
       if (_scope !== null && cn.branchId !== _scope) return res.status(404).json({ error: "Credit note not found" });
     }
 
-    res.json({
+    return res.json({
       id: cn.id,
       invoiceId: cn.invoiceId,
       invoiceNumber: cn.invoiceNumber ?? null,
@@ -1855,7 +1857,7 @@ router.get("/credit-notes/:id", requireAuth, async (req: AuthRequest, res) => {
     });
   } catch (err) {
     console.error("GET /credit-notes/:id error:", err);
-    res.status(500).json({ error: "Failed to fetch credit note" });
+    return res.status(500).json({ error: "Failed to fetch credit note" });
   }
 });
 

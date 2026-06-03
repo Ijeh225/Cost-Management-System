@@ -55,10 +55,10 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
         (cExpMap[b.id] ?? 0),
     }));
 
-    res.json(result);
+    return res.json(result);
   } catch (err) {
     console.error("GET /banks error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -66,8 +66,7 @@ banksRouter.post("/banks", requireBranchAdminOrAbove, async (req: AuthRequest, r
   try {
     const { name, accountNumber, bankCode } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
-      res.status(400).json({ error: "Bank name is required" });
-      return;
+      return res.status(400).json({ error: "Bank name is required" });
     }
     const createBranchId = resolveCreateBranch(req, res);
     if (createBranchId == null) return;
@@ -78,10 +77,10 @@ banksRouter.post("/banks", requireBranchAdminOrAbove, async (req: AuthRequest, r
       isActive: true,
       branchId: createBranchId,
     }).returning();
-    res.status(201).json(bank);
+    return res.status(201).json(bank);
   } catch (err) {
     console.error("POST /banks error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -99,10 +98,10 @@ banksRouter.patch("/banks/:id", requireBranchAdminOrAbove, async (req: AuthReque
     if (isActive !== undefined) updates.isActive = Boolean(isActive);
     const [updated] = await db.update(banksTable).set(updates).where(eq(banksTable.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Bank not found" }); return; }
-    res.json(updated);
+    return res.json(updated);
   } catch (err) {
     console.error("PATCH /banks/:id error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -113,10 +112,10 @@ banksRouter.delete("/banks/:id", requireBranchAdminOrAbove, async (req: AuthRequ
     const [existing] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Bank not found" }); return; }
     await db.delete(banksTable).where(eq(banksTable.id, id));
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (err) {
     console.error("DELETE /banks/:id error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -149,7 +148,7 @@ banksRouter.get("/banks/transfers", requireAuth, async (req: AuthRequest, res) =
     const bankRows = await db.select({ id: banksTable.id, name: banksTable.name }).from(banksTable);
     const bankMap = new Map(bankRows.map(b => [b.id, b.name]));
 
-    res.json(rows.map(r => ({
+    return res.json(rows.map(r => ({
       id: r.id,
       fromBankId: r.fromBankId ?? null,
       fromBankName: r.fromBankId ? (bankMap.get(r.fromBankId) ?? null) : null,
@@ -164,7 +163,7 @@ banksRouter.get("/banks/transfers", requireAuth, async (req: AuthRequest, res) =
     })));
   } catch (err) {
     console.error("GET /banks/transfers error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -176,10 +175,10 @@ banksRouter.get("/banks/:id", requireBranchAdminOrAbove, async (req: AuthRequest
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, id));
     if (!bank || !userCanAccessBranch(req, bank.branchId)) { res.status(404).json({ error: "Bank not found" }); return; }
-    res.json(bank);
+    return res.json(bank);
   } catch (err) {
     console.error("GET /banks/:id error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -498,7 +497,7 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
     // Return in descending date order for display (most recent first)
     result.reverse();
 
-    res.json({
+    return res.json({
       bank: {
         id: bank.id,
         name: bank.name,
@@ -516,7 +515,7 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
     });
   } catch (err) {
     console.error("GET /banks/:id/transactions error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -534,8 +533,7 @@ banksRouter.post("/banks/:id/fund-additions", requireBranchAdminOrAbove, async (
     };
 
     if (!amount || isNaN(amount) || amount <= 0) {
-      res.status(400).json({ error: "Amount must be a positive number" });
-      return;
+      return res.status(400).json({ error: "Amount must be a positive number" });
     }
 
     const [bank] = await db.select().from(banksTable).where(eq(banksTable.id, bankId));
@@ -556,10 +554,10 @@ banksRouter.post("/banks/:id/fund-additions", requireBranchAdminOrAbove, async (
       branchId: bank.branchId,
     }).returning();
 
-    res.status(201).json(addition);
+    return res.status(201).json(addition);
   } catch (err) {
     console.error("POST /banks/:id/fund-additions error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -574,16 +572,13 @@ banksRouter.post("/banks/transfers", requireBranchAdminOrAbove, async (req: Auth
     };
 
     if (!fromBankId || !toBankId) {
-      res.status(400).json({ error: "Both source and destination banks are required" });
-      return;
+      return res.status(400).json({ error: "Both source and destination banks are required" });
     }
     if (fromBankId === toBankId) {
-      res.status(400).json({ error: "Source and destination banks must be different" });
-      return;
+      return res.status(400).json({ error: "Source and destination banks must be different" });
     }
     if (!amount || isNaN(amount) || amount <= 0) {
-      res.status(400).json({ error: "Amount must be a positive number" });
-      return;
+      return res.status(400).json({ error: "Amount must be a positive number" });
     }
 
     const [fromBank] = await db.select().from(banksTable).where(eq(banksTable.id, fromBankId));
@@ -595,17 +590,14 @@ banksRouter.post("/banks/transfers", requireBranchAdminOrAbove, async (req: Auth
     {
       const _scope = getBranchScope(req);
       if (_scope !== null && (fromBank.branchId !== _scope || toBank.branchId !== _scope)) {
-        res.status(404).json({ error: "Bank not found" });
-        return;
+        return res.status(404).json({ error: "Bank not found" });
       }
       if (_scope === null && req.user?.role === "super_admin") {
-        res.status(400).json({ error: "Select a specific branch to record a transfer." });
-        return;
+        return res.status(400).json({ error: "Select a specific branch to record a transfer." });
       }
     }
     if (fromBank.branchId !== toBank.branchId) {
-      res.status(400).json({ error: "Cross-branch transfers are not allowed." });
-      return;
+      return res.status(400).json({ error: "Cross-branch transfers are not allowed." });
     }
 
     const userId = req.user?.id ?? null;
@@ -626,7 +618,7 @@ banksRouter.post("/banks/transfers", requireBranchAdminOrAbove, async (req: Auth
       createdByName = u?.name ?? null;
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       id: transfer.id,
       fromBankId: transfer.fromBankId ?? null,
       fromBankName: fromBank.name,
@@ -641,6 +633,6 @@ banksRouter.post("/banks/transfers", requireBranchAdminOrAbove, async (req: Auth
     });
   } catch (err) {
     console.error("POST /banks/transfers error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });

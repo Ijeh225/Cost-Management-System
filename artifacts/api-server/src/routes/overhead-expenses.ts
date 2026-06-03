@@ -96,13 +96,13 @@ overheadExpensesRouter.get("/overhead-expenses/categories", requireBranchAdminOr
     const rows = await db.select().from(expenseCategoriesTable)
       .where(bScope !== null ? eq(expenseCategoriesTable.branchId, bScope) : undefined)
       .orderBy(expenseCategoriesTable.name);
-    res.json(rows.map(r => ({
+    return res.json(rows.map(r => ({
       id: r.id, name: r.name, isDefault: r.isDefault, createdBy: r.createdBy ?? null,
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
     })));
   } catch (err) {
     console.error("GET /overhead-expenses/categories error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -110,7 +110,7 @@ overheadExpensesRouter.post("/overhead-expenses/categories", requireBranchAdminO
   try {
     const { name } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
-      res.status(400).json({ error: "Category name is required" }); return;
+      return res.status(400).json({ error: "Category name is required" });
     }
     const createBranchId = resolveCreateBranch(req, res);
     if (createBranchId == null) return;
@@ -118,11 +118,11 @@ overheadExpensesRouter.post("/overhead-expenses/categories", requireBranchAdminO
       name: name.trim(), isDefault: false, createdBy: req.user?.id ?? null,
       branchId: createBranchId,
     }).returning();
-    res.status(201).json({ id: row.id, name: row.name, isDefault: row.isDefault, createdBy: row.createdBy ?? null, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt) });
+    return res.status(201).json({ id: row.id, name: row.name, isDefault: row.isDefault, createdBy: row.createdBy ?? null, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt) });
   } catch (err: any) {
     if (err.code === "23505") { res.status(409).json({ error: "Category name already exists" }); return; }
     console.error("POST /overhead-expenses/categories error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -132,7 +132,7 @@ overheadExpensesRouter.patch("/overhead-expenses/categories/:id", requireBranchA
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     const { name } = _req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
-      res.status(400).json({ error: "Category name is required" }); return;
+      return res.status(400).json({ error: "Category name is required" });
     }
     const [existing] = await db.select({ branchId: expenseCategoriesTable.branchId })
       .from(expenseCategoriesTable).where(eq(expenseCategoriesTable.id, id));
@@ -140,11 +140,11 @@ overheadExpensesRouter.patch("/overhead-expenses/categories/:id", requireBranchA
     const [row] = await db.update(expenseCategoriesTable).set({ name: name.trim() })
       .where(eq(expenseCategoriesTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Category not found" }); return; }
-    res.json({ id: row.id, name: row.name, isDefault: row.isDefault, createdBy: row.createdBy ?? null, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt) });
+    return res.json({ id: row.id, name: row.name, isDefault: row.isDefault, createdBy: row.createdBy ?? null, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt) });
   } catch (err: any) {
     if (err.code === "23505") { res.status(409).json({ error: "Category name already exists" }); return; }
     console.error("PATCH /overhead-expenses/categories/:id error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -156,10 +156,10 @@ overheadExpensesRouter.delete("/overhead-expenses/categories/:id", requireBranch
     if (!cat || !userCanAccessBranch(_req, cat.branchId)) { res.status(404).json({ error: "Category not found" }); return; }
     if (cat.isDefault) { res.status(400).json({ error: "Cannot delete default categories" }); return; }
     await db.delete(expenseCategoriesTable).where(eq(expenseCategoriesTable.id, id));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /overhead-expenses/categories/:id error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -210,10 +210,10 @@ overheadExpensesRouter.get("/overhead-expenses", requireBranchAdminOrAbove, asyn
       byCategory[e.category] = (byCategory[e.category] ?? 0) + e.amount;
     }
 
-    res.json({ expenses, totalOutstanding, totalPaidThisMonth, totalPaidThisYear, byCategory });
+    return res.json({ expenses, totalOutstanding, totalPaidThisMonth, totalPaidThisYear, byCategory });
   } catch (err) {
     console.error("GET /overhead-expenses error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -221,7 +221,7 @@ overheadExpensesRouter.post("/overhead-expenses", requireBranchAdminOrAbove, asy
   try {
     const { category, description, amount, reference } = req.body;
     if (!category || !description || amount === undefined) {
-      res.status(400).json({ error: "category, description and amount are required" }); return;
+      return res.status(400).json({ error: "category, description and amount are required" });
     }
     const createBranchId = resolveCreateBranch(req, res);
     if (createBranchId == null) return;
@@ -232,10 +232,10 @@ overheadExpensesRouter.post("/overhead-expenses", requireBranchAdminOrAbove, asy
       branchId: createBranchId,
     }).returning();
     const [built] = await buildExpensesWithPayments([row]);
-    res.status(201).json(built);
+    return res.status(201).json(built);
   } catch (err) {
     console.error("POST /overhead-expenses error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -255,10 +255,10 @@ overheadExpensesRouter.patch("/overhead-expenses/:id", requireBranchAdminOrAbove
       .where(eq(overheadExpensesTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Expense not found" }); return; }
     const [built] = await buildExpensesWithPayments([row]);
-    res.json(built);
+    return res.json(built);
   } catch (err) {
     console.error("PATCH /overhead-expenses/:id error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -269,10 +269,10 @@ overheadExpensesRouter.delete("/overhead-expenses/:id", requireBranchAdminOrAbov
     const [existing] = await db.select({ branchId: overheadExpensesTable.branchId }).from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
     if (!existing || !userCanAccessBranch(_req, existing.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
     await db.delete(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /overhead-expenses/:id error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -285,13 +285,13 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireBranchAdmi
 
     const { amount, paymentMethod, bankId, paidAt, notes } = req.body;
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      res.status(400).json({ error: "Amount must be a positive number" }); return;
+      return res.status(400).json({ error: "Amount must be a positive number" });
     }
     if (!paymentMethod || !["cash", "bank"].includes(paymentMethod)) {
-      res.status(400).json({ error: "paymentMethod must be 'cash' or 'bank'" }); return;
+      return res.status(400).json({ error: "paymentMethod must be 'cash' or 'bank'" });
     }
     if (paymentMethod === "bank" && !bankId) {
-      res.status(400).json({ error: "bankId is required for bank payments" }); return;
+      return res.status(400).json({ error: "bankId is required for bank payments" });
     }
 
     const [expense] = await db.select().from(overheadExpensesTable)
@@ -301,15 +301,13 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireBranchAdmi
       const _scope = getBranchScope(req);
       if (_scope !== null && expense.branchId !== _scope) { res.status(404).json({ error: "Expense not found" }); return; }
       if (_scope === null && req.user?.role === "super_admin") {
-        res.status(400).json({ error: "Select a specific branch to record a payment." });
-        return;
+        return res.status(400).json({ error: "Select a specific branch to record a payment." });
       }
     }
     if (paymentMethod === "bank" && bankId) {
       const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, Number(bankId)));
       if (bk && bk.branchId !== expense.branchId) {
-        res.status(400).json({ error: "Selected bank belongs to a different branch than the expense." });
-        return;
+        return res.status(400).json({ error: "Selected bank belongs to a different branch than the expense." });
       }
     }
 
@@ -336,9 +334,9 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireBranchAdmi
     const [refreshedExpense] = await db.select().from(overheadExpensesTable)
       .where(eq(overheadExpensesTable.id, expenseId));
     const [updatedExpense] = await buildExpensesWithPayments([refreshedExpense]);
-    res.status(201).json({ payment, expense: updatedExpense });
+    return res.status(201).json({ payment, expense: updatedExpense });
   } catch (err) {
     console.error("POST /overhead-expenses/:id/payments error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });

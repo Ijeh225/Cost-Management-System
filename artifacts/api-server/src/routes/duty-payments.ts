@@ -23,8 +23,7 @@ const toNum = (v: Numericish): number => {
 
 dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, res) => {
   if (!req.user || !ALLOWED_ROLES.has(req.user.role)) {
-    res.status(403).json({ error: "Duty Payments access required" });
-    return;
+    return res.status(403).json({ error: "Duty Payments access required" });
   }
 
   try {
@@ -38,16 +37,14 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
 
     const VALID_STATUSES = new Set(["all", "paid", "partial", "unpaid", "not_assessed"]);
     if (status && !VALID_STATUSES.has(status)) {
-      res.status(400).json({ error: `Invalid status. Allowed: ${Array.from(VALID_STATUSES).join(", ")}` });
-      return;
+      return res.status(400).json({ error: `Invalid status. Allowed: ${Array.from(VALID_STATUSES).join(", ")}` });
     }
 
     let dateFromObj: Date | null = null;
     if (dateFrom) {
       const d = new Date(dateFrom);
       if (isNaN(d.getTime())) {
-        res.status(400).json({ error: "Invalid dateFrom (expected ISO date)" });
-        return;
+        return res.status(400).json({ error: "Invalid dateFrom (expected ISO date)" });
       }
       dateFromObj = d;
     }
@@ -55,15 +52,13 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
     if (dateTo) {
       const d = new Date(dateTo);
       if (isNaN(d.getTime())) {
-        res.status(400).json({ error: "Invalid dateTo (expected ISO date)" });
-        return;
+        return res.status(400).json({ error: "Invalid dateTo (expected ISO date)" });
       }
       d.setHours(23, 59, 59, 999);
       dateToObj = d;
     }
     if (dateFromObj && dateToObj && dateFromObj > dateToObj) {
-      res.status(400).json({ error: "dateFrom must be on or before dateTo" });
-      return;
+      return res.status(400).json({ error: "dateFrom must be on or before dateTo" });
     }
 
     const conds: SQL[] = [];
@@ -165,30 +160,27 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
     const total = filtered.length;
     const rows  = filtered.slice(offset, offset + limit);
 
-    res.json({ rows, summary, total, page, limit });
+    return res.json({ rows, summary, total, page, limit });
   } catch (err) {
     console.error("[duty-payments][list]", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req: AuthRequest, res) => {
   if (!req.user || !ALLOWED_ROLES.has(req.user.role)) {
-    res.status(403).json({ error: "Duty Payments access required" });
-    return;
+    return res.status(403).json({ error: "Duty Payments access required" });
   }
 
-  const containerId = parseInt(req.params.containerId, 10);
+  const containerId = parseInt(String(req.params.containerId), 10);
   if (!Number.isFinite(containerId) || containerId <= 0) {
-    res.status(400).json({ error: "Invalid containerId" });
-    return;
+    return res.status(400).json({ error: "Invalid containerId" });
   }
 
   const { amount, paymentDate, notes } = req.body ?? {};
   const amt = typeof amount === "number" ? amount : parseFloat(amount);
   if (!Number.isFinite(amt) || amt <= 0) {
-    res.status(400).json({ error: "Amount must be greater than zero" });
-    return;
+    return res.status(400).json({ error: "Amount must be greater than zero" });
   }
 
   // paymentDate is optional, but if provided must be a parseable date string.
@@ -197,8 +189,7 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
     const raw = String(paymentDate).trim();
     const d = new Date(raw);
     if (isNaN(d.getTime())) {
-      res.status(400).json({ error: "Invalid paymentDate (expected ISO date)" });
-      return;
+      return res.status(400).json({ error: "Invalid paymentDate (expected ISO date)" });
     }
     // Normalise to YYYY-MM-DD for the audit trail.
     paymentDateClean = d.toISOString().slice(0, 10);
@@ -289,13 +280,16 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
       } as const;
     });
 
-    if ("error" in result) {
-      res.status(result.error.code).json({ error: result.error.message });
-      return;
+    const error = (result as { error?: { code: number; message: string } }).error;
+    if (error) {
+      return res.status(error.code).json({ error: error.message });
     }
 
+    if (!("ok" in result) || !result.ok) {
+      return res.status(500).json({ error: "Unexpected duty payment result" });
+    }
     const ok = result.ok;
-    res.json({
+    return res.json({
       containerId,
       containerNumber: ok.container.containerNumber,
       blNumber:        ok.container.blNumber,
@@ -310,7 +304,7 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
     });
   } catch (err) {
     console.error("[duty-payments][record]", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

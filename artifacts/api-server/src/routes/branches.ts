@@ -54,14 +54,14 @@ router.get("/branches", requireSuperAdmin, async (_req: AuthRequest, res: Respon
     const containerMap = new Map<number, number>();
     for (const r of containerCounts) containerMap.set(r.branchId, Number(r.c ?? 0));
 
-    res.json(rows.map((b) => ({
+    return res.json(rows.map((b) => ({
       ...serialize(b),
       userCount: userMap.get(b.id) ?? 0,
       activeContainerCount: containerMap.get(b.id) ?? 0,
     })));
   } catch (err) {
     console.error("[branches] list error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -75,15 +75,14 @@ router.get("/my-branch", requireBranchAdminOrAbove, async (req: AuthRequest, res
       ? Number(req.header("x-branch-id") ?? req.header("X-Branch-Id"))
       : req.user?.branchId;
     if (!id || !Number.isFinite(id)) {
-      res.status(400).json({ error: "Select a specific branch first." });
-      return;
+      return res.status(400).json({ error: "Select a specific branch first." });
     }
     const [row] = await db.select().from(branchesTable).where(eq(branchesTable.id, id));
     if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
-    res.json(serialize(row));
+    return res.json(serialize(row));
   } catch (err) {
     console.error("[branches] my-branch error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -96,8 +95,7 @@ router.patch("/my-branch", requireBranchAdminOrAbove, async (req: AuthRequest, r
       ? Number(req.header("x-branch-id") ?? req.header("X-Branch-Id"))
       : req.user?.branchId;
     if (!id || !Number.isFinite(id)) {
-      res.status(400).json({ error: "Select a specific branch first." });
-      return;
+      return res.status(400).json({ error: "Select a specific branch first." });
     }
     // Strip name / shortCode — these are super-admin-only via /branches/:id.
     const body = req.body as BranchPayload;
@@ -115,10 +113,11 @@ router.patch("/my-branch", requireBranchAdminOrAbove, async (req: AuthRequest, r
       alertOnOverdue: body.alertOnOverdue,
       alertOnNegativeProfit: body.alertOnNegativeProfit,
     };
-    await applyBranchUpdate(id, safe, res);
+    return await applyBranchUpdate(id, safe, res);
   } catch (err) {
     console.error("[branches] my-branch update error:", err);
-    if (!res.headersSent) res.status(500).json({ error: "Server error" });
+    if (!res.headersSent) return res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
@@ -129,10 +128,10 @@ router.get("/branches/:id", requireSuperAdmin, async (req: Request, res: Respons
     if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
     const [row] = await db.select().from(branchesTable).where(eq(branchesTable.id, id));
     if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
-    res.json(serialize(row));
+    return res.json(serialize(row));
   } catch (err) {
     console.error("[branches] get error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -144,18 +143,15 @@ router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res: Respon
       whatsappMode, whatsappNumber, emailMode, emailFromAddress, emailReplyTo,
     } = req.body as BranchPayload;
     if (!name || typeof name !== "string" || name.trim() === "") {
-      res.status(400).json({ error: "Branch name is required" });
-      return;
+      return res.status(400).json({ error: "Branch name is required" });
     }
     const wMode = whatsappMode === "own" ? "own" : "head_office";
     const eMode = emailMode === "own" ? "own" : "head_office";
     if (wMode === "own" && !(whatsappNumber ?? "").trim()) {
-      res.status(400).json({ error: "WhatsApp number is required when using the branch's own number." });
-      return;
+      return res.status(400).json({ error: "WhatsApp number is required when using the branch's own number." });
     }
     if (eMode === "own" && !(emailFromAddress ?? "").trim()) {
-      res.status(400).json({ error: "From address is required when using the branch's own email." });
-      return;
+      return res.status(400).json({ error: "From address is required when using the branch's own email." });
     }
     const [row] = await db.insert(branchesTable).values({
       name: name.trim(),
@@ -170,14 +166,13 @@ router.post("/branches", requireSuperAdmin, async (req: AuthRequest, res: Respon
       emailFromAddress: eMode === "own" ? (emailFromAddress ?? "").trim() : null,
       emailReplyTo: eMode === "own" ? ((emailReplyTo ?? "").trim() || null) : null,
     }).returning();
-    res.status(201).json(serialize(row));
+    return res.status(201).json(serialize(row));
   } catch (err) {
     if ((err as { code?: string })?.code === "23505") {
-      res.status(400).json({ error: "A branch with this name already exists" });
-      return;
+      return res.status(400).json({ error: "A branch with this name already exists" });
     }
     console.error("[branches] create error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -213,16 +208,14 @@ async function applyBranchUpdate(id: number, body: BranchPayload, res: Response)
   } else if (body.whatsappNumber !== undefined) {
     const next = (body.whatsappNumber ?? "").toString().trim();
     if (current.whatsappMode === "own" && !next) {
-      res.status(400).json({ error: "WhatsApp number cannot be cleared while mode is set to the branch's own number." });
-      return;
+      return res.status(400).json({ error: "WhatsApp number cannot be cleared while mode is set to the branch's own number." });
     }
     updates.whatsappNumber = next || null;
   }
   if (body.emailFromAddress !== undefined && body.emailMode === undefined) {
     const next = (body.emailFromAddress ?? "").toString().trim();
     if (current.emailMode === "own" && !next) {
-      res.status(400).json({ error: "From address cannot be cleared while email mode is set to the branch's own." });
-      return;
+      return res.status(400).json({ error: "From address cannot be cleared while email mode is set to the branch's own." });
     }
     updates.emailFromAddress = next || null;
   }
@@ -248,7 +241,7 @@ async function applyBranchUpdate(id: number, body: BranchPayload, res: Response)
   if (body.alertOnNegativeProfit !== undefined) updates.alertOnNegativeProfit = body.alertOnNegativeProfit ? "true" : "false";
   const [row] = await db.update(branchesTable).set(updates).where(eq(branchesTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
-  res.json(serialize(row));
+  return res.json(serialize(row));
 }
 
 // PATCH /branches/:id — rename / change code / location / contact info.
@@ -257,14 +250,13 @@ async function updateHandler(req: Request, res: Response) {
   try {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "Invalid branch ID" }); return; }
-    await applyBranchUpdate(id, req.body as BranchPayload, res);
+    return await applyBranchUpdate(id, req.body as BranchPayload, res);
   } catch (err) {
     if ((err as { code?: string })?.code === "23505") {
-      res.status(400).json({ error: "A branch with this name already exists" });
-      return;
+      return res.status(400).json({ error: "A branch with this name already exists" });
     }
     console.error("[branches] update error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 }
 router.patch("/branches/:id", requireSuperAdmin, updateHandler);
@@ -282,7 +274,7 @@ router.post("/branches/:id/deactivate", requireSuperAdmin, async (req: Request, 
       .orderBy(branchesTable.id)
       .limit(1);
     if (fallback && id === fallback.id) {
-      res.status(400).json({
+      return res.status(400).json({
         error: "The default branch (system fallback) cannot be deactivated.",
       });
       return;
@@ -292,10 +284,10 @@ router.post("/branches/:id/deactivate", requireSuperAdmin, async (req: Request, 
       .where(eq(branchesTable.id, id))
       .returning();
     if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
-    res.json(serialize(row));
+    return res.json(serialize(row));
   } catch (err) {
     console.error("[branches] deactivate error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -309,10 +301,10 @@ router.post("/branches/:id/reactivate", requireSuperAdmin, async (req: Request, 
       .where(eq(branchesTable.id, id))
       .returning();
     if (!row) { res.status(404).json({ error: "Branch not found" }); return; }
-    res.json(serialize(row));
+    return res.json(serialize(row));
   } catch (err) {
     console.error("[branches] reactivate error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

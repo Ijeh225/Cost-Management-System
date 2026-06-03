@@ -35,26 +35,22 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      res.status(400).json({ error: "Email and password are required" });
-      return;
+      return res.status(400).json({ error: "Email and password are required" });
     }
     const users = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
     const user = users[0];
     if (!user || !user.isActive) {
-      res.status(401).json({ error: "Invalid credentials" });
-      return;
+      return res.status(401).json({ error: "Invalid credentials" });
     }
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
-      res.status(401).json({ error: "Invalid credentials" });
-      return;
+      return res.status(401).json({ error: "Invalid credentials" });
     }
     const [loginBranch] = await db.select().from(branchesTable).where(eq(branchesTable.id, user.branchId)).limit(1);
     // Task #75: branch_admin (and any non-super_admin) cannot log in if their
     // branch has been deactivated. Check BEFORE issuing a session cookie.
     if (user.role !== "super_admin" && (!loginBranch || !loginBranch.isActive)) {
-      res.status(401).json({ error: "Your branch is currently disabled. Please contact an administrator." });
-      return;
+      return res.status(401).json({ error: "Your branch is currently disabled. Please contact an administrator." });
     }
     const sessionToken = generateSessionToken();
     await db
@@ -70,7 +66,7 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
         if (Array.isArray(arr) && arr.length > 0) parsedRoles = arr;
       } catch {}
     }
-    res.json({
+    return res.json({
       user: {
         id: user.id,
         email: user.email,
@@ -86,7 +82,7 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
     });
   } catch (err) {
     console.error("Login error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -102,7 +98,7 @@ router.post("/auth/logout", requireAuth, async (req: AuthRequest, res) => {
     console.error("Logout session clear error:", err);
   }
   clearAuthCookie(res);
-  res.json({ message: "Logged out" });
+  return res.json({ message: "Logged out" });
 });
 
 router.get("/auth/me", requireAuth, async (req: AuthRequest, res) => {
@@ -110,8 +106,7 @@ router.get("/auth/me", requireAuth, async (req: AuthRequest, res) => {
     const user = req.user!;
     const [u] = await db.select().from(usersTable).where(eq(usersTable.id, user.id)).limit(1);
     if (!u) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
+      return res.status(401).json({ error: "Not authenticated" });
     }
     let parsedRoles: string[] = [u.role];
     if (u.roles) {
@@ -121,7 +116,7 @@ router.get("/auth/me", requireAuth, async (req: AuthRequest, res) => {
       } catch {}
     }
     const [meBranch] = await db.select().from(branchesTable).where(eq(branchesTable.id, u.branchId)).limit(1);
-    res.json({
+    return res.json({
       id: u.id,
       email: u.email,
       name: u.name,
@@ -136,16 +131,16 @@ router.get("/auth/me", requireAuth, async (req: AuthRequest, res) => {
       branchName: meBranch?.name ?? null,
     });
   } catch {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/auth/setup-required", async (_req, res) => {
   try {
     const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(usersTable);
-    res.json({ required: Number(count) === 0 });
+    return res.json({ required: Number(count) === 0 });
   } catch {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -153,17 +148,14 @@ router.post("/auth/setup", async (req, res) => {
   try {
     const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(usersTable);
     if (Number(count) > 0) {
-      res.status(403).json({ error: "Setup already completed. Please log in." });
-      return;
+      return res.status(403).json({ error: "Setup already completed. Please log in." });
     }
     const { name, email, password } = req.body;
     if (!name || !email || !password) {
-      res.status(400).json({ error: "Name, email, and password are required" });
-      return;
+      return res.status(400).json({ error: "Name, email, and password are required" });
     }
     if (password.length < 8) {
-      res.status(400).json({ error: "Password must be at least 8 characters" });
-      return;
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
     }
     const passwordHash = await hashPassword(password);
     const sessionToken = generateSessionToken();
@@ -171,8 +163,7 @@ router.post("/auth/setup", async (req, res) => {
     // "Head Office" branch exists. Assign the first super_admin to it.
     const [defaultBranch] = await db.select().from(branchesTable).orderBy(asc(branchesTable.id)).limit(1);
     if (!defaultBranch) {
-      res.status(500).json({ error: "No branches exist. Please restart the server." });
-      return;
+      return res.status(500).json({ error: "No branches exist. Please restart the server." });
     }
     const [user] = await db.insert(usersTable).values({
       name,
@@ -186,7 +177,7 @@ router.post("/auth/setup", async (req, res) => {
 
     const token = signToken(user.id, sessionToken);
     setAuthCookie(res, token);
-    res.status(201).json({
+    return res.status(201).json({
       user: {
         id: user.id,
         email: user.email,
@@ -199,10 +190,9 @@ router.post("/auth/setup", async (req, res) => {
     });
   } catch (err) {
     if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "23505") {
-      res.status(400).json({ error: "An account with this email already exists" });
-      return;
+      return res.status(400).json({ error: "An account with this email already exists" });
     }
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

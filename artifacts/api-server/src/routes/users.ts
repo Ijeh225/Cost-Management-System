@@ -68,10 +68,10 @@ router.get("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) =>
     const users = await (branchScope !== null
       ? baseQ.where(eq(usersTable.branchId, branchScope))
       : baseQ).orderBy(usersTable.createdAt);
-    res.json(users.map(formatUser));
+    return res.json(users.map(formatUser));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -79,18 +79,15 @@ router.post("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) =
   try {
     const { email, name, password, role, roles, sectionPermission, sectionPermissions, canUpload, branchId } = req.body;
     if (!email || !name || !password || !role) {
-      res.status(400).json({ error: "All fields required" });
-      return;
+      return res.status(400).json({ error: "All fields required" });
     }
     if (typeof password !== "string" || password.length < 8) {
-      res.status(400).json({ error: "Password must be at least 8 characters" });
-      return;
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
     }
     // Task #75: branch_admin can only assign non-elevated roles.
     const allowRole = rolesAllowedForActor(req.user?.role);
     if (!allowRole(role)) {
-      res.status(403).json({ error: "You are not allowed to assign that role." });
-      return;
+      return res.status(403).json({ error: "You are not allowed to assign that role." });
     }
     if (Array.isArray(roles)) {
       for (const r of roles) {
@@ -106,34 +103,28 @@ router.post("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) =
     if (branchId != null) {
       const parsed = Number(branchId);
       if (!Number.isInteger(parsed)) {
-        res.status(400).json({ error: "Invalid branchId" });
-        return;
+        return res.status(400).json({ error: "Invalid branchId" });
       }
       if (_scope !== null && parsed !== _scope) {
-        res.status(400).json({ error: "branchId must match the active branch scope." });
-        return;
+        return res.status(400).json({ error: "branchId must match the active branch scope." });
       }
       const [b] = await db.select().from(branchesTable).where(eq(branchesTable.id, parsed)).limit(1);
       if (!b) {
-        res.status(400).json({ error: "Branch not found" });
-        return;
+        return res.status(400).json({ error: "Branch not found" });
       }
       resolvedBranchId = b.id;
     } else {
       if (_scope === null && req.user?.role === "super_admin") {
-        res.status(400).json({ error: "Select a specific branch from the switcher before creating a user." });
-        return;
+        return res.status(400).json({ error: "Select a specific branch from the switcher before creating a user." });
       }
       resolvedBranchId = _scope ?? req.user?.branchId ?? null;
     }
     if (!resolvedBranchId) {
-      res.status(400).json({ error: "No branch available to assign user to" });
-      return;
+      return res.status(400).json({ error: "No branch available to assign user to" });
     }
     // Task #75: branch_admin can never create users in another branch.
     if (req.user?.role === "branch_admin" && resolvedBranchId !== req.user.branchId) {
-      res.status(403).json({ error: "You can only create users within your own branch." });
-      return;
+      return res.status(403).json({ error: "You can only create users within your own branch." });
     }
     const passwordHash = await hashPassword(password);
     const rolesJson = Array.isArray(roles) && roles.length > 0 ? JSON.stringify(roles) : null;
@@ -146,35 +137,33 @@ router.post("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) =
       isActive: true,
       branchId: resolvedBranchId,
     }).returning();
-    res.status(201).json(formatUser(user));
+    return res.status(201).json(formatUser(user));
   } catch (err) {
     if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "23505") {
-      res.status(400).json({ error: "Email already exists" });
-      return;
+      return res.status(400).json({ error: "Email already exists" });
     }
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/users/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
     if (!ELEVATED_ROLES.has(req.user?.role ?? "") && req.user?.id !== id) {
-      res.status(403).json({ error: "Access denied" });
-      return;
+      return res.status(403).json({ error: "Access denied" });
     }
     const [user] = await db.select(userFields).from(usersTable).where(eq(usersTable.id, id));
     if (!user || !userCanAccessBranch(req, user.branchId)) { res.status(404).json({ error: "User not found" }); return; }
-    res.json(formatUser(user));
+    return res.json(formatUser(user));
   } catch {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.put("/users/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
     const [_target] = await db.select({ branchId: usersTable.branchId, role: usersTable.role }).from(usersTable).where(eq(usersTable.id, id));
     if (!_target || !userCanAccessBranch(req, _target.branchId)) { res.status(404).json({ error: "User not found" }); return; }
@@ -186,12 +175,11 @@ router.put("/users/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res
     //  - Cannot edit own role / branch / active status.
     if (req.user?.role === "branch_admin") {
       if (["admin", "super_admin", "branch_admin"].includes(_target.role)) {
-        res.status(403).json({ error: "You cannot edit a user with this role." });
-        return;
+        return res.status(403).json({ error: "You cannot edit a user with this role." });
       }
       const allowRole = rolesAllowedForActor("branch_admin");
       if (role !== undefined && !allowRole(role)) {
-        res.status(403).json({ error: "You are not allowed to assign that role." }); return;
+        return res.status(403).json({ error: "You are not allowed to assign that role." });
       }
       if (Array.isArray(roles)) {
         for (const r of roles) {
@@ -199,23 +187,22 @@ router.put("/users/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res
         }
       }
       if (branchId !== undefined && Number(branchId) !== req.user.branchId) {
-        res.status(403).json({ error: "You cannot move users to another branch." }); return;
+        return res.status(403).json({ error: "You cannot move users to another branch." });
       }
     }
     if (req.user?.id === id) {
       if (role !== undefined && role !== _target.role) {
-        res.status(400).json({ error: "You cannot change your own role." }); return;
+        return res.status(400).json({ error: "You cannot change your own role." });
       }
       if (branchId !== undefined && Number(branchId) !== _target.branchId) {
-        res.status(400).json({ error: "You cannot change your own branch assignment." }); return;
+        return res.status(400).json({ error: "You cannot change your own branch assignment." });
       }
       if (isActive === false) {
-        res.status(400).json({ error: "You cannot deactivate your own account." }); return;
+        return res.status(400).json({ error: "You cannot deactivate your own account." });
       }
     }
     if (password !== undefined && (typeof password !== "string" || password.length < 8)) {
-      res.status(400).json({ error: "Password must be at least 8 characters" });
-      return;
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
     }
     const updates: Partial<typeof usersTable.$inferInsert> & { updatedAt: Date } = {
       updatedAt: new Date(),
@@ -233,27 +220,25 @@ router.put("/users/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res
     if (branchId !== undefined) {
       const parsed = Number(branchId);
       if (!Number.isInteger(parsed)) {
-        res.status(400).json({ error: "Invalid branchId" });
-        return;
+        return res.status(400).json({ error: "Invalid branchId" });
       }
       const [b] = await db.select().from(branchesTable).where(eq(branchesTable.id, parsed)).limit(1);
       if (!b) {
-        res.status(400).json({ error: "Branch not found" });
-        return;
+        return res.status(400).json({ error: "Branch not found" });
       }
       updates.branchId = b.id;
     }
     const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
-    res.json(formatUser(user));
+    return res.json(formatUser(user));
   } catch {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/users/:id/client-assignments", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseInt(String(req.params.id));
     if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
     const [_target] = await db.select({ branchId: usersTable.branchId }).from(usersTable).where(eq(usersTable.id, userId));
     if (!_target || !userCanAccessBranch(req, _target.branchId)) { res.status(404).json({ error: "User not found" }); return; }
@@ -262,15 +247,15 @@ router.get("/users/:id/client-assignments", requireBranchAdminOrAbove, async (re
       .from(userClientAssignmentsTable)
       .innerJoin(clientsTable, eq(userClientAssignmentsTable.clientId, clientsTable.id))
       .where(eq(userClientAssignmentsTable.userId, userId));
-    res.json(rows);
+    return res.json(rows);
   } catch {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.post("/users/:id/client-assignments", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseInt(String(req.params.id));
     if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
     const { clientId } = req.body;
     if (!clientId) { res.status(400).json({ error: "clientId required" }); return; }
@@ -285,25 +270,25 @@ router.post("/users/:id/client-assignments", requireBranchAdminOrAbove, async (r
     if (!client || !userCanAccessBranch(req, client.branchId)) { res.status(404).json({ error: "Client not found" }); return; }
     if (client.branchId !== _target.branchId) { res.status(400).json({ error: "User and client must belong to the same branch" }); return; }
     const [row] = await db.insert(userClientAssignmentsTable).values({ userId, clientId, branchId: client.branchId }).returning();
-    res.status(201).json(row);
+    return res.status(201).json(row);
   } catch {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.delete("/users/:id/client-assignments/:clientId", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.id);
-    const clientId = parseInt(req.params.clientId);
+    const userId = parseInt(String(req.params.id));
+    const clientId = parseInt(String(req.params.clientId));
     if (isNaN(userId) || isNaN(clientId)) { res.status(400).json({ error: "Invalid IDs" }); return; }
     const [_target] = await db.select({ branchId: usersTable.branchId }).from(usersTable).where(eq(usersTable.id, userId));
     if (!_target || !userCanAccessBranch(req, _target.branchId)) { res.status(404).json({ error: "User not found" }); return; }
     await db
       .delete(userClientAssignmentsTable)
       .where(and(eq(userClientAssignmentsTable.userId, userId), eq(userClientAssignmentsTable.clientId, clientId)));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

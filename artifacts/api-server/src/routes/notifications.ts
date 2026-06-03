@@ -443,11 +443,11 @@ notificationsRouter.get("/notifications/history", requireAuth, async (req: AuthR
   }
 });
 
-notificationsRouter.post("/notifications/:alertKey/read", requireAuth, async (req, res) => {
+notificationsRouter.post("/notifications/:alertKey/read", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const userId = (req as AuthRequest).user!.id;
-    const branchId = (req as AuthRequest).user!.branchId;
-    const { alertKey } = req.params;
+    const userId = req.user!.id;
+    const branchId = req.user!.branchId;
+    const alertKey = String(req.params.alertKey);
     const now = new Date();
     await db.insert(notificationsReadTable)
       .values({ alertKey, userId, branchId, isRead: true, readAt: now })
@@ -462,12 +462,12 @@ notificationsRouter.post("/notifications/:alertKey/read", requireAuth, async (re
   }
 });
 
-notificationsRouter.post("/notifications/read-all", requireAuth, async (req, res) => {
+notificationsRouter.post("/notifications/read-all", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const userId = (req as AuthRequest).user!.id;
-    const role   = (req as AuthRequest).user!.role;
-    const branchId = (req as AuthRequest).user!.branchId;
-    const branchScope = getBranchScope(req as AuthRequest);
+    const userId = req.user!.id;
+    const role   = req.user!.role;
+    const branchId = req.user!.branchId;
+    const branchScope = getBranchScope(req);
     const alerts = await computeAlerts(userId, role, branchScope);
     if (alerts.length === 0) return res.json({ success: true });
 
@@ -630,10 +630,10 @@ notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, 
 });
 
 // Workflow notifications (event-based: new_job, stage_complete, overdue, delay_recorded)
-notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res) => {
+notificationsRouter.get("/workflow-notifications", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const role = (req as AuthRequest).user.role;
-    const branchScope = getBranchScope(req as AuthRequest);
+    const role = req.user!.role;
+    const branchScope = getBranchScope(req);
 
     // Check for overdue stages and auto-create notifications (deduplicated by checking recent ones)
     const containers = branchScope !== null
@@ -724,7 +724,7 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req, res)
 
 notificationsRouter.post("/workflow-notifications/:id/read", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [existing] = await db.select({ branchId: workflowNotificationsTable.branchId, targetUserId: workflowNotificationsTable.targetUserId })
       .from(workflowNotificationsTable).where(eq(workflowNotificationsTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {

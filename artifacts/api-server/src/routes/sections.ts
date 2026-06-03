@@ -60,7 +60,7 @@ sectionsRouter.post("/custom-sections", requireAuth, async (req: AuthRequest, re
 
 // Update section
 sectionsRouter.patch("/custom-sections/:id", requireAuth, async (req: AuthRequest, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   const sec = await loadSectionForBranchCheck(id);
   if (!sec || !userCanAccessBranch(req, sec.branchId)) return res.status(404).json({ error: "Section not found" });
   const { name, color, icon, isRequired, isArchived, sectionOrder } = req.body;
@@ -82,7 +82,7 @@ sectionsRouter.patch("/custom-sections/:id", requireAuth, async (req: AuthReques
 
 // Delete section
 sectionsRouter.delete("/custom-sections/:id", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   const sec = await loadSectionForBranchCheck(id);
   if (!sec || !userCanAccessBranch(req, sec.branchId)) return res.status(404).json({ error: "Section not found" });
   try {
@@ -96,7 +96,7 @@ sectionsRouter.delete("/custom-sections/:id", requireAuth, requireBranchAdminOrA
 
 // Add field to section
 sectionsRouter.post("/custom-sections/:id/fields", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
-  const sectionId = parseInt(req.params.id);
+  const sectionId = parseInt(String(req.params.id));
   const sec = await loadSectionForBranchCheck(sectionId);
   if (!sec || !userCanAccessBranch(req, sec.branchId)) return res.status(404).json({ error: "Section not found" });
   const { name, fieldType = "text", placeholder = "", helpText = "", defaultValue = "", isRequired = false, includeInTotal = false, visibleByRole = "all", editableByRole = "all", dropdownOptions = "[]" } = req.body;
@@ -117,8 +117,8 @@ sectionsRouter.post("/custom-sections/:id/fields", requireAuth, requireBranchAdm
 
 // Update field
 sectionsRouter.patch("/custom-sections/:id/fields/:fieldId", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
-  const sectionId = parseInt(req.params.id);
-  const fieldId = parseInt(req.params.fieldId);
+  const sectionId = parseInt(String(req.params.id));
+  const fieldId = parseInt(String(req.params.fieldId));
   const sec = await loadSectionForBranchCheck(sectionId);
   if (!sec) return res.status(404).json({ error: "Section not found" });
   if (!userCanAccessBranch(req, sec.branchId)) return res.status(404).json({ error: "Section not found" });
@@ -151,8 +151,8 @@ sectionsRouter.patch("/custom-sections/:id/fields/:fieldId", requireAuth, requir
 
 // Delete field
 sectionsRouter.delete("/custom-sections/:id/fields/:fieldId", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
-  const sectionId = parseInt(req.params.id);
-  const fieldId = parseInt(req.params.fieldId);
+  const sectionId = parseInt(String(req.params.id));
+  const fieldId = parseInt(String(req.params.fieldId));
   const sec = await loadSectionForBranchCheck(sectionId);
   if (!sec) return res.status(404).json({ error: "Section not found" });
   if (!userCanAccessBranch(req, sec.branchId)) return res.status(404).json({ error: "Section not found" });
@@ -171,7 +171,7 @@ sectionsRouter.delete("/custom-sections/:id/fields/:fieldId", requireAuth, requi
 
 // Get field values for a container
 sectionsRouter.get("/containers/:containerId/custom-values", requireAuth, async (req: AuthRequest, res) => {
-  const containerId = parseInt(req.params.containerId);
+  const containerId = parseInt(String(req.params.containerId));
   try {
     const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, containerId));
     if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
@@ -185,7 +185,7 @@ sectionsRouter.get("/containers/:containerId/custom-values", requireAuth, async 
 
 // Save field values for a container
 sectionsRouter.post("/containers/:containerId/custom-values", requireAuth, async (req: AuthRequest, res) => {
-  const containerId = parseInt(req.params.containerId);
+  const containerId = parseInt(String(req.params.containerId));
   const { values } = req.body as { values: Array<{ fieldId: number; value: string }> };
   if (!Array.isArray(values)) return res.status(400).json({ error: "values array required" });
   try {
@@ -260,7 +260,7 @@ sectionsRouter.post("/builtin-extras", requireAuth, requireBranchAdminOrAbove, a
 
 // PATCH update extra field
 sectionsRouter.patch("/builtin-extras/:fieldId", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
-  const fieldId = parseInt(req.params.fieldId);
+  const fieldId = parseInt(String(req.params.fieldId));
   const [fieldRow] = await db.select({ id: customFieldsTable.id, branchId: customFieldsTable.branchId, builtinSectionKey: customFieldsTable.builtinSectionKey })
     .from(customFieldsTable).where(eq(customFieldsTable.id, fieldId));
   if (!fieldRow || !fieldRow.builtinSectionKey) return res.status(404).json({ error: "Builtin extra field not found" });
@@ -288,7 +288,7 @@ sectionsRouter.patch("/builtin-extras/:fieldId", requireAuth, requireBranchAdmin
 
 // DELETE extra field
 sectionsRouter.delete("/builtin-extras/:fieldId", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
-  const fieldId = parseInt(req.params.fieldId);
+  const fieldId = parseInt(String(req.params.fieldId));
   const [fieldRow] = await db.select({ id: customFieldsTable.id, branchId: customFieldsTable.branchId, builtinSectionKey: customFieldsTable.builtinSectionKey })
     .from(customFieldsTable).where(eq(customFieldsTable.id, fieldId));
   if (!fieldRow || !fieldRow.builtinSectionKey) return res.status(404).json({ error: "Builtin extra field not found" });

@@ -6,7 +6,7 @@ import { requireAuth, AuthRequest } from "../lib/auth.js";
 export const tasksRouter = Router();
 
 tasksRouter.get("/containers/:id/tasks", requireAuth, async (req: AuthRequest, res) => {
-  const containerId = parseInt(req.params.id);
+  const containerId = parseInt(String(req.params.id));
   try {
     const tasks = await db.select({
       id: containerTasksTable.id,
@@ -40,7 +40,7 @@ tasksRouter.get("/containers/:id/tasks", requireAuth, async (req: AuthRequest, r
 });
 
 tasksRouter.post("/containers/:id/tasks", requireAuth, async (req: AuthRequest, res) => {
-  const containerId = parseInt(req.params.id);
+  const containerId = parseInt(String(req.params.id));
   const { title, assignedStaffId, dueDate, priority = "medium", notes = "" } = req.body;
   if (!title) return res.status(400).json({ error: "title required" });
   try {
@@ -73,7 +73,7 @@ tasksRouter.post("/containers/:id/tasks", requireAuth, async (req: AuthRequest, 
 });
 
 tasksRouter.patch("/containers/:id/tasks/:taskId", requireAuth, async (req: AuthRequest, res) => {
-  const taskId = parseInt(req.params.taskId);
+  const taskId = parseInt(String(req.params.taskId));
   const { title, assignedStaffId, dueDate, priority, status, notes } = req.body;
   try {
     const updates: Record<string, any> = { updatedAt: new Date() };
@@ -104,7 +104,7 @@ tasksRouter.patch("/containers/:id/tasks/:taskId", requireAuth, async (req: Auth
 });
 
 tasksRouter.delete("/containers/:id/tasks/:taskId", requireAuth, async (req: AuthRequest, res) => {
-  const taskId = parseInt(req.params.taskId);
+  const taskId = parseInt(String(req.params.taskId));
   try {
     await db.delete(containerTasksTable).where(eq(containerTasksTable.id, taskId));
     return res.json({ success: true });

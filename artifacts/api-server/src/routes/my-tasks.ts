@@ -134,10 +134,10 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
         isRejectionTask: t.title.startsWith("Resubmit "),
       }));
 
-    res.json({ assignedContainers, sectionApprovals, mySections, correctionTasks });
+    return res.json({ assignedContainers, sectionApprovals, mySections, correctionTasks });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

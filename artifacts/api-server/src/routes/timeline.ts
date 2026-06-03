@@ -6,7 +6,7 @@ import { requireAuth, AuthRequest } from "../lib/auth.js";
 export const timelineRouter = Router();
 
 timelineRouter.get("/containers/:id/timeline", requireAuth, async (req: AuthRequest, res) => {
-  const containerId = parseInt(req.params.id);
+  const containerId = parseInt(String(req.params.id));
   try {
     const events = await db.select({
       id: containerTimelineTable.id,
@@ -31,7 +31,7 @@ timelineRouter.get("/containers/:id/timeline", requireAuth, async (req: AuthRequ
 });
 
 timelineRouter.post("/containers/:id/timeline", requireAuth, async (req: AuthRequest, res) => {
-  const containerId = parseInt(req.params.id);
+  const containerId = parseInt(String(req.params.id));
   const { title, eventType = "note", description = "", status = "completed" } = req.body;
   if (!title) return res.status(400).json({ error: "title required" });
   try {
@@ -51,7 +51,7 @@ timelineRouter.post("/containers/:id/timeline", requireAuth, async (req: AuthReq
 });
 
 timelineRouter.delete("/containers/:id/timeline/:eventId", requireAuth, async (req: AuthRequest, res) => {
-  const eventId = parseInt(req.params.eventId);
+  const eventId = parseInt(String(req.params.eventId));
   try {
     await db.delete(containerTimelineTable).where(eq(containerTimelineTable.id, eventId));
     return res.json({ success: true });

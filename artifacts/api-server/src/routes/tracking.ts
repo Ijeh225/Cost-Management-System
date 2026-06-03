@@ -32,7 +32,7 @@ async function getMaerskToken(): Promise<string> {
     throw new Error(`Maersk auth failed (${res.status}): ${body}`);
   }
 
-  const data = await res.json();
+  const data = await res.json() as { expires_in?: number; access_token: string };
   const expiresIn = (data.expires_in ?? 3600) as number;
 
   cachedToken = {
@@ -119,7 +119,7 @@ function extractTrackingData(data: any, containerNumber: string) {
 }
 
 router.get("/tracking/:containerNumber", requireAuth, async (req, res) => {
-  const { containerNumber } = req.params;
+  const containerNumber = String(req.params.containerNumber);
 
   if (!containerNumber || containerNumber.length < 4) {
     return res.status(400).json({ error: "Invalid container number" });
@@ -161,7 +161,7 @@ router.get("/tracking/:containerNumber", requireAuth, async (req, res) => {
       });
     }
 
-    const data = await trackRes.json();
+    const data = await trackRes.json() as unknown;
     const result = extractTrackingData(data, containerNumber);
 
     if (!result) {

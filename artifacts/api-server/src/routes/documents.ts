@@ -22,7 +22,7 @@ const upload = multer({
 });
 
 documentsRouter.get("/containers/:id/documents", requireAuth, async (req: AuthRequest, res) => {
-  const containerId = parseInt(req.params.id);
+  const containerId = parseInt(String(req.params.id));
   try {
     const docs = await db.select({
       id: containerDocumentsTable.id,
@@ -48,7 +48,7 @@ documentsRouter.get("/containers/:id/documents", requireAuth, async (req: AuthRe
 });
 
 documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("file"), async (req: AuthRequest, res) => {
-  const containerId = parseInt(req.params.id);
+  const containerId = parseInt(String(req.params.id));
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
   const section = req.body.section || null;
 
@@ -102,7 +102,7 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
 });
 
 documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, res) => {
-  const docId = parseInt(req.params.docId);
+  const docId = parseInt(String(req.params.docId));
   if (isNaN(docId)) return res.status(400).json({ error: "Invalid document id" });
   try {
     const [doc] = await db.select({
@@ -125,11 +125,12 @@ documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, r
     if (metadata.size) res.setHeader("Content-Length", String(metadata.size));
 
     gcsFile.createReadStream()
-      .on("error", (err) => {
+      .on("error", (err): void => {
         console.error("[documents] stream error:", err);
         if (!res.headersSent) res.status(500).json({ error: "Stream error" });
       })
       .pipe(res);
+    return;
   } catch (err) {
     console.error("[documents] serve error:", err);
     return res.status(500).json({ error: "Server error" });
@@ -137,7 +138,7 @@ documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, r
 });
 
 documentsRouter.delete("/containers/:id/documents/:docId", requireAuth, async (req: AuthRequest, res) => {
-  const docId = parseInt(req.params.docId);
+  const docId = parseInt(String(req.params.docId));
   try {
     const [doc] = await db.select().from(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
     if (doc) {

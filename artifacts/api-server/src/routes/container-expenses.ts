@@ -58,7 +58,7 @@ containerExpensesRouter.get("/container-expense-categories", requireBranchAdminO
     const rows = await db.select().from(containerExpenseCategoriesTable)
       .where(branchScope !== null ? eq(containerExpenseCategoriesTable.branchId, branchScope) : undefined)
       .orderBy(containerExpenseCategoriesTable.name);
-    res.json(rows.map(r => ({
+    return res.json(rows.map(r => ({
       id: r.id,
       name: r.name,
       isDefault: r.isDefault,
@@ -67,7 +67,7 @@ containerExpensesRouter.get("/container-expense-categories", requireBranchAdminO
     })));
   } catch (err) {
     console.error("GET /container-expense-categories error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -75,7 +75,7 @@ containerExpensesRouter.post("/container-expense-categories", requireBranchAdmin
   try {
     const { name } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
-      res.status(400).json({ error: "Category name is required" }); return;
+      return res.status(400).json({ error: "Category name is required" });
     }
     const createBranchId = resolveCreateBranch(req, res);
     if (createBranchId == null) return;
@@ -83,7 +83,7 @@ containerExpensesRouter.post("/container-expense-categories", requireBranchAdmin
       name: name.trim(), isDefault: false, createdBy: req.user?.id ?? null,
       branchId: createBranchId,
     }).returning();
-    res.status(201).json({
+    return res.status(201).json({
       id: row.id, name: row.name, isDefault: row.isDefault,
       createdBy: row.createdBy ?? null,
       createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
@@ -91,7 +91,7 @@ containerExpensesRouter.post("/container-expense-categories", requireBranchAdmin
   } catch (err: any) {
     if (err.code === "23505") { res.status(409).json({ error: "Category name already exists" }); return; }
     console.error("POST /container-expense-categories error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -103,10 +103,10 @@ containerExpensesRouter.delete("/container-expense-categories/:id", requireBranc
     if (!cat || !userCanAccessBranch(req, cat.branchId)) { res.status(404).json({ error: "Category not found" }); return; }
     if (cat.isDefault) { res.status(400).json({ error: "Cannot delete default categories" }); return; }
     await db.delete(containerExpenseCategoriesTable).where(eq(containerExpenseCategoriesTable.id, id));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /container-expense-categories/:id error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -126,23 +126,23 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireBranchA
     };
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ error: "items array is required" }); return;
+      return res.status(400).json({ error: "items array is required" });
     }
     if (!section && !categoryId) {
-      res.status(400).json({ error: "Either section or categoryId is required" }); return;
+      return res.status(400).json({ error: "Either section or categoryId is required" });
     }
     if (!paymentMethod || !["cash", "bank"].includes(paymentMethod)) {
-      res.status(400).json({ error: "paymentMethod must be 'cash' or 'bank'" }); return;
+      return res.status(400).json({ error: "paymentMethod must be 'cash' or 'bank'" });
     }
     if (paymentMethod === "bank" && !bankId) {
-      res.status(400).json({ error: "bankId is required for bank payments" }); return;
+      return res.status(400).json({ error: "bankId is required for bank payments" });
     }
     for (const item of items) {
       if (!item.containerId || isNaN(Number(item.containerId))) {
-        res.status(400).json({ error: "Each item must have a valid containerId" }); return;
+        return res.status(400).json({ error: "Each item must have a valid containerId" });
       }
       if (!item.amount || isNaN(Number(item.amount)) || Number(item.amount) <= 0) {
-        res.status(400).json({ error: "Each item must have a positive amount" }); return;
+        return res.status(400).json({ error: "Each item must have a positive amount" });
       }
     }
 
@@ -178,7 +178,7 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireBranchA
       .from(containersTable).where(inArray(containersTable.id, containerIds));
     const branchByContainer = new Map<number, number>(containerRows.map(c => [c.id, c.branchId]));
     if (branchByContainer.size !== containerIds.length) {
-      res.status(404).json({ error: "One or more containers not found" }); return;
+      return res.status(404).json({ error: "One or more containers not found" });
     }
 
     // Branch isolation (Task #74): all targeted containers must belong to the
@@ -187,14 +187,12 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireBranchA
     {
       const _scope = getBranchScope(req);
       if (_scope === null && req.user?.role === "super_admin") {
-        res.status(400).json({ error: "Select a specific branch to record container payments." });
-        return;
+        return res.status(400).json({ error: "Select a specific branch to record container payments." });
       }
       if (_scope !== null) {
         for (const cid of containerIds) {
           if (branchByContainer.get(cid) !== _scope) {
-            res.status(404).json({ error: "One or more containers not found" });
-            return;
+            return res.status(404).json({ error: "One or more containers not found" });
           }
         }
       }
@@ -204,8 +202,7 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireBranchA
     if (catBranchId !== null) {
       for (const cid of containerIds) {
         if (branchByContainer.get(cid) !== catBranchId) {
-          res.status(400).json({ error: "Selected category belongs to a different branch than one of the containers." });
-          return;
+          return res.status(400).json({ error: "Selected category belongs to a different branch than one of the containers." });
         }
       }
     }
@@ -215,8 +212,7 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireBranchA
       if (bk) {
         for (const cid of containerIds) {
           if (branchByContainer.get(cid) !== bk.branchId) {
-            res.status(400).json({ error: "Selected bank belongs to a different branch than one of the containers." });
-            return;
+            return res.status(400).json({ error: "Selected bank belongs to a different branch than one of the containers." });
           }
         }
       }
@@ -287,7 +283,7 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireBranchA
       return payments;
     });
 
-    res.status(201).json({ ok: true, count: inserted.length, payments: inserted.map(p => ({
+    return res.status(201).json({ ok: true, count: inserted.length, payments: inserted.map(p => ({
       id: p.id,
       containerId: p.containerId,
       categoryId: p.categoryId ?? null,
@@ -303,7 +299,7 @@ containerExpensesRouter.post("/container-expense-payments/batch", requireBranchA
     }))});
   } catch (err) {
     console.error("POST /container-expense-payments/batch error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -357,10 +353,10 @@ containerExpensesRouter.get("/containers/:id/expense-payments/by-section", requi
       };
     });
 
-    res.json(sections);
+    return res.json(sections);
   } catch (err) {
     console.error("GET /containers/:id/expense-payments/by-section error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -384,7 +380,7 @@ containerExpensesRouter.get("/containers/:id/expense-payments", requireBranchAdm
       .orderBy(desc(containerExpensePaymentsTable.paidAt));
 
     if (payments.length === 0) {
-      res.json({ payments: [], totalPaid: 0 }); return;
+      return res.json({ payments: [], totalPaid: 0 });
     }
 
     const categoryIds = [...new Set(payments.map(p => p.categoryId).filter(Boolean) as number[])];
@@ -419,7 +415,7 @@ containerExpensesRouter.get("/containers/:id/expense-payments", requireBranchAdm
 
     const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
 
-    res.json({
+    return res.json({
       payments: payments.map(p => {
         const sectionLabel = p.section ? (SECTION_LABELS[p.section] ?? p.section) : null;
         const catName = p.categoryId ? (catMap[p.categoryId] ?? "Unknown") : null;
@@ -446,7 +442,7 @@ containerExpensesRouter.get("/containers/:id/expense-payments", requireBranchAdm
     });
   } catch (err) {
     console.error("GET /containers/:id/expense-payments error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -499,7 +495,7 @@ containerExpensesRouter.get("/container-expense-payments/recent", requireBranchA
     const userMap: Record<number, string> = {};
     users.forEach(u => { userMap[u.id] = u.name; });
 
-    res.json(payments.map(p => {
+    return res.json(payments.map(p => {
       const sectionLabel = p.section ? (SECTION_LABELS[p.section] ?? p.section) : null;
       const catName = p.categoryId ? (catMap[p.categoryId] ?? null) : null;
       return {
@@ -526,7 +522,7 @@ containerExpensesRouter.get("/container-expense-payments/recent", requireBranchA
     }));
   } catch (err) {
     console.error("GET /container-expense-payments/recent error:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

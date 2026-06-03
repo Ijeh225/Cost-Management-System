@@ -236,12 +236,10 @@ analyticsRouter.get("/analytics/deliveries", requireAuth, requireBranchMemberOrA
     const fromDate = parseIsoDate(fromStr);
     const toDate = parseIsoDate(toStr);
     if (fromDate === "invalid") {
-      res.status(400).json({ error: "Invalid 'from' date — expected YYYY-MM-DD format" });
-      return;
+      return res.status(400).json({ error: "Invalid 'from' date — expected YYYY-MM-DD format" });
     }
     if (toDate === "invalid") {
-      res.status(400).json({ error: "Invalid 'to' date — expected YYYY-MM-DD format" });
-      return;
+      return res.status(400).json({ error: "Invalid 'to' date — expected YYYY-MM-DD format" });
     }
 
     const branchScope = await resolveBranchScopeInfo(req);

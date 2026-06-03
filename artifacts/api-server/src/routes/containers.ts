@@ -364,10 +364,10 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
       dutyPaid:    dutyPaidMap[c.id] ?? 0,
     }));
 
-    res.json({ containers, total: Number(count), page, limit });
+    return res.json({ containers, total: Number(count), page, limit });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -377,12 +377,10 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
     const trimmedCustomer = typeof customerName === "string" ? customerName.trim() : "";
     const parsedClientId = clientId ? Number(clientId) : null;
     if (!containerNumber || !blNumber) {
-      res.status(400).json({ error: "containerNumber and blNumber are required" });
-      return;
+      return res.status(400).json({ error: "containerNumber and blNumber are required" });
     }
     if (!command || !(VALID_COMMANDS as readonly string[]).includes(command)) {
-      res.status(400).json({ error: `Command is required. Must be one of: ${VALID_COMMANDS.join(", ")}` });
-      return;
+      return res.status(400).json({ error: `Command is required. Must be one of: ${VALID_COMMANDS.join(", ")}` });
     }
     let resolvedCustomerName = trimmedCustomer;
     if (!resolvedCustomerName && parsedClientId) {
@@ -395,8 +393,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       }
     }
     if (!resolvedCustomerName) {
-      res.status(400).json({ error: "customerName is required (or pick a client to auto-fill)" });
-      return;
+      return res.status(400).json({ error: "customerName is required (or pick a client to auto-fill)" });
     }
     const createBranchId = resolveCreateBranch(req, res);
     if (createBranchId == null) return;
@@ -404,8 +401,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       const [linkedClient] = await db.select({ branchId: clientsTable.branchId })
         .from(clientsTable).where(eq(clientsTable.id, parsedClientId));
       if (!linkedClient || linkedClient.branchId !== createBranchId) {
-        res.status(400).json({ error: "Selected client belongs to a different branch." });
-        return;
+        return res.status(400).json({ error: "Selected client belongs to a different branch." });
       }
     }
     const [container] = await db.insert(containersTable).values({
@@ -431,21 +427,19 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       containerId: container.id,
       containerNumber: container.containerNumber,
     });
-    res.status(201).json(formatContainer(container));
+    return res.status(201).json(formatContainer(container));
   } catch (err: any) {
     if (err.code === "23505") {
-      res.status(400).json({ error: "Container number or BL number already exists" });
-      return;
+      return res.status(400).json({ error: "Container number or BL number already exists" });
     }
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.post("/containers/check-duplicates", requireAuth, async (req: AuthRequest, res) => {
   const { containerNumbers, blNumbers } = req.body;
   if (!Array.isArray(containerNumbers) || !Array.isArray(blNumbers)) {
-    res.status(400).json({ error: "containerNumbers and blNumbers must be arrays" });
-    return;
+    return res.status(400).json({ error: "containerNumbers and blNumbers must be arrays" });
   }
   try {
     const _scope = getBranchScope(req);
@@ -469,13 +463,13 @@ router.post("/containers/check-duplicates", requireAuth, async (req: AuthRequest
             .where(_blFilter)
         : Promise.resolve([]),
     ]);
-    res.json({
+    return res.json({
       existingContainerNumbers: existingCons.map((r) => r.containerNumber),
       existingBlNumbers: existingBls.map((r) => r.blNumber),
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -488,8 +482,7 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
   try {
     const { rows, clientId } = req.body;
     if (!Array.isArray(rows)) {
-      res.status(400).json({ error: "rows must be an array" });
-      return;
+      return res.status(400).json({ error: "rows must be an array" });
     }
     const linkedClientId = clientId ? parseInt(clientId) : null;
     if (linkedClientId) {
@@ -568,10 +561,10 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
         containerId: null, containerNumber: null,
       });
     } catch {}
-    res.json({ created, duplicates, errors });
+    return res.json({ created, duplicates, errors });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -608,9 +601,9 @@ router.get("/containers/paar-status", requireAuth, async (req: AuthRequest, res)
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
     }));
 
-    res.json({ containers: items, total: items.length });
+    return res.json({ containers: items, total: items.length });
   } catch {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -775,21 +768,20 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
       stages[status].sort((a, b) => b.daysInStage - a.daysInStage);
     }
 
-    res.json({ stages, total: rows.length });
+    return res.json({ stages, total: rows.length });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 // POST /containers/:id/early-start — authorize early start (admin only)
 router.post("/containers/:id/early-start", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const reason: string | undefined = req.body?.reason?.trim();
     if (!reason) {
-      res.status(400).json({ error: "A reason is required to authorize Early Start." });
-      return;
+      return res.status(400).json({ error: "A reason is required to authorize Early Start." });
     }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
@@ -810,17 +802,17 @@ router.post("/containers/:id/early-start", requireBranchAdminOrAbove, async (req
       action: "early_start_authorized",
       section: "basic_info",
     });
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 // DELETE /containers/:id/early-start — revoke early start (admin only)
 router.delete("/containers/:id/early-start", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const [updated] = await db.update(containersTable)
@@ -840,10 +832,10 @@ router.delete("/containers/:id/early-start", requireBranchAdminOrAbove, async (r
       action: "early_start_revoked",
       section: "basic_info",
     });
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -892,21 +884,19 @@ const STAGE_ADVANCE_ALLOWED: Record<string, string[]> = {
 
 router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const userRole = req.user!.role;
     const isAdmin = userRole === "admin" || userRole === "super_admin";
     const requestedStatus: string | undefined = req.body?.status;
 
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
 
     const currentIdx = PIPELINE_STAGE_ORDER.indexOf(existing.status);
     if (currentIdx === -1) {
-      res.status(400).json({ error: `Unknown current status: ${existing.status}` });
-      return;
+      return res.status(400).json({ error: `Unknown current status: ${existing.status}` });
     }
 
     // Determine whether this is a navigation (jump to a specific stage) or a forward advance.
@@ -922,23 +912,20 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
     const nextStatus = isNavigation ? requestedStatus : naturalNext;
 
     if (!nextStatus) {
-      res.status(400).json({ error: "Container is already at the final stage" });
-      return;
+      return res.status(400).json({ error: "Container is already at the final stage" });
     }
 
     if (!isAdmin) {
       // Non-admin dept users: arbitrary stage navigation is not permitted.
       // Only the natural forward advance from a stage the user is allowed to advance is permitted.
       if (isNavigation) {
-        res.status(403).json({ error: "Stage navigation is restricted to administrators." });
-        return;
+        return res.status(403).json({ error: "Stage navigation is restricted to administrators." });
       }
       const userRoles: string[] = req.user!.roles ?? [userRole];
       const advanceAllowed = [...new Set(userRoles.flatMap(r => STAGE_ADVANCE_ALLOWED[r] ?? []))];
       // Forward advance: current stage must be in the user's advancement-allowed stages
       if (!advanceAllowed.includes(existing.status)) {
-        res.status(403).json({ error: "You don't have permission to advance this container from its current stage" });
-        return;
+        return res.status(403).json({ error: "You don't have permission to advance this container from its current stage" });
       }
     }
     const [updated] = await db.update(containersTable)
@@ -972,24 +959,22 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
         containerNumber: existing.containerNumber,
       });
     } catch {}
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.post("/containers/:id/verify", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     if (existing.status !== "pending_verification") {
-      res.status(400).json({ error: "Container is not in pending verification state" });
-      return;
+      return res.status(400).json({ error: "Container is not in pending verification state" });
     }
     const [updated] = await db.update(containersTable)
       .set({ status: "registered", verifiedAt: new Date(), verifiedBy: req.user!.id, updatedAt: new Date() })
@@ -1010,10 +995,10 @@ router.post("/containers/:id/verify", requireBranchAdminOrAbove, async (req: Aut
         containerId: id, containerNumber: existing.containerNumber,
       });
     } catch {}
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -1023,11 +1008,10 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
     return res.status(403).json({ error: "Only admin and operations users can confirm berthing." });
   }
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     const confirmedByUserId = req.user!.id;
     const confirmedByName = req.user!.name ?? req.user!.email ?? "Unknown";
@@ -1055,35 +1039,33 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
     let whatsappResult: { success: boolean; sid?: string; error?: string } | null = null;
     if (sendWhatsApp && existing.clientId) {
       const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, existing.clientId));
-      if (client?.phone) {
+      if (client?.contactPhone) {
         const { toE164Nigerian, sendViaTwilio } = await import("../lib/whatsapp.js");
-        const phone = toE164Nigerian(client.phone);
+        const phone = toE164Nigerian(client.contactPhone);
         const vesselInfo = existing.vessel ? ` (Vessel: ${existing.vessel})` : "";
         const message = `Hello! We're pleased to inform you that the vessel carrying your container ${existing.containerNumber}${vesselInfo} has berthed at the terminal. Clearing is now underway. — Cost Analysis Team`;
         whatsappResult = await sendViaTwilio(phone, message);
       }
     }
-    res.json({ container: formatContainer(updated), whatsappResult });
+    return res.json({ container: formatContainer(updated), whatsappResult });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     const {
       action, expectedDate, delayReason, finalDate,
     } = req.body;
     if (!action) {
-      res.status(400).json({ error: "action is required" });
-      return;
+      return res.status(400).json({ error: "action is required" });
     }
     const status = existing.status;
     const STAGE_ACTION_FIELDS: Record<string, { expected: string; releasedAt: string; delayReason: string; finalDate: string; label: string }> = {
@@ -1095,8 +1077,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
     };
     const fields = STAGE_ACTION_FIELDS[status];
     if (!fields) {
-      res.status(400).json({ error: `Stage action not supported for status: ${status}` });
-      return;
+      return res.status(400).json({ error: `Stage action not supported for status: ${status}` });
     }
 
     const userRoles: string[] = req.user!.roles;
@@ -1112,8 +1093,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       const allowedRoles = STAGE_ALLOWED_ROLES[status] ?? [];
       const hasRole = userRoles.some(r => allowedRoles.includes(r));
       if (!hasRole) {
-        res.status(403).json({ error: "You do not have permission to perform actions at this stage." });
-        return;
+        return res.status(403).json({ error: "You do not have permission to perform actions at this stage." });
       }
     }
 
@@ -1133,7 +1113,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
     } else if (action === "update_stage_owner") {
       updates.stageOwner = req.body.stageOwner || null;
     } else {
-      res.status(400).json({ error: `Unknown action: ${action}` }); return;
+      return res.status(400).json({ error: `Unknown action: ${action}` });
     }
     const [updated] = await db.update(containersTable).set(updates).where(eq(containersTable.id, id)).returning();
     await db.insert(auditLogTable).values({
@@ -1155,10 +1135,10 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
         containerNumber: existing.containerNumber,
       });
     }
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -1170,8 +1150,7 @@ router.get("/containers/gate-log", requireAuth, async (req: AuthRequest, res) =>
     const userRoles: string[] = (req.user as any).roles ?? [userRole];
     const isSecurityUser = userRoles.includes("security_user");
     if (!isAdmin && !isSecurityUser) {
-      res.status(403).json({ error: "Access denied" });
-      return;
+      return res.status(403).json({ error: "Access denied" });
     }
     const fromStr = req.query.from as string | undefined;
     const toStr = req.query.to as string | undefined;
@@ -1236,24 +1215,23 @@ router.get("/containers/gate-log", requireAuth, async (req: AuthRequest, res) =>
       return res.send(header + rowsCsv);
     }
 
-    res.json({ entries: data, total: data.length });
+    return res.json({ entries: data, total: data.length });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 // POST /containers/:id/gate-in — Security records container entry with exact timestamp
 router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const userRole = req.user!.role;
     const isAdmin = userRole === "admin" || userRole === "super_admin";
     const userRoles: string[] = (req.user as any).roles ?? [userRole];
     const isSecurityUser = userRoles.includes("security_user");
     if (!isAdmin && !isSecurityUser) {
-      res.status(403).json({ error: "Only security personnel or administrators can record Gate-In" });
-      return;
+      return res.status(403).json({ error: "Only security personnel or administrators can record Gate-In" });
     }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
@@ -1263,8 +1241,7 @@ router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res
     if (["shipping", "pull_out"].includes(existing.status)) {
       nextStatus = "gate_in";
     } else if (!["gate_in", "examination", "final_release"].includes(existing.status)) {
-      res.status(409).json({ error: `Container is at "${existing.status}" stage — Gate-In can only be recorded from shipping, pull_out, or once already in the terminal` });
-      return;
+      return res.status(409).json({ error: `Container is at "${existing.status}" stage — Gate-In can only be recorded from shipping, pull_out, or once already in the terminal` });
     }
 
     const [updated] = await db.update(containersTable)
@@ -1289,30 +1266,28 @@ router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res
         containerNumber: existing.containerNumber,
       });
     } catch {}
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 // POST /containers/:id/gate-out — Security records container exit (timestamp only, no stage change)
 router.post("/containers/:id/gate-out", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const userRole = req.user!.role;
     const isAdmin = userRole === "admin" || userRole === "super_admin";
     const userRoles: string[] = (req.user as any).roles ?? [userRole];
     const isSecurityUser = userRoles.includes("security_user");
     if (!isAdmin && !isSecurityUser) {
-      res.status(403).json({ error: "Only security personnel or administrators can record Gate-Out" });
-      return;
+      return res.status(403).json({ error: "Only security personnel or administrators can record Gate-Out" });
     }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     if (existing.gateOutDate) {
-      res.status(409).json({ error: "Gate-Out has already been recorded for this container" });
-      return;
+      return res.status(409).json({ error: "Gate-Out has already been recorded for this container" });
     }
     const now = new Date();
     const [updated] = await db.update(containersTable)
@@ -1334,30 +1309,28 @@ router.post("/containers/:id/gate-out", requireAuth, async (req: AuthRequest, re
         containerId: id, containerNumber: existing.containerNumber,
       });
     } catch {}
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 // POST /containers/:id/empty-gate-in — Security records empty container return to terminal (Scenario B step 1)
 router.post("/containers/:id/empty-gate-in", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const userRole = req.user!.role;
     const isAdmin = userRole === "admin" || userRole === "super_admin";
     const userRoles: string[] = (req.user as any).roles ?? [userRole];
     const isSecurityUser = userRoles.includes("security_user");
     if (!isAdmin && !isSecurityUser) {
-      res.status(403).json({ error: "Only security personnel or administrators can record Empty Gate-In" });
-      return;
+      return res.status(403).json({ error: "Only security personnel or administrators can record Empty Gate-In" });
     }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     if (existing.emptyGateInDate) {
-      res.status(409).json({ error: "Empty Gate-In has already been recorded for this container" });
-      return;
+      return res.status(409).json({ error: "Empty Gate-In has already been recorded for this container" });
     }
     const now = new Date();
     const [updated] = await db.update(containersTable)
@@ -1379,34 +1352,31 @@ router.post("/containers/:id/empty-gate-in", requireAuth, async (req: AuthReques
         containerId: id, containerNumber: existing.containerNumber,
       });
     } catch {}
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 // POST /containers/:id/empty-gate-out — Security records empty container exit to port (Scenario B step 2 — auto-sets emptyReturnDate)
 router.post("/containers/:id/empty-gate-out", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const userRole = req.user!.role;
     const isAdmin = userRole === "admin" || userRole === "super_admin";
     const userRoles: string[] = (req.user as any).roles ?? [userRole];
     const isSecurityUser = userRoles.includes("security_user");
     if (!isAdmin && !isSecurityUser) {
-      res.status(403).json({ error: "Only security personnel or administrators can record Empty Gate-Out" });
-      return;
+      return res.status(403).json({ error: "Only security personnel or administrators can record Empty Gate-Out" });
     }
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     if (!existing.emptyGateInDate) {
-      res.status(409).json({ error: "Empty Gate-In must be recorded before Empty Gate-Out" });
-      return;
+      return res.status(409).json({ error: "Empty Gate-In must be recorded before Empty Gate-Out" });
     }
     if (existing.emptyGateOutDate) {
-      res.status(409).json({ error: "Empty Gate-Out has already been recorded for this container" });
-      return;
+      return res.status(409).json({ error: "Empty Gate-Out has already been recorded for this container" });
     }
     const now = new Date();
     // Auto-set emptyReturnDate: empty has left terminal, custody lifespan closes
@@ -1429,26 +1399,24 @@ router.post("/containers/:id/empty-gate-out", requireAuth, async (req: AuthReque
         containerId: id, containerNumber: existing.containerNumber,
       });
     } catch {}
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [c] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!c) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     // Branch scoping (Task #74) — return 404, not 403, on cross-branch reads
     const branchScope = getBranchScope(req);
     if (branchScope !== null && c.branchId !== branchScope) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     let staffName: string | null = null;
     if (c.assignedStaffId) {
@@ -1494,7 +1462,7 @@ router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
     }));
 
-    res.json({
+    return res.json({
       container: containerFormatted,
       charges: {
         containerId: id,
@@ -1512,21 +1480,19 @@ router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     if (existing.isLocked) {
-      res.status(403).json({ error: "Container is locked" });
-      return;
+      return res.status(403).json({ error: "Container is locked" });
     }
     const userRole = req.user!.role;
     const isAdmin = userRole === "admin" || userRole === "super_admin";
@@ -1548,8 +1514,7 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
         const naturalNext = currentIdx !== -1 ? PIPELINE_STAGE_ORDER[currentIdx + 1] : undefined;
         // Allow only if: current stage is in advancement-allowed set AND requested status is the natural next stage
         if (!advanceAllowed.includes(existing.status) || status !== naturalNext) {
-          res.status(403).json({ error: "You can only advance this container from its current stage to the next stage." });
-          return;
+          return res.status(403).json({ error: "You can only advance this container from its current stage to the next stage." });
         }
       }
       updates.status = status;
@@ -1574,20 +1539,19 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       section: "basic_info",
     });
 
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     const {
       deliveredAt, stageOwner, nextAction, nextActionDueDate, delayReason,
@@ -1598,20 +1562,17 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     } = req.body;
     if (deliveredAt !== undefined && deliveredAt !== null) {
       if (typeof deliveredAt !== "string" || !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(deliveredAt) || isNaN(new Date(deliveredAt).getTime())) {
-        res.status(400).json({ error: "Invalid deliveredAt — expected YYYY-MM-DD format" });
-        return;
+        return res.status(400).json({ error: "Invalid deliveredAt — expected YYYY-MM-DD format" });
       }
     }
     const VALID_DELIVERY_STATUSES = ["pending", "in_transit", "delivered"];
     if (deliveryStatus !== undefined && !VALID_DELIVERY_STATUSES.includes(deliveryStatus)) {
-      res.status(400).json({ error: `Invalid deliveryStatus — must be one of: ${VALID_DELIVERY_STATUSES.join(", ")}` });
-      return;
+      return res.status(400).json({ error: `Invalid deliveryStatus — must be one of: ${VALID_DELIVERY_STATUSES.join(", ")}` });
     }
     for (const [field, val] of [["emptyReturnDueDate", emptyReturnDueDate], ["emptyReturnDate", emptyReturnDate]] as [string, unknown][]) {
       if (val !== undefined && val !== null && val !== "") {
         if (typeof val !== "string" || isNaN(new Date(val as string).getTime())) {
-          res.status(400).json({ error: `Invalid ${field} — expected ISO 8601 date format` });
-          return;
+          return res.status(400).json({ error: `Invalid ${field} — expected ISO 8601 date format` });
         }
       }
     }
@@ -1644,8 +1605,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (nextActionDueDate !== undefined) {
       if (nextActionDueDate !== null && nextActionDueDate !== "") {
         if (typeof nextActionDueDate !== "string" || isNaN(new Date(nextActionDueDate as string).getTime())) {
-          res.status(400).json({ error: "Invalid nextActionDueDate — expected ISO 8601 date format" });
-          return;
+          return res.status(400).json({ error: "Invalid nextActionDueDate — expected ISO 8601 date format" });
         }
       }
       updates.nextActionDueDate = nextActionDueDate ? new Date(nextActionDueDate as string) : null;
@@ -1668,8 +1628,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (paarReleasedAt !== undefined) {
       if (paarReleasedAt !== null && paarReleasedAt !== "") {
         if (typeof paarReleasedAt !== "string" || isNaN(new Date(paarReleasedAt as string).getTime())) {
-          res.status(400).json({ error: "Invalid paarReleasedAt — expected ISO 8601 date format" });
-          return;
+          return res.status(400).json({ error: "Invalid paarReleasedAt — expected ISO 8601 date format" });
         }
         updates.paarReleasedAt = new Date(paarReleasedAt as string);
         changed.push(`PAAR Released: ${paarReleasedAt}`);
@@ -1692,8 +1651,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (tdoReleasedAt !== undefined) {
       if (tdoReleasedAt !== null && tdoReleasedAt !== "") {
         if (typeof tdoReleasedAt !== "string" || isNaN(new Date(tdoReleasedAt as string).getTime())) {
-          res.status(400).json({ error: "Invalid tdoReleasedAt — expected ISO 8601 date format" });
-          return;
+          return res.status(400).json({ error: "Invalid tdoReleasedAt — expected ISO 8601 date format" });
         }
         updates.tdoReleasedAt = new Date(tdoReleasedAt as string);
         changed.push(`TDO Released: ${tdoReleasedAt}`);
@@ -1702,8 +1660,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       }
     }
     if (Object.keys(updates).length === 1) {
-      res.status(400).json({ error: "No valid fields to update" });
-      return;
+      return res.status(400).json({ error: "No valid fields to update" });
     }
     const finalDueDate = "nextActionDueDate" in updates
       ? (updates.nextActionDueDate as Date | null)
@@ -1714,8 +1671,7 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     const isActiveStatus = existing.status !== "closed";
     const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
     if (isActiveStatus && finalDueDate instanceof Date && finalDueDate.getTime() < startOfToday.getTime() && !finalDelayReason) {
-      res.status(400).json({ error: "Delay Reason is required when the Next Action Due Date is overdue" });
-      return;
+      return res.status(400).json({ error: "Delay Reason is required when the Next Action Due Date is overdue" });
     }
     const [updated] = await db.update(containersTable).set(updates).where(eq(containersTable.id, id)).returning();
     const reasons: string[] = [];
@@ -1784,30 +1740,28 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (timelineEntries.length > 0) {
       await db.insert(containerTimelineTable).values(timelineEntries);
     }
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 
 router.post("/containers/:id/lock", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const { locked, reason } = req.body;
     const [pre] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
     if (!pre || !userCanAccessBranch(req, pre.branchId)) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     const [updated] = await db.update(containersTable)
       .set({ isLocked: locked, updatedAt: new Date() })
       .where(eq(containersTable.id, id))
       .returning();
     if (!updated) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     await db.insert(auditLogTable).values({
       containerId: id,
@@ -1816,15 +1770,15 @@ router.post("/containers/:id/lock", requireBranchAdminOrAbove, async (req: AuthR
       action: locked ? "locked" : "unlocked",
       reason: reason ?? null,
     });
-    res.json(formatContainer(updated));
+    return res.json(formatContainer(updated));
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/containers/:id/extra-charges", requireAuth, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [container] = await db.select({ id: containersTable.id, branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
     if (!container || !userCanAccessBranch(req as AuthRequest, container.branchId)) return res.status(404).json({ error: "Container not found" });
     const rows = await db.select().from(containerExtraChargesTable)
@@ -1845,7 +1799,7 @@ const VALID_SECTIONS = new Set(["shipping", "customs", "terminal", "delivery", "
 
 router.post("/containers/:id/extra-charges", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
@@ -1874,8 +1828,8 @@ router.post("/containers/:id/extra-charges", requireAuth, async (req: AuthReques
 
 router.put("/containers/:id/extra-charges/:rowId", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const rowId = parseInt(req.params.rowId);
+    const id = parseInt(String(req.params.id));
+    const rowId = parseInt(String(req.params.rowId));
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
@@ -1911,8 +1865,8 @@ router.put("/containers/:id/extra-charges/:rowId", requireAuth, async (req: Auth
 
 router.delete("/containers/:id/extra-charges/:rowId", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const rowId = parseInt(req.params.rowId);
+    const id = parseInt(String(req.params.id));
+    const rowId = parseInt(String(req.params.rowId));
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
     if (container.isLocked) return res.status(403).json({ error: "Container is locked" });
@@ -1936,11 +1890,10 @@ router.delete("/containers/:id/extra-charges/:rowId", requireAuth, async (req: A
 
 router.get("/containers/:id/charges", requireAuth, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [c] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!c || !userCanAccessBranch(req as AuthRequest, c.branchId)) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     const charges = await getOrCreateCharges(id);
     const extraRows = await db.select().from(containerExtraChargesTable)
@@ -1948,7 +1901,7 @@ router.get("/containers/:id/charges", requireAuth, async (req, res) => {
     const extraTotal = extraRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
     const baseTotal = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations);
     const totalCost = baseTotal + extraTotal;
-    res.json({
+    return res.json({
       containerId: id,
       shipping: numericToObj(charges.shipping),
       customs: numericToObj(charges.customs),
@@ -1960,21 +1913,19 @@ router.get("/containers/:id/charges", requireAuth, async (req, res) => {
       grossProfit: parseFloat(c.clearingCharges ?? "0") - totalCost,
     });
   } catch {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [c] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!c || !userCanAccessBranch(req, c.branchId)) {
-      res.status(404).json({ error: "Container not found" });
-      return;
+      return res.status(404).json({ error: "Container not found" });
     }
     if (c.isLocked) {
-      res.status(403).json({ error: "Container is locked" });
-      return;
+      return res.status(403).json({ error: "Container is locked" });
     }
     const { section, clearingCharges, reason } = req.body;
     let { shipping, customs, terminal, delivery, operations } = req.body;
@@ -1984,15 +1935,13 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
       let lockedSections: string[] = [];
       try { lockedSections = JSON.parse(c.lockedSections ?? "[]"); } catch {}
       if (lockedSections.includes(section)) {
-        res.status(403).json({ error: `The ${section} section is locked.` });
-        return;
+        return res.status(403).json({ error: `The ${section} section is locked.` });
       }
     }
 
     // Check section-level permissions (mirrors extra-charges endpoint)
     if (section && !canUserEditSection(req.user!, section)) {
-      res.status(403).json({ error: "You do not have permission to edit this section" });
-      return;
+      return res.status(403).json({ error: "You do not have permission to edit this section" });
     }
 
     const strNums = (obj: any) => {
@@ -2035,8 +1984,7 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
     if (section === "delivery" && delivery) { const e = validateFx(delivery, "Delivery"); if (e) fxErrors.push(e); }
     if (section === "operations" && operations) { const e = validateFx(operations, "Operations"); if (e) fxErrors.push(e); }
     if (fxErrors.length > 0) {
-      res.status(422).json({ error: fxErrors.join("; ") });
-      return;
+      return res.status(422).json({ error: fxErrors.join("; ") });
     }
 
     if (section === "shipping" && shipping) {
@@ -2085,7 +2033,7 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
     const extraRows = await db.select().from(containerExtraChargesTable).where(eq(containerExtraChargesTable.containerId, id));
     const extraTotal = extraRows.reduce((s, r) => s + parseFloat(r.amount ?? "0"), 0);
     const totalCost = calcTotalCost(charges.shipping, charges.customs, charges.terminal, charges.delivery, charges.operations) + extraTotal;
-    res.json({
+    return res.json({
       containerId: id,
       shipping: numericToObj(charges.shipping),
       customs: numericToObj(charges.customs),
@@ -2098,21 +2046,20 @@ router.put("/containers/:id/charges", requireAuth, async (req: AuthRequest, res)
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.post("/containers/:id/sections/:section/submit", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const section = req.params.section;
+    const id = parseInt(String(req.params.id));
+    const section = String(req.params.section);
     const user = req.user!;
     const [_branchCheck] = await db.select({ branchId: containersTable.branchId, containerNumber: containersTable.containerNumber }).from(containersTable).where(eq(containersTable.id, id));
     if (!_branchCheck || !userCanAccessBranch(req, _branchCheck.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const approval = await getOrCreateSectionApproval(id, section);
     if (approval.status === "submitted") {
-      res.status(400).json({ error: "Section already submitted" });
-      return;
+      return res.status(400).json({ error: "Section already submitted" });
     }
     const [updated] = await db.update(sectionApprovalsTable)
       .set({ status: "submitted", submittedById: user.id, submittedAt: new Date(), reviewedById: null, reviewedAt: null, rejectionReason: null, updatedAt: new Date() })
@@ -2128,24 +2075,23 @@ router.post("/containers/:id/sections/:section/submit", requireAuth, async (req:
         containerId: id, containerNumber: _branchCheck.containerNumber,
       });
     } catch {}
-    res.json(await formatSectionApproval(updated));
+    return res.json(await formatSectionApproval(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.post("/containers/:id/sections/:section/approve", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const section = req.params.section;
+    const id = parseInt(String(req.params.id));
+    const section = String(req.params.section);
     const user = req.user!;
     const [_branchCheck] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
     if (!_branchCheck || !userCanAccessBranch(req, _branchCheck.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const approval = await getOrCreateSectionApproval(id, section);
     if (approval.status !== "submitted") {
-      res.status(400).json({ error: "Section must be submitted before approval" });
-      return;
+      return res.status(400).json({ error: "Section must be submitted before approval" });
     }
     const [updated] = await db.update(sectionApprovalsTable)
       .set({ status: "approved", reviewedById: user.id, reviewedAt: new Date(), updatedAt: new Date() })
@@ -2169,29 +2115,27 @@ router.post("/containers/:id/sections/:section/approve", requireBranchAdminOrAbo
       }
     }
     await db.insert(auditLogTable).values({ containerId: id, branchId: approval.branchId, userId: user.id, action: "section_approved", section });
-    res.json(await formatSectionApproval(updated));
+    return res.json(await formatSectionApproval(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.post("/containers/:id/sections/:section/reject", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const section = req.params.section;
+    const id = parseInt(String(req.params.id));
+    const section = String(req.params.section);
     const user = req.user!;
     const { reason } = req.body;
     if (!reason) {
-      res.status(400).json({ error: "Rejection reason is required" });
-      return;
+      return res.status(400).json({ error: "Rejection reason is required" });
     }
     const [_branchCheck] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
     if (!_branchCheck || !userCanAccessBranch(req, _branchCheck.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const approval = await getOrCreateSectionApproval(id, section);
     if (approval.status !== "submitted") {
-      res.status(400).json({ error: "Section must be submitted before rejection" });
-      return;
+      return res.status(400).json({ error: "Section must be submitted before rejection" });
     }
     const [updated] = await db.update(sectionApprovalsTable)
       .set({ status: "rejected", reviewedById: user.id, reviewedAt: new Date(), rejectionReason: reason, updatedAt: new Date() })
@@ -2219,17 +2163,17 @@ router.post("/containers/:id/sections/:section/reject", requireBranchAdminOrAbov
       });
     }
 
-    res.json(await formatSectionApproval(updated));
+    return res.json(await formatSectionApproval(updated));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.post("/containers/:id/sections/:section/lock", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const section = req.params.section;
+    const id = parseInt(String(req.params.id));
+    const section = String(req.params.section);
     const user = req.user!;
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container || !userCanAccessBranch(req, container.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
@@ -2240,16 +2184,16 @@ router.post("/containers/:id/sections/:section/lock", requireBranchAdminOrAbove,
       await db.update(containersTable).set({ lockedSections: JSON.stringify(lockedSections), updatedAt: new Date() }).where(eq(containersTable.id, id));
     }
     await db.insert(auditLogTable).values({ containerId: id, branchId: container.branchId, userId: user.id, action: "section_locked", section });
-    res.json({ message: `Section "${section}" locked` });
+    return res.json({ message: `Section "${section}" locked` });
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.post("/containers/:id/sections/:section/unlock", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const section = req.params.section;
+    const id = parseInt(String(req.params.id));
+    const section = String(req.params.section);
     const user = req.user!;
     const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!container || !userCanAccessBranch(req, container.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
@@ -2258,15 +2202,15 @@ router.post("/containers/:id/sections/:section/unlock", requireBranchAdminOrAbov
     lockedSections = lockedSections.filter(s => s !== section);
     await db.update(containersTable).set({ lockedSections: JSON.stringify(lockedSections), updatedAt: new Date() }).where(eq(containersTable.id, id));
     await db.insert(auditLogTable).values({ containerId: id, branchId: container.branchId, userId: user.id, action: "section_unlocked", section });
-    res.json({ message: `Section "${section}" unlocked` });
+    return res.json({ message: `Section "${section}" unlocked` });
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/containers/:id/audit", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [_c] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
     if (!_c || !userCanAccessBranch(req, _c.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
     const logs = await db.select({
@@ -2286,9 +2230,9 @@ router.get("/containers/:id/audit", requireAuth, async (req: AuthRequest, res) =
       .where(eq(auditLogTable.containerId, id))
       .orderBy(desc(auditLogTable.createdAt))
       .limit(100);
-    res.json(logs.map(l => ({ ...l, userName: l.userName ?? "Unknown", createdAt: l.createdAt.toISOString() })));
+    return res.json(logs.map(l => ({ ...l, userName: l.userName ?? "Unknown", createdAt: l.createdAt.toISOString() })));
   } catch {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -2479,7 +2423,7 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       ).length;
     }
 
-    res.json({
+    return res.json({
       totalContainers,
       inProgress,
       completed,
@@ -2509,7 +2453,7 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -2543,21 +2487,31 @@ router.delete("/containers/bulk", requireAuth, requireBranchAdminOrAbove, async 
     await db.delete(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, numIds));
     await db.delete(operationsChargesTable).where(inArray(operationsChargesTable.containerId, numIds));
     await db.delete(containersTable).where(inArray(containersTable.id, numIds));
-    res.json({ deleted: numIds.length });
+    return res.json({ deleted: numIds.length });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/:id/stage-notes", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const containerId = parseInt(req.params.id, 10);
+    const containerId = parseInt(String(req.params.id), 10);
     if (isNaN(containerId)) return res.status(400).json({ error: "Invalid container id" });
+    const [container] = await db
+      .select({ branchId: containersTable.branchId })
+      .from(containersTable)
+      .where(eq(containersTable.id, containerId));
+    if (!container || !userCanAccessBranch(req, container.branchId)) {
+      return res.status(404).json({ error: "Container not found" });
+    }
     const notes = await db
       .select()
       .from(containerStageNotesTable)
-      .where(eq(containerStageNotesTable.containerId, containerId))
+      .where(and(
+        eq(containerStageNotesTable.containerId, containerId),
+        eq(containerStageNotesTable.branchId, container.branchId)
+      ))
       .orderBy(desc(containerStageNotesTable.createdAt));
     return res.json(notes.map(n => ({ ...n, createdAt: n.createdAt instanceof Date ? n.createdAt.toISOString() : n.createdAt })));
   } catch (err) {
@@ -2568,13 +2522,20 @@ router.get("/:id/stage-notes", requireAuth, async (req: AuthRequest, res) => {
 
 router.post("/:id/stage-notes", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const containerId = parseInt(req.params.id, 10);
+    const containerId = parseInt(String(req.params.id), 10);
     if (isNaN(containerId)) return res.status(400).json({ error: "Invalid container id" });
     const { stage, note } = req.body;
     if (!stage || !note?.trim()) return res.status(400).json({ error: "stage and note are required" });
+    const [container] = await db
+      .select({ branchId: containersTable.branchId })
+      .from(containersTable)
+      .where(eq(containersTable.id, containerId));
+    if (!container || !userCanAccessBranch(req, container.branchId)) {
+      return res.status(404).json({ error: "Container not found" });
+    }
     const authorId = req.user!.id;
     const authorName = req.user!.name;
-    const branchId = req.user!.branchId ?? 1;
+    const branchId = container.branchId;
     const [row] = await db.insert(containerStageNotesTable).values({
       containerId, stage, note: note.trim(), authorId, authorName, branchId,
     }).returning();

@@ -89,7 +89,7 @@ clientsRouter.post("/clients", requireAuth, async (req: AuthRequest, res) => {
 
 clientsRouter.get("/clients/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
     const [raw] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
     if (!raw) return res.status(404).json({ error: "Client not found" });
@@ -122,7 +122,7 @@ clientsRouter.get("/clients/:id", requireAuth, async (req: AuthRequest, res) => 
 
 clientsRouter.patch("/clients/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
     const [_existing] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, id));
     if (!_existing || !userCanAccessBranch(req, _existing.branchId)) return res.status(404).json({ error: "Client not found" });
@@ -170,7 +170,7 @@ clientsRouter.patch("/clients/:id", requireAuth, async (req: AuthRequest, res) =
 
 clientsRouter.delete("/clients/:id", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
     const [_existing] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, id));
     if (!_existing || !userCanAccessBranch(req, _existing.branchId)) return res.status(404).json({ error: "Client not found" });
@@ -185,7 +185,7 @@ clientsRouter.delete("/clients/:id", requireAuth, requireBranchAdminOrAbove, asy
 
 clientsRouter.patch("/clients/:id/link-container", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const clientId = parseInt(req.params.id);
+    const clientId = parseInt(String(req.params.id));
     const { containerId } = req.body as { containerId: number };
     if (isNaN(clientId) || !containerId) return res.status(400).json({ error: "Invalid IDs" });
     const [client] = await db.select({ name: clientsTable.name, branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
@@ -205,7 +205,7 @@ clientsRouter.patch("/clients/:id/link-container", requireAuth, requireBranchAdm
 
 clientsRouter.patch("/containers/:id/unlink-client", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
     const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
     if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
@@ -219,7 +219,7 @@ clientsRouter.patch("/containers/:id/unlink-client", requireAuth, requireBranchA
 
 clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const clientId = parseInt(req.params.id);
+    const clientId = parseInt(String(req.params.id));
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
     const [_c] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
     if (!_c || !userCanAccessBranch(req, _c.branchId)) return res.status(404).json({ error: "Client not found" });
@@ -416,7 +416,7 @@ clientsRouter.post("/clients/bulk", requireAuth, async (req: AuthRequest, res) =
 
 clientsRouter.get("/clients/:id/deposits", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const clientId = parseInt(req.params.id);
+    const clientId = parseInt(String(req.params.id));
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
     const [_c] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, clientId));
     if (!_c || !userCanAccessBranch(req, _c.branchId)) return res.status(404).json({ error: "Client not found" });
@@ -473,7 +473,7 @@ const ALLOWED_PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque"] as const;
 
 clientsRouter.post("/clients/:id/deposits", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const clientId = parseInt(req.params.id);
+    const clientId = parseInt(String(req.params.id));
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
     const { amount, paymentMethod, reference, notes, bankId } = req.body;
     if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
@@ -536,8 +536,8 @@ clientsRouter.post("/clients/:id/deposits", requireBranchAdminOrAbove, async (re
 
 clientsRouter.delete("/clients/:id/deposits/:depositId", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const clientId = parseInt(req.params.id);
-    const depositId = parseInt(req.params.depositId);
+    const clientId = parseInt(String(req.params.id));
+    const depositId = parseInt(String(req.params.depositId));
     if (isNaN(clientId) || isNaN(depositId)) return res.status(400).json({ error: "Invalid ID" });
     const [existing] = await db.select().from(clientDepositsTable)
       .where(eq(clientDepositsTable.id, depositId));
@@ -565,7 +565,7 @@ clientsRouter.delete("/clients/:id/deposits/:depositId", requireBranchAdminOrAbo
 
 clientsRouter.post("/client-deposits/:id/allocate", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const depositId = parseInt(req.params.id);
+    const depositId = parseInt(String(req.params.id));
     if (isNaN(depositId)) return res.status(400).json({ error: "Invalid deposit ID" });
 
     const { invoiceId, amount: rawAmount } = req.body as { invoiceId: number; amount: number };
@@ -668,7 +668,7 @@ clientsRouter.post("/client-deposits/:id/allocate", requireBranchAdminOrAbove, a
 
 clientsRouter.get("/clients/:id/wallet-summary", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const clientId = parseInt(req.params.id);
+    const clientId = parseInt(String(req.params.id));
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
 
     const [clientRow] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
@@ -729,7 +729,7 @@ clientsRouter.get("/clients/:id/wallet-summary", requireAuth, async (req: AuthRe
 
 clientsRouter.post("/clients/:id/wallet/reset", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const clientId = parseInt(req.params.id);
+    const clientId = parseInt(String(req.params.id));
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
 
     const [clientRow] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
