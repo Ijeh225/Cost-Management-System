@@ -1036,15 +1036,18 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
       });
     } catch {}
     const { sendWhatsApp } = req.body;
-    let whatsappResult: { success: boolean; sid?: string; error?: string } | null = null;
+    let whatsappResult: { success: boolean; provider?: "meta"; providerMessageId?: string; error?: string } | null = null;
     if (sendWhatsApp && existing.clientId) {
       const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, existing.clientId));
       if (client?.contactPhone) {
-        const { toE164Nigerian, sendViaTwilio } = await import("../lib/whatsapp.js");
+        const { toE164Nigerian, sendWhatsAppTemplate, assertBranchWhatsAppSenderSupported } = await import("../lib/whatsapp.js");
         const phone = toE164Nigerian(client.contactPhone);
         const vesselInfo = existing.vessel ? ` (Vessel: ${existing.vessel})` : "";
         const message = `Hello! We're pleased to inform you that the vessel carrying your container ${existing.containerNumber}${vesselInfo} has berthed at the terminal. Clearing is now underway. — Cost Analysis Team`;
-        whatsappResult = await sendViaTwilio(phone, message);
+        const branchSender = await assertBranchWhatsAppSenderSupported(existing.branchId);
+        whatsappResult = branchSender.error
+          ? { success: false, error: branchSender.error }
+          : await sendWhatsAppTemplate(phone, "berthing", message);
       }
     }
     return res.json({ container: formatContainer(updated), whatsappResult });

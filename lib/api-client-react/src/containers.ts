@@ -288,7 +288,7 @@ export type ConfirmBerthingRequest = {
 
 export type ConfirmBerthingResponse = {
   container: import("./generated/api.schemas").Container;
-  whatsappResult: { success: boolean; sid?: string; error?: string } | null;
+  whatsappResult: { success: boolean; provider?: "meta"; providerMessageId?: string; error?: string } | null;
 };
 
 export function useConfirmBerthing() {
@@ -561,4 +561,3 @@ export function useGetGateLog(params?: { from?: string; to?: string }, options?:
     ...(options?.query ?? {}),
   });
 }
-

@@ -11,6 +11,8 @@ export const whatsappMessagesTable = pgTable("whatsapp_messages", {
   phone: text("phone").notNull(),
   messageBody: text("message_body").notNull(),
   status: text("status").notNull().default("sent"),
+  provider: text("provider").notNull().default("meta"),
+  providerMessageId: text("provider_message_id"),
   sentAt: timestamp("sent_at").notNull().defaultNow(),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -79,5 +79,5 @@ The application is built as a monorepo using pnpm workspaces, separating the fro
 -   **Excel Parsing:** `xlsx`
 -   **Authentication:** `bcryptjs`, `jsonwebtoken`
 -   **Validation:** `Zod`, `drizzle-zod`
--   **WhatsApp Integration:** `wa.me` links for click-to-send messages; optional integration with Twilio WhatsApp Business API if credentials (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`) are provided.
+-   **WhatsApp Integration:** Meta WhatsApp Cloud API for invoice, reminder, receipt, and berthing notifications when `META_WHATSAPP_ACCESS_TOKEN`, `META_WHATSAPP_PHONE_NUMBER_ID`, and approved template variables are configured.
 -   **Email Alerts:** Resend (currently not connected; requires `RESEND_API_KEY` to be set or integration connected).

@@ -589,6 +589,14 @@ async function runStartupMigrations() {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS workflow_notifications_target_user_idx ON workflow_notifications(target_user_id)`);
     });
+    await runMigration("whatsapp_messages_meta_provider_v1", async () => {
+      await pool.query(`
+        ALTER TABLE whatsapp_messages
+          ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'meta',
+          ADD COLUMN IF NOT EXISTS provider_message_id TEXT
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS whatsapp_messages_provider_message_id_idx ON whatsapp_messages(provider_message_id)`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

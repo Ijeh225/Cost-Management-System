@@ -3,7 +3,7 @@ import { db, containersTable, customsChargesTable, terminalChargesTable, deliver
 import { eq, lt, inArray, and, gte } from "drizzle-orm";
 import { requireAuth, requireBranchMemberOrAbove, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery, sumCustoms } from "../lib/calculations.js";
-import { sendViaTwilio, resolveBranchWhatsAppFrom, toE164Nigerian } from "../lib/whatsapp.js";
+import { sendWhatsAppText, assertBranchWhatsAppSenderSupported, toE164Nigerian } from "../lib/whatsapp.js";
 
 export const intelligenceRouter = Router();
 
@@ -205,13 +205,13 @@ intelligenceRouter.post("/intelligence/send-digest", requireAuth, requireBranchM
 
     if (messages.length === 0) return res.json({ sent: 0, skipped: 0, errors: [] });
 
-    const { from: fromOverride, error: fromErr } = await resolveBranchWhatsAppFrom(branchId);
-    if (fromErr) return res.status(400).json({ error: fromErr });
+    const branchSender = await assertBranchWhatsAppSenderSupported(branchId);
+    if (branchSender.error) return res.status(400).json({ error: branchSender.error });
 
     const toNumber = toE164Nigerian(adminNumber);
     const fullBody = `*${branch.name} — Daily Alert Digest*\n${new Date().toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}\n\n` + messages.map(m => m.text).join("\n\n");
 
-    const result = await sendViaTwilio(toNumber, fullBody, fromOverride);
+    const result = await sendWhatsAppText(toNumber, fullBody);
     if (!result.success) return res.status(500).json({ error: result.error ?? "Failed to send WhatsApp message" });
 
     await db.insert(intelligenceAlertLogTable).values(

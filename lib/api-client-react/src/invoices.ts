@@ -9,6 +9,8 @@ export type WhatsAppLogEntry = {
   phone: string;
   messageBody: string;
   status: "sent" | "failed";
+  provider: "meta";
+  providerMessageId: string | null;
   sentAt: string;
   errorMessage: string | null;
   createdAt: string;
@@ -16,7 +18,8 @@ export type WhatsAppLogEntry = {
 
 export type WhatsAppSendResponse = {
   success: boolean;
-  twilioSid: string | null;
+  provider: "meta";
+  providerMessageId: string | null;
   messageBody: string;
 };
 

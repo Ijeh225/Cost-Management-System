@@ -194,7 +194,7 @@ function BranchDialog({
               {form.whatsappMode === "own" && (
                 <Input value={form.whatsappNumber}
                   onChange={(e) => setForm(f => ({ ...f, whatsappNumber: e.target.value }))}
-                  placeholder="+2348012345678 (Twilio-registered WhatsApp number)" />
+                  placeholder="+2348012345678 (not supported with Meta Cloud API v1)" />
               )}
             </div>
 

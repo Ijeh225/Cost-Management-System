@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable, workflowNotificationsTable, userClientAssignmentsTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
-import { toE164Nigerian, sendViaTwilio, resolveBranchWhatsAppFrom } from "../lib/whatsapp.js";
+import { toE164Nigerian, sendWhatsAppTemplate, assertBranchWhatsAppSenderSupported } from "../lib/whatsapp.js";
 
 const router = Router();
 
@@ -1252,10 +1252,6 @@ router.post("/invoices/:id/send-whatsapp", requireBranchAdminOrAbove, async (req
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
 
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (and either set TWILIO_WHATSAPP_FROM or configure a branch-owned WhatsApp number)." });
-    }
-
     const [row] = await db
       .select({
         id: invoicesTable.id,
@@ -1294,9 +1290,9 @@ router.post("/invoices/:id/send-whatsapp", requireBranchAdminOrAbove, async (req
       items,
     });
 
-    const branchFrom = await resolveBranchWhatsAppFrom(row.branchId);
-    if (branchFrom.error) return res.status(400).json({ error: branchFrom.error });
-    const twilioResult = await sendViaTwilio(phone, messageBody, branchFrom.from);
+    const branchSender = await assertBranchWhatsAppSenderSupported(row.branchId);
+    if (branchSender.error) return res.status(400).json({ error: branchSender.error });
+    const whatsappResult = await sendWhatsAppTemplate(phone, "invoice", messageBody);
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,
@@ -1305,15 +1301,18 @@ router.post("/invoices/:id/send-whatsapp", requireBranchAdminOrAbove, async (req
       messageType: "invoice",
       phone,
       messageBody,
-      status: twilioResult.success ? "sent" : "failed",
-      errorMessage: twilioResult.success ? null : twilioResult.error ?? null,
+      status: whatsappResult.success ? "sent" : "failed",
+      provider: whatsappResult.provider,
+      providerMessageId: whatsappResult.providerMessageId ?? null,
+      errorMessage: whatsappResult.success ? null : whatsappResult.error ?? null,
     });
 
-    if (!twilioResult.success) {
-      return res.status(500).json({ error: twilioResult.error ?? "Failed to send WhatsApp message" });
+    if (!whatsappResult.success) {
+      return res.status(whatsappResult.error?.startsWith("WhatsApp not configured") || whatsappResult.error?.startsWith("WhatsApp template not configured") ? 503 : 500)
+        .json({ error: whatsappResult.error ?? "Failed to send WhatsApp message" });
     }
 
-    return res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
+    return res.json({ success: true, provider: whatsappResult.provider, providerMessageId: whatsappResult.providerMessageId ?? null, messageBody });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to send WhatsApp message" });
@@ -1326,10 +1325,6 @@ router.post("/invoices/:id/send-reminder", requireBranchAdminOrAbove, async (req
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
-
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (and either set TWILIO_WHATSAPP_FROM or configure a branch-owned WhatsApp number)." });
-    }
 
     const [row] = await db
       .select({
@@ -1374,9 +1369,9 @@ router.post("/invoices/:id/send-reminder", requireBranchAdminOrAbove, async (req
       items,
     });
 
-    const branchFrom = await resolveBranchWhatsAppFrom(row.branchId);
-    if (branchFrom.error) return res.status(400).json({ error: branchFrom.error });
-    const twilioResult = await sendViaTwilio(phone, messageBody, branchFrom.from);
+    const branchSender = await assertBranchWhatsAppSenderSupported(row.branchId);
+    if (branchSender.error) return res.status(400).json({ error: branchSender.error });
+    const whatsappResult = await sendWhatsAppTemplate(phone, "reminder", messageBody);
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,
@@ -1385,15 +1380,18 @@ router.post("/invoices/:id/send-reminder", requireBranchAdminOrAbove, async (req
       messageType: "reminder",
       phone,
       messageBody,
-      status: twilioResult.success ? "sent" : "failed",
-      errorMessage: twilioResult.success ? null : twilioResult.error ?? null,
+      status: whatsappResult.success ? "sent" : "failed",
+      provider: whatsappResult.provider,
+      providerMessageId: whatsappResult.providerMessageId ?? null,
+      errorMessage: whatsappResult.success ? null : whatsappResult.error ?? null,
     });
 
-    if (!twilioResult.success) {
-      return res.status(500).json({ error: twilioResult.error ?? "Failed to send reminder" });
+    if (!whatsappResult.success) {
+      return res.status(whatsappResult.error?.startsWith("WhatsApp not configured") || whatsappResult.error?.startsWith("WhatsApp template not configured") ? 503 : 500)
+        .json({ error: whatsappResult.error ?? "Failed to send reminder" });
     }
 
-    return res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
+    return res.json({ success: true, provider: whatsappResult.provider, providerMessageId: whatsappResult.providerMessageId ?? null, messageBody });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to send reminder" });
@@ -1406,10 +1404,6 @@ router.post("/invoices/:id/send-receipt", requireBranchAdminOrAbove, async (req:
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
-
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-      return res.status(503).json({ error: "WhatsApp not configured — add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (and either set TWILIO_WHATSAPP_FROM or configure a branch-owned WhatsApp number)." });
-    }
 
     const [row] = await db
       .select({
@@ -1481,9 +1475,9 @@ router.post("/invoices/:id/send-receipt", requireBranchAdminOrAbove, async (req:
 
     const messageBody = lines.join("\n");
     const phone = toE164Nigerian(row.clientPhone);
-    const branchFrom = await resolveBranchWhatsAppFrom(row.branchId);
-    if (branchFrom.error) return res.status(400).json({ error: branchFrom.error });
-    const twilioResult = await sendViaTwilio(phone, messageBody, branchFrom.from);
+    const branchSender = await assertBranchWhatsAppSenderSupported(row.branchId);
+    if (branchSender.error) return res.status(400).json({ error: branchSender.error });
+    const whatsappResult = await sendWhatsAppTemplate(phone, "receipt", messageBody);
 
     await db.insert(whatsappMessagesTable).values({
       invoiceId: id,
@@ -1492,15 +1486,18 @@ router.post("/invoices/:id/send-receipt", requireBranchAdminOrAbove, async (req:
       messageType: "receipt",
       phone,
       messageBody,
-      status: twilioResult.success ? "sent" : "failed",
-      errorMessage: twilioResult.success ? null : twilioResult.error ?? null,
+      status: whatsappResult.success ? "sent" : "failed",
+      provider: whatsappResult.provider,
+      providerMessageId: whatsappResult.providerMessageId ?? null,
+      errorMessage: whatsappResult.success ? null : whatsappResult.error ?? null,
     });
 
-    if (!twilioResult.success) {
-      return res.status(500).json({ error: twilioResult.error ?? "Failed to send receipt" });
+    if (!whatsappResult.success) {
+      return res.status(whatsappResult.error?.startsWith("WhatsApp not configured") || whatsappResult.error?.startsWith("WhatsApp template not configured") ? 503 : 500)
+        .json({ error: whatsappResult.error ?? "Failed to send receipt" });
     }
 
-    return res.json({ success: true, twilioSid: twilioResult.sid ?? null, messageBody });
+    return res.json({ success: true, provider: whatsappResult.provider, providerMessageId: whatsappResult.providerMessageId ?? null, messageBody });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to send receipt" });

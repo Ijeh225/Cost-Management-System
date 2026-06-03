@@ -1,35 +1,30 @@
-import { db, branchesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 /**
- * Resolves the WhatsApp "from" number for a given branch.
- * - If branch.whatsappMode === "own": returns branch.whatsappNumber (or an
- *   error if it's empty — explicit failure, no silent fallback per Task #149).
- * - Otherwise: returns null (caller falls back to env TWILIO_WHATSAPP_FROM).
+ * Meta WhatsApp Cloud API sends from the configured phone_number_id. Branch-owned
+ * sender numbers are intentionally unsupported in v1 so sends never pretend to
+ * come from a branch number Meta cannot use.
  */
-export async function resolveBranchWhatsAppFrom(
+export async function assertBranchWhatsAppSenderSupported(
   branchId: number | null | undefined,
-): Promise<{ from: string | null; error?: string }> {
-  if (!branchId) return { from: null };
-  const [b] = await db
+): Promise<{ error?: string }> {
+  if (!branchId) return {};
+  const { db, branchesTable } = await import("@workspace/db");
+  const [branch] = await db
     .select({
       mode: branchesTable.whatsappMode,
-      number: branchesTable.whatsappNumber,
       name: branchesTable.name,
     })
     .from(branchesTable)
     .where(eq(branchesTable.id, branchId));
-  if (!b) return { from: null };
-  if (b.mode === "own") {
-    if (!b.number || !b.number.trim()) {
-      return {
-        from: null,
-        error: `Branch "${b.name}" is set to use its own WhatsApp number, but no number is configured. Add one in Branch Settings → Communications.`,
-      };
-    }
-    return { from: b.number.trim() };
+
+  if (!branch) return {};
+  if (branch.mode === "own") {
+    return {
+      error: `Branch "${branch.name}" is set to use its own WhatsApp sender, but Meta Cloud API v1 uses the head-office phone number. Switch WhatsApp Sender to Head Office in Branch Settings.`,
+    };
   }
-  return { from: null };
+  return {};
 }
 
 export function toE164Nigerian(phone: string): string {
@@ -40,39 +35,156 @@ export function toE164Nigerian(phone: string): string {
   return phone;
 }
 
-export function isTwilioConfigured(): boolean {
+export type WhatsAppProvider = "meta";
+export type WhatsAppTemplateKey = "invoice" | "reminder" | "receipt" | "berthing";
+
+type MetaMessageResponse = {
+  messages?: Array<{ id?: string }>;
+  error?: {
+    message?: string;
+    type?: string;
+    code?: number;
+    error_data?: { details?: string };
+  };
+};
+
+export type WhatsAppSendResult = {
+  success: boolean;
+  provider: WhatsAppProvider;
+  providerMessageId?: string;
+  error?: string;
+};
+
+const TEMPLATE_ENV: Record<WhatsAppTemplateKey, string> = {
+  invoice: "META_WHATSAPP_TEMPLATE_INVOICE",
+  reminder: "META_WHATSAPP_TEMPLATE_REMINDER",
+  receipt: "META_WHATSAPP_TEMPLATE_RECEIPT",
+  berthing: "META_WHATSAPP_TEMPLATE_BERTHING",
+};
+
+function normalizeMetaRecipient(to: string): string {
+  return toE164Nigerian(to).replace(/^\+/, "");
+}
+
+function getMetaConfig(templateKey?: WhatsAppTemplateKey): {
+  accessToken?: string;
+  phoneNumberId?: string;
+  templateName?: string;
+  error?: string;
+} {
+  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
+  if (!accessToken || !phoneNumberId) {
+    return {
+      error: "WhatsApp not configured - add META_WHATSAPP_ACCESS_TOKEN and META_WHATSAPP_PHONE_NUMBER_ID.",
+    };
+  }
+  if (!templateKey) return { accessToken, phoneNumberId };
+
+  const templateName = process.env[TEMPLATE_ENV[templateKey]];
+  if (!templateName) {
+    return {
+      error: `WhatsApp template not configured - add ${TEMPLATE_ENV[templateKey]} in Railway.`,
+    };
+  }
+  return { accessToken, phoneNumberId, templateName };
+}
+
+function metaErrorMessage(response: MetaMessageResponse): string {
+  const err = response.error;
+  if (!err) return "Meta WhatsApp API returned an unexpected response";
+  const details = err.error_data?.details;
+  return [err.message, details].filter(Boolean).join(" - ") || "Meta WhatsApp API error";
+}
+
+export function isMetaWhatsAppConfigured(): boolean {
   return !!(
-    process.env.TWILIO_ACCOUNT_SID &&
-    process.env.TWILIO_AUTH_TOKEN &&
-    process.env.TWILIO_WHATSAPP_FROM
+    process.env.META_WHATSAPP_ACCESS_TOKEN &&
+    process.env.META_WHATSAPP_PHONE_NUMBER_ID
   );
 }
 
-export async function sendViaTwilio(
+export async function sendWhatsAppTemplate(
   to: string,
-  body: string,
-  fromOverride?: string | null,
-): Promise<{ success: boolean; sid?: string; error?: string; fromUsed?: string }> {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const from = fromOverride ?? process.env.TWILIO_WHATSAPP_FROM;
-
-  if (!accountSid || !authToken || !from) {
-    return { success: false, error: "WhatsApp (Twilio) credentials not configured" };
+  templateKey: WhatsAppTemplateKey,
+  messageBody: string,
+): Promise<WhatsAppSendResult> {
+  const config = getMetaConfig(templateKey);
+  if (config.error || !config.accessToken || !config.phoneNumberId || !config.templateName) {
+    return { success: false, provider: "meta", error: config.error };
   }
 
   try {
-    const { default: Twilio } = await import("twilio");
-    const client = Twilio(accountSid, authToken);
-    const msg = await client.messages.create({
-      from: from.startsWith("whatsapp:") ? from : `whatsapp:${from}`,
-      to: `whatsapp:${to}`,
-      body,
+    const response = await fetch(`https://graph.facebook.com/v20.0/${config.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: normalizeMetaRecipient(to),
+        type: "template",
+        template: {
+          name: config.templateName,
+          language: { code: "en" },
+          components: [
+            {
+              type: "body",
+              parameters: [{ type: "text", text: messageBody }],
+            },
+          ],
+        },
+      }),
     });
-    return { success: true, sid: msg.sid, fromUsed: from };
+
+    const data = await response.json().catch(() => ({})) as MetaMessageResponse;
+    if (!response.ok) {
+      return { success: false, provider: "meta", error: metaErrorMessage(data) };
+    }
+    return { success: true, provider: "meta", providerMessageId: data.messages?.[0]?.id };
   } catch (err) {
     return {
       success: false,
+      provider: "meta",
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function sendWhatsAppText(
+  to: string,
+  body: string,
+): Promise<WhatsAppSendResult> {
+  const config = getMetaConfig();
+  if (config.error || !config.accessToken || !config.phoneNumberId) {
+    return { success: false, provider: "meta", error: config.error };
+  }
+
+  try {
+    const response = await fetch(`https://graph.facebook.com/v20.0/${config.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: normalizeMetaRecipient(to),
+        type: "text",
+        text: { preview_url: false, body },
+      }),
+    });
+
+    const data = await response.json().catch(() => ({})) as MetaMessageResponse;
+    if (!response.ok) {
+      return { success: false, provider: "meta", error: metaErrorMessage(data) };
+    }
+    return { success: true, provider: "meta", providerMessageId: data.messages?.[0]?.id };
+  } catch (err) {
+    return {
+      success: false,
+      provider: "meta",
       error: err instanceof Error ? err.message : String(err),
     };
   }
