@@ -108,9 +108,20 @@ export default function SettingsPage() {
     }
     setSendingEmail(true);
     try {
+      await updateMutation.mutateAsync({
+        agingInactivityDays: inactivityDays,
+        agingDays1: days1,
+        agingDays2: days2,
+        agingDays3: days3,
+        agingEmailEnabled: emailEnabled ? "true" : "false",
+        agingEmailTo: emailTo.trim(),
+        digestFrequency,
+        digestTime,
+      });
       await customFetch("/api/notifications/send-email-digest", { method: "POST" });
       const now = new Date().toISOString();
       setDigestLastSentAt(now);
+      setDirty(false);
       toast({ title: "Email digest sent", description: `Alert summary sent to ${emailTo}` });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed to send email", description: err?.message ?? "Check that email settings are configured correctly" });
