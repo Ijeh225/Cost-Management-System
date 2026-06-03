@@ -262,7 +262,7 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium text-amber-500">Email service not configured</p>
                 <p className="text-xs text-muted-foreground">
                   A <code className="font-mono bg-muted px-1 rounded">RESEND_API_KEY</code> secret is required to send emails.
-                  Add it in the Replit Secrets panel, then restart the server.
+                  Add it to the Railway service variables, then restart the app service.
                 </p>
               </div>
             </div>
