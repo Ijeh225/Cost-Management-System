@@ -23,6 +23,16 @@ export type ExpensePayment = {
   createdAt: string;
 };
 
+export type OverheadExpenseTopup = {
+  id: number;
+  expenseId: number;
+  amount: number;
+  description: string;
+  recordedBy: number | null;
+  recordedByName: string | null;
+  createdAt: string;
+};
+
 export type OverheadExpense = {
   id: number;
   category: string;
@@ -38,6 +48,7 @@ export type OverheadExpense = {
   totalPaid: number;
   balance: number;
   status: "unpaid" | "partial" | "paid";
+  topups: OverheadExpenseTopup[];
   payments: ExpensePayment[];
 };
 
@@ -65,6 +76,12 @@ export type CreateExpensePaymentBody = {
   bankId?: number | null;
   paidAt?: string;
   notes?: string;
+};
+
+export type CreateOverheadExpenseTopupBody = {
+  expenseId: number;
+  amount: number;
+  description: string;
 };
 
 const QK = "/api/overhead-expenses";
@@ -119,6 +136,16 @@ export function useCreateExpensePayment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [QK] });
       qc.invalidateQueries({ queryKey: ["/api/banks"] });
+    },
+  });
+}
+
+export function useCreateOverheadExpenseTopup() {
+  const qc = useQueryClient();
+  return useMutation<OverheadExpense, Error, CreateOverheadExpenseTopupBody>({
+    mutationFn: ({ expenseId, ...data }) => customFetch<OverheadExpense>(`/api/overhead-expenses/${expenseId}/topups`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK] });
     },
   });
 }

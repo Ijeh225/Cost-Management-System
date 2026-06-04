@@ -181,6 +181,22 @@ async function runStartupMigrations() {
       `);
     });
 
+    await runMigration("create_overhead_expense_topups_table", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS overhead_expense_topups (
+          id SERIAL PRIMARY KEY,
+          expense_id INTEGER NOT NULL REFERENCES overhead_expenses(id) ON DELETE CASCADE,
+          amount NUMERIC(18,2) NOT NULL,
+          description TEXT NOT NULL,
+          recorded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          branch_id INTEGER NOT NULL DEFAULT 1 REFERENCES branches(id),
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS overhead_expense_topups_expense_id_idx ON overhead_expense_topups(expense_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS overhead_expense_topups_branch_id_idx ON overhead_expense_topups(branch_id)`);
+    });
+
     await runMigration("migrate_existing_expenses_to_payments", async () => {
       await pool.query(`
         INSERT INTO expense_payments (expense_id, amount, payment_method, bank_id, paid_at, recorded_by, created_at)

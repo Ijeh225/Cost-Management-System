@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, overheadExpensesTable, expenseCategoriesTable, expensePaymentsTable, banksTable, usersTable, branchesTable } from "@workspace/db";
-import { eq, desc, and, gte, lte, inArray } from "drizzle-orm";
+import { db, overheadExpensesTable, overheadExpenseTopupsTable, expenseCategoriesTable, expensePaymentsTable, banksTable, usersTable, branchesTable } from "@workspace/db";
+import { eq, desc, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
 export const overheadExpensesRouter = Router();
@@ -15,6 +15,9 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
   const allPayments = await db.select().from(expensePaymentsTable)
     .where(inArray(expensePaymentsTable.expenseId, expenseIds))
     .orderBy(expensePaymentsTable.paidAt);
+  const allTopups = await db.select().from(overheadExpenseTopupsTable)
+    .where(inArray(overheadExpenseTopupsTable.expenseId, expenseIds))
+    .orderBy(desc(overheadExpenseTopupsTable.createdAt));
 
   const bankIds = [...new Set(allPayments.map(p => p.bankId).filter(Boolean) as number[])];
   const bankMap: Record<number, string> = {};
@@ -26,7 +29,8 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
 
   const expUserIds = expenseRows.map(r => r.recordedBy).filter(Boolean) as number[];
   const pmtUserIds = allPayments.map(p => p.recordedBy).filter(Boolean) as number[];
-  const userIds = [...new Set([...expUserIds, ...pmtUserIds])];
+  const topupUserIds = allTopups.map(t => t.recordedBy).filter(Boolean) as number[];
+  const userIds = [...new Set([...expUserIds, ...pmtUserIds, ...topupUserIds])];
   const userMap: Record<number, string> = {};
   if (userIds.length > 0) {
     const users = await db.select({ id: usersTable.id, name: usersTable.name })
@@ -47,9 +51,15 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
     if (!paymentsByExpense[p.expenseId]) paymentsByExpense[p.expenseId] = [];
     paymentsByExpense[p.expenseId].push(p);
   }
+  const topupsByExpense: Record<number, typeof allTopups> = {};
+  for (const t of allTopups) {
+    if (!topupsByExpense[t.expenseId]) topupsByExpense[t.expenseId] = [];
+    topupsByExpense[t.expenseId].push(t);
+  }
 
   return expenseRows.map(e => {
     const payments = paymentsByExpense[e.id] ?? [];
+    const topups = topupsByExpense[e.id] ?? [];
     const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
     const totalAmount = parseFloat(e.amount ?? "0");
     const balance = Math.max(0, totalAmount - totalPaid);
@@ -71,6 +81,15 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
       totalPaid,
       balance,
       status,
+      topups: topups.map(t => ({
+        id: t.id,
+        expenseId: t.expenseId,
+        amount: parseFloat(t.amount ?? "0"),
+        description: t.description,
+        recordedBy: t.recordedBy ?? null,
+        recordedByName: t.recordedBy ? (userMap[t.recordedBy] ?? null) : null,
+        createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : String(t.createdAt),
+      })),
       payments: payments.map(p => ({
         id: p.id,
         expenseId: p.expenseId,
@@ -277,6 +296,52 @@ overheadExpensesRouter.delete("/overhead-expenses/:id", requireBranchAdminOrAbov
 });
 
 // ─── Payments ────────────────────────────────────────────────────────────────
+
+overheadExpensesRouter.post("/overhead-expenses/:id/topups", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const expenseId = Number(req.params.id);
+    if (isNaN(expenseId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+    const { amount, description } = req.body;
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+    if (!description || typeof description !== "string" || !description.trim()) {
+      return res.status(400).json({ error: "Description is required" });
+    }
+
+    const [expense] = await db.select().from(overheadExpensesTable)
+      .where(eq(overheadExpensesTable.id, expenseId));
+    if (!expense || !userCanAccessBranch(req, expense.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
+    const scope = getBranchScope(req);
+    if (scope !== null && expense.branchId !== scope) { res.status(404).json({ error: "Expense not found" }); return; }
+    if (scope === null && req.user?.role === "super_admin") {
+      return res.status(400).json({ error: "Select a specific branch to add money to this expense." });
+    }
+
+    await db.insert(overheadExpenseTopupsTable).values({
+      expenseId,
+      amount: String(amount),
+      description: description.trim(),
+      recordedBy: req.user?.id ?? null,
+      branchId: expense.branchId,
+    });
+
+    const [updated] = await db.update(overheadExpensesTable)
+      .set({
+        amount: sql`${overheadExpensesTable.amount} + ${String(amount)}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(overheadExpensesTable.id, expenseId))
+      .returning();
+
+    const [built] = await buildExpensesWithPayments([updated]);
+    return res.status(201).json(built);
+  } catch (err) {
+    console.error("POST /overhead-expenses/:id/topups error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
 
 overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {

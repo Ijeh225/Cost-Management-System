@@ -5,6 +5,7 @@ import {
   useGetOverheadExpenses, useCreateOverheadExpense, useUpdateOverheadExpense,
   useDeleteOverheadExpense, useCreateExpensePayment, useGetExpenseCategories,
   useCreateExpenseCategory, useUpdateExpenseCategory, useDeleteExpenseCategory,
+  useCreateOverheadExpenseTopup,
   type OverheadExpense, type ExpenseCategory,
 } from "@workspace/api-client-react";
 import { useListBanks } from "@workspace/api-client-react";
@@ -16,11 +17,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useForm, Controller } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Plus, Pencil, Trash2, Receipt, TrendingDown, Filter,
   CreditCard, Banknote, ChevronDown, ChevronRight, Lock, Tag,
+  Search, WalletCards,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { BranchChip } from "@/components/layout/branch-chip";
@@ -52,6 +55,7 @@ function catColor(name: string) {
 
 type ExpenseFormValues = { category: string; description: string; amount: number; reference: string };
 type PaymentFormValues = { amount: number; paymentMethod: "cash" | "bank"; bankId: string; paidAt: string; notes: string };
+type TopupFormValues = { amount: number; description: string };
 
 function ExpenseForm({ categories, defaultValues, onSubmit, onCancel, isPending, submitLabel }: {
   categories: ExpenseCategory[];
@@ -186,6 +190,52 @@ function MakePaymentDialog({ expense, onOpenChange, onSubmit, isPending }: {
   );
 }
 
+function AddMoneyDialog({ expense, onOpenChange, onSubmit, isPending }: {
+  expense: OverheadExpense | null;
+  onOpenChange: (v: boolean) => void;
+  onSubmit: (v: TopupFormValues) => void;
+  isPending: boolean;
+}) {
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<TopupFormValues>({
+    defaultValues: { amount: 0, description: "" },
+  });
+
+  useEffect(() => {
+    if (expense) reset({ amount: 0, description: "" });
+  }, [expense?.id]);
+
+  if (!expense) return null;
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-md">
+        <DialogHeader><DialogTitle>Add Money to Existing Expense</DialogTitle></DialogHeader>
+        <div className="rounded-lg border border-border/40 bg-muted/30 p-3 space-y-1">
+          <p className="text-sm font-medium flex items-center">{expense.description}<BranchChip branchId={expense.branchId} /></p>
+          <p className="text-xs text-muted-foreground">{expense.category}</p>
+          <p className="text-xs text-muted-foreground">Current total: <span className="font-medium text-foreground">{formatCurrency(expense.amount)}</span></p>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Amount to Add (NGN)</Label>
+            <Input type="number" step="0.01" min="0.01" {...register("amount", { required: true, valueAsNumber: true, min: 0.01 })} placeholder="30000" />
+            {errors.amount && <p className="text-xs text-destructive">Valid amount required</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Description</Label>
+            <Textarea rows={3} className="resize-none" {...register("description", { required: true })} placeholder="What is this additional money for?" />
+            {errors.description && <p className="text-xs text-destructive">Description is required</p>}
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={isPending}>{isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Add Money</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function OverheadExpensesPage() {
   const { isAdmin } = useAuth();
   const { activeBranchId, isSuperAdmin } = useBranchScope();
@@ -198,7 +248,9 @@ export default function OverheadExpensesPage() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [topupTarget, setTopupTarget] = useState<OverheadExpense | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<OverheadExpense | null>(null);
   const [editTarget, setEditTarget] = useState<OverheadExpense | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -221,12 +273,25 @@ export default function OverheadExpensesPage() {
   const createMutation = useCreateOverheadExpense();
   const updateMutation = useUpdateOverheadExpense();
   const deleteMutation = useDeleteOverheadExpense();
+  const topupMutation = useCreateOverheadExpenseTopup();
   const paymentMutation = useCreateExpensePayment();
   const createCatMutation = useCreateExpenseCategory();
   const updateCatMutation = useUpdateExpenseCategory();
   const deleteCatMutation = useDeleteExpenseCategory();
 
   const expenses = data?.expenses ?? [];
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const visibleExpenses = normalizedSearch
+    ? expenses.filter(e => [
+        e.description,
+        e.category,
+        e.reference ?? "",
+        e.recordedByName ?? "",
+        e.branchName ?? "",
+        ...e.payments.flatMap(p => [p.notes ?? "", p.bankName ?? "", p.recordedByName ?? ""]),
+        ...e.topups.flatMap(t => [t.description, t.recordedByName ?? ""]),
+      ].some(value => value.toLowerCase().includes(normalizedSearch)))
+    : expenses;
   const totalOutstanding = data?.totalOutstanding ?? 0;
   const totalPaidThisMonth = data?.totalPaidThisMonth ?? 0;
   const byCategory = data?.byCategory ?? {};
@@ -257,6 +322,18 @@ export default function OverheadExpensesPage() {
       notes: v.notes || undefined,
     }, {
       onSuccess: () => { toast({ title: "Payment recorded. Bank balance updated." }); setPaymentTarget(null); },
+      onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    });
+  };
+
+  const handleTopup = (v: TopupFormValues) => {
+    if (!topupTarget) return;
+    topupMutation.mutate({
+      expenseId: topupTarget.id,
+      amount: v.amount,
+      description: v.description,
+    }, {
+      onSuccess: () => { toast({ title: "Money added to expense." }); setTopupTarget(null); },
       onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
     });
   };
@@ -377,6 +454,15 @@ export default function OverheadExpensesPage() {
               {/* Filters */}
               <div className="flex items-center gap-2 flex-wrap pb-3">
                 <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="relative min-w-[220px] flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    placeholder="Search description, SA, notes..."
+                    className="h-8 text-xs pl-8"
+                  />
+                </div>
                 <Select value={filterCategory} onValueChange={setFilterCategory}>
                   <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -395,15 +481,15 @@ export default function OverheadExpensesPage() {
             <CardContent className="pt-0">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-              ) : expenses.length === 0 ? (
+              ) : visibleExpenses.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
                   <Receipt className="w-10 h-10 text-muted-foreground/30" />
                   <p className="text-sm text-muted-foreground">No expenses found.</p>
-                  <p className="text-xs text-muted-foreground/60">Adjust filters or click "Record Expense".</p>
+                  <p className="text-xs text-muted-foreground/60">Adjust filters/search or click "Record Expense".</p>
                 </div>
               ) : (
                 <div className="divide-y divide-border/30">
-                  {expenses.map(e => {
+                  {visibleExpenses.map(e => {
                     const isExpanded = expandedId === e.id;
                     const progressPct = e.amount > 0 ? Math.min(100, (e.totalPaid / e.amount) * 100) : 0;
                     return (
@@ -437,6 +523,9 @@ export default function OverheadExpensesPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                              <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1 text-blue-400 border-blue-500/30 hover:bg-blue-500/10" onClick={() => setTopupTarget(e)}>
+                                <WalletCards className="w-3 h-3" /> Add Money
+                              </Button>
                               {e.status !== "paid" && (
                                 <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1 text-green-400 border-green-500/30 hover:bg-green-500/10" onClick={() => setPaymentTarget(e)}>
                                   <CreditCard className="w-3 h-3" /> Pay
@@ -449,6 +538,22 @@ export default function OverheadExpensesPage() {
                         </div>
                         {isExpanded && (
                           <div className="pl-9 pr-3 pb-3 bg-muted/20 border-t border-border/20">
+                            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider pt-2 pb-1">Money Added ({e.topups.length})</p>
+                            {e.topups.length === 0 ? (
+                              <p className="text-xs text-muted-foreground py-1">No extra money added to this record yet.</p>
+                            ) : (
+                              <div className="space-y-1 mb-3">
+                                {e.topups.map(t => (
+                                  <div key={t.id} className="flex items-center gap-3 text-xs py-1 border-t border-border/20 first:border-t-0">
+                                    <WalletCards className="w-3 h-3 text-blue-400 shrink-0" />
+                                    <span className="font-semibold text-blue-400">{formatCurrency(t.amount)}</span>
+                                    <span className="text-muted-foreground">{new Date(t.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span>
+                                    <span className="text-muted-foreground/70 truncate">- {t.description}</span>
+                                    {t.recordedByName && <span className="text-muted-foreground/50 ml-auto shrink-0">by {t.recordedByName}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider pt-2 pb-1">Payment History ({e.payments.length})</p>
                             {e.payments.length === 0 ? (
                               <p className="text-xs text-muted-foreground py-1">No payments recorded yet.</p>
@@ -551,6 +656,7 @@ export default function OverheadExpensesPage() {
       )}
 
       <MakePaymentDialog expense={paymentTarget} onOpenChange={(v) => { if (!v) setPaymentTarget(null); }} onSubmit={handlePayment} isPending={paymentMutation.isPending} />
+      <AddMoneyDialog expense={topupTarget} onOpenChange={(v) => { if (!v) setTopupTarget(null); }} onSubmit={handleTopup} isPending={topupMutation.isPending} />
 
       <Dialog open={deleteId !== null} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
         <DialogContent className="border-border/50 bg-card/95 max-w-sm">
