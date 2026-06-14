@@ -38,10 +38,12 @@ export type AlertHistoryResponse = {
 
 export type WorkflowNotification = {
   id: number;
+  branchId?: number;
   type: string;
   message: string;
   containerId?: number | null;
   containerNumber?: string | null;
+  targetUserId?: number | null;
   isRead: boolean;
   readAt: string | null;
   createdAt: string;
@@ -55,6 +57,26 @@ export type WorkflowNotificationsResponse = {
 const NOTIFICATIONS_KEY = ["notifications"] as const;
 const WORKFLOW_NOTIFICATIONS_KEY = ["workflow-notifications"] as const;
 
+export type WorkflowNotificationFilters = {
+  type?: string;
+  read?: "all" | "read" | "unread";
+  dateFrom?: string;
+  dateTo?: string;
+  targetUserId?: number | null;
+  limit?: number;
+};
+
+function toWorkflowQuery(params?: WorkflowNotificationFilters) {
+  const qs = new URLSearchParams();
+  if (!params) return "";
+  Object.entries(params).forEach(([key, value]) => {
+    if (value == null || value === "" || value === "all") return;
+    qs.set(key, String(value));
+  });
+  const out = qs.toString();
+  return out ? `?${out}` : "";
+}
+
 export function useGetNotifications<T = NotificationsResponse>(options?: {
   query?: { refetchInterval?: number; enabled?: boolean };
 }) {
@@ -66,11 +88,12 @@ export function useGetNotifications<T = NotificationsResponse>(options?: {
 }
 
 export function useGetWorkflowNotifications(options?: {
+  params?: WorkflowNotificationFilters;
   query?: { refetchInterval?: number; enabled?: boolean };
 }) {
   return useQuery<WorkflowNotificationsResponse>({
-    queryKey: WORKFLOW_NOTIFICATIONS_KEY,
-    queryFn: () => customFetch<WorkflowNotificationsResponse>("/api/workflow-notifications"),
+    queryKey: [...WORKFLOW_NOTIFICATIONS_KEY, options?.params ?? {}],
+    queryFn: () => customFetch<WorkflowNotificationsResponse>(`/api/workflow-notifications${toWorkflowQuery(options?.params)}`),
     ...(options?.query ?? {}),
   });
 }

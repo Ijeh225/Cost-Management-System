@@ -613,6 +613,76 @@ async function runStartupMigrations() {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS whatsapp_messages_provider_message_id_idx ON whatsapp_messages(provider_message_id)`);
     });
+    await runMigration("payment_schedules_module_v1", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS payment_schedules (
+          id SERIAL PRIMARY KEY,
+          branch_id INTEGER NOT NULL REFERENCES branches(id),
+          schedule_date TIMESTAMP NOT NULL,
+          original_request_date TIMESTAMP NOT NULL DEFAULT NOW(),
+          requested_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          vendor_beneficiary TEXT NOT NULL,
+          client_name TEXT,
+          description TEXT NOT NULL,
+          amount_requested NUMERIC(18,2) NOT NULL,
+          amount_approved NUMERIC(18,2) NOT NULL DEFAULT 0,
+          amount_paid NUMERIC(18,2) NOT NULL DEFAULT 0,
+          priority TEXT NOT NULL DEFAULT 'normal',
+          status TEXT NOT NULL DEFAULT 'pending_approval',
+          completed_at TIMESTAMP,
+          cancelled_at TIMESTAMP,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS payment_schedule_events (
+          id SERIAL PRIMARY KEY,
+          branch_id INTEGER NOT NULL REFERENCES branches(id),
+          schedule_id INTEGER NOT NULL REFERENCES payment_schedules(id) ON DELETE CASCADE,
+          type TEXT NOT NULL,
+          actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          comment TEXT,
+          amount NUMERIC(18,2),
+          old_status TEXT,
+          new_status TEXT,
+          old_schedule_date TIMESTAMP,
+          new_schedule_date TIMESTAMP,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS payment_schedule_documents (
+          id SERIAL PRIMARY KEY,
+          branch_id INTEGER NOT NULL REFERENCES branches(id),
+          schedule_id INTEGER NOT NULL REFERENCES payment_schedules(id) ON DELETE CASCADE,
+          filename TEXT NOT NULL,
+          original_name TEXT NOT NULL,
+          mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+          size INTEGER NOT NULL DEFAULT 0,
+          uploaded_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedules_branch_id_idx ON payment_schedules(branch_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedules_requested_by_idx ON payment_schedules(requested_by_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedules_status_idx ON payment_schedules(status)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedules_schedule_date_idx ON payment_schedules(schedule_date)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedule_events_schedule_id_idx ON payment_schedule_events(schedule_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedule_documents_schedule_id_idx ON payment_schedule_documents(schedule_id)`);
+    });
+    await runMigration("payment_schedules_overhead_link_v1", async () => {
+      await pool.query(`
+        ALTER TABLE payment_schedules
+          ADD COLUMN IF NOT EXISTS overhead_expense_id INTEGER REFERENCES overhead_expenses(id) ON DELETE SET NULL
+      `);
+      await pool.query(`
+        ALTER TABLE expense_payments
+          ADD COLUMN IF NOT EXISTS payment_schedule_id INTEGER REFERENCES payment_schedules(id) ON DELETE SET NULL
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedules_overhead_expense_id_idx ON payment_schedules(overhead_expense_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS expense_payments_payment_schedule_id_idx ON expense_payments(payment_schedule_id)`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

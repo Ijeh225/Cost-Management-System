@@ -163,6 +163,14 @@ const WORKFLOW_TYPE_CONFIG: Record<string, { icon: any; color: string; bg: strin
   stage_complete:{ icon: CheckCircle2,   color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", label: "Stage Completed" },
   overdue:       { icon: AlertTriangle,  color: "text-red-400",     bg: "bg-red-400/10",     border: "border-red-400/20",     label: "Overdue Stage"   },
   delay_recorded:{ icon: Clock,          color: "text-amber-400",   bg: "bg-amber-400/10",   border: "border-amber-400/20",   label: "Delay Recorded"  },
+  payment_schedule_created:     { icon: Bell,          color: "text-blue-400",    bg: "bg-blue-400/10",    border: "border-blue-400/20",    label: "Payment Scheduled" },
+  payment_schedule_approved:    { icon: CheckCircle2,  color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", label: "Payment Approved" },
+  payment_schedule_rejected:    { icon: XCircle,       color: "text-red-400",     bg: "bg-red-400/10",     border: "border-red-400/20",     label: "Payment Rejected" },
+  payment_schedule_paid:        { icon: DollarSign,    color: "text-green-400",   bg: "bg-green-400/10",   border: "border-green-400/20",   label: "Payment Recorded" },
+  payment_schedule_completed:   { icon: CheckCheck,    color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", label: "Payment Completed" },
+  payment_schedule_rescheduled: { icon: CalendarRange, color: "text-amber-400",   bg: "bg-amber-400/10",   border: "border-amber-400/20",   label: "Payment Rescheduled" },
+  payment_schedule_cancelled:   { icon: XCircle,       color: "text-zinc-400",    bg: "bg-zinc-400/10",    border: "border-zinc-400/20",    label: "Payment Cancelled" },
+  payment_schedule_comment:     { icon: Activity,      color: "text-violet-400",  bg: "bg-violet-400/10",  border: "border-violet-400/20",  label: "Payment Comment" },
 };
 
 const SEVERITY_CONFIG: Record<string, { label: string; className: string }> = {
@@ -199,6 +207,7 @@ function getAlertUrl(type: string, containerId?: number): string {
 }
 
 function getWorkflowEventUrl(type: string, containerId?: number | null): string {
+  if (type.startsWith("payment_schedule_")) return "/payment-schedules";
   if (!containerId) return "/notifications";
   const ops  = `/operations/${containerId}?from=${FROM}`;
   const base = `/containers/${containerId}?from=${FROM}`;
@@ -502,6 +511,7 @@ export default function NotificationsPage() {
   const filteredWorkflow = wfNotifications.filter(n => {
     if (filter === "unread" && n.isRead) return false;
     if (filter === "read" && !n.isRead)  return false;
+    if (typeFilter !== "all" && n.type !== typeFilter) return false;
     if (!inDateRange(n.createdAt, dateFrom, dateTo)) return false;
     return true;
   });
@@ -527,7 +537,7 @@ export default function NotificationsPage() {
   const currentFetching = tab === "system" ? isFetching : wfFetching;
   const displayedItems  = tab === "system" ? filteredSystem.length : filteredWorkflow.length;
   const totalItems      = tab === "system" ? notifications.length  : wfNotifications.length;
-  const allTypes        = Array.from(new Set(notifications.map(n => n.type)));
+  const allTypes        = Array.from(new Set((tab === "system" ? notifications.map(n => n.type) : wfNotifications.map(n => n.type)).sort()));
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-4xl mx-auto">
@@ -574,7 +584,7 @@ export default function NotificationsPage() {
           className={`flex items-center gap-2 px-1 pb-2 text-sm font-medium border-b-2 transition-colors ${tab === "workflow" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
-          Workflow Events
+          Workflow History
           {wfUnreadCount > 0 && (
             <span className="text-[10px] bg-primary/80 text-white rounded-full px-1.5 py-0.5 leading-none font-bold">{wfUnreadCount}</span>
           )}
@@ -641,19 +651,19 @@ export default function NotificationsPage() {
             ))}
           </div>
 
-          {tab === "system" && (
+          {tab === "system" || tab === "workflow" ? (
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="h-8 text-xs w-44 bg-card/50 border-border/50">
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All alert types</SelectItem>
+                <SelectItem value="all">{tab === "system" ? "All alert types" : "All workflow types"}</SelectItem>
                 {allTypes.map(t => (
-                  <SelectItem key={t} value={t}>{ALERT_CONFIG[t]?.label ?? t}</SelectItem>
+                  <SelectItem key={t} value={t}>{tab === "system" ? (ALERT_CONFIG[t]?.label ?? t) : (WORKFLOW_TYPE_CONFIG[t]?.label ?? t)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          )}
+          ) : null}
 
           <div className="flex items-center gap-1.5 ml-auto">
             <CalendarRange className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -734,12 +744,12 @@ export default function NotificationsPage() {
                   <>
                     <BellOff className="w-12 h-12 text-muted-foreground/20 mb-3" />
                     <p className="font-medium text-muted-foreground">
-                      {tab === "system" ? "No system alerts" : "No workflow events yet"}
+                      {tab === "system" ? "No system alerts" : "No workflow history yet"}
                     </p>
                     <p className="text-sm text-muted-foreground/60 mt-1">
                       {tab === "system"
                         ? "All containers are within normal parameters."
-                        : "Events appear here as containers move through stages."}
+                        : "Events appear here as containers move through stages and payment schedules are approved or paid."}
                     </p>
                   </>
                 ) : (

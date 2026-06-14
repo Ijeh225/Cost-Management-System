@@ -12,6 +12,7 @@ export type ExpenseCategory = {
 export type ExpensePayment = {
   id: number;
   expenseId: number;
+  paymentScheduleId?: number | null;
   amount: number;
   paymentMethod: "cash" | "bank";
   bankId: number | null;
@@ -33,6 +34,21 @@ export type OverheadExpenseTopup = {
   createdAt: string;
 };
 
+export type OverheadExpensePaymentSchedule = {
+  id: number;
+  status: string;
+  scheduleDate: string;
+  amountRequested: number;
+  amountApproved: number;
+  amountPaid: number;
+  balance: number;
+  priority: string;
+  latestEventType: string | null;
+  latestComment: string | null;
+  latestEventAt: string | null;
+  createdAt: string;
+};
+
 export type OverheadExpense = {
   id: number;
   category: string;
@@ -48,6 +64,12 @@ export type OverheadExpense = {
   totalPaid: number;
   balance: number;
   status: "unpaid" | "partial" | "paid";
+  scheduledRequestedTotal: number;
+  scheduledApprovedTotal: number;
+  scheduledPaidTotal: number;
+  scheduledPendingApprovedTotal: number;
+  hasApprovedPendingPayment: boolean;
+  paymentSchedules: OverheadExpensePaymentSchedule[];
   topups: OverheadExpenseTopup[];
   payments: ExpensePayment[];
 };
@@ -82,6 +104,16 @@ export type CreateOverheadExpenseTopupBody = {
   expenseId: number;
   amount: number;
   description: string;
+};
+
+export type ScheduleOverheadExpensePaymentBody = {
+  expenseId: number;
+  scheduleDate?: string;
+  vendorBeneficiary?: string;
+  clientName?: string;
+  description?: string;
+  amountRequested?: number;
+  priority?: "low" | "normal" | "urgent";
 };
 
 const QK = "/api/overhead-expenses";
@@ -146,6 +178,20 @@ export function useCreateOverheadExpenseTopup() {
     mutationFn: ({ expenseId, ...data }) => customFetch<OverheadExpense>(`/api/overhead-expenses/${expenseId}/topups`, { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [QK] });
+    },
+  });
+}
+
+export function useScheduleOverheadExpensePayment() {
+  const qc = useQueryClient();
+  return useMutation<{ schedule: unknown; expense: OverheadExpense }, Error, ScheduleOverheadExpensePaymentBody>({
+    mutationFn: ({ expenseId, ...data }) => customFetch<{ schedule: unknown; expense: OverheadExpense }>(`/api/overhead-expenses/${expenseId}/payment-schedules`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK] });
+      qc.invalidateQueries({ queryKey: ["/api/payment-schedules"] });
     },
   });
 }

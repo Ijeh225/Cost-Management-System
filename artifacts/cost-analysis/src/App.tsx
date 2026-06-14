@@ -40,6 +40,7 @@ import DutyPaymentsPage from "@/pages/duty-payments/index";
 import BanksPage from "@/pages/banks/index";
 import BankDetailPage from "@/pages/banks/[id]";
 import OverheadExpensesPage from "@/pages/overhead-expenses/index";
+import PaymentSchedulesPage from "@/pages/payment-schedules/index";
 import ContainerPaymentsPage from "@/pages/container-payments/index";
 import DocumentationWorkspace from "@/pages/workspace/documentation";
 import AccountsWorkspace from "@/pages/workspace/accounts";
@@ -283,6 +284,9 @@ function Router() {
               </Route>
               <Route path="/overhead-expenses">
                 <BranchAdminOrAboveGuard><OverheadExpensesPage /></BranchAdminOrAboveGuard>
+              </Route>
+              <Route path="/payment-schedules">
+                <PaymentSchedulesPage />
               </Route>
               <Route path="/container-payments">
                 <BranchAdminOrAboveGuard><ContainerPaymentsPage /></BranchAdminOrAboveGuard>

@@ -5,8 +5,8 @@ import {
   useGetOverheadExpenses, useCreateOverheadExpense, useUpdateOverheadExpense,
   useDeleteOverheadExpense, useCreateExpensePayment, useGetExpenseCategories,
   useCreateExpenseCategory, useUpdateExpenseCategory, useDeleteExpenseCategory,
-  useCreateOverheadExpenseTopup,
-  type OverheadExpense, type ExpenseCategory,
+  useCreateOverheadExpenseTopup, useScheduleOverheadExpensePayment, usePayPaymentSchedule,
+  type OverheadExpense, type ExpenseCategory, type OverheadExpensePaymentSchedule,
 } from "@workspace/api-client-react";
 import { useListBanks } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Plus, Pencil, Trash2, Receipt, TrendingDown, Filter,
   CreditCard, Banknote, ChevronDown, ChevronRight, Lock, Tag,
-  Search, WalletCards,
+  Search, WalletCards, CalendarClock,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { BranchChip } from "@/components/layout/branch-chip";
@@ -36,6 +36,41 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   unpaid: "Unpaid", partial: "Partial", paid: "Paid",
 };
+
+const SCHEDULE_STATUS_LABELS: Record<string, string> = {
+  pending_approval: "Pending MD Approval",
+  partially_approved: "Partially Approved",
+  approved: "Approved",
+  paid: "Partially Paid",
+  completed: "Paid",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+};
+
+const SCHEDULE_STATUS_COLORS: Record<string, string> = {
+  pending_approval: "border-amber-500/30 text-amber-500 bg-amber-500/10",
+  partially_approved: "border-blue-500/30 text-blue-500 bg-blue-500/10",
+  approved: "border-emerald-500/30 text-emerald-500 bg-emerald-500/10",
+  paid: "border-green-500/30 text-green-500 bg-green-500/10",
+  completed: "border-slate-500/30 text-slate-500 bg-slate-500/10",
+  rejected: "border-red-500/30 text-red-500 bg-red-500/10",
+  cancelled: "border-zinc-500/30 text-zinc-500 bg-zinc-500/10",
+};
+
+function scheduleDisplayLabel(schedule: { status: string; amountApproved: number; amountPaid: number }) {
+  const pendingApproved = Math.max(0, schedule.amountApproved - schedule.amountPaid);
+  if (["approved", "partially_approved"].includes(schedule.status) && pendingApproved > 0) {
+    return `Approved ${formatCurrency(pendingApproved)} - Awaiting Payment`;
+  }
+  return SCHEDULE_STATUS_LABELS[schedule.status] ?? schedule.status.replace(/_/g, " ");
+}
+
+function getPayableSchedule(expense: OverheadExpense) {
+  return expense.paymentSchedules.find(s =>
+    ["approved", "partially_approved", "paid"].includes(s.status) &&
+    Math.max(0, s.amountApproved - s.amountPaid) > 0
+  ) ?? null;
+}
 
 const CATEGORY_PALETTE = [
   "border-blue-500/30 text-blue-400 bg-blue-500/10",
@@ -56,6 +91,9 @@ function catColor(name: string) {
 type ExpenseFormValues = { category: string; description: string; amount: number; reference: string };
 type PaymentFormValues = { amount: number; paymentMethod: "cash" | "bank"; bankId: string; paidAt: string; notes: string };
 type TopupFormValues = { amount: number; description: string };
+type SchedulePaymentFormValues = { amountRequested: number; scheduleDate: string; priority: "low" | "normal" | "urgent"; vendorBeneficiary: string; description: string; clientName: string };
+type ApprovedPaymentFormValues = { paymentMethod: "cash" | "bank"; bankId: string; notes: string };
+type ApprovedPaymentTarget = { expense: OverheadExpense; schedule: OverheadExpensePaymentSchedule };
 
 function ExpenseForm({ categories, defaultValues, onSubmit, onCancel, isPending, submitLabel }: {
   categories: ExpenseCategory[];
@@ -190,6 +228,103 @@ function MakePaymentDialog({ expense, onOpenChange, onSubmit, isPending }: {
   );
 }
 
+function PayApprovedPaymentDialog({ target, onOpenChange, onSubmit, isPending }: {
+  target: ApprovedPaymentTarget | null;
+  onOpenChange: (v: boolean) => void;
+  onSubmit: (v: ApprovedPaymentFormValues) => void;
+  isPending: boolean;
+}) {
+  const { data: banks } = useListBanks();
+  const { register, handleSubmit, control, reset, watch, formState: { errors } } = useForm<ApprovedPaymentFormValues>({
+    defaultValues: { paymentMethod: "bank", bankId: "", notes: "" },
+  });
+  const paymentMethod = watch("paymentMethod");
+
+  useEffect(() => {
+    if (target) reset({ paymentMethod: "bank", bankId: "", notes: "" });
+  }, [target?.schedule.id]);
+
+  if (!target) return null;
+
+  const { expense, schedule } = target;
+  const approvedRemaining = Math.max(0, schedule.amountApproved - schedule.amountPaid);
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-md">
+        <DialogHeader><DialogTitle>Pay Approved Payment</DialogTitle></DialogHeader>
+        <div className="rounded-lg border border-border/40 bg-muted/30 p-3 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium flex items-center">{expense.description}<BranchChip branchId={expense.branchId} /></p>
+              <p className="text-xs text-muted-foreground">{expense.category}</p>
+            </div>
+            <Badge variant="outline" className={`text-[10px] shrink-0 ${SCHEDULE_STATUS_COLORS[schedule.status] ?? ""}`}>{scheduleDisplayLabel(schedule)}</Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-md bg-background/60 p-2">
+              <p className="text-muted-foreground">MD Approved</p>
+              <p className="font-semibold text-emerald-500">{formatCurrency(schedule.amountApproved)}</p>
+            </div>
+            <div className="rounded-md bg-background/60 p-2">
+              <p className="text-muted-foreground">Pay Now</p>
+              <p className="font-semibold">{formatCurrency(approvedRemaining)}</p>
+            </div>
+            <div className="rounded-md bg-background/60 p-2">
+              <p className="text-muted-foreground">Already Paid</p>
+              <p className="font-semibold text-green-400">{formatCurrency(schedule.amountPaid)}</p>
+            </div>
+            <div className="rounded-md bg-background/60 p-2">
+              <p className="text-muted-foreground">Expense Balance</p>
+              <p className="font-semibold text-red-400">{formatCurrency(expense.balance)}</p>
+            </div>
+          </div>
+          {schedule.latestComment && (
+            <p className="text-xs text-muted-foreground">MD instruction: {schedule.latestComment}</p>
+          )}
+          <p className="text-[11px] text-muted-foreground">Payment date will be captured automatically when you click Pay.</p>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Payment Source</Label>
+            <Controller name="paymentMethod" control={control} render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Bank Account</SelectItem>
+                </SelectContent>
+              </Select>
+            )} />
+          </div>
+          {paymentMethod === "bank" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Bank Account</Label>
+              <Controller name="bankId" control={control} rules={{ required: paymentMethod === "bank" }} render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
+                  <SelectContent>{(banks ?? []).map(b => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}</SelectContent>
+                </Select>
+              )} />
+              {errors.bankId && <p className="text-xs text-destructive">Bank required for bank payments</p>}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Notes <span className="text-muted-foreground/50">(optional)</span></Label>
+            <Input {...register("notes")} placeholder="Reference, cheque no., or payment note" />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={isPending || approvedRemaining <= 0}>
+              {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Pay {formatCurrency(approvedRemaining)}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AddMoneyDialog({ expense, onOpenChange, onSubmit, isPending }: {
   expense: OverheadExpense | null;
   onOpenChange: (v: boolean) => void;
@@ -236,6 +371,83 @@ function AddMoneyDialog({ expense, onOpenChange, onSubmit, isPending }: {
   );
 }
 
+function SchedulePaymentDialog({ expense, onOpenChange, onSubmit, isPending }: {
+  expense: OverheadExpense | null;
+  onOpenChange: (v: boolean) => void;
+  onSubmit: (v: SchedulePaymentFormValues) => void;
+  isPending: boolean;
+}) {
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<SchedulePaymentFormValues>({
+    defaultValues: { amountRequested: 0, scheduleDate: new Date().toISOString().slice(0, 10), priority: "normal", vendorBeneficiary: "", description: "", clientName: "" },
+  });
+
+  useEffect(() => {
+    if (expense) {
+      reset({
+        amountRequested: Number(expense.balance.toFixed(2)),
+        scheduleDate: new Date().toISOString().slice(0, 10),
+        priority: "normal",
+        vendorBeneficiary: expense.category,
+        description: expense.description,
+        clientName: "",
+      });
+    }
+  }, [expense?.id]);
+
+  if (!expense) return null;
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-md">
+        <DialogHeader><DialogTitle>Schedule Payment for MD Approval</DialogTitle></DialogHeader>
+        <div className="rounded-lg border border-border/40 bg-muted/30 p-3 space-y-1">
+          <p className="text-sm font-medium flex items-center">{expense.description}<BranchChip branchId={expense.branchId} /></p>
+          <p className="text-xs text-muted-foreground">Outstanding balance: <span className="font-medium text-foreground">{formatCurrency(expense.balance)}</span></p>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Schedule Date</Label>
+              <Input type="date" {...register("scheduleDate", { required: true })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Priority</Label>
+              <select {...register("priority", { required: true })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <option value="low">Low</option>
+                <option value="normal">Normal</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Vendor / Beneficiary</Label>
+            <Input {...register("vendorBeneficiary", { required: true })} />
+            {errors.vendorBeneficiary && <p className="text-xs text-destructive">Required</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Description</Label>
+            <Textarea rows={3} className="resize-none" {...register("description", { required: true })} />
+            {errors.description && <p className="text-xs text-destructive">Required</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Client <span className="text-muted-foreground/50">(optional)</span></Label>
+            <Input {...register("clientName")} placeholder="Related client or job" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Amount to Schedule</Label>
+            <Input type="number" step="0.01" min="0.01" max={expense.balance} {...register("amountRequested", { required: true, valueAsNumber: true, min: 0.01, max: expense.balance })} />
+            {errors.amountRequested && <p className="text-xs text-destructive">Amount must not exceed outstanding balance</p>}
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={isPending}>{isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Schedule Payment</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function OverheadExpensesPage() {
   const { isAdmin } = useAuth();
   const { activeBranchId, isSuperAdmin } = useBranchScope();
@@ -252,6 +464,8 @@ export default function OverheadExpensesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [topupTarget, setTopupTarget] = useState<OverheadExpense | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<OverheadExpense | null>(null);
+  const [approvedPaymentTarget, setApprovedPaymentTarget] = useState<ApprovedPaymentTarget | null>(null);
+  const [scheduleTarget, setScheduleTarget] = useState<OverheadExpense | null>(null);
   const [editTarget, setEditTarget] = useState<OverheadExpense | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -275,6 +489,8 @@ export default function OverheadExpensesPage() {
   const deleteMutation = useDeleteOverheadExpense();
   const topupMutation = useCreateOverheadExpenseTopup();
   const paymentMutation = useCreateExpensePayment();
+  const schedulePaymentMutation = useScheduleOverheadExpensePayment();
+  const payScheduleMutation = usePayPaymentSchedule();
   const createCatMutation = useCreateExpenseCategory();
   const updateCatMutation = useUpdateExpenseCategory();
   const deleteCatMutation = useDeleteExpenseCategory();
@@ -290,6 +506,7 @@ export default function OverheadExpensesPage() {
         e.branchName ?? "",
         ...e.payments.flatMap(p => [p.notes ?? "", p.bankName ?? "", p.recordedByName ?? ""]),
         ...e.topups.flatMap(t => [t.description, t.recordedByName ?? ""]),
+        ...e.paymentSchedules.flatMap(s => [s.status, s.latestComment ?? ""]),
       ].some(value => value.toLowerCase().includes(normalizedSearch)))
     : expenses;
   const totalOutstanding = data?.totalOutstanding ?? 0;
@@ -322,6 +539,39 @@ export default function OverheadExpensesPage() {
       notes: v.notes || undefined,
     }, {
       onSuccess: () => { toast({ title: "Payment recorded. Bank balance updated." }); setPaymentTarget(null); },
+      onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    });
+  };
+
+  const handleSchedulePayment = (v: SchedulePaymentFormValues) => {
+    if (!scheduleTarget) return;
+    schedulePaymentMutation.mutate({
+      expenseId: scheduleTarget.id,
+      scheduleDate: v.scheduleDate,
+      vendorBeneficiary: v.vendorBeneficiary,
+      clientName: v.clientName || undefined,
+      description: v.description,
+      amountRequested: v.amountRequested,
+      priority: v.priority,
+    }, {
+      onSuccess: () => { toast({ title: "Payment scheduled for MD approval." }); setScheduleTarget(null); },
+      onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    });
+  };
+
+  const handleApprovedPayment = (v: ApprovedPaymentFormValues) => {
+    if (!approvedPaymentTarget) return;
+    const amount = Math.max(0, approvedPaymentTarget.schedule.amountApproved - approvedPaymentTarget.schedule.amountPaid);
+    payScheduleMutation.mutate({
+      id: approvedPaymentTarget.schedule.id,
+      data: {
+        amount,
+        paymentMethod: v.paymentMethod,
+        bankId: v.paymentMethod === "bank" && v.bankId ? Number(v.bankId) : null,
+        notes: v.notes || `Paid approved overhead payment for ${approvedPaymentTarget.expense.description}`,
+      },
+    }, {
+      onSuccess: () => { toast({ title: "Approved payment recorded. Overhead balance updated." }); setApprovedPaymentTarget(null); },
       onError: (e) => toast({ variant: "destructive", title: "Error", description: e.message }),
     });
   };
@@ -492,6 +742,7 @@ export default function OverheadExpensesPage() {
                   {visibleExpenses.map(e => {
                     const isExpanded = expandedId === e.id;
                     const progressPct = e.amount > 0 ? Math.min(100, (e.totalPaid / e.amount) * 100) : 0;
+                    const payableSchedule = getPayableSchedule(e);
                     return (
                       <div key={e.id}>
                         <div className="px-3 py-3 hover:bg-accent/10 transition-colors">
@@ -504,6 +755,11 @@ export default function OverheadExpensesPage() {
                                 <span className="text-sm font-medium text-foreground">{e.description}</span>
                                 <Badge variant="outline" className={`text-[10px] font-medium shrink-0 ${catColor(e.category)}`}>{e.category}</Badge>
                                 <Badge variant="outline" className={`text-[10px] font-medium shrink-0 ${STATUS_COLORS[e.status]}`}>{STATUS_LABELS[e.status]}</Badge>
+                                {e.hasApprovedPendingPayment && (
+                                  <Badge variant="outline" className="text-[10px] font-medium shrink-0 border-emerald-500/40 text-emerald-500 bg-emerald-500/10">
+                                    MD Approved Pending: {formatCurrency(e.scheduledPendingApprovedTotal)}
+                                  </Badge>
+                                )}
                                 {showBranchColumn && <BranchChip branchId={e.branchId} />}
                               </div>
                               <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
@@ -520,6 +776,12 @@ export default function OverheadExpensesPage() {
                                   {e.balance > 0 && <span>Balance: <span className="text-red-400 font-medium">{formatCurrency(e.balance)}</span></span>}
                                   <span>Total: <span className="font-medium text-foreground/80">{formatCurrency(e.amount)}</span></span>
                                 </div>
+                                {e.hasApprovedPendingPayment && (
+                                  <div className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2 py-1 text-[11px]">
+                                    <span className="font-medium text-emerald-500">Awaiting payment: {formatCurrency(e.scheduledPendingApprovedTotal)}</span>
+                                    <span className="text-muted-foreground">MD approved this amount. Paid and balance update after Accounts records payment.</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0 mt-0.5">
@@ -527,9 +789,19 @@ export default function OverheadExpensesPage() {
                                 <WalletCards className="w-3 h-3" /> Add Money
                               </Button>
                               {e.status !== "paid" && (
-                                <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1 text-green-400 border-green-500/30 hover:bg-green-500/10" onClick={() => setPaymentTarget(e)}>
-                                  <CreditCard className="w-3 h-3" /> Pay
-                                </Button>
+                                <>
+                                  <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1 text-green-400 border-green-500/30 hover:bg-green-500/10" onClick={() => setPaymentTarget(e)}>
+                                    <CreditCard className="w-3 h-3" /> Pay Now
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1 text-primary border-primary/30 hover:bg-primary/10" onClick={() => setScheduleTarget(e)}>
+                                    <CalendarClock className="w-3 h-3" /> Schedule Payment
+                                  </Button>
+                                  {payableSchedule && (
+                                    <Button size="sm" className="h-7 px-2 text-[11px] gap-1" onClick={() => setApprovedPaymentTarget({ expense: e, schedule: payableSchedule })}>
+                                      <CreditCard className="w-3 h-3" /> Pay Approved Payment
+                                    </Button>
+                                  )}
+                                </>
                               )}
                               <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => setEditTarget(e)}><Pencil className="w-3.5 h-3.5" /></Button>
                               <Button size="icon" variant="ghost" className="w-7 h-7 text-destructive hover:text-destructive" onClick={() => setDeleteId(e.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
@@ -558,7 +830,7 @@ export default function OverheadExpensesPage() {
                             {e.payments.length === 0 ? (
                               <p className="text-xs text-muted-foreground py-1">No payments recorded yet.</p>
                             ) : (
-                              <div className="space-y-1">
+                              <div className="space-y-2">
                                 {e.payments.map(p => (
                                   <div key={p.id} className="flex items-center gap-3 text-xs py-1 border-t border-border/20 first:border-t-0">
                                     <div className="flex items-center gap-1.5 text-muted-foreground shrink-0">
@@ -569,6 +841,29 @@ export default function OverheadExpensesPage() {
                                     <span className="text-muted-foreground">{new Date(p.paidAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span>
                                     {p.notes && <span className="text-muted-foreground/70 truncate">· {p.notes}</span>}
                                     {p.recordedByName && <span className="text-muted-foreground/50 ml-auto shrink-0">by {p.recordedByName}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider pt-3 pb-1">Scheduled Payments ({e.paymentSchedules.length})</p>
+                            {e.paymentSchedules.length === 0 ? (
+                              <p className="text-xs text-muted-foreground py-1">No payment schedules linked to this expense yet.</p>
+                            ) : (
+                              <div className="space-y-1">
+                                {e.paymentSchedules.map(s => (
+                                  <div key={s.id} className="flex items-center gap-3 text-xs py-1 border-t border-border/20 first:border-t-0">
+                                    <CalendarClock className="w-3 h-3 text-primary shrink-0" />
+                                    <span className="font-semibold">{formatCurrency(s.amountRequested)}</span>
+                                    <span className="text-muted-foreground">{new Date(s.scheduleDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span>
+                                    <Badge variant="outline" className={`text-[10px] ${SCHEDULE_STATUS_COLORS[s.status] ?? ""}`}>{scheduleDisplayLabel(s)}</Badge>
+                                    <span className="text-muted-foreground">Approved {formatCurrency(s.amountApproved)}</span>
+                                    {s.latestComment && <span className="text-muted-foreground/70 truncate">MD: {s.latestComment}</span>}
+                                    {Math.max(0, s.amountApproved - s.amountPaid) > 0 && (
+                                      <Button size="sm" variant="outline" className="ml-auto h-6 px-2 text-[10px]" onClick={() => setApprovedPaymentTarget({ expense: e, schedule: s })}>
+                                        Pay Approved Payment
+                                      </Button>
+                                    )}
+                                    <span className="text-muted-foreground ml-auto">Paid {formatCurrency(s.amountPaid)} · Balance {formatCurrency(s.balance)}</span>
                                   </div>
                                 ))}
                               </div>
@@ -656,7 +951,9 @@ export default function OverheadExpensesPage() {
       )}
 
       <MakePaymentDialog expense={paymentTarget} onOpenChange={(v) => { if (!v) setPaymentTarget(null); }} onSubmit={handlePayment} isPending={paymentMutation.isPending} />
+      <PayApprovedPaymentDialog target={approvedPaymentTarget} onOpenChange={(v) => { if (!v) setApprovedPaymentTarget(null); }} onSubmit={handleApprovedPayment} isPending={payScheduleMutation.isPending} />
       <AddMoneyDialog expense={topupTarget} onOpenChange={(v) => { if (!v) setTopupTarget(null); }} onSubmit={handleTopup} isPending={topupMutation.isPending} />
+      <SchedulePaymentDialog expense={scheduleTarget} onOpenChange={(v) => { if (!v) setScheduleTarget(null); }} onSubmit={handleSchedulePayment} isPending={schedulePaymentMutation.isPending} />
 
       <Dialog open={deleteId !== null} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
         <DialogContent className="border-border/50 bg-card/95 max-w-sm">

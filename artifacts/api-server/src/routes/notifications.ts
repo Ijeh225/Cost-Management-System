@@ -65,8 +65,8 @@ const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
   terminal_user:           new Set(["stage_complete", "gate_in", "gate_out", "empty_gate_in"]),
   security_user:           new Set(["new_job", "stage_complete", "gate_in"]),
   operations_user:         new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "gate_out", "empty_gate_in", "berthing_confirmed"]),
-  staff:                   new Set(["new_job", "stage_complete", "overdue", "delay_recorded"]),
-  accounts_user:           new Set(["invoice_created", "invoice_paid", "berthing_confirmed"]),
+  staff:                   new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "payment_schedule_created", "payment_schedule_rejected", "payment_schedule_paid", "payment_schedule_completed", "payment_schedule_rescheduled", "payment_schedule_cancelled", "payment_schedule_comment"]),
+  accounts_user:           new Set(["invoice_created", "invoice_paid", "berthing_confirmed", "payment_schedule_approved", "payment_schedule_paid", "payment_schedule_completed", "payment_schedule_comment"]),
   documentation_user:      new Set(["new_job"]),
   shipping_user:           new Set(["new_job", "stage_complete", "berthing_confirmed"]),
   shipping_terminal_user:  new Set(["new_job", "stage_complete", "berthing_confirmed", "gate_in", "gate_out"]),
@@ -705,7 +705,19 @@ notificationsRouter.post("/notifications/mark-viewed", requireAuth, async (req, 
 notificationsRouter.get("/workflow-notifications", requireAuth, async (req: AuthRequest, res) => {
   try {
     const role = req.user!.role;
+    const roles = req.user!.roles?.length ? req.user!.roles : [role];
     const branchScope = getBranchScope(req);
+    const userId = req.user!.id;
+    const typeFilter = String(req.query.type ?? "all");
+    const readFilter = String(req.query.read ?? "all");
+    const dateFrom = req.query.dateFrom ? new Date(String(req.query.dateFrom)) : null;
+    const dateTo = req.query.dateTo ? new Date(String(req.query.dateTo)) : null;
+    if (dateTo) dateTo.setHours(23, 59, 59, 999);
+    const targetUserId = req.query.targetUserId != null && req.query.targetUserId !== ""
+      ? Number(req.query.targetUserId)
+      : null;
+    const requestedLimit = Number(req.query.limit ?? 500);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 1000) : 500;
 
     // Check for overdue stages and auto-create notifications (deduplicated by checking recent ones)
     const containers = branchScope !== null
@@ -735,12 +747,15 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req: Auth
         if (exp.getTime() < today.getTime()) {
           const overdueDays = Math.floor((today.getTime() - exp.getTime()) / 86_400_000);
           const message = `${check.label} overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}: ${c.containerNumber}`;
-          // Check if an identical unread notification already exists today
-          const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          // Keep generated overdue reminders deduped; user/business action
+          // notifications are inserted elsewhere and must remain as full history.
           const [existing] = await db.select({ id: workflowNotificationsTable.id })
             .from(workflowNotificationsTable)
             .where(
-              eq(workflowNotificationsTable.containerId, c.id)
+              and(
+                eq(workflowNotificationsTable.containerId, c.id),
+                eq(workflowNotificationsTable.type, "overdue")
+              )
             )
             .limit(1);
           if (!existing) {
@@ -761,29 +776,31 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req: Auth
           .from(workflowNotificationsTable)
           .where(eq(workflowNotificationsTable.branchId, branchScope))
           .orderBy(desc(workflowNotificationsTable.createdAt))
-          .limit(500)
+          .limit(limit)
       : await db.select()
           .from(workflowNotificationsTable)
           .orderBy(desc(workflowNotificationsTable.createdAt))
-          .limit(500);
+          .limit(limit);
 
-    // Deduplicate: keep only the latest notification per (container, targetUser) pair
-    const seen = new Set<string>();
-    const deduped = allWorkflow.filter(n => {
-      const key = `${n.containerId ?? ""}:${n.targetUserId ?? ""}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    let notifications = deduped;
-    if (role && !ADMIN_ROLES.has(role)) {
-      const userId = req.user!.id;
-      const allowed = ROLE_WORKFLOW_TYPES[role];
+    let notifications = allWorkflow;
+    if (role && !roles.some(r => ADMIN_ROLES.has(r))) {
+      const allowed = new Set<string>();
+      for (const r of roles) {
+        for (const t of ROLE_WORKFLOW_TYPES[r] ?? []) allowed.add(t);
+      }
       notifications = notifications.filter(n => {
         if (n.targetUserId != null) return n.targetUserId === userId;
-        return allowed ? allowed.has(n.type) : false;
+        return allowed.has(n.type);
       });
+    }
+    if (typeFilter !== "all") notifications = notifications.filter(n => n.type === typeFilter);
+    if (readFilter === "read") notifications = notifications.filter(n => n.isRead);
+    if (readFilter === "unread") notifications = notifications.filter(n => !n.isRead);
+    if (dateFrom && !Number.isNaN(dateFrom.getTime())) notifications = notifications.filter(n => new Date(n.createdAt).getTime() >= dateFrom.getTime());
+    if (dateTo && !Number.isNaN(dateTo.getTime())) notifications = notifications.filter(n => new Date(n.createdAt).getTime() <= dateTo.getTime());
+    if (targetUserId != null && Number.isFinite(targetUserId)) {
+      if (!roles.some(r => ADMIN_ROLES.has(r)) && targetUserId !== userId) return res.status(403).json({ error: "Cannot filter another user's notifications" });
+      notifications = notifications.filter(n => n.targetUserId === targetUserId);
     }
 
     const unreadCount = notifications.filter(n => !n.isRead).length;

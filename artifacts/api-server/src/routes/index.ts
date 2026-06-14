@@ -23,6 +23,7 @@ import { banksRouter } from "./banks.js";
 import { overheadExpensesRouter } from "./overhead-expenses.js";
 import { containerExpensesRouter } from "./container-expenses.js";
 import { branchesRouter } from "./branches.js";
+import { paymentSchedulesRouter } from "./payment-schedules.js";
 
 const router: IRouter = Router();
 
@@ -50,5 +51,6 @@ router.use(banksRouter);
 router.use(overheadExpensesRouter);
 router.use(containerExpensesRouter);
 router.use(branchesRouter);
+router.use(paymentSchedulesRouter);
 
 export default router;

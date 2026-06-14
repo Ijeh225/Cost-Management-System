@@ -3,6 +3,7 @@ import { pgTable, serial, integer, numeric, text, timestamp } from "drizzle-orm/
 export const expensePaymentsTable = pgTable("expense_payments", {
   id: serial("id").primaryKey(),
   expenseId: integer("expense_id").notNull(),
+  paymentScheduleId: integer("payment_schedule_id"),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   paymentMethod: text("payment_method").notNull().default("cash"),
   bankId: integer("bank_id"),

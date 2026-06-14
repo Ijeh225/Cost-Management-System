@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, overheadExpensesTable, overheadExpenseTopupsTable, expenseCategoriesTable, expensePaymentsTable, banksTable, usersTable, branchesTable } from "@workspace/db";
+import { db, overheadExpensesTable, overheadExpenseTopupsTable, expenseCategoriesTable, expensePaymentsTable, banksTable, usersTable, branchesTable, paymentSchedulesTable, paymentScheduleEventsTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
@@ -18,6 +18,15 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
   const allTopups = await db.select().from(overheadExpenseTopupsTable)
     .where(inArray(overheadExpenseTopupsTable.expenseId, expenseIds))
     .orderBy(desc(overheadExpenseTopupsTable.createdAt));
+  const allSchedules = await db.select().from(paymentSchedulesTable)
+    .where(inArray(paymentSchedulesTable.overheadExpenseId, expenseIds))
+    .orderBy(desc(paymentSchedulesTable.createdAt));
+  const scheduleIds = allSchedules.map(s => s.id);
+  const allScheduleEvents = scheduleIds.length > 0
+    ? await db.select().from(paymentScheduleEventsTable)
+      .where(inArray(paymentScheduleEventsTable.scheduleId, scheduleIds))
+      .orderBy(desc(paymentScheduleEventsTable.createdAt))
+    : [];
 
   const bankIds = [...new Set(allPayments.map(p => p.bankId).filter(Boolean) as number[])];
   const bankMap: Record<number, string> = {};
@@ -56,10 +65,31 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
     if (!topupsByExpense[t.expenseId]) topupsByExpense[t.expenseId] = [];
     topupsByExpense[t.expenseId].push(t);
   }
+  const schedulesByExpense: Record<number, typeof allSchedules> = {};
+  for (const s of allSchedules) {
+    if (!s.overheadExpenseId) continue;
+    if (!schedulesByExpense[s.overheadExpenseId]) schedulesByExpense[s.overheadExpenseId] = [];
+    schedulesByExpense[s.overheadExpenseId].push(s);
+  }
+  const latestEventBySchedule: Record<number, (typeof allScheduleEvents)[number]> = {};
+  for (const event of allScheduleEvents) {
+    if (!latestEventBySchedule[event.scheduleId]) latestEventBySchedule[event.scheduleId] = event;
+  }
 
   return expenseRows.map(e => {
     const payments = paymentsByExpense[e.id] ?? [];
     const topups = topupsByExpense[e.id] ?? [];
+    const schedules = schedulesByExpense[e.id] ?? [];
+    const activeSchedules = schedules.filter(s => !["rejected", "cancelled"].includes(s.status));
+    const approvedSchedules = activeSchedules.filter(s => ["partially_approved", "approved", "paid", "completed"].includes(s.status));
+    const scheduledRequestedTotal = activeSchedules.reduce((sum, s) => sum + parseFloat(s.amountRequested ?? "0"), 0);
+    const scheduledApprovedTotal = approvedSchedules.reduce((sum, s) => sum + parseFloat(s.amountApproved ?? "0"), 0);
+    const scheduledPaidTotal = activeSchedules.reduce((sum, s) => sum + parseFloat(s.amountPaid ?? "0"), 0);
+    const scheduledPendingApprovedTotal = approvedSchedules.reduce((sum, s) => {
+      const approved = parseFloat(s.amountApproved ?? "0");
+      const paid = parseFloat(s.amountPaid ?? "0");
+      return sum + Math.max(0, approved - paid);
+    }, 0);
     const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
     const totalAmount = parseFloat(e.amount ?? "0");
     const balance = Math.max(0, totalAmount - totalPaid);
@@ -81,6 +111,25 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
       totalPaid,
       balance,
       status,
+      scheduledRequestedTotal,
+      scheduledApprovedTotal,
+      scheduledPaidTotal,
+      scheduledPendingApprovedTotal,
+      hasApprovedPendingPayment: scheduledPendingApprovedTotal > 0,
+      paymentSchedules: schedules.map(s => ({
+        id: s.id,
+        status: s.status,
+        scheduleDate: s.scheduleDate instanceof Date ? s.scheduleDate.toISOString() : String(s.scheduleDate),
+        amountRequested: parseFloat(s.amountRequested ?? "0"),
+        amountApproved: parseFloat(s.amountApproved ?? "0"),
+        amountPaid: parseFloat(s.amountPaid ?? "0"),
+        balance: Math.max(0, (parseFloat(s.amountApproved ?? "0") || parseFloat(s.amountRequested ?? "0")) - parseFloat(s.amountPaid ?? "0")),
+        priority: s.priority,
+        latestEventType: latestEventBySchedule[s.id]?.type ?? null,
+        latestComment: latestEventBySchedule[s.id]?.comment ?? null,
+        latestEventAt: latestEventBySchedule[s.id]?.createdAt instanceof Date ? latestEventBySchedule[s.id].createdAt.toISOString() : latestEventBySchedule[s.id]?.createdAt ? String(latestEventBySchedule[s.id].createdAt) : null,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : String(s.createdAt),
+      })),
       topups: topups.map(t => ({
         id: t.id,
         expenseId: t.expenseId,
@@ -97,6 +146,7 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
         paymentMethod: (p.paymentMethod ?? "cash") as "cash" | "bank",
         bankId: p.bankId ?? null,
         bankName: p.bankId ? (bankMap[p.bankId] ?? null) : null,
+        paymentScheduleId: p.paymentScheduleId ?? null,
         paidAt: p.paidAt instanceof Date ? p.paidAt.toISOString() : String(p.paidAt),
         notes: p.notes ?? null,
         recordedBy: p.recordedBy ?? null,
@@ -339,6 +389,98 @@ overheadExpensesRouter.post("/overhead-expenses/:id/topups", requireBranchAdminO
     return res.status(201).json(built);
   } catch (err) {
     console.error("POST /overhead-expenses/:id/topups error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+overheadExpensesRouter.post("/overhead-expenses/:id/payment-schedules", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const expenseId = Number(req.params.id);
+    if (isNaN(expenseId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+    const [expense] = await db.select().from(overheadExpensesTable)
+      .where(eq(overheadExpensesTable.id, expenseId));
+    if (!expense || !userCanAccessBranch(req, expense.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
+    const scope = getBranchScope(req);
+    if (scope !== null && expense.branchId !== scope) { res.status(404).json({ error: "Expense not found" }); return; }
+    if (scope === null && req.user?.role === "super_admin") {
+      return res.status(400).json({ error: "Select a specific branch to schedule this expense." });
+    }
+
+    const [builtExpense] = await buildExpensesWithPayments([expense]);
+    const outstanding = builtExpense.balance;
+    if (outstanding <= 0.005) {
+      return res.status(400).json({ error: "This overhead expense is already fully paid." });
+    }
+
+    const amount = req.body.amountRequested != null ? Number(req.body.amountRequested) : outstanding;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: "Amount requested must be greater than zero" });
+    }
+    if (amount > outstanding + 0.005) {
+      return res.status(400).json({ error: "Cannot schedule more than the outstanding overhead balance" });
+    }
+
+    const scheduleDate = req.body.scheduleDate ? new Date(String(req.body.scheduleDate)) : new Date();
+    if (Number.isNaN(scheduleDate.getTime())) {
+      return res.status(400).json({ error: "Valid scheduleDate is required" });
+    }
+    const priority = ["low", "normal", "urgent"].includes(req.body.priority) ? req.body.priority : "normal";
+    const vendorBeneficiary = typeof req.body.vendorBeneficiary === "string" && req.body.vendorBeneficiary.trim()
+      ? req.body.vendorBeneficiary.trim()
+      : expense.category;
+    const description = typeof req.body.description === "string" && req.body.description.trim()
+      ? req.body.description.trim()
+      : expense.description;
+
+    const [schedule] = await db.insert(paymentSchedulesTable).values({
+      branchId: expense.branchId,
+      scheduleDate,
+      originalRequestDate: new Date(),
+      requestedById: req.user?.id ?? null,
+      overheadExpenseId: expense.id,
+      vendorBeneficiary,
+      clientName: req.body.clientName?.trim() || null,
+      description,
+      amountRequested: String(amount),
+      amountApproved: "0",
+      amountPaid: "0",
+      priority,
+      status: "pending_approval",
+    }).returning();
+
+    await db.insert(paymentScheduleEventsTable).values({
+      branchId: expense.branchId,
+      scheduleId: schedule.id,
+      type: "created_from_overhead",
+      actorUserId: req.user?.id ?? null,
+      comment: `Scheduled from overhead expense #${expense.id}.`,
+      newStatus: "pending_approval",
+    });
+
+    try {
+      const adminUsers = await db.select({ id: usersTable.id, role: usersTable.role, branchId: usersTable.branchId })
+        .from(usersTable)
+        .where(eq(usersTable.isActive, true));
+      const targets = adminUsers
+        .filter(u => u.role === "super_admin" || (u.role === "admin" && u.branchId === expense.branchId))
+        .map(u => u.id);
+      if (targets.length > 0) {
+        await db.insert(workflowNotificationsTable).values([...new Set(targets)].map(targetUserId => ({
+          branchId: expense.branchId,
+          type: "payment_schedule_created",
+          message: `${req.user?.name ?? "A user"} scheduled overhead payment ${amount.toLocaleString("en-NG")} for ${vendorBeneficiary}`,
+          targetUserId,
+        })));
+      }
+    } catch (notifyErr) {
+      console.warn("[overhead-expenses] payment schedule notification warning:", notifyErr);
+    }
+
+    const [updatedExpense] = await buildExpensesWithPayments([expense]);
+    return res.status(201).json({ schedule, expense: updatedExpense });
+  } catch (err) {
+    console.error("POST /overhead-expenses/:id/payment-schedules error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 });

@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
   ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, Activity, BookOpen, FileCheck2,
   Truck, Kanban, Banknote, Anchor, Ship, PackageOpen, ChevronDown, ShieldCheck,
-  Sun, Moon, Landmark, TrendingDown, CreditCard,
+  Sun, Moon, Landmark, TrendingDown, CreditCard, CalendarClock,
 } from "lucide-react";
 
 type NavItem = {
@@ -83,6 +83,7 @@ export function AppSidebar() {
     { title: "Invoices",        url: "/invoices",       icon: FileText         },
     ...(canSeeDutyPayments ? [{ title: "Duty Payments", url: "/duty-payments", icon: Banknote }] : []),
     { title: "Accounts Receivable", url: "/accounts-receivable", icon: BookOpen },
+    { title: "Payment Schedule", url: "/payment-schedules", icon: CalendarClock },
     { title: "My Tasks",        url: "/my-tasks",       icon: ListTodo         },
     { title: "Notifications",   url: "/notifications",  icon: Bell, badge: unreadCount },
     ...(staffCanUpload ? [{ title: "Upload Data", url: "/containers/upload", icon: UploadCloud }] : []),
@@ -118,6 +119,7 @@ export function AppSidebar() {
   const deptNav: NavItem[] = [
     ...(isDocumentationUser ? [{ title: "My Jobs",            url: "/documentation",           icon: FileCheck2  }] : []),
     ...(isAccountsUser      ? [{ title: "Duty Payments",      url: "/duty-payments",           icon: Banknote    },
+                                { title: "Payment Schedule",  url: "/payment-schedules",       icon: CalendarClock },
                                 { title: "Accounts Workspace", url: "/workspace/accounts",      icon: BookOpen    }] : []),
     ...((isTransireUser || isOperationsUser) ? [{ title: "My Jobs", url: "/workspace/transire", icon: FileCheck2 }] : []),
     ...(isShippingUser      ? [{ title: "My Jobs", url: "/workspace/shipping",     icon: Ship        }] : []),

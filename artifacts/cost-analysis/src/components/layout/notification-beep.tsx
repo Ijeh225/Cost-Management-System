@@ -31,6 +31,14 @@ const NOTIF_TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string
   aging_warn:           { icon: Clock,         color: "text-yellow-400"   },
   overdue_task:         { icon: Clock,         color: "text-amber-400"    },
   inactive:             { icon: Clock,         color: "text-muted-foreground" },
+  payment_schedule_created:     { icon: Bell,         color: "text-blue-400" },
+  payment_schedule_approved:    { icon: CheckCircle2, color: "text-emerald-400" },
+  payment_schedule_rejected:    { icon: AlertTriangle, color: "text-red-400" },
+  payment_schedule_paid:        { icon: CheckCircle2, color: "text-green-400" },
+  payment_schedule_completed:   { icon: CheckCheck, color: "text-emerald-400" },
+  payment_schedule_rescheduled: { icon: Clock, color: "text-amber-400" },
+  payment_schedule_cancelled:   { icon: AlertTriangle, color: "text-zinc-400" },
+  payment_schedule_comment:     { icon: Clock, color: "text-violet-400" },
 };
 
 function playBeep(ctx: AudioContext) {
@@ -227,7 +235,7 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
                   setOpen(false);
                 }}
               >
-                <Link href={n.containerId ? `/operations/${n.containerId}` : "/notifications"}>
+                <Link href={n.type.startsWith("payment_schedule_") ? "/payment-schedules" : n.containerId ? `/operations/${n.containerId}` : "/notifications"}>
                   <div className="flex items-start gap-3 w-full">
                     <Icon className={`w-4 h-4 shrink-0 mt-0.5 ${cfg.color}`} />
                     <div className="flex-1 min-w-0">
