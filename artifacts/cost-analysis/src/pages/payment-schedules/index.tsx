@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useBranchScope } from "@/components/layout/branch-provider";
@@ -117,12 +117,30 @@ function canPay(role: string | null, roles: string[]) {
   return canApprove(role) || roles.includes("accounts_user");
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: string | number; tone?: string }) {
+function SummaryCard({
+  label,
+  value,
+  tone,
+  helper,
+  icon,
+  className,
+}: {
+  label: string;
+  value: string | number;
+  tone?: string;
+  helper: string;
+  icon: ReactNode;
+  className?: string;
+}) {
   return (
-    <Card className="border-border/60 bg-card/70 shadow-sm shadow-black/5">
-      <CardContent className="p-5">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <p className={`text-2xl font-bold mt-2 tracking-tight ${tone ?? ""}`}>{value}</p>
+    <Card className={`border-border/40 bg-card/40 backdrop-blur-sm ${className ?? ""}`}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        <div className={`text-xl font-bold ${tone ?? "text-foreground"}`}>{value}</div>
+        <p className="text-xs text-muted-foreground mt-1">{helper}</p>
       </CardContent>
     </Card>
   );
@@ -591,105 +609,121 @@ export default function PaymentSchedulesPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 space-y-6">
-      <div className="flex flex-col gap-4 rounded-2xl border border-border/60 bg-card/65 p-5 shadow-sm shadow-black/5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-11 h-11 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-            <CalendarClock className="w-5 h-5 text-primary" />
-          </div>
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight">Payment Schedule</h1>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              Submit payment requests for MD approval, payment tracking, and rollover visibility.
-            </p>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <CalendarClock className="w-5 h-5 text-primary" />
+        <div>
+          <h1 className="text-lg font-bold text-foreground">Payment Schedule</h1>
+          <p className="text-sm text-muted-foreground">Submit payment requests for MD approval, payment tracking, and rollover visibility.</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2 self-start px-5 sm:self-center">
-          <Plus className="w-4 h-4" /> New Schedule
+        <Button
+          onClick={() => setCreateOpen(true)}
+          size="sm"
+          className="ml-auto gap-1.5 h-8"
+        >
+          <Plus className="w-3.5 h-3.5" /> New Schedule
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <SummaryCard label="Total Scheduled Today" value={summary?.totalScheduledToday ?? 0} tone="text-primary" />
-        <SummaryCard label="Pending Approval" value={summary?.totalPendingApproval ?? 0} tone="text-amber-500" />
-        <SummaryCard label="Approved" value={summary?.totalApproved ?? 0} tone="text-emerald-500" />
-        <SummaryCard label="Paid Today" value={summary?.totalPaidToday ?? 0} tone="text-green-500" />
-        <SummaryCard label="Overdue Schedules" value={summary?.overdueSchedules ?? 0} tone="text-red-500" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <SummaryCard
+          label="Total Scheduled Today"
+          value={summary?.totalScheduledToday ?? 0}
+          tone="text-primary"
+          helper="Visible for today"
+          icon={<CalendarClock className="w-4 h-4 text-primary" />}
+        />
+        <SummaryCard
+          label="Pending Approval"
+          value={summary?.totalPendingApproval ?? 0}
+          tone="text-amber-500"
+          helper="Awaiting MD review"
+          icon={<Clock className="w-4 h-4 text-amber-400" />}
+          className="bg-amber-500/5"
+        />
+        <SummaryCard
+          label="Approved"
+          value={summary?.totalApproved ?? 0}
+          tone="text-emerald-500"
+          helper="Ready for payment"
+          icon={<CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+          className="bg-emerald-500/5"
+        />
+        <SummaryCard
+          label="Paid Today"
+          value={summary?.totalPaidToday ?? 0}
+          tone="text-green-500"
+          helper="Recorded today"
+          icon={<WalletCards className="w-4 h-4 text-green-400" />}
+          className="bg-green-500/5"
+        />
+        <SummaryCard
+          label="Overdue Schedules"
+          value={summary?.overdueSchedules ?? 0}
+          tone="text-red-500"
+          helper="Needs attention"
+          icon={<AlertTriangle className="w-4 h-4 text-red-400" />}
+          className="bg-red-500/5"
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5 items-start">
-        <div className="space-y-4">
-          <Card className="border-border/60 bg-card/70 shadow-sm shadow-black/5">
-            <CardHeader className="px-5 pb-2 pt-5">
-              <CardTitle className="text-sm font-semibold">Schedules By Staff</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 px-5 pb-5">
-              <button onClick={() => setRequestedById(null)} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors ${requestedById == null ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"}`}>
-                <span className="font-medium">All staff</span>
-                <span className="text-xs">{data?.byStaff?.reduce((sum, staff) => sum + staff.count, 0) ?? 0}</span>
-              </button>
-              {(data?.byStaff ?? []).map((staff) => (
-                <button key={staff.userId ?? "unknown"} onClick={() => setRequestedById(staff.userId)} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${requestedById === staff.userId ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"}`}>
-                  <span className="font-medium">{staff.name}</span>
-                  <span className="text-xs">{staff.count}</span>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-          <Card className="border-border/60 bg-card/55 shadow-sm shadow-black/5">
-            <CardHeader className="px-5 pb-2 pt-5">
-              <CardTitle className="text-sm font-semibold">Schedules By Branch</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 px-5 pb-5">
-              {(data?.byBranch ?? []).map((branch) => (
-                <div key={branch.branchId} className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 px-3 py-2.5 text-sm">
-                  <span className="truncate">{branch.name}</span>
-                  <span className="text-xs text-muted-foreground shrink-0">{branch.count}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="overflow-hidden border-border/60 bg-card/70 shadow-sm shadow-black/5">
-          <CardHeader className="border-b border-border/40 space-y-5 p-5">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <Card className="overflow-hidden border-border/40 bg-card/40 backdrop-blur-sm">
+        <CardHeader className="border-b border-border/40 space-y-4 p-4">
+          <div className="flex flex-wrap items-center gap-2">
               {BUCKETS.map((item) => (
-                <button key={item.value} onClick={() => setBucket(item.value)} className={`whitespace-nowrap rounded-lg border px-3 py-2 text-center text-sm font-medium transition-colors ${bucket === item.value ? "border-primary/30 bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:border-border hover:bg-accent/40 hover:text-foreground"}`}>
+                <button key={item.value} onClick={() => setBucket(item.value)} className={`h-8 whitespace-nowrap rounded-md border px-3 text-xs font-medium transition-colors ${bucket === item.value ? "border-primary/30 bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:border-border hover:bg-accent/40 hover:text-foreground"}`}>
                   {item.label}
                 </button>
               ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[240px] max-w-xl">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input className="h-8 pl-8 text-sm bg-background border-border/60" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search description, staff, vendor, branch..." />
             </div>
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_220px_auto]">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input className="h-11 pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search description, staff, vendor, branch..." />
-                </div>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger className="h-11 w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    {Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {hasActiveFilters && (
-                  <Button type="button" variant="outline" className="h-11 shrink-0" onClick={clearFilters}>
-                    Clear filters
-                  </Button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-                <Input className="h-11" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Vendor" />
-                <Input className="h-11" value={client} onChange={(e) => setClient(e.target.value)} placeholder="Client" />
-                <Input className="h-11" type="number" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} placeholder="Min amount" />
-                <Input className="h-11" type="number" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} placeholder="Max amount" />
-                <Input className="h-11 min-w-0" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                <Input className="h-11 min-w-0" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-              </div>
+            <Select value={requestedById == null ? "all" : String(requestedById)} onValueChange={(value) => setRequestedById(value === "all" ? null : Number(value))}>
+              <SelectTrigger className="h-8 w-[180px] bg-background border-border/60 text-sm"><SelectValue placeholder="Staff" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All staff ({data?.byStaff?.reduce((sum, staff) => sum + staff.count, 0) ?? 0})</SelectItem>
+                {(data?.byStaff ?? []).filter((staff) => staff.userId != null).map((staff) => (
+                  <SelectItem key={staff.userId} value={String(staff.userId)}>{staff.name} ({staff.count})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="h-8 w-[170px] bg-background border-border/60 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input className="h-8 w-36 text-sm bg-background border-border/60" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Vendor" />
+            <Input className="h-8 w-36 text-sm bg-background border-border/60" value={client} onChange={(e) => setClient(e.target.value)} placeholder="Client" />
+            <Input className="h-8 w-32 text-sm bg-background border-border/60" type="number" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} placeholder="Min amount" />
+            <Input className="h-8 w-32 text-sm bg-background border-border/60" type="number" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} placeholder="Max amount" />
+            <Input className="h-8 w-36 text-sm bg-background border-border/60" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <Input className="h-8 w-36 text-sm bg-background border-border/60" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            {hasActiveFilters && (
+              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearFilters}>
+                Clear
+              </Button>
+            )}
+            <span className="ml-auto text-xs text-muted-foreground">
+              {schedules.length} schedule{schedules.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          {(data?.byBranch ?? []).length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Branches:</span>
+              {(data?.byBranch ?? []).map((branch) => (
+                <span key={branch.branchId} className="rounded-full bg-muted/40 px-2 py-1">
+                  {branch.name} - {branch.count}
+                </span>
+              ))}
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
+          )}
+        </CardHeader>
+        <CardContent className="p-0">
             {isLoading ? (
               <div className="flex min-h-[360px] items-center justify-center"><Loader2 className="w-7 h-7 animate-spin text-primary" /></div>
             ) : schedules.length === 0 ? (
@@ -758,7 +792,6 @@ export default function PaymentSchedulesPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       <CreateScheduleDialog open={createOpen} onOpenChange={setCreateOpen} onSubmit={handleCreate} isPending={createSchedule.isPending || createdUpload != null} />
       <ScheduleDetailDialog
