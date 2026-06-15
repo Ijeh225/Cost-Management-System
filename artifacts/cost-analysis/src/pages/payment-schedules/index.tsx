@@ -119,10 +119,10 @@ function canPay(role: string | null, roles: string[]) {
 
 function SummaryCard({ label, value, tone }: { label: string; value: string | number; tone?: string }) {
   return (
-    <Card className="border-border/50 bg-card/40">
-      <CardContent className="pt-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`text-2xl font-bold mt-1 ${tone ?? ""}`}>{value}</p>
+    <Card className="border-border/50 bg-card/60 shadow-sm shadow-black/5">
+      <CardContent className="p-6">
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+        <p className={`text-3xl font-bold mt-3 tracking-tight ${tone ?? ""}`}>{value}</p>
       </CardContent>
     </Card>
   );
@@ -511,6 +511,19 @@ export default function PaymentSchedulesPage() {
   const schedules = data?.schedules ?? [];
   const summary = data?.summary;
   const pendingAction = approve.isPending || partialApprove.isPending || reject.isPending || pay.isPending || complete.isPending || reschedule.isPending || cancel.isPending || comment.isPending;
+  const hasActiveFilters = requestedById != null || status !== "all" || search.trim() !== "" || vendor.trim() !== "" || client.trim() !== "" || amountMin !== "" || amountMax !== "" || dateFrom !== "" || dateTo !== "";
+
+  const clearFilters = () => {
+    setRequestedById(null);
+    setStatus("all");
+    setSearch("");
+    setVendor("");
+    setClient("");
+    setAmountMin("");
+    setAmountMax("");
+    setDateFrom("");
+    setDateTo("");
+  };
 
   const handleCreate = (form: CreateForm, file: File | null) => {
     createSchedule.mutate({
@@ -578,21 +591,25 @@ export default function PaymentSchedulesPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-            <CalendarClock className="w-5 h-5 text-primary" />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <div className="flex flex-col gap-6 rounded-3xl border border-border/50 bg-card/50 p-6 shadow-sm shadow-black/5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+            <CalendarClock className="w-6 h-6 text-primary" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Payment Schedule</h1>
-            <p className="text-sm text-muted-foreground">Submit payment requests for MD approval, payment tracking, and rollover visibility.</p>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">Payment Schedule</h1>
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+              Submit payment requests for MD approval, payment tracking, and rollover visibility.
+            </p>
           </div>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2"><Plus className="w-4 h-4" /> New Schedule</Button>
+        <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2 self-start sm:self-center">
+          <Plus className="w-4 h-4" /> New Schedule
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         <SummaryCard label="Total Scheduled Today" value={summary?.totalScheduledToday ?? 0} tone="text-primary" />
         <SummaryCard label="Pending Approval" value={summary?.totalPendingApproval ?? 0} tone="text-amber-500" />
         <SummaryCard label="Approved" value={summary?.totalApproved ?? 0} tone="text-emerald-500" />
@@ -600,97 +617,128 @@ export default function PaymentSchedulesPage() {
         <SummaryCard label="Overdue Schedules" value={summary?.overdueSchedules ?? 0} tone="text-red-500" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5">
-        <div className="space-y-4">
-          <Card className="border-border/50 bg-card/40">
-            <CardHeader><CardTitle className="text-sm">Schedules By Staff</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              <button onClick={() => setRequestedById(null)} className={`w-full text-left rounded-lg px-3 py-2 text-sm ${requestedById == null ? "bg-primary/10 text-primary" : "hover:bg-accent/40"}`}>
-                All staff
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">
+        <div className="space-y-5">
+          <Card className="border-border/50 bg-card/60 shadow-sm shadow-black/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Schedules By Staff</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <button onClick={() => setRequestedById(null)} className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm transition-colors ${requestedById == null ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"}`}>
+                <span className="font-medium">All staff</span>
+                <span className="text-xs">{data?.byStaff?.reduce((sum, staff) => sum + staff.count, 0) ?? 0}</span>
               </button>
               {(data?.byStaff ?? []).map((staff) => (
-                <button key={staff.userId ?? "unknown"} onClick={() => setRequestedById(staff.userId)} className={`w-full text-left rounded-lg px-3 py-2 text-sm ${requestedById === staff.userId ? "bg-primary/10 text-primary" : "hover:bg-accent/40"}`}>
+                <button key={staff.userId ?? "unknown"} onClick={() => setRequestedById(staff.userId)} className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm transition-colors ${requestedById === staff.userId ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"}`}>
                   <span className="font-medium">{staff.name}</span>
-                  <span className="float-right text-xs text-muted-foreground">{staff.count}</span>
+                  <span className="text-xs">{staff.count}</span>
                 </button>
               ))}
             </CardContent>
           </Card>
-          <Card className="border-border/50 bg-card/40">
-            <CardHeader><CardTitle className="text-sm">Schedules By Branch</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
+          <Card className="border-border/50 bg-card/40 shadow-sm shadow-black/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Schedules By Branch</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
               {(data?.byBranch ?? []).map((branch) => (
-                <div key={branch.branchId} className="flex items-center justify-between text-sm rounded-lg px-3 py-2 bg-muted/30">
-                  <span>{branch.name}</span>
-                  <span className="text-xs text-muted-foreground">{branch.count}</span>
+                <div key={branch.branchId} className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 px-4 py-3 text-sm">
+                  <span className="truncate">{branch.name}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">{branch.count}</span>
                 </div>
               ))}
             </CardContent>
           </Card>
         </div>
 
-        <Card className="border-border/50 bg-card/40">
-          <CardHeader className="border-b border-border/40 space-y-4">
-            <div className="flex gap-1 flex-wrap">
+        <Card className="overflow-hidden border-border/50 bg-card/60 shadow-sm shadow-black/5">
+          <CardHeader className="border-b border-border/40 space-y-6 p-6">
+            <div className="flex gap-2 flex-wrap">
               {BUCKETS.map((item) => (
-                <button key={item.value} onClick={() => setBucket(item.value)} className={`px-3 py-1.5 rounded-md text-xs font-medium ${bucket === item.value ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-accent/40"}`}>
+                <button key={item.value} onClick={() => setBucket(item.value)} className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${bucket === item.value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"}`}>
                   {item.label}
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-              <div className="relative md:col-span-2">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search description, staff, vendor, branch..." />
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 xl:flex-row">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input className="h-12 pl-10 text-base" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search description, staff, vendor, branch..." />
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger className="h-12 w-full xl:w-[220px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      {Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {hasActiveFilters && (
+                    <Button type="button" variant="outline" className="h-12 shrink-0" onClick={clearFilters}>
+                      Clear filters
+                    </Button>
+                  )}
+                </div>
               </div>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Vendor" />
-              <Input value={client} onChange={(e) => setClient(e.target.value)} placeholder="Client" />
-              <Input type="number" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} placeholder="Min amount" />
-              <Input type="number" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} placeholder="Max amount" />
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                <Input className="h-11" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Vendor" />
+                <Input className="h-11" value={client} onChange={(e) => setClient(e.target.value)} placeholder="Client" />
+                <Input className="h-11" type="number" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} placeholder="Min amount" />
+                <Input className="h-11" type="number" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} placeholder="Max amount" />
+                <div className="grid grid-cols-1 gap-3 md:col-span-2 md:grid-cols-2 xl:col-span-1">
+                  <Input className="h-11" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                  <Input className="h-11" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                </div>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-primary" /></div>
+              <div className="flex min-h-[420px] items-center justify-center"><Loader2 className="w-7 h-7 animate-spin text-primary" /></div>
             ) : schedules.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center gap-2 text-muted-foreground">
-                <Clock className="w-10 h-10 opacity-40" />
-                <p>No payment schedules found.</p>
+              <div className="flex min-h-[420px] flex-col items-center justify-center px-6 py-20 text-center">
+                <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-border/60 bg-muted/30">
+                  <Clock className="w-10 h-10 text-muted-foreground/70" />
+                </div>
+                <h3 className="text-xl font-semibold tracking-tight">No payment schedules found</h3>
+                <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                  {hasActiveFilters
+                    ? "Try clearing your filters or switching schedule tabs to see more requests."
+                    : "Create a schedule when a payment needs approval, tracking, or future processing."}
+                </p>
+                <div className="mt-6 flex flex-wrap justify-center gap-3">
+                  {hasActiveFilters && <Button variant="outline" onClick={clearFilters}>Clear filters</Button>}
+                  <Button onClick={() => setCreateOpen(true)} className="gap-2"><Plus className="w-4 h-4" /> Create Schedule</Button>
+                </div>
               </div>
             ) : (
               <div className="divide-y divide-border/30">
                 {schedules.map((schedule) => (
-                  <div key={schedule.id} className="p-4 hover:bg-accent/20 transition-colors">
-                    <div className="flex items-start gap-4">
+                  <div key={schedule.id} className="p-6 hover:bg-accent/20 transition-colors">
+                    <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button onClick={() => setDetailId(schedule.id)} className="font-semibold hover:text-primary text-left">{schedule.vendorBeneficiary}</button>
+                        <div className="flex items-start justify-between gap-3">
+                          <button onClick={() => setDetailId(schedule.id)} className="text-lg font-semibold hover:text-primary text-left">{schedule.vendorBeneficiary}</button>
+                        </div>
+                        <div className="mt-3 flex items-center gap-2 flex-wrap">
                           {schedule.overheadExpenseId && <Badge variant="outline" className="text-[10px]">Source: Overhead Expense</Badge>}
                           <Badge variant="outline" className={STATUS_COLORS[schedule.status]}>{STATUS_LABELS[schedule.status]}</Badge>
                           <Badge variant="outline" className={PRIORITY_COLORS[schedule.priority]}>{schedule.priority}</Badge>
                           {schedule.overdueLevel && <Badge variant="outline" className={OVERDUE_COLORS[schedule.overdueLevel]}><AlertTriangle className="w-3 h-3 mr-1" /> {schedule.overdueDays} days overdue</Badge>}
                           <BranchChip branchId={schedule.branchId} />
                         </div>
-                        <p className="text-sm text-muted-foreground mt-1">{schedule.description}</p>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3 text-xs">
-                          <span>Schedule: <b>{dateLabel(schedule.scheduleDate)}</b></span>
-                          <span>By: <b>{schedule.requestedByName}</b></span>
-                          <span>Requested: <b>{formatCurrency(schedule.amountRequested)}</b></span>
-                          <span>Paid: <b>{formatCurrency(schedule.amountPaid)}</b></span>
-                          <span>Balance: <b>{formatCurrency(schedule.balance)}</b></span>
+                        <p className="text-sm text-muted-foreground mt-3 leading-6">{schedule.description}</p>
+                        <div className="mt-5 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-5">
+                          <div className="rounded-xl bg-muted/25 px-4 py-3"><span className="block text-xs text-muted-foreground">Schedule</span><b>{dateLabel(schedule.scheduleDate)}</b></div>
+                          <div className="rounded-xl bg-muted/25 px-4 py-3"><span className="block text-xs text-muted-foreground">Requested By</span><b>{schedule.requestedByName}</b></div>
+                          <div className="rounded-xl bg-muted/25 px-4 py-3"><span className="block text-xs text-muted-foreground">Requested</span><b>{formatCurrency(schedule.amountRequested)}</b></div>
+                          <div className="rounded-xl bg-muted/25 px-4 py-3"><span className="block text-xs text-muted-foreground">Paid</span><b>{formatCurrency(schedule.amountPaid)}</b></div>
+                          <div className="rounded-xl bg-muted/25 px-4 py-3"><span className="block text-xs text-muted-foreground">Balance</span><b>{formatCurrency(schedule.balance)}</b></div>
                         </div>
                         {schedule.clientName && <p className="text-xs text-muted-foreground mt-1">Client: {schedule.clientName}</p>}
                       </div>
-                      <div className="flex flex-col gap-2 shrink-0">
+                      <div className="flex shrink-0 flex-row gap-2 xl:flex-col">
                         <Button size="sm" variant="outline" onClick={() => setDetailId(schedule.id)}>Details</Button>
                         <div className="flex gap-1">
                           {canMdApprove && schedule.status === "pending_approval" && (
