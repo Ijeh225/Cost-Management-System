@@ -119,10 +119,10 @@ function canPay(role: string | null, roles: string[]) {
 
 function SummaryCard({ label, value, tone }: { label: string; value: string | number; tone?: string }) {
   return (
-    <Card className="border-border/50 bg-card/60 shadow-sm shadow-black/5">
-      <CardContent className="p-6">
+    <Card className="border-border/60 bg-card/70 shadow-sm shadow-black/5">
+      <CardContent className="p-5">
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <p className={`text-3xl font-bold mt-3 tracking-tight ${tone ?? ""}`}>{value}</p>
+        <p className={`text-2xl font-bold mt-2 tracking-tight ${tone ?? ""}`}>{value}</p>
       </CardContent>
     </Card>
   );
@@ -591,25 +591,25 @@ export default function PaymentSchedulesPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      <div className="flex flex-col gap-6 rounded-3xl border border-border/50 bg-card/50 p-6 shadow-sm shadow-black/5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-            <CalendarClock className="w-6 h-6 text-primary" />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 space-y-6">
+      <div className="flex flex-col gap-4 rounded-2xl border border-border/60 bg-card/65 p-5 shadow-sm shadow-black/5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-11 h-11 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+            <CalendarClock className="w-5 h-5 text-primary" />
           </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">Payment Schedule</h1>
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight">Payment Schedule</h1>
             <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
               Submit payment requests for MD approval, payment tracking, and rollover visibility.
             </p>
           </div>
         </div>
-        <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2 self-start sm:self-center">
+        <Button onClick={() => setCreateOpen(true)} className="gap-2 self-start px-5 sm:self-center">
           <Plus className="w-4 h-4" /> New Schedule
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <SummaryCard label="Total Scheduled Today" value={summary?.totalScheduledToday ?? 0} tone="text-primary" />
         <SummaryCard label="Pending Approval" value={summary?.totalPendingApproval ?? 0} tone="text-amber-500" />
         <SummaryCard label="Approved" value={summary?.totalApproved ?? 0} tone="text-emerald-500" />
@@ -617,32 +617,32 @@ export default function PaymentSchedulesPage() {
         <SummaryCard label="Overdue Schedules" value={summary?.overdueSchedules ?? 0} tone="text-red-500" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">
-        <div className="space-y-5">
-          <Card className="border-border/50 bg-card/60 shadow-sm shadow-black/5">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Schedules By Staff</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5 items-start">
+        <div className="space-y-4">
+          <Card className="border-border/60 bg-card/70 shadow-sm shadow-black/5">
+            <CardHeader className="px-5 pb-2 pt-5">
+              <CardTitle className="text-sm font-semibold">Schedules By Staff</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <button onClick={() => setRequestedById(null)} className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm transition-colors ${requestedById == null ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"}`}>
+            <CardContent className="space-y-2 px-5 pb-5">
+              <button onClick={() => setRequestedById(null)} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors ${requestedById == null ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"}`}>
                 <span className="font-medium">All staff</span>
                 <span className="text-xs">{data?.byStaff?.reduce((sum, staff) => sum + staff.count, 0) ?? 0}</span>
               </button>
               {(data?.byStaff ?? []).map((staff) => (
-                <button key={staff.userId ?? "unknown"} onClick={() => setRequestedById(staff.userId)} className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm transition-colors ${requestedById === staff.userId ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"}`}>
+                <button key={staff.userId ?? "unknown"} onClick={() => setRequestedById(staff.userId)} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${requestedById === staff.userId ? "bg-primary/10 text-primary ring-1 ring-primary/20" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"}`}>
                   <span className="font-medium">{staff.name}</span>
                   <span className="text-xs">{staff.count}</span>
                 </button>
               ))}
             </CardContent>
           </Card>
-          <Card className="border-border/50 bg-card/40 shadow-sm shadow-black/5">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Schedules By Branch</CardTitle>
+          <Card className="border-border/60 bg-card/55 shadow-sm shadow-black/5">
+            <CardHeader className="px-5 pb-2 pt-5">
+              <CardTitle className="text-sm font-semibold">Schedules By Branch</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2 px-5 pb-5">
               {(data?.byBranch ?? []).map((branch) => (
-                <div key={branch.branchId} className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 px-4 py-3 text-sm">
+                <div key={branch.branchId} className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 px-3 py-2.5 text-sm">
                   <span className="truncate">{branch.name}</span>
                   <span className="text-xs text-muted-foreground shrink-0">{branch.count}</span>
                 </div>
@@ -651,65 +651,63 @@ export default function PaymentSchedulesPage() {
           </Card>
         </div>
 
-        <Card className="overflow-hidden border-border/50 bg-card/60 shadow-sm shadow-black/5">
-          <CardHeader className="border-b border-border/40 space-y-6 p-6">
-            <div className="flex gap-2 flex-wrap">
+        <Card className="overflow-hidden border-border/60 bg-card/70 shadow-sm shadow-black/5">
+          <CardHeader className="border-b border-border/40 space-y-5 p-5">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
               {BUCKETS.map((item) => (
-                <button key={item.value} onClick={() => setBucket(item.value)} className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${bucket === item.value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"}`}>
+                <button key={item.value} onClick={() => setBucket(item.value)} className={`whitespace-nowrap rounded-lg border px-3 py-2 text-center text-sm font-medium transition-colors ${bucket === item.value ? "border-primary/30 bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:border-border hover:bg-accent/40 hover:text-foreground"}`}>
                   {item.label}
                 </button>
               ))}
             </div>
-            <div className="space-y-4">
-              <div className="flex flex-col gap-3 xl:flex-row">
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_220px_auto]">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input className="h-12 pl-10 text-base" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search description, staff, vendor, branch..." />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input className="h-11 pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search description, staff, vendor, branch..." />
                 </div>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger className="h-12 w-full xl:w-[220px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      {Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  {hasActiveFilters && (
-                    <Button type="button" variant="outline" className="h-12 shrink-0" onClick={clearFilters}>
-                      Clear filters
-                    </Button>
-                  )}
-                </div>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger className="h-11 w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    {Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {hasActiveFilters && (
+                  <Button type="button" variant="outline" className="h-11 shrink-0" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                )}
               </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
                 <Input className="h-11" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Vendor" />
                 <Input className="h-11" value={client} onChange={(e) => setClient(e.target.value)} placeholder="Client" />
                 <Input className="h-11" type="number" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} placeholder="Min amount" />
                 <Input className="h-11" type="number" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} placeholder="Max amount" />
-                <div className="grid grid-cols-1 gap-3 md:col-span-2 md:grid-cols-2 xl:col-span-1">
-                  <Input className="h-11" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                  <Input className="h-11" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-                </div>
+                <Input className="h-11 min-w-0" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                <Input className="h-11 min-w-0" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
               </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex min-h-[420px] items-center justify-center"><Loader2 className="w-7 h-7 animate-spin text-primary" /></div>
+              <div className="flex min-h-[360px] items-center justify-center"><Loader2 className="w-7 h-7 animate-spin text-primary" /></div>
             ) : schedules.length === 0 ? (
-              <div className="flex min-h-[420px] flex-col items-center justify-center px-6 py-20 text-center">
-                <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-border/60 bg-muted/30">
-                  <Clock className="w-10 h-10 text-muted-foreground/70" />
-                </div>
-                <h3 className="text-xl font-semibold tracking-tight">No payment schedules found</h3>
-                <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-                  {hasActiveFilters
-                    ? "Try clearing your filters or switching schedule tabs to see more requests."
-                    : "Create a schedule when a payment needs approval, tracking, or future processing."}
-                </p>
-                <div className="mt-6 flex flex-wrap justify-center gap-3">
-                  {hasActiveFilters && <Button variant="outline" onClick={clearFilters}>Clear filters</Button>}
-                  <Button onClick={() => setCreateOpen(true)} className="gap-2"><Plus className="w-4 h-4" /> Create Schedule</Button>
+              <div className="flex min-h-[360px] items-center justify-center px-6 py-12">
+                <div className="mx-auto flex max-w-md flex-col items-center rounded-2xl border border-dashed border-border/70 bg-muted/20 px-8 py-10 text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-border/60 bg-background/70">
+                    <Clock className="w-7 h-7 text-muted-foreground/70" />
+                  </div>
+                  <h3 className="text-lg font-semibold tracking-tight">No payment schedules found</h3>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {hasActiveFilters
+                      ? "Try clearing your filters or switching schedule tabs to see more requests."
+                      : "Create a schedule when a payment needs approval, tracking, or future processing."}
+                  </p>
+                  <div className="mt-5 flex flex-wrap justify-center gap-3">
+                    {hasActiveFilters && <Button variant="outline" onClick={clearFilters}>Clear filters</Button>}
+                    <Button onClick={() => setCreateOpen(true)} variant="outline" className="gap-2"><Plus className="w-4 h-4" /> Create Schedule</Button>
+                  </div>
                 </div>
               </div>
             ) : (
