@@ -788,6 +788,14 @@ export default function OverheadExpensesPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-[11px] gap-1"
+                                onClick={() => window.open(`/overhead-expenses/${e.id}/print`, "_blank", "noopener,noreferrer")}
+                              >
+                                <Receipt className="w-3 h-3" /> Generate Statement
+                              </Button>
                               <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1 text-blue-400 border-blue-500/30 hover:bg-blue-500/10" onClick={() => setTopupTarget(e)}>
                                 <WalletCards className="w-3 h-3" /> Add Money
                               </Button>

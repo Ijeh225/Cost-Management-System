@@ -40,6 +40,7 @@ import DutyPaymentsPage from "@/pages/duty-payments/index";
 import BanksPage from "@/pages/banks/index";
 import BankDetailPage from "@/pages/banks/[id]";
 import OverheadExpensesPage from "@/pages/overhead-expenses/index";
+import OverheadExpensePrintPage from "@/pages/overhead-expenses/print/[id]";
 import PaymentSchedulesPage from "@/pages/payment-schedules/index";
 import ContainerPaymentsPage from "@/pages/container-payments/index";
 import DocumentationWorkspace from "@/pages/workspace/documentation";
@@ -233,6 +234,7 @@ function Router() {
       <Route path="/setup" component={Setup} />
       <Route path="/containers/:id/print" component={ContainerPrintPage} />
       <Route path="/invoices/:id/print" component={InvoicePrintPage} />
+      <Route path="/overhead-expenses/:id/print" component={OverheadExpensePrintPage} />
       <Route path="/credit-notes/:id/print" component={CreditNotePrintPage} />
       <Route path="/reports/client-statement/print" component={ClientStatementPrint} />
       <Route path="/reports/vat-summary/print" component={VatSummaryPrint} />
