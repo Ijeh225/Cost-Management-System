@@ -251,36 +251,39 @@ function PayApprovedPaymentDialog({ target, onOpenChange, onSubmit, isPending }:
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-md">
+      <DialogContent className="w-[calc(100vw-2rem)] border-border/50 bg-card/95 backdrop-blur sm:max-w-2xl">
         <DialogHeader><DialogTitle>Pay Approved Payment</DialogTitle></DialogHeader>
         <div className="rounded-lg border border-border/40 bg-muted/30 p-3 space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium flex items-center">{expense.description}<BranchChip branchId={expense.branchId} /></p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-1 text-sm font-medium break-words">
+                <span className="min-w-0 break-words">{expense.description}</span>
+                <BranchChip branchId={expense.branchId} />
+              </p>
               <p className="text-xs text-muted-foreground">{expense.category}</p>
             </div>
-            <Badge variant="outline" className={`text-[10px] shrink-0 ${SCHEDULE_STATUS_COLORS[schedule.status] ?? ""}`}>{scheduleDisplayLabel(schedule)}</Badge>
+            <Badge variant="outline" className={`w-fit max-w-full whitespace-normal break-words text-left text-[10px] sm:shrink-0 ${SCHEDULE_STATUS_COLORS[schedule.status] ?? ""}`}>{scheduleDisplayLabel(schedule)}</Badge>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
             <div className="rounded-md bg-background/60 p-2">
               <p className="text-muted-foreground">MD Approved</p>
-              <p className="font-semibold text-emerald-500">{formatCurrency(schedule.amountApproved)}</p>
+              <p className="break-words font-semibold text-emerald-500">{formatCurrency(schedule.amountApproved)}</p>
             </div>
             <div className="rounded-md bg-background/60 p-2">
               <p className="text-muted-foreground">Pay Now</p>
-              <p className="font-semibold">{formatCurrency(approvedRemaining)}</p>
+              <p className="break-words font-semibold">{formatCurrency(approvedRemaining)}</p>
             </div>
             <div className="rounded-md bg-background/60 p-2">
               <p className="text-muted-foreground">Already Paid</p>
-              <p className="font-semibold text-green-400">{formatCurrency(schedule.amountPaid)}</p>
+              <p className="break-words font-semibold text-green-400">{formatCurrency(schedule.amountPaid)}</p>
             </div>
             <div className="rounded-md bg-background/60 p-2">
               <p className="text-muted-foreground">Expense Balance</p>
-              <p className="font-semibold text-red-400">{formatCurrency(expense.balance)}</p>
+              <p className="break-words font-semibold text-red-400">{formatCurrency(expense.balance)}</p>
             </div>
           </div>
           {schedule.latestComment && (
-            <p className="text-xs text-muted-foreground">MD instruction: {schedule.latestComment}</p>
+            <p className="break-words text-xs text-muted-foreground">MD instruction: {schedule.latestComment}</p>
           )}
           <p className="text-[11px] text-muted-foreground">Payment date will be captured automatically when you click Pay.</p>
         </div>
@@ -289,7 +292,7 @@ function PayApprovedPaymentDialog({ target, onOpenChange, onSubmit, isPending }:
             <Label className="text-xs text-muted-foreground">Payment Source</Label>
             <Controller name="paymentMethod" control={control} render={({ field }) => (
               <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="bank">Bank Account</SelectItem>
@@ -302,7 +305,7 @@ function PayApprovedPaymentDialog({ target, onOpenChange, onSubmit, isPending }:
               <Label className="text-xs text-muted-foreground">Bank Account</Label>
               <Controller name="bankId" control={control} rules={{ required: paymentMethod === "bank" }} render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Select bank" /></SelectTrigger>
                   <SelectContent>{(banks ?? []).map(b => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}</SelectContent>
                 </Select>
               )} />
@@ -311,9 +314,9 @@ function PayApprovedPaymentDialog({ target, onOpenChange, onSubmit, isPending }:
           )}
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Notes <span className="text-muted-foreground/50">(optional)</span></Label>
-            <Input {...register("notes")} placeholder="Reference, cheque no., or payment note" />
+            <Input className="w-full" {...register("notes")} placeholder="Reference, cheque no., or payment note" />
           </div>
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={isPending || approvedRemaining <= 0}>
               {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Pay {formatCurrency(approvedRemaining)}
