@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useGetSettings, useUpdateSettings, customFetch } from "@workspace/api-client-react";
+import { useGetSettings, useUpdateSettings, customFetch, useListUsers } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound } from "lucide-react";
+import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound, ShieldCheck } from "lucide-react";
 
 const DEFAULTS = {
   agingInactivityDays: "7",
@@ -24,6 +24,7 @@ const DEFAULTS = {
 
 export default function SettingsPage() {
   const { data: settings = {}, isLoading } = useGetSettings();
+  const { data: users = [] } = useListUsers();
   const updateMutation = useUpdateSettings();
   const { toast } = useToast();
 
@@ -51,6 +52,7 @@ export default function SettingsPage() {
   const [digestFrequency, setDigestFrequency] = useState<"none" | "daily" | "weekly">("none");
   const [digestTime, setDigestTime] = useState("08:00");
   const [digestLastSentAt, setDigestLastSentAt] = useState<string | null>(null);
+  const [verificationOfficerUserId, setVerificationOfficerUserId] = useState("none");
   const [saving, setSaving] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -66,6 +68,7 @@ export default function SettingsPage() {
       setDigestFrequency((s["digestFrequency"] as "none" | "daily" | "weekly") ?? "none");
       setDigestTime(s["digestTime"] ?? "08:00");
       setDigestLastSentAt(s["digestLastSentAt"] ?? null);
+      setVerificationOfficerUserId(s["verificationOfficerUserId"] || "none");
     }
   }, [isLoading]);
 
@@ -97,6 +100,7 @@ export default function SettingsPage() {
         agingEmailTo: emailTo.trim(),
         digestFrequency,
         digestTime,
+        verificationOfficerUserId: verificationOfficerUserId === "none" ? "" : verificationOfficerUserId,
       });
       toast({ title: "Settings saved" });
       setDirty(false);
@@ -123,6 +127,7 @@ export default function SettingsPage() {
         agingEmailTo: emailTo.trim(),
         digestFrequency,
         digestTime,
+        verificationOfficerUserId: verificationOfficerUserId === "none" ? "" : verificationOfficerUserId,
       });
       const result = await customFetch<{
         sent: number;
@@ -159,12 +164,70 @@ export default function SettingsPage() {
     );
   }
 
+  const activeUsers = (users ?? []).filter((u: any) => u.isActive !== false);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">System Settings</h1>
         <p className="text-muted-foreground text-sm mt-1">Configure alert thresholds and system behaviour.</p>
       </div>
+
+      {/* Verification Officer */}
+      <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="w-4 h-4 text-primary" />
+            Verification Officer
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Choose the only user allowed to verify new containers before they enter the operational pipeline.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Assigned verification officer</Label>
+            <Select
+              value={verificationOfficerUserId}
+              onValueChange={(value) => { setVerificationOfficerUserId(value); mark(); }}
+            >
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Select officer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Not configured</SelectItem>
+                {activeUsers.map((u: any) => (
+                  <SelectItem key={u.id} value={String(u.id)}>
+                    {u.name} ({u.role})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Admins and super admins can still view pending records, but only this officer can complete verification.
+            </p>
+          </div>
+
+          {verificationOfficerUserId === "none" && (
+            <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10">
+              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-amber-500">Verification officer not configured</p>
+                <p className="text-xs text-muted-foreground">
+                  New containers can still be created, but verification will be blocked until an officer is assigned.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-1">
+            <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Settings
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Aging Alerts */}
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm">

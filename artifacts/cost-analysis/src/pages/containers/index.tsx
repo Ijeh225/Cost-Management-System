@@ -52,7 +52,7 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
 
 export default function Containers() {
   const [, setLocation] = useLocation();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isBranchMember } = useAuth();
   const qc = useQueryClient();
   const { toast } = useToast();
 
@@ -110,7 +110,7 @@ export default function Containers() {
   const { data: pendingData } = useListContainers(
     { page: 1, limit: 100, status: "pending_verification" },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { query: { enabled: isAdmin } as any }
+    { query: { enabled: isBranchMember } as any }
   );
   const pendingCount = pendingData?.total ?? 0;
 
@@ -216,7 +216,7 @@ export default function Containers() {
         )}
       </div>
 
-      {isAdmin && pendingCount > 0 && (
+      {isBranchMember && pendingCount > 0 && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center gap-4">
           <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
           <div className="flex-1">
@@ -224,7 +224,7 @@ export default function Containers() {
               {pendingCount} Container{pendingCount !== 1 ? "s" : ""} Awaiting Verification
             </h4>
             <p className="text-xs text-amber-300/70 mt-0.5">
-              New containers must be verified before they enter the operational pipeline.
+              New containers must be verified by the assigned Verification Officer before they enter the operational pipeline.
             </p>
           </div>
           <Button

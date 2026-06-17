@@ -1756,10 +1756,12 @@ export default function ContainerDetail() {
           <div className="flex-1">
             <h4 className="font-semibold text-amber-400 text-sm">Awaiting Verification</h4>
             <p className="text-xs text-amber-300/70 mt-0.5">
-              This container must be verified by an admin before it enters the operational pipeline.
+              {container.verificationOfficerName
+                ? `Awaiting verification by ${container.verificationOfficerName}.`
+                : "Verification officer is not configured. Super admin must assign one in Settings."}
             </p>
           </div>
-          {isAdmin && (
+          {container.verificationOfficerId && user?.id === container.verificationOfficerId ? (
             <Button
               size="sm"
               className="bg-amber-500 hover:bg-amber-600 text-white shrink-0 gap-1.5"
@@ -1777,7 +1779,21 @@ export default function ContainerDetail() {
               {verifyContainerMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
               Verify Container
             </Button>
+          ) : (
+            <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-500/10 shrink-0">
+              View only
+            </Badge>
           )}
+        </div>
+      )}
+
+      {container.verifiedAt && (
+        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg p-3 flex items-center gap-3">
+          <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+          <p className="text-xs text-emerald-600 dark:text-emerald-400">
+            Verified by {container.verifiedByName ?? "Verification Officer"} on{" "}
+            {new Date(container.verifiedAt).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })}.
+          </p>
         </div>
       )}
 

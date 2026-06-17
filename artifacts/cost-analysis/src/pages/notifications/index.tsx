@@ -160,6 +160,8 @@ const ALERT_CONFIG: Record<string, { icon: any; color: string; bg: string; borde
 
 const WORKFLOW_TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string; border: string; label: string }> = {
   new_job:       { icon: BriefcaseIcon,  color: "text-blue-400",    bg: "bg-blue-400/10",    border: "border-blue-400/20",    label: "New Job"         },
+  container_awaiting_verification: { icon: ShieldCheck, color: "text-amber-400", bg: "bg-amber-400/10", border: "border-amber-400/20", label: "Awaiting Verification" },
+  container_verified: { icon: ShieldCheck, color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", label: "Container Verified" },
   stage_complete:{ icon: CheckCircle2,   color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", label: "Stage Completed" },
   overdue:       { icon: AlertTriangle,  color: "text-red-400",     bg: "bg-red-400/10",     border: "border-red-400/20",     label: "Overdue Stage"   },
   delay_recorded:{ icon: Clock,          color: "text-amber-400",   bg: "bg-amber-400/10",   border: "border-amber-400/20",   label: "Delay Recorded"  },
@@ -212,6 +214,7 @@ function getWorkflowEventUrl(type: string, containerId?: number | null): string 
   const ops  = `/operations/${containerId}?from=${FROM}`;
   const base = `/containers/${containerId}?from=${FROM}`;
   switch (type) {
+    case "container_awaiting_verification": return base;
     case "new_job": return base;
     default:        return ops;
   }
@@ -379,7 +382,7 @@ function WorkflowEventRow({ notif }: { notif: WorkflowNotification }) {
           {notif.containerNumber && !isSecurityUser && (
             <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
               <ArrowRight className="w-3 h-3" />
-              {notif.type === "new_job" ? "View Container" : "Open in Operations"} · {notif.containerNumber}
+              {notif.type === "new_job" || notif.type === "container_awaiting_verification" ? "View Container" : "Open in Operations"} · {notif.containerNumber}
             </div>
           )}
         </div>

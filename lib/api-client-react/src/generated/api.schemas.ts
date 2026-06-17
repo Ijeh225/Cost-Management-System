@@ -125,6 +125,8 @@ export interface Container {
   lockedSections?: string[];
   assignedStaffId?: number | null;
   assignedStaffName?: string | null;
+  verificationOfficerId?: number | null;
+  verificationOfficerName?: string | null;
   totalCost: number;
   clearingCharges: number;
   grossProfit: number;
@@ -147,6 +149,9 @@ export interface Container {
   berthingConfirmedAt?: string | null;
   berthingConfirmedById?: number | null;
   berthingConfirmedByName?: string | null;
+  verifiedAt?: string | null;
+  verifiedBy?: number | null;
+  verifiedByName?: string | null;
   createdAt: string;
   updatedAt: string;
   expectedTransireDate?: string | null;

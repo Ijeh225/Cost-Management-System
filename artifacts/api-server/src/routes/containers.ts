@@ -1,11 +1,26 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable, workflowNotificationsTable, containerStageNotesTable } from "@workspace/db";
+import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable, workflowNotificationsTable, containerStageNotesTable, settingsTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
 
 const router = Router();
+const VERIFICATION_OFFICER_SETTING_KEY = "verificationOfficerUserId";
+
+async function getConfiguredVerificationOfficerId(): Promise<number | null> {
+  const [setting] = await db.select({ value: settingsTable.value })
+    .from(settingsTable)
+    .where(eq(settingsTable.key, VERIFICATION_OFFICER_SETTING_KEY));
+  const id = Number.parseInt(setting?.value ?? "", 10);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+async function getUserName(userId: number | null | undefined): Promise<string | null> {
+  if (!userId) return null;
+  const [user] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, userId));
+  return user?.name ?? null;
+}
 
 function canUserEditSection(
   user: { role: string; sectionPermission: string | null; sectionPermissions: string | null },
@@ -29,7 +44,14 @@ function canUserEditSection(
   return true;
 }
 
-function formatContainer(c: any, staffName?: string | null, clientName?: string | null, berthingConfirmedByName?: string | null) {
+function formatContainer(
+  c: any,
+  staffName?: string | null,
+  clientName?: string | null,
+  berthingConfirmedByName?: string | null,
+  verificationOfficerName?: string | null,
+  verifiedByName?: string | null,
+) {
   let lockedSections: string[] = [];
   try { lockedSections = JSON.parse(c.lockedSections ?? "[]"); } catch {}
   return {
@@ -45,6 +67,8 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     lockedSections,
     assignedStaffId: c.assignedStaffId ?? null,
     assignedStaffName: staffName ?? null,
+    verificationOfficerId: c.verificationOfficerId ?? null,
+    verificationOfficerName: verificationOfficerName ?? null,
     branchId: c.branchId ?? null,
     clientId: c.clientId ?? null,
     clientName: clientName ?? null,
@@ -81,6 +105,7 @@ function formatContainer(c: any, staffName?: string | null, clientName?: string 
     berthingConfirmedByName: berthingConfirmedByName ?? null,
     verifiedAt: c.verifiedAt instanceof Date ? c.verifiedAt.toISOString() : (c.verifiedAt ?? null),
     verifiedBy: c.verifiedBy ?? null,
+    verifiedByName: verifiedByName ?? null,
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
     expectedTransireDate: c.expectedTransireDate instanceof Date ? c.expectedTransireDate.toISOString() : (c.expectedTransireDate ?? null),
@@ -256,7 +281,8 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     // and must be reviewed by an admin before entering operations. This gate is
     // applied unconditionally so it cannot be bypassed via the status parameter.
     const isAdmin = req.user?.role === "admin" || req.user?.role === "super_admin";
-    if (!isAdmin) {
+    const requestedPendingVerification = status?.split(",").map(s => s.trim()).includes("pending_verification");
+    if (!isAdmin && !requestedPendingVerification) {
       conditions.push(ne(containersTable.status, "pending_verification"));
     }
     if (status && status !== "all") {
@@ -296,8 +322,12 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     const [{ count }] = await countQuery;
     const rows = await query.orderBy(desc(containersTable.updatedAt)).limit(limit).offset(offset);
 
-    // Fetch assigned staff names
-    const staffIds = [...new Set(rows.map(r => r.assignedStaffId).filter(Boolean))];
+    // Fetch assigned staff / verification names
+    const staffIds = [...new Set([
+      ...rows.map(r => r.assignedStaffId).filter(Boolean),
+      ...rows.map(r => r.verificationOfficerId).filter(Boolean),
+      ...rows.map(r => r.verifiedBy).filter(Boolean),
+    ])];
     const staffMap: Record<number, string> = {};
     if (staffIds.length > 0) {
       const staffRows = await db.select({ id: usersTable.id, name: usersTable.name })
@@ -356,7 +386,14 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     }
 
     const containers = rows.map(c => ({
-      ...formatContainer(c, c.assignedStaffId ? staffMap[c.assignedStaffId] ?? null : null, c.clientId ? clientMap[c.clientId] ?? null : null),
+      ...formatContainer(
+        c,
+        c.assignedStaffId ? staffMap[c.assignedStaffId] ?? null : null,
+        c.clientId ? clientMap[c.clientId] ?? null : null,
+        null,
+        c.verificationOfficerId ? staffMap[c.verificationOfficerId] ?? null : null,
+        c.verifiedBy ? staffMap[c.verifiedBy] ?? null : null,
+      ),
       totalCost: totalsMap[c.id] ?? 0,
       grossProfit: parseFloat(c.clearingCharges ?? "0") - (totalsMap[c.id] ?? 0),
       dutyNotPaid: dutyMap[c.id] ?? 0,
@@ -404,6 +441,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
         return res.status(400).json({ error: "Selected client belongs to a different branch." });
       }
     }
+    const verificationOfficerId = await getConfiguredVerificationOfficerId();
     const [container] = await db.insert(containersTable).values({
       customerName: resolvedCustomerName,
       containerNumber,
@@ -417,17 +455,29 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       eta: eta ? new Date(eta) : null,
       consignee: consignee || null,
       branchId: createBranchId,
+      verificationOfficerId,
     }).returning();
     await getOrCreateCharges(container.id);
     // Notify: new job created
-    await db.insert(workflowNotificationsTable).values({
-      type: "new_job",
-      branchId: container.branchId,
-      message: `New job created: ${containerNumber} (${resolvedCustomerName})`,
-      containerId: container.id,
-      containerNumber: container.containerNumber,
-    });
-    return res.status(201).json(formatContainer(container));
+    await db.insert(workflowNotificationsTable).values([
+      {
+        type: "new_job",
+        branchId: container.branchId,
+        message: `New job created: ${containerNumber} (${resolvedCustomerName})`,
+        containerId: container.id,
+        containerNumber: container.containerNumber,
+      },
+      ...(verificationOfficerId ? [{
+        type: "container_awaiting_verification",
+        branchId: container.branchId,
+        targetUserId: verificationOfficerId,
+        message: `Container awaiting verification: ${containerNumber}`,
+        containerId: container.id,
+        containerNumber: container.containerNumber,
+      }] : []),
+    ]);
+    const verificationOfficerName = await getUserName(verificationOfficerId);
+    return res.status(201).json(formatContainer(container, null, null, null, verificationOfficerName));
   } catch (err: any) {
     if (err.code === "23505") {
       return res.status(400).json({ error: "Container number or BL number already exists" });
@@ -495,6 +545,7 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
     let created = 0;
     const duplicates: string[] = [];
     const errors: string[] = [];
+    const verificationOfficerId = await getConfiguredVerificationOfficerId();
 
     // Pre-validate: reject entire upload if any row is missing a valid command
     const missingCommandRows: number[] = [];
@@ -539,8 +590,19 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
           eta: etaDate,
           consignee: row.consignee ?? null,
           branchId: uploadBranchId,
+          verificationOfficerId,
         }).returning();
         await getOrCreateCharges(container.id);
+        if (verificationOfficerId) {
+          await db.insert(workflowNotificationsTable).values({
+            type: "container_awaiting_verification",
+            branchId: container.branchId,
+            targetUserId: verificationOfficerId,
+            message: `Container awaiting verification: ${container.containerNumber}`,
+            containerId: container.id,
+            containerNumber: container.containerNumber,
+          });
+        }
         created++;
       } catch (err: any) {
         if (err.code === "23505") {
@@ -966,7 +1028,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
   }
 });
 
-router.post("/containers/:id/verify", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+router.post("/containers/:id/verify", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
@@ -976,8 +1038,23 @@ router.post("/containers/:id/verify", requireBranchAdminOrAbove, async (req: Aut
     if (existing.status !== "pending_verification") {
       return res.status(400).json({ error: "Container is not in pending verification state" });
     }
+    const configuredOfficerId = await getConfiguredVerificationOfficerId();
+    const assignedOfficerId = existing.verificationOfficerId ?? configuredOfficerId;
+    if (!assignedOfficerId) {
+      return res.status(503).json({ error: "Verification officer is not configured. Super admin must assign one in Settings." });
+    }
+    if (req.user!.id !== assignedOfficerId) {
+      const officerName = await getUserName(assignedOfficerId);
+      return res.status(403).json({ error: `Only the assigned Verification Officer${officerName ? ` (${officerName})` : ""} can verify this container.` });
+    }
     const [updated] = await db.update(containersTable)
-      .set({ status: "registered", verifiedAt: new Date(), verifiedBy: req.user!.id, updatedAt: new Date() })
+      .set({
+        status: "registered",
+        verificationOfficerId: assignedOfficerId,
+        verifiedAt: new Date(),
+        verifiedBy: req.user!.id,
+        updatedAt: new Date(),
+      })
       .where(eq(containersTable.id, id))
       .returning();
     await db.insert(auditLogTable).values({
@@ -995,7 +1072,8 @@ router.post("/containers/:id/verify", requireBranchAdminOrAbove, async (req: Aut
         containerId: id, containerNumber: existing.containerNumber,
       });
     } catch {}
-    return res.json(formatContainer(updated));
+    const verifierName = await getUserName(req.user!.id);
+    return res.json(formatContainer(updated, null, null, null, verifierName, verifierName));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -1436,6 +1514,12 @@ router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       const [bcu] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, c.berthingConfirmedById));
       berthingConfirmedByName = bcu?.name ?? null;
     }
+    let verificationOfficerName: string | null = null;
+    const effectiveVerificationOfficerId = c.verificationOfficerId ?? await getConfiguredVerificationOfficerId();
+    if (effectiveVerificationOfficerId) {
+      verificationOfficerName = await getUserName(effectiveVerificationOfficerId);
+    }
+    const verifiedByName = await getUserName(c.verifiedBy);
     const charges = await getOrCreateCharges(id);
     const extraChargeRows = await db.select().from(containerExtraChargesTable)
       .where(eq(containerExtraChargesTable.containerId, id))
@@ -1445,7 +1529,14 @@ router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     const dutyNotPaid = parseFloat(charges.customs.dutyNotPaid ?? "0");
 
     const containerFormatted = {
-      ...formatContainer(c, staffName, clientName, berthingConfirmedByName),
+      ...formatContainer(
+        { ...c, verificationOfficerId: effectiveVerificationOfficerId },
+        staffName,
+        clientName,
+        berthingConfirmedByName,
+        verificationOfficerName,
+        verifiedByName,
+      ),
       totalCost,
       grossProfit: parseFloat(c.clearingCharges ?? "0") - totalCost,
       dutyNotPaid,

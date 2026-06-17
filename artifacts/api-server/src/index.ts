@@ -605,6 +605,13 @@ async function runStartupMigrations() {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS workflow_notifications_target_user_idx ON workflow_notifications(target_user_id)`);
     });
+    await runMigration("container_verification_officer_v1", async () => {
+      await pool.query(`
+        ALTER TABLE containers
+          ADD COLUMN IF NOT EXISTS verification_officer_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS containers_verification_officer_idx ON containers(verification_officer_id)`);
+    });
     await runMigration("whatsapp_messages_meta_provider_v1", async () => {
       await pool.query(`
         ALTER TABLE whatsapp_messages

@@ -8,7 +8,7 @@ import {
   useMarkAllNotificationsRead,
   type WorkflowNotification,
 } from "@workspace/api-client-react";
-import { Bell, CheckCheck, BriefcaseIcon, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
+import { Bell, CheckCheck, BriefcaseIcon, CheckCircle2, AlertTriangle, Clock, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -21,6 +21,8 @@ import {
 
 const NOTIF_TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string }> = {
   new_job:       { icon: BriefcaseIcon,  color: "text-blue-400"          },
+  container_awaiting_verification: { icon: ShieldCheck, color: "text-amber-400" },
+  container_verified: { icon: ShieldCheck, color: "text-emerald-400" },
   stage_complete:{ icon: CheckCircle2,   color: "text-emerald-400"        },
   overdue:       { icon: AlertTriangle,  color: "text-red-400"            },
   delay_recorded:{ icon: Clock,          color: "text-amber-400"          },
@@ -235,7 +237,15 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
                   setOpen(false);
                 }}
               >
-                <Link href={n.type.startsWith("payment_schedule_") ? "/payment-schedules" : n.containerId ? `/operations/${n.containerId}` : "/notifications"}>
+                <Link href={
+                  n.type.startsWith("payment_schedule_")
+                    ? "/payment-schedules"
+                    : n.containerId
+                      ? n.type === "container_awaiting_verification" || n.type === "new_job"
+                        ? `/containers/${n.containerId}`
+                        : `/operations/${n.containerId}`
+                      : "/notifications"
+                }>
                   <div className="flex items-start gap-3 w-full">
                     <Icon className={`w-4 h-4 shrink-0 mt-0.5 ${cfg.color}`} />
                     <div className="flex-1 min-w-0">
