@@ -471,6 +471,7 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payment-schedules", requireB
           type: "payment_schedule_created",
           message: `${req.user?.name ?? "A user"} scheduled overhead payment ${amount.toLocaleString("en-NG")} for ${vendorBeneficiary}`,
           targetUserId,
+          actionUrl: `/payment-schedules?focus=${schedule.id}`,
         })));
       }
     } catch (notifyErr) {

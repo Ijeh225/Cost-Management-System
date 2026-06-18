@@ -32,7 +32,7 @@ import {
   Clock, ShieldAlert, ListTodo, Activity, CheckCheck,
   ExternalLink, Loader2, RefreshCw, XCircle, Anchor,
   BriefcaseIcon, CheckCircle2, Filter, CalendarRange, ArrowRight,
-  History, CheckCircle, Circle, ShieldCheck,
+  History, CheckCircle, Circle, ShieldCheck, FileText, CreditCard,
 } from "lucide-react";
 
 // ─── Security Container Info Modal ─────────────────────────────────────────────
@@ -162,6 +162,10 @@ const WORKFLOW_TYPE_CONFIG: Record<string, { icon: any; color: string; bg: strin
   new_job:       { icon: BriefcaseIcon,  color: "text-blue-400",    bg: "bg-blue-400/10",    border: "border-blue-400/20",    label: "New Job"         },
   container_awaiting_verification: { icon: ShieldCheck, color: "text-amber-400", bg: "bg-amber-400/10", border: "border-amber-400/20", label: "Awaiting Verification" },
   container_verified: { icon: ShieldCheck, color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", label: "Container Verified" },
+  berthing_confirmed: { icon: Anchor, color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20", label: "Vessel Berthed" },
+  invoice_created: { icon: FileText, color: "text-cyan-400", bg: "bg-cyan-400/10", border: "border-cyan-400/20", label: "Invoice Created" },
+  invoice_paid: { icon: CreditCard, color: "text-green-400", bg: "bg-green-400/10", border: "border-green-400/20", label: "Payment Recorded" },
+  section_submitted: { icon: ShieldAlert, color: "text-violet-400", bg: "bg-violet-400/10", border: "border-violet-400/20", label: "Section Submitted" },
   stage_complete:{ icon: CheckCircle2,   color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", label: "Stage Completed" },
   overdue:       { icon: AlertTriangle,  color: "text-red-400",     bg: "bg-red-400/10",     border: "border-red-400/20",     label: "Overdue Stage"   },
   delay_recorded:{ icon: Clock,          color: "text-amber-400",   bg: "bg-amber-400/10",   border: "border-amber-400/20",   label: "Delay Recorded"  },
@@ -208,15 +212,41 @@ function getAlertUrl(type: string, containerId?: number): string {
   }
 }
 
-function getWorkflowEventUrl(type: string, containerId?: number | null): string {
+function getWorkflowEventUrl(notif: WorkflowNotification): string {
+  if (notif.actionUrl) return notif.actionUrl;
+  const { type, containerId } = notif;
   if (type.startsWith("payment_schedule_")) return "/payment-schedules";
   if (!containerId) return "/notifications";
   const ops  = `/operations/${containerId}?from=${FROM}`;
   const base = `/containers/${containerId}?from=${FROM}`;
   switch (type) {
+    case "new_job":
+    case "container_verified":
     case "container_awaiting_verification": return base;
-    case "new_job": return base;
+    case "berthing_confirmed": return `${base}&section=berthing`;
+    case "invoice_created": return `${base}&tab=charges`;
+    case "invoice_paid": return `${base}&tab=payments`;
+    case "section_submitted": return base;
+    case "stage_complete":
+    case "overdue":
+    case "delay_recorded": return ops;
     default:        return ops;
+  }
+}
+
+function getWorkflowActionLabel(notif: WorkflowNotification): string {
+  const { type, containerId } = notif;
+  if (type.startsWith("payment_schedule_")) return "View Schedule";
+  if (!containerId && !notif.actionUrl) return "View";
+  switch (type) {
+    case "new_job": return "View Job";
+    case "container_awaiting_verification": return "Verify Container";
+    case "container_verified": return "View Container";
+    case "berthing_confirmed": return "View Berthing";
+    case "invoice_created": return "View Invoice";
+    case "invoice_paid": return "View Payment";
+    case "section_submitted": return "View Section";
+    default: return "Open Record";
   }
 }
 
@@ -307,7 +337,7 @@ function NotificationRow({ notif }: { notif: Notification }) {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
-          {!isSecurityUser && (
+          {notif.containerNumber && !isSecurityUser && (
             <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
               <ArrowRight className="w-3 h-3" />
               {getAlertActionLabel(notif.type, notif.containerId)}
@@ -334,7 +364,7 @@ function WorkflowEventRow({ notif }: { notif: WorkflowNotification }) {
     if (isSecurityUser && notif.containerId) {
       setModalOpen(true);
     } else {
-      navigate(getWorkflowEventUrl(notif.type, notif.containerId));
+      navigate(getWorkflowEventUrl(notif));
     }
   };
 
@@ -379,7 +409,7 @@ function WorkflowEventRow({ notif }: { notif: WorkflowNotification }) {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
-          {notif.containerNumber && !isSecurityUser && (
+          {!isSecurityUser && (
             <div className="mt-2 flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
               <ArrowRight className="w-3 h-3" />
               {notif.type === "new_job" || notif.type === "container_awaiting_verification" ? "View Container" : "Open in Operations"} · {notif.containerNumber}

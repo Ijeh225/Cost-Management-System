@@ -308,6 +308,33 @@ export function useConfirmBerthing() {
   });
 }
 
+export type ReviseBerthingEtaRequest = {
+  eta: string;
+  note?: string;
+};
+
+export type ReviseBerthingEtaResponse = {
+  container: import("./generated/api.schemas").Container;
+};
+
+export function useReviseBerthingEta() {
+  const qc = useQueryClient();
+  return useMutation<ReviseBerthingEtaResponse, Error, { id: number } & ReviseBerthingEtaRequest>({
+    mutationFn: ({ id, ...data }) =>
+      customFetch<ReviseBerthingEtaResponse>(`/api/containers/${id}/berthing-eta`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
+      qc.invalidateQueries({ queryKey: [`/api/containers/${id}/audit`] });
+      qc.invalidateQueries({ queryKey: ["/api/containers"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
 export type CheckDuplicatesRequest = {
   containerNumbers: string[];
   blNumbers: string[];

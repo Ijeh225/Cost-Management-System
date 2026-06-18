@@ -21,6 +21,7 @@ import {
   type BuiltinExtraField,
   useVerifyContainer,
   useConfirmBerthing,
+  useReviseBerthingEta,
   useAuthorizeEarlyStart,
   useRevokeEarlyStart,
 } from "@workspace/api-client-react";
@@ -1175,8 +1176,11 @@ export default function ContainerDetail() {
   const [editSectionsOpen, setEditSectionsOpen] = useState(false);
   const [invoiceDialog, setInvoiceDialog] = useState(false);
   const [showEditDetails, setShowEditDetails] = useState(false);
-  const [berthingConfirmStep, setBerthingConfirmStep] = useState<"idle" | "confirm">("idle");
+  const [berthingConfirmStep, setBerthingConfirmStep] = useState<"idle" | "confirm" | "revise">("idle");
+  const [revisedBerthingEta, setRevisedBerthingEta] = useState("");
+  const [revisedBerthingNote, setRevisedBerthingNote] = useState("");
   const confirmBerthingMutation = useConfirmBerthing();
+  const reviseBerthingEtaMutation = useReviseBerthingEta();
   const [, setLocation] = useLocation();
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [trackingData, setTrackingData] = useState<TrackingResult | null>(null);
@@ -1896,8 +1900,9 @@ export default function ContainerDetail() {
         const isEtaArrived = etaDay <= today;
         if (!isEtaArrived) return null;
         const overdueDays = Math.floor((today.getTime() - etaDay.getTime()) / (1000 * 60 * 60 * 24));
+        const isBusy = confirmBerthingMutation.isPending || reviseBerthingEtaMutation.isPending;
         return (
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 flex items-center gap-4">
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 flex flex-col gap-4">
             <Anchor className="w-5 h-5 text-blue-400 shrink-0" />
             <div className="flex-1">
               <h4 className="font-semibold text-blue-400 text-sm">
@@ -1906,8 +1911,8 @@ export default function ContainerDetail() {
                   : "Vessel ETA Is Today — Confirm Berthing"}
               </h4>
               <p className="text-xs text-blue-300/70 mt-0.5">
-                Has the vessel berthed at the terminal? Confirm to update records
-                {container.clientId ? " and optionally notify the client via WhatsApp." : "."}
+                Has the vessel berthed at the port? Confirm to update records
+                {container.clientId ? " and optionally notify the client via WhatsApp, or update the revised ETA if it has not berthed." : ", or update the revised ETA if it has not berthed."}
               </p>
             </div>
             {berthingConfirmStep === "idle" ? (
@@ -1919,16 +1924,16 @@ export default function ContainerDetail() {
                 <Anchor className="w-3.5 h-3.5" />
                 Confirm Berthing
               </Button>
-            ) : (
-              <div className="flex items-center gap-2 shrink-0">
+            ) : berthingConfirmStep === "confirm" ? (
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                 <span className="text-xs text-blue-300">
-                  {container.clientId ? "Notify client via WhatsApp?" : "Confirm berthing?"}
+                  Has this vessel berthed at the port?
                 </span>
                 {container.clientId && (
                   <Button
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
-                    disabled={confirmBerthingMutation.isPending}
+                    disabled={isBusy}
                     onClick={async () => {
                       try {
                         const res = await confirmBerthingMutation.mutateAsync({ id: containerId, sendWhatsApp: true });
@@ -1946,14 +1951,14 @@ export default function ContainerDetail() {
                     }}
                   >
                     {confirmBerthingMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                    Yes + Notify
+                    Yes + Notify Client
                   </Button>
                 )}
                 <Button
                   size="sm"
                   variant="outline"
                   className="border-blue-500/40 text-blue-400 hover:bg-blue-500/10 gap-1.5"
-                  disabled={confirmBerthingMutation.isPending}
+                  disabled={isBusy}
                   onClick={async () => {
                     try {
                       await confirmBerthingMutation.mutateAsync({ id: containerId, sendWhatsApp: false });
@@ -1965,17 +1970,97 @@ export default function ContainerDetail() {
                   }}
                 >
                   {confirmBerthingMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  {container.clientId ? "Yes, No Notify" : "Confirm"}
+                  {container.clientId ? "Yes, No Notification" : "Yes, Confirm"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-amber-500/40 text-amber-500 hover:bg-amber-500/10 gap-1.5"
+                  disabled={isBusy}
+                  onClick={() => {
+                    setRevisedBerthingEta("");
+                    setRevisedBerthingNote("");
+                    setBerthingConfirmStep("revise");
+                  }}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  Not Yet Berthed
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
                   className="text-muted-foreground"
                   onClick={() => setBerthingConfirmStep("idle")}
-                  disabled={confirmBerthingMutation.isPending}
+                  disabled={isBusy}
                 >
                   Cancel
                 </Button>
+              </div>
+            ) : (
+              <div className="w-full rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Not yet berthed - update revised ETA</p>
+                  <p className="text-xs text-muted-foreground">Use the date provided by the shipping line or terminal. The berthing reminder will follow this new ETA.</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[220px_1fr]">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="revised-berthing-eta">Revised ETA / berthing date</Label>
+                    <Input
+                      id="revised-berthing-eta"
+                      type="date"
+                      value={revisedBerthingEta}
+                      onChange={(event) => setRevisedBerthingEta(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="revised-berthing-note">Note / source (optional)</Label>
+                    <Textarea
+                      id="revised-berthing-note"
+                      value={revisedBerthingNote}
+                      onChange={(event) => setRevisedBerthingNote(event.target.value)}
+                      placeholder="e.g. Shipping line revised ETA"
+                      className="min-h-[42px]"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+                    disabled={isBusy}
+                    onClick={async () => {
+                      if (!revisedBerthingEta) {
+                        toast({ variant: "destructive", title: "Revised ETA required", description: "Select the new ETA or berthing date before saving." });
+                        return;
+                      }
+                      try {
+                        await reviseBerthingEtaMutation.mutateAsync({
+                          id: containerId,
+                          eta: revisedBerthingEta,
+                          note: revisedBerthingNote.trim() || undefined,
+                        });
+                        toast({ title: "Revised ETA saved", description: "Berthing reminder rescheduled." });
+                        setBerthingConfirmStep("idle");
+                        setRevisedBerthingEta("");
+                        setRevisedBerthingNote("");
+                      } catch (err) {
+                        toast({ variant: "destructive", title: "Failed", description: err instanceof Error ? err.message : "Could not update revised ETA" });
+                      }
+                    }}
+                  >
+                    {reviseBerthingEtaMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    Save Revised ETA
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    onClick={() => setBerthingConfirmStep("confirm")}
+                    disabled={isBusy}
+                  >
+                    Back
+                  </Button>
+                </div>
               </div>
             )}
           </div>

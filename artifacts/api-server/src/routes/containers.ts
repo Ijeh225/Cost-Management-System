@@ -466,6 +466,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
         message: `New job created: ${containerNumber} (${resolvedCustomerName})`,
         containerId: container.id,
         containerNumber: container.containerNumber,
+        actionUrl: `/containers/${container.id}`,
       },
       ...(verificationOfficerId ? [{
         type: "container_awaiting_verification",
@@ -474,6 +475,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
         message: `Container awaiting verification: ${containerNumber}`,
         containerId: container.id,
         containerNumber: container.containerNumber,
+        actionUrl: `/containers/${container.id}?section=verification`,
       }] : []),
     ]);
     const verificationOfficerName = await getUserName(verificationOfficerId);
@@ -601,6 +603,7 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
             message: `Container awaiting verification: ${container.containerNumber}`,
             containerId: container.id,
             containerNumber: container.containerNumber,
+            actionUrl: `/containers/${container.id}?section=verification`,
           });
         }
         created++;
@@ -621,6 +624,7 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
         type: "bulk_import", branchId: uploadBranchId,
         message: `Bulk import complete — ${summary}`,
         containerId: null, containerNumber: null,
+        actionUrl: "/containers",
       });
     } catch {}
     return res.json({ created, duplicates, errors });
@@ -1019,6 +1023,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
         containerId: id,
         branchId: existing.branchId,
         containerNumber: existing.containerNumber,
+        actionUrl: `/operations/${id}`,
       });
     } catch {}
     return res.json(formatContainer(updated));
@@ -1070,6 +1075,7 @@ router.post("/containers/:id/verify", requireAuth, async (req: AuthRequest, res)
         type: "container_verified", branchId: existing.branchId,
         message: `Container verified and moved to pipeline: ${existing.containerNumber}`,
         containerId: id, containerNumber: existing.containerNumber,
+        actionUrl: `/containers/${id}`,
       });
     } catch {}
     const verifierName = await getUserName(req.user!.id);
@@ -1111,6 +1117,7 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
         type: "berthing_confirmed", branchId: existing.branchId,
         message: `Vessel berthed — clearing underway: ${existing.containerNumber}`,
         containerId: id, containerNumber: existing.containerNumber,
+        actionUrl: `/containers/${id}?section=berthing`,
       });
     } catch {}
     const { sendWhatsApp } = req.body;
@@ -1121,7 +1128,7 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
         const { toE164Nigerian, sendWhatsAppTemplate, assertBranchWhatsAppSenderSupported } = await import("../lib/whatsapp.js");
         const phone = toE164Nigerian(client.contactPhone);
         const vesselInfo = existing.vessel ? ` (Vessel: ${existing.vessel})` : "";
-        const message = `Hello! We're pleased to inform you that the vessel carrying your container ${existing.containerNumber}${vesselInfo} has berthed at the terminal. Clearing is now underway. — Cost Analysis Team`;
+        const message = `Hello! We're pleased to inform you that the vessel carrying your container ${existing.containerNumber}${vesselInfo} has berthed at the port. Clearing is now underway. - Cost Analysis Team`;
         const branchSender = await assertBranchWhatsAppSenderSupported(existing.branchId);
         whatsappResult = branchSender.error
           ? { success: false, error: branchSender.error }
@@ -1129,6 +1136,57 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
       }
     }
     return res.json({ container: formatContainer(updated), whatsappResult });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.patch("/containers/:id/berthing-eta", requireAuth, async (req: AuthRequest, res) => {
+  const userRole = req.user?.role;
+  if (userRole !== "admin" && userRole !== "super_admin" && userRole !== "operations_user") {
+    return res.status(403).json({ error: "Only admin and operations users can revise berthing ETA." });
+  }
+  try {
+    const id = parseInt(String(req.params.id));
+    const { eta, note } = req.body ?? {};
+    if (typeof eta !== "string" || !eta.trim() || isNaN(new Date(eta).getTime())) {
+      return res.status(400).json({ error: "A valid revised ETA is required." });
+    }
+    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (!existing || !userCanAccessBranch(req, existing.branchId)) {
+      return res.status(404).json({ error: "Container not found" });
+    }
+    if (existing.status === "closed") {
+      return res.status(400).json({ error: "Closed containers cannot have berthing ETA revised." });
+    }
+    if (existing.berthed) {
+      return res.status(400).json({ error: "This vessel has already been marked as berthed." });
+    }
+
+    const revisedEta = new Date(eta);
+    const previousEta = existing.eta instanceof Date
+      ? existing.eta.toISOString().slice(0, 10)
+      : existing.eta
+        ? new Date(existing.eta).toISOString().slice(0, 10)
+        : "not set";
+    const revisedEtaLabel = revisedEta.toISOString().slice(0, 10);
+    const cleanNote = typeof note === "string" ? note.trim() : "";
+    const [updated] = await db.update(containersTable)
+      .set({ eta: revisedEta, updatedAt: new Date() })
+      .where(eq(containersTable.id, id))
+      .returning();
+
+    await db.insert(auditLogTable).values({
+      containerId: id,
+      branchId: existing.branchId,
+      userId: req.user!.id,
+      action: "berthing_eta_revised",
+      section: "basic_info",
+      reason: `Berthing ETA revised from ${previousEta} to ${revisedEtaLabel}${cleanNote ? ` - ${cleanNote}` : ""}`,
+    });
+
+    return res.json({ container: formatContainer(updated) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -1214,6 +1272,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
         containerId: id,
         branchId: existing.branchId,
         containerNumber: existing.containerNumber,
+        actionUrl: action === "mark_released" ? `/operations/${id}` : `/operations/${id}`,
       });
     }
     return res.json(formatContainer(updated));

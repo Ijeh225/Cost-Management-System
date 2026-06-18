@@ -334,6 +334,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
     try {
       const invoiceMsg = `Invoice ${invoiceNumber} created — ₦${Math.round(total).toLocaleString("en-NG")}${clientName ? ` for ${clientName}` : ""}`;
       const invoiceCtrNum = containers.length === 1 ? containers[0].containerNumber : null;
+      const invoiceActionUrl = `/invoices/${inv.id}`;
       const assignedUsers = clientId
         ? await db.select({ userId: userClientAssignmentsTable.userId }).from(userClientAssignmentsTable).where(eq(userClientAssignmentsTable.clientId, clientId))
         : [];
@@ -343,6 +344,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
             type: "invoice_created", branchId: createBranchId,
             message: invoiceMsg, containerId: singleContainerId,
             containerNumber: invoiceCtrNum, targetUserId: a.userId,
+            actionUrl: invoiceActionUrl,
           }))
         );
       } else {
@@ -350,6 +352,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
           type: "invoice_created", branchId: createBranchId,
           message: invoiceMsg, containerId: singleContainerId,
           containerNumber: invoiceCtrNum,
+          actionUrl: invoiceActionUrl,
         });
       }
     } catch {}
@@ -1019,6 +1022,7 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
         message: `Payment of ₦${Math.round(amount).toLocaleString("en-NG")} recorded on ${inv.invoiceNumber} (${newStatus})`,
         containerId: inv.containerId ?? null,
         containerNumber: null,
+        actionUrl: `/invoices/${invoiceId}`,
       });
     } catch {}
     return res.status(201).json({ success: true, totalPaid, status: newStatus, overpaymentStored });

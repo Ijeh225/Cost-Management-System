@@ -19,6 +19,7 @@ export const workflowNotificationsTable = pgTable("workflow_notifications", {
   branchId: integer("branch_id").notNull().default(1),
   type: text("type").notNull(), // new_job | stage_complete | overdue | delay_recorded
   message: text("message").notNull(),
+  actionUrl: text("action_url"),
   containerId: integer("container_id").references(() => containersTable.id, { onDelete: "cascade" }),
   containerNumber: text("container_number"),
   targetUserId: integer("target_user_id").references(() => usersTable.id, { onDelete: "cascade" }),

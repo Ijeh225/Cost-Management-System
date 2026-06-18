@@ -8,7 +8,7 @@ import {
   useMarkAllNotificationsRead,
   type WorkflowNotification,
 } from "@workspace/api-client-react";
-import { Bell, CheckCheck, BriefcaseIcon, CheckCircle2, AlertTriangle, Clock, ShieldCheck } from "lucide-react";
+import { Anchor, Bell, CheckCheck, BriefcaseIcon, CheckCircle2, AlertTriangle, Clock, CreditCard, FileText, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,6 +23,9 @@ const NOTIF_TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string
   new_job:       { icon: BriefcaseIcon,  color: "text-blue-400"          },
   container_awaiting_verification: { icon: ShieldCheck, color: "text-amber-400" },
   container_verified: { icon: ShieldCheck, color: "text-emerald-400" },
+  berthing_confirmed: { icon: Anchor, color: "text-blue-400" },
+  invoice_created: { icon: FileText, color: "text-cyan-400" },
+  invoice_paid: { icon: CreditCard, color: "text-green-400" },
   stage_complete:{ icon: CheckCircle2,   color: "text-emerald-400"        },
   overdue:       { icon: AlertTriangle,  color: "text-red-400"            },
   delay_recorded:{ icon: Clock,          color: "text-amber-400"          },
@@ -42,6 +45,40 @@ const NOTIF_TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string
   payment_schedule_cancelled:   { icon: AlertTriangle, color: "text-zinc-400" },
   payment_schedule_comment:     { icon: Clock, color: "text-violet-400" },
 };
+
+const FROM = encodeURIComponent("/notifications");
+
+function getWorkflowEventUrl(n: WorkflowNotification): string {
+  if (n.actionUrl) return n.actionUrl;
+  if (n.type.startsWith("payment_schedule_")) return "/payment-schedules";
+  if (!n.containerId) return "/notifications";
+  const base = `/containers/${n.containerId}?from=${FROM}`;
+  const ops = `/operations/${n.containerId}?from=${FROM}`;
+  switch (n.type) {
+    case "new_job":
+    case "container_awaiting_verification":
+    case "container_verified":
+      return base;
+    case "berthing_confirmed":
+      return `${base}&section=berthing`;
+    case "invoice_created":
+      return `${base}&tab=charges`;
+    case "invoice_paid":
+      return `${base}&tab=payments`;
+    case "section_submitted":
+      return base;
+    case "stage_complete":
+    case "overdue":
+    case "delay_recorded":
+    case "gate_in":
+    case "gate_out":
+    case "empty_gate_in":
+    case "empty_gate_out":
+      return ops;
+    default:
+      return base;
+  }
+}
 
 function playBeep(ctx: AudioContext) {
   const osc = ctx.createOscillator();
@@ -237,15 +274,7 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
                   setOpen(false);
                 }}
               >
-                <Link href={
-                  n.type.startsWith("payment_schedule_")
-                    ? "/payment-schedules"
-                    : n.containerId
-                      ? n.type === "container_awaiting_verification" || n.type === "new_job"
-                        ? `/containers/${n.containerId}`
-                        : `/operations/${n.containerId}`
-                      : "/notifications"
-                }>
+                <Link href={getWorkflowEventUrl(n)}>
                   <div className="flex items-start gap-3 w-full">
                     <Icon className={`w-4 h-4 shrink-0 mt-0.5 ${cfg.color}`} />
                     <div className="flex-1 min-w-0">

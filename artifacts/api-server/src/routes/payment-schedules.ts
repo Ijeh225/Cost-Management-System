@@ -180,6 +180,7 @@ async function notifyUsers(params: {
   message: string;
   target: "approvers" | "accounts" | "creator";
   creatorId?: number | null;
+  actionUrl?: string | null;
 }) {
   try {
     let targets: number[] = [];
@@ -209,6 +210,7 @@ async function notifyUsers(params: {
       type: params.type,
       message: params.message,
       targetUserId,
+      actionUrl: params.actionUrl ?? null,
     })));
   } catch (err) {
     console.warn("[payment-schedules] notification warning:", err);
@@ -393,6 +395,7 @@ paymentSchedulesRouter.post("/payment-schedules", requireAuth, async (req: AuthR
       type: "payment_schedule_created",
       message: `${req.user!.name} requested ${amount.toLocaleString("en-NG")} for ${schedule.vendorBeneficiary}`,
       target: "approvers",
+      actionUrl: `/payment-schedules?focus=${schedule.id}`,
     });
 
     return res.status(201).json(formatSchedule({ ...schedule, requesterName: req.user!.name, branchName: null }));
@@ -482,7 +485,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/approve", requireAuth, asyn
       updatedAt: new Date(),
     }).where(eq(paymentSchedulesTable.id, id)).returning();
     await addEvent({ branchId: updated.branchId, scheduleId: id, type: "approved", actorUserId: req.user!.id, comment: req.body.comment ?? "Approved.", amount: toNumber(updated.amountApproved), oldStatus: schedule.status, newStatus: updated.status });
-    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_approved", message: `Payment schedule approved for ${updated.vendorBeneficiary}`, target: "accounts" });
+    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_approved", message: `Payment schedule approved for ${updated.vendorBeneficiary}`, target: "accounts", actionUrl: `/payment-schedules?focus=${updated.id}` });
     return res.json(formatSchedule(updated));
   } catch (err) {
     console.error("[payment-schedules] approve error:", err);
@@ -506,7 +509,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/partial-approve", requireAu
       updatedAt: new Date(),
     }).where(eq(paymentSchedulesTable.id, id)).returning();
     await addEvent({ branchId: updated.branchId, scheduleId: id, type: "partial_approved", actorUserId: req.user!.id, comment: req.body.comment ?? null, amount: approvedAmount, oldStatus: schedule.status, newStatus: updated.status });
-    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_approved", message: `Payment schedule partially approved for ${updated.vendorBeneficiary}`, target: "accounts" });
+    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_approved", message: `Payment schedule partially approved for ${updated.vendorBeneficiary}`, target: "accounts", actionUrl: `/payment-schedules?focus=${updated.id}` });
     return res.json(formatSchedule(updated));
   } catch (err) {
     console.error("[payment-schedules] partial approve error:", err);
@@ -524,7 +527,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/reject", requireAuth, async
     if (!comment) return res.status(400).json({ error: "Rejection reason is required" });
     const [updated] = await db.update(paymentSchedulesTable).set({ status: "rejected", updatedAt: new Date() }).where(eq(paymentSchedulesTable.id, id)).returning();
     await addEvent({ branchId: updated.branchId, scheduleId: id, type: "rejected", actorUserId: req.user!.id, comment, oldStatus: schedule.status, newStatus: updated.status });
-    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_rejected", message: `Payment schedule rejected for ${updated.vendorBeneficiary}: ${comment}`, target: "creator", creatorId: updated.requestedById });
+    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_rejected", message: `Payment schedule rejected for ${updated.vendorBeneficiary}: ${comment}`, target: "creator", creatorId: updated.requestedById, actionUrl: `/payment-schedules?focus=${updated.id}` });
     return res.json(formatSchedule(updated));
   } catch (err) {
     console.error("[payment-schedules] reject error:", err);
@@ -590,7 +593,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/pay", requireAuth, async (r
       }
     }
     await addEvent({ branchId: updated.branchId, scheduleId: id, type: "paid", actorUserId: req.user!.id, comment: req.body.comment ?? null, amount, oldStatus: schedule.status, newStatus: updated.status });
-    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_paid", message: `Payment recorded for ${updated.vendorBeneficiary}`, target: "creator", creatorId: updated.requestedById });
+    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_paid", message: `Payment recorded for ${updated.vendorBeneficiary}`, target: "creator", creatorId: updated.requestedById, actionUrl: `/payment-schedules?focus=${updated.id}` });
     return res.json(formatSchedule(updated));
   } catch (err) {
     console.error("[payment-schedules] pay error:", err);
@@ -608,7 +611,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/complete", requireAuth, asy
     if (toNumber(schedule.amountPaid) < approved) return res.status(400).json({ error: "Schedule cannot be completed until balance is zero" });
     const [updated] = await db.update(paymentSchedulesTable).set({ status: "completed", completedAt: new Date(), updatedAt: new Date() }).where(eq(paymentSchedulesTable.id, id)).returning();
     await addEvent({ branchId: updated.branchId, scheduleId: id, type: "completed", actorUserId: req.user!.id, comment: req.body.comment ?? "Completed.", oldStatus: schedule.status, newStatus: updated.status });
-    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_completed", message: `Payment schedule completed for ${updated.vendorBeneficiary}`, target: "creator", creatorId: updated.requestedById });
+    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_completed", message: `Payment schedule completed for ${updated.vendorBeneficiary}`, target: "creator", creatorId: updated.requestedById, actionUrl: `/payment-schedules?focus=${updated.id}` });
     return res.json(formatSchedule(updated));
   } catch (err) {
     console.error("[payment-schedules] complete error:", err);
@@ -627,7 +630,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/reschedule", requireAuth, a
     if (!nextDate) return res.status(400).json({ error: "Valid scheduleDate is required" });
     const [updated] = await db.update(paymentSchedulesTable).set({ scheduleDate: nextDate, updatedAt: new Date() }).where(eq(paymentSchedulesTable.id, id)).returning();
     await addEvent({ branchId: updated.branchId, scheduleId: id, type: "rescheduled", actorUserId: req.user!.id, comment: req.body.comment ?? null, oldScheduleDate: schedule.scheduleDate, newScheduleDate: nextDate });
-    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_rescheduled", message: `Payment schedule rescheduled for ${updated.vendorBeneficiary}`, target: "creator", creatorId: updated.requestedById });
+    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_rescheduled", message: `Payment schedule rescheduled for ${updated.vendorBeneficiary}`, target: "creator", creatorId: updated.requestedById, actionUrl: `/payment-schedules?focus=${updated.id}` });
     return res.json(formatSchedule(updated));
   } catch (err) {
     console.error("[payment-schedules] reschedule error:", err);
@@ -645,7 +648,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/cancel", requireAuth, async
     const comment = String(req.body.comment ?? req.body.reason ?? "").trim();
     const [updated] = await db.update(paymentSchedulesTable).set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() }).where(eq(paymentSchedulesTable.id, id)).returning();
     await addEvent({ branchId: updated.branchId, scheduleId: id, type: "cancelled", actorUserId: req.user!.id, comment: comment || null, oldStatus: schedule.status, newStatus: updated.status });
-    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_cancelled", message: `Payment schedule cancelled for ${updated.vendorBeneficiary}`, target: "creator", creatorId: updated.requestedById });
+    await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_cancelled", message: `Payment schedule cancelled for ${updated.vendorBeneficiary}`, target: "creator", creatorId: updated.requestedById, actionUrl: `/payment-schedules?focus=${updated.id}` });
     return res.json(formatSchedule(updated));
   } catch (err) {
     console.error("[payment-schedules] cancel error:", err);
@@ -663,7 +666,7 @@ paymentSchedulesRouter.post("/payment-schedules/:id/comments", requireAuth, asyn
     await addEvent({ branchId: schedule.branchId, scheduleId: id, type: "comment_added", actorUserId: req.user!.id, comment });
     const notifyCreator = isApprover(req) || canMarkPaid(req);
     if (notifyCreator) {
-      await notifyUsers({ branchId: schedule.branchId, type: "payment_schedule_comment", message: `New comment on payment schedule for ${schedule.vendorBeneficiary}: ${comment}`, target: "creator", creatorId: schedule.requestedById });
+      await notifyUsers({ branchId: schedule.branchId, type: "payment_schedule_comment", message: `New comment on payment schedule for ${schedule.vendorBeneficiary}: ${comment}`, target: "creator", creatorId: schedule.requestedById, actionUrl: `/payment-schedules?focus=${schedule.id}` });
     }
     return res.status(201).json({ ok: true });
   } catch (err) {

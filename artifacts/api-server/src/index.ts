@@ -605,6 +605,12 @@ async function runStartupMigrations() {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS workflow_notifications_target_user_idx ON workflow_notifications(target_user_id)`);
     });
+    await runMigration("workflow_notifications_action_url_v1", async () => {
+      await pool.query(`
+        ALTER TABLE workflow_notifications
+          ADD COLUMN IF NOT EXISTS action_url TEXT
+      `);
+    });
     await runMigration("container_verification_officer_v1", async () => {
       await pool.query(`
         ALTER TABLE containers

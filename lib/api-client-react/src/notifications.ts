@@ -41,6 +41,7 @@ export type WorkflowNotification = {
   branchId?: number;
   type: string;
   message: string;
+  actionUrl?: string | null;
   containerId?: number | null;
   containerNumber?: string | null;
   targetUserId?: number | null;

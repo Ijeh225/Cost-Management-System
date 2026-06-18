@@ -494,7 +494,8 @@ export default function PaymentSchedulesPage() {
 
   useEffect(() => {
     const query = location.includes("?") ? location.split("?")[1] : window.location.search.replace(/^\?/, "");
-    const scheduleId = Number(new URLSearchParams(query).get("scheduleId"));
+    const params = new URLSearchParams(query);
+    const scheduleId = Number(params.get("scheduleId") ?? params.get("focus"));
     if (Number.isFinite(scheduleId) && scheduleId > 0) setDetailId(scheduleId);
   }, [location]);
 
