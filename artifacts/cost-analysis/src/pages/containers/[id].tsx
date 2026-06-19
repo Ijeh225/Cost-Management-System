@@ -1200,7 +1200,11 @@ function OperationalContainerView({
   const isEtaDue = !!etaDay && etaDay.getTime() <= today.getTime();
   const overdueDays = etaDay ? Math.floor((today.getTime() - etaDay.getTime()) / 86_400_000) : 0;
   const isBusy = confirmBerthingMutation.isPending || reviseBerthingEtaMutation.isPending;
-  const isAssignedBerthingOfficer = !!container.berthingOfficerId && user?.id === container.berthingOfficerId;
+  const berthingOfficerIds = Array.isArray(container.berthingOfficerIds) ? container.berthingOfficerIds : [];
+  const isAssignedBerthingOfficer = !!user?.id && berthingOfficerIds.includes(user.id);
+  const berthingOfficerLabel = Array.isArray(container.berthingOfficerNames) && container.berthingOfficerNames.length
+    ? container.berthingOfficerNames.join(", ")
+    : container.berthingOfficerName || "the assigned Berthing Officer";
 
   async function confirmBerthing(sendWhatsApp: boolean) {
     try {
@@ -1321,7 +1325,7 @@ function OperationalContainerView({
                 </div>
               </div>
 
-              {!container.berthingOfficerId ? (
+              {berthingOfficerIds.length === 0 ? (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-muted-foreground">
                   {isAdmin
                     ? "Berthing officer is not configured. Super admin must assign one in Settings."
@@ -1329,7 +1333,7 @@ function OperationalContainerView({
                 </div>
               ) : !isAssignedBerthingOfficer ? (
                 <div className="rounded-md border border-blue-500/20 bg-background/50 p-3 text-xs text-muted-foreground">
-                  Awaiting berthing confirmation by {container.berthingOfficerName || "the assigned Berthing Officer"}.
+                  Awaiting berthing confirmation by {berthingOfficerLabel}.
                 </div>
               ) : berthingConfirmStep === "idle" ? (
                 <Button size="sm" className="gap-1.5" onClick={() => setBerthingConfirmStep("confirm")}>
@@ -1587,7 +1591,16 @@ export default function ContainerDetail() {
   if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
 
   const { container, charges, sectionApprovals = [] } = data as any;
-  const isAssignedBerthingOfficer = !!container.berthingOfficerId && user?.id === container.berthingOfficerId;
+  const verificationOfficerIds = Array.isArray(container.verificationOfficerIds) ? container.verificationOfficerIds : [];
+  const berthingOfficerIds = Array.isArray(container.berthingOfficerIds) ? container.berthingOfficerIds : [];
+  const isAssignedVerificationOfficer = !!user?.id && verificationOfficerIds.includes(user.id);
+  const isAssignedBerthingOfficer = !!user?.id && berthingOfficerIds.includes(user.id);
+  const verificationOfficerLabel = Array.isArray(container.verificationOfficerNames) && container.verificationOfficerNames.length
+    ? container.verificationOfficerNames.join(", ")
+    : container.verificationOfficerName || "Verification Officer";
+  const berthingOfficerLabel = Array.isArray(container.berthingOfficerNames) && container.berthingOfficerNames.length
+    ? container.berthingOfficerNames.join(", ")
+    : container.berthingOfficerName || "the assigned Berthing Officer";
 
   const isFieldDepartmentUser = !isAdmin && (
     isTransireUser ||
@@ -2056,11 +2069,11 @@ export default function ContainerDetail() {
             <h4 className="font-semibold text-amber-400 text-sm">Awaiting Verification</h4>
             <p className="text-xs text-amber-300/70 mt-0.5">
               {container.verificationOfficerName
-                ? `Awaiting verification by ${container.verificationOfficerName}.`
+                ? `Awaiting verification by ${verificationOfficerLabel}.`
                 : "Verification officer is not configured. Super admin must assign one in Settings."}
             </p>
           </div>
-          {container.verificationOfficerId && user?.id === container.verificationOfficerId ? (
+          {verificationOfficerIds.length > 0 && isAssignedVerificationOfficer ? (
             <Button
               size="sm"
               className="bg-amber-500 hover:bg-amber-600 text-white shrink-0 gap-1.5"
@@ -2210,7 +2223,7 @@ export default function ContainerDetail() {
                 {container.clientId ? " and optionally notify the client via WhatsApp, or update the revised ETA if it has not berthed." : ", or update the revised ETA if it has not berthed."}
               </p>
             </div>
-            {!container.berthingOfficerId ? (
+            {berthingOfficerIds.length === 0 ? (
               <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-muted-foreground">
                 {isAdmin
                   ? "Berthing officer is not configured. Super admin must assign one in Settings."
@@ -2218,7 +2231,7 @@ export default function ContainerDetail() {
               </div>
             ) : !isAssignedBerthingOfficer ? (
               <div className="rounded-md border border-blue-500/20 bg-background/50 p-3 text-xs text-muted-foreground">
-                Awaiting berthing confirmation by {container.berthingOfficerName || "the assigned Berthing Officer"}.
+                Awaiting berthing confirmation by {berthingOfficerLabel}.
               </div>
             ) : berthingConfirmStep === "idle" ? (
               <Button

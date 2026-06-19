@@ -10,6 +10,22 @@ const AVG_THRESHOLD = 1.5;
 const LOW_MARGIN_PCT = 0.15;
 const RESEND_TEST_FROM = "Cost Management <onboarding@resend.dev>";
 
+function uniquePositiveIds(ids: Array<number | null | undefined>): number[] {
+  return [...new Set(ids.filter((id): id is number => typeof id === "number" && Number.isFinite(id) && id > 0))];
+}
+
+function parseOfficerIds(value?: string | null): number[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return uniquePositiveIds(parsed.map((id) => Number.parseInt(String(id), 10)));
+    }
+  } catch {}
+  const single = Number.parseInt(value, 10);
+  return Number.isFinite(single) && single > 0 ? [single] : [];
+}
+
 const ADMIN_ROLES = new Set(["admin", "super_admin", "branch_admin"]);
 
 const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
@@ -227,10 +243,10 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
   const settingRows = await db.select().from(settingsTable);
   const settingsMap: Record<string, string> = {};
   for (const r of settingRows) settingsMap[r.key] = r.value;
-  const configuredBerthingOfficerId = Number.parseInt(settingsMap["berthingOfficerUserId"] ?? "", 10);
-  const fallbackBerthingOfficerId = Number.isFinite(configuredBerthingOfficerId) && configuredBerthingOfficerId > 0
-    ? configuredBerthingOfficerId
-    : null;
+  const configuredBerthingOfficerIds = parseOfficerIds(settingsMap["berthingOfficerUserIds"]);
+  const fallbackBerthingOfficerIds = configuredBerthingOfficerIds.length > 0
+    ? configuredBerthingOfficerIds
+    : parseOfficerIds(settingsMap["berthingOfficerUserId"]);
   const allContainers = branchScope != null
     ? await db.select().from(containersTable).where(eq(containersTable.branchId, branchScope))
     : await db.select().from(containersTable);
@@ -266,7 +282,7 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
     const berthed = c.berthed ?? false;
     const paarReleasedAt = c.paarReleasedAt ? new Date(c.paarReleasedAt) : null;
     const paarNumber = c.paarNumber ?? null;
-    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue, emptyReturnDueDate, emptyReturnDate, eta, berthingOfficerId: c.berthingOfficerId ?? null, berthed, paarReleasedAt, paarNumber };
+    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue, emptyReturnDueDate, emptyReturnDate, eta, berthingOfficerId: c.berthingOfficerId ?? null, berthingOfficerIds: parseOfficerIds(c.berthingOfficerIds), berthed, paarReleasedAt, paarNumber };
   });
 
   const totals = containerData.reduce((acc, c) => ({ terminal: acc.terminal + c.terminalCost, delivery: acc.delivery + c.deliveryCost }), { terminal: 0, delivery: 0 });
@@ -382,8 +398,12 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
 
   for (const c of containerData) {
     if (c.eta && !c.berthed && c.status !== "closed") {
-      const effectiveBerthingOfficerId = c.berthingOfficerId ?? fallbackBerthingOfficerId;
-      if (!effectiveBerthingOfficerId || effectiveBerthingOfficerId !== userId) continue;
+      const effectiveBerthingOfficerIds = c.berthingOfficerIds.length > 0
+        ? c.berthingOfficerIds
+        : c.berthingOfficerId
+          ? [c.berthingOfficerId]
+          : fallbackBerthingOfficerIds;
+      if (effectiveBerthingOfficerIds.length === 0 || !userId || !effectiveBerthingOfficerIds.includes(userId)) continue;
       const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
       const startOfTomorrow = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
       const etaDay = new Date(c.eta); etaDay.setUTCHours(0, 0, 0, 0);
@@ -399,7 +419,7 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
           message,
           containerId: c.id,
           containerNumber: c.containerNumber,
-          targetUserId: effectiveBerthingOfficerId,
+          targetUserId: userId,
           generatedAt: now,
         });
       }

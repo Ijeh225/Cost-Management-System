@@ -8,21 +8,48 @@ import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fx
 const router = Router();
 const VERIFICATION_OFFICER_SETTING_KEY = "verificationOfficerUserId";
 const BERTHING_OFFICER_SETTING_KEY = "berthingOfficerUserId";
+const VERIFICATION_OFFICERS_SETTING_KEY = "verificationOfficerUserIds";
+const BERTHING_OFFICERS_SETTING_KEY = "berthingOfficerUserIds";
 
-async function getConfiguredVerificationOfficerId(): Promise<number | null> {
-  const [setting] = await db.select({ value: settingsTable.value })
-    .from(settingsTable)
-    .where(eq(settingsTable.key, VERIFICATION_OFFICER_SETTING_KEY));
-  const id = Number.parseInt(setting?.value ?? "", 10);
-  return Number.isFinite(id) && id > 0 ? id : null;
+function uniquePositiveIds(ids: Array<number | null | undefined>): number[] {
+  return [...new Set(ids.filter((id): id is number => typeof id === "number" && Number.isFinite(id) && id > 0))];
 }
 
-async function getConfiguredBerthingOfficerId(): Promise<number | null> {
+function parseOfficerIds(value?: string | null): number[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return uniquePositiveIds(parsed.map((id) => Number.parseInt(String(id), 10)));
+    }
+  } catch {}
+  const single = Number.parseInt(value, 10);
+  return Number.isFinite(single) && single > 0 ? [single] : [];
+}
+
+function stringifyOfficerIds(ids: number[]): string {
+  return JSON.stringify(uniquePositiveIds(ids));
+}
+
+async function getSettingValue(key: string): Promise<string | null> {
   const [setting] = await db.select({ value: settingsTable.value })
     .from(settingsTable)
-    .where(eq(settingsTable.key, BERTHING_OFFICER_SETTING_KEY));
-  const id = Number.parseInt(setting?.value ?? "", 10);
-  return Number.isFinite(id) && id > 0 ? id : null;
+    .where(eq(settingsTable.key, key));
+  return setting?.value ?? null;
+}
+
+async function getConfiguredOfficerIds(multiKey: string, legacyKey: string): Promise<number[]> {
+  const multiIds = parseOfficerIds(await getSettingValue(multiKey));
+  if (multiIds.length > 0) return multiIds;
+  return parseOfficerIds(await getSettingValue(legacyKey));
+}
+
+async function getConfiguredVerificationOfficerIds(): Promise<number[]> {
+  return getConfiguredOfficerIds(VERIFICATION_OFFICERS_SETTING_KEY, VERIFICATION_OFFICER_SETTING_KEY);
+}
+
+async function getConfiguredBerthingOfficerIds(): Promise<number[]> {
+  return getConfiguredOfficerIds(BERTHING_OFFICERS_SETTING_KEY, BERTHING_OFFICER_SETTING_KEY);
 }
 
 async function getUserName(userId: number | null | undefined): Promise<string | null> {
@@ -31,30 +58,55 @@ async function getUserName(userId: number | null | undefined): Promise<string | 
   return user?.name ?? null;
 }
 
-async function getEffectiveBerthingOfficerId(container: { berthingOfficerId?: number | null }): Promise<number | null> {
-  return container.berthingOfficerId ?? await getConfiguredBerthingOfficerId();
+async function getUserNames(userIds: number[]): Promise<string[]> {
+  const ids = uniquePositiveIds(userIds);
+  if (ids.length === 0) return [];
+  const rows = await db.select({ id: usersTable.id, name: usersTable.name })
+    .from(usersTable)
+    .where(inArray(usersTable.id, ids));
+  const map = new Map(rows.map((row) => [row.id, row.name]));
+  return ids.map((id) => map.get(id)).filter((name): name is string => Boolean(name));
 }
 
-async function requireAssignedBerthingOfficer(req: AuthRequest, container: { berthingOfficerId?: number | null }) {
-  const assignedOfficerId = await getEffectiveBerthingOfficerId(container);
-  if (!assignedOfficerId) {
+function getSnapshotOfficerIds(container: { verificationOfficerIds?: string | null; verificationOfficerId?: number | null; berthingOfficerIds?: string | null; berthingOfficerId?: number | null }, kind: "verification" | "berthing"): number[] {
+  const ids = kind === "verification"
+    ? parseOfficerIds(container.verificationOfficerIds)
+    : parseOfficerIds(container.berthingOfficerIds);
+  if (ids.length > 0) return ids;
+  const legacyId = kind === "verification" ? container.verificationOfficerId : container.berthingOfficerId;
+  return legacyId ? [legacyId] : [];
+}
+
+async function getEffectiveVerificationOfficerIds(container: { verificationOfficerIds?: string | null; verificationOfficerId?: number | null }): Promise<number[]> {
+  const snapshotIds = getSnapshotOfficerIds(container, "verification");
+  return snapshotIds.length > 0 ? snapshotIds : await getConfiguredVerificationOfficerIds();
+}
+
+async function getEffectiveBerthingOfficerIds(container: { berthingOfficerIds?: string | null; berthingOfficerId?: number | null }): Promise<number[]> {
+  const snapshotIds = getSnapshotOfficerIds(container, "berthing");
+  return snapshotIds.length > 0 ? snapshotIds : await getConfiguredBerthingOfficerIds();
+}
+
+async function requireAssignedBerthingOfficer(req: AuthRequest, container: { berthingOfficerIds?: string | null; berthingOfficerId?: number | null }) {
+  const assignedOfficerIds = await getEffectiveBerthingOfficerIds(container);
+  if (assignedOfficerIds.length === 0) {
     return {
       ok: false as const,
       status: 503,
       error: "Berthing officer is not configured. Super admin must assign one in Settings.",
-      officerId: null,
+      officerIds: [],
     };
   }
-  if (req.user!.id !== assignedOfficerId) {
-    const officerName = await getUserName(assignedOfficerId);
+  if (!assignedOfficerIds.includes(req.user!.id)) {
+    const officerNames = await getUserNames(assignedOfficerIds);
     return {
       ok: false as const,
       status: 403,
-      error: `Only the assigned Berthing Officer${officerName ? ` (${officerName})` : ""} can confirm or revise berthing for this container.`,
-      officerId: assignedOfficerId,
+      error: `Only an assigned Berthing Officer${officerNames.length ? ` (${officerNames.join(", ")})` : ""} can confirm or revise berthing for this container.`,
+      officerIds: assignedOfficerIds,
     };
   }
-  return { ok: true as const, officerId: assignedOfficerId };
+  return { ok: true as const, officerIds: assignedOfficerIds };
 }
 
 function canUserEditSection(
@@ -87,9 +139,13 @@ function formatContainer(
   verificationOfficerName?: string | null,
   verifiedByName?: string | null,
   berthingOfficerName?: string | null,
+  verificationOfficerNames?: string[],
+  berthingOfficerNames?: string[],
 ) {
   let lockedSections: string[] = [];
   try { lockedSections = JSON.parse(c.lockedSections ?? "[]"); } catch {}
+  const verificationOfficerIds = getSnapshotOfficerIds(c, "verification");
+  const berthingOfficerIds = getSnapshotOfficerIds(c, "berthing");
   return {
     id: c.id,
     customerName: clientName ?? c.customerName,
@@ -105,8 +161,12 @@ function formatContainer(
     assignedStaffName: staffName ?? null,
     verificationOfficerId: c.verificationOfficerId ?? null,
     verificationOfficerName: verificationOfficerName ?? null,
+    verificationOfficerIds,
+    verificationOfficerNames: verificationOfficerNames ?? (verificationOfficerName ? [verificationOfficerName] : []),
     berthingOfficerId: c.berthingOfficerId ?? null,
     berthingOfficerName: berthingOfficerName ?? null,
+    berthingOfficerIds,
+    berthingOfficerNames: berthingOfficerNames ?? (berthingOfficerName ? [berthingOfficerName] : []),
     branchId: c.branchId ?? null,
     clientId: c.clientId ?? null,
     clientName: clientName ?? null,
@@ -365,6 +425,8 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
       ...rows.map(r => r.assignedStaffId).filter(Boolean),
       ...rows.map(r => r.verificationOfficerId).filter(Boolean),
       ...rows.map(r => r.berthingOfficerId).filter(Boolean),
+      ...rows.flatMap(r => parseOfficerIds(r.verificationOfficerIds)),
+      ...rows.flatMap(r => parseOfficerIds(r.berthingOfficerIds)),
       ...rows.map(r => r.verifiedBy).filter(Boolean),
       ...rows.map(r => r.berthingConfirmedById).filter(Boolean),
     ])];
@@ -434,6 +496,8 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
         c.verificationOfficerId ? staffMap[c.verificationOfficerId] ?? null : null,
         c.verifiedBy ? staffMap[c.verifiedBy] ?? null : null,
         c.berthingOfficerId ? staffMap[c.berthingOfficerId] ?? null : null,
+        parseOfficerIds(c.verificationOfficerIds).map(id => staffMap[id]).filter((name): name is string => Boolean(name)),
+        parseOfficerIds(c.berthingOfficerIds).map(id => staffMap[id]).filter((name): name is string => Boolean(name)),
       ),
       totalCost: totalsMap[c.id] ?? 0,
       grossProfit: parseFloat(c.clearingCharges ?? "0") - (totalsMap[c.id] ?? 0),
@@ -482,8 +546,10 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
         return res.status(400).json({ error: "Selected client belongs to a different branch." });
       }
     }
-    const verificationOfficerId = await getConfiguredVerificationOfficerId();
-    const berthingOfficerId = await getConfiguredBerthingOfficerId();
+    const verificationOfficerIds = await getConfiguredVerificationOfficerIds();
+    const berthingOfficerIds = await getConfiguredBerthingOfficerIds();
+    const verificationOfficerId = verificationOfficerIds[0] ?? null;
+    const berthingOfficerId = berthingOfficerIds[0] ?? null;
     const [container] = await db.insert(containersTable).values({
       customerName: resolvedCustomerName,
       containerNumber,
@@ -498,7 +564,9 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       consignee: consignee || null,
       branchId: createBranchId,
       verificationOfficerId,
+      verificationOfficerIds: stringifyOfficerIds(verificationOfficerIds),
       berthingOfficerId,
+      berthingOfficerIds: stringifyOfficerIds(berthingOfficerIds),
     }).returning();
     await getOrCreateCharges(container.id);
     // Notify: new job created
@@ -511,19 +579,21 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
         containerNumber: container.containerNumber,
         actionUrl: `/containers/${container.id}`,
       },
-      ...(verificationOfficerId ? [{
+      ...verificationOfficerIds.map((officerId) => ({
         type: "container_awaiting_verification",
         branchId: container.branchId,
-        targetUserId: verificationOfficerId,
+        targetUserId: officerId,
         message: `Container awaiting verification: ${containerNumber}`,
         containerId: container.id,
         containerNumber: container.containerNumber,
         actionUrl: `/containers/${container.id}?section=verification`,
-      }] : []),
+      })),
     ]);
     const verificationOfficerName = await getUserName(verificationOfficerId);
     const berthingOfficerName = await getUserName(berthingOfficerId);
-    return res.status(201).json(formatContainer(container, null, null, null, verificationOfficerName, null, berthingOfficerName));
+    const verificationOfficerNames = await getUserNames(verificationOfficerIds);
+    const berthingOfficerNames = await getUserNames(berthingOfficerIds);
+    return res.status(201).json(formatContainer(container, null, null, null, verificationOfficerName, null, berthingOfficerName, verificationOfficerNames, berthingOfficerNames));
   } catch (err: any) {
     if (err.code === "23505") {
       return res.status(400).json({ error: "Container number or BL number already exists" });
@@ -591,8 +661,10 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
     let created = 0;
     const duplicates: string[] = [];
     const errors: string[] = [];
-    const verificationOfficerId = await getConfiguredVerificationOfficerId();
-    const berthingOfficerId = await getConfiguredBerthingOfficerId();
+    const verificationOfficerIds = await getConfiguredVerificationOfficerIds();
+    const berthingOfficerIds = await getConfiguredBerthingOfficerIds();
+    const verificationOfficerId = verificationOfficerIds[0] ?? null;
+    const berthingOfficerId = berthingOfficerIds[0] ?? null;
 
     // Pre-validate: reject entire upload if any row is missing a valid command
     const missingCommandRows: number[] = [];
@@ -638,19 +710,21 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
           consignee: row.consignee ?? null,
           branchId: uploadBranchId,
           verificationOfficerId,
+          verificationOfficerIds: stringifyOfficerIds(verificationOfficerIds),
           berthingOfficerId,
+          berthingOfficerIds: stringifyOfficerIds(berthingOfficerIds),
         }).returning();
         await getOrCreateCharges(container.id);
-        if (verificationOfficerId) {
-          await db.insert(workflowNotificationsTable).values({
+        if (verificationOfficerIds.length > 0) {
+          await db.insert(workflowNotificationsTable).values(verificationOfficerIds.map((officerId) => ({
             type: "container_awaiting_verification",
             branchId: container.branchId,
-            targetUserId: verificationOfficerId,
+            targetUserId: officerId,
             message: `Container awaiting verification: ${container.containerNumber}`,
             containerId: container.id,
             containerNumber: container.containerNumber,
             actionUrl: `/containers/${container.id}?section=verification`,
-          });
+          })));
         }
         created++;
       } catch (err: any) {
@@ -1168,19 +1242,19 @@ router.post("/containers/:id/verify", requireAuth, async (req: AuthRequest, res)
     if (existing.status !== "pending_verification") {
       return res.status(400).json({ error: "Container is not in pending verification state" });
     }
-    const configuredOfficerId = await getConfiguredVerificationOfficerId();
-    const assignedOfficerId = existing.verificationOfficerId ?? configuredOfficerId;
-    if (!assignedOfficerId) {
+    const assignedOfficerIds = await getEffectiveVerificationOfficerIds(existing);
+    if (assignedOfficerIds.length === 0) {
       return res.status(503).json({ error: "Verification officer is not configured. Super admin must assign one in Settings." });
     }
-    if (req.user!.id !== assignedOfficerId) {
-      const officerName = await getUserName(assignedOfficerId);
-      return res.status(403).json({ error: `Only the assigned Verification Officer${officerName ? ` (${officerName})` : ""} can verify this container.` });
+    if (!assignedOfficerIds.includes(req.user!.id)) {
+      const officerNames = await getUserNames(assignedOfficerIds);
+      return res.status(403).json({ error: `Only an assigned Verification Officer${officerNames.length ? ` (${officerNames.join(", ")})` : ""} can verify this container.` });
     }
     const [updated] = await db.update(containersTable)
       .set({
         status: "registered",
-        verificationOfficerId: assignedOfficerId,
+        verificationOfficerId: assignedOfficerIds[0] ?? null,
+        verificationOfficerIds: stringifyOfficerIds(assignedOfficerIds),
         verifiedAt: new Date(),
         verifiedBy: req.user!.id,
         updatedAt: new Date(),
@@ -1204,7 +1278,8 @@ router.post("/containers/:id/verify", requireAuth, async (req: AuthRequest, res)
       });
     } catch {}
     const verifierName = await getUserName(req.user!.id);
-    return res.json(formatContainer(updated, null, null, null, verifierName, verifierName));
+    const verificationOfficerNames = await getUserNames(assignedOfficerIds);
+    return res.json(formatContainer(updated, null, null, null, verificationOfficerNames[0] ?? verifierName, verifierName, null, verificationOfficerNames));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -1228,7 +1303,8 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
     const [updated] = await db.update(containersTable)
       .set({
         berthed: true,
-        berthingOfficerId: officerCheck.officerId,
+        berthingOfficerId: officerCheck.officerIds[0] ?? null,
+        berthingOfficerIds: stringifyOfficerIds(officerCheck.officerIds),
         berthingConfirmedAt: now,
         berthingConfirmedById: confirmedByUserId,
         updatedAt: now,
@@ -1266,8 +1342,8 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
           : await sendWhatsAppTemplate(phone, "berthing", message);
       }
     }
-    const berthingOfficerName = await getUserName(officerCheck.officerId);
-    return res.json({ container: formatContainer(updated, null, null, confirmedByName, null, null, berthingOfficerName), whatsappResult });
+    const berthingOfficerNames = await getUserNames(officerCheck.officerIds);
+    return res.json({ container: formatContainer(updated, null, null, confirmedByName, null, null, berthingOfficerNames[0] ?? null, undefined, berthingOfficerNames), whatsappResult });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -1305,7 +1381,12 @@ router.patch("/containers/:id/berthing-eta", requireAuth, async (req: AuthReques
     const revisedEtaLabel = revisedEta.toISOString().slice(0, 10);
     const cleanNote = typeof note === "string" ? note.trim() : "";
     const [updated] = await db.update(containersTable)
-      .set({ eta: revisedEta, berthingOfficerId: officerCheck.officerId, updatedAt: new Date() })
+      .set({
+        eta: revisedEta,
+        berthingOfficerId: officerCheck.officerIds[0] ?? null,
+        berthingOfficerIds: stringifyOfficerIds(officerCheck.officerIds),
+        updatedAt: new Date(),
+      })
       .where(eq(containersTable.id, id))
       .returning();
 
@@ -1318,8 +1399,8 @@ router.patch("/containers/:id/berthing-eta", requireAuth, async (req: AuthReques
       reason: `Berthing ETA revised from ${previousEta} to ${revisedEtaLabel}${cleanNote ? ` - ${cleanNote}` : ""}`,
     });
 
-    const berthingOfficerName = await getUserName(officerCheck.officerId);
-    return res.json({ container: formatContainer(updated, null, null, null, null, null, berthingOfficerName) });
+    const berthingOfficerNames = await getUserNames(officerCheck.officerIds);
+    return res.json({ container: formatContainer(updated, null, null, null, null, null, berthingOfficerNames[0] ?? null, undefined, berthingOfficerNames) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -1708,15 +1789,15 @@ router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       berthingConfirmedByName = bcu?.name ?? null;
     }
     let verificationOfficerName: string | null = null;
-    const effectiveVerificationOfficerId = c.verificationOfficerId ?? await getConfiguredVerificationOfficerId();
-    if (effectiveVerificationOfficerId) {
-      verificationOfficerName = await getUserName(effectiveVerificationOfficerId);
-    }
+    const effectiveVerificationOfficerIds = await getEffectiveVerificationOfficerIds(c);
+    const verificationOfficerNames = await getUserNames(effectiveVerificationOfficerIds);
+    const effectiveVerificationOfficerId = effectiveVerificationOfficerIds[0] ?? null;
+    verificationOfficerName = verificationOfficerNames[0] ?? null;
     let berthingOfficerName: string | null = null;
-    const effectiveBerthingOfficerId = c.berthingOfficerId ?? await getConfiguredBerthingOfficerId();
-    if (effectiveBerthingOfficerId) {
-      berthingOfficerName = await getUserName(effectiveBerthingOfficerId);
-    }
+    const effectiveBerthingOfficerIds = await getEffectiveBerthingOfficerIds(c);
+    const berthingOfficerNames = await getUserNames(effectiveBerthingOfficerIds);
+    const effectiveBerthingOfficerId = effectiveBerthingOfficerIds[0] ?? null;
+    berthingOfficerName = berthingOfficerNames[0] ?? null;
     const verifiedByName = await getUserName(c.verifiedBy);
     const charges = await getOrCreateCharges(id);
     const extraChargeRows = await db.select().from(containerExtraChargesTable)
@@ -1728,13 +1809,21 @@ router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
 
     const containerFormatted = {
       ...formatContainer(
-        { ...c, verificationOfficerId: effectiveVerificationOfficerId, berthingOfficerId: effectiveBerthingOfficerId },
+        {
+          ...c,
+          verificationOfficerId: effectiveVerificationOfficerId,
+          verificationOfficerIds: stringifyOfficerIds(effectiveVerificationOfficerIds),
+          berthingOfficerId: effectiveBerthingOfficerId,
+          berthingOfficerIds: stringifyOfficerIds(effectiveBerthingOfficerIds),
+        },
         staffName,
         clientName,
         berthingConfirmedByName,
         verificationOfficerName,
         verifiedByName,
         berthingOfficerName,
+        verificationOfficerNames,
+        berthingOfficerNames,
       ),
       totalCost,
       grossProfit: parseFloat(c.clearingCharges ?? "0") - totalCost,

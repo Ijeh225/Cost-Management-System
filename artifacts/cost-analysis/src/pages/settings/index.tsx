@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useGetSettings, useUpdateSettings, customFetch, useListUsers } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound, ShieldCheck, Anchor } from "lucide-react";
+import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound, ShieldCheck, Anchor, X, Users } from "lucide-react";
 
 const DEFAULTS = {
   agingInactivityDays: "7",
@@ -21,6 +21,86 @@ const DEFAULTS = {
   digestFrequency: "none",
   digestTime: "08:00",
 };
+
+function parseOfficerIds(value?: string, legacyValue?: string) {
+  const parse = (raw?: string) => {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map((id) => String(id)).filter(Boolean);
+      }
+    } catch {}
+    return raw && raw !== "none" ? [raw] : [];
+  };
+  const ids = parse(value);
+  return ids.length > 0 ? [...new Set(ids)] : [...new Set(parse(legacyValue))];
+}
+
+function OfficerMultiSelect({
+  title,
+  description,
+  icon,
+  selectedIds,
+  users,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  icon: ReactNode;
+  selectedIds: string[];
+  users: any[];
+  onChange: (ids: string[]) => void;
+}) {
+  const selectedUsers = users.filter((u: any) => selectedIds.includes(String(u.id)));
+  const availableUsers = users.filter((u: any) => !selectedIds.includes(String(u.id)));
+
+  const removeUser = (id: string) => onChange(selectedIds.filter((selectedId) => selectedId !== id));
+
+  return (
+    <div className="rounded-xl border border-border/50 bg-background/60 p-4 space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs font-medium">Assigned users</Label>
+        <div className="min-h-[44px] rounded-lg border border-border/60 bg-card/40 p-2 flex flex-wrap gap-2">
+          {selectedUsers.length > 0 ? selectedUsers.map((u: any) => (
+            <span key={u.id} className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs text-foreground">
+              {u.name} <span className="text-muted-foreground">({u.role})</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => removeUser(String(u.id))}>
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )) : (
+            <span className="text-xs text-muted-foreground px-1 py-1.5">No officers selected</span>
+          )}
+        </div>
+      </div>
+
+      <Select value="__placeholder__" onValueChange={(value) => value !== "__placeholder__" && onChange([...selectedIds, value])}>
+        <SelectTrigger className="h-9 text-sm">
+          <SelectValue placeholder="Add officer" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__placeholder__" disabled>Add officer</SelectItem>
+          {availableUsers.map((u: any) => (
+            <SelectItem key={u.id} value={String(u.id)}>
+              {u.name} ({u.role})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { data: settings = {}, isLoading } = useGetSettings();
@@ -52,8 +132,8 @@ export default function SettingsPage() {
   const [digestFrequency, setDigestFrequency] = useState<"none" | "daily" | "weekly">("none");
   const [digestTime, setDigestTime] = useState("08:00");
   const [digestLastSentAt, setDigestLastSentAt] = useState<string | null>(null);
-  const [verificationOfficerUserId, setVerificationOfficerUserId] = useState("none");
-  const [berthingOfficerUserId, setBerthingOfficerUserId] = useState("none");
+  const [verificationOfficerUserIds, setVerificationOfficerUserIds] = useState<string[]>([]);
+  const [berthingOfficerUserIds, setBerthingOfficerUserIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -69,8 +149,8 @@ export default function SettingsPage() {
       setDigestFrequency((s["digestFrequency"] as "none" | "daily" | "weekly") ?? "none");
       setDigestTime(s["digestTime"] ?? "08:00");
       setDigestLastSentAt(s["digestLastSentAt"] ?? null);
-      setVerificationOfficerUserId(s["verificationOfficerUserId"] || "none");
-      setBerthingOfficerUserId(s["berthingOfficerUserId"] || "none");
+      setVerificationOfficerUserIds(parseOfficerIds(s["verificationOfficerUserIds"], s["verificationOfficerUserId"]));
+      setBerthingOfficerUserIds(parseOfficerIds(s["berthingOfficerUserIds"], s["berthingOfficerUserId"]));
     }
   }, [isLoading]);
 
@@ -102,8 +182,10 @@ export default function SettingsPage() {
         agingEmailTo: emailTo.trim(),
         digestFrequency,
         digestTime,
-        verificationOfficerUserId: verificationOfficerUserId === "none" ? "" : verificationOfficerUserId,
-        berthingOfficerUserId: berthingOfficerUserId === "none" ? "" : berthingOfficerUserId,
+        verificationOfficerUserIds: JSON.stringify(verificationOfficerUserIds),
+        verificationOfficerUserId: verificationOfficerUserIds[0] ?? "",
+        berthingOfficerUserIds: JSON.stringify(berthingOfficerUserIds),
+        berthingOfficerUserId: berthingOfficerUserIds[0] ?? "",
       });
       toast({ title: "Settings saved" });
       setDirty(false);
@@ -130,8 +212,10 @@ export default function SettingsPage() {
         agingEmailTo: emailTo.trim(),
         digestFrequency,
         digestTime,
-        verificationOfficerUserId: verificationOfficerUserId === "none" ? "" : verificationOfficerUserId,
-        berthingOfficerUserId: berthingOfficerUserId === "none" ? "" : berthingOfficerUserId,
+        verificationOfficerUserIds: JSON.stringify(verificationOfficerUserIds),
+        verificationOfficerUserId: verificationOfficerUserIds[0] ?? "",
+        berthingOfficerUserIds: JSON.stringify(berthingOfficerUserIds),
+        berthingOfficerUserId: berthingOfficerUserIds[0] ?? "",
       });
       const result = await customFetch<{
         sent: number;
@@ -171,121 +255,60 @@ export default function SettingsPage() {
   const activeUsers = (users ?? []).filter((u: any) => u.isActive !== false);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">System Settings</h1>
-        <p className="text-muted-foreground text-sm mt-1">Configure alert thresholds and system behaviour.</p>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-5xl">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">System Settings</h1>
+          <p className="text-muted-foreground text-sm mt-1">Configure workflow permissions, alert thresholds, and email delivery.</p>
+        </div>
+        <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="gap-2 sm:w-auto w-full">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save Settings
+        </Button>
       </div>
 
-      {/* Verification Officer */}
+      {/* Workflow Permissions */}
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheck className="w-4 h-4 text-primary" />
-            Verification Officer
+            <Users className="w-4 h-4 text-primary" />
+            Workflow Permissions
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Choose the only user allowed to verify new containers before they enter the operational pipeline.
+            Assign the users who can perform sensitive verification and berthing workflow actions.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Assigned verification officer</Label>
-            <Select
-              value={verificationOfficerUserId}
-              onValueChange={(value) => { setVerificationOfficerUserId(value); mark(); }}
-            >
-              <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder="Select officer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Not configured</SelectItem>
-                {activeUsers.map((u: any) => (
-                  <SelectItem key={u.id} value={String(u.id)}>
-                    {u.name} ({u.role})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-muted-foreground">
-              Admins and super admins can still view pending records, but only this officer can complete verification.
-            </p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <OfficerMultiSelect
+              title="Verification Officers"
+              description="Any selected user can verify new containers before they enter the operational pipeline."
+              icon={<ShieldCheck className="w-4 h-4" />}
+              selectedIds={verificationOfficerUserIds}
+              users={activeUsers}
+              onChange={(ids) => { setVerificationOfficerUserIds(ids); mark(); }}
+            />
+            <OfficerMultiSelect
+              title="Berthing Officers"
+              description="Any selected user can confirm vessel berthing or save a revised ETA."
+              icon={<Anchor className="w-4 h-4" />}
+              selectedIds={berthingOfficerUserIds}
+              users={activeUsers}
+              onChange={(ids) => { setBerthingOfficerUserIds(ids); mark(); }}
+            />
           </div>
 
-          {verificationOfficerUserId === "none" && (
+          {(verificationOfficerUserIds.length === 0 || berthingOfficerUserIds.length === 0) && (
             <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10">
               <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
               <div className="space-y-0.5">
-                <p className="text-sm font-medium text-amber-500">Verification officer not configured</p>
+                <p className="text-sm font-medium text-amber-500">Workflow officers incomplete</p>
                 <p className="text-xs text-muted-foreground">
-                  New containers can still be created, but verification will be blocked until an officer is assigned.
+                  Empty officer lists will block their related actions until at least one user is assigned.
                 </p>
               </div>
             </div>
           )}
-
-          <div className="flex justify-end pt-1">
-            <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="gap-2">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Settings
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Berthing Officer */}
-      <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Anchor className="w-4 h-4 text-primary" />
-            Berthing Officer
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Choose the only user allowed to confirm vessel berthing or revise berthing ETA from the berthing workflow.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Assigned berthing officer</Label>
-            <Select
-              value={berthingOfficerUserId}
-              onValueChange={(value) => { setBerthingOfficerUserId(value); mark(); }}
-            >
-              <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder="Select officer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Not configured</SelectItem>
-                {activeUsers.map((u: any) => (
-                  <SelectItem key={u.id} value={String(u.id)}>
-                    {u.name} ({u.role})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-muted-foreground">
-              Other users can view vessel status, but only this officer can confirm berthing or save a revised ETA.
-            </p>
-          </div>
-
-          {berthingOfficerUserId === "none" && (
-            <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10">
-              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium text-amber-500">Berthing officer not configured</p>
-                <p className="text-xs text-muted-foreground">
-                  Berthing confirmation and revised ETA actions will be blocked until an officer is assigned.
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end pt-1">
-            <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="gap-2">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Settings
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
@@ -379,13 +402,6 @@ export default function SettingsPage() {
                 Thresholds must be valid numbers in ascending order (Warning &lt; High Warning &lt; Critical).
               </p>
             )}
-          </div>
-
-          <div className="flex justify-end pt-2">
-            <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="gap-2">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Settings
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -511,7 +527,7 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center justify-start pt-1">
             <Button
               variant="outline"
               onClick={handleSendDigest}
@@ -520,10 +536,6 @@ export default function SettingsPage() {
             >
               {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Send Test Digest Now
-            </Button>
-            <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="gap-2">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Settings
             </Button>
           </div>
         </CardContent>

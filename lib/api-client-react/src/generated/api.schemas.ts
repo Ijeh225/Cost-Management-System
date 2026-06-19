@@ -127,8 +127,12 @@ export interface Container {
   assignedStaffName?: string | null;
   verificationOfficerId?: number | null;
   verificationOfficerName?: string | null;
+  verificationOfficerIds?: number[];
+  verificationOfficerNames?: string[];
   berthingOfficerId?: number | null;
   berthingOfficerName?: string | null;
+  berthingOfficerIds?: number[];
+  berthingOfficerNames?: string[];
   totalCost: number;
   clearingCharges: number;
   grossProfit: number;

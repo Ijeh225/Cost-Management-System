@@ -625,6 +625,13 @@ async function runStartupMigrations() {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS containers_berthing_officer_idx ON containers(berthing_officer_id)`);
     });
+    await runMigration("container_multi_officers_v1", async () => {
+      await pool.query(`
+        ALTER TABLE containers
+          ADD COLUMN IF NOT EXISTS verification_officer_ids TEXT NOT NULL DEFAULT '[]',
+          ADD COLUMN IF NOT EXISTS berthing_officer_ids TEXT NOT NULL DEFAULT '[]'
+      `);
+    });
     await runMigration("whatsapp_messages_meta_provider_v1", async () => {
       await pool.query(`
         ALTER TABLE whatsapp_messages
