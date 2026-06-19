@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable, systemAlertsHistoryTable, branchesTable } from "@workspace/db";
-import { eq, lt, sql, max, isNotNull, isNull, or, desc, inArray, notInArray, and } from "drizzle-orm";
+import { eq, lt, sql, max, isNotNull, desc, inArray, notInArray, and } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost, sumTerminal, sumDelivery } from "../lib/calculations.js";
 
@@ -68,12 +68,78 @@ const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
   staff:                   new Set(["new_job", "stage_complete", "overdue", "delay_recorded", "payment_schedule_created", "payment_schedule_rejected", "payment_schedule_paid", "payment_schedule_completed", "payment_schedule_rescheduled", "payment_schedule_cancelled", "payment_schedule_comment"]),
   accounts_user:           new Set(["invoice_created", "invoice_paid", "berthing_confirmed", "payment_schedule_approved", "payment_schedule_paid", "payment_schedule_completed", "payment_schedule_comment"]),
   documentation_user:      new Set(["new_job"]),
-  shipping_user:           new Set(["new_job", "stage_complete", "berthing_confirmed"]),
-  shipping_terminal_user:  new Set(["new_job", "stage_complete", "berthing_confirmed", "gate_in", "gate_out"]),
+  shipping_user:           new Set(["stage_complete", "delay_recorded", "overdue", "berthing_confirmed"]),
+  shipping_terminal_user:  new Set(["stage_complete", "delay_recorded", "overdue", "berthing_confirmed", "gate_in", "gate_out"]),
   customs_user:            new Set(["new_job", "stage_complete", "berthing_confirmed"]),
-  transire_user:           new Set(["new_job", "stage_complete"]),
-  pull_out_user:           new Set(["stage_complete", "gate_out", "empty_gate_out"]),
+  transire_user:           new Set(["stage_complete", "delay_recorded", "overdue"]),
+  pull_out_user:           new Set(["stage_complete", "delay_recorded", "overdue", "gate_out", "empty_gate_out"]),
 };
+
+const ROLE_WORKFLOW_STAGES: Record<string, Set<string>> = {
+  transire_user: new Set(["transire_processing"]),
+  shipping_user: new Set(["shipping"]),
+  terminal_user: new Set(["terminal"]),
+  pull_out_user: new Set(["pull_out"]),
+  shipping_terminal_user: new Set(["shipping", "terminal"]),
+  terminal_manager: new Set(["gate_in", "examination", "final_release"]),
+};
+
+function getAllowedWorkflowTypes(roles: string[]): Set<string> {
+  const allowed = new Set<string>();
+  for (const r of roles) {
+    for (const t of ROLE_WORKFLOW_TYPES[r] ?? []) allowed.add(t);
+  }
+  return allowed;
+}
+
+function getAllowedWorkflowStages(roles: string[]): Set<string> {
+  const allowed = new Set<string>();
+  for (const r of roles) {
+    for (const s of ROLE_WORKFLOW_STAGES[r] ?? []) allowed.add(s);
+  }
+  return allowed;
+}
+
+function inferWorkflowStage(notification: { type: string; message: string }): string | null {
+  const message = notification.message.toLowerCase();
+  if (message.includes("transire")) return "transire_processing";
+  if (message.includes("delivery order") || message.includes("do released") || message.includes(" do ")) return "shipping";
+  if (message.includes("tdo") || message.includes("terminal")) return "terminal";
+  if (message.includes("pullout") || message.includes("pull-out") || message.includes("pull out")) return "pull_out";
+  if (message.includes("gate-in") || message.includes("gate in")) return "gate_in";
+  if (message.includes("examination")) return "examination";
+  if (message.includes("final release")) return "final_release";
+  return null;
+}
+
+function isWorkflowNotificationVisibleToUser(
+  notification: { type: string; message: string; targetUserId: number | null },
+  roles: string[],
+  userId: number,
+): boolean {
+  if (notification.targetUserId != null) return notification.targetUserId === userId;
+
+  const allowedTypes = getAllowedWorkflowTypes(roles);
+  if (!allowedTypes.has(notification.type)) return false;
+
+  const allowedStages = getAllowedWorkflowStages(roles);
+  if (allowedStages.size === 0) return true;
+
+  if (notification.type === "stage_complete" || notification.type === "delay_recorded" || notification.type === "overdue") {
+    const notificationStage = inferWorkflowStage(notification);
+    return notificationStage != null && allowedStages.has(notificationStage);
+  }
+
+  if (notification.type === "gate_in" || notification.type === "gate_out" || notification.type === "empty_gate_in" || notification.type === "empty_gate_out") {
+    return allowedStages.has("gate_in") || allowedStages.has("pull_out");
+  }
+
+  if (notification.type === "berthing_confirmed") {
+    return allowedStages.has("shipping") || allowedStages.has("terminal");
+  }
+
+  return false;
+}
 
 type EmailSenderInfo = {
   fromAddress: string;
@@ -739,10 +805,10 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req: Auth
     for (const c of containers) {
       if (c.status === "closed") continue;
       for (const check of STAGE_OVERDUE_CHECK) {
-        if (c.status !== check.stage) continue;
         const expectedDate = c[check.expectedField] as Date | null;
         const releasedAt = c[check.releasedField] as Date | null;
         if (!expectedDate || releasedAt) continue;
+        if (check.stage === "pull_out" && !c.tdoReleasedAt) continue;
         const exp = new Date(expectedDate); exp.setUTCHours(0, 0, 0, 0);
         if (exp.getTime() < today.getTime()) {
           const overdueDays = Math.floor((today.getTime() - exp.getTime()) / 86_400_000);
@@ -784,14 +850,7 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req: Auth
 
     let notifications = allWorkflow;
     if (role && !roles.some(r => ADMIN_ROLES.has(r))) {
-      const allowed = new Set<string>();
-      for (const r of roles) {
-        for (const t of ROLE_WORKFLOW_TYPES[r] ?? []) allowed.add(t);
-      }
-      notifications = notifications.filter(n => {
-        if (n.targetUserId != null) return n.targetUserId === userId;
-        return allowed.has(n.type);
-      });
+      notifications = notifications.filter(n => isWorkflowNotificationVisibleToUser(n, roles, userId));
     }
     if (typeFilter !== "all") notifications = notifications.filter(n => n.type === typeFilter);
     if (readFilter === "read") notifications = notifications.filter(n => n.isRead);
@@ -814,13 +873,19 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req: Auth
 notificationsRouter.post("/workflow-notifications/:id/read", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id));
-    const [existing] = await db.select({ branchId: workflowNotificationsTable.branchId, targetUserId: workflowNotificationsTable.targetUserId })
+    const [existing] = await db.select({
+      branchId: workflowNotificationsTable.branchId,
+      targetUserId: workflowNotificationsTable.targetUserId,
+      type: workflowNotificationsTable.type,
+      message: workflowNotificationsTable.message,
+    })
       .from(workflowNotificationsTable).where(eq(workflowNotificationsTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       return res.status(404).json({ error: "Notification not found" });
     }
     const isAdmin = ADMIN_ROLES.has(req.user!.role);
-    if (!isAdmin && existing.targetUserId != null && existing.targetUserId !== req.user!.id) {
+    const roles = req.user!.roles?.length ? req.user!.roles : [req.user!.role];
+    if (!isAdmin && !isWorkflowNotificationVisibleToUser(existing, roles, req.user!.id)) {
       return res.status(403).json({ error: "Cannot mark another user's notification as read" });
     }
     await db.update(workflowNotificationsTable)
@@ -838,15 +903,29 @@ notificationsRouter.post("/workflow-notifications/read-all", requireAuth, async 
     const branchScope = getBranchScope(req);
     const isAdmin = ADMIN_ROLES.has(req.user!.role);
     const userId = req.user!.id;
-    const ownershipClause = isAdmin
-      ? undefined
-      : or(isNull(workflowNotificationsTable.targetUserId), eq(workflowNotificationsTable.targetUserId, userId));
+    const roles = req.user!.roles?.length ? req.user!.roles : [req.user!.role];
     const unreadClause = eq(workflowNotificationsTable.isRead, false);
     const branchClause = branchScope !== null ? eq(workflowNotificationsTable.branchId, branchScope) : undefined;
-    const whereClause = and(unreadClause, branchClause, ownershipClause);
-    await db.update(workflowNotificationsTable)
-      .set({ isRead: true, readAt: new Date() })
-      .where(whereClause);
+    const baseWhere = and(unreadClause, branchClause);
+
+    if (isAdmin) {
+      await db.update(workflowNotificationsTable)
+        .set({ isRead: true, readAt: new Date() })
+        .where(baseWhere);
+    } else {
+      const rows = await db.select()
+        .from(workflowNotificationsTable)
+        .where(baseWhere)
+        .limit(1000);
+      const visibleIds = rows
+        .filter(n => isWorkflowNotificationVisibleToUser(n, roles, userId))
+        .map(n => n.id);
+      if (visibleIds.length > 0) {
+        await db.update(workflowNotificationsTable)
+          .set({ isRead: true, readAt: new Date() })
+          .where(inArray(workflowNotificationsTable.id, visibleIds));
+      }
+    }
     return res.json({ success: true });
   } catch (err) {
     console.error(err);
