@@ -27,9 +27,22 @@ export type PipelineContainer = {
   releaseConfirmedAt?: string | null;
   releaseDelayReason?: string | null;
   releaseFinalDate?: string | null;
+  expectedTransireDate?: string | null;
+  transireReleasedAt?: string | null;
+  transireDelayReason?: string | null;
+  transireFinalDate?: string | null;
+  expectedDoDate?: string | null;
+  doReleasedAt?: string | null;
+  doDelayReason?: string | null;
+  doFinalDate?: string | null;
+  expectedTdoDate?: string | null;
   tdoReleasedAt?: string | null;
+  tdoDelayReason?: string | null;
+  tdoFinalDate?: string | null;
   expectedPulloutDate?: string | null;
   pulloutReleasedAt?: string | null;
+  pulloutDelayReason?: string | null;
+  pulloutFinalDate?: string | null;
   gateInDate?: string | null;
   emptyReturnDate?: string | null;
   emptyReturnDueDate?: string | null;
@@ -444,6 +457,7 @@ export function useDeleteContainerExtraCharge(containerId: number) {
 
 export type StageActionRequest = {
   id: number;
+  stage?: "transire_processing" | "shipping" | "terminal" | "pull_out" | "final_release";
   action: "set_expected_date" | "mark_released" | "record_delay" | "update_stage_owner";
   expectedDate?: string | null;
   delayReason?: string | null;

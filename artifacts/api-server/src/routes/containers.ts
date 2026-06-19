@@ -703,7 +703,22 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
       releaseConfirmedAt: containersTable.releaseConfirmedAt,
       releaseDelayReason: containersTable.releaseDelayReason,
       releaseFinalDate: containersTable.releaseFinalDate,
+      expectedTransireDate: containersTable.expectedTransireDate,
+      transireReleasedAt: containersTable.transireReleasedAt,
+      transireDelayReason: containersTable.transireDelayReason,
+      transireFinalDate: containersTable.transireFinalDate,
+      expectedDoDate: containersTable.expectedDoDate,
+      doReleasedAt: containersTable.doReleasedAt,
+      doDelayReason: containersTable.doDelayReason,
+      doFinalDate: containersTable.doFinalDate,
+      expectedTdoDate: containersTable.expectedTdoDate,
       tdoReleasedAt: containersTable.tdoReleasedAt,
+      tdoDelayReason: containersTable.tdoDelayReason,
+      tdoFinalDate: containersTable.tdoFinalDate,
+      expectedPulloutDate: containersTable.expectedPulloutDate,
+      pulloutReleasedAt: containersTable.pulloutReleasedAt,
+      pulloutDelayReason: containersTable.pulloutDelayReason,
+      pulloutFinalDate: containersTable.pulloutFinalDate,
       gateInDate: containersTable.gateInDate,
       emptyReturnDate: containersTable.emptyReturnDate,
       emptyReturnDueDate: containersTable.emptyReturnDueDate,
@@ -721,9 +736,12 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
     const PARALLEL_OPS_STAGES = ["transire_processing", "shipping", "terminal"] as const;
     const PARALLEL_OPS_SET   = new Set<string>(PARALLEL_OPS_STAGES);
 
-    // Doc-adjacent stages: containers here that have earlyStartAuthorized also
-    // appear virtually in all three ops workspace tabs simultaneously.
-    const EARLY_START_STAGES = new Set(["registered", "documentation", "duty_assessment", "duty_payment"]);
+    // Once verified, early operational departments can start independently.
+    // Pullout is intentionally excluded here; it starts after Terminal/TDO is submitted.
+    const VERIFIED_PARALLEL_START_STAGES = new Set([
+      "registered", "documentation", "duty_assessment", "duty_payment",
+      "transire_processing", "shipping", "terminal",
+    ]);
 
     const stages: Record<string, Array<{
       id: number;
@@ -751,7 +769,22 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
       releaseConfirmedAt?: string | null;
       releaseDelayReason?: string | null;
       releaseFinalDate?: string | null;
+      expectedTransireDate?: string | null;
+      transireReleasedAt?: string | null;
+      transireDelayReason?: string | null;
+      transireFinalDate?: string | null;
+      expectedDoDate?: string | null;
+      doReleasedAt?: string | null;
+      doDelayReason?: string | null;
+      doFinalDate?: string | null;
+      expectedTdoDate?: string | null;
       tdoReleasedAt?: string | null;
+      tdoDelayReason?: string | null;
+      tdoFinalDate?: string | null;
+      expectedPulloutDate?: string | null;
+      pulloutReleasedAt?: string | null;
+      pulloutDelayReason?: string | null;
+      pulloutFinalDate?: string | null;
       branchId?: number | null;
     }>> = {};
 
@@ -792,7 +825,22 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
         releaseConfirmedAt: c.releaseConfirmedAt instanceof Date ? c.releaseConfirmedAt.toISOString() : (c.releaseConfirmedAt ?? null),
         releaseDelayReason: c.releaseDelayReason ?? null,
         releaseFinalDate: c.releaseFinalDate instanceof Date ? c.releaseFinalDate.toISOString() : (c.releaseFinalDate ?? null),
+        expectedTransireDate: c.expectedTransireDate instanceof Date ? c.expectedTransireDate.toISOString() : (c.expectedTransireDate ?? null),
+        transireReleasedAt: c.transireReleasedAt instanceof Date ? c.transireReleasedAt.toISOString() : (c.transireReleasedAt ?? null),
+        transireDelayReason: c.transireDelayReason ?? null,
+        transireFinalDate: c.transireFinalDate instanceof Date ? c.transireFinalDate.toISOString() : (c.transireFinalDate ?? null),
+        expectedDoDate: c.expectedDoDate instanceof Date ? c.expectedDoDate.toISOString() : (c.expectedDoDate ?? null),
+        doReleasedAt: c.doReleasedAt instanceof Date ? c.doReleasedAt.toISOString() : (c.doReleasedAt ?? null),
+        doDelayReason: c.doDelayReason ?? null,
+        doFinalDate: c.doFinalDate instanceof Date ? c.doFinalDate.toISOString() : (c.doFinalDate ?? null),
+        expectedTdoDate: c.expectedTdoDate instanceof Date ? c.expectedTdoDate.toISOString() : (c.expectedTdoDate ?? null),
         tdoReleasedAt: c.tdoReleasedAt instanceof Date ? c.tdoReleasedAt.toISOString() : (c.tdoReleasedAt ?? null),
+        tdoDelayReason: c.tdoDelayReason ?? null,
+        tdoFinalDate: c.tdoFinalDate instanceof Date ? c.tdoFinalDate.toISOString() : (c.tdoFinalDate ?? null),
+        expectedPulloutDate: c.expectedPulloutDate instanceof Date ? c.expectedPulloutDate.toISOString() : (c.expectedPulloutDate ?? null),
+        pulloutReleasedAt: c.pulloutReleasedAt instanceof Date ? c.pulloutReleasedAt.toISOString() : (c.pulloutReleasedAt ?? null),
+        pulloutDelayReason: c.pulloutDelayReason ?? null,
+        pulloutFinalDate: c.pulloutFinalDate instanceof Date ? c.pulloutFinalDate.toISOString() : (c.pulloutFinalDate ?? null),
         gateInDate: c.gateInDate instanceof Date ? c.gateInDate.toISOString() : (c.gateInDate ?? null),
         emptyReturnDate: c.emptyReturnDate instanceof Date ? c.emptyReturnDate.toISOString() : (c.emptyReturnDate ?? null),
         emptyReturnDueDate: c.emptyReturnDueDate instanceof Date ? c.emptyReturnDueDate.toISOString() : (c.emptyReturnDueDate ?? null),
@@ -802,31 +850,30 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
       };
       stages[c.status].push(entry);
 
-      // Parallel ops: if the container is in any of the three field-ops stages,
-      // mirror it into the other two so all departments see it simultaneously.
-      if (PARALLEL_OPS_SET.has(c.status)) {
-        for (const opsStage of PARALLEL_OPS_STAGES) {
-          if (opsStage !== c.status) {
-            if (!stages[opsStage]) stages[opsStage] = [];
-            stages[opsStage].push(entry);
-          }
-        }
-      }
-
-      // Early Start: inject into all three parallel ops stages (not just transire).
-      if (c.earlyStartAuthorized && EARLY_START_STAGES.has(c.status)) {
-        const earlyEntry = {
+      if (VERIFIED_PARALLEL_START_STAGES.has(c.status)) {
+        const parallelEntry = {
           ...entry,
-          isEarlyStart: true,
+          isEarlyStart: c.earlyStartAuthorized,
           earlyStartReason: c.earlyStartReason ?? null,
           earlyStartAuthorizedAt: c.earlyStartAuthorizedAt instanceof Date
             ? c.earlyStartAuthorizedAt.toISOString()
             : (c.earlyStartAuthorizedAt ?? null),
         };
         for (const opsStage of PARALLEL_OPS_STAGES) {
+          if (opsStage === c.status && PARALLEL_OPS_SET.has(c.status)) continue;
           if (!stages[opsStage]) stages[opsStage] = [];
-          stages[opsStage].push(earlyEntry);
+          stages[opsStage].push(parallelEntry);
         }
+      }
+
+      if (c.tdoReleasedAt && !c.pulloutReleasedAt) {
+        if (!stages.pull_out) stages.pull_out = [];
+        stages.pull_out.push({ ...entry, status: "pull_out" });
+      }
+
+      if (c.pulloutReleasedAt && !c.gateInDate) {
+        if (!stages.gate_in) stages.gate_in = [];
+        stages.gate_in.push({ ...entry, status: "gate_in" });
       }
     }
 
@@ -963,6 +1010,38 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
     const currentIdx = PIPELINE_STAGE_ORDER.indexOf(existing.status);
     if (currentIdx === -1) {
       return res.status(400).json({ error: `Unknown current status: ${existing.status}` });
+    }
+
+    if (requestedStatus === "gate_in" && existing.pulloutReleasedAt) {
+      const userRoles: string[] = req.user!.roles ?? [userRole];
+      const canStartGateIn = isAdmin || userRoles.includes("terminal_manager") || userRoles.includes("security_user");
+      if (!canStartGateIn) {
+        return res.status(403).json({ error: "Only terminal managers, security users, or administrators can move a pull-out released job to Gate-In." });
+      }
+
+      const [updated] = await db.update(containersTable)
+        .set({ status: "gate_in", updatedAt: new Date(), stageEnteredAt: new Date(), nextAction: null, nextActionDueDate: null })
+        .where(eq(containersTable.id, id))
+        .returning();
+
+      await db.insert(auditLogTable).values({
+        containerId: id,
+        branchId: existing.branchId,
+        userId: req.user!.id,
+        action: "status_advanced",
+        section: "basic_info",
+        reason: "Pull-Out released job moved to Gate-In",
+      });
+      await db.insert(workflowNotificationsTable).values({
+        type: "stage_change",
+        message: `Container moved to Gate-In: ${existing.containerNumber}`,
+        containerId: id,
+        branchId: existing.branchId,
+        containerNumber: existing.containerNumber,
+        actionUrl: `/containers/${id}`,
+      });
+
+      return res.json(formatContainer(updated));
     }
 
     // Determine whether this is a navigation (jump to a specific stage) or a forward advance.
@@ -1201,12 +1280,12 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       return res.status(404).json({ error: "Container not found" });
     }
     const {
-      action, expectedDate, delayReason, finalDate,
+      action, expectedDate, delayReason, finalDate, stage,
     } = req.body;
     if (!action) {
       return res.status(400).json({ error: "action is required" });
     }
-    const status = existing.status;
+    const status = typeof stage === "string" && stage.trim() ? stage.trim() : existing.status;
     const STAGE_ACTION_FIELDS: Record<string, { expected: string; releasedAt: string; delayReason: string; finalDate: string; label: string }> = {
       transire_processing: { expected: "expectedTransireDate", releasedAt: "transireReleasedAt", delayReason: "transireDelayReason", finalDate: "transireFinalDate", label: "Transire" },
       shipping:            { expected: "expectedDoDate",       releasedAt: "doReleasedAt",       delayReason: "doDelayReason",       finalDate: "doFinalDate",       label: "Delivery Order (DO)" },
@@ -1217,6 +1296,9 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
     const fields = STAGE_ACTION_FIELDS[status];
     if (!fields) {
       return res.status(400).json({ error: `Stage action not supported for status: ${status}` });
+    }
+    if (status === "pull_out" && !existing.tdoReleasedAt) {
+      return res.status(409).json({ error: "Pull-Out cannot be submitted until Terminal/TDO is submitted." });
     }
 
     const userRoles: string[] = req.user!.roles;
@@ -1264,15 +1346,13 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       reason: `Stage action: ${action} for ${fields.label}${delayReason ? ` — ${delayReason}` : ""}`,
     });
     if (notifMsg) {
-      await db.delete(workflowNotificationsTable)
-        .where(eq(workflowNotificationsTable.containerId, id));
       await db.insert(workflowNotificationsTable).values({
         type: action === "mark_released" ? "stage_complete" : "delay_recorded",
         message: notifMsg,
         containerId: id,
         branchId: existing.branchId,
         containerNumber: existing.containerNumber,
-        actionUrl: action === "mark_released" ? `/operations/${id}` : `/operations/${id}`,
+        actionUrl: `/containers/${id}`,
       });
     }
     return res.json(formatContainer(updated));
@@ -1378,10 +1458,10 @@ router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res
 
     const now = new Date();
     let nextStatus = existing.status;
-    if (["shipping", "pull_out"].includes(existing.status)) {
+    if (["shipping", "pull_out"].includes(existing.status) || existing.pulloutReleasedAt) {
       nextStatus = "gate_in";
     } else if (!["gate_in", "examination", "final_release"].includes(existing.status)) {
-      return res.status(409).json({ error: `Container is at "${existing.status}" stage — Gate-In can only be recorded from shipping, pull_out, or once already in the terminal` });
+      return res.status(409).json({ error: `Container is at "${existing.status}" stage — Gate-In can only be recorded after Pull-Out release or once already in the terminal` });
     }
 
     const [updated] = await db.update(containersTable)

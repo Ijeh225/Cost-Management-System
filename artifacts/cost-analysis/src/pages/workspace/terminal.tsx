@@ -30,6 +30,12 @@ const STAGE_SUBMIT_LABEL: Record<string, string> = {
   final_release: "Submit to Delivery",
 };
 
+const STAGE_NEXT_STATUS: Record<string, string> = {
+  gate_in: "examination",
+  examination: "final_release",
+  final_release: "delivery",
+};
+
 function DaysChip({ days }: { days: number }) {
   const color =
     days >= 7  ? "text-red-400 bg-red-500/10 border-red-500/30"
@@ -293,7 +299,10 @@ export default function TerminalWorkspace() {
   }, {});
 
   const handleSubmit = (container: (typeof filtered)[0]) => {
-    advance.mutate({ id: container.id, status: container.stage }, {
+    const targetStatus = container.stage === "gate_in" && container.status !== "gate_in"
+      ? "gate_in"
+      : STAGE_NEXT_STATUS[container.stage] ?? container.stage;
+    advance.mutate({ id: container.id, status: targetStatus }, {
       onSuccess: () => toast({ title: `Job ${container.containerNumber} submitted to next stage.` }),
       onError:   (e) => toast({ title: "Error", description: (e as Error).message, variant: "destructive" }),
     });
@@ -406,7 +415,7 @@ export default function TerminalWorkspace() {
                                 disabled={advance.isPending}
                               >
                                 <SendHorizonal className="w-3 h-3" />
-                                {STAGE_SUBMIT_LABEL[stage]}
+                                {stage === "gate_in" && c.status !== "gate_in" ? "Move to Gate-In" : STAGE_SUBMIT_LABEL[stage]}
                               </Button>
                             </div>
                           </Card>
