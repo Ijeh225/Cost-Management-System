@@ -150,13 +150,13 @@ function StageJobCard({
   const [stageOwner, setStageOwner] = useState(c.stageOwnerName ?? "");
   const [expectedDate, setExpectedDate] = useState(fmtInput(c[config.expectedField] as string | null | undefined));
   const [delayReason, setDelayReason] = useState(delayReasonValue ?? "");
-  const [finalDate, setFinalDate] = useState(fmtInput(finalDateValue || releasedAt || new Date().toISOString()));
+  const [finalDate, setFinalDate] = useState(fmtInput(finalDateValue || releasedAt));
 
   useEffect(() => {
     setStageOwner(c.stageOwnerName ?? "");
     setExpectedDate(fmtInput(c[config.expectedField] as string | null | undefined));
     setDelayReason(delayReasonValue ?? "");
-    setFinalDate(fmtInput(finalDateValue || releasedAt || new Date().toISOString()));
+    setFinalDate(fmtInput(finalDateValue || releasedAt));
   }, [c.id, c.stageOwnerName, c[config.expectedField], delayReasonValue, finalDateValue, releasedAt]);
 
   const isBusy = stageAction.isPending;
@@ -212,10 +212,10 @@ function StageJobCard({
 
           <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
             <div className="space-y-2">
-              <Label>{config.releasedLabel}</Label>
+              <Label>{config.releasedLabel} <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <Input type="date" value={finalDate} onChange={e => setFinalDate(e.target.value)} />
             </div>
-            <Button disabled={isBusy || !finalDate || !isReady} onClick={() => runAction("mark_released", { finalDate })}>
+            <Button disabled={isBusy || !isReady} onClick={() => runAction("mark_released", { finalDate: finalDate || undefined })}>
               {isBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <SendHorizonal className="w-4 h-4 mr-2" />}
               {config.submitLabel}
             </Button>

@@ -810,9 +810,11 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req: Auth
         if (!expectedDate || releasedAt) continue;
         if (check.stage === "pull_out" && !c.tdoReleasedAt) continue;
         const exp = new Date(expectedDate); exp.setUTCHours(0, 0, 0, 0);
-        if (exp.getTime() < today.getTime()) {
+        if (exp.getTime() <= today.getTime()) {
           const overdueDays = Math.floor((today.getTime() - exp.getTime()) / 86_400_000);
-          const message = `${check.label} overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}: ${c.containerNumber}`;
+          const message = overdueDays > 0
+            ? `${check.label} overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}: ${c.containerNumber}`
+            : `${check.label} due today: ${c.containerNumber}`;
           // Keep generated overdue reminders deduped; user/business action
           // notifications are inserted elsewhere and must remain as full history.
           const [existing] = await db.select({ id: workflowNotificationsTable.id })

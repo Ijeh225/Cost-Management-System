@@ -227,6 +227,74 @@ function SuperAdminGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function HomeRoute() {
+  const {
+    isLoading,
+    isTransireUser,
+    isShippingUser,
+    isTerminalUser,
+    isPullOutUser,
+    isShippingTerminalUser,
+    isOperationsUser,
+    isDocumentationUser,
+    isAccountsUser,
+    isTerminalManager,
+    isDeliveryUser,
+    isSecurityUser,
+  } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (isTransireUser || isOperationsUser) setLocation("/workspace/transire", { replace: true });
+    else if (isShippingUser || isShippingTerminalUser) setLocation("/workspace/shipping", { replace: true });
+    else if (isTerminalUser) setLocation("/workspace/terminal-ops", { replace: true });
+    else if (isPullOutUser) setLocation("/workspace/pull-out", { replace: true });
+    else if (isDocumentationUser) setLocation("/documentation", { replace: true });
+    else if (isAccountsUser) setLocation("/workspace/accounts", { replace: true });
+    else if (isTerminalManager) setLocation("/workspace/terminal", { replace: true });
+    else if (isDeliveryUser) setLocation("/workspace/delivery", { replace: true });
+    else if (isSecurityUser) setLocation("/gate", { replace: true });
+  }, [
+    isLoading,
+    isTransireUser,
+    isShippingUser,
+    isTerminalUser,
+    isPullOutUser,
+    isShippingTerminalUser,
+    isOperationsUser,
+    isDocumentationUser,
+    isAccountsUser,
+    isTerminalManager,
+    isDeliveryUser,
+    isSecurityUser,
+    setLocation,
+  ]);
+
+  if (
+    isLoading ||
+    isTransireUser ||
+    isShippingUser ||
+    isTerminalUser ||
+    isPullOutUser ||
+    isShippingTerminalUser ||
+    isOperationsUser ||
+    isDocumentationUser ||
+    isAccountsUser ||
+    isTerminalManager ||
+    isDeliveryUser ||
+    isSecurityUser
+  ) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return <Dashboard />;
+}
+
 function Router() {
   return (
     <Switch>
@@ -247,7 +315,7 @@ function Router() {
         <AppLayout>
           <PageErrorBoundary>
             <Switch>
-              <Route path="/" component={Dashboard} />
+              <Route path="/" component={HomeRoute} />
               <Route path="/containers" component={Containers} />
               <Route path="/containers/upload" component={UploadPage} />
               <Route path="/containers/:id" component={ContainerDetail} />

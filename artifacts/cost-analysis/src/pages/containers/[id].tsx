@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import type { ReactNode } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { getShippingLine, normalizeContainerNumber, formatTrackingDate, formatTrackingDateTime, isMaerskContainer, type TrackingResult } from "@/lib/tracking";
 import { trackRecentItem } from "@/lib/recent-items";
@@ -1152,10 +1153,273 @@ function AuditTrail({ containerId }: { containerId: number }) {
   );
 }
 
+function OperationalInfo({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">{label}</p>
+      <div className="text-sm font-medium text-foreground">{value || "—"}</div>
+    </div>
+  );
+}
+
+function formatOperationalDate(value?: string | null, withTime = false) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-NG", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+  });
+}
+
+function OperationalContainerView({
+  container,
+  containerId,
+  backHref,
+}: {
+  container: any;
+  containerId: number;
+  backHref: string;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const confirmBerthingMutation = useConfirmBerthing();
+  const reviseBerthingEtaMutation = useReviseBerthingEta();
+  const [berthingConfirmStep, setBerthingConfirmStep] = useState<"idle" | "confirm" | "revise">("idle");
+  const [revisedBerthingEta, setRevisedBerthingEta] = useState("");
+  const [revisedBerthingNote, setRevisedBerthingNote] = useState("");
+
+  const etaDate = container.eta ? new Date(container.eta) : null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const etaDay = etaDate ? new Date(etaDate) : null;
+  etaDay?.setHours(0, 0, 0, 0);
+  const isEtaDue = !!etaDay && etaDay.getTime() <= today.getTime();
+  const overdueDays = etaDay ? Math.floor((today.getTime() - etaDay.getTime()) / 86_400_000) : 0;
+  const isBusy = confirmBerthingMutation.isPending || reviseBerthingEtaMutation.isPending;
+
+  async function confirmBerthing(sendWhatsApp: boolean) {
+    try {
+      const res = await confirmBerthingMutation.mutateAsync({ id: containerId, sendWhatsApp });
+      const wa = res.whatsappResult;
+      await queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      toast({
+        title: "Berthing Confirmed",
+        description: sendWhatsApp
+          ? wa?.success
+            ? "WhatsApp notification sent to client."
+            : `Berthing recorded. WhatsApp failed: ${wa?.error ?? "unknown error"}`
+          : "Berthing recorded without client notification.",
+      });
+      setBerthingConfirmStep("idle");
+    } catch (err) {
+      toast({ variant: "destructive", title: "Failed", description: err instanceof Error ? err.message : "Could not confirm berthing" });
+    }
+  }
+
+  async function saveRevisedEta() {
+    if (!revisedBerthingEta) {
+      toast({ variant: "destructive", title: "Revised ETA required", description: "Select the new ETA or berthing date before saving." });
+      return;
+    }
+    try {
+      await reviseBerthingEtaMutation.mutateAsync({
+        id: containerId,
+        eta: revisedBerthingEta,
+        note: revisedBerthingNote.trim() || undefined,
+      });
+      await queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      toast({ title: "Revised ETA saved", description: "Berthing reminder rescheduled." });
+      setBerthingConfirmStep("idle");
+      setRevisedBerthingEta("");
+      setRevisedBerthingNote("");
+    } catch (err) {
+      toast({ variant: "destructive", title: "Failed", description: err instanceof Error ? err.message : "Could not update revised ETA" });
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-3xl mx-auto pb-16">
+      <div className="flex items-center gap-4">
+        <Link href={backHref}>
+          <Button variant="ghost" size="icon" className="hover:bg-accent rounded-full">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+        </Link>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight font-mono truncate">{container.containerNumber}</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+            <FileText className="w-3.5 h-3.5" /> BL: {container.blNumber || "—"}
+          </p>
+        </div>
+        <Badge variant="outline" className="ml-auto shrink-0">Operational View</Badge>
+      </div>
+
+      <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
+        <CardContent className="p-6 space-y-6">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <OperationalInfo label="Customer" value={container.customerName} />
+            <OperationalInfo label="Vessel" value={container.vessel} />
+            <OperationalInfo label="Size / Type" value={[container.size, container.command].filter(Boolean).join(" / ")} />
+            <OperationalInfo
+              label="Assigned To"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <UserIcon className="w-4 h-4 text-primary" />
+                  {container.assignedStaffName || "Unassigned"}
+                </span>
+              }
+            />
+            <OperationalInfo
+              label="ETA"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  {formatOperationalDate(container.eta)}
+                  {container.berthed && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-green-600 bg-green-500/10 border border-green-500/30 rounded-full px-1.5 py-0.5">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> Berthed
+                    </span>
+                  )}
+                </span>
+              }
+            />
+            <OperationalInfo label="Consignee" value={container.consignee} />
+          </div>
+
+          {container.berthed && (
+            <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <Anchor className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-green-700 dark:text-green-300">Vessel berthed at the port</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Confirmed {formatOperationalDate(container.berthingConfirmedAt, true)}
+                    {container.berthingConfirmedByName ? ` by ${container.berthingConfirmedByName}` : ""}.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!container.berthed && isEtaDue && container.status !== "closed" && (
+            <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 space-y-4">
+              <div className="flex items-start gap-3">
+                <Anchor className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-blue-600 dark:text-blue-300 text-sm">
+                    {overdueDays > 0
+                      ? `ETA passed ${overdueDays} day${overdueDays === 1 ? "" : "s"} ago — Confirm Berthing`
+                      : "Vessel ETA Is Today — Confirm Berthing"}
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Has the vessel berthed at the port? Confirm it, notify the client if needed, or save a revised ETA.
+                  </p>
+                </div>
+              </div>
+
+              {berthingConfirmStep === "idle" ? (
+                <Button size="sm" className="gap-1.5" onClick={() => setBerthingConfirmStep("confirm")}>
+                  <Anchor className="w-3.5 h-3.5" />
+                  Confirm Berthing
+                </Button>
+              ) : berthingConfirmStep === "confirm" ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {container.clientId && (
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1.5" disabled={isBusy} onClick={() => confirmBerthing(true)}>
+                      {confirmBerthingMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      Yes + Notify Client
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" disabled={isBusy} onClick={() => confirmBerthing(false)}>
+                    {confirmBerthingMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    {container.clientId ? "Yes, No Notification" : "Yes, Confirm"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-500/40 text-amber-600 hover:bg-amber-500/10 gap-1.5"
+                    disabled={isBusy}
+                    onClick={() => {
+                      setRevisedBerthingEta("");
+                      setRevisedBerthingNote("");
+                      setBerthingConfirmStep("revise");
+                    }}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    Not Yet Berthed
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={isBusy} onClick={() => setBerthingConfirmStep("idle")}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Not yet berthed - update revised ETA</p>
+                    <p className="text-xs text-muted-foreground">Use the date provided by the shipping line or terminal.</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="field-revised-berthing-eta">Revised ETA / berthing date</Label>
+                      <Input
+                        id="field-revised-berthing-eta"
+                        type="date"
+                        value={revisedBerthingEta}
+                        onChange={(event) => setRevisedBerthingEta(event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="field-revised-berthing-note">Note / source (optional)</Label>
+                      <Textarea
+                        id="field-revised-berthing-note"
+                        value={revisedBerthingNote}
+                        onChange={(event) => setRevisedBerthingNote(event.target.value)}
+                        placeholder="e.g. Shipping line revised ETA"
+                        className="min-h-[42px]"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5" disabled={isBusy} onClick={saveRevisedEta}>
+                      {reviseBerthingEtaMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      Save Revised ETA
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={isBusy} onClick={() => setBerthingConfirmStep("confirm")}>
+                      Back
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!container.berthed && !isEtaDue && (
+            <div className="rounded-lg border border-border/40 bg-muted/20 p-4 text-sm text-muted-foreground">
+              Berthing confirmation will become available when the ETA date arrives.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function ContainerDetail() {
   const { id } = useParams();
   const containerId = Number(id);
-  const { isAdmin, isOperationsUser, isSecurityUser, user } = useAuth();
+  const {
+    isAdmin,
+    isOperationsUser,
+    isSecurityUser,
+    isTransireUser,
+    isShippingUser,
+    isTerminalUser,
+    isPullOutUser,
+    isShippingTerminalUser,
+    user,
+  } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("charges");
@@ -1312,6 +1576,25 @@ export default function ContainerDetail() {
   if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
 
   const { container, charges, sectionApprovals = [] } = data as any;
+
+  const isFieldDepartmentUser = !isAdmin && (
+    isTransireUser ||
+    isShippingUser ||
+    isTerminalUser ||
+    isPullOutUser ||
+    isShippingTerminalUser
+  );
+
+  if (isFieldDepartmentUser) {
+    const backHref = isTransireUser
+      ? "/workspace/transire"
+      : isShippingUser || isShippingTerminalUser
+        ? "/workspace/shipping"
+        : isTerminalUser
+          ? "/workspace/terminal-ops"
+          : "/workspace/pull-out";
+    return <OperationalContainerView container={container} containerId={containerId} backHref={backHref} />;
+  }
 
   if (isSecurityUser) {
     return (
