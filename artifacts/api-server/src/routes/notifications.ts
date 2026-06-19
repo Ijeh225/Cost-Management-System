@@ -224,6 +224,13 @@ async function getAgingThresholds() {
 }
 
 async function computeAlerts(userId?: number, role?: string, branchScope?: number | null) {
+  const settingRows = await db.select().from(settingsTable);
+  const settingsMap: Record<string, string> = {};
+  for (const r of settingRows) settingsMap[r.key] = r.value;
+  const configuredBerthingOfficerId = Number.parseInt(settingsMap["berthingOfficerUserId"] ?? "", 10);
+  const fallbackBerthingOfficerId = Number.isFinite(configuredBerthingOfficerId) && configuredBerthingOfficerId > 0
+    ? configuredBerthingOfficerId
+    : null;
   const allContainers = branchScope != null
     ? await db.select().from(containersTable).where(eq(containersTable.branchId, branchScope))
     : await db.select().from(containersTable);
@@ -259,7 +266,7 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
     const berthed = c.berthed ?? false;
     const paarReleasedAt = c.paarReleasedAt ? new Date(c.paarReleasedAt) : null;
     const paarNumber = c.paarNumber ?? null;
-    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue, emptyReturnDueDate, emptyReturnDate, eta, berthed, paarReleasedAt, paarNumber };
+    return { id: c.id, containerNumber: c.containerNumber, customerName: c.customerName, status: c.status, revenue, totalCost, grossProfit, margin, terminalCost, deliveryCost, dutyNotPaid, createdAt: c.createdAt, ageDays, stageOwner: c.stageOwner ?? null, nextActionDueDate, isActionOverdue, emptyReturnDueDate, emptyReturnDate, eta, berthingOfficerId: c.berthingOfficerId ?? null, berthed, paarReleasedAt, paarNumber };
   });
 
   const totals = containerData.reduce((acc, c) => ({ terminal: acc.terminal + c.terminalCost, delivery: acc.delivery + c.deliveryCost }), { terminal: 0, delivery: 0 });
@@ -281,7 +288,7 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
     }
   }
 
-  type Alert = { alertKey: string; type: string; severity: string; message: string; containerId?: number; containerNumber?: string; generatedAt: string };
+  type Alert = { alertKey: string; type: string; severity: string; message: string; containerId?: number; containerNumber?: string; targetUserId?: number; generatedAt: string };
   const alerts: Alert[] = [];
   const now = new Date().toISOString();
 
@@ -375,6 +382,8 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
 
   for (const c of containerData) {
     if (c.eta && !c.berthed && c.status !== "closed") {
+      const effectiveBerthingOfficerId = c.berthingOfficerId ?? fallbackBerthingOfficerId;
+      if (!effectiveBerthingOfficerId || effectiveBerthingOfficerId !== userId) continue;
       const startOfToday = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
       const startOfTomorrow = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
       const etaDay = new Date(c.eta); etaDay.setUTCHours(0, 0, 0, 0);
@@ -390,6 +399,7 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
           message,
           containerId: c.id,
           containerNumber: c.containerNumber,
+          targetUserId: effectiveBerthingOfficerId,
           generatedAt: now,
         });
       }
@@ -464,8 +474,8 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
 
   if (role && !ADMIN_ROLES.has(role)) {
     const allowed = ROLE_ALERT_TYPES[role];
-    if (allowed) return alerts.filter(a => allowed.has(a.type));
-    return [];
+    if (allowed) return alerts.filter(a => allowed.has(a.type) || a.targetUserId === userId);
+    return alerts.filter(a => a.targetUserId === userId);
   }
 
   return alerts;

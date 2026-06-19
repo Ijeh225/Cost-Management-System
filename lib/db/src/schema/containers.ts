@@ -15,6 +15,7 @@ export const containersTable = pgTable("containers", {
   vessel: text("vessel").notNull().default(""),
   status: text("status").notNull().default("pending_verification"),
   verificationOfficerId: integer("verification_officer_id").references(() => usersTable.id),
+  berthingOfficerId: integer("berthing_officer_id").references(() => usersTable.id),
   verifiedAt: timestamp("verified_at"),
   verifiedBy: integer("verified_by").references(() => usersTable.id),
   isLocked: boolean("is_locked").notNull().default(false),

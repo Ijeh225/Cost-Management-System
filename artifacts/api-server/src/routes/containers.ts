@@ -7,6 +7,7 @@ import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fx
 
 const router = Router();
 const VERIFICATION_OFFICER_SETTING_KEY = "verificationOfficerUserId";
+const BERTHING_OFFICER_SETTING_KEY = "berthingOfficerUserId";
 
 async function getConfiguredVerificationOfficerId(): Promise<number | null> {
   const [setting] = await db.select({ value: settingsTable.value })
@@ -16,10 +17,44 @@ async function getConfiguredVerificationOfficerId(): Promise<number | null> {
   return Number.isFinite(id) && id > 0 ? id : null;
 }
 
+async function getConfiguredBerthingOfficerId(): Promise<number | null> {
+  const [setting] = await db.select({ value: settingsTable.value })
+    .from(settingsTable)
+    .where(eq(settingsTable.key, BERTHING_OFFICER_SETTING_KEY));
+  const id = Number.parseInt(setting?.value ?? "", 10);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
 async function getUserName(userId: number | null | undefined): Promise<string | null> {
   if (!userId) return null;
   const [user] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, userId));
   return user?.name ?? null;
+}
+
+async function getEffectiveBerthingOfficerId(container: { berthingOfficerId?: number | null }): Promise<number | null> {
+  return container.berthingOfficerId ?? await getConfiguredBerthingOfficerId();
+}
+
+async function requireAssignedBerthingOfficer(req: AuthRequest, container: { berthingOfficerId?: number | null }) {
+  const assignedOfficerId = await getEffectiveBerthingOfficerId(container);
+  if (!assignedOfficerId) {
+    return {
+      ok: false as const,
+      status: 503,
+      error: "Berthing officer is not configured. Super admin must assign one in Settings.",
+      officerId: null,
+    };
+  }
+  if (req.user!.id !== assignedOfficerId) {
+    const officerName = await getUserName(assignedOfficerId);
+    return {
+      ok: false as const,
+      status: 403,
+      error: `Only the assigned Berthing Officer${officerName ? ` (${officerName})` : ""} can confirm or revise berthing for this container.`,
+      officerId: assignedOfficerId,
+    };
+  }
+  return { ok: true as const, officerId: assignedOfficerId };
 }
 
 function canUserEditSection(
@@ -51,6 +86,7 @@ function formatContainer(
   berthingConfirmedByName?: string | null,
   verificationOfficerName?: string | null,
   verifiedByName?: string | null,
+  berthingOfficerName?: string | null,
 ) {
   let lockedSections: string[] = [];
   try { lockedSections = JSON.parse(c.lockedSections ?? "[]"); } catch {}
@@ -69,6 +105,8 @@ function formatContainer(
     assignedStaffName: staffName ?? null,
     verificationOfficerId: c.verificationOfficerId ?? null,
     verificationOfficerName: verificationOfficerName ?? null,
+    berthingOfficerId: c.berthingOfficerId ?? null,
+    berthingOfficerName: berthingOfficerName ?? null,
     branchId: c.branchId ?? null,
     clientId: c.clientId ?? null,
     clientName: clientName ?? null,
@@ -326,7 +364,9 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
     const staffIds = [...new Set([
       ...rows.map(r => r.assignedStaffId).filter(Boolean),
       ...rows.map(r => r.verificationOfficerId).filter(Boolean),
+      ...rows.map(r => r.berthingOfficerId).filter(Boolean),
       ...rows.map(r => r.verifiedBy).filter(Boolean),
+      ...rows.map(r => r.berthingConfirmedById).filter(Boolean),
     ])];
     const staffMap: Record<number, string> = {};
     if (staffIds.length > 0) {
@@ -393,6 +433,7 @@ router.get("/containers", requireAuth, async (req: AuthRequest, res) => {
         null,
         c.verificationOfficerId ? staffMap[c.verificationOfficerId] ?? null : null,
         c.verifiedBy ? staffMap[c.verifiedBy] ?? null : null,
+        c.berthingOfficerId ? staffMap[c.berthingOfficerId] ?? null : null,
       ),
       totalCost: totalsMap[c.id] ?? 0,
       grossProfit: parseFloat(c.clearingCharges ?? "0") - (totalsMap[c.id] ?? 0),
@@ -442,6 +483,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       }
     }
     const verificationOfficerId = await getConfiguredVerificationOfficerId();
+    const berthingOfficerId = await getConfiguredBerthingOfficerId();
     const [container] = await db.insert(containersTable).values({
       customerName: resolvedCustomerName,
       containerNumber,
@@ -456,6 +498,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       consignee: consignee || null,
       branchId: createBranchId,
       verificationOfficerId,
+      berthingOfficerId,
     }).returning();
     await getOrCreateCharges(container.id);
     // Notify: new job created
@@ -479,7 +522,8 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
       }] : []),
     ]);
     const verificationOfficerName = await getUserName(verificationOfficerId);
-    return res.status(201).json(formatContainer(container, null, null, null, verificationOfficerName));
+    const berthingOfficerName = await getUserName(berthingOfficerId);
+    return res.status(201).json(formatContainer(container, null, null, null, verificationOfficerName, null, berthingOfficerName));
   } catch (err: any) {
     if (err.code === "23505") {
       return res.status(400).json({ error: "Container number or BL number already exists" });
@@ -548,6 +592,7 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
     const duplicates: string[] = [];
     const errors: string[] = [];
     const verificationOfficerId = await getConfiguredVerificationOfficerId();
+    const berthingOfficerId = await getConfiguredBerthingOfficerId();
 
     // Pre-validate: reject entire upload if any row is missing a valid command
     const missingCommandRows: number[] = [];
@@ -593,6 +638,7 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
           consignee: row.consignee ?? null,
           branchId: uploadBranchId,
           verificationOfficerId,
+          berthingOfficerId,
         }).returning();
         await getOrCreateCharges(container.id);
         if (verificationOfficerId) {
@@ -1166,21 +1212,27 @@ router.post("/containers/:id/verify", requireAuth, async (req: AuthRequest, res)
 });
 
 router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthRequest, res) => {
-  const userRole = req.user?.role;
-  if (userRole !== "admin" && userRole !== "super_admin" && userRole !== "operations_user") {
-    return res.status(403).json({ error: "Only admin and operations users can confirm berthing." });
-  }
   try {
     const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       return res.status(404).json({ error: "Container not found" });
     }
+    const officerCheck = await requireAssignedBerthingOfficer(req, existing);
+    if (!officerCheck.ok) {
+      return res.status(officerCheck.status).json({ error: officerCheck.error });
+    }
     const confirmedByUserId = req.user!.id;
     const confirmedByName = req.user!.name ?? req.user!.email ?? "Unknown";
     const now = new Date();
     const [updated] = await db.update(containersTable)
-      .set({ berthed: true, berthingConfirmedAt: now, berthingConfirmedById: confirmedByUserId, updatedAt: now })
+      .set({
+        berthed: true,
+        berthingOfficerId: officerCheck.officerId,
+        berthingConfirmedAt: now,
+        berthingConfirmedById: confirmedByUserId,
+        updatedAt: now,
+      })
       .where(eq(containersTable.id, id))
       .returning();
     await db.insert(auditLogTable).values({
@@ -1214,7 +1266,8 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
           : await sendWhatsAppTemplate(phone, "berthing", message);
       }
     }
-    return res.json({ container: formatContainer(updated), whatsappResult });
+    const berthingOfficerName = await getUserName(officerCheck.officerId);
+    return res.json({ container: formatContainer(updated, null, null, confirmedByName, null, null, berthingOfficerName), whatsappResult });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -1222,10 +1275,6 @@ router.post("/containers/:id/confirm-berthing", requireAuth, async (req: AuthReq
 });
 
 router.patch("/containers/:id/berthing-eta", requireAuth, async (req: AuthRequest, res) => {
-  const userRole = req.user?.role;
-  if (userRole !== "admin" && userRole !== "super_admin" && userRole !== "operations_user") {
-    return res.status(403).json({ error: "Only admin and operations users can revise berthing ETA." });
-  }
   try {
     const id = parseInt(String(req.params.id));
     const { eta, note } = req.body ?? {};
@@ -1235,6 +1284,10 @@ router.patch("/containers/:id/berthing-eta", requireAuth, async (req: AuthReques
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       return res.status(404).json({ error: "Container not found" });
+    }
+    const officerCheck = await requireAssignedBerthingOfficer(req, existing);
+    if (!officerCheck.ok) {
+      return res.status(officerCheck.status).json({ error: officerCheck.error });
     }
     if (existing.status === "closed") {
       return res.status(400).json({ error: "Closed containers cannot have berthing ETA revised." });
@@ -1252,7 +1305,7 @@ router.patch("/containers/:id/berthing-eta", requireAuth, async (req: AuthReques
     const revisedEtaLabel = revisedEta.toISOString().slice(0, 10);
     const cleanNote = typeof note === "string" ? note.trim() : "";
     const [updated] = await db.update(containersTable)
-      .set({ eta: revisedEta, updatedAt: new Date() })
+      .set({ eta: revisedEta, berthingOfficerId: officerCheck.officerId, updatedAt: new Date() })
       .where(eq(containersTable.id, id))
       .returning();
 
@@ -1265,7 +1318,8 @@ router.patch("/containers/:id/berthing-eta", requireAuth, async (req: AuthReques
       reason: `Berthing ETA revised from ${previousEta} to ${revisedEtaLabel}${cleanNote ? ` - ${cleanNote}` : ""}`,
     });
 
-    return res.json({ container: formatContainer(updated) });
+    const berthingOfficerName = await getUserName(officerCheck.officerId);
+    return res.json({ container: formatContainer(updated, null, null, null, null, null, berthingOfficerName) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -1658,6 +1712,11 @@ router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (effectiveVerificationOfficerId) {
       verificationOfficerName = await getUserName(effectiveVerificationOfficerId);
     }
+    let berthingOfficerName: string | null = null;
+    const effectiveBerthingOfficerId = c.berthingOfficerId ?? await getConfiguredBerthingOfficerId();
+    if (effectiveBerthingOfficerId) {
+      berthingOfficerName = await getUserName(effectiveBerthingOfficerId);
+    }
     const verifiedByName = await getUserName(c.verifiedBy);
     const charges = await getOrCreateCharges(id);
     const extraChargeRows = await db.select().from(containerExtraChargesTable)
@@ -1669,12 +1728,13 @@ router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
 
     const containerFormatted = {
       ...formatContainer(
-        { ...c, verificationOfficerId: effectiveVerificationOfficerId },
+        { ...c, verificationOfficerId: effectiveVerificationOfficerId, berthingOfficerId: effectiveBerthingOfficerId },
         staffName,
         clientName,
         berthingConfirmedByName,
         verificationOfficerName,
         verifiedByName,
+        berthingOfficerName,
       ),
       totalCost,
       grossProfit: parseFloat(c.clearingCharges ?? "0") - totalCost,

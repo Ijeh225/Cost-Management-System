@@ -127,6 +127,8 @@ export interface Container {
   assignedStaffName?: string | null;
   verificationOfficerId?: number | null;
   verificationOfficerName?: string | null;
+  berthingOfficerId?: number | null;
+  berthingOfficerName?: string | null;
   totalCost: number;
   clearingCharges: number;
   grossProfit: number;

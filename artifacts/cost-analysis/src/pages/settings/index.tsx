@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound, ShieldCheck } from "lucide-react";
+import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound, ShieldCheck, Anchor } from "lucide-react";
 
 const DEFAULTS = {
   agingInactivityDays: "7",
@@ -53,6 +53,7 @@ export default function SettingsPage() {
   const [digestTime, setDigestTime] = useState("08:00");
   const [digestLastSentAt, setDigestLastSentAt] = useState<string | null>(null);
   const [verificationOfficerUserId, setVerificationOfficerUserId] = useState("none");
+  const [berthingOfficerUserId, setBerthingOfficerUserId] = useState("none");
   const [saving, setSaving] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -69,6 +70,7 @@ export default function SettingsPage() {
       setDigestTime(s["digestTime"] ?? "08:00");
       setDigestLastSentAt(s["digestLastSentAt"] ?? null);
       setVerificationOfficerUserId(s["verificationOfficerUserId"] || "none");
+      setBerthingOfficerUserId(s["berthingOfficerUserId"] || "none");
     }
   }, [isLoading]);
 
@@ -101,6 +103,7 @@ export default function SettingsPage() {
         digestFrequency,
         digestTime,
         verificationOfficerUserId: verificationOfficerUserId === "none" ? "" : verificationOfficerUserId,
+        berthingOfficerUserId: berthingOfficerUserId === "none" ? "" : berthingOfficerUserId,
       });
       toast({ title: "Settings saved" });
       setDirty(false);
@@ -128,6 +131,7 @@ export default function SettingsPage() {
         digestFrequency,
         digestTime,
         verificationOfficerUserId: verificationOfficerUserId === "none" ? "" : verificationOfficerUserId,
+        berthingOfficerUserId: berthingOfficerUserId === "none" ? "" : berthingOfficerUserId,
       });
       const result = await customFetch<{
         sent: number;
@@ -215,6 +219,62 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium text-amber-500">Verification officer not configured</p>
                 <p className="text-xs text-muted-foreground">
                   New containers can still be created, but verification will be blocked until an officer is assigned.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-1">
+            <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Settings
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Berthing Officer */}
+      <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Anchor className="w-4 h-4 text-primary" />
+            Berthing Officer
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Choose the only user allowed to confirm vessel berthing or revise berthing ETA from the berthing workflow.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Assigned berthing officer</Label>
+            <Select
+              value={berthingOfficerUserId}
+              onValueChange={(value) => { setBerthingOfficerUserId(value); mark(); }}
+            >
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Select officer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Not configured</SelectItem>
+                {activeUsers.map((u: any) => (
+                  <SelectItem key={u.id} value={String(u.id)}>
+                    {u.name} ({u.role})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Other users can view vessel status, but only this officer can confirm berthing or save a revised ETA.
+            </p>
+          </div>
+
+          {berthingOfficerUserId === "none" && (
+            <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10">
+              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-amber-500">Berthing officer not configured</p>
+                <p className="text-xs text-muted-foreground">
+                  Berthing confirmation and revised ETA actions will be blocked until an officer is assigned.
                 </p>
               </div>
             </div>

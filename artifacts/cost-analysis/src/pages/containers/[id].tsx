@@ -1184,6 +1184,7 @@ function OperationalContainerView({
   backHref: string;
 }) {
   const { toast } = useToast();
+  const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const confirmBerthingMutation = useConfirmBerthing();
   const reviseBerthingEtaMutation = useReviseBerthingEta();
@@ -1199,6 +1200,7 @@ function OperationalContainerView({
   const isEtaDue = !!etaDay && etaDay.getTime() <= today.getTime();
   const overdueDays = etaDay ? Math.floor((today.getTime() - etaDay.getTime()) / 86_400_000) : 0;
   const isBusy = confirmBerthingMutation.isPending || reviseBerthingEtaMutation.isPending;
+  const isAssignedBerthingOfficer = !!container.berthingOfficerId && user?.id === container.berthingOfficerId;
 
   async function confirmBerthing(sendWhatsApp: boolean) {
     try {
@@ -1319,7 +1321,17 @@ function OperationalContainerView({
                 </div>
               </div>
 
-              {berthingConfirmStep === "idle" ? (
+              {!container.berthingOfficerId ? (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-muted-foreground">
+                  {isAdmin
+                    ? "Berthing officer is not configured. Super admin must assign one in Settings."
+                    : "Berthing officer is not configured yet."}
+                </div>
+              ) : !isAssignedBerthingOfficer ? (
+                <div className="rounded-md border border-blue-500/20 bg-background/50 p-3 text-xs text-muted-foreground">
+                  Awaiting berthing confirmation by {container.berthingOfficerName || "the assigned Berthing Officer"}.
+                </div>
+              ) : berthingConfirmStep === "idle" ? (
                 <Button size="sm" className="gap-1.5" onClick={() => setBerthingConfirmStep("confirm")}>
                   <Anchor className="w-3.5 h-3.5" />
                   Confirm Berthing
@@ -1411,7 +1423,6 @@ export default function ContainerDetail() {
   const containerId = Number(id);
   const {
     isAdmin,
-    isOperationsUser,
     isSecurityUser,
     isTransireUser,
     isShippingUser,
@@ -1576,6 +1587,7 @@ export default function ContainerDetail() {
   if (isError || !data) return <div className="p-12 text-center text-destructive">Failed to load container details.</div>;
 
   const { container, charges, sectionApprovals = [] } = data as any;
+  const isAssignedBerthingOfficer = !!container.berthingOfficerId && user?.id === container.berthingOfficerId;
 
   const isFieldDepartmentUser = !isAdmin && (
     isTransireUser ||
@@ -2176,7 +2188,7 @@ export default function ContainerDetail() {
         </DialogContent>
       </Dialog>
 
-      {(isAdmin || isOperationsUser) && container.eta && !container.berthed && container.status !== "closed" && (() => {
+      {container.eta && !container.berthed && container.status !== "closed" && (() => {
         const etaDate = new Date(container.eta);
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const etaDay = new Date(etaDate); etaDay.setHours(0, 0, 0, 0);
@@ -2198,7 +2210,17 @@ export default function ContainerDetail() {
                 {container.clientId ? " and optionally notify the client via WhatsApp, or update the revised ETA if it has not berthed." : ", or update the revised ETA if it has not berthed."}
               </p>
             </div>
-            {berthingConfirmStep === "idle" ? (
+            {!container.berthingOfficerId ? (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-muted-foreground">
+                {isAdmin
+                  ? "Berthing officer is not configured. Super admin must assign one in Settings."
+                  : "Berthing officer is not configured yet."}
+              </div>
+            ) : !isAssignedBerthingOfficer ? (
+              <div className="rounded-md border border-blue-500/20 bg-background/50 p-3 text-xs text-muted-foreground">
+                Awaiting berthing confirmation by {container.berthingOfficerName || "the assigned Berthing Officer"}.
+              </div>
+            ) : berthingConfirmStep === "idle" ? (
               <Button
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 gap-1.5"
