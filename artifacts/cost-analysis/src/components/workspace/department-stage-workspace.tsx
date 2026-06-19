@@ -172,14 +172,21 @@ function StageJobCard({
     );
   }
 
+  const actualDateDisplay = releasedAt ? fmtDisplay(releasedAt) : "Not recorded yet";
+
   return (
     <Card className="p-4 space-y-4 border-border/50 hover:bg-accent/10 transition-colors">
-      <div className="flex items-start gap-4">
+      <button
+        type="button"
+        className="w-full text-left flex items-start gap-4 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        onClick={() => setExpanded(v => !v)}
+        aria-expanded={expanded}
+      >
         <JobSummary c={c} config={config} />
-        <Button size="sm" variant="outline" className="gap-1 text-xs shrink-0" onClick={() => setExpanded(v => !v)}>
-          {expanded ? "Hide Controls" : "Open Job"}
-        </Button>
-      </div>
+        <span className="text-xs text-muted-foreground shrink-0 mt-1">
+          {expanded ? "Hide details" : "Click to open"}
+        </span>
+      </button>
 
       {expanded && (
         <div className="border-t pt-4 space-y-4">
@@ -205,15 +212,22 @@ function StageJobCard({
                 <Input type="date" value={expectedDate} onChange={e => setExpectedDate(e.target.value)} />
                 <Button variant="outline" disabled={isBusy || !expectedDate} onClick={() => runAction("set_expected_date", { expectedDate })}>
                   <Calendar className="w-4 h-4" />
+                  Save
                 </Button>
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                Saving this date keeps the job Active. Use the release button only when the stage is truly completed.
+              </p>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-            <div className="space-y-2">
-              <Label>{config.releasedLabel} <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <Input type="date" value={finalDate} onChange={e => setFinalDate(e.target.value)} />
+          <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end rounded-lg border border-border/40 bg-muted/20 p-3">
+            <div className="space-y-1">
+              <Label>{config.releasedLabel}</Label>
+              <p className="text-sm font-medium">{actualDateDisplay}</p>
+              <p className="text-[11px] text-muted-foreground">
+                This is recorded automatically when you click {config.submitLabel}.
+              </p>
             </div>
             <Button disabled={isBusy || !isReady} onClick={() => runAction("mark_released", { finalDate: finalDate || undefined })}>
               {isBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <SendHorizonal className="w-4 h-4 mr-2" />}
