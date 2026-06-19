@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import * as XLSX from "xlsx";
 import {
   useGetPipeline,
@@ -8,7 +8,7 @@ import {
   type PipelineContainer,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { getStatusColor, WORKFLOW_STAGES } from "@/lib/format";
+import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,12 +16,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Loader2, Search, FileCheck2, Clock, SendHorizonal, Inbox,
-  CheckCircle2, ChevronDown, ChevronRight, Download, AlertTriangle,
+  CheckCircle2, ChevronDown, ChevronRight, Download, AlertTriangle, Eye,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CompletedJobsView } from "@/components/workspace/completed-jobs-view";
 
 const DEPT_STAGES = ["registered", "documentation", "duty_assessment"] as const;
 
@@ -113,6 +113,11 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
   async function handleSaveAndSubmit() {
     setBusy(true);
     try {
+      const normalizedPaarNumber = paarNumber.trim();
+      const releaseDateForSave = normalizedPaarNumber
+        ? (paarReleaseDate || new Date().toISOString().slice(0, 10))
+        : (paarReleaseDate || null);
+
       // Always save whatever data is present
       await updateCard.mutateAsync({
         id: c.id,
@@ -120,8 +125,8 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
         nextAction:        null,
         nextActionDueDate: paarEta         || null,
         delayReason:       delayReason     || null,
-        paarNumber:        paarNumber      || null,
-        paarReleasedAt:    paarReleaseDate || null,
+        paarNumber:        normalizedPaarNumber || null,
+        paarReleasedAt:    releaseDateForSave,
         paarDelayReason:   paarDelayReason || null,
       });
 
@@ -132,21 +137,18 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
         });
       }
 
-      // Only advance to Submitted when PAAR Number + PAAR Release Date are both confirmed
-      const canSubmit = paarNumber.trim() && paarReleaseDate;
-      if (canSubmit) {
+      // Only advance to Submitted when PAAR Number is entered. Release date defaults to today.
+      if (normalizedPaarNumber) {
+        if (!paarReleaseDate) setPaarReleaseDate(releaseDateForSave ?? "");
         const stageIdx = DEPT_STAGES.indexOf(c.stage as typeof DEPT_STAGES[number]);
         const stagesToAdvance = DEPT_STAGES.slice(stageIdx >= 0 ? stageIdx : 0);
         for (const stage of stagesToAdvance) {
           await advance.mutateAsync({ id: c.id, status: stage });
         }
-        toast({ title: "Submitted", description: `${c.containerNumber} submitted — moved to Duty Payment.` });
+        toast({ title: "Documentation submitted", description: `${c.containerNumber} moved to Submitted. Operations can continue from the Operations page.` });
         onSubmitSuccess();
       } else {
-        const missing = !paarNumber.trim()
-          ? "Enter the PAAR number to move this job to Submitted."
-          : "Use the Set button beside PAAR Number to confirm the release date.";
-        toast({ title: "Saved", description: missing });
+        toast({ title: "Saved", description: "This job remains Active until PAAR Number is entered." });
       }
     } catch (e) {
       toast({ variant: "destructive", title: "Save failed", description: (e as Error).message });
@@ -309,27 +311,153 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
           {/* Action — single smart button */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-[11px] text-muted-foreground/60">
-              {paarNumber.trim() && paarReleaseDate
-                ? "Ready to submit — this job will move to Duty Payment."
-                : "Job stays Active until PAAR number is entered and release date is set."}
+              {paarNumber.trim()
+                ? "Ready to submit. If release date is blank, today will be used."
+                : "Job stays Active until PAAR Number is entered."}
             </p>
             <Button
               onClick={handleSaveAndSubmit}
               disabled={busy}
-              className={`gap-2 shrink-0 ${paarNumber.trim() && paarReleaseDate ? "" : "opacity-80"}`}
-              variant={paarNumber.trim() && paarReleaseDate ? "default" : "outline"}
+              className={`gap-2 shrink-0 ${paarNumber.trim() ? "" : "opacity-80"}`}
+              variant={paarNumber.trim() ? "default" : "outline"}
             >
               {busy
                 ? <Loader2 className="w-4 h-4 animate-spin" />
-                : paarNumber.trim() && paarReleaseDate
+                : paarNumber.trim()
                   ? <SendHorizonal className="w-4 h-4" />
                   : <CheckCircle2 className="w-4 h-4" />}
-              {paarNumber.trim() && paarReleaseDate ? "Save & Submit" : "Save"}
+              {paarNumber.trim() ? "Save & Submit" : "Save"}
             </Button>
           </div>
         </div>
       )}
     </Card>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="mt-1 text-sm font-medium text-foreground">{value || "—"}</div>
+    </div>
+  );
+}
+
+function SubmittedDocumentationView({ containers }: { containers: DocContainer[] }) {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<DocContainer | null>(null);
+  const q = search.trim().toLowerCase();
+  const filtered = containers.filter(c =>
+    !q
+    || c.containerNumber.toLowerCase().includes(q)
+    || (c.blNumber ?? "").toLowerCase().includes(q)
+    || c.customerName.toLowerCase().includes(q)
+    || (c.paarNumber ?? "").toLowerCase().includes(q)
+  );
+
+  return (
+    <>
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search submitted documentation by container #, BL #, customer, or PAAR..."
+            className="pl-11 h-11 text-sm"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+            <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center">
+              <Inbox className="w-7 h-7 text-muted-foreground/50" />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">
+              {search.trim() ? "No matching submitted documentation." : "No jobs submitted yet"}
+            </p>
+            <p className="text-xs text-muted-foreground/60">
+              Jobs submitted by Documentation appear here for reference.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{filtered.length} submitted documentation record{filtered.length === 1 ? "" : "s"}</span>
+              <span>Read-only</span>
+            </div>
+            <div className="space-y-2">
+              {filtered.map(c => (
+                <Card key={c.id} className="p-4 flex items-center gap-4 border-border/50 bg-card/60">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm font-mono">{c.containerNumber}</span>
+                      {c.blNumber && <span className="text-muted-foreground text-xs font-mono">BL: {c.blNumber}</span>}
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                        Documentation Submitted
+                      </Badge>
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-5 ${getStatusColor(c.stage)}`}>
+                        {getStatusLabel(c.stage)}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground truncate">
+                      <span className="truncate">{c.customerName}</span>
+                      {c.paarNumber && <span className="font-mono shrink-0">PAAR: {c.paarNumber}</span>}
+                    </div>
+                  </div>
+                  <Button size="sm" variant="outline" className="gap-1 text-xs h-8 shrink-0" onClick={() => setSelected(c)}>
+                    <Eye className="w-3 h-3" />
+                    View Details
+                  </Button>
+                </Card>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <Dialog open={!!selected} onOpenChange={open => { if (!open) setSelected(null); }}>
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCheck2 className="w-5 h-5 text-yellow-400" />
+              Documentation Submitted
+            </DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-5">
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-lg font-semibold font-mono">{selected.containerNumber}</span>
+                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30">Read only</Badge>
+                  <Badge variant="outline" className={getStatusColor(selected.stage)}>{getStatusLabel(selected.stage)}</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">{selected.customerName}</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <DetailItem label="BL Number" value={selected.blNumber} />
+                <DetailItem label="PAAR Number" value={selected.paarNumber} />
+                <DetailItem label="PAAR Release Date" value={fmtDate(selected.paarReleasedAt)} />
+                <DetailItem label="PAAR ETA" value={fmtDate(selected.nextActionDueAt)} />
+                <DetailItem label="Documentation Officer" value={selected.stageOwnerName} />
+                <DetailItem label="Assessment Amount" value={formatCurrency(selected.duty ?? 0)} />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <DetailItem label="PAAR Delay Reason" value={selected.paarDelayReason} />
+                <DetailItem label="General Delay Reason" value={selected.delayReason} />
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Documentation workflow ends here. Use the Operations page for any downstream duty payment or operations action.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -345,6 +473,18 @@ export default function DocumentationWorkspace() {
   const allContainers: DocContainer[] = DEPT_STAGES.flatMap(s =>
     (data?.stages?.[s] ?? []).map(c => ({ ...c, stage: s }))
   );
+  const submittedContainers: DocContainer[] = useMemo(() => {
+    const lastDeptIdx = Math.max(...DEPT_STAGES.map(stage => WORKFLOW_STAGES.findIndex(s => s.value === stage)));
+    const downstreamStages = WORKFLOW_STAGES.slice(lastDeptIdx + 1).map(s => s.value);
+    const seen = new Set<number>();
+    return downstreamStages.flatMap(stage =>
+      (data?.stages?.[stage] ?? []).map(c => ({ ...c, stage }))
+    ).filter(c => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  }, [data]);
 
   const q = search.trim().toLowerCase();
   const filtered = allContainers.filter(c => {
@@ -420,6 +560,9 @@ export default function DocumentationWorkspace() {
         </TabsList>
 
         <TabsContent value="active" className="space-y-4 mt-6">
+          <p className="text-xs text-muted-foreground">
+            Jobs stay Active until PAAR Number is entered. You can save progress while PAAR is still pending.
+          </p>
           {/* Search + Filter row */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -483,11 +626,7 @@ export default function DocumentationWorkspace() {
         </TabsContent>
 
         <TabsContent value="completed" className="mt-6">
-          <CompletedJobsView
-            deptStages={[...DEPT_STAGES]}
-            emptyTitle="No jobs submitted yet"
-            emptySubtitle="Once you submit a job, it will show up here for review."
-          />
+          <SubmittedDocumentationView containers={submittedContainers} />
         </TabsContent>
       </Tabs>
     </div>
