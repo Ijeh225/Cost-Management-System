@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, clientsTable, userClientAssignmentsTable, branchesTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireSuperAdmin, requireBranchAdminOrAbove, AuthRequest, hashPassword, parseRoles, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
+import { requireAuth, requireAdmin, requireSuperAdmin, requireBranchAdminOrAbove, AuthRequest, hashPassword, isStrongPassword, STRONG_PASSWORD_MESSAGE, parseRoles, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 
 // Roles a branch_admin is permitted to assign to users they create/edit (Task #75).
 // Explicitly excludes super_admin, admin, and branch_admin itself — branch admins
@@ -81,8 +81,8 @@ router.post("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) =
     if (!email || !name || !password || !role) {
       return res.status(400).json({ error: "All fields required" });
     }
-    if (typeof password !== "string" || password.length < 8) {
-      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    if (!isStrongPassword(password)) {
+      return res.status(400).json({ error: STRONG_PASSWORD_MESSAGE });
     }
     // Task #75: branch_admin can only assign non-elevated roles.
     const allowRole = rolesAllowedForActor(req.user?.role);
@@ -201,8 +201,8 @@ router.put("/users/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res
         return res.status(400).json({ error: "You cannot deactivate your own account." });
       }
     }
-    if (password !== undefined && (typeof password !== "string" || password.length < 8)) {
-      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    if (password !== undefined && password !== "" && !isStrongPassword(password)) {
+      return res.status(400).json({ error: STRONG_PASSWORD_MESSAGE });
     }
     const updates: Partial<typeof usersTable.$inferInsert> & { updatedAt: Date } = {
       updatedAt: new Date(),

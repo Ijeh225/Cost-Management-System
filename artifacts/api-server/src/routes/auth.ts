@@ -11,13 +11,15 @@ import {
   clearAuthCookie,
   requireAuth,
   AuthRequest,
+  isStrongPassword,
+  STRONG_PASSWORD_MESSAGE,
 } from "../lib/auth.js";
 
 const router = Router();
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 50,
+  limit: 10,
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
   standardHeaders: "draft-7",
   legacyHeaders: false,
@@ -31,7 +33,17 @@ const loginLimiter = rateLimit({
   },
 });
 
-router.post("/auth/login", loginLimiter, async (req, res) => {
+const loginIpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 50,
+  message: { error: "Too many login attempts from this network. Please try again in 15 minutes." },
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? "") || "unknown",
+});
+
+router.post("/auth/login", loginIpLimiter, loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -154,8 +166,8 @@ router.post("/auth/setup", async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ error: "Name, email, and password are required" });
     }
-    if (password.length < 8) {
-      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    if (!isStrongPassword(password)) {
+      return res.status(400).json({ error: STRONG_PASSWORD_MESSAGE });
     }
     const passwordHash = await hashPassword(password);
     const sessionToken = generateSessionToken();

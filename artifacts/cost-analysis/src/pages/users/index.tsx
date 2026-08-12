@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -114,14 +115,14 @@ const ROLE_LABELS: Record<string, string> = {
 const createSchema = z.object({
   name:     z.string().min(2, "Name required"),
   email:    z.string().email("Valid email required"),
-  password: z.string().min(8, "Min 8 characters"),
+  password: z.string().min(8, "At least 8 characters").regex(/[a-z]/, "Include a lowercase letter").regex(/[A-Z]/, "Include an uppercase letter").regex(/\d/, "Include a number"),
   role:     z.enum(ALL_ROLES),
 });
 
 const editSchema = z.object({
   name:     z.string().min(2, "Name required"),
   role:     z.enum(ALL_ROLES),
-  password: z.string().optional(),
+  password: z.string().optional().refine((value) => !value || (value.length >= 8 && /[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value)), "Use 8+ characters with uppercase, lowercase, and number"),
 });
 
 type UserRow = {
@@ -301,7 +302,7 @@ function CreateUserDialog() {
               <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="password" render={({ field }) => (
-              <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" placeholder="Min. 6 characters" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Password</FormLabel><FormControl><PasswordInput placeholder="8+ characters with upper, lower, and number" autoComplete="new-password" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="role" render={({ field }) => (
               <FormItem>
@@ -506,7 +507,7 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
           <FormField control={form.control} name="password" render={({ field }) => (
             <FormItem>
               <FormLabel>New Password <span className="text-muted-foreground font-normal">(leave blank to keep current)</span></FormLabel>
-              <FormControl><Input type="password" placeholder="New password (optional)" {...field} /></FormControl>
+              <FormControl><PasswordInput placeholder="8+ characters with upper, lower, and number" autoComplete="new-password" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />

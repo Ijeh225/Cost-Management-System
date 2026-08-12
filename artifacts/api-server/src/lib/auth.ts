@@ -23,6 +23,16 @@ if (!JWT_SECRET) {
 const SECRET = JWT_SECRET ?? "cost-analysis-dev-only-secret-never-use-in-production";
 const COOKIE_NAME = "cost_analysis_session";
 
+export function isStrongPassword(password: unknown): password is string {
+  return typeof password === "string"
+    && password.length >= 8
+    && /[a-z]/.test(password)
+    && /[A-Z]/.test(password)
+    && /\d/.test(password);
+}
+
+export const STRONG_PASSWORD_MESSAGE = "Password must be at least 8 characters and include uppercase, lowercase, and a number";
+
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
 }
@@ -44,12 +54,13 @@ export function setAuthCookie(res: Response, token: string) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
+    path: "/",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 }
 
 export function clearAuthCookie(res: Response) {
-  res.clearCookie(COOKIE_NAME);
+  res.clearCookie(COOKIE_NAME, { path: "/" });
 }
 
 export function parseRoles(role: string, rolesJson: string | null | undefined): string[] {

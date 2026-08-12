@@ -14,13 +14,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
 const setupSchema = z.object({
   name: z.string().min(2, "Full name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters").regex(/[a-z]/, "Include a lowercase letter").regex(/[A-Z]/, "Include an uppercase letter").regex(/\d/, "Include a number"),
   confirmPassword: z.string().min(8, "Please confirm your password"),
 }).refine((d) => d.password === d.confirmPassword, {
   message: "Passwords do not match",
@@ -131,7 +132,7 @@ export default function Setup() {
                   <FormItem>
                     <FormLabel className="text-xs uppercase tracking-widest text-muted-foreground">Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="Min. 8 characters" autoComplete="new-password" {...field} />
+                      <PasswordInput placeholder="8+ characters with upper, lower, and number" autoComplete="new-password" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -144,7 +145,7 @@ export default function Setup() {
                   <FormItem>
                     <FormLabel className="text-xs uppercase tracking-widest text-muted-foreground">Confirm Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="Repeat your password" autoComplete="new-password" {...field} />
+                      <PasswordInput placeholder="Repeat your password" autoComplete="new-password" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

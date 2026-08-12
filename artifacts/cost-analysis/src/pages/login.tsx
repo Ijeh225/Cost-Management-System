@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useLogin } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Box, Loader2, LockKeyhole } from "lucide-react";
+import { Box, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
@@ -119,15 +120,12 @@ export default function Login() {
                   <FormItem>
                     <FormLabel className="text-xs uppercase font-mono tracking-wider text-muted-foreground">Password</FormLabel>
                     <FormControl>
-                      <div className="relative">
-                        <Input 
-                          type="password" 
-                          placeholder="••••••••" 
-                          {...field} 
-                          className="bg-background/50 h-12 border-border/50 focus-visible:ring-primary/30 text-base pr-10"
-                        />
-                        <LockKeyhole className="absolute right-3 top-3.5 w-5 h-5 text-muted-foreground/50 pointer-events-none" />
-                      </div>
+                      <PasswordInput
+                        placeholder="Enter your password"
+                        autoComplete="current-password"
+                        {...field}
+                        className="bg-background/50 h-12 border-border/50 focus-visible:ring-primary/30 text-base"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
