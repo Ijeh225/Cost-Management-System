@@ -10,6 +10,201 @@ const AVG_THRESHOLD = 1.5;
 const LOW_MARGIN_PCT = 0.15;
 const RESEND_TEST_FROM = "Cost Management <onboarding@resend.dev>";
 
+type EmailAlertCategory = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "financial_exceptions";
+type EmailAlertPreference = { enabled: boolean; recipients: string; frequency: "none" | "daily" | "weekly"; lastSentAt?: string };
+type EmailAlertPreferences = Record<EmailAlertCategory, EmailAlertPreference>;
+
+const EMAIL_ALERT_CATEGORIES: Array<{ id: EmailAlertCategory; title: string; helper: string }> = [
+  { id: "terminal_jobs", title: "Terminal Jobs", helper: "Open jobs currently in Terminal and its downstream release stages." },
+  { id: "overdue_containers", title: "Overdue Containers", helper: "Overdue next actions, stage stalls, and overdue empty returns." },
+  { id: "berthing_watch", title: "Berthing Watch", helper: "Unberthed vessels with an ETA in the next seven days." },
+  { id: "clearing_delays", title: "Clearing Delays", helper: "Jobs exceeding the configured clearing-age thresholds." },
+  { id: "inactive_jobs", title: "Inactive Jobs", helper: "Jobs with no recorded activity for the configured number of days." },
+  { id: "documentation_delays", title: "PAAR / Documentation Delays", helper: "Documentation jobs whose PAAR ETA has passed." },
+  { id: "financial_exceptions", title: "Financial Exceptions", helper: "Unpaid duty, negative-profit, and low-margin jobs." },
+];
+
+function getEmailAlertPreferences(settings: Record<string, string>): EmailAlertPreferences {
+  const fallbackRecipients = settings["agingEmailTo"] ?? "";
+  const legacyFrequency = (settings["digestFrequency"] === "daily" || settings["digestFrequency"] === "weekly")
+    ? settings["digestFrequency"] as "daily" | "weekly"
+    : "none";
+  const defaults = Object.fromEntries(EMAIL_ALERT_CATEGORIES.map(({ id }) => [id, {
+    enabled: settings["agingEmailEnabled"] === "true" && ["clearing_delays", "inactive_jobs", "financial_exceptions"].includes(id),
+    recipients: fallbackRecipients,
+    frequency: legacyFrequency,
+  }])) as EmailAlertPreferences;
+  try {
+    const parsed = JSON.parse(settings["emailAlertPreferences"] ?? "{}");
+    if (!parsed || typeof parsed !== "object") return defaults;
+    for (const { id } of EMAIL_ALERT_CATEGORIES) {
+      const preference = parsed[id];
+      if (!preference || typeof preference !== "object") continue;
+      defaults[id] = {
+        enabled: preference.enabled === true,
+        recipients: typeof preference.recipients === "string" ? preference.recipients : fallbackRecipients,
+        frequency: preference.frequency === "daily" || preference.frequency === "weekly" ? preference.frequency : "none",
+        ...(typeof preference.lastSentAt === "string" ? { lastSentAt: preference.lastSentAt } : {}),
+      };
+    }
+  } catch {}
+  return defaults;
+}
+
+function escapeEmailHtml(value: unknown): string {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+const EMAIL_ALERT_TYPES: Record<Exclude<EmailAlertCategory, "terminal_jobs" | "berthing_watch">, string[]> = {
+  overdue_containers: ["action_overdue", "empty_return_overdue", "stage_stall", "overdue_task", "stale_approval"],
+  clearing_delays: ["aging_warn", "aging_high", "aging_critical"],
+  inactive_jobs: ["inactive"],
+  documentation_delays: ["paar_overdue"],
+  financial_exceptions: ["unpaid_duty", "negative_profit", "low_margin", "high_terminal", "high_delivery"],
+};
+
+function formatContainerStage(status: string): string {
+  const labels: Record<string, string> = {
+    pending_verification: "Awaiting Verification",
+    registered: "Registered",
+    documentation: "Documentation",
+    duty_assessment: "Duty Assessment",
+    duty_payment: "Duty Payment",
+    transire_processing: "Transire",
+    shipping: "Shipping / DO",
+    terminal: "Terminal / TDO",
+    pull_out: "Pullout",
+    gate_in: "Gate In",
+    examination: "Examination",
+    final_release: "Final Release",
+    delivery: "Delivery",
+    closed: "Closed",
+  };
+  return labels[status] ?? status.replace(/_/g, " ");
+}
+
+function emailRecipients(value: string): string[] {
+  return [...new Set(value.split(",").map((email) => email.trim()).filter(Boolean))];
+}
+
+function recommendationForEmailCategory(category: EmailAlertCategory): string {
+  const recommendations: Record<EmailAlertCategory, string> = {
+    terminal_jobs: "Review terminal progress and confirm the next release action.",
+    overdue_containers: "Contact the responsible officer and update the overdue action.",
+    berthing_watch: "Confirm berthing at the port or update the vessel ETA.",
+    clearing_delays: "Review the delay, record the blocker, and set the next action.",
+    inactive_jobs: "Update the job activity or record the blocking issue.",
+    documentation_delays: "Follow up on PAAR/documentation and update the expected date.",
+    financial_exceptions: "Review the financial exception with Accounts before it grows.",
+  };
+  return recommendations[category];
+}
+
+type EmailReportRow = {
+  containerNumber: string;
+  customerName: string;
+  stage: string;
+  officer: string;
+  issue: string;
+  action: string;
+};
+
+async function buildEmailAlertReport(category: EmailAlertCategory, alerts: any[], branchScope?: number | null): Promise<EmailReportRow[]> {
+  const containers = branchScope != null
+    ? await db.select().from(containersTable).where(eq(containersTable.branchId, branchScope))
+    : await db.select().from(containersTable);
+  const activeContainers = containers.filter((container) => container.status !== "closed");
+  const now = new Date();
+  const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
+  const inSevenDays = new Date(startOfToday); inSevenDays.setDate(inSevenDays.getDate() + 7);
+
+  if (category === "terminal_jobs") {
+    const terminalStatuses = new Set(["terminal", "pull_out", "gate_in", "examination", "final_release"]);
+    return activeContainers
+      .filter((container) => terminalStatuses.has(container.status))
+      .map((container) => ({
+        containerNumber: container.containerNumber,
+        customerName: container.customerName,
+        stage: formatContainerStage(container.status),
+        officer: container.stageOwner ?? "Unassigned",
+        issue: "Open job currently in terminal workflow.",
+        action: recommendationForEmailCategory(category),
+      }));
+  }
+
+  if (category === "berthing_watch") {
+    return activeContainers
+      .filter((container) => {
+        if (container.berthed || !container.eta) return false;
+        const eta = new Date(container.eta);
+        return eta >= startOfToday && eta <= inSevenDays;
+      })
+      .map((container) => ({
+        containerNumber: container.containerNumber,
+        customerName: container.customerName,
+        stage: formatContainerStage(container.status),
+        officer: container.stageOwner ?? "Unassigned",
+        issue: `Vessel ETA: ${new Date(container.eta!).toLocaleDateString("en-NG", { dateStyle: "medium" })}.`,
+        action: recommendationForEmailCategory(category),
+      }));
+  }
+
+  const containerById = new Map(activeContainers.map((container) => [container.id, container]));
+  return alerts
+    .filter((alert) => EMAIL_ALERT_TYPES[category].includes(alert.type))
+    .map((alert) => {
+      const container = alert.containerId ? containerById.get(alert.containerId) : undefined;
+      return {
+        containerNumber: container?.containerNumber ?? alert.containerNumber ?? "System alert",
+        customerName: container?.customerName ?? "",
+        stage: container ? formatContainerStage(container.status) : "System",
+        officer: container?.stageOwner ?? "Unassigned",
+        issue: alert.message,
+        action: recommendationForEmailCategory(category),
+      };
+    });
+}
+
+function buildEmailAlertHtml(title: string, rows: EmailReportRow[]): string {
+  const tableRows = rows.map((row) => `
+    <tr style="border-bottom:1px solid #e5e7eb;vertical-align:top;">
+      <td style="padding:12px 10px 12px 0;font-size:13px;color:#111827;font-weight:600;">${escapeEmailHtml(row.containerNumber)}<br><span style="font-size:11px;color:#6b7280;font-weight:400;">${escapeEmailHtml(row.customerName)}</span></td>
+      <td style="padding:12px 10px;font-size:12px;color:#374151;">${escapeEmailHtml(row.stage)}<br><span style="color:#6b7280;">Owner: ${escapeEmailHtml(row.officer)}</span></td>
+      <td style="padding:12px 10px;font-size:12px;color:#374151;">${escapeEmailHtml(row.issue)}</td>
+      <td style="padding:12px 0 12px 10px;font-size:12px;color:#1d4ed8;">${escapeEmailHtml(row.action)}</td>
+    </tr>`).join("");
+  return `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#f3f4f6;font-family:Arial,sans-serif;color:#111827;">
+    <div style="max-width:900px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+      <div style="padding:24px 28px;background:#eff6ff;border-bottom:1px solid #bfdbfe;"><h1 style="margin:0;font-size:20px;">${escapeEmailHtml(title)}</h1><p style="margin:7px 0 0;font-size:13px;color:#4b5563;">${rows.length} item${rows.length === 1 ? "" : "s"} requiring review · ${escapeEmailHtml(new Date().toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" }))}</p></div>
+      <div style="padding:8px 28px 24px;">${rows.length === 0 ? "<p style=\"padding:28px 0;text-align:center;color:#6b7280;\">No current items in this alert category.</p>" : `<table style="width:100%;border-collapse:collapse;"><thead><tr style="text-align:left;"><th style="padding:16px 10px 10px 0;font-size:11px;color:#6b7280;text-transform:uppercase;">Container / Customer</th><th style="padding:16px 10px 10px;font-size:11px;color:#6b7280;text-transform:uppercase;">Stage / Owner</th><th style="padding:16px 10px 10px;font-size:11px;color:#6b7280;text-transform:uppercase;">Issue</th><th style="padding:16px 0 10px 10px;font-size:11px;color:#6b7280;text-transform:uppercase;">Recommended Action</th></tr></thead><tbody>${tableRows}</tbody></table>`}</div>
+      <div style="padding:14px 28px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:11px;color:#6b7280;">Cost Management System operational alert</div>
+    </div></body></html>`;
+}
+
+async function sendEmailAlertCategory(category: EmailAlertCategory, recipients: string[], alerts: any[], branchScope?: number | null): Promise<{ count: number; fromAddress: string; productionReady: boolean }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("Email service is not configured");
+  const sender = await resolveEmailSender(branchScope ?? null);
+  const definition = EMAIL_ALERT_CATEGORIES.find((item) => item.id === category)!;
+  const rows = await buildEmailAlertReport(category, alerts, branchScope);
+  const emailRes = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: sender.fromAddress,
+      to: recipients,
+      ...(sender.replyTo ? { reply_to: sender.replyTo } : {}),
+      subject: `[Cost Management] ${definition.title} - ${rows.length} item${rows.length === 1 ? "" : "s"}`,
+      html: buildEmailAlertHtml(definition.title, rows),
+    }),
+  });
+  if (!emailRes.ok) {
+    console.error("[email-alert] Resend error:", await emailRes.text().catch(() => "unknown"));
+    throw new Error("Failed to send email via Resend. Check your API key and sender domain.");
+  }
+  return { count: rows.length, fromAddress: sender.fromAddress, productionReady: sender.productionReady };
+}
+
 function uniquePositiveIds(ids: Array<number | null | undefined>): number[] {
   return [...new Set(ids.filter((id): id is number => typeof id === "number" && Number.isFinite(id) && id > 0))];
 }
@@ -669,6 +864,40 @@ notificationsRouter.get("/notifications/email-status", requireAuth, requireBranc
 
 notificationsRouter.post("/notifications/send-email-digest", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
+    {
+      const branchScope = getBranchScope(req);
+      if (!process.env.RESEND_API_KEY) {
+        return res.status(503).json({ error: "Email service is not configured. Please set up the Resend integration in Settings." });
+      }
+      const rows = await db.select().from(settingsTable);
+      const settingsMap: Record<string, string> = {};
+      for (const row of rows) settingsMap[row.key] = row.value;
+      if (settingsMap["agingEmailEnabled"] !== "true") {
+        return res.status(400).json({ error: "Email alerts are disabled in Settings." });
+      }
+      const preferences = getEmailAlertPreferences(settingsMap);
+      const configured = EMAIL_ALERT_CATEGORIES
+        .map(({ id }) => ({ id, recipients: emailRecipients(preferences[id].recipients) }))
+        .filter(({ id, recipients }) => preferences[id].enabled && recipients.length > 0);
+      if (configured.length === 0) {
+        return res.status(400).json({ error: "Enable at least one alert category and add its recipients in Settings." });
+      }
+      const alerts = await computeAlerts(undefined, undefined, branchScope);
+      const results = await Promise.all(configured.map(({ id, recipients }) => sendEmailAlertCategory(id, recipients, alerts, branchScope)));
+      const nowSent = new Date();
+      for (const { id } of configured) preferences[id].lastSentAt = nowSent.toISOString();
+      await db.insert(settingsTable)
+        .values({ key: "emailAlertPreferences", value: JSON.stringify(preferences), updatedAt: nowSent })
+        .onConflictDoUpdate({ target: settingsTable.key, set: { value: JSON.stringify(preferences), updatedAt: nowSent } });
+      return res.json({
+        success: true,
+        sent: configured.reduce((total, entry) => total + entry.recipients.length, 0),
+        categoriesSent: configured.length,
+        alertCount: results.reduce((total, result) => total + result.count, 0),
+        fromAddress: results[0]?.fromAddress,
+        productionReady: results[0]?.productionReady,
+      });
+    }
     // Branch isolation (Task #74): scope alert computation. Super-admin must
     // pick a specific branch via X-Branch-Id; non-super-admins are pinned to
     // their own branch.
@@ -967,6 +1196,46 @@ notificationsRouter.post("/workflow-notifications/read-all", requireAuth, async 
 
 export async function runScheduledDigest(): Promise<void> {
   try {
+    {
+      const rows = await db.select().from(settingsTable);
+      const settings: Record<string, string> = {};
+      for (const row of rows) settings[row.key] = row.value;
+      if (settings["agingEmailEnabled"] !== "true" || !process.env.RESEND_API_KEY) return;
+
+      const [hours, minutes] = (settings["digestTime"] ?? "08:00").split(":").map((part) => Number.parseInt(part, 10));
+      const now = new Date();
+      const targetMinutes = (Number.isFinite(hours) ? hours : 8) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+      if (now.getHours() * 60 + now.getMinutes() < targetMinutes) return;
+
+      const preferences = getEmailAlertPreferences(settings);
+      const alerts = await computeAlerts();
+      const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
+      const startOfWeek = new Date(startOfToday); startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7));
+      let changed = false;
+
+      for (const { id, title } of EMAIL_ALERT_CATEGORIES) {
+        const preference = preferences[id];
+        const recipients = preference.enabled ? emailRecipients(preference.recipients) : [];
+        if (preference.frequency === "none" || recipients.length === 0) continue;
+        const lastSent = preference.lastSentAt ? new Date(preference.lastSentAt) : null;
+        if (preference.frequency === "daily" && lastSent && lastSent >= startOfToday) continue;
+        if (preference.frequency === "weekly" && (now.getDay() !== 1 || (lastSent && lastSent >= startOfWeek))) continue;
+        try {
+          const result = await sendEmailAlertCategory(id, recipients, alerts);
+          preference.lastSentAt = now.toISOString();
+          changed = true;
+          console.log(`[email-alert-scheduler] Sent ${title} to ${recipients.length} recipient(s), ${result.count} item(s).`);
+        } catch (error) {
+          console.error(`[email-alert-scheduler] ${title} failed:`, error);
+        }
+      }
+      if (changed) {
+        await db.insert(settingsTable)
+          .values({ key: "emailAlertPreferences", value: JSON.stringify(preferences), updatedAt: now })
+          .onConflictDoUpdate({ target: settingsTable.key, set: { value: JSON.stringify(preferences), updatedAt: now } });
+      }
+      return;
+    }
     const rows = await db.select().from(settingsTable);
     const s: Record<string, string> = {};
     for (const r of rows) s[r.key] = r.value;

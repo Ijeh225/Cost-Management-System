@@ -22,6 +22,43 @@ const DEFAULTS = {
   digestTime: "08:00",
 };
 
+type EmailAlertCategoryId = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "financial_exceptions";
+type EmailAlertPreference = { enabled: boolean; recipients: string; frequency: "none" | "daily" | "weekly"; lastSentAt?: string };
+type EmailAlertPreferences = Record<EmailAlertCategoryId, EmailAlertPreference>;
+
+const EMAIL_ALERT_CATEGORIES: Array<{ id: EmailAlertCategoryId; title: string; helper: string }> = [
+  { id: "terminal_jobs", title: "Terminal Jobs", helper: "Open jobs in Terminal and downstream terminal release stages." },
+  { id: "overdue_containers", title: "Overdue Containers", helper: "Overdue next actions, stage stalls, and empty-return delays." },
+  { id: "berthing_watch", title: "Berthing Watch", helper: "Vessels not berthed with ETA in the next seven days." },
+  { id: "clearing_delays", title: "Clearing Delays", helper: "Jobs above your clearing-age warning thresholds." },
+  { id: "inactive_jobs", title: "Inactive Jobs", helper: "Jobs with no recorded activity for too long." },
+  { id: "documentation_delays", title: "PAAR / Documentation Delays", helper: "Documentation records with a PAAR ETA that has passed." },
+  { id: "financial_exceptions", title: "Financial Exceptions", helper: "Unpaid duty, negative profit, low margin, and unusual costs." },
+];
+
+function parseEmailAlertPreferences(value: string | undefined, legacyRecipients: string, legacyFrequency: "none" | "daily" | "weekly", enabled: boolean): EmailAlertPreferences {
+  const preferences = Object.fromEntries(EMAIL_ALERT_CATEGORIES.map(({ id }) => [id, {
+    enabled: enabled && ["clearing_delays", "inactive_jobs", "financial_exceptions"].includes(id),
+    recipients: legacyRecipients,
+    frequency: legacyFrequency,
+  }])) as EmailAlertPreferences;
+  try {
+    const parsed = JSON.parse(value ?? "{}");
+    if (!parsed || typeof parsed !== "object") return preferences;
+    for (const { id } of EMAIL_ALERT_CATEGORIES) {
+      const current = parsed[id];
+      if (!current || typeof current !== "object") continue;
+      preferences[id] = {
+        enabled: current.enabled === true,
+        recipients: typeof current.recipients === "string" ? current.recipients : legacyRecipients,
+        frequency: current.frequency === "daily" || current.frequency === "weekly" ? current.frequency : "none",
+        ...(typeof current.lastSentAt === "string" ? { lastSentAt: current.lastSentAt } : {}),
+      };
+    }
+  } catch {}
+  return preferences;
+}
+
 function parseOfficerIds(value?: string, legacyValue?: string) {
   const parse = (raw?: string) => {
     if (!raw) return [];
@@ -132,6 +169,7 @@ export default function SettingsPage() {
   const [digestFrequency, setDigestFrequency] = useState<"none" | "daily" | "weekly">("none");
   const [digestTime, setDigestTime] = useState("08:00");
   const [digestLastSentAt, setDigestLastSentAt] = useState<string | null>(null);
+  const [emailPreferences, setEmailPreferences] = useState<EmailAlertPreferences>(() => parseEmailAlertPreferences(undefined, "", "none", false));
   const [verificationOfficerUserIds, setVerificationOfficerUserIds] = useState<string[]>([]);
   const [berthingOfficerUserIds, setBerthingOfficerUserIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -146,9 +184,13 @@ export default function SettingsPage() {
       setDays3(s["agingDays3"] ?? DEFAULTS.agingDays3);
       setEmailEnabled(s["agingEmailEnabled"] === "true");
       setEmailTo(s["agingEmailTo"] ?? "");
-      setDigestFrequency((s["digestFrequency"] as "none" | "daily" | "weekly") ?? "none");
+      const legacyFrequency = s["digestFrequency"] === "daily" || s["digestFrequency"] === "weekly"
+        ? s["digestFrequency"] as "daily" | "weekly"
+        : "none";
+      setDigestFrequency(legacyFrequency);
       setDigestTime(s["digestTime"] ?? "08:00");
       setDigestLastSentAt(s["digestLastSentAt"] ?? null);
+      setEmailPreferences(parseEmailAlertPreferences(s["emailAlertPreferences"], s["agingEmailTo"] ?? "", legacyFrequency, s["agingEmailEnabled"] === "true"));
       setVerificationOfficerUserIds(parseOfficerIds(s["verificationOfficerUserIds"], s["verificationOfficerUserId"]));
       setBerthingOfficerUserIds(parseOfficerIds(s["berthingOfficerUserIds"], s["berthingOfficerUserId"]));
     }
@@ -169,24 +211,28 @@ export default function SettingsPage() {
     parseInt(days1) < parseInt(days2) &&
     parseInt(days2) < parseInt(days3);
 
+  const settingsPayload = () => ({
+    agingInactivityDays: inactivityDays,
+    agingDays1: days1,
+    agingDays2: days2,
+    agingDays3: days3,
+    agingEmailEnabled: emailEnabled ? "true" : "false",
+    // Keep these values for installations that used the old single digest configuration.
+    agingEmailTo: emailTo.trim(),
+    digestFrequency,
+    digestTime,
+    emailAlertPreferences: JSON.stringify(emailPreferences),
+    verificationOfficerUserIds: JSON.stringify(verificationOfficerUserIds),
+    verificationOfficerUserId: verificationOfficerUserIds[0] ?? "",
+    berthingOfficerUserIds: JSON.stringify(berthingOfficerUserIds),
+    berthingOfficerUserId: berthingOfficerUserIds[0] ?? "",
+  });
+
   const handleSave = async () => {
     if (!isValid) return;
     setSaving(true);
     try {
-      await updateMutation.mutateAsync({
-        agingInactivityDays: inactivityDays,
-        agingDays1: days1,
-        agingDays2: days2,
-        agingDays3: days3,
-        agingEmailEnabled: emailEnabled ? "true" : "false",
-        agingEmailTo: emailTo.trim(),
-        digestFrequency,
-        digestTime,
-        verificationOfficerUserIds: JSON.stringify(verificationOfficerUserIds),
-        verificationOfficerUserId: verificationOfficerUserIds[0] ?? "",
-        berthingOfficerUserIds: JSON.stringify(berthingOfficerUserIds),
-        berthingOfficerUserId: berthingOfficerUserIds[0] ?? "",
-      });
+      await updateMutation.mutateAsync(settingsPayload());
       toast({ title: "Settings saved" });
       setDirty(false);
     } catch {
@@ -197,28 +243,17 @@ export default function SettingsPage() {
   };
 
   const handleSendDigest = async () => {
-    if (!emailTo.trim()) {
-      toast({ variant: "destructive", title: "Please enter at least one email address first" });
+    const configuredRecipients = EMAIL_ALERT_CATEGORIES.some(({ id }) => emailPreferences[id].enabled && emailPreferences[id].recipients.trim());
+    if (!configuredRecipients) {
+      toast({ variant: "destructive", title: "Enable an alert category and enter its recipient email address first" });
       return;
     }
     setSendingEmail(true);
     try {
-      await updateMutation.mutateAsync({
-        agingInactivityDays: inactivityDays,
-        agingDays1: days1,
-        agingDays2: days2,
-        agingDays3: days3,
-        agingEmailEnabled: emailEnabled ? "true" : "false",
-        agingEmailTo: emailTo.trim(),
-        digestFrequency,
-        digestTime,
-        verificationOfficerUserIds: JSON.stringify(verificationOfficerUserIds),
-        verificationOfficerUserId: verificationOfficerUserIds[0] ?? "",
-        berthingOfficerUserIds: JSON.stringify(berthingOfficerUserIds),
-        berthingOfficerUserId: berthingOfficerUserIds[0] ?? "",
-      });
+      await updateMutation.mutateAsync(settingsPayload());
       const result = await customFetch<{
         sent: number;
+        categoriesSent?: number;
         fromAddress?: string;
         productionReady?: boolean;
       }>("/api/notifications/send-email-digest", { method: "POST" });
@@ -227,7 +262,7 @@ export default function SettingsPage() {
       setDirty(false);
       toast({
         title: "Email digest sent",
-        description: `Sent to ${result.sent ?? emailTo.split(",").filter(Boolean).length} recipient(s) from ${result.fromAddress ?? "configured sender"}`,
+        description: `Sent ${result.categoriesSent ?? 0} alert report(s) to ${result.sent ?? 0} recipient(s) from ${result.fromAddress ?? "configured sender"}`,
       });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed to send email", description: err?.message ?? "Check that email settings are configured correctly" });
@@ -460,12 +495,12 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-background/50">
             <div>
               <p className="text-sm font-medium">Enable email alerts</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Activates the email digest feature</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Turn on the selected operational alert reports below.</p>
             </div>
             <Switch checked={emailEnabled} onCheckedChange={(v) => { setEmailEnabled(v); mark(); }} />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 hidden">
             <Label className="text-xs font-medium">Alert email recipients</Label>
             <Input
               type="text"
@@ -479,7 +514,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Auto-send Schedule */}
-          <div className="p-4 rounded-lg border border-border/40 bg-background/30 space-y-4">
+          <div className="hidden p-4 rounded-lg border border-border/40 bg-background/30 space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <CalendarClock className="w-4 h-4 text-primary" />
               Automatic Schedule
@@ -527,15 +562,50 @@ export default function SettingsPage() {
             )}
           </div>
 
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">Alert Categories</p>
+              <p className="text-xs text-muted-foreground mt-1">Choose who receives each report and how often it should be sent. Separate email addresses with commas.</p>
+            </div>
+            <div className="max-w-xs space-y-1.5">
+              <Label className="text-xs font-medium">Daily / weekly send time (server time)</Label>
+              <Input type="time" value={digestTime} onChange={(event) => { setDigestTime(event.target.value); mark(); }} className="h-9 text-sm" disabled={!emailEnabled} />
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {EMAIL_ALERT_CATEGORIES.map((category) => {
+                const preference = emailPreferences[category.id];
+                return (
+                  <div key={category.id} className="rounded-lg border border-border/50 bg-background/40 p-3 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{category.title}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{category.helper}</p>
+                      </div>
+                      <Switch checked={preference.enabled} disabled={!emailEnabled} onCheckedChange={(enabled) => { setEmailPreferences((current) => ({ ...current, [category.id]: { ...current[category.id], enabled } })); mark(); }} />
+                    </div>
+                    <Input value={preference.recipients} placeholder="recipient@example.com" disabled={!emailEnabled || !preference.enabled} onChange={(event) => { const recipients = event.target.value; setEmailPreferences((current) => ({ ...current, [category.id]: { ...current[category.id], recipients } })); mark(); }} className="h-9 text-sm" />
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Frequency</Label>
+                      <Select value={preference.frequency} disabled={!emailEnabled || !preference.enabled} onValueChange={(frequency) => { setEmailPreferences((current) => ({ ...current, [category.id]: { ...current[category.id], frequency: frequency as EmailAlertPreference["frequency"] } })); mark(); }}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="none">Manual only</SelectItem><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly (Mondays)</SelectItem></SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex items-center justify-start pt-1">
             <Button
               variant="outline"
               onClick={handleSendDigest}
-              disabled={sendingEmail || !emailServiceConfigured || !emailTo.trim()}
+              disabled={sendingEmail || !emailServiceConfigured || !emailEnabled || !EMAIL_ALERT_CATEGORIES.some(({ id }) => emailPreferences[id].enabled && emailPreferences[id].recipients.trim())}
               className="gap-2"
             >
               {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Send Test Digest Now
+              Send Test Alerts Now
             </Button>
           </div>
         </CardContent>
