@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { DEPARTMENT_ALERT_TYPES } from "../lib/department-alerts.js";
 import { db, notificationsReadTable, containersTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, shippingChargesTable, operationsChargesTable, containerTasksTable, sectionApprovalsTable, settingsTable, auditLogTable, workflowNotificationsTable, systemAlertsHistoryTable, branchesTable } from "@workspace/db";
 import { eq, lt, sql, max, isNotNull, desc, inArray, notInArray, and } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
@@ -10,7 +11,7 @@ const AVG_THRESHOLD = 1.5;
 const LOW_MARGIN_PCT = 0.15;
 const RESEND_TEST_FROM = "Cost Management <onboarding@resend.dev>";
 
-type EmailAlertCategory = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "transire_delay" | "shipping_delay" | "exam_release_delay" | "financial_exceptions";
+type EmailAlertCategory = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "transire_delay" | "shipping_delay" | "terminal_delay" | "pullout_delay" | "exam_release_delay" | "financial_exceptions";
 type EmailAlertPreference = { enabled: boolean; recipients: string; frequency: "none" | "daily" | "weekly"; lastSentAt?: string };
 type EmailAlertPreferences = Record<EmailAlertCategory, EmailAlertPreference>;
 
@@ -23,6 +24,8 @@ const EMAIL_ALERT_CATEGORIES: Array<{ id: EmailAlertCategory; title: string; hel
   { id: "documentation_delays", title: "PAAR / Documentation Delays", helper: "Documentation jobs whose PAAR ETA has passed." },
   { id: "transire_delay", title: "Transire Delay", helper: "Transire releases that are due soon or overdue." },
   { id: "shipping_delay", title: "Shipping / DO Delay", helper: "Delivery Order releases that are due soon or overdue." },
+  { id: "terminal_delay", title: "Terminal / TDO Delay", helper: "Terminal Delivery Order releases that are due soon or overdue." },
+  { id: "pullout_delay", title: "Pullout Delay", helper: "Pullout actions that are due soon or overdue." },
   { id: "exam_release_delay", title: "Exam / Release Delay", helper: "Examination and final-release actions that are due soon or overdue." },
   { id: "financial_exceptions", title: "Financial Exceptions", helper: "Unpaid duty, negative-profit, and low-margin jobs." },
 ];
@@ -65,6 +68,8 @@ const EMAIL_ALERT_TYPES: Record<Exclude<EmailAlertCategory, "terminal_jobs" | "b
   documentation_delays: ["paar_overdue"],
   transire_delay: ["transire_due"],
   shipping_delay: ["shipping_due"],
+  terminal_delay: ["terminal_due"],
+  pullout_delay: ["pullout_due"],
   exam_release_delay: ["exam_release_due"],
   financial_exceptions: ["unpaid_duty", "negative_profit", "low_margin", "high_terminal", "high_delivery"],
 };
@@ -103,6 +108,8 @@ function recommendationForEmailCategory(category: EmailAlertCategory): string {
     documentation_delays: "Follow up on PAAR/documentation and update the expected date.",
     transire_delay: "Follow up on the Transire release and update its expected date if delayed.",
     shipping_delay: "Follow up on the Delivery Order release and update its expected date if delayed.",
+    terminal_delay: "Follow up on the TDO release and update its expected date if delayed.",
+    pullout_delay: "Confirm the pullout action or update its expected date if delayed.",
     exam_release_delay: "Confirm the examination or final-release action and record the next step.",
     financial_exceptions: "Review the financial exception with Accounts before it grows.",
   };
@@ -277,6 +284,7 @@ const ROLE_ALERT_TYPES: Record<string, Set<string>> = {
     "rejected_section",
     "paar_overdue",
   ]),
+  ...DEPARTMENT_ALERT_TYPES,
 };
 
 const ROLE_WORKFLOW_TYPES: Record<string, Set<string>> = {
@@ -332,7 +340,7 @@ function inferWorkflowStage(notification: { type: string; message: string }): st
   return null;
 }
 
-function isWorkflowNotificationVisibleToUser(
+export function isWorkflowNotificationVisibleToUser(
   notification: { type: string; message: string; targetUserId: number | null },
   roles: string[],
   userId: number,
@@ -546,9 +554,11 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
     }
   }
 
-  const stageDueAlerts: Array<{ type: "transire_due" | "shipping_due" | "exam_release_due"; label: string; expected: keyof typeof allContainers[number]; released: keyof typeof allContainers[number]; eligible: (container: typeof allContainers[number]) => boolean }> = [
+  const stageDueAlerts: Array<{ type: "transire_due" | "shipping_due" | "terminal_due" | "pullout_due" | "exam_release_due"; label: string; expected: keyof typeof allContainers[number]; released: keyof typeof allContainers[number]; eligible: (container: typeof allContainers[number]) => boolean }> = [
     { type: "transire_due", label: "Transire release", expected: "expectedTransireDate", released: "transireReleasedAt", eligible: () => true },
     { type: "shipping_due", label: "Delivery Order release", expected: "expectedDoDate", released: "doReleasedAt", eligible: () => true },
+    { type: "terminal_due", label: "Terminal Delivery Order release", expected: "expectedTdoDate", released: "tdoReleasedAt", eligible: () => true },
+    { type: "pullout_due", label: "Pullout", expected: "expectedPulloutDate", released: "pulloutReleasedAt", eligible: (container) => !!container.tdoReleasedAt },
     { type: "exam_release_due", label: "Examination / final release", expected: "expectedReleaseDate", released: "releaseConfirmedAt", eligible: (container) => ["examination", "final_release"].includes(container.status) },
   ];
   const startOfTodayForDueDates = new Date(); startOfTodayForDueDates.setHours(0, 0, 0, 0);
@@ -1277,78 +1287,6 @@ export async function runScheduledDigest(): Promise<void> {
           .onConflictDoUpdate({ target: settingsTable.key, set: { value: JSON.stringify(preferences), updatedAt: now } });
       }
       return;
-    }
-    const rows = await db.select().from(settingsTable);
-    const s: Record<string, string> = {};
-    for (const r of rows) s[r.key] = r.value;
-
-    const freq = s["digestFrequency"] ?? "none";
-    if (freq === "none") return;
-
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) return;
-
-    const emailTo = s["agingEmailTo"] ?? "";
-    if (!emailTo.trim()) return;
-
-    const [hhStr, mmStr] = (s["digestTime"] ?? "08:00").split(":");
-    const hh = parseInt(hhStr ?? "8");
-    const mm = parseInt(mmStr ?? "0");
-
-    const now = new Date();
-    const nowMins = now.getHours() * 60 + now.getMinutes();
-    const targetMins = (isNaN(hh) ? 8 : hh) * 60 + (isNaN(mm) ? 0 : mm);
-    if (nowMins < targetMins) return;
-
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const lastSentStr = s["digestLastSentAt"];
-    if (lastSentStr) {
-      const lastSent = new Date(lastSentStr);
-      if (freq === "daily" && lastSent >= startOfToday) return;
-      if (freq === "weekly") {
-        if (now.getDay() !== 1) return;
-        const monday = new Date(startOfToday);
-        monday.setDate(startOfToday.getDate() - ((startOfToday.getDay() + 6) % 7));
-        if (lastSent >= monday) return;
-      }
-    }
-
-    const to = emailTo.split(",").map((e: string) => e.trim()).filter(Boolean);
-
-    // Resolve the from address: the scheduled digest is a system-wide send.
-    // Recipient/schedule settings live in the global settings table (not per-branch),
-    // so there is no single authoritative branch context. We look for a branch with
-    // emailMode="own" and a set emailFromAddress only when there is exactly one such
-    // branch — this keeps the address unambiguous. With multiple or zero own-mode
-    // branches we fall back to the system default to avoid cross-branch identity leakage.
-    const sender = await resolveEmailSender(null);
-
-    const allAlerts = await computeAlerts();
-    const agingTypes = ["aging_warn", "aging_high", "aging_critical", "inactive", "negative_profit"];
-    const relevant = allAlerts.filter((a: any) => agingTypes.includes(a.type));
-
-    const emailRes = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: sender.fromAddress,
-        to,
-        ...(sender.replyTo ? { reply_to: sender.replyTo } : {}),
-        subject: `[Scheduled] Container Alert Digest — ${relevant.filter((a: any) => a.severity === "critical").length} critical`,
-        html: `<p>Scheduled digest: ${relevant.length} alerts. Log in to Cost Analysis to review.</p>`,
-      }),
-    });
-
-    if (emailRes.ok) {
-      const sent = new Date();
-      await db.insert(settingsTable)
-        .values({ key: "digestLastSentAt", value: sent.toISOString(), updatedAt: sent })
-        .onConflictDoUpdate({ target: settingsTable.key, set: { value: sent.toISOString(), updatedAt: sent } });
-      console.log(`[digest-scheduler] Sent to ${to.length} recipients, ${relevant.length} alerts, from: ${sender.fromAddress}, productionReady=${sender.productionReady}`);
-    } else {
-      console.error("[digest-scheduler] Resend error:", await emailRes.text().catch(() => "unknown"));
     }
   } catch (err) {
     console.error("[digest-scheduler] Error:", err);

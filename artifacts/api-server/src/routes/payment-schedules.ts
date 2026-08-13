@@ -24,6 +24,7 @@ import {
   userCanAccessBranch,
 } from "../lib/auth.js";
 import { objectStorageClient } from "../lib/objectStorage.js";
+import { exceedsApprovedPaymentBalance, exceedsOverheadPaymentBalance, isScheduleReadyToComplete } from "../lib/payment-rules.js";
 
 export const paymentSchedulesRouter = Router();
 
@@ -561,7 +562,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/pay", requireAuth, async (r
 
       const approved = toNumber(schedule.amountApproved) > 0 ? toNumber(schedule.amountApproved) : toNumber(schedule.amountRequested);
       const currentPaid = toNumber(schedule.amountPaid);
-      if (currentPaid + amount > approved + 0.005) throw new Error("PAYMENT_EXCEEDS_APPROVED");
+      if (exceedsApprovedPaymentBalance(currentPaid, amount, approved)) throw new Error("PAYMENT_EXCEEDS_APPROVED");
 
       if (schedule.overheadExpenseId) {
         const [expense] = await tx.select().from(overheadExpensesTable)
@@ -569,8 +570,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/pay", requireAuth, async (r
         if (!expense || expense.branchId !== schedule.branchId) throw new Error("PAYMENT_OVERHEAD_NOT_FOUND");
         const [paidRow] = await tx.select({ total: sql<string>`COALESCE(SUM(${expensePaymentsTable.amount}), 0)` })
           .from(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, expense.id));
-        const overheadOutstanding = Math.max(0, toNumber(expense.amount) - toNumber(paidRow?.total));
-        if (amount > overheadOutstanding + 0.005) throw new Error("PAYMENT_EXCEEDS_OVERHEAD");
+        if (exceedsOverheadPaymentBalance(amount, toNumber(expense.amount), toNumber(paidRow?.total))) throw new Error("PAYMENT_EXCEEDS_OVERHEAD");
       }
 
       const nextPaid = currentPaid + amount;
@@ -622,7 +622,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/complete", requireAuth, asy
     const schedule = await getScheduleForRequest(req, id);
     if (!schedule) return res.status(404).json({ error: "Payment schedule not found" });
     const approved = toNumber(schedule.amountApproved) > 0 ? toNumber(schedule.amountApproved) : toNumber(schedule.amountRequested);
-    if (toNumber(schedule.amountPaid) < approved) return res.status(400).json({ error: "Schedule cannot be completed until balance is zero" });
+    if (!isScheduleReadyToComplete(toNumber(schedule.amountPaid), approved)) return res.status(400).json({ error: "Schedule cannot be completed until balance is zero" });
     const [updated] = await db.update(paymentSchedulesTable).set({ status: "completed", completedAt: new Date(), updatedAt: new Date() }).where(eq(paymentSchedulesTable.id, id)).returning();
     await addEvent({ branchId: updated.branchId, scheduleId: id, type: "completed", actorUserId: req.user!.id, comment: req.body.comment ?? "Completed.", oldStatus: schedule.status, newStatus: updated.status });
     await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_completed", message: `Payment schedule completed for ${updated.vendorBeneficiary}`, target: "creator", creatorId: updated.requestedById, actionUrl: `/payment-schedules?focus=${updated.id}` });

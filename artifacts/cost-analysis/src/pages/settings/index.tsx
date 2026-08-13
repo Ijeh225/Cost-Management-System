@@ -23,7 +23,7 @@ const DEFAULTS = {
   digestTime: "08:00",
 };
 
-type EmailAlertCategoryId = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "transire_delay" | "shipping_delay" | "exam_release_delay" | "financial_exceptions";
+type EmailAlertCategoryId = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "transire_delay" | "shipping_delay" | "terminal_delay" | "pullout_delay" | "exam_release_delay" | "financial_exceptions";
 type EmailAlertPreference = { enabled: boolean; recipients: string; frequency: "none" | "daily" | "weekly"; lastSentAt?: string };
 type EmailAlertPreferences = Record<EmailAlertCategoryId, EmailAlertPreference>;
 
@@ -36,6 +36,8 @@ const EMAIL_ALERT_CATEGORIES: Array<{ id: EmailAlertCategoryId; title: string; h
   { id: "documentation_delays", title: "PAAR / Documentation Delays", helper: "Documentation records with a PAAR ETA that has passed." },
   { id: "transire_delay", title: "Transire Delay", helper: "Transire release actions that are due soon or overdue." },
   { id: "shipping_delay", title: "Shipping / DO Delay", helper: "Delivery Order releases that are due soon or overdue." },
+  { id: "terminal_delay", title: "Terminal / TDO Delay", helper: "Terminal Delivery Order releases that are due soon or overdue." },
+  { id: "pullout_delay", title: "Pullout Delay", helper: "Pullout actions that are due soon or overdue." },
   { id: "exam_release_delay", title: "Exam / Release Delay", helper: "Examination and final-release actions that are due soon or overdue." },
   { id: "financial_exceptions", title: "Financial Exceptions", helper: "Unpaid duty, negative profit, low margin, and unusual costs." },
 ];
