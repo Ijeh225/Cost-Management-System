@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound, ShieldCheck, Anchor, X, Users, FolderOpen, Plus, Trash2 } from "lucide-react";
 
 const DEFAULTS = {
@@ -24,6 +25,17 @@ const DEFAULTS = {
 };
 
 type DocumentSection = { id: string; label: string };
+type SettingsTab = "general" | "aging" | "documentation" | "email" | "notifications" | "workflow" | "other";
+
+const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
+  { id: "general", label: "General" },
+  { id: "aging", label: "Container Aging" },
+  { id: "documentation", label: "Documentation" },
+  { id: "email", label: "Email Alerts" },
+  { id: "notifications", label: "Notifications" },
+  { id: "workflow", label: "Workflow" },
+  { id: "other", label: "Other Settings" },
+];
 const DEFAULT_DOCUMENT_SECTIONS: DocumentSection[] = [
   { id: "general", label: "General" },
   { id: "shipping", label: "Shipping" },
@@ -208,9 +220,10 @@ export default function SettingsPage() {
   const [verificationOfficerUserIds, setVerificationOfficerUserIds] = useState<string[]>([]);
   const [berthingOfficerUserIds, setBerthingOfficerUserIds] = useState<string[]>([]);
   const [documentSections, setDocumentSections] = useState<DocumentSection[]>(DEFAULT_DOCUMENT_SECTIONS);
-  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [savingTab, setSavingTab] = useState<SettingsTab | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [dirtyTabs, setDirtyTabs] = useState<Partial<Record<SettingsTab, boolean>>>({});
 
   useEffect(() => {
     if (!isLoading) {
@@ -234,7 +247,7 @@ export default function SettingsPage() {
     }
   }, [isLoading]);
 
-  const mark = () => setDirty(true);
+  const mark = () => setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
 
   const validateNum = (v: string, min = 1) => {
     const n = parseInt(v);
@@ -250,36 +263,44 @@ export default function SettingsPage() {
     parseInt(days1) < parseInt(days2) &&
     parseInt(days2) < parseInt(days3);
 
-  const settingsPayload = () => ({
-    agingInactivityDays: inactivityDays,
-    agingDays1: days1,
-    agingDays2: days2,
-    agingDays3: days3,
-    notifyBeforeDueDays,
-    agingEmailEnabled: emailEnabled ? "true" : "false",
-    // Keep these values for installations that used the old single digest configuration.
-    agingEmailTo: emailTo.trim(),
-    digestFrequency,
-    digestTime,
-    emailAlertPreferences: JSON.stringify(emailPreferences),
-    verificationOfficerUserIds: JSON.stringify(verificationOfficerUserIds),
-    verificationOfficerUserId: verificationOfficerUserIds[0] ?? "",
-    berthingOfficerUserIds: JSON.stringify(berthingOfficerUserIds),
-    berthingOfficerUserId: berthingOfficerUserIds[0] ?? "",
-    documentSections: JSON.stringify(documentSections),
-  });
+  const settingsPayload = (tab: SettingsTab): Record<string, string> => {
+    switch (tab) {
+      case "aging":
+        return { agingInactivityDays: inactivityDays, agingDays1: days1, agingDays2: days2, agingDays3: days3, notifyBeforeDueDays };
+      case "documentation":
+        return { documentSections: JSON.stringify(documentSections) };
+      case "email":
+        return {
+          agingEmailEnabled: emailEnabled ? "true" : "false",
+          // Keep these values for installations that used the old single digest configuration.
+          agingEmailTo: emailTo.trim(), digestFrequency, digestTime,
+          emailAlertPreferences: JSON.stringify(emailPreferences),
+        };
+      case "workflow":
+        return {
+          verificationOfficerUserIds: JSON.stringify(verificationOfficerUserIds),
+          verificationOfficerUserId: verificationOfficerUserIds[0] ?? "",
+          berthingOfficerUserIds: JSON.stringify(berthingOfficerUserIds),
+          berthingOfficerUserId: berthingOfficerUserIds[0] ?? "",
+        };
+      default:
+        return {};
+    }
+  };
 
-  const handleSave = async () => {
-    if (!isValid) return;
-    setSaving(true);
+  const handleSave = async (tab = activeTab) => {
+    if (tab === "aging" && !isValid) return;
+    const payload = settingsPayload(tab);
+    if (Object.keys(payload).length === 0) return;
+    setSavingTab(tab);
     try {
-      await updateMutation.mutateAsync(settingsPayload());
-      toast({ title: "Settings saved" });
-      setDirty(false);
+      await updateMutation.mutateAsync(payload);
+      toast({ title: `${SETTINGS_TABS.find((item) => item.id === tab)?.label} settings saved` });
+      setDirtyTabs((current) => ({ ...current, [tab]: false }));
     } catch {
       toast({ variant: "destructive", title: "Failed to save settings" });
     } finally {
-      setSaving(false);
+      setSavingTab(null);
     }
   };
 
@@ -291,7 +312,7 @@ export default function SettingsPage() {
     }
     setSendingEmail(true);
     try {
-      await updateMutation.mutateAsync(settingsPayload());
+      await updateMutation.mutateAsync(settingsPayload("email"));
       const result = await customFetch<{
         sent: number;
         categoriesSent?: number;
@@ -300,7 +321,7 @@ export default function SettingsPage() {
       }>("/api/notifications/send-email-digest", { method: "POST" });
       const now = new Date().toISOString();
       setDigestLastSentAt(now);
-      setDirty(false);
+      setDirtyTabs((current) => ({ ...current, email: false }));
       toast({
         title: "Email digest sent",
         description: `Sent ${result.categoriesSent ?? 0} alert report(s) to ${result.sent ?? 0} recipient(s) from ${result.fromAddress ?? "configured sender"}`,
@@ -329,6 +350,9 @@ export default function SettingsPage() {
   }
 
   const activeUsers = (users ?? []).filter((u: any) => u.isActive !== false);
+  const canSaveActiveTab = ["aging", "documentation", "email", "workflow"].includes(activeTab);
+  const activeTabDirty = Boolean(dirtyTabs[activeTab]);
+  const activeTabIsValid = activeTab !== "aging" || isValid;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto w-full max-w-[1400px] space-y-6 pb-10">
@@ -337,13 +361,23 @@ export default function SettingsPage() {
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">System Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">Configure workflow assignments, container aging rules, notifications and email alerts.</p>
         </div>
-        <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="h-10 gap-2 px-5 sm:w-auto w-full">
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Save Changes
+        <Button onClick={() => handleSave()} disabled={!canSaveActiveTab || !activeTabDirty || !activeTabIsValid || savingTab !== null} className="h-10 gap-2 px-5 sm:w-auto w-full">
+          {savingTab === activeTab ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save {SETTINGS_TABS.find((tab) => tab.id === activeTab)?.label ?? "Changes"}
         </Button>
       </div>
 
-      <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)}>
+        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border/60 bg-card p-1.5">
+          {SETTINGS_TABS.map((tab) => (
+            <TabsTrigger key={tab.id} value={tab.id} className="shrink-0 rounded-lg px-3 py-2 text-sm data-[state=active]:shadow-sm">
+              {tab.label}{dirtyTabs[tab.id] ? " *" : ""}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      {activeTab === "workflow" && <Card className="rounded-xl border-border/60 bg-card shadow-sm">
         <CardHeader className="p-6 pb-0">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Users className="w-4 h-4 text-primary" />
@@ -385,9 +419,9 @@ export default function SettingsPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+      {activeTab === "aging" && <Card className="rounded-xl border-border/60 bg-card shadow-sm">
         <CardHeader className="p-6 pb-0">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Clock className="w-4 h-4 text-primary" />
@@ -419,12 +453,12 @@ export default function SettingsPage() {
                 ["Critical", days3, setDays3, "bg-red-500"],
               ].map(([label, value, setter, color]) => <div key={String(label)} className="rounded-lg border border-border/60 p-4 space-y-2"><Label className="flex items-center gap-2 text-sm font-medium"><span className={`h-2 w-2 rounded-full ${color}`} />{String(label)}</Label><div className="flex items-center gap-2"><Input type="number" min={1} value={String(value)} onChange={(e) => { (setter as (next: string) => void)(e.target.value); mark(); }} className="h-10" /><span className="text-sm text-muted-foreground">Days</span></div></div>)}
             </div>
-            {!isValid && dirty && <p className="text-xs text-destructive">Thresholds must be valid numbers in ascending order (Warning &lt; High Warning &lt; Critical).</p>}
+            {!isValid && activeTabDirty && <p className="text-xs text-destructive">Thresholds must be valid numbers in ascending order (Warning &lt; High Warning &lt; Critical).</p>}
           </div>
         </CardContent>
-      </Card>
+      </Card>}
 
-      <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+      {activeTab === "documentation" && <Card className="rounded-xl border-border/60 bg-card shadow-sm">
         <CardHeader className="p-6 pb-0">
           <CardTitle className="flex items-center gap-2 text-lg">
             <FolderOpen className="w-4 h-4 text-primary" />
@@ -476,11 +510,11 @@ export default function SettingsPage() {
           >
             <Plus className="h-4 w-4" /> Add section
           </Button>
-          <p className="text-xs text-muted-foreground">General is kept as the default. Use the page-level <strong>Save Changes</strong> button to apply your section list.</p>
+          <p className="text-xs text-muted-foreground">General is kept as the default. Save Changes applies only document sections in this tab.</p>
         </CardContent>
-      </Card>
+      </Card>}
 
-      <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+      {activeTab === "email" && <Card className="rounded-xl border-border/60 bg-card shadow-sm">
         <CardHeader className="p-6 pb-0">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Mail className="w-4 h-4 text-primary" />
@@ -647,7 +681,37 @@ export default function SettingsPage() {
             </Button>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
+
+      {activeTab === "general" && (
+        <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+          <CardHeader className="p-6 pb-0">
+            <CardTitle className="flex items-center gap-2 text-lg"><ShieldCheck className="h-4 w-4 text-primary" />General Settings</CardTitle>
+            <p className="text-sm text-muted-foreground">System-wide controls will appear here as they are added.</p>
+          </CardHeader>
+          <CardContent className="p-6"><div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-6 text-sm text-muted-foreground">There are no general settings to configure yet. Use the dedicated tabs for workflow, document, aging, and email controls.</div></CardContent>
+        </Card>
+      )}
+
+      {activeTab === "notifications" && (
+        <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+          <CardHeader className="p-6 pb-0">
+            <CardTitle className="flex items-center gap-2 text-lg"><Mail className="h-4 w-4 text-primary" />Notifications</CardTitle>
+            <p className="text-sm text-muted-foreground">In-app notifications follow workflow roles, assignments, and branch access.</p>
+          </CardHeader>
+          <CardContent className="p-6"><div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-6 text-sm text-muted-foreground">Notification preferences will appear here when they become configurable. Email delivery preferences are available in Email Alerts.</div></CardContent>
+        </Card>
+      )}
+
+      {activeTab === "other" && (
+        <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+          <CardHeader className="p-6 pb-0">
+            <CardTitle className="flex items-center gap-2 text-lg"><FolderOpen className="h-4 w-4 text-primary" />Other Settings</CardTitle>
+            <p className="text-sm text-muted-foreground">Reserved for future integrations, storage, and advanced platform configuration.</p>
+          </CardHeader>
+          <CardContent className="p-6"><div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-6 text-sm text-muted-foreground">No additional settings are available yet. This space keeps future configuration from crowding the core settings pages.</div></CardContent>
+        </Card>
+      )}
     </motion.div>
   );
 }
