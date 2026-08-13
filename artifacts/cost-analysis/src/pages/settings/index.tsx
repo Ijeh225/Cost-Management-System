@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound, ShieldCheck, Anchor, X, Users } from "lucide-react";
+import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound, ShieldCheck, Anchor, X, Users, FolderOpen, Plus, Trash2 } from "lucide-react";
 
 const DEFAULTS = {
   agingInactivityDays: "7",
@@ -22,6 +22,34 @@ const DEFAULTS = {
   digestFrequency: "none",
   digestTime: "08:00",
 };
+
+type DocumentSection = { id: string; label: string };
+const DEFAULT_DOCUMENT_SECTIONS: DocumentSection[] = [
+  { id: "general", label: "General" },
+  { id: "shipping", label: "Shipping" },
+  { id: "customs", label: "Customs" },
+  { id: "terminal", label: "Terminal" },
+  { id: "delivery", label: "Delivery" },
+  { id: "operations", label: "Operations" },
+];
+
+function parseDocumentSections(value?: string): DocumentSection[] {
+  try {
+    const parsed = JSON.parse(value ?? "");
+    if (Array.isArray(parsed) && parsed.length > 0 && parsed.every((item) => item && typeof item.id === "string" && typeof item.label === "string")) {
+      return parsed;
+    }
+  } catch {}
+  return DEFAULT_DOCUMENT_SECTIONS;
+}
+
+function sectionId(label: string, sections: DocumentSection[]) {
+  const base = label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "section";
+  let id = base.slice(0, 36);
+  let suffix = 2;
+  while (sections.some((section) => section.id === id)) id = `${base.slice(0, 32)}-${suffix++}`;
+  return id;
+}
 
 type EmailAlertCategoryId = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "transire_delay" | "shipping_delay" | "terminal_delay" | "pullout_delay" | "exam_release_delay" | "financial_exceptions";
 type EmailAlertPreference = { enabled: boolean; recipients: string; frequency: "none" | "daily" | "weekly"; lastSentAt?: string };
@@ -179,6 +207,7 @@ export default function SettingsPage() {
   const [emailPreferences, setEmailPreferences] = useState<EmailAlertPreferences>(() => parseEmailAlertPreferences(undefined, "", "none", false));
   const [verificationOfficerUserIds, setVerificationOfficerUserIds] = useState<string[]>([]);
   const [berthingOfficerUserIds, setBerthingOfficerUserIds] = useState<string[]>([]);
+  const [documentSections, setDocumentSections] = useState<DocumentSection[]>(DEFAULT_DOCUMENT_SECTIONS);
   const [saving, setSaving] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -201,6 +230,7 @@ export default function SettingsPage() {
       setEmailPreferences(parseEmailAlertPreferences(s["emailAlertPreferences"], s["agingEmailTo"] ?? "", legacyFrequency, s["agingEmailEnabled"] === "true"));
       setVerificationOfficerUserIds(parseOfficerIds(s["verificationOfficerUserIds"], s["verificationOfficerUserId"]));
       setBerthingOfficerUserIds(parseOfficerIds(s["berthingOfficerUserIds"], s["berthingOfficerUserId"]));
+      setDocumentSections(parseDocumentSections(s["documentSections"]));
     }
   }, [isLoading]);
 
@@ -236,6 +266,7 @@ export default function SettingsPage() {
     verificationOfficerUserId: verificationOfficerUserIds[0] ?? "",
     berthingOfficerUserIds: JSON.stringify(berthingOfficerUserIds),
     berthingOfficerUserId: berthingOfficerUserIds[0] ?? "",
+    documentSections: JSON.stringify(documentSections),
   });
 
   const handleSave = async () => {
@@ -390,6 +421,62 @@ export default function SettingsPage() {
             </div>
             {!isValid && dirty && <p className="text-xs text-destructive">Thresholds must be valid numbers in ascending order (Warning &lt; High Warning &lt; Critical).</p>}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+        <CardHeader className="p-6 pb-0">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <FolderOpen className="w-4 h-4 text-primary" />
+            Document Sections
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">Organise uploaded job documents into the categories your team uses. Existing files keep their recorded section if a category is removed.</p>
+        </CardHeader>
+        <CardContent className="space-y-4 p-6">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {documentSections.map((section) => (
+              <div key={section.id} className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/60 p-2">
+                <Input
+                  value={section.label}
+                  maxLength={60}
+                  aria-label={`${section.label} document section`}
+                  onChange={(event) => {
+                    const label = event.target.value;
+                    setDocumentSections((current) => current.map((item) => item.id === section.id ? { ...item, label } : item));
+                    mark();
+                  }}
+                  className="h-9 border-0 bg-transparent shadow-none focus-visible:ring-0"
+                />
+                {section.id !== "general" && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                    aria-label={`Remove ${section.label}`}
+                    onClick={() => { setDocumentSections((current) => current.filter((item) => item.id !== section.id)); mark(); }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={documentSections.length >= 20}
+            onClick={() => {
+              const label = "New Section";
+              setDocumentSections((current) => [...current, { id: sectionId(label, current), label }]);
+              mark();
+            }}
+          >
+            <Plus className="h-4 w-4" /> Add section
+          </Button>
+          <p className="text-xs text-muted-foreground">General is kept as the default. Use the page-level <strong>Save Changes</strong> button to apply your section list.</p>
         </CardContent>
       </Card>
 

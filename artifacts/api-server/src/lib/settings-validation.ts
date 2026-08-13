@@ -10,6 +10,7 @@ export const CLIENT_SETTING_KEYS = new Set([
   "agingInactivityDays", "agingDays1", "agingDays2", "agingDays3", "notifyBeforeDueDays",
   "agingEmailEnabled", "agingEmailTo", "digestFrequency", "digestTime", "emailAlertPreferences",
   "verificationOfficerUserIds", "verificationOfficerUserId", "berthingOfficerUserIds", "berthingOfficerUserId",
+  "documentSections",
 ]);
 
 function csvEmails(value: string): boolean {
@@ -66,6 +67,24 @@ export function validateSettingsPayload(payload: unknown): { values: Record<stri
         ) throw new Error();
       }
     } catch { return { values: {}, officerIds: [], error: "Invalid email alert preferences." }; }
+  }
+  if ("documentSections" in normalized) {
+    try {
+      const sections = JSON.parse(normalized.documentSections);
+      if (!Array.isArray(sections) || sections.length < 1 || sections.length > 20) throw new Error();
+      const ids = new Set<string>();
+      const labels = new Set<string>();
+      for (const section of sections) {
+        if (!section || typeof section !== "object") throw new Error();
+        const item = section as Record<string, unknown>;
+        if (typeof item.id !== "string" || typeof item.label !== "string") throw new Error();
+        const id = item.id.trim();
+        const label = item.label.trim();
+        if (!/^[a-z0-9][a-z0-9_-]{0,39}$/.test(id) || label.length < 1 || label.length > 60 || ids.has(id) || labels.has(label.toLowerCase())) throw new Error();
+        ids.add(id);
+        labels.add(label.toLowerCase());
+      }
+    } catch { return { values: {}, officerIds: [], error: "Document sections must be a unique list of 1 to 20 named sections." }; }
   }
   const officerIds = ["verificationOfficerUserIds", "berthingOfficerUserIds"].flatMap((key) => key in normalized ? (parseOfficerIds(normalized[key]) ?? []) : []);
   for (const key of ["verificationOfficerUserIds", "berthingOfficerUserIds"]) if (key in normalized && parseOfficerIds(normalized[key]) == null) return { values: {}, officerIds: [], error: `${key} must be a list of user IDs.` };

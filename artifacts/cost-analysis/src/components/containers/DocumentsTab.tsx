@@ -1,21 +1,25 @@
 import { useRef, useState } from "react";
-import { useGetContainerDocuments, useDeleteContainerDocument } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useGetContainerDocuments, useDeleteContainerDocument, customFetch } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/layout/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Upload, Trash2, FileText, Download, File, Image, FileSpreadsheet } from "lucide-react";
 
-const SECTION_OPTIONS = [
-  { value: "general", label: "General" },
-  { value: "shipping", label: "Shipping" },
-  { value: "customs", label: "Customs" },
-  { value: "terminal", label: "Terminal" },
-  { value: "delivery", label: "Delivery" },
-  { value: "operations", label: "Operations" },
+const DEFAULT_SECTION_OPTIONS: DocumentSection[] = [
+  { id: "general", label: "General" },
+  { id: "shipping", label: "Shipping" },
+  { id: "customs", label: "Customs" },
+  { id: "terminal", label: "Terminal" },
+  { id: "delivery", label: "Delivery" },
+  { id: "operations", label: "Operations" },
 ];
+
+type DocumentSection = { id: string; label: string };
 
 function FileIcon({ mimeType }: { mimeType: string }) {
   if (mimeType.startsWith("image/")) return <Image className="w-5 h-5 text-blue-400" />;
@@ -32,12 +36,19 @@ function formatBytes(bytes: number): string {
 
 export function DocumentsTab({ containerId }: { containerId: number }) {
   const { toast } = useToast();
+  const { user, isAdminOrAbove } = useAuth();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [section, setSection] = useState("general");
+  const [previewDocument, setPreviewDocument] = useState<any | null>(null);
 
   const { data: documents = [], isLoading } = useGetContainerDocuments(containerId);
+  const { data: sections = DEFAULT_SECTION_OPTIONS } = useQuery<DocumentSection[]>({
+    queryKey: ["document-sections"],
+    queryFn: () => customFetch("/api/document-sections"),
+  });
+  const sectionLabels = new Map(sections.map((item) => [item.id, item.label]));
   const deleteMutation = useDeleteContainerDocument();
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["getContainerDocuments", containerId] });
@@ -84,6 +95,8 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
     window.open(`/api/documents/${doc.id}`, "_blank");
   };
 
+  const canDelete = (doc: any) => isAdminOrAbove || doc.uploadedById === user?.id;
+
   return (
     <div className="space-y-4">
       {/* Upload Area */}
@@ -99,7 +112,7 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
             <Select value={section} onValueChange={setSection}>
               <SelectTrigger className="h-7 text-xs w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {SECTION_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                {sections.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -130,29 +143,53 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
           {(documents as any[]).map((doc: any) => (
             <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-accent/20 transition-colors group">
               <FileIcon mimeType={doc.mimeType} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{doc.originalName}</p>
+              <button type="button" className="flex-1 min-w-0 text-left" onClick={() => setPreviewDocument(doc)}>
+                <p className="text-sm font-medium truncate hover:text-primary transition-colors">{doc.originalName}</p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
-                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 capitalize">{doc.section ?? "general"}</Badge>
+                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">{sectionLabels.get(doc.section ?? "general") ?? doc.section ?? "General"}</Badge>
                   <span>{formatBytes(doc.size)}</span>
                   <span>·</span>
                   <span>{doc.uploaderName}</span>
                   <span>·</span>
                   <span>{new Date(doc.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span>
                 </div>
-              </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              </button>
+              <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <button onClick={() => handleDownload(doc)} className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded">
                   <Download className="w-3.5 h-3.5" />
                 </button>
-                <button onClick={() => handleDelete(doc.id)} className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded">
+                {canDelete(doc) && <button onClick={() => handleDelete(doc.id)} className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded">
                   <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                </button>}
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <Dialog open={!!previewDocument} onOpenChange={(open) => !open && setPreviewDocument(null)}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-4xl max-h-[90vh] overflow-hidden p-0">
+          {previewDocument && <>
+            <DialogHeader className="p-5 pb-3 border-b">
+              <DialogTitle className="pr-8 truncate">{previewDocument.originalName}</DialogTitle>
+              <DialogDescription>Uploaded by {previewDocument.uploaderName} on {new Date(previewDocument.createdAt).toLocaleDateString("en-NG")}</DialogDescription>
+            </DialogHeader>
+            <div className="min-h-[360px] max-h-[70vh] bg-muted/30 flex items-center justify-center overflow-auto">
+              {previewDocument.mimeType?.startsWith("image/") ? (
+                <img src={`/api/documents/${previewDocument.id}`} alt={previewDocument.originalName} className="max-h-[68vh] max-w-full object-contain" />
+              ) : previewDocument.mimeType === "application/pdf" ? (
+                <iframe title={previewDocument.originalName} src={`/api/documents/${previewDocument.id}`} className="h-[68vh] w-full bg-white" />
+              ) : (
+                <div className="p-8 text-center space-y-3">
+                  <FileText className="h-10 w-10 text-muted-foreground mx-auto" />
+                  <p className="text-sm text-muted-foreground">This file type opens in your browser or downloads to your device.</p>
+                  <Button variant="outline" onClick={() => handleDownload(previewDocument)} className="gap-2"><Download className="h-4 w-4" /> Open document</Button>
+                </div>
+              )}
+            </div>
+          </>}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

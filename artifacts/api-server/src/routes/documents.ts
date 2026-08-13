@@ -6,6 +6,7 @@ import { db, containerDocumentsTable, containersTable, usersTable, workflowNotif
 import { eq, asc, inArray, and } from "drizzle-orm";
 import { requireAuth, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
 import { deleteDocument, documentExists, getDocument, saveDocument } from "../lib/document-storage.js";
+import { settingsTable } from "@workspace/db";
 
 export const documentsRouter = Router();
 
@@ -13,6 +14,26 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
 });
+
+const DEFAULT_DOCUMENT_SECTIONS = [
+  { id: "general", label: "General" },
+  { id: "shipping", label: "Shipping" },
+  { id: "customs", label: "Customs" },
+  { id: "terminal", label: "Terminal" },
+  { id: "delivery", label: "Delivery" },
+  { id: "operations", label: "Operations" },
+];
+
+async function getDocumentSections() {
+  const [setting] = await db.select({ value: settingsTable.value }).from(settingsTable)
+    .where(eq(settingsTable.key, "documentSections")).limit(1);
+  if (!setting?.value) return DEFAULT_DOCUMENT_SECTIONS;
+  try {
+    const parsed = JSON.parse(setting.value);
+    if (Array.isArray(parsed) && parsed.every((item) => item && typeof item.id === "string" && typeof item.label === "string")) return parsed;
+  } catch {}
+  return DEFAULT_DOCUMENT_SECTIONS;
+}
 
 async function getAccessibleContainer(req: AuthRequest, containerId: number) {
   if (!Number.isInteger(containerId) || containerId <= 0) return null;
@@ -53,10 +74,19 @@ documentsRouter.get("/containers/:id/documents", requireAuth, async (req: AuthRe
   }
 });
 
+documentsRouter.get("/document-sections", requireAuth, async (_req: AuthRequest, res) => {
+  try {
+    return res.json(await getDocumentSections());
+  } catch (err) {
+    console.error("[documents] sections error:", err);
+    return res.status(500).json({ error: "Failed to load document sections" });
+  }
+});
+
 documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("file"), async (req: AuthRequest, res) => {
   const containerId = parseInt(String(req.params.id));
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  const section = req.body.section || null;
+  const section = typeof req.body.section === "string" ? req.body.section.trim() : "";
 
   const ext = path.extname(req.file.originalname).toLowerCase();
   const objectKey = `documents/${Date.now()}-${randomUUID()}${ext}`;
@@ -64,13 +94,17 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
   try {
     const container = await getAccessibleContainer(req, containerId);
     if (!container) return res.status(404).json({ error: "Container not found" });
+    const sections = await getDocumentSections();
+    if (section && !sections.some((item) => item.id === section)) {
+      return res.status(400).json({ error: "Choose a valid document section." });
+    }
 
     await saveDocument(objectKey, req.file.buffer, req.file.mimetype);
 
     const [doc] = await db.insert(containerDocumentsTable).values({
       containerId,
       branchId: container.branchId,
-      section,
+      section: section || null,
       filename: objectKey,
       originalName: req.file.originalname,
       mimeType: req.file.mimetype,
@@ -151,6 +185,8 @@ documentsRouter.delete("/containers/:id/documents/:docId", requireAuth, async (r
     const [doc] = await db.select().from(containerDocumentsTable)
       .where(and(eq(containerDocumentsTable.id, docId), eq(containerDocumentsTable.containerId, containerId)));
     if (!doc || doc.branchId !== container.branchId) return res.status(404).json({ error: "Document not found" });
+    const canDelete = doc.uploadedById === req.user!.id || ["super_admin", "admin", "branch_admin"].includes(req.user!.role);
+    if (!canDelete) return res.status(403).json({ error: "Only the uploader or a branch administrator can delete this document." });
     try {
       await deleteDocument(doc.filename);
     } catch (storageErr) {
