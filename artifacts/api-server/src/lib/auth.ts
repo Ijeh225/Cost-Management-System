@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { randomUUID } from "crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { Request, Response, NextFunction } from "express";
 import { db, usersTable, branchesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -28,6 +28,23 @@ if (!JWT_SECRET) {
 
 const SECRET = JWT_SECRET ?? "cost-analysis-dev-only-secret-never-use-in-production";
 const COOKIE_NAME = "cost_analysis_session";
+const CSRF_HEADER = "x-csrf-token";
+
+export function createCsrfToken(sessionToken: string): string {
+  return createHmac("sha256", SECRET).update(`csrf:${sessionToken}`).digest("base64url");
+}
+
+export function isValidCsrfToken(actual: unknown, sessionToken: string): boolean {
+  if (typeof actual !== "string") return false;
+  const expected = createCsrfToken(sessionToken);
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function isUnsafeMethod(method: string): boolean {
+  return !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase());
+}
 
 export function isStrongPassword(password: unknown): password is string {
   return typeof password === "string"
@@ -124,6 +141,10 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
     }
     if (!decoded.sessionToken || user.sessionToken !== decoded.sessionToken) {
       res.status(401).json({ error: "Session expired. Please log in again." });
+      return;
+    }
+    if (isUnsafeMethod(req.method) && !isValidCsrfToken(req.header(CSRF_HEADER), decoded.sessionToken)) {
+      res.status(403).json({ error: "Invalid or missing CSRF token. Refresh the page and try again." });
       return;
     }
     // Task #74: hard-fail when branch scope inputs are invalid. Non-super-admin

@@ -25,6 +25,7 @@ import {
   useReviseBerthingEta,
   useAuthorizeEarlyStart,
   useRevokeEarlyStart,
+  getCsrfHeaders,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -1551,7 +1552,7 @@ export default function ContainerDetail() {
       const res = await fetch(`/api/containers/${containerId}/unlink-client`, {
         method: "PATCH",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await getCsrfHeaders()) },
       });
       if (!res.ok) throw new Error("Unlink failed");
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });

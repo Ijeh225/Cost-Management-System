@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useGetContainerDocuments, useDeleteContainerDocument, customFetch, getGetContainerDocumentsQueryKey } from "@workspace/api-client-react";
+import { useGetContainerDocuments, useDeleteContainerDocument, customFetch, getCsrfHeaders, getGetContainerDocumentsQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/layout/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,7 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
       const resp = await fetch(`/api/containers/${containerId}/documents`, {
         method: "POST",
         credentials: "include",
+        headers: await getCsrfHeaders(),
         body: formData,
       });
       if (!resp.ok) throw new Error("Upload failed");

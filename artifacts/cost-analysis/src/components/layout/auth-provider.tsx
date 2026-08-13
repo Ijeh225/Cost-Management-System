@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { useGetCurrentUser, getGetCurrentUserQueryKey } from "@workspace/api-client-react";
+import { useGetCurrentUser, getGetCurrentUserQueryKey, clearCsrfToken } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
@@ -107,6 +107,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ? null
       : lastKnownUser.current
   );
+
+  // CSRF tokens are bound to a server-side session. Clear the cached token
+  // whenever the authenticated user changes (login, logout, or session expiry).
+  useEffect(() => {
+    clearCsrfToken();
+  }, [effectiveUser?.id]);
 
   useEffect(() => {
     if (setupLoading) return;

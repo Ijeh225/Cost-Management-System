@@ -8,11 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Building2, Save } from "lucide-react";
 import type { Branch } from "@/pages/branches";
+import { getCsrfHeaders } from "@workspace/api-client-react";
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const csrfHeaders = ["GET", "HEAD", "OPTIONS"].includes(method) ? {} : await getCsrfHeaders();
   const res = await fetch(`/api${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers: { "Content-Type": "application/json", ...csrfHeaders, ...(init?.headers ?? {}) },
     ...init,
   });
   const text = await res.text();

@@ -9,6 +9,7 @@ import {
   generateSessionToken,
   setAuthCookie,
   clearAuthCookie,
+  createCsrfToken,
   requireAuth,
   AuthRequest,
   isStrongPassword,
@@ -113,6 +114,12 @@ router.post("/auth/logout", requireAuth, async (req: AuthRequest, res) => {
   }
   clearAuthCookie(res);
   return res.json({ message: "Logged out" });
+});
+
+router.get("/auth/csrf", requireAuth, async (req: AuthRequest, res) => {
+  const [user] = await db.select({ sessionToken: usersTable.sessionToken }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
+  if (!user?.sessionToken) return res.status(401).json({ error: "Not authenticated" });
+  return res.json({ token: createCsrfToken(user.sessionToken) });
 });
 
 router.get("/auth/me", requireAuth, async (req: AuthRequest, res) => {

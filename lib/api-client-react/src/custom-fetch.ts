@@ -8,6 +8,33 @@ export type BodyType<T> = T;
 
 const NO_BODY_STATUS = new Set([204, 205, 304]);
 const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
+let csrfToken: string | null = null;
+let csrfTokenRequest: Promise<string> | null = null;
+
+export function clearCsrfToken(): void {
+  csrfToken = null;
+  csrfTokenRequest = null;
+}
+
+async function getCsrfToken(): Promise<string> {
+  if (csrfToken) return csrfToken;
+  if (!csrfTokenRequest) {
+    csrfTokenRequest = fetch("/api/auth/csrf", { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to establish a secure session.");
+        const data = await response.json() as { token?: string };
+        if (!data.token) throw new Error("Unable to establish a secure session.");
+        csrfToken = data.token;
+        return data.token;
+      })
+      .finally(() => { csrfTokenRequest = null; });
+  }
+  return csrfTokenRequest;
+}
+
+export async function getCsrfHeaders(): Promise<Record<string, string>> {
+  return { "X-CSRF-Token": await getCsrfToken() };
+}
 
 function isRequest(input: RequestInfo | URL): input is Request {
   return typeof Request !== "undefined" && input instanceof Request;
@@ -29,6 +56,10 @@ function resolveUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (isUrl(input)) return input.toString();
   return input.url;
+}
+
+function isPublicAuthWrite(url: string): boolean {
+  return /\/api\/auth\/(?:login|setup)(?:[/?#]|$)/.test(url);
 }
 
 function mergeHeaders(...sources: Array<HeadersInit | undefined>): Headers {
@@ -282,12 +313,21 @@ export async function customFetch<T = unknown>(
   }
 
   const method = resolveMethod(input, init.method);
+  const requestInfo = { method, url: resolveUrl(input) };
 
   if (init.body != null && (method === "GET" || method === "HEAD")) {
     throw new TypeError(`customFetch: ${method} requests cannot have a body.`);
   }
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
+
+  if (
+    !["GET", "HEAD", "OPTIONS"].includes(method) &&
+    !isPublicAuthWrite(requestInfo.url) &&
+    !headers.has("x-csrf-token")
+  ) {
+    headers.set("X-CSRF-Token", await getCsrfToken());
+  }
 
   if (
     typeof init.body === "string" &&
@@ -316,8 +356,6 @@ export async function customFetch<T = unknown>(
       /* ignore storage access errors (e.g. private mode) */
     }
   }
-
-  const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });
 
