@@ -23,21 +23,15 @@ import {
   requireAuth,
   userCanAccessBranch,
 } from "../lib/auth.js";
-import { objectStorageClient } from "../lib/objectStorage.js";
+import { deleteDocument, documentExists, getDocument, saveDocument } from "../lib/document-storage.js";
 import { exceedsApprovedPaymentBalance, exceedsOverheadPaymentBalance, isScheduleReadyToComplete } from "../lib/payment-rules.js";
 
 export const paymentSchedulesRouter = Router();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
-const BUCKET_ID = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
 const FINAL_STATUSES = new Set(["completed", "rejected", "cancelled"]);
 const OPEN_STATUSES = new Set(["pending_approval", "partially_approved", "approved", "paid"]);
 const PRIORITIES = new Set(["low", "normal", "urgent"]);
-
-function getBucket() {
-  if (!BUCKET_ID) throw new Error("DEFAULT_OBJECT_STORAGE_BUCKET_ID is not set");
-  return objectStorageClient.bucket(BUCKET_ID);
-}
 
 function startOfDay(date: Date) {
   const d = new Date(date);
@@ -697,8 +691,7 @@ paymentSchedulesRouter.post("/payment-schedules/:id/documents", requireAuth, upl
   try {
     const schedule = await getScheduleForRequest(req, id);
     if (!schedule) return res.status(404).json({ error: "Payment schedule not found" });
-    const gcsFile = getBucket().file(objectKey);
-    await gcsFile.save(req.file.buffer, { metadata: { contentType: req.file.mimetype }, resumable: false });
+    await saveDocument(objectKey, req.file.buffer, req.file.mimetype);
     const [doc] = await db.insert(paymentScheduleDocumentsTable).values({
       branchId: schedule.branchId,
       scheduleId: id,
@@ -711,7 +704,7 @@ paymentSchedulesRouter.post("/payment-schedules/:id/documents", requireAuth, upl
     await addEvent({ branchId: schedule.branchId, scheduleId: id, type: "document_uploaded", actorUserId: req.user!.id, comment: req.file.originalname });
     return res.status(201).json({ ...doc, createdAt: formatDate(doc.createdAt)! });
   } catch (err) {
-    try { await getBucket().file(objectKey).delete({ ignoreNotFound: true }); } catch {}
+    try { await deleteDocument(objectKey); } catch {}
     console.error("[payment-schedules] document upload error:", err);
     return res.status(500).json({ error: "Failed to upload document" });
   }
@@ -725,14 +718,13 @@ paymentSchedulesRouter.get("/payment-schedules/:id/documents/:docId", requireAut
     if (!schedule) return res.status(404).json({ error: "Payment schedule not found" });
     const [doc] = await db.select().from(paymentScheduleDocumentsTable).where(and(eq(paymentScheduleDocumentsTable.id, docId), eq(paymentScheduleDocumentsTable.scheduleId, id))).limit(1);
     if (!doc) return res.status(404).json({ error: "Document not found" });
-    const gcsFile = getBucket().file(doc.filename);
-    const [exists] = await gcsFile.exists();
-    if (!exists) return res.status(404).json({ error: "File not found in storage" });
-    const [metadata] = await gcsFile.getMetadata();
-    res.setHeader("Content-Type", (metadata.contentType as string) || doc.mimeType);
+    if (!await documentExists(doc.filename)) return res.status(404).json({ error: "File not found in storage" });
+    const storedDocument = await getDocument(doc.filename);
+    res.setHeader("Content-Type", storedDocument.contentType || doc.mimeType);
     res.setHeader("Cache-Control", "private, max-age=3600");
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(doc.originalName)}"`);
-    gcsFile.createReadStream().on("error", (err): void => {
+    if (storedDocument.contentLength) res.setHeader("Content-Length", String(storedDocument.contentLength));
+    storedDocument.stream.on("error", (err): void => {
       console.error("[payment-schedules] document stream error:", err);
       if (!res.headersSent) res.status(500).json({ error: "Stream error" });
     }).pipe(res);

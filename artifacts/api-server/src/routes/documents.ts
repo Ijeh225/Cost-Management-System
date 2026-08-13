@@ -5,7 +5,7 @@ import { randomUUID } from "crypto";
 import { db, containerDocumentsTable, containersTable, usersTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, asc, inArray, and } from "drizzle-orm";
 import { requireAuth, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
-import { getDocumentStorageBucket } from "../lib/document-storage.js";
+import { deleteDocument, documentExists, getDocument, saveDocument } from "../lib/document-storage.js";
 
 export const documentsRouter = Router();
 
@@ -65,11 +65,7 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
     const container = await getAccessibleContainer(req, containerId);
     if (!container) return res.status(404).json({ error: "Container not found" });
 
-    const gcsFile = getDocumentStorageBucket().file(objectKey);
-    await gcsFile.save(req.file.buffer, {
-      metadata: { contentType: req.file.mimetype },
-      resumable: false,
-    });
+    await saveDocument(objectKey, req.file.buffer, req.file.mimetype);
 
     const [doc] = await db.insert(containerDocumentsTable).values({
       containerId,
@@ -102,7 +98,7 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
     return res.status(201).json({ ...doc, createdAt: doc.createdAt.toISOString() });
   } catch (err) {
     console.error("[documents] upload error:", err);
-    try { await getDocumentStorageBucket().file(objectKey).delete({ ignoreNotFound: true }); } catch {}
+    try { await deleteDocument(objectKey); } catch {}
     const message = err instanceof Error ? err.message : "";
     return res.status(message.includes("Document storage is not configured") ? 503 : 500)
       .json({ error: message.includes("Document storage is not configured") ? message : "Document upload failed" });
@@ -122,19 +118,16 @@ documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, r
     }).from(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
     if (!doc || !userCanAccessBranch(req, doc.branchId)) return res.status(404).json({ error: "Document not found" });
 
-    const gcsFile = getDocumentStorageBucket().file(doc.filename);
-    const [exists] = await gcsFile.exists();
-    if (!exists) return res.status(404).json({ error: "File not found in storage" });
-
-    const [metadata] = await gcsFile.getMetadata();
-    const contentType = (metadata.contentType as string) || doc.mimeType || "application/octet-stream";
+    if (!await documentExists(doc.filename)) return res.status(404).json({ error: "File not found in storage" });
+    const storedDocument = await getDocument(doc.filename);
+    const contentType = storedDocument.contentType || doc.mimeType || "application/octet-stream";
 
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "private, max-age=3600");
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(doc.originalName)}"`);
-    if (metadata.size) res.setHeader("Content-Length", String(metadata.size));
+    if (storedDocument.contentLength) res.setHeader("Content-Length", String(storedDocument.contentLength));
 
-    gcsFile.createReadStream()
+    storedDocument.stream
       .on("error", (err): void => {
         console.error("[documents] stream error:", err);
         if (!res.headersSent) res.status(500).json({ error: "Stream error" });
@@ -158,9 +151,8 @@ documentsRouter.delete("/containers/:id/documents/:docId", requireAuth, async (r
     const [doc] = await db.select().from(containerDocumentsTable)
       .where(and(eq(containerDocumentsTable.id, docId), eq(containerDocumentsTable.containerId, containerId)));
     if (!doc || doc.branchId !== container.branchId) return res.status(404).json({ error: "Document not found" });
-    const storageBucket = getDocumentStorageBucket();
     try {
-      await storageBucket.file(doc.filename).delete({ ignoreNotFound: true });
+      await deleteDocument(doc.filename);
     } catch (storageErr) {
       console.error("[documents] storage delete failed:", storageErr);
       return res.status(502).json({ error: "Document storage is temporarily unavailable. The document was not deleted." });

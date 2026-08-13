@@ -10,6 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1108.0",
+    "@aws-sdk/lib-storage": "^3.1108.0",
     "@google-cloud/storage": "^7.19.0",
     "@types/multer": "^2.1.0",
     "@workspace/api-zod": "workspace:*",
