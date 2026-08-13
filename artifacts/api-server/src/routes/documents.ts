@@ -4,7 +4,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { db, containerDocumentsTable, containersTable, usersTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, asc, inArray, and } from "drizzle-orm";
-import { requireAuth, AuthRequest } from "../lib/auth.js";
+import { requireAuth, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
 import { objectStorageClient } from "../lib/objectStorage.js";
 
 export const documentsRouter = Router();
@@ -21,9 +21,22 @@ const upload = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
 });
 
+async function getAccessibleContainer(req: AuthRequest, containerId: number) {
+  if (!Number.isInteger(containerId) || containerId <= 0) return null;
+  const [container] = await db.select({
+    id: containersTable.id,
+    branchId: containersTable.branchId,
+    containerNumber: containersTable.containerNumber,
+    stageOwner: containersTable.stageOwner,
+  }).from(containersTable).where(eq(containersTable.id, containerId)).limit(1);
+  return container && userCanAccessBranch(req, container.branchId) ? container : null;
+}
+
 documentsRouter.get("/containers/:id/documents", requireAuth, async (req: AuthRequest, res) => {
   const containerId = parseInt(String(req.params.id));
   try {
+    const container = await getAccessibleContainer(req, containerId);
+    if (!container) return res.status(404).json({ error: "Container not found" });
     const docs = await db.select({
       id: containerDocumentsTable.id,
       containerId: containerDocumentsTable.containerId,
@@ -56,7 +69,7 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
   const objectKey = `documents/${Date.now()}-${randomUUID()}${ext}`;
 
   try {
-    const [container] = await db.select({ branchId: containersTable.branchId, containerNumber: containersTable.containerNumber, stageOwner: containersTable.stageOwner }).from(containersTable).where(eq(containersTable.id, containerId));
+    const container = await getAccessibleContainer(req, containerId);
     if (!container) return res.status(404).json({ error: "Container not found" });
 
     const gcsFile = getBucket().file(objectKey);
@@ -106,11 +119,13 @@ documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, r
   if (isNaN(docId)) return res.status(400).json({ error: "Invalid document id" });
   try {
     const [doc] = await db.select({
+      containerId: containerDocumentsTable.containerId,
+      branchId: containerDocumentsTable.branchId,
       filename: containerDocumentsTable.filename,
       originalName: containerDocumentsTable.originalName,
       mimeType: containerDocumentsTable.mimeType,
     }).from(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
-    if (!doc) return res.status(404).json({ error: "Document not found" });
+    if (!doc || !userCanAccessBranch(req, doc.branchId)) return res.status(404).json({ error: "Document not found" });
 
     const gcsFile = getBucket().file(doc.filename);
     const [exists] = await gcsFile.exists();
@@ -138,10 +153,15 @@ documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, r
 });
 
 documentsRouter.delete("/containers/:id/documents/:docId", requireAuth, async (req: AuthRequest, res) => {
+  const containerId = parseInt(String(req.params.id));
   const docId = parseInt(String(req.params.docId));
   try {
-    const [doc] = await db.select().from(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
-    if (doc) {
+    const container = await getAccessibleContainer(req, containerId);
+    if (!container) return res.status(404).json({ error: "Container not found" });
+    const [doc] = await db.select().from(containerDocumentsTable)
+      .where(and(eq(containerDocumentsTable.id, docId), eq(containerDocumentsTable.containerId, containerId)));
+    if (!doc || doc.branchId !== container.branchId) return res.status(404).json({ error: "Document not found" });
+    {
       try {
         await getBucket().file(doc.filename).delete({ ignoreNotFound: true });
       } catch (storageErr) {

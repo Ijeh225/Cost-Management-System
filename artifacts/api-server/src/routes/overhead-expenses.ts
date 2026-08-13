@@ -512,38 +512,56 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireBranchAdmi
         return res.status(400).json({ error: "Select a specific branch to record a payment." });
       }
     }
-    if (paymentMethod === "bank" && bankId) {
-      const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, Number(bankId)));
-      if (bk && bk.branchId !== expense.branchId) {
-        return res.status(400).json({ error: "Selected bank belongs to a different branch than the expense." });
-      }
-    }
-
     const paymentDate = paidAt ? new Date(paidAt) : new Date();
+    if (Number.isNaN(paymentDate.getTime())) return res.status(400).json({ error: "Valid payment date is required" });
 
-    const [payment] = await db.insert(expensePaymentsTable).values({
-      expenseId,
-      amount: String(amount),
-      paymentMethod,
-      bankId: paymentMethod === "bank" && bankId ? Number(bankId) : null,
-      paidAt: paymentDate,
-      notes: notes || null,
-      recordedBy: req.user?.id ?? null,
-      branchId: expense.branchId,
-    }).returning();
+    const payment = await db.transaction(async (tx) => {
+      const [lockedExpense] = await tx.select().from(overheadExpensesTable)
+        .where(eq(overheadExpensesTable.id, expenseId)).for("update");
+      if (!lockedExpense || !userCanAccessBranch(req, lockedExpense.branchId)) throw new Error("EXPENSE_NOT_FOUND");
 
-    // Set paidAt on the parent expense to the date of the first payment recorded
-    if (expense.paidAt === null) {
-      await db.update(overheadExpensesTable)
+      if (paymentMethod === "bank" && bankId) {
+        const [bank] = await tx.select({ branchId: banksTable.branchId }).from(banksTable)
+          .where(eq(banksTable.id, Number(bankId))).limit(1);
+        if (!bank) throw new Error("BANK_NOT_FOUND");
+        if (bank.branchId !== lockedExpense.branchId) throw new Error("BANK_BRANCH_MISMATCH");
+      }
+
+      const [paidRow] = await tx.select({ total: sql<string>`COALESCE(SUM(${expensePaymentsTable.amount}), 0)` })
+        .from(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, expenseId));
+      const outstanding = Math.max(0, Number(lockedExpense.amount) - Number(paidRow?.total ?? 0));
+      if (Number(amount) > outstanding + 0.005) throw new Error("PAYMENT_EXCEEDS_EXPENSE");
+
+      const [createdPayment] = await tx.insert(expensePaymentsTable).values({
+        expenseId,
+        amount: String(amount),
+        paymentMethod,
+        bankId: paymentMethod === "bank" && bankId ? Number(bankId) : null,
+        paidAt: paymentDate,
+        notes: notes || null,
+        recordedBy: req.user?.id ?? null,
+        branchId: lockedExpense.branchId,
+      }).returning();
+
+      await tx.update(overheadExpensesTable)
         .set({ paidAt: paymentDate, updatedAt: new Date() })
-        .where(eq(overheadExpensesTable.id, expenseId));
-    }
+        .where(and(eq(overheadExpensesTable.id, expenseId), sql`${overheadExpensesTable.paidAt} IS NULL`));
+      return createdPayment;
+    });
 
     const [refreshedExpense] = await db.select().from(overheadExpensesTable)
       .where(eq(overheadExpensesTable.id, expenseId));
     const [updatedExpense] = await buildExpensesWithPayments([refreshedExpense]);
     return res.status(201).json({ payment, expense: updatedExpense });
   } catch (err) {
+    const code = err instanceof Error ? err.message : "";
+    const errorMessages: Record<string, string> = {
+      EXPENSE_NOT_FOUND: "Expense not found",
+      BANK_NOT_FOUND: "Selected bank was not found",
+      BANK_BRANCH_MISMATCH: "Selected bank belongs to a different branch than the expense.",
+      PAYMENT_EXCEEDS_EXPENSE: "Payment exceeds the remaining overhead expense balance.",
+    };
+    if (errorMessages[code]) return res.status(code === "EXPENSE_NOT_FOUND" ? 404 : 400).json({ error: errorMessages[code] });
     console.error("POST /overhead-expenses/:id/payments error:", err);
     return res.status(500).json({ error: "Server error" });
   }

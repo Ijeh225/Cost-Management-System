@@ -539,9 +539,6 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/pay", requireAuth, async (r
   try {
     if (!canMarkPaid(req)) return res.status(403).json({ error: "Accounts access required" });
     const id = Number(req.params.id);
-    const schedule = await getScheduleForRequest(req, id);
-    if (!schedule) return res.status(404).json({ error: "Payment schedule not found" });
-    if (!["approved", "partially_approved", "paid"].includes(schedule.status)) return res.status(400).json({ error: "Schedule must be approved before payment" });
     const amount = Number(req.body.amount);
     if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ error: "Payment amount must be greater than zero" });
     const paymentMethod = req.body.paymentMethod === "cash" ? "cash" : "bank";
@@ -549,53 +546,70 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/pay", requireAuth, async (r
     const paidAt = req.body.paidAt ? new Date(String(req.body.paidAt)) : new Date();
     if (Number.isNaN(paidAt.getTime())) return res.status(400).json({ error: "Valid paidAt date is required" });
     if (paymentMethod === "bank" && !bankId) return res.status(400).json({ error: "bankId is required for bank payments" });
-    if (paymentMethod === "bank" && bankId) {
-      const [bank] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, bankId)).limit(1);
-      if (!bank) return res.status(400).json({ error: "Selected bank was not found" });
-      if (bank.branchId !== schedule.branchId) return res.status(400).json({ error: "Selected bank belongs to a different branch than this schedule" });
-    }
-    const approved = toNumber(schedule.amountApproved) > 0 ? toNumber(schedule.amountApproved) : toNumber(schedule.amountRequested);
-    const currentPaid = toNumber(schedule.amountPaid);
-    if (currentPaid + amount > approved) return res.status(400).json({ error: "Payment exceeds approved balance" });
-    if (schedule.overheadExpenseId) {
-      const [expense] = await db.select().from(overheadExpensesTable).where(eq(overheadExpensesTable.id, schedule.overheadExpenseId)).limit(1);
-      if (!expense || expense.branchId !== schedule.branchId) return res.status(400).json({ error: "Linked overhead expense was not found" });
-      const [paidRow] = await db.select({ total: sql<string>`COALESCE(SUM(${expensePaymentsTable.amount}), 0)` })
-        .from(expensePaymentsTable)
-        .where(eq(expensePaymentsTable.expenseId, expense.id));
-      const overheadOutstanding = Math.max(0, toNumber(expense.amount) - toNumber(paidRow?.total));
-      if (amount > overheadOutstanding + 0.005) return res.status(400).json({ error: "Payment exceeds remaining overhead expense balance" });
-    }
-    const nextPaid = currentPaid + amount;
-    const nextStatus = nextPaid >= approved ? "paid" : schedule.status;
-    const [updated] = await db.update(paymentSchedulesTable).set({
-      amountPaid: String(nextPaid),
-      status: nextStatus,
-      updatedAt: new Date(),
-    }).where(eq(paymentSchedulesTable.id, id)).returning();
-    if (updated.overheadExpenseId) {
-      await db.insert(expensePaymentsTable).values({
-        expenseId: updated.overheadExpenseId,
-        paymentScheduleId: updated.id,
-        amount: String(amount),
-        paymentMethod,
-        bankId: paymentMethod === "bank" ? bankId : null,
-        paidAt,
-        notes: req.body.notes || req.body.comment || `Paid via payment schedule #${updated.id}`,
-        recordedBy: req.user?.id ?? null,
-        branchId: updated.branchId,
-      });
-      const [expense] = await db.select().from(overheadExpensesTable).where(eq(overheadExpensesTable.id, updated.overheadExpenseId)).limit(1);
-      if (expense && expense.paidAt === null) {
-        await db.update(overheadExpensesTable)
-          .set({ paidAt, updatedAt: new Date() })
-          .where(eq(overheadExpensesTable.id, updated.overheadExpenseId));
+    const { updated, previousStatus } = await db.transaction(async (tx) => {
+      const [schedule] = await tx.select().from(paymentSchedulesTable)
+        .where(eq(paymentSchedulesTable.id, id)).for("update");
+      if (!schedule || !userCanAccessBranch(req, schedule.branchId)) throw new Error("PAYMENT_SCHEDULE_NOT_FOUND");
+      if (!["approved", "partially_approved", "paid"].includes(schedule.status)) throw new Error("PAYMENT_SCHEDULE_NOT_APPROVED");
+
+      if (paymentMethod === "bank" && bankId) {
+        const [bank] = await tx.select({ branchId: banksTable.branchId }).from(banksTable)
+          .where(eq(banksTable.id, bankId)).limit(1);
+        if (!bank) throw new Error("PAYMENT_BANK_NOT_FOUND");
+        if (bank.branchId !== schedule.branchId) throw new Error("PAYMENT_BANK_BRANCH_MISMATCH");
       }
-    }
-    await addEvent({ branchId: updated.branchId, scheduleId: id, type: "paid", actorUserId: req.user!.id, comment: req.body.comment ?? null, amount, oldStatus: schedule.status, newStatus: updated.status });
+
+      const approved = toNumber(schedule.amountApproved) > 0 ? toNumber(schedule.amountApproved) : toNumber(schedule.amountRequested);
+      const currentPaid = toNumber(schedule.amountPaid);
+      if (currentPaid + amount > approved + 0.005) throw new Error("PAYMENT_EXCEEDS_APPROVED");
+
+      if (schedule.overheadExpenseId) {
+        const [expense] = await tx.select().from(overheadExpensesTable)
+          .where(eq(overheadExpensesTable.id, schedule.overheadExpenseId)).for("update");
+        if (!expense || expense.branchId !== schedule.branchId) throw new Error("PAYMENT_OVERHEAD_NOT_FOUND");
+        const [paidRow] = await tx.select({ total: sql<string>`COALESCE(SUM(${expensePaymentsTable.amount}), 0)` })
+          .from(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, expense.id));
+        const overheadOutstanding = Math.max(0, toNumber(expense.amount) - toNumber(paidRow?.total));
+        if (amount > overheadOutstanding + 0.005) throw new Error("PAYMENT_EXCEEDS_OVERHEAD");
+      }
+
+      const nextPaid = currentPaid + amount;
+      const nextStatus = nextPaid >= approved ? "paid" : schedule.status;
+      const [updatedSchedule] = await tx.update(paymentSchedulesTable).set({
+        amountPaid: String(nextPaid), status: nextStatus, updatedAt: new Date(),
+      }).where(eq(paymentSchedulesTable.id, id)).returning();
+
+      if (updatedSchedule.overheadExpenseId) {
+        await tx.insert(expensePaymentsTable).values({
+          expenseId: updatedSchedule.overheadExpenseId, paymentScheduleId: updatedSchedule.id,
+          amount: String(amount), paymentMethod, bankId: paymentMethod === "bank" ? bankId : null,
+          paidAt, notes: req.body.notes || req.body.comment || `Paid via payment schedule #${updatedSchedule.id}`,
+          recordedBy: req.user?.id ?? null, branchId: updatedSchedule.branchId,
+        });
+        await tx.update(overheadExpensesTable).set({ paidAt, updatedAt: new Date() })
+          .where(and(eq(overheadExpensesTable.id, updatedSchedule.overheadExpenseId), sql`${overheadExpensesTable.paidAt} IS NULL`));
+      }
+      await tx.insert(paymentScheduleEventsTable).values({
+        branchId: updatedSchedule.branchId, scheduleId: updatedSchedule.id, type: "paid",
+        actorUserId: req.user!.id, comment: req.body.comment ?? null, amount: String(amount),
+        oldStatus: schedule.status, newStatus: updatedSchedule.status,
+      });
+      return { updated: updatedSchedule, previousStatus: schedule.status };
+    });
     await notifyUsers({ branchId: updated.branchId, type: "payment_schedule_paid", message: `Payment recorded for ${updated.vendorBeneficiary}`, target: "creator", creatorId: updated.requestedById, actionUrl: `/payment-schedules?focus=${updated.id}` });
     return res.json(formatSchedule(updated));
   } catch (err) {
+    const code = err instanceof Error ? err.message : "";
+    const errorMessages: Record<string, string> = {
+      PAYMENT_SCHEDULE_NOT_FOUND: "Payment schedule not found",
+      PAYMENT_SCHEDULE_NOT_APPROVED: "Schedule must be approved before payment",
+      PAYMENT_BANK_NOT_FOUND: "Selected bank was not found",
+      PAYMENT_BANK_BRANCH_MISMATCH: "Selected bank belongs to a different branch than this schedule",
+      PAYMENT_EXCEEDS_APPROVED: "Payment exceeds approved balance",
+      PAYMENT_OVERHEAD_NOT_FOUND: "Linked overhead expense was not found",
+      PAYMENT_EXCEEDS_OVERHEAD: "Payment exceeds remaining overhead expense balance",
+    };
+    if (errorMessages[code]) return res.status(code === "PAYMENT_SCHEDULE_NOT_FOUND" ? 404 : 400).json({ error: errorMessages[code] });
     console.error("[payment-schedules] pay error:", err);
     return res.status(500).json({ error: "Failed to record payment" });
   }
