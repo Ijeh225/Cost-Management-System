@@ -10,7 +10,7 @@ const AVG_THRESHOLD = 1.5;
 const LOW_MARGIN_PCT = 0.15;
 const RESEND_TEST_FROM = "Cost Management <onboarding@resend.dev>";
 
-type EmailAlertCategory = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "financial_exceptions";
+type EmailAlertCategory = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "transire_delay" | "shipping_delay" | "exam_release_delay" | "financial_exceptions";
 type EmailAlertPreference = { enabled: boolean; recipients: string; frequency: "none" | "daily" | "weekly"; lastSentAt?: string };
 type EmailAlertPreferences = Record<EmailAlertCategory, EmailAlertPreference>;
 
@@ -21,6 +21,9 @@ const EMAIL_ALERT_CATEGORIES: Array<{ id: EmailAlertCategory; title: string; hel
   { id: "clearing_delays", title: "Clearing Delays", helper: "Jobs exceeding the configured clearing-age thresholds." },
   { id: "inactive_jobs", title: "Inactive Jobs", helper: "Jobs with no recorded activity for the configured number of days." },
   { id: "documentation_delays", title: "PAAR / Documentation Delays", helper: "Documentation jobs whose PAAR ETA has passed." },
+  { id: "transire_delay", title: "Transire Delay", helper: "Transire releases that are due soon or overdue." },
+  { id: "shipping_delay", title: "Shipping / DO Delay", helper: "Delivery Order releases that are due soon or overdue." },
+  { id: "exam_release_delay", title: "Exam / Release Delay", helper: "Examination and final-release actions that are due soon or overdue." },
   { id: "financial_exceptions", title: "Financial Exceptions", helper: "Unpaid duty, negative-profit, and low-margin jobs." },
 ];
 
@@ -60,6 +63,9 @@ const EMAIL_ALERT_TYPES: Record<Exclude<EmailAlertCategory, "terminal_jobs" | "b
   clearing_delays: ["aging_warn", "aging_high", "aging_critical"],
   inactive_jobs: ["inactive"],
   documentation_delays: ["paar_overdue"],
+  transire_delay: ["transire_due"],
+  shipping_delay: ["shipping_due"],
+  exam_release_delay: ["exam_release_due"],
   financial_exceptions: ["unpaid_duty", "negative_profit", "low_margin", "high_terminal", "high_delivery"],
 };
 
@@ -95,6 +101,9 @@ function recommendationForEmailCategory(category: EmailAlertCategory): string {
     clearing_delays: "Review the delay, record the blocker, and set the next action.",
     inactive_jobs: "Update the job activity or record the blocking issue.",
     documentation_delays: "Follow up on PAAR/documentation and update the expected date.",
+    transire_delay: "Follow up on the Transire release and update its expected date if delayed.",
+    shipping_delay: "Follow up on the Delivery Order release and update its expected date if delayed.",
+    exam_release_delay: "Confirm the examination or final-release action and record the next step.",
     financial_exceptions: "Review the financial exception with Accounts before it grows.",
   };
   return recommendations[category];
@@ -431,6 +440,7 @@ async function getAgingThresholds() {
     days1: parseInt(map["agingDays1"] ?? "30"),
     days2: parseInt(map["agingDays2"] ?? "60"),
     days3: parseInt(map["agingDays3"] ?? "90"),
+    notifyBeforeDueDays: parseInt(map["notifyBeforeDueDays"] ?? "7"),
   };
 }
 
@@ -533,6 +543,38 @@ async function computeAlerts(userId?: number, role?: string, branchScope?: numbe
       if (inactiveDays >= thresholds.inactivityDays) {
         alerts.push({ alertKey: `inactive_${c.id}`, type: "inactive", severity: "warning", message: `No activity for ${inactiveDays} day${inactiveDays === 1 ? "" : "s"}: ${c.containerNumber} (${c.customerName}) — last updated ${inactiveDays} days ago`, containerId: c.id, containerNumber: c.containerNumber, generatedAt: now });
       }
+    }
+  }
+
+  const stageDueAlerts: Array<{ type: "transire_due" | "shipping_due" | "exam_release_due"; label: string; expected: keyof typeof allContainers[number]; released: keyof typeof allContainers[number]; eligible: (container: typeof allContainers[number]) => boolean }> = [
+    { type: "transire_due", label: "Transire release", expected: "expectedTransireDate", released: "transireReleasedAt", eligible: () => true },
+    { type: "shipping_due", label: "Delivery Order release", expected: "expectedDoDate", released: "doReleasedAt", eligible: () => true },
+    { type: "exam_release_due", label: "Examination / final release", expected: "expectedReleaseDate", released: "releaseConfirmedAt", eligible: (container) => ["examination", "final_release"].includes(container.status) },
+  ];
+  const startOfTodayForDueDates = new Date(); startOfTodayForDueDates.setHours(0, 0, 0, 0);
+  const thresholdsForDueDates = await getAgingThresholds();
+  const dueWindowEnd = new Date(startOfTodayForDueDates); dueWindowEnd.setDate(dueWindowEnd.getDate() + Math.max(0, thresholdsForDueDates.notifyBeforeDueDays));
+  for (const container of allContainers) {
+    if (container.status === "closed") continue;
+    for (const check of stageDueAlerts) {
+      if (!check.eligible(container) || container[check.released]) continue;
+      const expectedDate = container[check.expected] as Date | null;
+      if (!expectedDate) continue;
+      const expected = new Date(expectedDate); expected.setHours(0, 0, 0, 0);
+      if (expected > dueWindowEnd) continue;
+      const deltaDays = Math.floor((expected.getTime() - startOfTodayForDueDates.getTime()) / 86_400_000);
+      const timing = deltaDays < 0
+        ? `overdue by ${Math.abs(deltaDays)} day${Math.abs(deltaDays) === 1 ? "" : "s"}`
+        : deltaDays === 0 ? "due today" : `due in ${deltaDays} day${deltaDays === 1 ? "" : "s"}`;
+      alerts.push({
+        alertKey: `${check.type}_${container.id}`,
+        type: check.type,
+        severity: deltaDays < 0 ? "warning" : "info",
+        message: `${check.label} ${timing}: ${container.containerNumber} (${container.customerName})${container.stageOwner ? ` - owner: ${container.stageOwner}` : ""}`,
+        containerId: container.id,
+        containerNumber: container.containerNumber,
+        generatedAt: now,
+      });
     }
   }
 

@@ -16,23 +16,27 @@ const DEFAULTS = {
   agingDays1: "30",
   agingDays2: "60",
   agingDays3: "90",
+  notifyBeforeDueDays: "7",
   agingEmailEnabled: "false",
   agingEmailTo: "",
   digestFrequency: "none",
   digestTime: "08:00",
 };
 
-type EmailAlertCategoryId = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "financial_exceptions";
+type EmailAlertCategoryId = "terminal_jobs" | "overdue_containers" | "berthing_watch" | "clearing_delays" | "inactive_jobs" | "documentation_delays" | "transire_delay" | "shipping_delay" | "exam_release_delay" | "financial_exceptions";
 type EmailAlertPreference = { enabled: boolean; recipients: string; frequency: "none" | "daily" | "weekly"; lastSentAt?: string };
 type EmailAlertPreferences = Record<EmailAlertCategoryId, EmailAlertPreference>;
 
 const EMAIL_ALERT_CATEGORIES: Array<{ id: EmailAlertCategoryId; title: string; helper: string }> = [
-  { id: "terminal_jobs", title: "Terminal Jobs", helper: "Open jobs in Terminal and downstream terminal release stages." },
+  { id: "terminal_jobs", title: "Terminal Jobs Summary", helper: "Open jobs in Terminal and downstream terminal release stages." },
   { id: "overdue_containers", title: "Overdue Containers", helper: "Overdue next actions, stage stalls, and empty-return delays." },
   { id: "berthing_watch", title: "Berthing Watch", helper: "Vessels not berthed with ETA in the next seven days." },
   { id: "clearing_delays", title: "Clearing Delays", helper: "Jobs above your clearing-age warning thresholds." },
   { id: "inactive_jobs", title: "Inactive Jobs", helper: "Jobs with no recorded activity for too long." },
   { id: "documentation_delays", title: "PAAR / Documentation Delays", helper: "Documentation records with a PAAR ETA that has passed." },
+  { id: "transire_delay", title: "Transire Delay", helper: "Transire release actions that are due soon or overdue." },
+  { id: "shipping_delay", title: "Shipping / DO Delay", helper: "Delivery Order releases that are due soon or overdue." },
+  { id: "exam_release_delay", title: "Exam / Release Delay", helper: "Examination and final-release actions that are due soon or overdue." },
   { id: "financial_exceptions", title: "Financial Exceptions", helper: "Unpaid duty, negative profit, low margin, and unusual costs." },
 ];
 
@@ -164,6 +168,7 @@ export default function SettingsPage() {
   const [days1, setDays1] = useState(DEFAULTS.agingDays1);
   const [days2, setDays2] = useState(DEFAULTS.agingDays2);
   const [days3, setDays3] = useState(DEFAULTS.agingDays3);
+  const [notifyBeforeDueDays, setNotifyBeforeDueDays] = useState(DEFAULTS.notifyBeforeDueDays);
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailTo, setEmailTo] = useState("");
   const [digestFrequency, setDigestFrequency] = useState<"none" | "daily" | "weekly">("none");
@@ -182,6 +187,7 @@ export default function SettingsPage() {
       setDays1(s["agingDays1"] ?? DEFAULTS.agingDays1);
       setDays2(s["agingDays2"] ?? DEFAULTS.agingDays2);
       setDays3(s["agingDays3"] ?? DEFAULTS.agingDays3);
+      setNotifyBeforeDueDays(s["notifyBeforeDueDays"] ?? DEFAULTS.notifyBeforeDueDays);
       setEmailEnabled(s["agingEmailEnabled"] === "true");
       setEmailTo(s["agingEmailTo"] ?? "");
       const legacyFrequency = s["digestFrequency"] === "daily" || s["digestFrequency"] === "weekly"
@@ -208,6 +214,7 @@ export default function SettingsPage() {
     validateNum(days1) &&
     validateNum(days2) &&
     validateNum(days3) &&
+    validateNum(notifyBeforeDueDays, 0) &&
     parseInt(days1) < parseInt(days2) &&
     parseInt(days2) < parseInt(days3);
 
@@ -216,6 +223,7 @@ export default function SettingsPage() {
     agingDays1: days1,
     agingDays2: days2,
     agingDays3: days3,
+    notifyBeforeDueDays,
     agingEmailEnabled: emailEnabled ? "true" : "false",
     // Keep these values for installations that used the old single digest configuration.
     agingEmailTo: emailTo.trim(),
@@ -290,31 +298,30 @@ export default function SettingsPage() {
   const activeUsers = (users ?? []).filter((u: any) => u.isActive !== false);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-5xl">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto w-full max-w-[1400px] space-y-6 pb-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">System Settings</h1>
-          <p className="text-muted-foreground text-sm mt-1">Configure workflow permissions, alert thresholds, and email delivery.</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">System Settings</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Configure workflow assignments, container aging rules, notifications and email alerts.</p>
         </div>
-        <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="gap-2 sm:w-auto w-full">
+        <Button onClick={handleSave} disabled={!dirty || !isValid || saving} className="h-10 gap-2 px-5 sm:w-auto w-full">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Save Settings
+          Save Changes
         </Button>
       </div>
 
-      {/* Workflow Permissions */}
-      <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+      <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+        <CardHeader className="p-6 pb-0">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Users className="w-4 h-4 text-primary" />
-            Workflow Permissions
+            Workflow & Assignments
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             Assign the users who can perform sensitive verification and berthing workflow actions.
           </p>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
+        <CardContent className="space-y-5 p-6">
+          <div className="grid gap-5 lg:grid-cols-2">
             <OfficerMultiSelect
               title="Verification Officers"
               description="Any selected user can verify new containers before they enter the operational pipeline."
@@ -334,7 +341,7 @@ export default function SettingsPage() {
           </div>
 
           {(verificationOfficerUserIds.length === 0 || berthingOfficerUserIds.length === 0) && (
-            <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10">
+            <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
               <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
               <div className="space-y-0.5">
                 <p className="text-sm font-medium text-amber-500">Workflow officers incomplete</p>
@@ -347,112 +354,54 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Aging Alerts */}
-      <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+      <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+        <CardHeader className="p-6 pb-0">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Clock className="w-4 h-4 text-primary" />
-            Container Aging Alerts
+            Container Aging
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Set how long a container can be in clearing before alerts fire. Alerts appear in Notifications and are colour-coded on the Containers list.
+            Set the lead time for due-date reminders and the thresholds used for clearing and inactivity alerts.
           </p>
         </CardHeader>
-        <CardContent className="space-y-6">
-
-          <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 space-y-3">
-            <div className="flex items-center gap-2 text-amber-500">
-              <AlertTriangle className="w-4 h-4" />
-              <span className="text-sm font-semibold">Inactivity Alert</span>
+        <CardContent className="space-y-6 p-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-2">
+              <Label className="text-sm font-medium">Notify Before Due Date</Label>
+              <p className="text-xs text-muted-foreground">Send stage reminders this many days before the expected date.</p>
+              <div className="flex max-w-xs items-center gap-2"><Input type="number" min={0} value={notifyBeforeDueDays} onChange={(e) => { setNotifyBeforeDueDays(e.target.value); mark(); }} className="h-10" /><span className="text-sm text-muted-foreground">days</span></div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Fire an alert when no update has been made to a container for this many days.
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">Days without activity</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={1}
-                    value={inactivityDays}
-                    onChange={(e) => { setInactivityDays(e.target.value); mark(); }}
-                    className="h-8 w-24 text-sm"
-                  />
-                  <span className="text-sm text-muted-foreground">days</span>
-                </div>
-              </div>
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-2">
+              <Label className="text-sm font-medium">Inactive Job Alert</Label>
+              <p className="text-xs text-muted-foreground">Flag a job when it has not received an update within this period.</p>
+              <div className="flex max-w-xs items-center gap-2"><Input type="number" min={1} value={inactivityDays} onChange={(e) => { setInactivityDays(e.target.value); mark(); }} className="h-10" /><span className="text-sm text-muted-foreground">days</span></div>
             </div>
           </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <ShieldAlert className="w-4 h-4 text-primary" />
-              Aging Thresholds
+          <div className="space-y-3">
+            <div><p className="text-sm font-semibold">Aging Thresholds</p><p className="mt-1 text-xs text-muted-foreground">Jobs are flagged after these days in clearing. Values must be in ascending order.</p></div>
+            <div className="grid gap-4 md:grid-cols-3">
+              {[
+                ["Warning", days1, setDays1, "bg-amber-400"],
+                ["High Warning", days2, setDays2, "bg-orange-500"],
+                ["Critical", days3, setDays3, "bg-red-500"],
+              ].map(([label, value, setter, color]) => <div key={String(label)} className="rounded-lg border border-border/60 p-4 space-y-2"><Label className="flex items-center gap-2 text-sm font-medium"><span className={`h-2 w-2 rounded-full ${color}`} />{String(label)}</Label><div className="flex items-center gap-2"><Input type="number" min={1} value={String(value)} onChange={(e) => { (setter as (next: string) => void)(e.target.value); mark(); }} className="h-10" /><span className="text-sm text-muted-foreground">Days</span></div></div>)}
             </div>
-            <p className="text-xs text-muted-foreground -mt-2">
-              Alert when a container has been clearing longer than these thresholds. Must be in ascending order.
-            </p>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-medium flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
-                  Warning
-                </Label>
-                <div className="flex items-center gap-1.5">
-                  <Input type="number" min={1} value={days1} onChange={(e) => { setDays1(e.target.value); mark(); }} className="h-8 text-sm" />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">days</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground">Amber badge</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-medium flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />
-                  High Warning
-                </Label>
-                <div className="flex items-center gap-1.5">
-                  <Input type="number" min={1} value={days2} onChange={(e) => { setDays2(e.target.value); mark(); }} className="h-8 text-sm" />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">days</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground">Orange badge</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-medium flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                  Critical
-                </Label>
-                <div className="flex items-center gap-1.5">
-                  <Input type="number" min={1} value={days3} onChange={(e) => { setDays3(e.target.value); mark(); }} className="h-8 text-sm" />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">days</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground">Red badge</p>
-              </div>
-            </div>
-
-            {!isValid && dirty && (
-              <p className="text-xs text-destructive">
-                Thresholds must be valid numbers in ascending order (Warning &lt; High Warning &lt; Critical).
-              </p>
-            )}
+            {!isValid && dirty && <p className="text-xs text-destructive">Thresholds must be valid numbers in ascending order (Warning &lt; High Warning &lt; Critical).</p>}
           </div>
         </CardContent>
       </Card>
 
-      {/* Email Alerts */}
-      <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+      <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+        <CardHeader className="p-6 pb-0">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Mail className="w-4 h-4 text-primary" />
             Email Alerts
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Send an email digest of current aging and critical alerts to the specified recipients.
+            Choose which operational events and job conditions should be automatically emailed to selected recipients.
           </p>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-6 p-6">
           {!emailServiceConfigured && (
             <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10">
               <KeyRound className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
@@ -500,7 +449,7 @@ export default function SettingsPage() {
             <Switch checked={emailEnabled} onCheckedChange={(v) => { setEmailEnabled(v); mark(); }} />
           </div>
 
-          <div className="space-y-1.5 hidden">
+          <div className="hidden">
             <Label className="text-xs font-medium">Alert email recipients</Label>
             <Input
               type="text"
@@ -513,8 +462,7 @@ export default function SettingsPage() {
             <p className="text-[11px] text-muted-foreground">Separate multiple addresses with commas</p>
           </div>
 
-          {/* Auto-send Schedule */}
-          <div className="hidden p-4 rounded-lg border border-border/40 bg-background/30 space-y-4">
+          <div className="hidden">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <CalendarClock className="w-4 h-4 text-primary" />
               Automatic Schedule
@@ -562,32 +510,32 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div>
               <p className="text-sm font-semibold">Alert Categories</p>
-              <p className="text-xs text-muted-foreground mt-1">Choose who receives each report and how often it should be sent. Separate email addresses with commas.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Choose recipients and delivery frequency for each report. Separate email addresses with commas.</p>
             </div>
-            <div className="max-w-xs space-y-1.5">
-              <Label className="text-xs font-medium">Daily / weekly send time (server time)</Label>
-              <Input type="time" value={digestTime} onChange={(event) => { setDigestTime(event.target.value); mark(); }} className="h-9 text-sm" disabled={!emailEnabled} />
+            <div className="max-w-sm space-y-1.5">
+              <Label className="text-sm font-medium">Daily / weekly send time</Label>
+              <Input type="time" value={digestTime} onChange={(event) => { setDigestTime(event.target.value); mark(); }} className="h-10 text-sm" disabled={!emailEnabled} />
             </div>
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-2">
               {EMAIL_ALERT_CATEGORIES.map((category) => {
                 const preference = emailPreferences[category.id];
                 return (
-                  <div key={category.id} className="rounded-lg border border-border/50 bg-background/40 p-3 space-y-3">
+                  <div key={category.id} className={`rounded-xl border p-4 space-y-4 transition-colors ${emailEnabled && preference.enabled ? "border-border/60 bg-background" : "border-border/40 bg-muted/30 opacity-60"}`}>
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium">{category.title}</p>
                         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{category.helper}</p>
                       </div>
                       <Switch checked={preference.enabled} disabled={!emailEnabled} onCheckedChange={(enabled) => { setEmailPreferences((current) => ({ ...current, [category.id]: { ...current[category.id], enabled } })); mark(); }} />
                     </div>
-                    <Input value={preference.recipients} placeholder="recipient@example.com" disabled={!emailEnabled || !preference.enabled} onChange={(event) => { const recipients = event.target.value; setEmailPreferences((current) => ({ ...current, [category.id]: { ...current[category.id], recipients } })); mark(); }} className="h-9 text-sm" />
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Frequency</Label>
+                    <div className="space-y-1.5"><Label className="text-xs font-medium">Recipients</Label><Input value={preference.recipients} placeholder="recipient@example.com" disabled={!emailEnabled || !preference.enabled} onChange={(event) => { const recipients = event.target.value; setEmailPreferences((current) => ({ ...current, [category.id]: { ...current[category.id], recipients } })); mark(); }} className="h-10 text-sm" /></div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Frequency</Label>
                       <Select value={preference.frequency} disabled={!emailEnabled || !preference.enabled} onValueChange={(frequency) => { setEmailPreferences((current) => ({ ...current, [category.id]: { ...current[category.id], frequency: frequency as EmailAlertPreference["frequency"] } })); mark(); }}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent><SelectItem value="none">Manual only</SelectItem><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly (Mondays)</SelectItem></SelectContent>
                       </Select>
                     </div>
@@ -597,9 +545,10 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-start pt-1">
+          {digestLastSentAt && <div className="flex items-center gap-2 text-xs text-muted-foreground"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />Last test email: {formatLastSent(digestLastSentAt)}</div>}
+          <div className="flex items-center justify-start border-t border-border/50 pt-5">
             <Button
-              variant="outline"
+              variant="default"
               onClick={handleSendDigest}
               disabled={sendingEmail || !emailServiceConfigured || !emailEnabled || !EMAIL_ALERT_CATEGORIES.some(({ id }) => emailPreferences[id].enabled && emailPreferences[id].recipients.trim())}
               className="gap-2"
