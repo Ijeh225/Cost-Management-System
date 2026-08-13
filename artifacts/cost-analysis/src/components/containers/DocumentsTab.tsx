@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useGetContainerDocuments, useDeleteContainerDocument, customFetch } from "@workspace/api-client-react";
+import { useGetContainerDocuments, useDeleteContainerDocument, customFetch, getGetContainerDocumentsQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/layout/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,8 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
   const sectionLabels = new Map(sections.map((item) => [item.id, item.label]));
   const deleteMutation = useDeleteContainerDocument();
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["getContainerDocuments", containerId] });
+  const documentsQueryKey = getGetContainerDocumentsQueryKey(containerId);
+  const invalidate = () => qc.invalidateQueries({ queryKey: documentsQueryKey });
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -71,6 +72,8 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
         body: formData,
       });
       if (!resp.ok) throw new Error("Upload failed");
+      const uploadedDocument = await resp.json();
+      qc.setQueryData<any[]>(documentsQueryKey, (current = []) => [...current, uploadedDocument]);
       invalidate();
       toast({ title: "Document uploaded", description: file.name });
     } catch {
