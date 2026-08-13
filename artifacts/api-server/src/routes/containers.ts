@@ -3,6 +3,7 @@ import { db, containersTable, usersTable, clientsTable, shippingChargesTable, cu
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
+import { getFinalWorkflowMissingStages } from "../lib/workflow-readiness.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
 
 const router = Router();
@@ -1115,6 +1116,15 @@ const STAGE_ADVANCE_ALLOWED: Record<string, string[]> = {
   delivery_user: ["delivery"],
 };
 
+function finalWorkflowReadinessError(container: Parameters<typeof getFinalWorkflowMissingStages>[0]) {
+  const missingStages = getFinalWorkflowMissingStages(container);
+  if (missingStages.length === 0) return null;
+  return {
+    error: `Cannot continue to Terminal Manager work. Complete: ${missingStages.join(", ")}.`,
+    missingStages,
+  };
+}
+
 router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id));
@@ -1138,6 +1148,8 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
       if (!canStartGateIn) {
         return res.status(403).json({ error: "Only terminal managers, security users, or administrators can move a pull-out released job to Gate-In." });
       }
+      const readinessError = finalWorkflowReadinessError(existing);
+      if (readinessError) return res.status(409).json(readinessError);
 
       const [updated] = await db.update(containersTable)
         .set({ status: "gate_in", updatedAt: new Date(), stageEnteredAt: new Date(), nextAction: null, nextActionDueDate: null })
@@ -1178,6 +1190,11 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
 
     if (!nextStatus) {
       return res.status(400).json({ error: "Container is already at the final stage" });
+    }
+
+    if (["gate_in", "examination", "final_release", "delivery", "closed"].includes(nextStatus)) {
+      const readinessError = finalWorkflowReadinessError(existing);
+      if (readinessError) return res.status(409).json(readinessError);
     }
 
     if (!isAdmin) {
@@ -2475,11 +2492,15 @@ router.post("/containers/:id/sections/:section/approve", requireBranchAdminOrAbo
     if (approval.status !== "submitted") {
       return res.status(400).json({ error: "Section must be submitted before approval" });
     }
+    const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    if (section === "container_review" && container && container.status !== "closed") {
+      const readinessError = finalWorkflowReadinessError(container);
+      if (readinessError) return res.status(409).json(readinessError);
+    }
     const [updated] = await db.update(sectionApprovalsTable)
       .set({ status: "approved", reviewedById: user.id, reviewedAt: new Date(), updatedAt: new Date() })
       .where(eq(sectionApprovalsTable.id, approval.id))
       .returning();
-    const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
     if (section === "container_review") {
       // Full container review approval — advance status to closed
       if (container && container.status !== "closed") {
