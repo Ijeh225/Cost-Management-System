@@ -5,16 +5,9 @@ import { randomUUID } from "crypto";
 import { db, containerDocumentsTable, containersTable, usersTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, asc, inArray, and } from "drizzle-orm";
 import { requireAuth, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
-import { objectStorageClient } from "../lib/objectStorage.js";
+import { getDocumentStorageBucket } from "../lib/document-storage.js";
 
 export const documentsRouter = Router();
-
-const BUCKET_ID = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
-
-function getBucket() {
-  if (!BUCKET_ID) throw new Error("DEFAULT_OBJECT_STORAGE_BUCKET_ID is not set");
-  return objectStorageClient.bucket(BUCKET_ID);
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -72,7 +65,7 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
     const container = await getAccessibleContainer(req, containerId);
     if (!container) return res.status(404).json({ error: "Container not found" });
 
-    const gcsFile = getBucket().file(objectKey);
+    const gcsFile = getDocumentStorageBucket().file(objectKey);
     await gcsFile.save(req.file.buffer, {
       metadata: { contentType: req.file.mimetype },
       resumable: false,
@@ -109,8 +102,10 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
     return res.status(201).json({ ...doc, createdAt: doc.createdAt.toISOString() });
   } catch (err) {
     console.error("[documents] upload error:", err);
-    try { await getBucket().file(objectKey).delete({ ignoreNotFound: true }); } catch {}
-    return res.status(500).json({ error: "Server error" });
+    try { await getDocumentStorageBucket().file(objectKey).delete({ ignoreNotFound: true }); } catch {}
+    const message = err instanceof Error ? err.message : "";
+    return res.status(message.includes("Document storage is not configured") ? 503 : 500)
+      .json({ error: message.includes("Document storage is not configured") ? message : "Document upload failed" });
   }
 });
 
@@ -127,7 +122,7 @@ documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, r
     }).from(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
     if (!doc || !userCanAccessBranch(req, doc.branchId)) return res.status(404).json({ error: "Document not found" });
 
-    const gcsFile = getBucket().file(doc.filename);
+    const gcsFile = getDocumentStorageBucket().file(doc.filename);
     const [exists] = await gcsFile.exists();
     if (!exists) return res.status(404).json({ error: "File not found in storage" });
 
@@ -148,7 +143,9 @@ documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, r
     return;
   } catch (err) {
     console.error("[documents] serve error:", err);
-    return res.status(500).json({ error: "Server error" });
+    const message = err instanceof Error ? err.message : "";
+    return res.status(message.includes("Document storage is not configured") ? 503 : 500)
+      .json({ error: message.includes("Document storage is not configured") ? message : "Document retrieval failed" });
   }
 });
 
@@ -161,17 +158,19 @@ documentsRouter.delete("/containers/:id/documents/:docId", requireAuth, async (r
     const [doc] = await db.select().from(containerDocumentsTable)
       .where(and(eq(containerDocumentsTable.id, docId), eq(containerDocumentsTable.containerId, containerId)));
     if (!doc || doc.branchId !== container.branchId) return res.status(404).json({ error: "Document not found" });
-    {
-      try {
-        await getBucket().file(doc.filename).delete({ ignoreNotFound: true });
-      } catch (storageErr) {
-        console.warn("[documents] GCS delete warning:", storageErr);
-      }
-      await db.delete(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
+    const storageBucket = getDocumentStorageBucket();
+    try {
+      await storageBucket.file(doc.filename).delete({ ignoreNotFound: true });
+    } catch (storageErr) {
+      console.error("[documents] storage delete failed:", storageErr);
+      return res.status(502).json({ error: "Document storage is temporarily unavailable. The document was not deleted." });
     }
+    await db.delete(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
     return res.json({ success: true });
   } catch (err) {
     console.error("[documents] delete error:", err);
-    return res.status(500).json({ error: "Server error" });
+    const message = err instanceof Error ? err.message : "";
+    return res.status(message.includes("Document storage is not configured") ? 503 : 500)
+      .json({ error: message.includes("Document storage is not configured") ? message : "Document deletion failed" });
   }
 });

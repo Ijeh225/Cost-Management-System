@@ -16,6 +16,7 @@ import {
 } from "../lib/auth.js";
 
 const router = Router();
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -45,8 +46,9 @@ const loginIpLimiter = rateLimit({
 
 router.post("/auth/login", loginIpLimiter, loginLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!email || !password || email.length > 254 || password.length > 256) {
       return res.status(400).json({ error: "Email and password are required" });
     }
     const users = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
@@ -162,8 +164,10 @@ router.post("/auth/setup", async (req, res) => {
     if (Number(count) > 0) {
       return res.status(403).json({ error: "Setup already completed. Please log in." });
     }
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!name || !email || !password || name.length > 120 || email.length > 254 || !EMAIL_PATTERN.test(email)) {
       return res.status(400).json({ error: "Name, email, and password are required" });
     }
     if (!isStrongPassword(password)) {

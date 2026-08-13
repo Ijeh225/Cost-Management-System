@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { db, settingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest } from "../lib/auth.js";
+import { db, settingsTable, usersTable } from "@workspace/db";
+import { eq, inArray, and } from "drizzle-orm";
+import { requireAdmin, requireSuperAdmin, AuthRequest } from "../lib/auth.js";
+import { validateSettingsPayload } from "../lib/settings-validation.js";
 
 export const settingsRouter = Router();
 
@@ -30,16 +31,20 @@ settingsRouter.get("/settings", requireAdmin, async (_req, res) => {
 
 settingsRouter.patch("/settings", requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
-    const updates = req.body as Record<string, string>;
-    for (const [key, value] of Object.entries(updates)) {
-      if (typeof value !== "string") continue;
-      const existing = await db.select().from(settingsTable).where(eq(settingsTable.key, key));
-      if (existing.length > 0) {
-        await db.update(settingsTable).set({ value, updatedAt: new Date() }).where(eq(settingsTable.key, key));
-      } else {
-        await db.insert(settingsTable).values({ key, value });
-      }
+    const validated = validateSettingsPayload(req.body);
+    if (validated.error) return res.status(400).json({ error: validated.error });
+    if (validated.officerIds.length) {
+      const activeUsers = await db.select({ id: usersTable.id }).from(usersTable)
+        .where(and(inArray(usersTable.id, validated.officerIds), eq(usersTable.isActive, true)));
+      if (activeUsers.length !== validated.officerIds.length) return res.status(400).json({ error: "Officer selections must refer to active users." });
     }
+    const now = new Date();
+    await db.transaction(async (tx) => {
+      for (const [key, value] of Object.entries(validated.values)) {
+        await tx.insert(settingsTable).values({ key, value, updatedAt: now })
+          .onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: now } });
+      }
+    });
     const rows = await db.select().from(settingsTable);
     const map: Record<string, string> = { ...BUILT_IN_SECTION_DEFAULTS };
     for (const row of rows) {

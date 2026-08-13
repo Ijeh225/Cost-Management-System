@@ -2,6 +2,7 @@ import app from "./app";
 import { db, pool, containersTable, appMigrationsTable, usersTable } from "@workspace/db";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { runScheduledDigest } from "./routes/notifications";
+import { getDocumentStorageConfigurationError } from "./lib/document-storage";
 
 async function ensureMigrationsTable() {
   await pool.query(`
@@ -30,6 +31,12 @@ async function runMigration(name: string, fn: () => Promise<void>) {
 
 async function runStartupMigrations() {
   try {
+    const documentStorageConfigurationError = getDocumentStorageConfigurationError();
+    if (documentStorageConfigurationError) {
+      console.warn(
+        `[documents] ${documentStorageConfigurationError} Upload, download, and delete actions will return 503 until it is configured.`,
+      );
+    }
     await ensureMigrationsTable();
     // Legacy migration kept for environments that ran it before consolidation.
     // The 'consolidate_to_shipping_terminal_payment' migration that follows

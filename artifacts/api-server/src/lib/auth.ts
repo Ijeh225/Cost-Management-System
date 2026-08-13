@@ -6,6 +6,12 @@ import { db, usersTable, branchesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_ISSUER = "cost-management-system";
+const JWT_AUDIENCE = "cost-management-web";
+const BCRYPT_ROUNDS = Math.max(
+  process.env.NODE_ENV === "production" ? 12 : 10,
+  Math.min(15, Number.parseInt(process.env.BCRYPT_ROUNDS ?? "", 10) || 10),
+);
 
 if (!JWT_SECRET) {
   if (process.env.NODE_ENV === "production") {
@@ -25,16 +31,17 @@ const COOKIE_NAME = "cost_analysis_session";
 
 export function isStrongPassword(password: unknown): password is string {
   return typeof password === "string"
-    && password.length >= 8
+    && password.length >= 10
+    && Buffer.byteLength(password, "utf8") <= 72
     && /[a-z]/.test(password)
     && /[A-Z]/.test(password)
     && /\d/.test(password);
 }
 
-export const STRONG_PASSWORD_MESSAGE = "Password must be at least 8 characters and include uppercase, lowercase, and a number";
+export const STRONG_PASSWORD_MESSAGE = "Password must be 10-72 characters and include uppercase, lowercase, and a number";
 
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
@@ -46,7 +53,12 @@ export function generateSessionToken(): string {
 }
 
 export function signToken(userId: number, sessionToken: string): string {
-  return jwt.sign({ userId, sessionToken }, SECRET, { expiresIn: "7d" });
+  return jwt.sign({ userId, sessionToken }, SECRET, {
+    algorithm: "HS256",
+    audience: JWT_AUDIENCE,
+    issuer: JWT_ISSUER,
+    expiresIn: "7d",
+  });
 }
 
 export function setAuthCookie(res: Response, token: string) {
@@ -60,7 +72,12 @@ export function setAuthCookie(res: Response, token: string) {
 }
 
 export function clearAuthCookie(res: Response) {
-  res.clearCookie(COOKIE_NAME, { path: "/" });
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
 }
 
 export function parseRoles(role: string, rolesJson: string | null | undefined): string[] {
@@ -94,7 +111,11 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
-    const decoded = jwt.verify(token, SECRET) as { userId: number; sessionToken: string };
+    const decoded = jwt.verify(token, SECRET, {
+      algorithms: ["HS256"],
+      audience: JWT_AUDIENCE,
+      issuer: JWT_ISSUER,
+    }) as { userId: number; sessionToken: string };
     const users = await db.select().from(usersTable).where(eq(usersTable.id, decoded.userId)).limit(1);
     const user = users[0];
     if (!user || !user.isActive) {
