@@ -24,6 +24,7 @@ import { overheadExpensesRouter } from "./overhead-expenses.js";
 import { containerExpensesRouter } from "./container-expenses.js";
 import { branchesRouter } from "./branches.js";
 import { paymentSchedulesRouter } from "./payment-schedules.js";
+import { aiAssistantRouter } from "./ai-assistant.js";
 
 const router: IRouter = Router();
 
@@ -52,5 +53,6 @@ router.use(overheadExpensesRouter);
 router.use(containerExpensesRouter);
 router.use(branchesRouter);
 router.use(paymentSchedulesRouter);
+router.use(aiAssistantRouter);
 
 export default router;

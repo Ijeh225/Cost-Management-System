@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Box, UploadCloud, Users, ShieldAlert, ClipboardCheck,
   ListTodo, BarChart2, FileDown, Building2, Bell, Settings, FileText, Activity, BookOpen, FileCheck2,
   Truck, Kanban, Banknote, Anchor, Ship, PackageOpen, ChevronDown, ShieldCheck,
-  Sun, Moon, Landmark, TrendingDown, CreditCard, CalendarClock,
+  Sun, Moon, Landmark, TrendingDown, CreditCard, CalendarClock, Bot,
 } from "lucide-react";
 
 type NavItem = {
@@ -100,6 +100,7 @@ export function AppSidebar() {
     { title: "Overhead Expenses", url: "/overhead-expenses",     icon: TrendingDown    },
     { title: "Upload Data",      url: "/containers/upload",      icon: UploadCloud     },
     { title: "User Management",  url: "/users",                  icon: Users           },
+    ...(isAdmin ? [{ title: "AI Assistant", url: "/ai-assistant", icon: Bot }] : []),
     ...(isSuperAdmin ? [{ title: "Branches", url: "/settings/branches", icon: Building2 }] : []),
     ...(isSuperAdmin ? [{ title: "Settings", url: "/settings", icon: Settings, match: "exact" as const }] : []),
     ...(isBranchAdmin ? [{ title: "Branch Settings", url: "/branch-settings", icon: Settings }] : []),

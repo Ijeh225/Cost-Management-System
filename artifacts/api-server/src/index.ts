@@ -717,6 +717,39 @@ async function runStartupMigrations() {
       await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedules_overhead_expense_id_idx ON payment_schedules(overhead_expense_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS expense_payments_payment_schedule_id_idx ON expense_payments(payment_schedule_id)`);
     });
+    await runMigration("ai_assistant_foundation_v1", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ai_assistant_sessions (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+          title TEXT NOT NULL DEFAULT 'New assistant session',
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ai_assistant_audit_logs (
+          id SERIAL PRIMARY KEY,
+          session_id INTEGER REFERENCES ai_assistant_sessions(id) ON DELETE SET NULL,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+          event_type TEXT NOT NULL,
+          request_summary TEXT,
+          response_summary TEXT,
+          tool_name TEXT,
+          record_references TEXT NOT NULL DEFAULT '[]',
+          metadata TEXT NOT NULL DEFAULT '{}',
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_sessions_user_idx ON ai_assistant_sessions(user_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_sessions_branch_idx ON ai_assistant_sessions(branch_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_audit_user_idx ON ai_assistant_audit_logs(user_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_audit_branch_idx ON ai_assistant_audit_logs(branch_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_audit_session_idx ON ai_assistant_audit_logs(session_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_audit_created_at_idx ON ai_assistant_audit_logs(created_at)`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

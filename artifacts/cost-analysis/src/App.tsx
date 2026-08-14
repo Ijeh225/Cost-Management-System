@@ -65,6 +65,7 @@ import BranchComparisonPrint from "@/pages/reports/branch-comparison/print";
 import CreditNotePrintPage from "@/pages/credit-notes/print/[id]";
 import BranchesPage from "@/pages/branches/index";
 import BranchSettingsPage from "@/pages/branch-settings/index";
+import AiAssistantPage from "@/pages/ai-assistant/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -376,6 +377,9 @@ function Router() {
               <Route path="/invoices/:id" component={InvoiceDetailPage} />
               <Route path="/settings">
                 <AdminGuard><SettingsPage /></AdminGuard>
+              </Route>
+              <Route path="/ai-assistant">
+                <AdminGuard><AiAssistantPage /></AdminGuard>
               </Route>
               <Route path="/settings/branches">
                 <SuperAdminGuard><BranchesPage /></SuperAdminGuard>

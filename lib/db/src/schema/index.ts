@@ -30,3 +30,4 @@ export * from "./container-expense-payments";
 export * from "./container-stage-notes";
 export * from "./intelligence-alert-log";
 export * from "./payment-schedules";
+export * from "./ai-assistant";
