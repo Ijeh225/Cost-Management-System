@@ -1,6 +1,7 @@
 import { NextFunction, Response, Router } from "express";
 import {
   aiAssistantAuditLogsTable,
+  aiAssistantSessionsTable,
   branchesTable,
   containersTable,
   db,
@@ -105,6 +106,46 @@ const TOOL_CATALOG = [
 type ToolId = typeof TOOL_CATALOG[number]["id"];
 const TOOL_IDS = new Set<string>(TOOL_CATALOG.map((tool) => tool.id));
 
+type CopilotIntent = { toolId: ToolId; args: Record<string, unknown>; label: string } | { toolId: null; args: Record<string, never>; label: string };
+type CopilotAnswer = {
+  sessionId: number;
+  question: string;
+  answer: string;
+  facts: AssistantFact[];
+  calculations: string[];
+  assumptions: string[];
+  citations: AssistantSource[];
+  records: AssistantRecord[];
+  status: "answered" | "unsupported" | "no_data";
+};
+
+const SUGGESTED_QUESTIONS = [
+  "How many containers are currently in the terminal?",
+  "Show me all overdue containers.",
+  "Which jobs are delayed at the Transire, Shipping, Terminal, or Pullout stage?",
+  "Show outstanding invoices and overdue balances.",
+  "Show approved payment schedules awaiting payment.",
+  "Show overhead expenses that are still outstanding.",
+  "Compare branch performance.",
+];
+
+function interpretQuestion(question: string): CopilotIntent {
+  const normalised = question.trim().toLowerCase();
+  const containerMatch = question.toUpperCase().match(/\b[A-Z]{4}\d{7}\b/);
+  if (containerMatch && /(why|status|delay|container|job|where|investigate|check)/.test(normalised)) {
+    return { toolId: "container_lookup", args: { containerNumber: containerMatch[0] }, label: "container investigation" };
+  }
+  if (/(overdue|late).*(container|vessel|berthing)|(container|vessel|berthing).*(overdue|late)/.test(normalised)) return { toolId: "overdue_containers", args: {}, label: "overdue containers" };
+  if (/(documentation|paar).*(delay|missing|pending|check)|(delay|missing|pending).*(documentation|paar)/.test(normalised)) return { toolId: "documentation_checks", args: {}, label: "documentation checks" };
+  if (/(delay|delayed|late|stalled).*(job|transire|shipping|do|terminal|tdo|pullout)|(job|transire|shipping|do|terminal|tdo|pullout).*(delay|delayed|late|stalled)/.test(normalised)) return { toolId: "delayed_jobs", args: {}, label: "delayed jobs" };
+  if (/(outstanding|overdue|receivable|invoice|collected).*(invoice|balance|payment|receivable)|(invoice|balance|payment|receivable).*(outstanding|overdue|receivable|collected)/.test(normalised)) return { toolId: "receivables_overview", args: {}, label: "receivables overview" };
+  if (/(approved|pending).*(schedule|payment)|(schedule|payment).*(approved|awaiting)/.test(normalised)) return { toolId: "approved_payment_schedules", args: {}, label: "approved payment schedules" };
+  if (/(overhead|expense).*(outstanding|paid|payment|balance)|(outstanding|paid|payment|balance).*(overhead|expense)/.test(normalised)) return { toolId: "overhead_overview", args: {}, label: "overhead overview" };
+  if (/(branch|branches).*(compare|performance)|(compare|performance).*(branch|branches)/.test(normalised)) return { toolId: "branch_performance", args: {}, label: "branch performance" };
+  if (/(terminal|operations|container).*(count|summary|currently|how many)|(count|summary|currently|how many).*(terminal|operations|container)/.test(normalised)) return { toolId: "operations_overview", args: {}, label: "operations overview" };
+  return { toolId: null, args: {}, label: "unsupported question" };
+}
+
 function toAmount(value: string | number | null | undefined): number {
   const amount = Number(value ?? 0);
   return Number.isFinite(amount) ? amount : 0;
@@ -186,6 +227,62 @@ export async function recordAiAssistantAuditEvent(input: {
     recordReferences: serialiseAuditValue(input.recordReferences ?? []),
     metadata: serialiseAuditValue(input.metadata ?? {}),
   });
+}
+
+async function getOrCreateSession(req: AuthRequest, sessionId: unknown, question: string) {
+  const requestedId = Number(sessionId);
+  if (Number.isInteger(requestedId) && requestedId > 0) {
+    const [existing] = await db.select().from(aiAssistantSessionsTable)
+      .where(and(eq(aiAssistantSessionsTable.id, requestedId), eq(aiAssistantSessionsTable.userId, req.user!.id)))
+      .limit(1);
+    if (!existing) throw new Error("AI assistant session was not found.");
+    return existing;
+  }
+
+  const title = question.trim().replace(/\s+/g, " ").slice(0, 100) || "New assistant session";
+  const [created] = await db.insert(aiAssistantSessionsTable).values({
+    userId: req.user!.id,
+    branchId: getBranchScope(req),
+    title,
+  }).returning();
+  return created;
+}
+
+function makeCopilotAnswer(sessionId: number, question: string, intent: CopilotIntent, result?: AssistantToolResult): CopilotAnswer {
+  if (!intent.toolId || !result) {
+    return {
+      sessionId,
+      question,
+      status: "unsupported",
+      answer: "I can currently help with approved container status, overdue and delayed jobs, PAAR checks, receivables, approved payment schedules, overhead balances, and branch performance. Try one of the suggested questions.",
+      facts: [],
+      calculations: [],
+      assumptions: ["I do not guess, run arbitrary database searches, or take actions outside the approved read-only tools."],
+      citations: [],
+      records: [],
+    };
+  }
+
+  const noData = result.facts.every((fact) => fact.value === 0 || fact.value === "₦0.00") && result.records.length === 0;
+  const calculations = result.facts.filter((fact) => /invoiced|collected|outstanding|balance|overhead|payments/i.test(fact.label))
+    .map((fact) => `${fact.label}: ${fact.value}`);
+  return {
+    sessionId,
+    question,
+    status: noData ? "no_data" : "answered",
+    answer: noData
+      ? `I checked the current authorised data for ${intent.label} and found no matching records.`
+      : `I checked the current authorised data for ${intent.label}. The facts and linked source records are below.`,
+    facts: result.facts,
+    calculations,
+    assumptions: [
+      "Figures and statuses are live at the time shown and use your current branch scope.",
+      "Amounts marked as paid are actual recorded payments; approved-but-unpaid schedules remain separate.",
+      "Use the cited source record to confirm or act through the normal workflow.",
+    ],
+    citations: result.sources,
+    records: result.records,
+  };
 }
 
 async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<string, unknown>): Promise<AssistantToolResult> {
@@ -436,9 +533,10 @@ aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit,
       .limit(1);
     const governance = parseGovernance(setting?.value);
     return res.json({
-      phase: "approved_data_tools",
+      phase: "read_only_copilot",
       available: true,
       modelConnected: false,
+      copilotMode: "guided_read_only",
       governance,
       approvedToolCount: TOOL_CATALOG.filter((tool) => governance.dataDomains.includes(tool.domain)).length,
       safeguards: [
@@ -467,6 +565,55 @@ aiAssistantRouter.get("/ai-assistant/tools", requireAdmin, foundationRateLimit, 
   } catch (error) {
     console.error("[ai-assistant] Failed to load approved tool catalogue", error);
     return res.status(500).json({ error: "Unable to load approved AI data tools" });
+  }
+});
+
+aiAssistantRouter.get("/ai-assistant/suggestions", requireAdmin, foundationRateLimit, (_req: AuthRequest, res) => {
+  return res.json(SUGGESTED_QUESTIONS);
+});
+
+aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
+  const question = typeof body.question === "string" ? body.question.trim() : "";
+  if (!question || question.length > 1_000) return res.status(400).json({ error: "Ask a question between 1 and 1,000 characters." });
+
+  let activeSessionId: number | null = null;
+  try {
+    const session = await getOrCreateSession(req, body.sessionId, question);
+    activeSessionId = session.id;
+    const intent = interpretQuestion(question);
+    const result = intent.toolId ? await runApprovedTool(intent.toolId, req, intent.args) : undefined;
+    const answer = makeCopilotAnswer(session.id, question, intent, result);
+    await db.update(aiAssistantSessionsTable).set({ updatedAt: new Date() }).where(eq(aiAssistantSessionsTable.id, session.id));
+    await recordAiAssistantAuditEvent({
+      userId: req.user!.id,
+      branchId: getBranchScope(req),
+      sessionId: session.id,
+      eventType: "copilot_question_answered",
+      requestSummary: question,
+      responseSummary: answer.answer,
+      toolName: intent.toolId ?? "none",
+      recordReferences: answer.citations,
+      metadata: { intent: intent.label, status: answer.status, factCount: answer.facts.length, citationCount: answer.citations.length },
+    });
+    return res.json(answer);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to answer the assistant question";
+    console.error("[ai-assistant] Copilot question failed", error);
+    try {
+      await recordAiAssistantAuditEvent({
+        userId: req.user!.id,
+        branchId: getBranchScope(req),
+        sessionId: activeSessionId,
+        eventType: "copilot_question_failed",
+        requestSummary: question,
+        responseSummary: message,
+        metadata: { sessionId: activeSessionId },
+      });
+    } catch (auditError) {
+      console.error("[ai-assistant] Failed to audit copilot error", auditError);
+    }
+    return res.status(message.includes("disabled by AI Assistant governance") ? 403 : 400).json({ error: message });
   }
 });
 
