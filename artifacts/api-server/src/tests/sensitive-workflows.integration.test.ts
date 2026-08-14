@@ -1,0 +1,191 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import request from "supertest";
+import bcrypt from "bcryptjs";
+import app from "../app";
+import {
+  db,
+  branchesTable,
+  containersTable,
+  expensePaymentsTable,
+  overheadExpensesTable,
+  paymentSchedulesTable,
+  usersTable,
+  workflowNotificationsTable,
+} from "@workspace/db";
+import { and, eq, inArray } from "drizzle-orm";
+
+type Session = { agent: ReturnType<typeof request.agent>; csrf: string };
+
+const suffix = `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
+const password = "IntegrationPass123!";
+let branchAId = 0;
+let branchBId = 0;
+let adminId = 0;
+let officerId = 0;
+let otherBranchUserId = 0;
+let admin: Session;
+let officer: Session;
+let otherBranchUser: Session;
+let protectedContainerId = 0;
+let paymentExpenseId = 0;
+let paymentScheduleId = 0;
+
+async function login(email: string): Promise<Session> {
+  const agent = request.agent(app);
+  const result = await agent.post("/api/auth/login").send({ email, password });
+  if (result.status !== 200) throw new Error(`Test login failed: ${result.status} ${JSON.stringify(result.body)}`);
+  const csrf = await agent.get("/api/auth/csrf");
+  if (csrf.status !== 200 || typeof csrf.body.token !== "string") throw new Error("Unable to obtain CSRF token for test session");
+  return { agent, csrf: csrf.body.token };
+}
+
+beforeAll(async () => {
+  const passwordHash = await bcrypt.hash(password, 10);
+  const [branchA, branchB] = await db.insert(branchesTable).values([
+    { name: `Integration A ${suffix}`, shortCode: "ITA" },
+    { name: `Integration B ${suffix}`, shortCode: "ITB" },
+  ]).returning({ id: branchesTable.id });
+  branchAId = branchA.id;
+  branchBId = branchB.id;
+
+  const [adminUser, officerUser, otherUser] = await db.insert(usersTable).values([
+    { name: "Integration Admin", email: `integration-admin-${suffix}@example.test`, passwordHash, role: "admin", branchId: branchAId },
+    { name: "Integration Officer", email: `integration-officer-${suffix}@example.test`, passwordHash, role: "staff", branchId: branchAId },
+    { name: "Integration Other Branch", email: `integration-other-${suffix}@example.test`, passwordHash, role: "staff", branchId: branchBId },
+  ]).returning({ id: usersTable.id });
+  adminId = adminUser.id;
+  officerId = officerUser.id;
+  otherBranchUserId = otherUser.id;
+
+  admin = await login(`integration-admin-${suffix}@example.test`);
+  officer = await login(`integration-officer-${suffix}@example.test`);
+  otherBranchUser = await login(`integration-other-${suffix}@example.test`);
+
+  const [container] = await db.insert(containersTable).values({
+    branchId: branchAId,
+    customerName: "Integration Test Customer",
+    containerNumber: `INT-${suffix}`,
+    blNumber: `BL-INT-${suffix}`,
+    status: "pending_verification",
+    verificationOfficerId: officerId,
+    verificationOfficerIds: JSON.stringify([officerId]),
+    berthingOfficerId: officerId,
+    berthingOfficerIds: JSON.stringify([officerId]),
+  }).returning({ id: containersTable.id });
+  protectedContainerId = container.id;
+
+  const [expense] = await db.insert(overheadExpensesTable).values({
+    branchId: branchAId,
+    category: "Other",
+    description: `Integration payment ${suffix}`,
+    amount: "100000",
+    recordedBy: adminId,
+  }).returning({ id: overheadExpensesTable.id });
+  paymentExpenseId = expense.id;
+  const [schedule] = await db.insert(paymentSchedulesTable).values({
+    branchId: branchAId,
+    scheduleDate: new Date(),
+    requestedById: adminId,
+    overheadExpenseId: paymentExpenseId,
+    vendorBeneficiary: "Integration vendor",
+    description: `Integration schedule ${suffix}`,
+    amountRequested: "100000",
+    amountApproved: "40000",
+    amountPaid: "0",
+    status: "partially_approved",
+  }).returning({ id: paymentSchedulesTable.id });
+  paymentScheduleId = schedule.id;
+});
+
+afterAll(async () => {
+  if (paymentExpenseId) await db.delete(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, paymentExpenseId));
+  if (paymentScheduleId) await db.delete(paymentSchedulesTable).where(eq(paymentSchedulesTable.id, paymentScheduleId));
+  if (paymentExpenseId) await db.delete(overheadExpensesTable).where(eq(overheadExpensesTable.id, paymentExpenseId));
+  if (protectedContainerId) await db.delete(containersTable).where(eq(containersTable.id, protectedContainerId));
+  if (adminId || officerId || otherBranchUserId) {
+    await db.delete(workflowNotificationsTable).where(inArray(workflowNotificationsTable.targetUserId, [adminId, officerId, otherBranchUserId].filter(Boolean)));
+    await db.delete(usersTable).where(inArray(usersTable.id, [adminId, officerId, otherBranchUserId].filter(Boolean)));
+  }
+  if (branchAId || branchBId) await db.delete(branchesTable).where(inArray(branchesTable.id, [branchAId, branchBId].filter(Boolean)));
+});
+
+describe("sensitive workflow integration", () => {
+  it("blocks cross-branch task reads and writes", async () => {
+    const read = await otherBranchUser.agent.get(`/api/containers/${protectedContainerId}/tasks`);
+    expect(read.status).toBe(404);
+
+    const write = await otherBranchUser.agent
+      .post(`/api/containers/${protectedContainerId}/tasks`)
+      .set("X-CSRF-Token", otherBranchUser.csrf)
+      .send({ title: "Unauthorized cross-branch task" });
+    expect(write.status).toBe(404);
+  });
+
+  it("allows only assigned verification and berthing officers to act", async () => {
+    const denied = await admin.agent
+      .post(`/api/containers/${protectedContainerId}/verify`)
+      .set("X-CSRF-Token", admin.csrf);
+    expect(denied.status).toBe(403);
+
+    const verified = await officer.agent
+      .post(`/api/containers/${protectedContainerId}/verify`)
+      .set("X-CSRF-Token", officer.csrf);
+    expect(verified.status).toBe(200);
+    expect(verified.body.verifiedBy).toBe(officerId);
+
+    const deniedBerthing = await admin.agent
+      .post(`/api/containers/${protectedContainerId}/confirm-berthing`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ sendWhatsApp: false });
+    expect(deniedBerthing.status).toBe(403);
+
+    const confirmedBerthing = await officer.agent
+      .post(`/api/containers/${protectedContainerId}/confirm-berthing`)
+      .set("X-CSRF-Token", officer.csrf)
+      .send({ sendWhatsApp: false });
+    expect(confirmedBerthing.status).toBe(200);
+    expect(confirmedBerthing.body.container.berthingConfirmedById).toBe(officerId);
+  });
+
+  it("stores targeted notifications when a task is assigned", async () => {
+    const created = await admin.agent
+      .post(`/api/containers/${protectedContainerId}/tasks`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ title: "Integration notification task", assignedStaffId: officerId });
+    expect(created.status).toBe(201);
+
+    const [notification] = await db.select().from(workflowNotificationsTable).where(and(
+      eq(workflowNotificationsTable.targetUserId, officerId),
+      eq(workflowNotificationsTable.containerId, protectedContainerId),
+      eq(workflowNotificationsTable.type, "task_assigned"),
+    ));
+    expect(notification).toBeDefined();
+    expect(notification.message).toContain("Integration notification task");
+  });
+
+  it("records an approved overhead schedule payment atomically and rejects an overpayment", async () => {
+    const paid = await admin.agent
+      .patch(`/api/payment-schedules/${paymentScheduleId}/pay`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ amount: 40000, paymentMethod: "cash", notes: "integration payment" });
+    expect(paid.status).toBe(200);
+    expect(paid.body.amountPaid).toBe(40000);
+    expect(paid.body.status).toBe("paid");
+
+    const payments = await db.select().from(expensePaymentsTable).where(and(
+      eq(expensePaymentsTable.expenseId, paymentExpenseId),
+      eq(expensePaymentsTable.paymentScheduleId, paymentScheduleId),
+    ));
+    expect(payments).toHaveLength(1);
+    expect(Number(payments[0].amount)).toBe(40000);
+
+    const overpayment = await admin.agent
+      .patch(`/api/payment-schedules/${paymentScheduleId}/pay`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ amount: 1, paymentMethod: "cash" });
+    expect(overpayment.status).toBe(400);
+
+    const paymentsAfter = await db.select().from(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, paymentExpenseId));
+    expect(paymentsAfter).toHaveLength(1);
+  });
+});

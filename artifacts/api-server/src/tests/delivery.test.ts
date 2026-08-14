@@ -5,6 +5,7 @@ import { db, containersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 let ADMIN_COOKIE = "";
+let ADMIN_CSRF = "";
 
 beforeAll(async () => {
   const res = await request(app)
@@ -17,6 +18,8 @@ beforeAll(async () => {
   }
   const raw = res.headers["set-cookie"];
   ADMIN_COOKIE = Array.isArray(raw) ? raw[0] : raw;
+  const csrf = await request(app).get("/api/auth/csrf").set("Cookie", ADMIN_COOKIE);
+  ADMIN_CSRF = csrf.body.token;
 });
 
 describe("GET /api/analytics/deliveries", () => {
@@ -134,6 +137,7 @@ describe("PATCH /api/containers/:id — delivered date", () => {
     const res = await request(app)
       .patch(`/api/containers/${testContainerId}`)
       .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
       .set("Content-Type", "application/json")
       .send({ deliveredAt: "2026-01-15" });
     expect(res.status).toBe(200);
@@ -145,6 +149,7 @@ describe("PATCH /api/containers/:id — delivered date", () => {
     const res = await request(app)
       .patch(`/api/containers/${testContainerId}`)
       .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
       .set("Content-Type", "application/json")
       .send({ deliveredAt: "2026-02-20" });
     expect(res.status).toBe(200);
@@ -155,6 +160,7 @@ describe("PATCH /api/containers/:id — delivered date", () => {
     const res = await request(app)
       .patch(`/api/containers/${testContainerId}`)
       .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
       .set("Content-Type", "application/json")
       .send({ deliveredAt: null });
     expect(res.status).toBe(200);
@@ -165,6 +171,7 @@ describe("PATCH /api/containers/:id — delivered date", () => {
     const res = await request(app)
       .patch("/api/containers/999999999")
       .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
       .set("Content-Type", "application/json")
       .send({ deliveredAt: "2026-01-01" });
     expect(res.status).toBe(404);
@@ -174,6 +181,7 @@ describe("PATCH /api/containers/:id — delivered date", () => {
     const res = await request(app)
       .patch(`/api/containers/${testContainerId}`)
       .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
       .set("Content-Type", "application/json")
       .send({ deliveredAt: "not-a-date" });
     expect(res.status).toBe(400);
@@ -228,6 +236,7 @@ describe("API contract: backfill — deliveredAtEstimated flag", () => {
     const patch = await request(app)
       .patch(`/api/containers/${seedId}`)
       .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
       .set("Content-Type", "application/json")
       .send({ deliveredAt: "2025-07-15" });
     expect(patch.status).toBe(200);

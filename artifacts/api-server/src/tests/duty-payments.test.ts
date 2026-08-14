@@ -5,6 +5,7 @@ import { db, containersTable, customsChargesTable, auditLogTable } from "@worksp
 import { eq, and } from "drizzle-orm";
 
 let ADMIN_COOKIE = "";
+let ADMIN_CSRF = "";
 
 beforeAll(async () => {
   const res = await request(app)
@@ -15,6 +16,8 @@ beforeAll(async () => {
   }
   const raw = res.headers["set-cookie"];
   ADMIN_COOKIE = Array.isArray(raw) ? raw[0] : raw;
+  const csrf = await request(app).get("/api/auth/csrf").set("Cookie", ADMIN_COOKIE);
+  ADMIN_CSRF = csrf.body.token;
 });
 
 async function seedContainerWithDuty(opts: {
@@ -113,6 +116,7 @@ describe("PATCH /api/duty-payments/:containerId — happy path + audit", () => {
     const res = await request(app)
       .patch(`/api/duty-payments/${containerId}`)
       .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
       .send({ amount: 30_000, paymentDate: "2026-04-27", notes: "first slice" });
     expect(res.status).toBe(200);
     expect(res.body.dutyPaid).toBe(30_000);
@@ -140,6 +144,7 @@ describe("PATCH /api/duty-payments/:containerId — happy path + audit", () => {
     const res = await request(app)
       .patch(`/api/duty-payments/${containerId}`)
       .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
       .send({ amount: 999_999_999 });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/exceeds outstanding/i);
@@ -149,6 +154,7 @@ describe("PATCH /api/duty-payments/:containerId — happy path + audit", () => {
     const res = await request(app)
       .patch(`/api/duty-payments/${containerId}`)
       .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
       .send({ amount: 0 });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/greater than zero/i);
@@ -158,6 +164,7 @@ describe("PATCH /api/duty-payments/:containerId — happy path + audit", () => {
     const res = await request(app)
       .patch("/api/duty-payments/999999999")
       .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
       .send({ amount: 1 });
     expect(res.status).toBe(404);
     expect(res.body.error).toMatch(/Container not found/);
@@ -188,6 +195,7 @@ describe("PATCH /api/duty-payments/:containerId — concurrency / no lost update
         request(app)
           .patch(`/api/duty-payments/${containerId}`)
           .set("Cookie", ADMIN_COOKIE)
+          .set("X-CSRF-Token", ADMIN_CSRF)
           .send({ amount }),
       ),
     );
@@ -225,6 +233,7 @@ describe("PATCH /api/duty-payments/:containerId — concurrency / no lost update
         request(app)
           .patch(`/api/duty-payments/${containerId}`)
           .set("Cookie", ADMIN_COOKIE)
+          .set("X-CSRF-Token", ADMIN_CSRF)
           .send({ amount }),
       ),
     );
