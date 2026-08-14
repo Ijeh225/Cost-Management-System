@@ -750,6 +750,31 @@ async function runStartupMigrations() {
       await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_audit_session_idx ON ai_assistant_audit_logs(session_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_audit_created_at_idx ON ai_assistant_audit_logs(created_at)`);
     });
+    await runMigration("document_intelligence_v1", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS document_intelligence_index (
+          id SERIAL PRIMARY KEY,
+          document_id INTEGER NOT NULL REFERENCES container_documents(id) ON DELETE CASCADE,
+          container_id INTEGER NOT NULL REFERENCES containers(id) ON DELETE CASCADE,
+          branch_id INTEGER NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+          section TEXT,
+          uploaded_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          extractor_version TEXT NOT NULL DEFAULT 'v1',
+          content_text TEXT,
+          page_text TEXT NOT NULL DEFAULT '[]',
+          page_count INTEGER,
+          error_message TEXT,
+          indexed_at TIMESTAMP,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          CONSTRAINT document_intelligence_document_unique UNIQUE(document_id)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS document_intelligence_branch_idx ON document_intelligence_index(branch_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS document_intelligence_container_idx ON document_intelligence_index(container_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS document_intelligence_status_idx ON document_intelligence_index(status)`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

@@ -2,11 +2,13 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import { randomUUID } from "crypto";
-import { db, containerDocumentsTable, containersTable, usersTable, workflowNotificationsTable } from "@workspace/db";
-import { eq, asc, inArray, and } from "drizzle-orm";
+import { db, containerDocumentsTable, containersTable, documentIntelligenceIndexTable, usersTable, workflowNotificationsTable } from "@workspace/db";
+import type { DocumentIntelligenceIndex } from "@workspace/db";
+import { eq, asc, and } from "drizzle-orm";
 import { requireAuth, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
-import { deleteDocument, documentExists, getDocument, saveDocument } from "../lib/document-storage.js";
+import { deleteDocument, documentExists, getDocument, getDocumentBuffer, saveDocument } from "../lib/document-storage.js";
 import { settingsTable } from "@workspace/db";
+import { getDocumentIndex, getIndexableDocument, indexContainerDocument } from "../lib/document-intelligence.js";
 
 export const documentsRouter = Router();
 
@@ -46,6 +48,20 @@ async function getAccessibleContainer(req: AuthRequest, containerId: number) {
   return container && userCanAccessBranch(req, container.branchId) ? container : null;
 }
 
+function documentIntelligenceResponse(index: DocumentIntelligenceIndex | null) {
+  return index ? {
+    status: index.status,
+    pageCount: index.pageCount,
+    indexedAt: index.indexedAt?.toISOString() ?? null,
+    errorMessage: index.errorMessage,
+  } : {
+    status: "not_indexed",
+    pageCount: null,
+    indexedAt: null,
+    errorMessage: "This existing document has not been indexed yet. Select Retry indexing to make it searchable.",
+  };
+}
+
 documentsRouter.get("/containers/:id/documents", requireAuth, async (req: AuthRequest, res) => {
   const containerId = parseInt(String(req.params.id));
   try {
@@ -62,12 +78,34 @@ documentsRouter.get("/containers/:id/documents", requireAuth, async (req: AuthRe
       uploadedById: containerDocumentsTable.uploadedById,
       uploaderName: usersTable.name,
       createdAt: containerDocumentsTable.createdAt,
+      intelligenceStatus: documentIntelligenceIndexTable.status,
+      intelligencePageCount: documentIntelligenceIndexTable.pageCount,
+      intelligenceIndexedAt: documentIntelligenceIndexTable.indexedAt,
+      intelligenceError: documentIntelligenceIndexTable.errorMessage,
     }).from(containerDocumentsTable)
       .leftJoin(usersTable, eq(containerDocumentsTable.uploadedById, usersTable.id))
+      .leftJoin(documentIntelligenceIndexTable, eq(documentIntelligenceIndexTable.documentId, containerDocumentsTable.id))
       .where(eq(containerDocumentsTable.containerId, containerId))
       .orderBy(asc(containerDocumentsTable.createdAt));
 
-    return res.json(docs.map(d => ({ ...d, uploaderName: d.uploaderName ?? "Unknown", createdAt: d.createdAt.toISOString() })));
+    return res.json(docs.map(d => ({
+      id: d.id,
+      containerId: d.containerId,
+      section: d.section,
+      filename: d.filename,
+      originalName: d.originalName,
+      mimeType: d.mimeType,
+      size: d.size,
+      uploadedById: d.uploadedById,
+      uploaderName: d.uploaderName ?? "Unknown",
+      createdAt: d.createdAt.toISOString(),
+      intelligence: d.intelligenceStatus ? {
+        status: d.intelligenceStatus,
+        pageCount: d.intelligencePageCount,
+        indexedAt: d.intelligenceIndexedAt?.toISOString() ?? null,
+        errorMessage: d.intelligenceError,
+      } : documentIntelligenceResponse(null),
+    })));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -129,13 +167,45 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
       });
     } catch {}
 
-    return res.status(201).json({ ...doc, createdAt: doc.createdAt.toISOString() });
+    let intelligence = documentIntelligenceResponse(null);
+    try {
+      intelligence = documentIntelligenceResponse(await indexContainerDocument(doc, req.file.buffer));
+    } catch (indexError) {
+      // Upload remains successful; the Documents tab exposes the failed status and retry control.
+      console.error("[documents] indexing error:", indexError);
+      intelligence = { status: "failed", pageCount: null, indexedAt: null, errorMessage: "Indexing could not start. Select Retry indexing to try again." };
+    }
+
+    return res.status(201).json({ ...doc, createdAt: doc.createdAt.toISOString(), intelligence });
   } catch (err) {
     console.error("[documents] upload error:", err);
     try { await deleteDocument(objectKey); } catch {}
     const message = err instanceof Error ? err.message : "";
     return res.status(message.includes("Document storage is not configured") ? 503 : 500)
       .json({ error: message.includes("Document storage is not configured") ? message : "Document upload failed" });
+  }
+});
+
+documentsRouter.post("/containers/:id/documents/:docId/intelligence/retry", requireAuth, async (req: AuthRequest, res) => {
+  const containerId = parseInt(String(req.params.id));
+  const docId = parseInt(String(req.params.docId));
+  try {
+    const container = await getAccessibleContainer(req, containerId);
+    if (!container) return res.status(404).json({ error: "Container not found" });
+    const document = await getIndexableDocument(docId);
+    if (!document || document.containerId !== container.id || document.branchId !== container.branchId) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+    const canRetry = document.uploadedById === req.user!.id || ["super_admin", "admin", "branch_admin"].includes(req.user!.role);
+    if (!canRetry) return res.status(403).json({ error: "Only the uploader or a branch administrator can retry document indexing." });
+    const buffer = await getDocumentBuffer(document.filename);
+    const index = await indexContainerDocument(document, buffer);
+    return res.json({ success: true, intelligence: documentIntelligenceResponse(index) });
+  } catch (error) {
+    console.error("[documents] retry indexing error:", error);
+    const message = error instanceof Error ? error.message : "Document indexing failed";
+    return res.status(message.includes("Document storage is not configured") ? 503 : 500)
+      .json({ error: message.includes("Document storage is not configured") ? message : "Document indexing failed. Retry again shortly." });
   }
 });
 

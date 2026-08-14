@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Upload, Trash2, FileText, Download, File, Image, FileSpreadsheet } from "lucide-react";
+import { Loader2, Upload, Trash2, FileText, Download, File, Image, FileSpreadsheet, RefreshCw } from "lucide-react";
 
 const DEFAULT_SECTION_OPTIONS: DocumentSection[] = [
   { id: "general", label: "General" },
@@ -42,6 +42,7 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
   const [uploading, setUploading] = useState(false);
   const [section, setSection] = useState("general");
   const [previewDocument, setPreviewDocument] = useState<any | null>(null);
+  const [retryingDocumentId, setRetryingDocumentId] = useState<number | null>(null);
 
   const { data: documents = [], isLoading } = useGetContainerDocuments(containerId);
   const { data: sections = DEFAULT_SECTION_OPTIONS } = useQuery<DocumentSection[]>({
@@ -100,6 +101,34 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
   };
 
   const canDelete = (doc: any) => isAdminOrAbove || doc.uploadedById === user?.id;
+  const canRetryIndex = (doc: any) => isAdminOrAbove || doc.uploadedById === user?.id;
+
+  const handleRetryIndex = async (doc: any) => {
+    setRetryingDocumentId(doc.id);
+    try {
+      const response = await customFetch<{ success: boolean; intelligence: any }>(`/api/containers/${containerId}/documents/${doc.id}/intelligence/retry`, {
+        method: "POST",
+        headers: await getCsrfHeaders(),
+      });
+      qc.setQueryData<any[]>(documentsQueryKey, (current = []) => current.map((item) => item.id === doc.id
+        ? { ...item, intelligence: response.intelligence }
+        : item));
+      invalidate();
+      toast({ title: response.intelligence?.status === "indexed" ? "Document indexed" : "Indexing completed", description: response.intelligence?.errorMessage ?? "The document search status has been updated." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Indexing failed", description: error instanceof Error ? error.message : "Please try again." });
+    } finally {
+      setRetryingDocumentId(null);
+    }
+  };
+
+  const intelligenceLabel = (doc: any) => {
+    const status = doc.intelligence?.status;
+    if (status === "indexed") return "Searchable";
+    if (status === "unsupported") return "OCR needed";
+    if (status === "failed") return "Index failed";
+    return "Not indexed";
+  };
 
   return (
     <div className="space-y-4">
@@ -151,6 +180,7 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
                 <p className="text-sm font-medium truncate hover:text-primary transition-colors">{doc.originalName}</p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
                   <Badge variant="outline" className="text-[10px] py-0 px-1.5">{sectionLabels.get(doc.section ?? "general") ?? doc.section ?? "General"}</Badge>
+                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">{intelligenceLabel(doc)}</Badge>
                   <span>{formatBytes(doc.size)}</span>
                   <span>·</span>
                   <span>{doc.uploaderName}</span>
@@ -159,6 +189,9 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
                 </div>
               </button>
               <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                {doc.intelligence?.status !== "indexed" && canRetryIndex(doc) && <button onClick={() => handleRetryIndex(doc)} disabled={retryingDocumentId === doc.id} className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-50 transition-colors rounded" title="Retry document indexing">
+                  {retryingDocumentId === doc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                </button>}
                 <button onClick={() => handleDownload(doc)} className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded">
                   <Download className="w-3.5 h-3.5" />
                 </button>

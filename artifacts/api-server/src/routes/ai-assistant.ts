@@ -4,6 +4,8 @@ import {
   aiAssistantSessionsTable,
   branchesTable,
   containersTable,
+  containerDocumentsTable,
+  documentIntelligenceIndexTable,
   db,
   expensePaymentsTable,
   invoicePaymentsTable,
@@ -12,7 +14,7 @@ import {
   paymentSchedulesTable,
   settingsTable,
 } from "@workspace/db";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, ne } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
 
 export const aiAssistantRouter = Router();
@@ -101,6 +103,7 @@ const TOOL_CATALOG = [
   { id: "approved_payment_schedules", title: "Approved schedules awaiting payment", description: "Show approved or partially approved payment schedules with an unpaid balance.", domain: "finance" as const },
   { id: "overhead_overview", title: "Overhead expense overview", description: "Review recorded overhead, actual payments, and outstanding overhead balances.", domain: "finance" as const },
   { id: "branch_performance", title: "Branch performance", description: "Compare scoped branches using container volume, invoices, collections, and outstanding balances.", domain: "reports" as const },
+  { id: "document_search", title: "Search uploaded documents", description: "Search readable uploaded documents and return permission-scoped file and page references.", domain: "documents" as const, requiresQuery: true },
 ] as const;
 
 type ToolId = typeof TOOL_CATALOG[number]["id"];
@@ -127,10 +130,27 @@ const SUGGESTED_QUESTIONS = [
   "Show approved payment schedules awaiting payment.",
   "Show overhead expenses that are still outstanding.",
   "Compare branch performance.",
+  "Find \"PAAR\" in uploaded documents.",
 ];
+
+function documentSearchQuery(question: string): string {
+  const quoted = question.match(/["']([^"']{2,160})["']/);
+  if (quoted?.[1]) return quoted[1].trim();
+  return question
+    .replace(/\b(search|find|show|list|documents?|files?|attachments?|for|in|containing|contains|that|the)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+}
 
 function interpretQuestion(question: string): CopilotIntent {
   const normalised = question.trim().toLowerCase();
+  if (/(document|file|attachment)/.test(normalised) && /(search|find|contain|mention|show|list)/.test(normalised)) {
+    const query = documentSearchQuery(question);
+    return query.length >= 2
+      ? { toolId: "document_search", args: { query }, label: "uploaded document search" }
+      : { toolId: null, args: {}, label: "unsupported question" };
+  }
   const containerMatch = question.toUpperCase().match(/\b[A-Z]{4}\d{7}\b/);
   if (containerMatch && /(why|status|delay|container|job|where|investigate|check)/.test(normalised)) {
     return { toolId: "container_lookup", args: { containerNumber: containerMatch[0] }, label: "container investigation" };
@@ -499,6 +519,70 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     }));
     result.sources = totals.filter((expense) => expense.balance > 0).sort((a, b) => b.balance - a.balance).slice(0, limit)
       .map((expense) => ({ type: "overhead_expense", id: expense.id, label: expense.description, href: `/overhead-expenses?expenseId=${expense.id}` }));
+    return result;
+  }
+
+  if (toolId === "document_search") {
+    const requestedQuery = typeof body.query === "string" ? body.query.trim().slice(0, 160) : "";
+    if (requestedQuery.length < 2) throw new Error("Provide at least two characters to search uploaded documents.");
+    const escapedQuery = requestedQuery.replace(/[\\%_]/g, " ").replace(/\s+/g, " ").trim();
+    if (escapedQuery.length < 2) throw new Error("Provide a more specific document search term.");
+    const condition = branchId == null
+      ? and(eq(documentIntelligenceIndexTable.status, "indexed"), ilike(documentIntelligenceIndexTable.contentText, `%${escapedQuery}%`))
+      : and(eq(documentIntelligenceIndexTable.branchId, branchId), eq(documentIntelligenceIndexTable.status, "indexed"), ilike(documentIntelligenceIndexTable.contentText, `%${escapedQuery}%`));
+    const rows = await db.select({
+      documentId: documentIntelligenceIndexTable.documentId,
+      containerId: documentIntelligenceIndexTable.containerId,
+      originalName: containerDocumentsTable.originalName,
+      section: documentIntelligenceIndexTable.section,
+      pageText: documentIntelligenceIndexTable.pageText,
+      contentText: documentIntelligenceIndexTable.contentText,
+      pageCount: documentIntelligenceIndexTable.pageCount,
+      containerNumber: containersTable.containerNumber,
+      customerName: containersTable.customerName,
+    }).from(documentIntelligenceIndexTable)
+      .innerJoin(containerDocumentsTable, eq(documentIntelligenceIndexTable.documentId, containerDocumentsTable.id))
+      .innerJoin(containersTable, eq(documentIntelligenceIndexTable.containerId, containersTable.id))
+      .where(condition)
+      .orderBy(desc(documentIntelligenceIndexTable.indexedAt))
+      .limit(limit);
+    const lowerQuery = escapedQuery.toLowerCase();
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Matching indexed documents", value: rows.length },
+      { label: "Search term", value: escapedQuery },
+    ];
+    result.records = rows.map((row) => {
+      let page = "Page unavailable";
+      let sourceText = row.contentText ?? "";
+      try {
+        const pages = JSON.parse(row.pageText) as Array<{ page?: number; text?: string }>;
+        const matchedPage = pages.find((item) => item.text?.toLowerCase().includes(lowerQuery));
+        if (matchedPage?.page) page = `Page ${matchedPage.page}`;
+        sourceText = matchedPage?.text ?? sourceText;
+      } catch {
+        // Older or failed metadata is still safe to show without a page number.
+      }
+      const matchIndex = sourceText.toLowerCase().indexOf(lowerQuery);
+      const start = Math.max(0, matchIndex - 110);
+      const snippet = sourceText.slice(start, start + 280).replace(/\s+/g, " ").trim();
+      return {
+        title: row.originalName,
+        detail: `${row.containerNumber} - ${page}${row.section ? ` - ${row.section}` : ""}${snippet ? `: ${snippet}` : ""}`,
+        href: `/containers/${row.containerId}?tab=documents`,
+        badges: ["Document", page],
+      };
+    });
+    result.sources = rows.map((row) => ({
+      type: "document",
+      id: row.documentId,
+      label: `${row.originalName} (${row.containerNumber})`,
+      href: `/containers/${row.containerId}?tab=documents`,
+    }));
+    result.notes = [
+      "Only readable, indexed documents within your authorised branch scope were searched.",
+      "Open the linked container's Documents tab to view the source file; confirm wording against the original document.",
+    ];
     return result;
   }
 

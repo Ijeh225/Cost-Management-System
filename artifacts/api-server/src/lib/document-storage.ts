@@ -71,6 +71,16 @@ export async function getDocument(key: string): Promise<{ stream: Readable; cont
   };
 }
 
+/** Read a stored document for server-side indexing. Never expose this buffer to clients. */
+export async function getDocumentBuffer(key: string): Promise<Buffer> {
+  const { stream } = await getDocument(key);
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
 export async function documentExists(key: string): Promise<boolean> {
   const config = getConfig();
   try {
