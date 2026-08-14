@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound, ShieldCheck, Anchor, X, Users, FolderOpen, Plus, Trash2 } from "lucide-react";
+import { Loader2, Save, Clock, AlertTriangle, ShieldAlert, Mail, Send, CalendarClock, CheckCircle2, KeyRound, ShieldCheck, Anchor, X, Users, FolderOpen, Plus, Trash2, Bot, LockKeyhole, WalletCards, DatabaseZap } from "lucide-react";
 
 const DEFAULTS = {
   agingInactivityDays: "7",
@@ -25,7 +26,7 @@ const DEFAULTS = {
 };
 
 type DocumentSection = { id: string; label: string };
-type SettingsTab = "general" | "aging" | "documentation" | "email" | "notifications" | "workflow" | "other";
+type SettingsTab = "general" | "aging" | "documentation" | "email" | "notifications" | "workflow" | "ai_governance" | "other";
 
 const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: "general", label: "General" },
@@ -34,8 +35,66 @@ const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: "email", label: "Email Alerts" },
   { id: "notifications", label: "Notifications" },
   { id: "workflow", label: "Workflow" },
+  { id: "ai_governance", label: "AI Governance" },
   { id: "other", label: "Other Settings" },
 ];
+
+type AiAssistantDataDomain = "dashboard" | "operations" | "documentation" | "containers" | "finance" | "banking" | "reports" | "notifications" | "documents";
+type AiAssistantGovernance = {
+  accessRoles: Array<"admin" | "super_admin">;
+  mode: "read_only";
+  dataDomains: AiAssistantDataDomain[];
+  monthlyBudgetNgn: number;
+  auditRetentionDays: number;
+  actionPolicy: "human_confirmation_required";
+};
+
+const DEFAULT_AI_GOVERNANCE: AiAssistantGovernance = {
+  accessRoles: ["admin", "super_admin"],
+  mode: "read_only",
+  dataDomains: ["dashboard", "operations", "documentation", "containers", "finance", "banking", "reports", "notifications", "documents"],
+  monthlyBudgetNgn: 100000,
+  auditRetentionDays: 365,
+  actionPolicy: "human_confirmation_required",
+};
+
+const AI_DATA_DOMAINS: Array<{ id: AiAssistantDataDomain; label: string; helper: string }> = [
+  { id: "finance", label: "Finance", helper: "Invoices, receivables, payments, schedules, overheads, and wallets." },
+  { id: "banking", label: "Banking", helper: "Bank balances, transfers, fund additions, and reconciliations." },
+  { id: "reports", label: "Reports", helper: "Branch comparisons, analytics, financial reports, and management summaries." },
+  { id: "containers", label: "Containers", helper: "Container details, ETA, berthing, stage history, and tracking." },
+  { id: "operations", label: "Operations", helper: "Operational workflow status, owners, expected dates, and delays." },
+  { id: "documentation", label: "Documentation", helper: "PAAR, documentation progress, release dates, and delay reasons." },
+  { id: "dashboard", label: "Dashboard", helper: "High-level totals and current operational indicators." },
+  { id: "notifications", label: "Notifications", helper: "Relevant alert history, delays, and required actions." },
+  { id: "documents", label: "Documents", helper: "Authorised document metadata and future document-search scope." },
+];
+
+function parseAiAssistantGovernance(value?: string): AiAssistantGovernance {
+  try {
+    const parsed = JSON.parse(value ?? "");
+    if (
+      parsed && typeof parsed === "object" && !Array.isArray(parsed) &&
+      Array.isArray(parsed.accessRoles) && Array.isArray(parsed.dataDomains) &&
+      parsed.mode === "read_only" && parsed.actionPolicy === "human_confirmation_required" &&
+      Number.isInteger(parsed.monthlyBudgetNgn) && Number.isInteger(parsed.auditRetentionDays)
+    ) {
+      const rawDataDomains: unknown[] = parsed.dataDomains;
+      const dataDomains: AiAssistantDataDomain[] = rawDataDomains.filter((domain): domain is AiAssistantDataDomain =>
+        typeof domain === "string" && AI_DATA_DOMAINS.some((item) => item.id === domain),
+      );
+      return {
+        accessRoles: ["admin", "super_admin"],
+        mode: "read_only",
+        dataDomains: dataDomains.length ? [...new Set(dataDomains)] : DEFAULT_AI_GOVERNANCE.dataDomains,
+        monthlyBudgetNgn: Math.max(0, parsed.monthlyBudgetNgn),
+        auditRetentionDays: Math.max(30, parsed.auditRetentionDays),
+        actionPolicy: "human_confirmation_required",
+      };
+    }
+  } catch {}
+  return DEFAULT_AI_GOVERNANCE;
+}
 const DEFAULT_DOCUMENT_SECTIONS: DocumentSection[] = [
   { id: "general", label: "General" },
   { id: "shipping", label: "Shipping" },
@@ -220,6 +279,7 @@ export default function SettingsPage() {
   const [verificationOfficerUserIds, setVerificationOfficerUserIds] = useState<string[]>([]);
   const [berthingOfficerUserIds, setBerthingOfficerUserIds] = useState<string[]>([]);
   const [documentSections, setDocumentSections] = useState<DocumentSection[]>(DEFAULT_DOCUMENT_SECTIONS);
+  const [aiGovernance, setAiGovernance] = useState<AiAssistantGovernance>(DEFAULT_AI_GOVERNANCE);
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [savingTab, setSavingTab] = useState<SettingsTab | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -244,6 +304,7 @@ export default function SettingsPage() {
       setVerificationOfficerUserIds(parseOfficerIds(s["verificationOfficerUserIds"], s["verificationOfficerUserId"]));
       setBerthingOfficerUserIds(parseOfficerIds(s["berthingOfficerUserIds"], s["berthingOfficerUserId"]));
       setDocumentSections(parseDocumentSections(s["documentSections"]));
+      setAiGovernance(parseAiAssistantGovernance(s["aiAssistantGovernance"]));
     }
   }, [isLoading]);
 
@@ -283,6 +344,8 @@ export default function SettingsPage() {
           berthingOfficerUserIds: JSON.stringify(berthingOfficerUserIds),
           berthingOfficerUserId: berthingOfficerUserIds[0] ?? "",
         };
+      case "ai_governance":
+        return { aiAssistantGovernance: JSON.stringify(aiGovernance) };
       default:
         return {};
     }
@@ -350,7 +413,7 @@ export default function SettingsPage() {
   }
 
   const activeUsers = (users ?? []).filter((u: any) => u.isActive !== false);
-  const canSaveActiveTab = ["aging", "documentation", "email", "workflow"].includes(activeTab);
+  const canSaveActiveTab = ["aging", "documentation", "email", "workflow", "ai_governance"].includes(activeTab);
   const activeTabDirty = Boolean(dirtyTabs[activeTab]);
   const activeTabIsValid = activeTab !== "aging" || isValid;
 
@@ -691,6 +754,86 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="p-6"><div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-6 text-sm text-muted-foreground">There are no general settings to configure yet. Use the dedicated tabs for workflow, document, aging, and email controls.</div></CardContent>
         </Card>
+      )}
+
+      {activeTab === "ai_governance" && (
+        <div className="space-y-6">
+          <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+            <CardHeader className="p-6 pb-0">
+              <CardTitle className="flex items-center gap-2 text-lg"><Bot className="h-4 w-4 text-primary" />AI Assistant Governance</CardTitle>
+              <p className="text-sm text-muted-foreground">Set the safe operating rules for the future Financial Intelligence Assistant before any AI connection is enabled.</p>
+            </CardHeader>
+            <CardContent className="space-y-5 p-6">
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-start gap-3">
+                  <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Phase 0: Governance only</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">No chatbot, provider key, document indexing, or live-data access is active yet. These settings define the boundaries that future implementation must obey.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+                <div className="rounded-xl border border-border/60 bg-background/50 p-4 space-y-3">
+                  <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /><p className="text-sm font-semibold">Authorised access</p></div>
+                  <p className="text-xs leading-relaxed text-muted-foreground">The first release is restricted to these elevated roles. Future backend checks will enforce this server-side.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium">Admin</span>
+                    <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium">Super Admin</span>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-background/50 p-4 space-y-3">
+                  <div className="flex items-center gap-2"><LockKeyhole className="h-4 w-4 text-primary" /><p className="text-sm font-semibold">Action boundary</p></div>
+                  <p className="text-xs leading-relaxed text-muted-foreground">The assistant will begin in read-only mode. Any future draft action must be reviewed and explicitly confirmed by a human through the normal application permissions.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">Read-only required</span>
+                    <span className="rounded-full border border-border/70 bg-muted/50 px-2.5 py-1 text-xs">Human confirmation required</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+            <CardHeader className="p-6 pb-0">
+              <CardTitle className="flex items-center gap-2 text-lg"><DatabaseZap className="h-4 w-4 text-primary" />Proposed Data Scope</CardTitle>
+              <p className="text-sm text-muted-foreground">Choose the application areas the future assistant may query through approved, permission-checked tools. This does not grant access today.</p>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {AI_DATA_DOMAINS.map((domain) => {
+                  const selected = aiGovernance.dataDomains.includes(domain.id);
+                  return (
+                    <label key={domain.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${selected ? "border-primary/30 bg-primary/5" : "border-border/60 bg-background/40"}`}>
+                      <Checkbox checked={selected} disabled={selected && aiGovernance.dataDomains.length === 1} onCheckedChange={(checked) => {
+                        setAiGovernance((current) => ({
+                          ...current,
+                          dataDomains: checked
+                            ? [...new Set([...current.dataDomains, domain.id])]
+                            : current.dataDomains.filter((item) => item !== domain.id),
+                        }));
+                        mark();
+                      }} />
+                      <span className="space-y-1"><span className="block text-sm font-medium">{domain.label}</span><span className="block text-xs leading-relaxed text-muted-foreground">{domain.helper}</span></span>
+                    </label>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+            <CardHeader className="p-6 pb-0">
+              <CardTitle className="flex items-center gap-2 text-lg"><WalletCards className="h-4 w-4 text-primary" />Budget and Audit Policy</CardTitle>
+              <p className="text-sm text-muted-foreground">Define the financial usage limit and how long future AI activity records must remain available for review.</p>
+            </CardHeader>
+            <CardContent className="grid gap-5 p-6 md:grid-cols-2">
+              <div className="space-y-2"><Label>Monthly AI budget (NGN)</Label><Input inputMode="numeric" min="0" type="number" value={aiGovernance.monthlyBudgetNgn} onChange={(event) => { setAiGovernance((current) => ({ ...current, monthlyBudgetNgn: Number(event.target.value) || 0 })); mark(); }} /><p className="text-xs text-muted-foreground">A maximum planned spend for model and document-processing usage. It will be enforced when the AI service is introduced.</p></div>
+              <div className="space-y-2"><Label>AI audit retention (days)</Label><Input inputMode="numeric" min="30" max="3650" type="number" value={aiGovernance.auditRetentionDays} onChange={(event) => { setAiGovernance((current) => ({ ...current, auditRetentionDays: Math.max(30, Number(event.target.value) || 30) })); mark(); }} /><p className="text-xs text-muted-foreground">Future questions, answers, tools used, source records, generated drafts, and confirmed actions will be retained for this period.</p></div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {activeTab === "notifications" && (

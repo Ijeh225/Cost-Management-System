@@ -6,11 +6,24 @@ const EMAIL_ALERT_IDS = new Set([
   "exam_release_delay", "financial_exceptions",
 ]);
 
+const AI_ASSISTANT_ACCESS_ROLES = new Set(["admin", "super_admin"]);
+const AI_ASSISTANT_DATA_DOMAINS = new Set([
+  "dashboard",
+  "operations",
+  "documentation",
+  "containers",
+  "finance",
+  "banking",
+  "reports",
+  "notifications",
+  "documents",
+]);
+
 export const CLIENT_SETTING_KEYS = new Set([
   "agingInactivityDays", "agingDays1", "agingDays2", "agingDays3", "notifyBeforeDueDays",
   "agingEmailEnabled", "agingEmailTo", "digestFrequency", "digestTime", "emailAlertPreferences",
   "verificationOfficerUserIds", "verificationOfficerUserId", "berthingOfficerUserIds", "berthingOfficerUserId",
-  "documentSections",
+  "documentSections", "aiAssistantGovernance",
 ]);
 
 function csvEmails(value: string): boolean {
@@ -85,6 +98,26 @@ export function validateSettingsPayload(payload: unknown): { values: Record<stri
         labels.add(label.toLowerCase());
       }
     } catch { return { values: {}, officerIds: [], error: "Document sections must be a unique list of 1 to 20 named sections." }; }
+  }
+  if ("aiAssistantGovernance" in normalized) {
+    try {
+      const governance = JSON.parse(normalized.aiAssistantGovernance);
+      if (!governance || typeof governance !== "object" || Array.isArray(governance)) throw new Error();
+      const policy = governance as Record<string, unknown>;
+      const keys = Object.keys(policy);
+      const allowedKeys = new Set([
+        "accessRoles", "mode", "dataDomains", "monthlyBudgetNgn", "auditRetentionDays", "actionPolicy",
+      ]);
+      if (keys.some((key) => !allowedKeys.has(key))) throw new Error();
+      if (!Array.isArray(policy.accessRoles) || policy.accessRoles.length === 0 || policy.accessRoles.some((role) => typeof role !== "string" || !AI_ASSISTANT_ACCESS_ROLES.has(role))) throw new Error();
+      if (policy.mode !== "read_only") throw new Error();
+      if (!Array.isArray(policy.dataDomains) || policy.dataDomains.length === 0 || policy.dataDomains.some((domain) => typeof domain !== "string" || !AI_ASSISTANT_DATA_DOMAINS.has(domain))) throw new Error();
+      if (!Number.isInteger(policy.monthlyBudgetNgn) || Number(policy.monthlyBudgetNgn) < 0 || Number(policy.monthlyBudgetNgn) > 50_000_000) throw new Error();
+      if (!Number.isInteger(policy.auditRetentionDays) || Number(policy.auditRetentionDays) < 30 || Number(policy.auditRetentionDays) > 3650) throw new Error();
+      if (policy.actionPolicy !== "human_confirmation_required") throw new Error();
+    } catch {
+      return { values: {}, officerIds: [], error: "AI governance settings must use the approved read-only access, scope, budget, and audit policy format." };
+    }
   }
   const officerIds = ["verificationOfficerUserIds", "berthingOfficerUserIds"].flatMap((key) => key in normalized ? (parseOfficerIds(normalized[key]) ?? []) : []);
   for (const key of ["verificationOfficerUserIds", "berthingOfficerUserIds"]) if (key in normalized && parseOfficerIds(normalized[key]) == null) return { values: {}, officerIds: [], error: `${key} must be a list of user IDs.` };

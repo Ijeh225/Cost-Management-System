@@ -44,4 +44,20 @@ describe("settings validation", () => {
     });
     expect(validateSettingsPayload({ ...validPayload, emailAlertPreferences }).error).toContain("email alert preferences");
   });
+
+  it("accepts only the approved read-only AI governance policy", () => {
+    const aiAssistantGovernance = JSON.stringify({
+      accessRoles: ["admin", "super_admin"],
+      mode: "read_only",
+      dataDomains: ["finance", "containers", "reports"],
+      monthlyBudgetNgn: 100000,
+      auditRetentionDays: 365,
+      actionPolicy: "human_confirmation_required",
+    });
+    expect(validateSettingsPayload({ aiAssistantGovernance }).error).toBeUndefined();
+    expect(validateSettingsPayload({ aiAssistantGovernance: JSON.stringify({
+      accessRoles: ["staff"], mode: "read_write", dataDomains: ["finance"], monthlyBudgetNgn: 100000,
+      auditRetentionDays: 365, actionPolicy: "automatic_actions",
+    }) }).error).toContain("AI governance settings");
+  });
 });
