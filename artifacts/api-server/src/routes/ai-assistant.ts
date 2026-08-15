@@ -3,8 +3,13 @@ import {
   aiAssistantAuditLogsTable,
   aiAssistantSessionsTable,
   branchesTable,
+  banksTable,
+  bankFundAdditionsTable,
+  bankTransfersTable,
   containersTable,
   containerDocumentsTable,
+  containerExpensePaymentsTable,
+  clientDepositsTable,
   documentIntelligenceIndexTable,
   db,
   expensePaymentsTable,
@@ -104,6 +109,10 @@ const TOOL_CATALOG = [
   { id: "overhead_overview", title: "Overhead expense overview", description: "Review recorded overhead, actual payments, and outstanding overhead balances.", domain: "finance" as const },
   { id: "branch_performance", title: "Branch performance", description: "Compare scoped branches using container volume, invoices, collections, and outstanding balances.", domain: "reports" as const },
   { id: "document_search", title: "Search uploaded documents", description: "Search readable uploaded documents and return permission-scoped file and page references.", domain: "documents" as const, requiresQuery: true },
+  { id: "monthly_financial_report", title: "Monthly financial report", description: "Prepare a read-only monthly income, collections, expense, and net-cash report from live records.", domain: "reports" as const },
+  { id: "receivables_ageing", title: "Receivables ageing", description: "Group unpaid invoice balances by age and show overdue collection priorities.", domain: "finance" as const },
+  { id: "bank_ledger_reconciliation", title: "Bank ledger reconciliation", description: "Reconcile recorded bank-ledger inflows, outflows, transfers, and balances. This is not a bank-statement confirmation.", domain: "banking" as const },
+  { id: "financial_control_review", title: "Financial control review", description: "Find explainable review prompts for possible duplicates, overpayments, unallocated funds, delayed collections, unusual expenses, and incomplete payment controls.", domain: "finance" as const },
 ] as const;
 
 type ToolId = typeof TOOL_CATALOG[number]["id"];
@@ -131,6 +140,10 @@ const SUGGESTED_QUESTIONS = [
   "Show overhead expenses that are still outstanding.",
   "Compare branch performance.",
   "Find \"PAAR\" in uploaded documents.",
+  "Prepare this month's financial report.",
+  "Show receivables ageing and overdue collections.",
+  "Run a financial control review for unusual expenses or overpayments.",
+  "Show the bank ledger reconciliation.",
 ];
 
 function documentSearchQuery(question: string): string {
@@ -158,9 +171,13 @@ function interpretQuestion(question: string): CopilotIntent {
   if (/(overdue|late).*(container|vessel|berthing)|(container|vessel|berthing).*(overdue|late)/.test(normalised)) return { toolId: "overdue_containers", args: {}, label: "overdue containers" };
   if (/(documentation|paar).*(delay|missing|pending|check)|(delay|missing|pending).*(documentation|paar)/.test(normalised)) return { toolId: "documentation_checks", args: {}, label: "documentation checks" };
   if (/(delay|delayed|late|stalled).*(job|transire|shipping|do|terminal|tdo|pullout)|(job|transire|shipping|do|terminal|tdo|pullout).*(delay|delayed|late|stalled)/.test(normalised)) return { toolId: "delayed_jobs", args: {}, label: "delayed jobs" };
+  if (/(receivable|invoice|collection).*(ageing|aging)|(ageing|aging).*(receivable|invoice|collection)/.test(normalised)) return { toolId: "receivables_ageing", args: {}, label: "receivables ageing" };
   if (/(outstanding|overdue|receivable|invoice|collected).*(invoice|balance|payment|receivable)|(invoice|balance|payment|receivable).*(outstanding|overdue|receivable|collected)/.test(normalised)) return { toolId: "receivables_overview", args: {}, label: "receivables overview" };
   if (/(approved|pending).*(schedule|payment)|(schedule|payment).*(approved|awaiting)/.test(normalised)) return { toolId: "approved_payment_schedules", args: {}, label: "approved payment schedules" };
   if (/(overhead|expense).*(outstanding|paid|payment|balance)|(outstanding|paid|payment|balance).*(overhead|expense)/.test(normalised)) return { toolId: "overhead_overview", args: {}, label: "overhead overview" };
+  if (/(financial|profit|loss|revenue|cashflow|cash flow).*(report|month|summary)|(report|month|summary).*(financial|profit|loss|revenue|cashflow|cash flow)/.test(normalised)) return { toolId: "monthly_financial_report", args: {}, label: "monthly financial report" };
+  if (/(bank|ledger).*(reconciliation|reconcile|balance)|(reconciliation|reconcile).*(bank|ledger)/.test(normalised)) return { toolId: "bank_ledger_reconciliation", args: {}, label: "bank ledger reconciliation" };
+  if (/(control|duplicate|unusual|overpayment|unallocated).*(review|expense|payment|fund|transaction)|(review|expense|payment|fund|transaction).*(control|duplicate|unusual|overpayment|unallocated)/.test(normalised)) return { toolId: "financial_control_review", args: {}, label: "financial control review" };
   if (/(branch|branches).*(compare|performance)|(compare|performance).*(branch|branches)/.test(normalised)) return { toolId: "branch_performance", args: {}, label: "branch performance" };
   if (/(terminal|operations|container).*(count|summary|currently|how many)|(count|summary|currently|how many).*(terminal|operations|container)/.test(normalised)) return { toolId: "operations_overview", args: {}, label: "operations overview" };
   return { toolId: null, args: {}, label: "unsupported question" };
@@ -184,6 +201,24 @@ function dateOnly(value: Date | string | null | undefined): string {
 function getRequestedLimit(value: unknown): number {
   const limit = Number(value);
   return Number.isInteger(limit) ? Math.max(1, Math.min(limit, 50)) : 20;
+}
+
+function getReportPeriod(value: Record<string, unknown>): { from: Date; to: Date; label: string } {
+  const now = new Date();
+  const defaultFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const defaultTo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const from = typeof value.from === "string" ? new Date(`${value.from}T00:00:00.000Z`) : defaultFrom;
+  const to = typeof value.to === "string" ? new Date(`${value.to}T23:59:59.999Z`) : defaultTo;
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) throw new Error("Provide a valid report date range.");
+  const maxDays = 366;
+  if ((to.getTime() - from.getTime()) / 86_400_000 > maxDays) throw new Error("Report date range cannot exceed 366 days.");
+  return { from, to, label: `${from.toISOString().slice(0, 10)} to ${to.toISOString().slice(0, 10)}` };
+}
+
+function occursWithin(value: Date | string | null | undefined, period: { from: Date; to: Date }): boolean {
+  if (!value) return false;
+  const date = value instanceof Date ? value : new Date(value);
+  return !Number.isNaN(date.getTime()) && date >= period.from && date <= period.to;
 }
 
 function scoped<T extends { branchId: unknown }>(rows: T[], branchId: number | null): T[] {
@@ -519,6 +554,247 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     }));
     result.sources = totals.filter((expense) => expense.balance > 0).sort((a, b) => b.balance - a.balance).slice(0, limit)
       .map((expense) => ({ type: "overhead_expense", id: expense.id, label: expense.description, href: `/overhead-expenses?expenseId=${expense.id}` }));
+    return result;
+  }
+
+  if (toolId === "monthly_financial_report") {
+    const period = getReportPeriod(body);
+    const [allInvoices, allInvoicePayments, allDeposits, allOverheadPayments, allContainerPayments] = await Promise.all([
+      db.select({ id: invoicesTable.id, branchId: invoicesTable.branchId, invoiceNumber: invoicesTable.invoiceNumber, total: invoicesTable.total, createdAt: invoicesTable.createdAt, status: invoicesTable.status }).from(invoicesTable),
+      db.select({ id: invoicePaymentsTable.id, branchId: invoicePaymentsTable.branchId, invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount, paidAt: invoicePaymentsTable.paidAt }).from(invoicePaymentsTable),
+      db.select({ id: clientDepositsTable.id, branchId: clientDepositsTable.branchId, amount: clientDepositsTable.amount, allocatedAmount: clientDepositsTable.allocatedAmount, createdAt: clientDepositsTable.createdAt }).from(clientDepositsTable),
+      db.select({ id: expensePaymentsTable.id, branchId: expensePaymentsTable.branchId, expenseId: expensePaymentsTable.expenseId, amount: expensePaymentsTable.amount, paidAt: expensePaymentsTable.paidAt }).from(expensePaymentsTable),
+      db.select({ id: containerExpensePaymentsTable.id, branchId: containerExpensePaymentsTable.branchId, containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount, paidAt: containerExpensePaymentsTable.paidAt }).from(containerExpensePaymentsTable),
+    ]);
+    const invoices = scoped(allInvoices, branchId).filter((row) => occursWithin(row.createdAt, period) && row.status !== "written_off");
+    const collections = scoped(allInvoicePayments, branchId).filter((row) => occursWithin(row.paidAt, period));
+    const deposits = scoped(allDeposits, branchId).filter((row) => occursWithin(row.createdAt, period));
+    const overheadPayments = scoped(allOverheadPayments, branchId).filter((row) => occursWithin(row.paidAt, period));
+    const containerPayments = scoped(allContainerPayments, branchId).filter((row) => occursWithin(row.paidAt, period));
+    const issued = invoices.reduce((sum, invoice) => sum + toAmount(invoice.total), 0);
+    const collected = collections.reduce((sum, payment) => sum + toAmount(payment.amount), 0);
+    const depositsReceived = deposits.reduce((sum, deposit) => sum + toAmount(deposit.amount), 0);
+    const overheadPaid = overheadPayments.reduce((sum, payment) => sum + toAmount(payment.amount), 0);
+    const containerCostPaid = containerPayments.reduce((sum, payment) => sum + toAmount(payment.amount), 0);
+    const totalExpenses = overheadPaid + containerCostPaid;
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Report period", value: period.label },
+      { label: "Invoices issued", value: money(issued), detail: `${invoices.length} invoice(s) created in the period.` },
+      { label: "Invoice collections", value: money(collected), detail: `${collections.length} recorded payment(s).` },
+      { label: "Client deposits received", value: money(depositsReceived), detail: "Includes allocated and unallocated deposits." },
+      { label: "Recorded operating expenses", value: money(totalExpenses), detail: `${money(overheadPaid)} overhead and ${money(containerCostPaid)} container disbursements.` },
+      { label: "Net recorded cash movement", value: money(collected + depositsReceived - totalExpenses), detail: "Collections plus deposits less actual recorded payments; this is not an accrual profit figure." },
+    ];
+    result.records = [
+      { title: "Financial Reports", detail: `Open the existing reports for the ${period.label} period, preview totals, or export PDF/Excel.`, href: `/reports?from=${period.from.toISOString().slice(0, 10)}&to=${period.to.toISOString().slice(0, 10)}`, badges: ["Report draft"] },
+      ...invoices.slice(0, Math.max(0, limit - 1)).map((invoice) => ({ title: invoice.invoiceNumber, detail: `${money(toAmount(invoice.total))} issued on ${dateOnly(invoice.createdAt)}.`, href: `/invoices/${invoice.id}`, badges: ["Invoice"] })),
+    ];
+    result.sources = [
+      { type: "report", label: "Financial reports", href: "/reports" },
+      ...invoices.slice(0, Math.max(0, limit - 1)).map((invoice) => ({ type: "invoice", id: invoice.id, label: invoice.invoiceNumber, href: `/invoices/${invoice.id}` })),
+    ];
+    result.notes = [
+      "This is a read-only management draft built from live records. Use the cited reports before exporting or distributing a final report.",
+      "Net recorded cash movement is not a statutory profit-and-loss statement and excludes unpaid invoices, non-cash adjustments, and external bank-statement differences.",
+    ];
+    return result;
+  }
+
+  if (toolId === "receivables_ageing") {
+    const [allInvoices, allPayments] = await Promise.all([
+      db.select({ id: invoicesTable.id, branchId: invoicesTable.branchId, invoiceNumber: invoicesTable.invoiceNumber, total: invoicesTable.total, dueDate: invoicesTable.dueDate, status: invoicesTable.status, createdAt: invoicesTable.createdAt }).from(invoicesTable),
+      db.select({ invoiceId: invoicePaymentsTable.invoiceId, branchId: invoicePaymentsTable.branchId, amount: invoicePaymentsTable.amount }).from(invoicePaymentsTable),
+    ]);
+    const invoices = scoped(allInvoices, branchId).filter((invoice) => invoice.status !== "written_off");
+    const paymentMap = new Map<number, number>();
+    scoped(allPayments, branchId).forEach((payment) => paymentMap.set(payment.invoiceId, (paymentMap.get(payment.invoiceId) ?? 0) + toAmount(payment.amount)));
+    const now = new Date();
+    const buckets = { current: 0, days1to30: 0, days31to60: 0, days61to90: 0, days90plus: 0 };
+    const balances = invoices.map((invoice) => {
+      const outstanding = Math.max(0, toAmount(invoice.total) - (paymentMap.get(invoice.id) ?? 0));
+      const baseDate = invoice.dueDate ? new Date(`${invoice.dueDate}T00:00:00`) : invoice.createdAt;
+      const ageDays = Math.max(0, Math.floor((now.getTime() - baseDate.getTime()) / 86_400_000));
+      if (outstanding > 0) {
+        if (!invoice.dueDate || ageDays === 0) buckets.current += outstanding;
+        else if (ageDays <= 30) buckets.days1to30 += outstanding;
+        else if (ageDays <= 60) buckets.days31to60 += outstanding;
+        else if (ageDays <= 90) buckets.days61to90 += outstanding;
+        else buckets.days90plus += outstanding;
+      }
+      return { ...invoice, outstanding, ageDays };
+    }).filter((invoice) => invoice.outstanding > 0);
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Outstanding receivables", value: money(balances.reduce((sum, invoice) => sum + invoice.outstanding, 0)) },
+      { label: "Current / no due date", value: money(buckets.current) },
+      { label: "1-30 days overdue", value: money(buckets.days1to30) },
+      { label: "31-60 days overdue", value: money(buckets.days31to60) },
+      { label: "61-90 days overdue", value: money(buckets.days61to90) },
+      { label: "90+ days overdue", value: money(buckets.days90plus) },
+    ];
+    result.records = balances.sort((a, b) => b.ageDays - a.ageDays || b.outstanding - a.outstanding).slice(0, limit).map((invoice) => ({
+      title: invoice.invoiceNumber,
+      detail: `${money(invoice.outstanding)} outstanding${invoice.dueDate ? ` - ${invoice.ageDays} day(s) since due date` : " - due date not recorded"}.`,
+      href: `/invoices/${invoice.id}`,
+      badges: [invoice.ageDays > 90 ? "90+ days" : invoice.ageDays > 0 ? `${invoice.ageDays} days overdue` : "Current"],
+    }));
+    result.sources = result.records.map((record) => {
+      const invoice = balances.find((candidate) => candidate.invoiceNumber === record.title)!;
+      return { type: "invoice", id: invoice.id, label: invoice.invoiceNumber, href: record.href };
+    });
+    result.notes = ["Age is calculated from invoice due date. Invoices without a due date stay in Current rather than being assumed overdue."];
+    return result;
+  }
+
+  if (toolId === "bank_ledger_reconciliation") {
+    const [allBanks, allPayments, allDeposits, allTransfers, allFundAdditions, allOverheadPayments, allContainerPayments] = await Promise.all([
+      db.select({ id: banksTable.id, branchId: banksTable.branchId, name: banksTable.name, accountNumber: banksTable.accountNumber, isActive: banksTable.isActive }).from(banksTable),
+      db.select({ branchId: invoicePaymentsTable.branchId, bankId: invoicePaymentsTable.bankId, amount: invoicePaymentsTable.amount }).from(invoicePaymentsTable),
+      db.select({ branchId: clientDepositsTable.branchId, bankId: clientDepositsTable.bankId, amount: clientDepositsTable.amount }).from(clientDepositsTable),
+      db.select({ branchId: bankTransfersTable.branchId, fromBankId: bankTransfersTable.fromBankId, toBankId: bankTransfersTable.toBankId, amount: bankTransfersTable.amount }).from(bankTransfersTable),
+      db.select({ branchId: bankFundAdditionsTable.branchId, bankId: bankFundAdditionsTable.bankId, amount: bankFundAdditionsTable.amount }).from(bankFundAdditionsTable),
+      db.select({ branchId: expensePaymentsTable.branchId, bankId: expensePaymentsTable.bankId, amount: expensePaymentsTable.amount }).from(expensePaymentsTable),
+      db.select({ branchId: containerExpensePaymentsTable.branchId, bankId: containerExpensePaymentsTable.bankId, amount: containerExpensePaymentsTable.amount }).from(containerExpensePaymentsTable),
+    ]);
+    const banks = scoped(allBanks, branchId);
+    const payments = scoped(allPayments, branchId);
+    const deposits = scoped(allDeposits, branchId);
+    const transfers = scoped(allTransfers, branchId);
+    const fundAdditions = scoped(allFundAdditions, branchId);
+    const overheadPayments = scoped(allOverheadPayments, branchId);
+    const containerPayments = scoped(allContainerPayments, branchId);
+    const rows = banks.map((bank) => {
+      const inflows = payments.filter((item) => item.bankId === bank.id).reduce((sum, item) => sum + toAmount(item.amount), 0)
+        + deposits.filter((item) => item.bankId === bank.id).reduce((sum, item) => sum + toAmount(item.amount), 0)
+        + transfers.filter((item) => item.toBankId === bank.id).reduce((sum, item) => sum + toAmount(item.amount), 0)
+        + fundAdditions.filter((item) => item.bankId === bank.id).reduce((sum, item) => sum + toAmount(item.amount), 0);
+      const outflows = transfers.filter((item) => item.fromBankId === bank.id).reduce((sum, item) => sum + toAmount(item.amount), 0)
+        + overheadPayments.filter((item) => item.bankId === bank.id).reduce((sum, item) => sum + toAmount(item.amount), 0)
+        + containerPayments.filter((item) => item.bankId === bank.id).reduce((sum, item) => sum + toAmount(item.amount), 0);
+      return { ...bank, inflows, outflows, ledgerBalance: inflows - outflows };
+    });
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Banks in scope", value: rows.length },
+      { label: "Recorded inflows", value: money(rows.reduce((sum, row) => sum + row.inflows, 0)) },
+      { label: "Recorded outflows", value: money(rows.reduce((sum, row) => sum + row.outflows, 0)) },
+      { label: "Ledger balance", value: money(rows.reduce((sum, row) => sum + row.ledgerBalance, 0)) },
+    ];
+    result.records = rows.sort((a, b) => Math.abs(b.ledgerBalance) - Math.abs(a.ledgerBalance)).slice(0, limit).map((bank) => ({
+      title: bank.name,
+      detail: `Ledger inflows ${money(bank.inflows)} - outflows ${money(bank.outflows)} = ${money(bank.ledgerBalance)}.`,
+      href: `/banks?bankId=${bank.id}`,
+      badges: [bank.isActive ? "Active" : "Inactive", "Ledger only"],
+    }));
+    result.sources = rows.slice(0, limit).map((bank) => ({ type: "bank", id: bank.id, label: bank.name, href: `/banks?bankId=${bank.id}` }));
+    result.notes = [
+      "This reconciles application ledger entries only: invoice payments, client deposits, fund additions, transfers, and recorded expenses.",
+      "No imported bank statement is available, so this cannot confirm the external bank balance or detect statement-only transactions.",
+    ];
+    return result;
+  }
+
+  if (toolId === "financial_control_review") {
+    const [allInvoices, allInvoicePayments, allDeposits, allExpenses, allSchedules, allContainers, allDocuments] = await Promise.all([
+      db.select({ id: invoicesTable.id, branchId: invoicesTable.branchId, invoiceNumber: invoicesTable.invoiceNumber, total: invoicesTable.total, dueDate: invoicesTable.dueDate, createdAt: invoicesTable.createdAt, status: invoicesTable.status }).from(invoicesTable),
+      db.select({ id: invoicePaymentsTable.id, branchId: invoicePaymentsTable.branchId, invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount, reference: invoicePaymentsTable.reference, paidAt: invoicePaymentsTable.paidAt }).from(invoicePaymentsTable),
+      db.select({ id: clientDepositsTable.id, branchId: clientDepositsTable.branchId, clientId: clientDepositsTable.clientId, amount: clientDepositsTable.amount, allocatedAmount: clientDepositsTable.allocatedAmount, createdAt: clientDepositsTable.createdAt }).from(clientDepositsTable),
+      db.select({ id: overheadExpensesTable.id, branchId: overheadExpensesTable.branchId, category: overheadExpensesTable.category, description: overheadExpensesTable.description, amount: overheadExpensesTable.amount, createdAt: overheadExpensesTable.createdAt }).from(overheadExpensesTable),
+      db.select({ id: paymentSchedulesTable.id, branchId: paymentSchedulesTable.branchId, vendorBeneficiary: paymentSchedulesTable.vendorBeneficiary, description: paymentSchedulesTable.description, amountApproved: paymentSchedulesTable.amountApproved, amountPaid: paymentSchedulesTable.amountPaid, scheduleDate: paymentSchedulesTable.scheduleDate, status: paymentSchedulesTable.status }).from(paymentSchedulesTable),
+      db.select({ id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber, status: containersTable.status }).from(containersTable),
+      db.select({ containerId: containerDocumentsTable.containerId, branchId: containerDocumentsTable.branchId }).from(containerDocumentsTable),
+    ]);
+    const invoices = scoped(allInvoices, branchId).filter((invoice) => invoice.status !== "written_off");
+    const payments = scoped(allInvoicePayments, branchId);
+    const deposits = scoped(allDeposits, branchId);
+    const expenses = scoped(allExpenses, branchId);
+    const schedules = scoped(allSchedules, branchId);
+    const containers = scoped(allContainers, branchId);
+    const documentedContainerIds = new Set(scoped(allDocuments, branchId).map((document) => document.containerId));
+    const flags: Array<{ title: string; detail: string; href: string; badge: string; source: AssistantSource }> = [];
+    const paidByInvoice = new Map<number, number>();
+    payments.forEach((payment) => paidByInvoice.set(payment.invoiceId, (paidByInvoice.get(payment.invoiceId) ?? 0) + toAmount(payment.amount)));
+    for (const invoice of invoices) {
+      const paid = paidByInvoice.get(invoice.id) ?? 0;
+      if (paid > toAmount(invoice.total) + 0.01) flags.push({
+        title: invoice.invoiceNumber,
+        detail: `Review possible overpayment: ${money(paid)} recorded against an invoice total of ${money(toAmount(invoice.total))}.`,
+        href: `/invoices/${invoice.id}`,
+        badge: "Possible overpayment",
+        source: { type: "invoice", id: invoice.id, label: invoice.invoiceNumber, href: `/invoices/${invoice.id}` },
+      });
+      if (invoice.dueDate && paid < toAmount(invoice.total) && new Date(`${invoice.dueDate}T23:59:59`).getTime() < Date.now()) flags.push({
+        title: invoice.invoiceNumber,
+        detail: `Review delayed collection: ${money(toAmount(invoice.total) - paid)} remains after the due date ${invoice.dueDate}.`,
+        href: `/invoices/${invoice.id}`,
+        badge: "Overdue collection",
+        source: { type: "invoice", id: invoice.id, label: invoice.invoiceNumber, href: `/invoices/${invoice.id}` },
+      });
+    }
+    const duplicateGroups = new Map<string, typeof payments>();
+    payments.filter((payment) => payment.reference.trim()).forEach((payment) => {
+      const key = `${payment.invoiceId}|${toAmount(payment.amount).toFixed(2)}|${payment.reference.trim().toLowerCase()}`;
+      duplicateGroups.set(key, [...(duplicateGroups.get(key) ?? []), payment]);
+    });
+    duplicateGroups.forEach((group) => {
+      if (group.length < 2) return;
+      const invoice = invoices.find((item) => item.id === group[0].invoiceId);
+      flags.push({
+        title: invoice?.invoiceNumber ?? `Invoice ${group[0].invoiceId}`,
+        detail: `Review possible duplicate payment: ${group.length} payments share reference "${group[0].reference}" and amount ${money(toAmount(group[0].amount))}.`,
+        href: `/invoices/${group[0].invoiceId}`,
+        badge: "Possible duplicate",
+        source: { type: "invoice", id: group[0].invoiceId, label: invoice?.invoiceNumber ?? `Invoice ${group[0].invoiceId}`, href: `/invoices/${group[0].invoiceId}` },
+      });
+    });
+    deposits.forEach((deposit) => {
+      const unallocated = Math.max(0, toAmount(deposit.amount) - toAmount(deposit.allocatedAmount));
+      if (unallocated > 0.01) flags.push({
+        title: `Client deposit ${deposit.id}`,
+        detail: `Review unallocated funds: ${money(unallocated)} of ${money(toAmount(deposit.amount))} has not been allocated to an invoice.`,
+        href: "/accounts-receivable",
+        badge: "Unallocated deposit",
+        source: { type: "client_deposit", id: deposit.id, label: `Client deposit ${deposit.id}`, href: "/accounts-receivable" },
+      });
+    });
+    const amounts = expenses.map((expense) => toAmount(expense.amount)).filter((amount) => amount > 0).sort((a, b) => a - b);
+    const median = amounts.length ? amounts[Math.floor(amounts.length / 2)] : 0;
+    if (amounts.length >= 5 && median > 0) expenses.filter((expense) => toAmount(expense.amount) >= Math.max(median * 3, 300_000)).forEach((expense) => flags.push({
+      title: expense.description,
+      detail: `Review unusual overhead: ${money(toAmount(expense.amount))} is at least three times the current median recorded overhead of ${money(median)}.`,
+      href: `/overhead-expenses?expenseId=${expense.id}`,
+      badge: "Unusual expense",
+      source: { type: "overhead_expense", id: expense.id, label: expense.description, href: `/overhead-expenses?expenseId=${expense.id}` },
+    }));
+    schedules.filter((schedule) => ["approved", "partially_approved"].includes(schedule.status) && toAmount(schedule.amountApproved) > toAmount(schedule.amountPaid) && new Date(schedule.scheduleDate).getTime() < Date.now()).forEach((schedule) => flags.push({
+      title: schedule.vendorBeneficiary,
+      detail: `Review incomplete payment control: ${money(toAmount(schedule.amountApproved) - toAmount(schedule.amountPaid))} is approved but unpaid after its schedule date.`,
+      href: `/payment-schedules?selected=${schedule.id}`,
+      badge: "Approved payment overdue",
+      source: { type: "payment_schedule", id: schedule.id, label: schedule.vendorBeneficiary, href: `/payment-schedules?selected=${schedule.id}` },
+    }));
+    containers.filter((container) => !["pending_verification", "closed"].includes(container.status) && !documentedContainerIds.has(container.id)).forEach((container) => flags.push({
+      title: container.containerNumber,
+      detail: "Review missing supporting documents: this active container has no uploaded documents. Confirm whether documentation is required before treating this as an exception.",
+      href: `/containers/${container.id}?tab=documents`,
+      badge: "No uploaded documents",
+      source: { type: "container", id: container.id, label: container.containerNumber, href: `/containers/${container.id}?tab=documents` },
+    }));
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Review prompts", value: flags.length },
+      { label: "Possible duplicate groups", value: [...duplicateGroups.values()].filter((group) => group.length > 1).length },
+      { label: "Unallocated deposits", value: deposits.filter((deposit) => toAmount(deposit.amount) - toAmount(deposit.allocatedAmount) > 0.01).length },
+      { label: "Approved unpaid schedules", value: schedules.filter((schedule) => ["approved", "partially_approved"].includes(schedule.status) && toAmount(schedule.amountApproved) > toAmount(schedule.amountPaid)).length },
+      { label: "Active containers without uploads", value: containers.filter((container) => !["pending_verification", "closed"].includes(container.status) && !documentedContainerIds.has(container.id)).length },
+    ];
+    result.records = flags.slice(0, limit).map(({ title, detail, href, badge }) => ({ title, detail, href, badges: [badge, "Review needed"] }));
+    result.sources = flags.slice(0, limit).map((flag) => flag.source);
+    result.notes = [
+      "These are rule-based review prompts, not accusations, final accounting conclusions, or automated corrections.",
+      "Each prompt uses the rule stated in its detail. Open the source record and verify supporting evidence before taking action.",
+    ];
     return result;
   }
 
