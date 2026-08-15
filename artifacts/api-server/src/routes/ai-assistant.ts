@@ -1,6 +1,7 @@
 import { NextFunction, Response, Router } from "express";
 import {
   aiAssistantAuditLogsTable,
+  aiAssistantActionDraftsTable,
   aiAssistantSessionsTable,
   branchesTable,
   banksTable,
@@ -17,7 +18,10 @@ import {
   invoicesTable,
   overheadExpensesTable,
   paymentSchedulesTable,
+  paymentScheduleEventsTable,
   settingsTable,
+  usersTable,
+  workflowNotificationsTable,
 } from "@workspace/db";
 import { and, desc, eq, ilike, inArray, ne } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
@@ -885,6 +889,171 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
   return result;
 }
 
+type AssistantDraftType = "payment_schedule" | "workflow_notification" | "management_summary";
+type AssistantActionPreview = {
+  title: string;
+  description: string;
+  confirmationText: string;
+  fields: Array<{ label: string; value: string }>;
+  sourceRecords: AssistantSource[];
+};
+
+function parseJson<T>(value: string, fallback: T): T {
+  try { return JSON.parse(value) as T; } catch { return fallback; }
+}
+
+function formatActionDraft(draft: typeof aiAssistantActionDraftsTable.$inferSelect) {
+  return {
+    id: draft.id,
+    type: draft.type,
+    status: draft.status,
+    payload: parseJson<Record<string, unknown>>(draft.payload, {}),
+    preview: parseJson<AssistantActionPreview>(draft.preview, { title: "Draft", description: "", confirmationText: "", fields: [], sourceRecords: [] }),
+    sourceRecords: parseJson<AssistantSource[]>(draft.sourceRecords, []),
+    confirmationNote: draft.confirmationNote,
+    confirmedAt: draft.confirmedAt?.toISOString() ?? null,
+    executedAt: draft.executedAt?.toISOString() ?? null,
+    executionResult: parseJson<Record<string, unknown> | null>(draft.executionResult ?? "null", null),
+    expiresAt: draft.expiresAt.toISOString(),
+    createdAt: draft.createdAt.toISOString(),
+  };
+}
+
+function requireSpecificActionBranch(req: AuthRequest): number {
+  const branchId = getBranchScope(req);
+  if (branchId == null) throw new Error("Select a specific branch before preparing an assisted action.");
+  return branchId;
+}
+
+function draftPreview(type: AssistantDraftType, body: Record<string, unknown>, branchId: number): { payload: Record<string, unknown>; preview: AssistantActionPreview } {
+  if (type === "payment_schedule") {
+    const vendorBeneficiary = typeof body.vendorBeneficiary === "string" ? body.vendorBeneficiary.trim().slice(0, 200) : "";
+    const description = typeof body.description === "string" ? body.description.trim().slice(0, 1_000) : "";
+    const scheduleDate = typeof body.scheduleDate === "string" ? body.scheduleDate.trim() : "";
+    const clientName = typeof body.clientName === "string" ? body.clientName.trim().slice(0, 200) : "";
+    const amount = Number(body.amountRequested);
+    const priority = ["low", "normal", "urgent"].includes(String(body.priority)) ? String(body.priority) : "normal";
+    const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(scheduleDate) ? new Date(`${scheduleDate}T00:00:00`) : null;
+    if (!vendorBeneficiary || !description || !parsedDate || Number.isNaN(parsedDate.getTime()) || !Number.isFinite(amount) || amount <= 0) {
+      throw new Error("A vendor, description, valid schedule date, and amount greater than zero are required for a payment schedule draft.");
+    }
+    const payload = { vendorBeneficiary, description, scheduleDate, clientName: clientName || null, amountRequested: amount, priority };
+    return {
+      payload,
+      preview: {
+        title: "Payment Schedule Draft",
+        description: "This will create a Pending Approval payment schedule. It will not approve or pay any money.",
+        confirmationText: "Confirm creation of this payment schedule draft? The normal MD approval workflow will still be required.",
+        fields: [
+          { label: "Vendor / beneficiary", value: vendorBeneficiary },
+          { label: "Description", value: description },
+          { label: "Requested amount", value: money(amount) },
+          { label: "Schedule date", value: scheduleDate },
+          { label: "Priority", value: priority },
+        ],
+        sourceRecords: [{ type: "payment_schedule", label: "New pending payment schedule", href: "/payment-schedules" }],
+      },
+    };
+  }
+
+  if (type === "workflow_notification") {
+    const message = typeof body.message === "string" ? body.message.trim().slice(0, 1_000) : "";
+    const actionUrl = typeof body.actionUrl === "string" && body.actionUrl.startsWith("/") ? body.actionUrl.slice(0, 500) : "/notifications";
+    if (!message) throw new Error("A notification message is required.");
+    const payload = { message, actionUrl };
+    return {
+      payload,
+      preview: {
+        title: "Internal Notification Draft",
+        description: "This will notify active Admin and Super Admin users in the selected branch. It does not send email, WhatsApp, or SMS.",
+        confirmationText: "Confirm delivery of this internal workflow notification?",
+        fields: [{ label: "Message", value: message }, { label: "Destination", value: "Selected branch administrators" }],
+        sourceRecords: [{ type: "notification", label: "Notifications", href: actionUrl }],
+      },
+    };
+  }
+
+  const title = typeof body.title === "string" ? body.title.trim().slice(0, 200) : "";
+  const content = typeof body.content === "string" ? body.content.trim().slice(0, 5_000) : "";
+  if (!title || !content) throw new Error("A title and content are required for a management summary draft.");
+  const payload = { title, content };
+  return {
+    payload,
+    preview: {
+      title: "Management Summary Draft",
+      description: "This finalises a read-only management summary for review. It does not email, publish, or alter application records.",
+      confirmationText: "Confirm finalisation of this management summary draft?",
+      fields: [{ label: "Title", value: title }, { label: "Content", value: content }],
+      sourceRecords: [{ type: "report", label: "Reports", href: "/reports" }],
+    },
+  };
+}
+
+async function activeBranchAdministrators(branchId: number): Promise<number[]> {
+  const users = await db.select({ id: usersTable.id, role: usersTable.role, branchId: usersTable.branchId })
+    .from(usersTable).where(eq(usersTable.isActive, true));
+  return users.filter((user) => user.role === "super_admin" || (user.branchId === branchId && user.role === "admin")).map((user) => user.id);
+}
+
+async function executeAssistantDraft(draft: typeof aiAssistantActionDraftsTable.$inferSelect, userId: number) {
+  const type = draft.type as AssistantDraftType;
+  const payload = parseJson<Record<string, unknown>>(draft.payload, {});
+  const branchId = draft.branchId;
+  if (branchId == null) throw new Error("This action draft has no branch scope.");
+
+  if (type === "payment_schedule") {
+    const prepared = draftPreview(type, payload, branchId);
+    const [schedule] = await db.insert(paymentSchedulesTable).values({
+      branchId,
+      scheduleDate: new Date(`${prepared.payload.scheduleDate as string}T00:00:00`),
+      originalRequestDate: new Date(),
+      requestedById: userId,
+      vendorBeneficiary: prepared.payload.vendorBeneficiary as string,
+      clientName: prepared.payload.clientName as string | null,
+      description: prepared.payload.description as string,
+      amountRequested: String(prepared.payload.amountRequested),
+      amountApproved: "0",
+      amountPaid: "0",
+      priority: prepared.payload.priority as string,
+      status: "pending_approval",
+    }).returning();
+    await db.insert(paymentScheduleEventsTable).values({
+      branchId,
+      scheduleId: schedule.id,
+      type: "created",
+      actorUserId: userId,
+      comment: "Payment schedule created from a confirmed AI Assistant draft.",
+      newStatus: "pending_approval",
+    });
+    const approvers = await activeBranchAdministrators(branchId);
+    if (approvers.length) await db.insert(workflowNotificationsTable).values(approvers.map((targetUserId) => ({
+      branchId,
+      type: "payment_schedule_created",
+      message: `AI Assistant draft confirmed: ${String(prepared.payload.vendorBeneficiary)} payment schedule awaits approval.`,
+      actionUrl: `/payment-schedules?focus=${schedule.id}`,
+      targetUserId,
+    })));
+    return { action: "payment_schedule_created", scheduleId: schedule.id, href: `/payment-schedules?focus=${schedule.id}` };
+  }
+
+  if (type === "workflow_notification") {
+    const prepared = draftPreview(type, payload, branchId);
+    const recipients = await activeBranchAdministrators(branchId);
+    if (!recipients.length) throw new Error("No active branch administrators are available to receive this notification.");
+    await db.insert(workflowNotificationsTable).values(recipients.map((targetUserId) => ({
+      branchId,
+      type: "ai_assistant_notification",
+      message: prepared.payload.message as string,
+      actionUrl: prepared.payload.actionUrl as string,
+      targetUserId,
+    })));
+    return { action: "workflow_notification_sent", recipientCount: recipients.length, href: prepared.payload.actionUrl as string };
+  }
+
+  const prepared = draftPreview(type, payload, branchId);
+  return { action: "management_summary_finalised", title: prepared.payload.title, href: "/reports" };
+}
+
 aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit, async (_req: AuthRequest, res) => {
   try {
     const [setting] = await db.select({ value: settingsTable.value })
@@ -893,18 +1062,18 @@ aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit,
       .limit(1);
     const governance = parseGovernance(setting?.value);
     return res.json({
-      phase: "read_only_copilot",
+      phase: "controlled_assisted_actions",
       available: true,
       modelConnected: false,
-      copilotMode: "guided_read_only",
+      copilotMode: "guided_read_only_with_confirmed_actions",
       governance,
       approvedToolCount: TOOL_CATALOG.filter((tool) => governance.dataDomains.includes(tool.domain)).length,
       safeguards: [
         "Admin and Super Admin access only",
-        "Read-only mode",
+        "Read-only answers with a small, confirmation-gated action set",
         "No direct database access",
         "Only approved, permission-scoped tools can read live data",
-        "Human confirmation required for future actions",
+        "Each permitted action is previewed, confirmation-gated, branch-scoped, and audited",
         "Every tool result records its sources and audit event",
       ],
     });
@@ -930,6 +1099,132 @@ aiAssistantRouter.get("/ai-assistant/tools", requireAdmin, foundationRateLimit, 
 
 aiAssistantRouter.get("/ai-assistant/suggestions", requireAdmin, foundationRateLimit, (_req: AuthRequest, res) => {
   return res.json(SUGGESTED_QUESTIONS);
+});
+
+aiAssistantRouter.get("/ai-assistant/actions/drafts", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  try {
+    const requestedLimit = Number(req.query.limit ?? 20);
+    const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 50) : 20;
+    const branchScope = getBranchScope(req);
+    const conditions = branchScope == null
+      ? eq(aiAssistantActionDraftsTable.requestedById, req.user!.id)
+      : and(eq(aiAssistantActionDraftsTable.requestedById, req.user!.id), eq(aiAssistantActionDraftsTable.branchId, branchScope));
+    const drafts = await db.select().from(aiAssistantActionDraftsTable).where(conditions)
+      .orderBy(desc(aiAssistantActionDraftsTable.createdAt)).limit(limit);
+    return res.json(drafts.map(formatActionDraft));
+  } catch (error) {
+    console.error("[ai-assistant] Failed to load action drafts", error);
+    return res.status(500).json({ error: "Unable to load assistant action drafts" });
+  }
+});
+
+aiAssistantRouter.post("/ai-assistant/actions/drafts", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
+  const type = String(body.type ?? "") as AssistantDraftType;
+  if (!["payment_schedule", "workflow_notification", "management_summary"].includes(type)) {
+    return res.status(400).json({ error: "Unsupported assisted action type." });
+  }
+  try {
+    const branchId = requireSpecificActionBranch(req);
+    const [setting] = await db.select({ value: settingsTable.value }).from(settingsTable)
+      .where(eq(settingsTable.key, "aiAssistantGovernance")).limit(1);
+    const governance = parseGovernance(setting?.value);
+    if (governance.actionPolicy !== "human_confirmation_required") return res.status(403).json({ error: "Assisted actions are disabled by AI Assistant governance." });
+    const prepared = draftPreview(type, body.payload && typeof body.payload === "object" && !Array.isArray(body.payload) ? body.payload as Record<string, unknown> : {}, branchId);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const [draft] = await db.insert(aiAssistantActionDraftsTable).values({
+      requestedById: req.user!.id,
+      branchId,
+      type,
+      status: "draft",
+      payload: JSON.stringify(prepared.payload),
+      sourceRecords: JSON.stringify(prepared.preview.sourceRecords),
+      preview: JSON.stringify(prepared.preview),
+      expiresAt,
+    }).returning();
+    await recordAiAssistantAuditEvent({
+      userId: req.user!.id,
+      branchId,
+      eventType: "assisted_action_draft_created",
+      requestSummary: `Created ${type} draft`,
+      responseSummary: prepared.preview.title,
+      toolName: `draft:${type}`,
+      recordReferences: prepared.preview.sourceRecords,
+      metadata: { draftId: draft.id, type, expiresAt: expiresAt.toISOString() },
+    });
+    return res.status(201).json(formatActionDraft(draft));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to prepare assisted action draft";
+    console.error("[ai-assistant] Draft creation failed", error);
+    return res.status(400).json({ error: message });
+  }
+});
+
+aiAssistantRouter.post("/ai-assistant/actions/drafts/:id/confirm", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid action draft id." });
+  const confirmationNote = typeof req.body?.confirmationNote === "string" ? req.body.confirmationNote.trim().slice(0, 500) : null;
+  let lockedDraft: typeof aiAssistantActionDraftsTable.$inferSelect | undefined;
+  try {
+    const [existing] = await db.select().from(aiAssistantActionDraftsTable)
+      .where(and(eq(aiAssistantActionDraftsTable.id, id), eq(aiAssistantActionDraftsTable.requestedById, req.user!.id)))
+      .limit(1);
+    if (!existing) return res.status(404).json({ error: "Action draft not found." });
+    const branchScope = getBranchScope(req);
+    if (branchScope != null && existing.branchId !== branchScope) return res.status(404).json({ error: "Action draft not found." });
+    if (existing.status !== "draft") return res.status(409).json({ error: "This draft has already been confirmed, cancelled, or processed." });
+    if (existing.expiresAt.getTime() <= Date.now()) {
+      await db.update(aiAssistantActionDraftsTable).set({ status: "expired", updatedAt: new Date() }).where(eq(aiAssistantActionDraftsTable.id, existing.id));
+      return res.status(410).json({ error: "This action draft has expired. Create a new draft from current data." });
+    }
+    const [locked] = await db.update(aiAssistantActionDraftsTable).set({ status: "executing", updatedAt: new Date() })
+      .where(and(eq(aiAssistantActionDraftsTable.id, existing.id), eq(aiAssistantActionDraftsTable.status, "draft"))).returning();
+    if (!locked) return res.status(409).json({ error: "This action draft is already being processed." });
+    lockedDraft = locked;
+    const executionResult = await executeAssistantDraft(locked, req.user!.id);
+    const now = new Date();
+    const [confirmed] = await db.update(aiAssistantActionDraftsTable).set({
+      status: "confirmed",
+      confirmationNote,
+      confirmedAt: now,
+      executedAt: now,
+      executionResult: JSON.stringify(executionResult),
+      updatedAt: now,
+    }).where(eq(aiAssistantActionDraftsTable.id, locked.id)).returning();
+    await recordAiAssistantAuditEvent({
+      userId: req.user!.id,
+      branchId: locked.branchId,
+      eventType: "assisted_action_confirmed",
+      requestSummary: `Confirmed ${locked.type} draft ${locked.id}`,
+      responseSummary: String(executionResult.action),
+      toolName: `confirm:${locked.type}`,
+      recordReferences: parseJson<AssistantSource[]>(locked.sourceRecords, []),
+      metadata: { draftId: locked.id, executionResult },
+    });
+    return res.json({ success: true, draft: formatActionDraft(confirmed), executionResult });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to confirm assisted action";
+    console.error("[ai-assistant] Draft confirmation failed", error);
+    if (lockedDraft) {
+      await db.update(aiAssistantActionDraftsTable).set({
+        status: "failed",
+        executionResult: JSON.stringify({ error: message }),
+        updatedAt: new Date(),
+      }).where(eq(aiAssistantActionDraftsTable.id, lockedDraft.id));
+    }
+    return res.status(400).json({ error: message });
+  }
+});
+
+aiAssistantRouter.post("/ai-assistant/actions/drafts/:id/cancel", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid action draft id." });
+  const [cancelled] = await db.update(aiAssistantActionDraftsTable).set({ status: "cancelled", updatedAt: new Date() })
+    .where(and(eq(aiAssistantActionDraftsTable.id, id), eq(aiAssistantActionDraftsTable.requestedById, req.user!.id), eq(aiAssistantActionDraftsTable.status, "draft")))
+    .returning();
+  if (!cancelled) return res.status(404).json({ error: "Active action draft not found." });
+  await recordAiAssistantAuditEvent({ userId: req.user!.id, branchId: cancelled.branchId, eventType: "assisted_action_cancelled", requestSummary: `Cancelled ${cancelled.type} draft ${cancelled.id}`, toolName: `cancel:${cancelled.type}` });
+  return res.json({ success: true, draft: formatActionDraft(cancelled) });
 });
 
 aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {

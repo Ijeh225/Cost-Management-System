@@ -31,4 +31,5 @@ export * from "./container-stage-notes";
 export * from "./intelligence-alert-log";
 export * from "./payment-schedules";
 export * from "./ai-assistant";
+export * from "./ai-assistant-actions";
 export * from "./document-intelligence";

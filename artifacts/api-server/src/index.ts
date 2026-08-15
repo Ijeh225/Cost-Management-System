@@ -775,6 +775,30 @@ async function runStartupMigrations() {
       await pool.query(`CREATE INDEX IF NOT EXISTS document_intelligence_container_idx ON document_intelligence_index(container_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS document_intelligence_status_idx ON document_intelligence_index(status)`);
     });
+    await runMigration("ai_assistant_action_drafts_v1", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ai_assistant_action_drafts (
+          id SERIAL PRIMARY KEY,
+          requested_by_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+          type TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'draft',
+          payload TEXT NOT NULL DEFAULT '{}',
+          source_records TEXT NOT NULL DEFAULT '[]',
+          preview TEXT NOT NULL DEFAULT '{}',
+          confirmation_note TEXT,
+          confirmed_at TIMESTAMP,
+          executed_at TIMESTAMP,
+          execution_result TEXT,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_action_drafts_user_idx ON ai_assistant_action_drafts(requested_by_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_action_drafts_branch_idx ON ai_assistant_action_drafts(branch_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_action_drafts_status_idx ON ai_assistant_action_drafts(status)`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);
