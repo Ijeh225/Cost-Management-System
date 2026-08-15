@@ -2,6 +2,7 @@ import { NextFunction, Response, Router } from "express";
 import {
   aiAssistantAuditLogsTable,
   aiAssistantActionDraftsTable,
+  aiAssistantBriefingsTable,
   aiAssistantSessionsTable,
   branchesTable,
   banksTable,
@@ -25,6 +26,7 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, ilike, inArray, ne } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
+import { formatProactiveBriefing, generateProactiveBriefing } from "../lib/ai-proactive-intelligence.js";
 
 export const aiAssistantRouter = Router();
 
@@ -1099,6 +1101,40 @@ aiAssistantRouter.get("/ai-assistant/tools", requireAdmin, foundationRateLimit, 
 
 aiAssistantRouter.get("/ai-assistant/suggestions", requireAdmin, foundationRateLimit, (_req: AuthRequest, res) => {
   return res.json(SUGGESTED_QUESTIONS);
+});
+
+aiAssistantRouter.get("/ai-assistant/briefings", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  try {
+    const limit = getRequestedLimit(req.query.limit);
+    const branchId = getBranchScope(req);
+    const rows = branchId == null
+      ? await db.select().from(aiAssistantBriefingsTable).orderBy(desc(aiAssistantBriefingsTable.generatedAt)).limit(limit)
+      : await db.select().from(aiAssistantBriefingsTable).where(eq(aiAssistantBriefingsTable.branchId, branchId)).orderBy(desc(aiAssistantBriefingsTable.generatedAt)).limit(limit);
+    return res.json(rows.map(formatProactiveBriefing));
+  } catch (error) {
+    console.error("[ai-assistant] Failed to load proactive briefings", error);
+    return res.status(500).json({ error: "Unable to load proactive briefings" });
+  }
+});
+
+aiAssistantRouter.post("/ai-assistant/briefings/generate", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  try {
+    const branchId = requireSpecificActionBranch(req);
+    const briefing = await generateProactiveBriefing(branchId, "on_demand", true);
+    await recordAiAssistantAuditEvent({
+      userId: req.user!.id,
+      branchId,
+      eventType: "proactive_briefing_generated",
+      requestSummary: "Generated an on-demand finance and control briefing",
+      responseSummary: briefing.summary,
+      toolName: "proactive_briefing",
+      metadata: { briefingId: briefing.id, insightCount: briefing.insightCount },
+    });
+    return res.status(201).json(formatProactiveBriefing(briefing));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to generate proactive briefing";
+    return res.status(400).json({ error: message });
+  }
 });
 
 aiAssistantRouter.get("/ai-assistant/actions/drafts", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {

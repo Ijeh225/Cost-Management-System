@@ -60,4 +60,13 @@ describe("settings validation", () => {
       auditRetentionDays: 365, actionPolicy: "automatic_actions",
     }) }).error).toContain("AI governance settings");
   });
+
+  it("accepts only explicit proactive briefing switches", () => {
+    expect(validateSettingsPayload({
+      aiProactiveBriefingPreferences: JSON.stringify({ enabled: true, daily: true, weekly: false }),
+    }).error).toBeUndefined();
+    expect(validateSettingsPayload({
+      aiProactiveBriefingPreferences: JSON.stringify({ enabled: true, daily: "yes", weekly: false }),
+    }).error).toContain("Proactive briefing preferences");
+  });
 });

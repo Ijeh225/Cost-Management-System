@@ -1,7 +1,8 @@
 import app from "./app";
-import { db, pool, containersTable, appMigrationsTable, usersTable } from "@workspace/db";
+import { db, pool, containersTable, appMigrationsTable, settingsTable, usersTable } from "@workspace/db";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { runScheduledDigest } from "./routes/notifications";
+import { runScheduledAiProactiveBriefings } from "./lib/ai-proactive-intelligence";
 import { getDocumentStorageConfigurationError } from "./lib/document-storage";
 
 async function ensureMigrationsTable() {
@@ -799,6 +800,30 @@ async function runStartupMigrations() {
       await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_action_drafts_branch_idx ON ai_assistant_action_drafts(branch_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_action_drafts_status_idx ON ai_assistant_action_drafts(status)`);
     });
+    await runMigration("ai_assistant_briefings_v1", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ai_assistant_briefings (
+          id SERIAL PRIMARY KEY,
+          branch_id INTEGER NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+          period TEXT NOT NULL,
+          briefing_date TEXT NOT NULL,
+          title TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          insight_count INTEGER NOT NULL DEFAULT 0,
+          payload TEXT NOT NULL DEFAULT '{}',
+          generated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_briefings_branch_idx ON ai_assistant_briefings(branch_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_briefings_period_date_idx ON ai_assistant_briefings(period, briefing_date)`);
+    });
+    await runMigration("ai_assistant_briefings_scheduled_dedup_v1", async () => {
+      // On-demand briefings remain repeatable. Scheduled daily/weekly runs are
+      // unique per branch and Lagos calendar day so a retry cannot create noise.
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS ai_assistant_briefings_scheduled_unique_idx
+        ON ai_assistant_briefings(branch_id, period, briefing_date)
+        WHERE period IN ('daily', 'weekly')`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);
@@ -823,5 +848,12 @@ runStartupMigrations().then(() => {
   app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
   });
-  setInterval(() => { runScheduledDigest().catch(console.error); }, 60_000);
+  setInterval(() => {
+    runScheduledDigest().catch(console.error);
+    // Uses the same one-minute scheduler; database deduplication limits each briefing to its configured period.
+    db.select().from(settingsTable).then((rows) => {
+      const settings = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+      return runScheduledAiProactiveBriefings(settings);
+    }).catch(console.error);
+  }, 60_000);
 });

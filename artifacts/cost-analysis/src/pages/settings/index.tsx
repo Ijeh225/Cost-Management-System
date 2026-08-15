@@ -48,6 +48,7 @@ type AiAssistantGovernance = {
   auditRetentionDays: number;
   actionPolicy: "human_confirmation_required";
 };
+type AiProactiveBriefingPreferences = { enabled: boolean; daily: boolean; weekly: boolean };
 
 const DEFAULT_AI_GOVERNANCE: AiAssistantGovernance = {
   accessRoles: ["admin", "super_admin"],
@@ -57,6 +58,7 @@ const DEFAULT_AI_GOVERNANCE: AiAssistantGovernance = {
   auditRetentionDays: 365,
   actionPolicy: "human_confirmation_required",
 };
+const DEFAULT_AI_PROACTIVE_BRIEFINGS: AiProactiveBriefingPreferences = { enabled: false, daily: true, weekly: true };
 
 const AI_DATA_DOMAINS: Array<{ id: AiAssistantDataDomain; label: string; helper: string }> = [
   { id: "finance", label: "Finance", helper: "Invoices, receivables, payments, schedules, overheads, and wallets." },
@@ -94,6 +96,16 @@ function parseAiAssistantGovernance(value?: string): AiAssistantGovernance {
     }
   } catch {}
   return DEFAULT_AI_GOVERNANCE;
+}
+
+function parseAiProactiveBriefings(value?: string): AiProactiveBriefingPreferences {
+  try {
+    const parsed = JSON.parse(value ?? "") as Partial<AiProactiveBriefingPreferences>;
+    if (typeof parsed.enabled === "boolean" && typeof parsed.daily === "boolean" && typeof parsed.weekly === "boolean") {
+      return { enabled: parsed.enabled, daily: parsed.daily, weekly: parsed.weekly };
+    }
+  } catch {}
+  return DEFAULT_AI_PROACTIVE_BRIEFINGS;
 }
 const DEFAULT_DOCUMENT_SECTIONS: DocumentSection[] = [
   { id: "general", label: "General" },
@@ -280,6 +292,7 @@ export default function SettingsPage() {
   const [berthingOfficerUserIds, setBerthingOfficerUserIds] = useState<string[]>([]);
   const [documentSections, setDocumentSections] = useState<DocumentSection[]>(DEFAULT_DOCUMENT_SECTIONS);
   const [aiGovernance, setAiGovernance] = useState<AiAssistantGovernance>(DEFAULT_AI_GOVERNANCE);
+  const [aiProactiveBriefings, setAiProactiveBriefings] = useState<AiProactiveBriefingPreferences>(DEFAULT_AI_PROACTIVE_BRIEFINGS);
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [savingTab, setSavingTab] = useState<SettingsTab | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -305,6 +318,7 @@ export default function SettingsPage() {
       setBerthingOfficerUserIds(parseOfficerIds(s["berthingOfficerUserIds"], s["berthingOfficerUserId"]));
       setDocumentSections(parseDocumentSections(s["documentSections"]));
       setAiGovernance(parseAiAssistantGovernance(s["aiAssistantGovernance"]));
+      setAiProactiveBriefings(parseAiProactiveBriefings(s["aiProactiveBriefingPreferences"]));
     }
   }, [isLoading]);
 
@@ -345,7 +359,7 @@ export default function SettingsPage() {
           berthingOfficerUserId: berthingOfficerUserIds[0] ?? "",
         };
       case "ai_governance":
-        return { aiAssistantGovernance: JSON.stringify(aiGovernance) };
+        return { aiAssistantGovernance: JSON.stringify(aiGovernance), aiProactiveBriefingPreferences: JSON.stringify(aiProactiveBriefings) };
       default:
         return {};
     }
@@ -820,6 +834,24 @@ export default function SettingsPage() {
                   );
                 })}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+            <CardHeader className="p-6 pb-0">
+              <CardTitle className="flex items-center gap-2 text-lg"><CalendarClock className="h-4 w-4 text-primary" />Proactive Finance & Control Briefings</CardTitle>
+              <p className="text-sm text-muted-foreground">Generate scheduled, evidence-based risk summaries for active branch administrators. Briefings link to affected containers, invoices, and payment schedules; they do not make decisions or change records.</p>
+            </CardHeader>
+            <CardContent className="space-y-5 p-6">
+              <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/50 p-4">
+                <div><p className="text-sm font-medium">Enable proactive briefings</p><p className="mt-1 text-xs text-muted-foreground">Uses the configured digest time and sends in-app notices only when a briefing contains risk items.</p></div>
+                <Switch checked={aiProactiveBriefings.enabled} onCheckedChange={(enabled) => { setAiProactiveBriefings((current) => ({ ...current, enabled })); mark(); }} />
+              </div>
+              <div className={`grid gap-4 md:grid-cols-2 ${!aiProactiveBriefings.enabled ? "opacity-55" : ""}`}>
+                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/40 p-4"><div><p className="text-sm font-medium">Daily briefing</p><p className="mt-1 text-xs text-muted-foreground">Prioritised current finance and operational exceptions.</p></div><Switch disabled={!aiProactiveBriefings.enabled} checked={aiProactiveBriefings.daily} onCheckedChange={(daily) => { setAiProactiveBriefings((current) => ({ ...current, daily })); mark(); }} /></div>
+                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/40 p-4"><div><p className="text-sm font-medium">Weekly briefing</p><p className="mt-1 text-xs text-muted-foreground">A Monday trend and risk review using the same evidence rules.</p></div><Switch disabled={!aiProactiveBriefings.enabled} checked={aiProactiveBriefings.weekly} onCheckedChange={(weekly) => { setAiProactiveBriefings((current) => ({ ...current, weekly })); mark(); }} /></div>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">Recipients are active Admins and Super Admins within the affected branch. Email alerts remain separately controlled in the Email Alerts tab.</p>
             </CardContent>
           </Card>
 

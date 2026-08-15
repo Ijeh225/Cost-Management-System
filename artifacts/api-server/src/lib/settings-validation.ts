@@ -23,7 +23,7 @@ export const CLIENT_SETTING_KEYS = new Set([
   "agingInactivityDays", "agingDays1", "agingDays2", "agingDays3", "notifyBeforeDueDays",
   "agingEmailEnabled", "agingEmailTo", "digestFrequency", "digestTime", "emailAlertPreferences",
   "verificationOfficerUserIds", "verificationOfficerUserId", "berthingOfficerUserIds", "berthingOfficerUserId",
-  "documentSections", "aiAssistantGovernance",
+  "documentSections", "aiAssistantGovernance", "aiProactiveBriefingPreferences",
 ]);
 
 function csvEmails(value: string): boolean {
@@ -117,6 +117,17 @@ export function validateSettingsPayload(payload: unknown): { values: Record<stri
       if (policy.actionPolicy !== "human_confirmation_required") throw new Error();
     } catch {
       return { values: {}, officerIds: [], error: "AI governance settings must use the approved read-only access, scope, budget, and audit policy format." };
+    }
+  }
+  if ("aiProactiveBriefingPreferences" in normalized) {
+    try {
+      const preferences = JSON.parse(normalized.aiProactiveBriefingPreferences);
+      if (!preferences || typeof preferences !== "object" || Array.isArray(preferences)) throw new Error();
+      const item = preferences as Record<string, unknown>;
+      const allowedKeys = new Set(["enabled", "daily", "weekly"]);
+      if (Object.keys(item).some((key) => !allowedKeys.has(key)) || typeof item.enabled !== "boolean" || typeof item.daily !== "boolean" || typeof item.weekly !== "boolean") throw new Error();
+    } catch {
+      return { values: {}, officerIds: [], error: "Proactive briefing preferences must contain enabled, daily, and weekly switches." };
     }
   }
   const officerIds = ["verificationOfficerUserIds", "berthingOfficerUserIds"].flatMap((key) => key in normalized ? (parseOfficerIds(normalized[key]) ?? []) : []);

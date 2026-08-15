@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Bell, Bot, CheckCircle2, ClipboardCheck, ExternalLink, FilePlus2, FileSearch, Loader2, LockKeyhole, Send, Settings2, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, Bell, Bot, CheckCircle2, ClipboardCheck, ExternalLink, FilePlus2, FileSearch, Loader2, LockKeyhole, RefreshCw, Send, Settings2, ShieldCheck, Sparkles } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,11 +50,38 @@ type AssistantActionDraft = {
   expiresAt: string;
 };
 
+type ProactiveBriefing = {
+  id: number;
+  branchId: number;
+  period: "daily" | "weekly" | "on_demand";
+  briefingDate: string;
+  title: string;
+  summary: string;
+  insightCount: number;
+  generatedAt: string;
+  counts: { critical: number; warning: number; watch: number };
+  insights: Array<{
+    severity: "critical" | "warning" | "watch";
+    category: string;
+    title: string;
+    detail: string;
+    recommendedAction: string;
+    href: string;
+    source: { type: string; id: number; label: string };
+  }>;
+};
+
 const ACTION_DRAFT_TYPES: Array<{ value: AssistantDraftType; label: string; description: string; icon: typeof FilePlus2 }> = [
   { value: "payment_schedule", label: "Payment schedule", description: "Create a normal Pending Approval request. It cannot approve or pay money.", icon: FilePlus2 },
   { value: "workflow_notification", label: "Internal notification", description: "Send an in-app notification to the selected branch administrators.", icon: Bell },
   { value: "management_summary", label: "Management summary", description: "Finalise a read-only summary for management review.", icon: ClipboardCheck },
 ];
+
+function BriefingView({ briefing, onOpen }: { briefing: ProactiveBriefing; onOpen: (href: string) => void }) {
+  const severityClass = { critical: "border-destructive/30 bg-destructive/[0.06] text-destructive", warning: "border-amber-500/30 bg-amber-500/[0.07] text-amber-700 dark:text-amber-400", watch: "border-primary/20 bg-primary/[0.05] text-primary" } as const;
+  const periodLabel = briefing.period === "on_demand" ? "Current" : briefing.period[0].toUpperCase() + briefing.period.slice(1);
+  return <div className="space-y-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><p className="font-medium">{briefing.title}</p><p className="mt-1 text-sm text-muted-foreground">{briefing.summary}</p></div><div className="flex flex-wrap gap-2 text-xs"><span className="rounded-full border border-border/70 bg-muted/30 px-2.5 py-1">{periodLabel} · {briefing.briefingDate}</span><span className="rounded-full border border-destructive/20 bg-destructive/[0.04] px-2.5 py-1 text-destructive">{briefing.counts.critical} critical</span><span className="rounded-full border border-amber-500/20 bg-amber-500/[0.05] px-2.5 py-1 text-amber-700 dark:text-amber-400">{briefing.counts.warning} warning</span><span className="rounded-full border border-primary/20 bg-primary/[0.04] px-2.5 py-1 text-primary">{briefing.counts.watch} watch</span></div></div><div className="grid gap-3 lg:grid-cols-2">{briefing.insights.slice(0, 8).map((insight, index) => <button key={`${insight.source.type}-${insight.source.id}-${index}`} type="button" onClick={() => onOpen(insight.href)} className="rounded-xl border border-border/60 bg-background/55 p-4 text-left transition-colors hover:border-primary/30 hover:bg-primary/[0.03]"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{insight.category}</p><p className="mt-1 font-medium leading-5">{insight.title}</p></div><span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${severityClass[insight.severity]}`}>{insight.severity}</span></div><p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{insight.detail}</p><p className="mt-3 text-xs font-medium text-primary">{insight.recommendedAction}</p></button>)}</div>{briefing.insights.length > 8 && <p className="text-sm text-muted-foreground">Showing the first 8 of {briefing.insights.length} prioritised items. Generate or review a briefing regularly to keep the list current.</p>}{briefing.insights.length === 0 && <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.05] p-4 text-sm text-muted-foreground">No current exceptions matched the configured rules for this branch. This is a status check, not a guarantee that every record is complete.</div>}</div>;
+}
 
 export default function AiAssistantPage() {
   const [, setLocation] = useLocation();
@@ -82,6 +109,11 @@ export default function AiAssistantPage() {
     queryKey: ["/api/ai-assistant/actions/drafts"],
     queryFn: () => customFetch("/api/ai-assistant/actions/drafts"),
     staleTime: 15_000,
+  });
+  const { data: briefings = [], isLoading: briefingsLoading } = useQuery<ProactiveBriefing[]>({
+    queryKey: ["/api/ai-assistant/briefings"],
+    queryFn: () => customFetch("/api/ai-assistant/briefings"),
+    staleTime: 30_000,
   });
   const askMutation = useMutation({
     mutationFn: (submittedQuestion: string) => customFetch<CopilotAnswer>("/api/ai-assistant/ask", {
@@ -121,6 +153,10 @@ export default function AiAssistantPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-assistant/actions/drafts"] });
     },
   });
+  const generateBriefingMutation = useMutation({
+    mutationFn: () => customFetch<ProactiveBriefing>("/api/ai-assistant/briefings/generate", { method: "POST" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/ai-assistant/briefings"] }),
+  });
 
   function submitQuestion(event: FormEvent) {
     event.preventDefault();
@@ -139,7 +175,12 @@ export default function AiAssistantPage() {
         <Button variant="outline" className="gap-2" onClick={() => setLocation("/settings")}><Settings2 className="h-4 w-4" />Review Governance</Button>
       </div>
 
-      <Card className="border-primary/20 bg-primary/[0.03] shadow-sm"><CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-primary" /><div><p className="font-medium">Phase 6: Controlled assisted actions</p><p className="mt-1 text-sm text-muted-foreground">Ask supported questions about live records, readable documents, financial summaries, receivables ageing, bank ledger entries, and review prompts. The copilot uses only {status.approvedToolCount} approved tools and cites each source record.</p></div></div><span className="w-fit rounded-full border border-primary/20 bg-background px-3 py-1.5 text-xs font-medium">Draft + confirmation required</span></CardContent></Card>
+      <Card className="border-primary/20 bg-primary/[0.03] shadow-sm"><CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-primary" /><div><p className="font-medium">Phase 7: Proactive finance &amp; control intelligence</p><p className="mt-1 text-sm text-muted-foreground">Ask supported questions about live records, readable documents, financial summaries, receivables ageing, bank ledger entries, and review prompts. The copilot uses only {status.approvedToolCount} approved tools, cites each source record, and can surface evidence-based risks before they become larger issues.</p></div></div><span className="w-fit rounded-full border border-primary/20 bg-background px-3 py-1.5 text-xs font-medium">Draft + confirmation required</span></CardContent></Card>
+
+      <Card className="border-border/60 bg-card shadow-sm">
+        <CardHeader className="flex flex-col gap-3 border-b border-border/60 p-6 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="flex items-center gap-2 text-lg"><AlertTriangle className="h-5 w-5 text-primary" />Proactive finance & control briefing</CardTitle><p className="mt-1 text-sm text-muted-foreground">Defined risk rules scan your authorised branch for berthing, operational, documentation, receivable, and payable issues. This is evidence, not speculation.</p></div><Button type="button" variant="outline" className="gap-2" onClick={() => generateBriefingMutation.mutate()} disabled={generateBriefingMutation.isPending}><RefreshCw className={`h-4 w-4 ${generateBriefingMutation.isPending ? "animate-spin" : ""}`} />{generateBriefingMutation.isPending ? "Generating..." : "Generate current briefing"}</Button></CardHeader>
+        <CardContent className="p-6">{briefingsLoading ? <div className="flex min-h-28 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div> : briefings[0] ? <BriefingView briefing={briefings[0]} onOpen={setLocation} /> : <div className="flex min-h-32 flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-muted/[0.12] p-5 text-center"><p className="font-medium">No proactive briefing has been generated yet</p><p className="mt-1 text-sm text-muted-foreground">Generate a current briefing now, or enable daily and weekly briefings in AI Governance settings.</p></div>}{generateBriefingMutation.isError && <p className="mt-3 text-sm text-destructive">{generateBriefingMutation.error instanceof Error ? generateBriefingMutation.error.message : "Unable to generate the briefing."}</p>}</CardContent>
+      </Card>
 
       <Card className="border-border/60 bg-card shadow-sm">
         <CardHeader className="border-b border-border/60 p-6"><CardTitle className="flex items-center gap-2 text-lg"><ClipboardCheck className="h-5 w-5 text-primary" />Controlled action drafts</CardTitle><p className="text-sm text-muted-foreground">Prepare the action first, review the exact effect, then explicitly confirm it. Every draft and result is retained in the AI audit history.</p></CardHeader>
