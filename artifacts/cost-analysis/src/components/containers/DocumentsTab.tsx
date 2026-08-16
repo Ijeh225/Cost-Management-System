@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGetContainerDocuments, useDeleteContainerDocument, customFetch, getCsrfHeaders, getGetContainerDocumentsQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -54,6 +54,13 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
 
   const documentsQueryKey = getGetContainerDocumentsQueryKey(containerId);
   const invalidate = () => qc.invalidateQueries({ queryKey: documentsQueryKey });
+
+  useEffect(() => {
+    const previewId = Number(new URLSearchParams(window.location.search).get("previewDocument"));
+    if (!Number.isInteger(previewId) || previewId <= 0) return;
+    const matched = (documents as any[]).find((document) => document.id === previewId);
+    if (matched) setPreviewDocument(matched);
+  }, [documents]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

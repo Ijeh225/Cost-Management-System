@@ -117,6 +117,7 @@ const TOOL_CATALOG = [
   { id: "delayed_jobs", title: "Delayed jobs", description: "Find Transire, Shipping, Terminal, and Pullout jobs whose expected date has passed.", domain: "operations" as const },
   { id: "documentation_checks", title: "Documentation checks", description: "Identify open jobs without a PAAR number and link to their container record.", domain: "documentation" as const },
   { id: "container_lookup", title: "Container investigation", description: "Look up one container by exact container number or ID and inspect its live workflow state.", domain: "containers" as const, requiresContainer: true },
+  { id: "container_documents", title: "Container documents", description: "List every uploaded document attached to one exact container, including files that are not text-searchable.", domain: "documents" as const, requiresContainer: true },
   { id: "container_payment_history", title: "Container payment history", description: "Show recorded container disbursements for one exact container.", domain: "finance" as const, requiresContainer: true },
   { id: "invoice_status", title: "Invoice status", description: "Show the total, collections, balance, and linked record for one exact invoice.", domain: "finance" as const, requiresInvoice: true },
   { id: "client_balance", title: "Client balance", description: "Show receivable balance and credit for one authorised client.", domain: "finance" as const, requiresClient: true },
@@ -181,13 +182,16 @@ function documentSearchQuery(question: string): string {
 
 function interpretQuestionFallback(question: string): CopilotIntent {
   const normalised = question.trim().toLowerCase();
+  const containerMatch = question.toUpperCase().match(/\b[A-Z]{4}\d{7}\b/);
+  if (containerMatch && /\b(documents?|docs?|files?|attachments?)\b/.test(normalised)) {
+    return { toolId: "container_documents", args: { containerNumber: containerMatch[0] }, label: "container documents" };
+  }
   if (/(document|file|attachment)/.test(normalised) && /(search|find|contain|mention|show|list)/.test(normalised)) {
     const query = documentSearchQuery(question);
     return query.length >= 2
       ? { toolId: "document_search", args: { query }, label: "uploaded document search" }
       : { toolId: null, args: {}, label: "unsupported question" };
   }
-  const containerMatch = question.toUpperCase().match(/\b[A-Z]{4}\d{7}\b/);
   if (containerMatch && /(why|status|delay|container|job|where|investigate|check)/.test(normalised)) {
     return { toolId: "container_lookup", args: { containerNumber: containerMatch[0] }, label: "container investigation" };
   }
@@ -665,6 +669,51 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     ];
     result.records = [{ title: row.containerNumber, detail: `B/L ${row.blNumber} - Vessel ${row.vessel || "Not recorded"}`, href: `/containers/${row.id}`, badges: [row.status.replace(/_/g, " ")] }];
     result.sources = [{ type: "container", id: row.id, label: row.containerNumber, href: `/containers/${row.id}` }];
+    return result;
+  }
+
+  if (toolId === "container_documents") {
+    const requestedId = Number(body.containerId);
+    const requestedNumber = typeof body.containerNumber === "string" ? body.containerNumber.trim().toUpperCase() : "";
+    if ((!Number.isInteger(requestedId) || requestedId <= 0) && !requestedNumber) throw new Error("Provide an exact container number or container ID.");
+    const containers = scoped(await db.select({
+      id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber, customerName: containersTable.customerName,
+    }).from(containersTable), branchId);
+    const container = containers.find((row) => (Number.isInteger(requestedId) && row.id === requestedId) || (!!requestedNumber && row.containerNumber.toUpperCase() === requestedNumber));
+    if (!container) throw new Error("Container not found in your authorised branch scope.");
+    const documents = await db.select({
+      id: containerDocumentsTable.id,
+      section: containerDocumentsTable.section,
+      originalName: containerDocumentsTable.originalName,
+      mimeType: containerDocumentsTable.mimeType,
+      size: containerDocumentsTable.size,
+      createdAt: containerDocumentsTable.createdAt,
+      intelligenceStatus: documentIntelligenceIndexTable.status,
+      intelligenceError: documentIntelligenceIndexTable.errorMessage,
+    }).from(containerDocumentsTable)
+      .leftJoin(documentIntelligenceIndexTable, eq(documentIntelligenceIndexTable.documentId, containerDocumentsTable.id))
+      .where(and(eq(containerDocumentsTable.containerId, container.id), eq(containerDocumentsTable.branchId, container.branchId)))
+      .orderBy(desc(containerDocumentsTable.createdAt));
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Attached documents", value: documents.length },
+      { label: "Container", value: container.containerNumber, detail: container.customerName || "No customer recorded" },
+    ];
+    result.records = documents.map((document) => ({
+      title: document.originalName,
+      detail: `${container.containerNumber} - ${document.section || "General"} - ${document.intelligenceStatus === "indexed" ? "Searchable" : document.intelligenceStatus === "unsupported" ? "Stored; OCR/text search unavailable" : document.intelligenceStatus === "failed" ? "Stored; indexing failed" : "Stored; not indexed"}`,
+      href: `/containers/${container.id}?tab=documents&previewDocument=${document.id}`,
+      badges: ["Document", document.section || "General"],
+    }));
+    result.sources = documents.map((document) => ({
+      type: "document",
+      id: document.id,
+      label: `${document.originalName} (${container.containerNumber})`,
+      href: `/containers/${container.id}?tab=documents&previewDocument=${document.id}`,
+    }));
+    result.notes = documents.length
+      ? ["These are all files attached to the authorised container. This list does not depend on OCR or document-text indexing."]
+      : ["No files are currently attached to this authorised container."];
     return result;
   }
 
