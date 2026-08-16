@@ -12,6 +12,7 @@ import {
   containerDocumentsTable,
   containerExpensePaymentsTable,
   clientDepositsTable,
+  clientsTable,
   documentIntelligenceIndexTable,
   db,
   expensePaymentsTable,
@@ -107,15 +108,22 @@ type AssistantToolResult = {
 
 const TOOL_CATALOG = [
   { id: "operations_overview", title: "Operations overview", description: "Count current containers, terminal activity, verification backlog, and current workflow work.", domain: "operations" as const },
+  { id: "stage_count", title: "Stage job count", description: "Count active or released jobs for one approved operational stage.", domain: "operations" as const, requiresStage: true },
+  { id: "stage_jobs", title: "Stage job list", description: "List active or released jobs for one approved operational stage.", domain: "operations" as const, requiresStage: true },
+  { id: "stage_delays", title: "Stage delay review", description: "Find overdue expected dates for one approved operational stage.", domain: "operations" as const, requiresStage: true },
   { id: "overdue_containers", title: "Overdue containers", description: "Find containers past ETA whose vessel berthing is still unconfirmed.", domain: "containers" as const },
   { id: "delayed_jobs", title: "Delayed jobs", description: "Find Transire, Shipping, Terminal, and Pullout jobs whose expected date has passed.", domain: "operations" as const },
   { id: "documentation_checks", title: "Documentation checks", description: "Identify open jobs without a PAAR number and link to their container record.", domain: "documentation" as const },
   { id: "container_lookup", title: "Container investigation", description: "Look up one container by exact container number or ID and inspect its live workflow state.", domain: "containers" as const, requiresContainer: true },
+  { id: "container_payment_history", title: "Container payment history", description: "Show recorded container disbursements for one exact container.", domain: "finance" as const, requiresContainer: true },
+  { id: "invoice_status", title: "Invoice status", description: "Show the total, collections, balance, and linked record for one exact invoice.", domain: "finance" as const, requiresInvoice: true },
+  { id: "client_balance", title: "Client balance", description: "Show receivable balance and credit for one authorised client.", domain: "finance" as const, requiresClient: true },
   { id: "receivables_overview", title: "Receivables overview", description: "Review invoiced, collected, outstanding, and overdue client balances.", domain: "finance" as const },
   { id: "approved_payment_schedules", title: "Approved schedules awaiting payment", description: "Show approved or partially approved payment schedules with an unpaid balance.", domain: "finance" as const },
   { id: "overhead_overview", title: "Overhead expense overview", description: "Review recorded overhead, actual payments, and outstanding overhead balances.", domain: "finance" as const },
   { id: "branch_performance", title: "Branch performance", description: "Compare scoped branches using container volume, invoices, collections, and outstanding balances.", domain: "reports" as const },
   { id: "document_search", title: "Search uploaded documents", description: "Search readable uploaded documents and return permission-scoped file and page references.", domain: "documents" as const, requiresQuery: true },
+  { id: "notifications_summary", title: "Notification summary", description: "Summarise recent workflow notifications in the current authorised branch.", domain: "notifications" as const },
   { id: "monthly_financial_report", title: "Monthly financial report", description: "Prepare a read-only monthly income, collections, expense, and net-cash report from live records.", domain: "reports" as const },
   { id: "receivables_ageing", title: "Receivables ageing", description: "Group unpaid invoice balances by age and show overdue collection priorities.", domain: "finance" as const },
   { id: "bank_ledger_reconciliation", title: "Bank ledger reconciliation", description: "Reconcile recorded bank-ledger inflows, outflows, transfers, and balances. This is not a bank-statement confirmation.", domain: "banking" as const },
@@ -208,6 +216,31 @@ function dateOnly(value: Date | string | null | undefined): string {
 function getRequestedLimit(value: unknown): number {
   const limit = Number(value);
   return Number.isInteger(limit) ? Math.max(1, Math.min(limit, 50)) : 20;
+}
+
+const STAGE_TOOL_FIELDS = {
+  transire_processing: { expected: "expectedTransireDate", released: "transireReleasedAt" },
+  shipping: { expected: "expectedDoDate", released: "doReleasedAt" },
+  terminal: { expected: "expectedTdoDate", released: "tdoReleasedAt" },
+  pull_out: { expected: "expectedPulloutDate", released: "pulloutReleasedAt" },
+} as const;
+type StageToolId = keyof typeof STAGE_TOOL_FIELDS;
+
+function getStageToolId(value: unknown): StageToolId {
+  if (typeof value !== "string" || !(value in STAGE_TOOL_FIELDS)) {
+    throw new Error("Choose one approved stage: transire_processing, shipping, terminal, or pull_out.");
+  }
+  return value as StageToolId;
+}
+
+function getLookupId(value: unknown, label: string): number {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id <= 0) throw new Error(`Provide a valid ${label} ID.`);
+  return id;
+}
+
+function stageState(row: Record<string, unknown>, stage: StageToolId): "active" | "released" {
+  return row[STAGE_TOOL_FIELDS[stage].released] ? "released" : "active";
 }
 
 function getReportPeriod(value: Record<string, unknown>): { from: Date; to: Date; label: string } {
@@ -392,6 +425,54 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     return result;
   }
 
+  if (toolId === "stage_count" || toolId === "stage_jobs" || toolId === "stage_delays") {
+    const stage = getStageToolId(body.stage);
+    const requestedState = typeof body.status === "string" ? body.status : "all";
+    if (!["all", "active", "released"].includes(requestedState)) throw new Error("Stage status must be all, active, or released.");
+    const rows = scoped(await db.select({
+      id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber,
+      customerName: containersTable.customerName, status: containersTable.status,
+      expectedTransireDate: containersTable.expectedTransireDate, transireReleasedAt: containersTable.transireReleasedAt,
+      expectedDoDate: containersTable.expectedDoDate, doReleasedAt: containersTable.doReleasedAt,
+      expectedTdoDate: containersTable.expectedTdoDate, tdoReleasedAt: containersTable.tdoReleasedAt,
+      expectedPulloutDate: containersTable.expectedPulloutDate, pulloutReleasedAt: containersTable.pulloutReleasedAt,
+    }).from(containersTable), branchId).filter((row) => row.status !== "closed");
+    const stageRows = rows.filter((row) => requestedState === "all" || stageState(row as unknown as Record<string, unknown>, stage) === requestedState);
+    const route = stage === "transire_processing" ? "/transire" : stage === "pull_out" ? "/pull-out" : `/${stage}`;
+    const result = createResult(toolId, tool.title, branchId);
+    if (toolId === "stage_delays") {
+      const rawOverdueDays = body.overdueDays == null ? 0 : Number(body.overdueDays);
+      if (!Number.isInteger(rawOverdueDays) || rawOverdueDays < 0 || rawOverdueDays > 365) throw new Error("Overdue days must be a whole number from 0 to 365.");
+      const overdueDays = rawOverdueDays;
+      const cutoff = new Date(); cutoff.setHours(0, 0, 0, 0); cutoff.setDate(cutoff.getDate() - overdueDays);
+      const delayed = stageRows.filter((row) => {
+        const data = row as unknown as Record<string, unknown>;
+        const expected = data[STAGE_TOOL_FIELDS[stage].expected];
+        return stageState(data, stage) === "active" && expected instanceof Date && expected.getTime() < cutoff.getTime();
+      });
+      result.facts = [{ label: `${operationalStageLabel(stage)} overdue jobs`, value: delayed.length }, { label: "Overdue after", value: `${overdueDays} day(s)` }];
+      result.records = delayed.slice(0, limit).map((row) => ({
+        title: row.containerNumber,
+        detail: `${row.customerName} - expected ${dateOnly((row as unknown as Record<string, unknown>)[STAGE_TOOL_FIELDS[stage].expected] as Date)}.`,
+        href: `${route}?container=${row.id}`, badges: ["Overdue"],
+      }));
+      result.sources = delayed.slice(0, limit).map((row) => ({ type: "container", id: row.id, label: row.containerNumber, href: `/containers/${row.id}` }));
+      return result;
+    }
+    const activeCount = rows.filter((row) => stageState(row as unknown as Record<string, unknown>, stage) === "active").length;
+    const releasedCount = rows.length - activeCount;
+    result.facts = [{ label: `${operationalStageLabel(stage)} active`, value: activeCount }, { label: `${operationalStageLabel(stage)} released`, value: releasedCount }];
+    if (toolId === "stage_jobs") {
+      result.records = stageRows.slice(0, limit).map((row) => {
+        const data = row as unknown as Record<string, unknown>;
+        const state = stageState(data, stage);
+        return { title: row.containerNumber, detail: `${row.customerName} - ${state === "released" ? `released ${dateOnly(data[STAGE_TOOL_FIELDS[stage].released] as Date)}` : `expected ${dateOnly(data[STAGE_TOOL_FIELDS[stage].expected] as Date)}`}.`, href: `${route}?container=${row.id}`, badges: [state] };
+      });
+      result.sources = stageRows.slice(0, limit).map((row) => ({ type: "container", id: row.id, label: row.containerNumber, href: `/containers/${row.id}` }));
+    }
+    return result;
+  }
+
   if (toolId === "delayed_jobs") {
     const now = new Date();
     const rows = scoped(await db.select({
@@ -489,6 +570,87 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     ];
     result.records = [{ title: row.containerNumber, detail: `B/L ${row.blNumber} - Vessel ${row.vessel || "Not recorded"}`, href: `/containers/${row.id}`, badges: [row.status.replace(/_/g, " ")] }];
     result.sources = [{ type: "container", id: row.id, label: row.containerNumber, href: `/containers/${row.id}` }];
+    return result;
+  }
+
+  if (toolId === "container_payment_history") {
+    const containerId = getLookupId(body.containerId, "container");
+    const containers = scoped(await db.select({ id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber, customerName: containersTable.customerName }).from(containersTable), branchId);
+    const container = containers.find((row) => row.id === containerId);
+    const result = createResult(toolId, tool.title, branchId);
+    if (!container) { result.notes = ["No authorised container matches that ID."]; return result; }
+    const payments = scoped(await db.select({ id: containerExpensePaymentsTable.id, branchId: containerExpensePaymentsTable.branchId, containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount, section: containerExpensePaymentsTable.section, paymentMethod: containerExpensePaymentsTable.paymentMethod, reference: containerExpensePaymentsTable.reference, narration: containerExpensePaymentsTable.narration, paidAt: containerExpensePaymentsTable.paidAt }).from(containerExpensePaymentsTable), branchId)
+      .filter((row) => row.containerId === containerId);
+    result.facts = [{ label: "Container", value: container.containerNumber }, { label: "Recorded payments", value: payments.length }, { label: "Total paid", value: money(payments.reduce((sum, payment) => sum + toAmount(payment.amount), 0)) }];
+    result.records = payments.sort((a, b) => b.paidAt.getTime() - a.paidAt.getTime()).slice(0, limit).map((payment) => ({ title: money(toAmount(payment.amount)), detail: `${payment.section ?? "Uncategorised"} - ${payment.paymentMethod} on ${dateOnly(payment.paidAt)}${payment.reference ? `; ref ${payment.reference}` : ""}.`, href: `/containers/${containerId}?tab=payment-history`, badges: [payment.section ?? "payment"] }));
+    result.sources = [{ type: "container", id: container.id, label: container.containerNumber, href: `/containers/${container.id}?tab=payment-history` }];
+    return result;
+  }
+
+  if (toolId === "invoice_status") {
+    const invoiceId = body.invoiceId == null ? null : getLookupId(body.invoiceId, "invoice");
+    const invoiceNumber = typeof body.invoiceNumber === "string" ? body.invoiceNumber.trim() : "";
+    if (!invoiceId && !invoiceNumber) throw new Error("Provide an exact invoice number or invoice ID.");
+    const invoices = scoped(await db.select({ id: invoicesTable.id, branchId: invoicesTable.branchId, containerId: invoicesTable.containerId, clientId: invoicesTable.clientId, invoiceNumber: invoicesTable.invoiceNumber, status: invoicesTable.status, total: invoicesTable.total, dueDate: invoicesTable.dueDate }).from(invoicesTable), branchId);
+    const invoice = invoices.find((row) => row.id === invoiceId || row.invoiceNumber.toLowerCase() === invoiceNumber.toLowerCase());
+    const result = createResult(toolId, tool.title, branchId);
+    if (!invoice) { result.notes = ["No authorised invoice matches that exact identifier."]; return result; }
+    const payments = await db.select({ amount: invoicePaymentsTable.amount, paidAt: invoicePaymentsTable.paidAt }).from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoice.id));
+    const paid = payments.reduce((sum, payment) => sum + toAmount(payment.amount), 0);
+    const balance = Math.max(0, toAmount(invoice.total) - paid);
+    result.facts = [{ label: "Invoice", value: invoice.invoiceNumber }, { label: "Status", value: invoice.status }, { label: "Total", value: money(toAmount(invoice.total)) }, { label: "Collected", value: money(paid) }, { label: "Outstanding", value: money(balance) }, { label: "Due date", value: dateOnly(invoice.dueDate) }];
+    result.records = [{ title: invoice.invoiceNumber, detail: `${money(balance)} outstanding from ${payments.length} recorded payment(s).`, href: `/invoices/${invoice.id}`, badges: [invoice.status] }];
+    result.sources = [{ type: "invoice", id: invoice.id, label: invoice.invoiceNumber, href: `/invoices/${invoice.id}` }];
+    return result;
+  }
+
+  if (toolId === "client_balance") {
+    const clientId = body.clientId == null ? null : getLookupId(body.clientId, "client");
+    const clientName = typeof body.clientName === "string" ? body.clientName.trim() : "";
+    if (!clientId && clientName.length < 2) throw new Error("Provide an exact client ID or at least two characters of the client name.");
+    const clients = scoped(await db.select({ id: clientsTable.id, branchId: clientsTable.branchId, name: clientsTable.name, creditBalance: clientsTable.creditBalance }).from(clientsTable), branchId);
+    const matchingClients = clients.filter((row) => row.id === clientId || row.name.toLowerCase().includes(clientName.toLowerCase())).slice(0, limit);
+    const result = createResult(toolId, tool.title, branchId);
+    if (!matchingClients.length) { result.notes = ["No authorised client matches that identifier."]; return result; }
+    const invoices = scoped(await db.select({ id: invoicesTable.id, branchId: invoicesTable.branchId, clientId: invoicesTable.clientId, total: invoicesTable.total }).from(invoicesTable), branchId);
+    const invoiceIds = invoices.filter((row) => matchingClients.some((client) => client.id === row.clientId)).map((row) => row.id);
+    const payments = invoiceIds.length ? await db.select({ invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount }).from(invoicePaymentsTable).where(inArray(invoicePaymentsTable.invoiceId, invoiceIds)) : [];
+    const paidByInvoice = new Map<number, number>(); payments.forEach((payment) => paidByInvoice.set(payment.invoiceId, (paidByInvoice.get(payment.invoiceId) ?? 0) + toAmount(payment.amount)));
+    const clientBalances = matchingClients.map((client) => {
+      const clientInvoices = invoices.filter((invoice) => invoice.clientId === client.id);
+      const outstanding = clientInvoices.reduce((sum, invoice) => sum + Math.max(0, toAmount(invoice.total) - (paidByInvoice.get(invoice.id) ?? 0)), 0);
+      return { client, outstanding };
+    });
+    result.records = clientBalances.map(({ client, outstanding }) => ({ title: client.name, detail: `${money(outstanding)} outstanding; ${money(toAmount(client.creditBalance))} credit balance.`, href: `/accounts-receivable?client=${client.id}`, badges: ["Client balance"] }));
+    result.facts = [{ label: "Matching clients", value: matchingClients.length }, { label: "Outstanding receivables", value: money(clientBalances.reduce((sum, item) => sum + item.outstanding, 0)) }];
+    result.sources = matchingClients.map((client) => ({ type: "client", id: client.id, label: client.name, href: `/accounts-receivable?client=${client.id}` }));
+    return result;
+  }
+
+  if (toolId === "notifications_summary") {
+    const notifications = scoped(await db.select({
+      id: workflowNotificationsTable.id, branchId: workflowNotificationsTable.branchId, type: workflowNotificationsTable.type,
+      message: workflowNotificationsTable.message, actionUrl: workflowNotificationsTable.actionUrl,
+      containerId: workflowNotificationsTable.containerId, containerNumber: workflowNotificationsTable.containerNumber,
+      targetUserId: workflowNotificationsTable.targetUserId, isRead: workflowNotificationsTable.isRead, createdAt: workflowNotificationsTable.createdAt,
+    }).from(workflowNotificationsTable).orderBy(desc(workflowNotificationsTable.createdAt)).limit(250), branchId)
+      .filter((row) => row.targetUserId == null || row.targetUserId === req.user!.id);
+    const result = createResult(toolId, tool.title, branchId);
+    const typeCounts = notifications.reduce<Record<string, number>>((counts, notification) => { counts[notification.type] = (counts[notification.type] ?? 0) + 1; return counts; }, {});
+    result.facts = [
+      { label: "Visible notifications", value: notifications.length },
+      { label: "Unread notifications", value: notifications.filter((notification) => !notification.isRead).length },
+      { label: "Notification types", value: Object.keys(typeCounts).length },
+    ];
+    result.records = notifications.slice(0, limit).map((notification) => ({
+      title: notification.type.replace(/_/g, " "), detail: notification.message,
+      href: notification.actionUrl || (notification.containerId ? `/containers/${notification.containerId}` : "/notifications"),
+      badges: [notification.isRead ? "Read" : "Unread"],
+    }));
+    result.sources = notifications.slice(0, limit).map((notification) => ({
+      type: "workflow_notification", id: notification.id, label: notification.containerNumber || notification.type,
+      href: notification.actionUrl || (notification.containerId ? `/containers/${notification.containerId}` : "/notifications"),
+    }));
     return result;
   }
 
@@ -814,12 +976,17 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
 
   if (toolId === "document_search") {
     const requestedQuery = typeof body.query === "string" ? body.query.trim().slice(0, 160) : "";
+    const requestedContainerId = body.containerId == null ? null : getLookupId(body.containerId, "container");
     if (requestedQuery.length < 2) throw new Error("Provide at least two characters to search uploaded documents.");
     const escapedQuery = requestedQuery.replace(/[\\%_]/g, " ").replace(/\s+/g, " ").trim();
     if (escapedQuery.length < 2) throw new Error("Provide a more specific document search term.");
-    const condition = branchId == null
-      ? and(eq(documentIntelligenceIndexTable.status, "indexed"), ilike(documentIntelligenceIndexTable.contentText, `%${escapedQuery}%`))
-      : and(eq(documentIntelligenceIndexTable.branchId, branchId), eq(documentIntelligenceIndexTable.status, "indexed"), ilike(documentIntelligenceIndexTable.contentText, `%${escapedQuery}%`));
+    const conditions = [
+      eq(documentIntelligenceIndexTable.status, "indexed"),
+      ilike(documentIntelligenceIndexTable.contentText, `%${escapedQuery}%`),
+      ...(branchId == null ? [] : [eq(documentIntelligenceIndexTable.branchId, branchId)]),
+      ...(requestedContainerId == null ? [] : [eq(documentIntelligenceIndexTable.containerId, requestedContainerId)]),
+    ];
+    const condition = and(...conditions);
     const rows = await db.select({
       documentId: documentIntelligenceIndexTable.documentId,
       containerId: documentIntelligenceIndexTable.containerId,
@@ -841,6 +1008,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     result.facts = [
       { label: "Matching indexed documents", value: rows.length },
       { label: "Search term", value: escapedQuery },
+      ...(requestedContainerId == null ? [] : [{ label: "Container filter", value: requestedContainerId }]),
     ];
     result.records = rows.map((row) => {
       let page = "Page unavailable";
