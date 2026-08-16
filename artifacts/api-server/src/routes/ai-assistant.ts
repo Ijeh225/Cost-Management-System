@@ -11,6 +11,7 @@ import {
   bankTransfersTable,
   containersTable,
   containerDocumentsTable,
+  containerTasksTable,
   containerExpensePaymentsTable,
   clientDepositsTable,
   clientsTable,
@@ -1212,7 +1213,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
   return result;
 }
 
-type AssistantDraftType = "payment_schedule" | "workflow_notification" | "management_summary";
+type AssistantDraftType = "payment_schedule" | "workflow_notification" | "management_summary" | "follow_up_task" | "payment_schedule_reschedule";
 type AssistantActionPreview = {
   title: string;
   description: string;
@@ -1248,7 +1249,7 @@ function requireSpecificActionBranch(req: AuthRequest): number {
   return branchId;
 }
 
-function draftPreview(type: AssistantDraftType, body: Record<string, unknown>, branchId: number): { payload: Record<string, unknown>; preview: AssistantActionPreview } {
+async function draftPreview(type: AssistantDraftType, body: Record<string, unknown>, branchId: number): Promise<{ payload: Record<string, unknown>; preview: AssistantActionPreview }> {
   if (type === "payment_schedule") {
     const vendorBeneficiary = typeof body.vendorBeneficiary === "string" ? body.vendorBeneficiary.trim().slice(0, 200) : "";
     const description = typeof body.description === "string" ? body.description.trim().slice(0, 1_000) : "";
@@ -1296,6 +1297,77 @@ function draftPreview(type: AssistantDraftType, body: Record<string, unknown>, b
     };
   }
 
+  if (type === "follow_up_task") {
+    const containerNumber = typeof body.containerNumber === "string" ? body.containerNumber.trim().toUpperCase().slice(0, 32) : "";
+    const title = typeof body.title === "string" ? body.title.trim().slice(0, 300) : "";
+    const notes = typeof body.notes === "string" ? body.notes.trim().slice(0, 2_000) : "";
+    const priority = ["low", "medium", "high", "urgent"].includes(String(body.priority)) ? String(body.priority) : "medium";
+    const dueDate = typeof body.dueDate === "string" && body.dueDate.trim() ? body.dueDate.trim() : null;
+    const parsedDueDate = dueDate ? new Date(`${dueDate}T00:00:00`) : null;
+    const assignedStaffId = body.assignedStaffId == null || body.assignedStaffId === "" ? null : Number(body.assignedStaffId);
+    if (!containerNumber || !title || (parsedDueDate && Number.isNaN(parsedDueDate.getTime())) || (assignedStaffId != null && (!Number.isInteger(assignedStaffId) || assignedStaffId <= 0))) {
+      throw new Error("An exact container number and task title are required. Use a valid due date and branch staff member when provided.");
+    }
+    const [container] = await db.select({ id: containersTable.id, containerNumber: containersTable.containerNumber })
+      .from(containersTable).where(and(eq(containersTable.branchId, branchId), eq(containersTable.containerNumber, containerNumber))).limit(1);
+    if (!container) throw new Error("The container was not found in the selected branch.");
+    let assigneeName: string | null = null;
+    if (assignedStaffId != null) {
+      const [assignee] = await db.select({ id: usersTable.id, name: usersTable.name })
+        .from(usersTable).where(and(eq(usersTable.id, assignedStaffId), eq(usersTable.branchId, branchId), eq(usersTable.isActive, true))).limit(1);
+      if (!assignee) throw new Error("The selected task assignee must be an active user in the selected branch.");
+      assigneeName = assignee.name;
+    }
+    const payload = { containerId: container.id, containerNumber: container.containerNumber, title, notes, priority, dueDate, assignedStaffId };
+    return {
+      payload,
+      preview: {
+        title: "Container Follow-up Task Draft",
+        description: "This will create an internal task only. It does not change the container's workflow stage, payments, or documentation status.",
+        confirmationText: "Confirm creation of this follow-up task? The assigned staff member will receive the normal in-app task notification.",
+        fields: [
+          { label: "Container", value: container.containerNumber },
+          { label: "Task", value: title },
+          { label: "Assigned to", value: assigneeName ?? "Unassigned" },
+          { label: "Due date", value: dueDate ?? "Not set" },
+          { label: "Priority", value: priority },
+          { label: "Notes", value: notes || "None" },
+        ],
+        sourceRecords: [{ type: "container", id: container.id, label: container.containerNumber, href: `/containers/${container.id}?tab=tasks` }],
+      },
+    };
+  }
+
+  if (type === "payment_schedule_reschedule") {
+    const scheduleId = Number(body.scheduleId);
+    const scheduleDate = typeof body.scheduleDate === "string" ? body.scheduleDate.trim() : "";
+    const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 1_000) : "";
+    const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(scheduleDate) ? new Date(`${scheduleDate}T00:00:00`) : null;
+    if (!Number.isInteger(scheduleId) || scheduleId <= 0 || !parsedDate || Number.isNaN(parsedDate.getTime())) {
+      throw new Error("A payment schedule ID and valid new schedule date are required.");
+    }
+    const [schedule] = await db.select().from(paymentSchedulesTable)
+      .where(and(eq(paymentSchedulesTable.id, scheduleId), eq(paymentSchedulesTable.branchId, branchId))).limit(1);
+    if (!schedule) throw new Error("The payment schedule was not found in the selected branch.");
+    if (["completed", "rejected", "cancelled"].includes(schedule.status)) throw new Error("A completed, rejected, or cancelled payment schedule cannot be rescheduled.");
+    const payload = { scheduleId, scheduleDate, comment: comment || null };
+    return {
+      payload,
+      preview: {
+        title: "Payment Schedule Reschedule Proposal",
+        description: "This will change only the scheduled date. It will not approve, pay, cancel, or alter the requested amount.",
+        confirmationText: "Confirm this new payment schedule date? The schedule owner will receive the normal reschedule notification.",
+        fields: [
+          { label: "Vendor / beneficiary", value: schedule.vendorBeneficiary },
+          { label: "Current date", value: schedule.scheduleDate.toISOString().slice(0, 10) },
+          { label: "New date", value: scheduleDate },
+          { label: "Reason", value: comment || "No reason supplied" },
+        ],
+        sourceRecords: [{ type: "payment_schedule", id: schedule.id, label: schedule.vendorBeneficiary, href: `/payment-schedules?focus=${schedule.id}` }],
+      },
+    };
+  }
+
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 200) : "";
   const content = typeof body.content === "string" ? body.content.trim().slice(0, 5_000) : "";
   if (!title || !content) throw new Error("A title and content are required for a management summary draft.");
@@ -1325,7 +1397,7 @@ async function executeAssistantDraft(draft: typeof aiAssistantActionDraftsTable.
   if (branchId == null) throw new Error("This action draft has no branch scope.");
 
   if (type === "payment_schedule") {
-    const prepared = draftPreview(type, payload, branchId);
+    const prepared = await draftPreview(type, payload, branchId);
     const [schedule] = await db.insert(paymentSchedulesTable).values({
       branchId,
       scheduleDate: new Date(`${prepared.payload.scheduleDate as string}T00:00:00`),
@@ -1360,7 +1432,7 @@ async function executeAssistantDraft(draft: typeof aiAssistantActionDraftsTable.
   }
 
   if (type === "workflow_notification") {
-    const prepared = draftPreview(type, payload, branchId);
+    const prepared = await draftPreview(type, payload, branchId);
     const recipients = await activeBranchAdministrators(branchId);
     if (!recipients.length) throw new Error("No active branch administrators are available to receive this notification.");
     await db.insert(workflowNotificationsTable).values(recipients.map((targetUserId) => ({
@@ -1373,7 +1445,60 @@ async function executeAssistantDraft(draft: typeof aiAssistantActionDraftsTable.
     return { action: "workflow_notification_sent", recipientCount: recipients.length, href: prepared.payload.actionUrl as string };
   }
 
-  const prepared = draftPreview(type, payload, branchId);
+  if (type === "follow_up_task") {
+    const prepared = await draftPreview(type, payload, branchId);
+    const [task] = await db.insert(containerTasksTable).values({
+      branchId,
+      containerId: prepared.payload.containerId as number,
+      title: prepared.payload.title as string,
+      assignedStaffId: prepared.payload.assignedStaffId as number | null,
+      dueDate: prepared.payload.dueDate ? new Date(`${prepared.payload.dueDate as string}T00:00:00`) : null,
+      priority: prepared.payload.priority as string,
+      notes: prepared.payload.notes as string,
+      status: "pending",
+      createdById: userId,
+    }).returning();
+    if (task.assignedStaffId) await db.insert(workflowNotificationsTable).values({
+      branchId,
+      type: "task_assigned",
+      message: `Task assigned: "${task.title}" - ${prepared.payload.containerNumber as string}`,
+      containerId: task.containerId,
+      containerNumber: prepared.payload.containerNumber as string,
+      targetUserId: task.assignedStaffId,
+      actionUrl: `/containers/${task.containerId}?tab=tasks`,
+    });
+    return { action: "follow_up_task_created", taskId: task.id, href: `/containers/${task.containerId}?tab=tasks` };
+  }
+
+  if (type === "payment_schedule_reschedule") {
+    const prepared = await draftPreview(type, payload, branchId);
+    const scheduleId = prepared.payload.scheduleId as number;
+    const [schedule] = await db.select().from(paymentSchedulesTable)
+      .where(and(eq(paymentSchedulesTable.id, scheduleId), eq(paymentSchedulesTable.branchId, branchId))).limit(1);
+    if (!schedule || ["completed", "rejected", "cancelled"].includes(schedule.status)) throw new Error("This payment schedule is no longer eligible for rescheduling. Create a new draft from current data.");
+    const nextDate = new Date(`${prepared.payload.scheduleDate as string}T00:00:00`);
+    const [updated] = await db.update(paymentSchedulesTable).set({ scheduleDate: nextDate, updatedAt: new Date() })
+      .where(eq(paymentSchedulesTable.id, schedule.id)).returning();
+    await db.insert(paymentScheduleEventsTable).values({
+      branchId,
+      scheduleId: updated.id,
+      type: "rescheduled",
+      actorUserId: userId,
+      comment: prepared.payload.comment as string | null,
+      oldScheduleDate: schedule.scheduleDate,
+      newScheduleDate: nextDate,
+    });
+    if (updated.requestedById) await db.insert(workflowNotificationsTable).values({
+      branchId,
+      type: "payment_schedule_rescheduled",
+      message: `Payment schedule rescheduled for ${updated.vendorBeneficiary}`,
+      targetUserId: updated.requestedById,
+      actionUrl: `/payment-schedules?focus=${updated.id}`,
+    });
+    return { action: "payment_schedule_rescheduled", scheduleId: updated.id, href: `/payment-schedules?focus=${updated.id}` };
+  }
+
+  const prepared = await draftPreview(type, payload, branchId);
   return { action: "management_summary_finalised", title: prepared.payload.title, href: "/reports" };
 }
 
@@ -1408,7 +1533,7 @@ aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit,
       .limit(1);
     const governance = parseGovernance(setting?.value);
     return res.json({
-      phase: "report_and_document_requests",
+      phase: "controlled_assisted_actions",
       available: true,
       modelConnected: isNaturalLanguageRoutingConfigured(),
       copilotMode: isNaturalLanguageRoutingConfigured() ? "natural_language_read_only_with_confirmed_actions" : "guided_read_only_with_confirmed_actions",
@@ -1548,7 +1673,7 @@ aiAssistantRouter.get("/ai-assistant/actions/drafts", requireAdmin, foundationRa
 aiAssistantRouter.post("/ai-assistant/actions/drafts", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
   const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
   const type = String(body.type ?? "") as AssistantDraftType;
-  if (!["payment_schedule", "workflow_notification", "management_summary"].includes(type)) {
+  if (!["payment_schedule", "workflow_notification", "management_summary", "follow_up_task", "payment_schedule_reschedule"].includes(type)) {
     return res.status(400).json({ error: "Unsupported assisted action type." });
   }
   try {
@@ -1557,7 +1682,7 @@ aiAssistantRouter.post("/ai-assistant/actions/drafts", requireAdmin, foundationR
       .where(eq(settingsTable.key, "aiAssistantGovernance")).limit(1);
     const governance = parseGovernance(setting?.value);
     if (governance.actionPolicy !== "human_confirmation_required") return res.status(403).json({ error: "Assisted actions are disabled by AI Assistant governance." });
-    const prepared = draftPreview(type, body.payload && typeof body.payload === "object" && !Array.isArray(body.payload) ? body.payload as Record<string, unknown> : {}, branchId);
+    const prepared = await draftPreview(type, body.payload && typeof body.payload === "object" && !Array.isArray(body.payload) ? body.payload as Record<string, unknown> : {}, branchId);
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const [draft] = await db.insert(aiAssistantActionDraftsTable).values({
       requestedById: req.user!.id,

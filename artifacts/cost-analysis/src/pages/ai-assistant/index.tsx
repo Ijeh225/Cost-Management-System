@@ -1,8 +1,8 @@
 import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { AlertTriangle, Bell, Bot, CheckCircle2, ClipboardCheck, Download, ExternalLink, FileBarChart, FilePlus2, FileSearch, Loader2, LockKeyhole, Printer, RefreshCw, Send, Settings2, ShieldCheck, Sparkles } from "lucide-react";
-import { customFetch } from "@workspace/api-client-react";
+import { AlertTriangle, Bell, Bot, CalendarClock, CheckCircle2, ClipboardCheck, Download, ExternalLink, FileBarChart, FilePlus2, FileSearch, ListTodo, Loader2, LockKeyhole, Printer, RefreshCw, Send, Settings2, ShieldCheck, Sparkles } from "lucide-react";
+import { customFetch, useListUsers } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 type AssistantStatus = {
-  phase: "evidence_and_conversation_context" | "report_and_document_requests";
+  phase: "evidence_and_conversation_context" | "report_and_document_requests" | "controlled_assisted_actions";
   available: true;
   modelConnected: boolean;
   copilotMode: "guided_read_only_with_confirmed_actions" | "natural_language_read_only_with_confirmed_actions";
@@ -37,7 +37,7 @@ type CopilotAnswer = {
   records: Array<{ title: string; detail: string; href: string; badges?: string[] }>;
 };
 
-type AssistantDraftType = "payment_schedule" | "workflow_notification" | "management_summary";
+type AssistantDraftType = "payment_schedule" | "workflow_notification" | "management_summary" | "follow_up_task" | "payment_schedule_reschedule";
 type AssistantActionDraft = {
   id: number;
   type: AssistantDraftType;
@@ -92,6 +92,8 @@ type AssistantReportDraft = {
 
 const ACTION_DRAFT_TYPES: Array<{ value: AssistantDraftType; label: string; description: string; icon: typeof FilePlus2 }> = [
   { value: "payment_schedule", label: "Payment schedule", description: "Create a normal Pending Approval request. It cannot approve or pay money.", icon: FilePlus2 },
+  { value: "follow_up_task", label: "Follow-up task", description: "Create a branch-scoped container task without changing the job workflow.", icon: ListTodo },
+  { value: "payment_schedule_reschedule", label: "Reschedule proposal", description: "Move an eligible payment schedule date without approving or paying it.", icon: CalendarClock },
   { value: "workflow_notification", label: "Internal notification", description: "Send an in-app notification to the selected branch administrators.", icon: Bell },
   { value: "management_summary", label: "Management summary", description: "Finalise a read-only summary for management review.", icon: ClipboardCheck },
 ];
@@ -146,7 +148,7 @@ export default function AiAssistantPage() {
   const [draftType, setDraftType] = useState<AssistantDraftType>("payment_schedule");
   const [draftPayload, setDraftPayload] = useState({
     vendorBeneficiary: "", description: "", scheduleDate: new Date().toISOString().slice(0, 10), amountRequested: "", priority: "normal",
-    message: "", actionUrl: "/notifications", title: "", content: "",
+    message: "", actionUrl: "/notifications", title: "", content: "", containerNumber: "", taskTitle: "", assignedStaffId: "unassigned", dueDate: "", taskNotes: "", taskPriority: "medium", rescheduleScheduleId: "", rescheduleDate: new Date().toISOString().slice(0, 10), rescheduleComment: "",
   });
   const [activeDraft, setActiveDraft] = useState<AssistantActionDraft | null>(null);
   const [reportType, setReportType] = useState<AssistantReportType>("monthly_finance");
@@ -171,6 +173,7 @@ export default function AiAssistantPage() {
     queryFn: () => customFetch("/api/ai-assistant/actions/drafts"),
     staleTime: 15_000,
   });
+  const { data: users = [] } = useListUsers();
   const { data: briefings = [], isLoading: briefingsLoading } = useQuery<ProactiveBriefing[]>({
     queryKey: ["/api/ai-assistant/briefings"],
     queryFn: () => customFetch("/api/ai-assistant/briefings"),
@@ -193,9 +196,9 @@ export default function AiAssistantPage() {
     },
   });
   const createDraftMutation = useMutation({
-    mutationFn: () => customFetch<AssistantActionDraft>("/api/ai-assistant/actions/drafts", {
+    mutationFn: (payload: Record<string, unknown>) => customFetch<AssistantActionDraft>("/api/ai-assistant/actions/drafts", {
       method: "POST",
-      body: JSON.stringify({ type: draftType, payload: draftPayload }),
+      body: JSON.stringify({ type: draftType, payload }),
     }),
     onSuccess: (draft) => {
       setActiveDraft(draft);
@@ -249,6 +252,7 @@ export default function AiAssistantPage() {
 
   const selectedReportType = REPORT_TYPES.find((type) => type.value === reportType)!;
   const displayedReport = activeReport ?? reportDrafts[0] ?? null;
+  const activeUsers = users.filter((user) => user.isActive);
 
   if (isLoading) return <div className="flex min-h-[50vh] items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
   if (isError || !status) return <div className="mx-auto max-w-xl rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-muted-foreground">Unable to load the Finance Copilot. Refresh the page and try again.</div>;
@@ -297,8 +301,10 @@ export default function AiAssistantPage() {
             {!activeDraft || activeDraft.status !== "draft" ? <>
               {draftType === "payment_schedule" && <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="ai-vendor">Vendor / beneficiary</Label><Input id="ai-vendor" value={draftPayload.vendorBeneficiary} onChange={(event) => setDraftPayload((payload) => ({ ...payload, vendorBeneficiary: event.target.value }))} placeholder="Vendor or beneficiary" /></div><div className="space-y-2"><Label htmlFor="ai-amount">Requested amount</Label><Input id="ai-amount" type="number" min="1" value={draftPayload.amountRequested} onChange={(event) => setDraftPayload((payload) => ({ ...payload, amountRequested: event.target.value }))} placeholder="0.00" /></div><div className="space-y-2 sm:col-span-2"><Label htmlFor="ai-description">Description</Label><Textarea id="ai-description" value={draftPayload.description} onChange={(event) => setDraftPayload((payload) => ({ ...payload, description: event.target.value }))} placeholder="What is this payment request for?" className="min-h-[82px] resize-none" /></div><div className="space-y-2"><Label htmlFor="ai-date">Schedule date</Label><Input id="ai-date" type="date" value={draftPayload.scheduleDate} onChange={(event) => setDraftPayload((payload) => ({ ...payload, scheduleDate: event.target.value }))} /></div><div className="space-y-2"><Label>Priority</Label><Select value={draftPayload.priority} onValueChange={(priority) => setDraftPayload((payload) => ({ ...payload, priority }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="normal">Normal</SelectItem><SelectItem value="urgent">Urgent</SelectItem></SelectContent></Select></div></div>}
               {draftType === "workflow_notification" && <div className="space-y-4"><div className="space-y-2"><Label htmlFor="ai-notification-message">Notification message</Label><Textarea id="ai-notification-message" value={draftPayload.message} onChange={(event) => setDraftPayload((payload) => ({ ...payload, message: event.target.value }))} placeholder="State the operational issue and recommended action..." className="min-h-[112px] resize-none" /></div><div className="space-y-2"><Label htmlFor="ai-notification-link">In-app destination</Label><Input id="ai-notification-link" value={draftPayload.actionUrl} onChange={(event) => setDraftPayload((payload) => ({ ...payload, actionUrl: event.target.value }))} placeholder="/notifications" /></div></div>}
+              {draftType === "follow_up_task" && <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="ai-task-container">Container number</Label><Input id="ai-task-container" value={draftPayload.containerNumber} onChange={(event) => setDraftPayload((payload) => ({ ...payload, containerNumber: event.target.value }))} placeholder="MSCU1234567" /></div><div className="space-y-2"><Label htmlFor="ai-task-title">Task title</Label><Input id="ai-task-title" value={draftPayload.taskTitle} onChange={(event) => setDraftPayload((payload) => ({ ...payload, taskTitle: event.target.value }))} placeholder="Follow up with shipping line" /></div><div className="space-y-2"><Label htmlFor="ai-task-assignee">Assign to</Label><Select value={draftPayload.assignedStaffId} onValueChange={(assignedStaffId) => setDraftPayload((payload) => ({ ...payload, assignedStaffId }))}><SelectTrigger id="ai-task-assignee"><SelectValue placeholder="Unassigned" /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{activeUsers.map((user) => <SelectItem key={user.id} value={String(user.id)}>{user.name} ({user.role})</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label htmlFor="ai-task-due-date">Due date</Label><Input id="ai-task-due-date" type="date" value={draftPayload.dueDate} onChange={(event) => setDraftPayload((payload) => ({ ...payload, dueDate: event.target.value }))} /></div><div className="space-y-2"><Label>Priority</Label><Select value={draftPayload.taskPriority} onValueChange={(taskPriority) => setDraftPayload((payload) => ({ ...payload, taskPriority }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem><SelectItem value="urgent">Urgent</SelectItem></SelectContent></Select></div><div className="space-y-2 sm:col-span-2"><Label htmlFor="ai-task-notes">Notes</Label><Textarea id="ai-task-notes" value={draftPayload.taskNotes} onChange={(event) => setDraftPayload((payload) => ({ ...payload, taskNotes: event.target.value }))} placeholder="Reason and expected follow-up outcome..." className="min-h-[82px] resize-none" /></div></div>}
+              {draftType === "payment_schedule_reschedule" && <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="ai-reschedule-id">Payment schedule ID</Label><Input id="ai-reschedule-id" inputMode="numeric" value={draftPayload.rescheduleScheduleId} onChange={(event) => setDraftPayload((payload) => ({ ...payload, rescheduleScheduleId: event.target.value }))} placeholder="Schedule ID from Payment Schedule" /></div><div className="space-y-2"><Label htmlFor="ai-reschedule-date">New schedule date</Label><Input id="ai-reschedule-date" type="date" value={draftPayload.rescheduleDate} onChange={(event) => setDraftPayload((payload) => ({ ...payload, rescheduleDate: event.target.value }))} /></div><div className="space-y-2 sm:col-span-2"><Label htmlFor="ai-reschedule-comment">Reason / instruction</Label><Textarea id="ai-reschedule-comment" value={draftPayload.rescheduleComment} onChange={(event) => setDraftPayload((payload) => ({ ...payload, rescheduleComment: event.target.value }))} placeholder="Explain why this payment schedule needs a new date..." className="min-h-[82px] resize-none" /></div></div>}
               {draftType === "management_summary" && <div className="space-y-4"><div className="space-y-2"><Label htmlFor="ai-summary-title">Summary title</Label><Input id="ai-summary-title" value={draftPayload.title} onChange={(event) => setDraftPayload((payload) => ({ ...payload, title: event.target.value }))} placeholder="Monthly management summary" /></div><div className="space-y-2"><Label htmlFor="ai-summary-content">Summary content</Label><Textarea id="ai-summary-content" value={draftPayload.content} onChange={(event) => setDraftPayload((payload) => ({ ...payload, content: event.target.value }))} placeholder="Write the reviewed facts, findings, and recommended next actions..." className="min-h-[132px] resize-none" /></div></div>}
-              <div className="mt-5 flex flex-wrap items-center gap-3"><Button type="button" onClick={() => createDraftMutation.mutate()} disabled={createDraftMutation.isPending} className="gap-2"><ClipboardCheck className="h-4 w-4" />{createDraftMutation.isPending ? "Preparing preview..." : "Prepare preview"}</Button><span className="text-xs text-muted-foreground">Nothing is created or sent at this step.</span></div>
+              <div className="mt-5 flex flex-wrap items-center gap-3"><Button type="button" onClick={() => { const payload = draftType === "follow_up_task" ? { containerNumber: draftPayload.containerNumber, title: draftPayload.taskTitle, assignedStaffId: draftPayload.assignedStaffId === "unassigned" ? null : draftPayload.assignedStaffId, dueDate: draftPayload.dueDate, priority: draftPayload.taskPriority, notes: draftPayload.taskNotes } : draftType === "payment_schedule_reschedule" ? { scheduleId: draftPayload.rescheduleScheduleId, scheduleDate: draftPayload.rescheduleDate, comment: draftPayload.rescheduleComment } : draftPayload; createDraftMutation.mutate(payload); }} disabled={createDraftMutation.isPending} className="gap-2"><ClipboardCheck className="h-4 w-4" />{createDraftMutation.isPending ? "Preparing preview..." : "Prepare preview"}</Button><span className="text-xs text-muted-foreground">Nothing is created or sent at this step.</span></div>
               {createDraftMutation.isError && <p className="mt-3 text-sm text-destructive">{createDraftMutation.error instanceof Error ? createDraftMutation.error.message : "Unable to prepare this action draft."}</p>}
             </> : <div className="rounded-xl border border-primary/25 bg-primary/[0.035] p-5"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="font-semibold">{activeDraft.preview.title}</h3><p className="mt-1 text-sm text-muted-foreground">{activeDraft.preview.description}</p></div><span className="w-fit rounded-full border border-primary/25 bg-background px-2.5 py-1 text-xs font-medium">Preview only</span></div><dl className="mt-5 grid gap-3 sm:grid-cols-2">{activeDraft.preview.fields.map((field) => <div key={field.label} className="rounded-lg border border-border/60 bg-background/75 p-3"><dt className="text-xs text-muted-foreground">{field.label}</dt><dd className="mt-1 break-words text-sm font-medium">{field.value}</dd></div>)}</dl><div className="mt-5 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] p-3 text-sm"><p className="font-medium">Confirmation required</p><p className="mt-1 text-muted-foreground">{activeDraft.preview.confirmationText}</p></div><div className="mt-5 flex flex-wrap gap-3"><Button type="button" onClick={() => confirmDraftMutation.mutate(activeDraft)} disabled={confirmDraftMutation.isPending} className="gap-2"><CheckCircle2 className="h-4 w-4" />{confirmDraftMutation.isPending ? "Confirming..." : "Confirm and execute"}</Button><Button type="button" variant="outline" onClick={() => cancelDraftMutation.mutate(activeDraft)} disabled={cancelDraftMutation.isPending}>Cancel draft</Button></div>{confirmDraftMutation.isError && <p className="mt-3 text-sm text-destructive">{confirmDraftMutation.error instanceof Error ? confirmDraftMutation.error.message : "Unable to confirm this action."}</p>}{activeDraft.executionResult?.href && <Button variant="link" type="button" className="mt-3 h-auto px-0" onClick={() => setLocation(activeDraft.executionResult!.href!)}>Open resulting record <ExternalLink className="ml-1 h-3.5 w-3.5" /></Button>}</div>}
             {actionDrafts.filter((draft) => draft.status === "draft").length > 0 && <p className="mt-5 text-xs text-muted-foreground">{actionDrafts.filter((draft) => draft.status === "draft").length} other active draft{actionDrafts.filter((draft) => draft.status === "draft").length === 1 ? "" : "s"} saved for your current branch.</p>}
