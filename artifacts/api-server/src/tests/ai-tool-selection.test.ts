@@ -65,6 +65,7 @@ describe("AI operational business definitions", () => {
   it("distinguishes physical terminal presence from the Terminal/TDO department queue", () => {
     expect(isPhysicalTerminalPresenceQuestion("How many jobs are in the terminal?")).toBe(true);
     expect(isPhysicalTerminalPresenceQuestion("Show containers at the terminal")).toBe(true);
+    expect(isPhysicalTerminalPresenceQuestion("containers in the terminals")).toBe(true);
     expect(isPhysicalTerminalPresenceQuestion("How many Terminal / TDO active jobs are there?")).toBe(false);
     expect(isPhysicalTerminalPresenceQuestion("Show jobs awaiting TDO release")).toBe(false);
   });

@@ -39,7 +39,7 @@ export const AI_BUSINESS_DEFINITIONS: readonly AiBusinessDefinition[] = [
   { term: "Vessel ETA", aliases: ["ETA", "arrival date", "revised ETA"], category: "operations", definition: "The expected vessel arrival or berthing date. ETA is a plan and may be revised; it is not proof that the vessel has berthed." },
   { term: "Berthing", aliases: ["vessel berthed", "berthed at port", "berthing confirmation"], category: "operations", definition: "Confirmation that the vessel has berthed at the port. It is recorded only by an assigned Berthing Officer and is separate from ETA." },
   { term: "Berthing Officer", aliases: ["berthing confirmation officer"], category: "operations", definition: "One or more users selected in Settings who may confirm berthing or revise a berthing ETA. Other users have read-only visibility." },
-  { term: "In terminal", aliases: ["at terminal", "physically in terminal", "containers in terminal"], category: "operations", definition: "A container physically present in the terminal: it is at Gate-In, Examination, or Final Release and has not been gate-out. It is not the Terminal/TDO department queue and does not include Pullout." },
+  { term: "In terminal", aliases: ["at terminal", "at terminals", "physically in terminal", "containers in terminal", "containers in terminals"], category: "operations", definition: "A container physically present in the terminal: it is at Gate-In, Examination, or Final Release and has not been gate-out. It is not the Terminal/TDO department queue and does not include Pullout." },
   { term: "Gate-In", aliases: ["gate in", "gate-in date"], category: "operations", definition: "The operational state after a container has entered the terminal gate. It counts as physically in the terminal until gate-out." },
   { term: "Examination", aliases: ["exam", "customs examination"], category: "operations", definition: "The physical terminal workflow state for examination. It counts as physically in the terminal until gate-out." },
   { term: "Final Release", aliases: ["final released"], category: "operations", definition: "A physical terminal workflow state after final release. It still counts as physically in the terminal until gate-out." },
@@ -136,7 +136,7 @@ export function resolveAiOperationalStage(question: string): AiOperationalStage 
 
 export function isPhysicalTerminalPresenceQuestion(question: string): boolean {
   const normalisedQuestion = question.trim().toLowerCase().replace(/\s+/g, " ");
-  const refersToTerminalLocation = /\b(?:in|at) (?:the )?terminal\b/.test(normalisedQuestion);
+  const refersToTerminalLocation = /\b(?:in|at) (?:the )?terminals?\b/.test(normalisedQuestion);
   const asksAboutJobsOrContainers = /\b(?:how many|count|list|show|which|job|jobs|container|containers)\b/.test(normalisedQuestion);
   const explicitlyRefersToDepartmentQueue = resolveAiOperationalStage(normalisedQuestion) === "terminal";
   return refersToTerminalLocation && asksAboutJobsOrContainers && !explicitlyRefersToDepartmentQueue;
