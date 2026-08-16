@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { AlertTriangle, Bell, Bot, CalendarClock, CheckCircle2, ClipboardCheck, Download, ExternalLink, FileBarChart, FilePlus2, FileSearch, ListTodo, Loader2, LockKeyhole, Printer, RefreshCw, Send, Settings2, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, Bell, Bot, CalendarClock, CheckCircle2, ClipboardCheck, Download, ExternalLink, FileBarChart, FilePlus2, FileSearch, ListTodo, Loader2, LockKeyhole, Printer, RefreshCw, Send, Settings2, ShieldCheck, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { customFetch, useListUsers } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -195,6 +195,9 @@ export default function AiAssistantPage() {
       setQuestion("");
     },
   });
+  const feedbackMutation = useMutation({
+    mutationFn: ({ sessionId, rating }: { sessionId: number; rating: "helpful" | "not_helpful" }) => customFetch("/api/ai-assistant/feedback", { method: "POST", body: JSON.stringify({ sessionId, rating }) }),
+  });
   const createDraftMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => customFetch<AssistantActionDraft>("/api/ai-assistant/actions/drafts", {
       method: "POST",
@@ -325,7 +328,7 @@ export default function AiAssistantPage() {
                   {message.calculations.length > 0 && <div className="mt-4 rounded-lg border border-border/60 bg-background/60 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calculations</p>{message.calculations.map((calculation) => <p key={calculation} className="mt-1 text-sm">{calculation}</p>)}</div>}
                   {message.recommendations?.length > 0 && <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.035] p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Suggested next steps</p>{message.recommendations.map((recommendation) => <p key={recommendation} className="mt-1 text-sm">{recommendation}</p>)}</div>}
                   {message.records.length > 0 && <div className="mt-4 space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cited records</p>{message.records.map((record) => <button key={`${record.href}-${record.title}`} type="button" onClick={() => setLocation(record.href)} className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/80 p-3 text-left hover:bg-accent/40"><div className="min-w-0"><p className="font-medium">{record.title}</p><p className="mt-0.5 truncate text-sm text-muted-foreground">{record.detail}</p></div><ExternalLink className="h-4 w-4 shrink-0 text-primary" /></button>)}</div>}
-                  <div className="mt-4 border-t border-border/50 pt-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence, assumptions and limits</p><p className="mt-1 text-xs text-muted-foreground">{message.evidenceNotice}</p>{message.evidenceFactLabels.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Answer evidence: {message.evidenceFactLabels.join(", ")}</p>}{message.evidenceRecordHrefs.length > 0 && <p className="mt-1 text-xs text-muted-foreground">The answer is linked to {message.evidenceRecordHrefs.length} cited record{message.evidenceRecordHrefs.length === 1 ? "" : "s"} above.</p>}{message.assumptions.map((assumption) => <p key={assumption} className="mt-1 text-xs text-muted-foreground">{assumption}</p>)}</div>
+                  <div className="mt-4 border-t border-border/50 pt-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence, assumptions and limits</p><div className="flex items-center gap-1"><span className="mr-1 text-xs text-muted-foreground">Was this useful?</span><Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Helpful" onClick={() => feedbackMutation.mutate({ sessionId: message.sessionId, rating: "helpful" })} disabled={feedbackMutation.isPending}><ThumbsUp className="h-3.5 w-3.5" /></Button><Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Not helpful" onClick={() => feedbackMutation.mutate({ sessionId: message.sessionId, rating: "not_helpful" })} disabled={feedbackMutation.isPending}><ThumbsDown className="h-3.5 w-3.5" /></Button></div></div><p className="mt-1 text-xs text-muted-foreground">{message.evidenceNotice}</p>{message.evidenceFactLabels.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Answer evidence: {message.evidenceFactLabels.join(", ")}</p>}{message.evidenceRecordHrefs.length > 0 && <p className="mt-1 text-xs text-muted-foreground">The answer is linked to {message.evidenceRecordHrefs.length} cited record{message.evidenceRecordHrefs.length === 1 ? "" : "s"} above.</p>}{message.assumptions.map((assumption) => <p key={assumption} className="mt-1 text-xs text-muted-foreground">{assumption}</p>)}</div>
                 </div>
               </div>)}
               {askMutation.isPending && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Checking authorised records...</div>}

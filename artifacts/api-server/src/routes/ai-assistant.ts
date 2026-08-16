@@ -44,6 +44,9 @@ type AiAssistantGovernance = {
   monthlyBudgetNgn: number;
   auditRetentionDays: number;
   actionPolicy: "human_confirmation_required";
+  providerEnabled: boolean;
+  rolloutStage: "super_admin_only" | "selected_admins" | "all_authorized_admins";
+  selectedAdminUserIds: number[];
 };
 
 const ALLOWED_DOMAINS = new Set<AiAssistantDataDomain>([
@@ -57,6 +60,9 @@ const DEFAULT_GOVERNANCE: AiAssistantGovernance = {
   monthlyBudgetNgn: 100_000,
   auditRetentionDays: 365,
   actionPolicy: "human_confirmation_required",
+  providerEnabled: false,
+  rolloutStage: "super_admin_only",
+  selectedAdminUserIds: [],
 };
 
 function parseGovernance(value: string | undefined): AiAssistantGovernance {
@@ -80,6 +86,13 @@ function parseGovernance(value: string | undefined): AiAssistantGovernance {
       Number(parsed.auditRetentionDays) > 3650
     ) return DEFAULT_GOVERNANCE;
 
+    const rolloutStage = parsed.rolloutStage === "super_admin_only" || parsed.rolloutStage === "selected_admins" || parsed.rolloutStage === "all_authorized_admins"
+      ? parsed.rolloutStage
+      // Existing saved configurations predate rollout controls. Preserve their current access.
+      : "all_authorized_admins";
+    const selectedAdminUserIds = Array.isArray(parsed.selectedAdminUserIds)
+      ? [...new Set(parsed.selectedAdminUserIds.map(Number))].filter((id) => Number.isInteger(id) && id > 0)
+      : [];
     return {
       accessRoles: [...new Set(parsed.accessRoles)] as AiAssistantGovernance["accessRoles"],
       mode: "read_only",
@@ -87,11 +100,44 @@ function parseGovernance(value: string | undefined): AiAssistantGovernance {
       monthlyBudgetNgn: Number(parsed.monthlyBudgetNgn),
       auditRetentionDays: Number(parsed.auditRetentionDays),
       actionPolicy: "human_confirmation_required",
+      providerEnabled: typeof parsed.providerEnabled === "boolean" ? parsed.providerEnabled : true,
+      rolloutStage,
+      selectedAdminUserIds,
     };
   } catch {
     return DEFAULT_GOVERNANCE;
   }
 }
+
+async function getAiGovernance(): Promise<AiAssistantGovernance> {
+  const [setting] = await db.select({ value: settingsTable.value })
+    .from(settingsTable)
+    .where(eq(settingsTable.key, "aiAssistantGovernance"))
+    .limit(1);
+  return parseGovernance(setting?.value);
+}
+
+function canUseAiAssistant(user: NonNullable<AuthRequest["user"]>, governance: AiAssistantGovernance): boolean {
+  if (user.role === "super_admin") return true;
+  if (user.role !== "admin") return false;
+  if (governance.rolloutStage === "all_authorized_admins") return true;
+  return governance.rolloutStage === "selected_admins" && governance.selectedAdminUserIds.includes(user.id);
+}
+
+async function requireAiAssistantRollout(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const governance = await getAiGovernance();
+    if (!req.user || !canUseAiAssistant(req.user, governance)) {
+      return res.status(403).json({ error: "AI Assistant access is not enabled for your account in the current rollout stage." });
+    }
+    return next();
+  } catch (error) {
+    console.error("[ai-assistant] Failed to check rollout access", error);
+    return res.status(500).json({ error: "Unable to verify AI Assistant access." });
+  }
+}
+
+aiAssistantRouter.use(requireAdmin, requireAiAssistantRollout);
 
 type RateBucket = { startedAt: number; count: number };
 const rateBuckets = new Map<number, RateBucket>();
@@ -217,13 +263,8 @@ async function interpretNaturalLanguageQuestion(question: string, req: AuthReque
   if (contextualIntent && TOOL_IDS.has(contextualIntent.toolId)) {
     return { toolId: contextualIntent.toolId as ToolId, args: contextualIntent.args, label: contextualIntent.label };
   }
-  if (!isNaturalLanguageRoutingConfigured()) return interpretQuestionFallback(question);
-
-  const [setting] = await db.select({ value: settingsTable.value })
-    .from(settingsTable)
-    .where(eq(settingsTable.key, "aiAssistantGovernance"))
-    .limit(1);
-  const governance = parseGovernance(setting?.value);
+  const governance = await getAiGovernance();
+  if (!governance.providerEnabled || !isNaturalLanguageRoutingConfigured()) return interpretQuestionFallback(question);
   const approvedTools = TOOL_CATALOG
     .filter((tool) => governance.dataDomains.includes(tool.domain))
     .map((tool) => ({ id: tool.id, title: tool.title, description: tool.description }));
@@ -430,7 +471,7 @@ function evidenceConfidenceNotice(result: AssistantToolResult): string {
   return "Evidence is current at the time of this request and is limited to the cited records within your authorised branch scope.";
 }
 
-async function makeCopilotAnswer(sessionId: number, question: string, intent: CopilotIntent, result?: AssistantToolResult): Promise<CopilotAnswer> {
+async function makeCopilotAnswer(sessionId: number, question: string, intent: CopilotIntent, result: AssistantToolResult | undefined, providerEnabled: boolean): Promise<CopilotAnswer> {
   if (!intent.toolId || !result) {
     return {
       sessionId,
@@ -452,14 +493,14 @@ async function makeCopilotAnswer(sessionId: number, question: string, intent: Co
   const noData = result.facts.every((fact) => fact.value === 0 || fact.value === "₦0.00") && result.records.length === 0;
   const calculations = result.facts.filter((fact) => /invoiced|collected|outstanding|balance|overhead|payments/i.test(fact.label))
     .map((fact) => `${fact.label}: ${fact.value}`);
-  const evidence = (await generateEvidenceBasedAnswer({
+  const evidence = (providerEnabled ? await generateEvidenceBasedAnswer({
     question,
     toolTitle: result.title,
     scopeLabel: result.scope.label,
     facts: result.facts,
     records: result.records,
     notes: result.notes,
-  })) ?? deterministicEvidenceAnswer(intent, noData);
+  }) : null) ?? deterministicEvidenceAnswer(intent, noData);
   return {
     sessionId,
     question,
@@ -1527,20 +1568,17 @@ function formatReportDraft(draft: typeof aiAssistantReportDraftsTable.$inferSele
 
 aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit, async (_req: AuthRequest, res) => {
   try {
-    const [setting] = await db.select({ value: settingsTable.value })
-      .from(settingsTable)
-      .where(eq(settingsTable.key, "aiAssistantGovernance"))
-      .limit(1);
-    const governance = parseGovernance(setting?.value);
+    const governance = await getAiGovernance();
+    const providerAvailable = governance.providerEnabled && isNaturalLanguageRoutingConfigured();
     return res.json({
-      phase: "controlled_assisted_actions",
+      phase: "evaluation_monitoring_and_rollout",
       available: true,
-      modelConnected: isNaturalLanguageRoutingConfigured(),
-      copilotMode: isNaturalLanguageRoutingConfigured() ? "natural_language_read_only_with_confirmed_actions" : "guided_read_only_with_confirmed_actions",
+      modelConnected: providerAvailable,
+      copilotMode: providerAvailable ? "natural_language_read_only_with_confirmed_actions" : "guided_read_only_with_confirmed_actions",
       naturalLanguageRouting: {
-        configured: isNaturalLanguageRoutingConfigured(),
-        provider: isNaturalLanguageRoutingConfigured() ? "OpenAI" : null,
-        configurationHint: isNaturalLanguageRoutingConfigured() ? null : "Set AI_ASSISTANT_OPENAI_API_KEY in Railway to enable natural-language tool selection.",
+        configured: providerAvailable,
+        provider: providerAvailable ? "OpenAI" : null,
+        configurationHint: !governance.providerEnabled ? "Natural-language provider requests are disabled in AI Governance. Approved tools and report requests remain available." : isNaturalLanguageRoutingConfigured() ? null : "Set AI_ASSISTANT_OPENAI_API_KEY in Railway to enable natural-language tool selection.",
       },
       governance,
       approvedToolCount: TOOL_CATALOG.filter((tool) => governance.dataDomains.includes(tool.domain)).length,
@@ -1551,6 +1589,8 @@ aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit,
         "Only approved, permission-scoped tools can read live data",
         "Each permitted action is previewed, confirmation-gated, branch-scoped, and audited",
         "Every tool result records its sources and audit event",
+        "Natural-language provider can be disabled immediately without affecting approved tools or reports",
+        "Rollout access, questions, feedback, and failures are monitored in the audit trail",
       ],
     });
   } catch (error) {
@@ -1785,15 +1825,17 @@ aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, a
   if (!question || question.length > 1_000) return res.status(400).json({ error: "Ask a question between 1 and 1,000 characters." });
 
   let activeSessionId: number | null = null;
+  const startedAt = Date.now();
   try {
     const session = await getOrCreateSession(req, body.sessionId, question);
     activeSessionId = session.id;
     const sessionContext = !session.contextExpiresAt || session.contextExpiresAt.getTime() > Date.now()
       ? parseAiConversationContext(session.conversationContext, getBranchScope(req), TOOL_IDS)
       : null;
+    const governance = await getAiGovernance();
     const intent = await interpretNaturalLanguageQuestion(question, req, sessionContext);
     const result = intent.toolId ? await runApprovedTool(intent.toolId, req, intent.args) : undefined;
-    const answer = await makeCopilotAnswer(session.id, question, intent, result);
+    const answer = await makeCopilotAnswer(session.id, question, intent, result, governance.providerEnabled && isNaturalLanguageRoutingConfigured());
     const now = new Date();
     const nextContext = intent.toolId && result ? buildAiConversationContext({
       branchId: getBranchScope(req),
@@ -1821,7 +1863,7 @@ aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, a
       responseSummary: answer.answer,
       toolName: intent.toolId ?? "none",
       recordReferences: answer.citations,
-      metadata: { intent: intent.label, status: answer.status, factCount: answer.facts.length, citationCount: answer.citations.length, naturalLanguageRoutingConfigured: isNaturalLanguageRoutingConfigured(), contextUsed: !!sessionContext, contextExpiresAt: nextContext ? new Date(now.getTime() + CONTEXT_TTL_MS).toISOString() : session.contextExpiresAt?.toISOString() ?? null },
+      metadata: { intent: intent.label, status: answer.status, factCount: answer.facts.length, citationCount: answer.citations.length, naturalLanguageRoutingConfigured: governance.providerEnabled && isNaturalLanguageRoutingConfigured(), providerEnabled: governance.providerEnabled, latencyMs: Date.now() - startedAt, contextUsed: !!sessionContext, contextExpiresAt: nextContext ? new Date(now.getTime() + CONTEXT_TTL_MS).toISOString() : session.contextExpiresAt?.toISOString() ?? null },
     });
     return res.json(answer);
   } catch (error) {
@@ -1835,13 +1877,38 @@ aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, a
         eventType: "copilot_question_failed",
         requestSummary: question,
         responseSummary: message,
-        metadata: { sessionId: activeSessionId },
+        metadata: { sessionId: activeSessionId, latencyMs: Date.now() - startedAt },
       });
     } catch (auditError) {
       console.error("[ai-assistant] Failed to audit copilot error", auditError);
     }
     return res.status(message.includes("disabled by AI Assistant governance") ? 403 : 400).json({ error: message });
   }
+});
+
+aiAssistantRouter.post("/ai-assistant/feedback", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
+  const rating = body.rating === "helpful" || body.rating === "not_helpful" ? body.rating : null;
+  const sessionId = Number(body.sessionId);
+  const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 500) : "";
+  if (!rating || !Number.isInteger(sessionId) || sessionId <= 0) return res.status(400).json({ error: "Provide a valid answer session and feedback rating." });
+  const [session] = await db.select().from(aiAssistantSessionsTable).where(and(eq(aiAssistantSessionsTable.id, sessionId), eq(aiAssistantSessionsTable.userId, req.user!.id))).limit(1);
+  if (!session) return res.status(404).json({ error: "AI Assistant session was not found." });
+  await recordAiAssistantAuditEvent({ userId: req.user!.id, branchId: getBranchScope(req), sessionId, eventType: "copilot_feedback", requestSummary: rating, responseSummary: comment || null, metadata: { rating } });
+  return res.status(201).json({ success: true });
+});
+
+aiAssistantRouter.get("/ai-assistant/monitoring", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  if (req.user!.role !== "super_admin") return res.status(403).json({ error: "Only Super Admins can view AI monitoring." });
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const rows = await db.select().from(aiAssistantAuditLogsTable).orderBy(desc(aiAssistantAuditLogsTable.createdAt)).limit(1000);
+  const recent = rows.filter((row) => row.createdAt >= since && (getBranchScope(req) == null || row.branchId === getBranchScope(req)));
+  const questions = recent.filter((row) => row.eventType === "copilot_question_answered");
+  const failures = recent.filter((row) => row.eventType === "copilot_question_failed");
+  const feedback = recent.filter((row) => row.eventType === "copilot_feedback");
+  const meta = (value: string) => parseJson<Record<string, unknown>>(value, {});
+  const latencies = questions.map((row) => Number(meta(row.metadata).latencyMs)).filter(Number.isFinite);
+  return res.json({ periodDays: 30, questions: questions.length, failures: failures.length, unsupported: questions.filter((row) => meta(row.metadata).status === "unsupported").length, averageLatencyMs: latencies.length ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length) : null, providerRequests: questions.filter((row) => meta(row.metadata).naturalLanguageRoutingConfigured === true).length, providerCost: { currency: "NGN", amount: null, note: "Token-cost metering is not enabled. Provider request counts are retained for budget review." }, feedback: { helpful: feedback.filter((row) => meta(row.metadata).rating === "helpful").length, notHelpful: feedback.filter((row) => meta(row.metadata).rating === "not_helpful").length } });
 });
 
 aiAssistantRouter.post("/ai-assistant/tools/:toolId", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {

@@ -7,6 +7,7 @@ const EMAIL_ALERT_IDS = new Set([
 ]);
 
 const AI_ASSISTANT_ACCESS_ROLES = new Set(["admin", "super_admin"]);
+const AI_ASSISTANT_ROLLOUT_STAGES = new Set(["super_admin_only", "selected_admins", "all_authorized_admins"]);
 const AI_ASSISTANT_DATA_DOMAINS = new Set([
   "dashboard",
   "operations",
@@ -106,7 +107,7 @@ export function validateSettingsPayload(payload: unknown): { values: Record<stri
       const policy = governance as Record<string, unknown>;
       const keys = Object.keys(policy);
       const allowedKeys = new Set([
-        "accessRoles", "mode", "dataDomains", "monthlyBudgetNgn", "auditRetentionDays", "actionPolicy",
+        "accessRoles", "mode", "dataDomains", "monthlyBudgetNgn", "auditRetentionDays", "actionPolicy", "providerEnabled", "rolloutStage", "selectedAdminUserIds",
       ]);
       if (keys.some((key) => !allowedKeys.has(key))) throw new Error();
       if (!Array.isArray(policy.accessRoles) || policy.accessRoles.length === 0 || policy.accessRoles.some((role) => typeof role !== "string" || !AI_ASSISTANT_ACCESS_ROLES.has(role))) throw new Error();
@@ -115,6 +116,10 @@ export function validateSettingsPayload(payload: unknown): { values: Record<stri
       if (!Number.isInteger(policy.monthlyBudgetNgn) || Number(policy.monthlyBudgetNgn) < 0 || Number(policy.monthlyBudgetNgn) > 50_000_000) throw new Error();
       if (!Number.isInteger(policy.auditRetentionDays) || Number(policy.auditRetentionDays) < 30 || Number(policy.auditRetentionDays) > 3650) throw new Error();
       if (policy.actionPolicy !== "human_confirmation_required") throw new Error();
+      if ("providerEnabled" in policy && typeof policy.providerEnabled !== "boolean") throw new Error();
+      if ("rolloutStage" in policy && (typeof policy.rolloutStage !== "string" || !AI_ASSISTANT_ROLLOUT_STAGES.has(policy.rolloutStage))) throw new Error();
+      if ("selectedAdminUserIds" in policy && (!Array.isArray(policy.selectedAdminUserIds) || policy.selectedAdminUserIds.some((id) => !Number.isInteger(id) || Number(id) <= 0))) throw new Error();
+      if (policy.rolloutStage === "selected_admins" && (!Array.isArray(policy.selectedAdminUserIds) || policy.selectedAdminUserIds.length === 0)) throw new Error();
     } catch {
       return { values: {}, officerIds: [], error: "AI governance settings must use the approved read-only access, scope, budget, and audit policy format." };
     }

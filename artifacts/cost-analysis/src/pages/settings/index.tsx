@@ -47,6 +47,9 @@ type AiAssistantGovernance = {
   monthlyBudgetNgn: number;
   auditRetentionDays: number;
   actionPolicy: "human_confirmation_required";
+  providerEnabled: boolean;
+  rolloutStage: "super_admin_only" | "selected_admins" | "all_authorized_admins";
+  selectedAdminUserIds: number[];
 };
 type AiProactiveBriefingPreferences = { enabled: boolean; daily: boolean; weekly: boolean };
 
@@ -57,6 +60,9 @@ const DEFAULT_AI_GOVERNANCE: AiAssistantGovernance = {
   monthlyBudgetNgn: 100000,
   auditRetentionDays: 365,
   actionPolicy: "human_confirmation_required",
+  providerEnabled: false,
+  rolloutStage: "super_admin_only",
+  selectedAdminUserIds: [],
 };
 const DEFAULT_AI_PROACTIVE_BRIEFINGS: AiProactiveBriefingPreferences = { enabled: false, daily: true, weekly: true };
 
@@ -85,6 +91,8 @@ function parseAiAssistantGovernance(value?: string): AiAssistantGovernance {
       const dataDomains: AiAssistantDataDomain[] = rawDataDomains.filter((domain): domain is AiAssistantDataDomain =>
         typeof domain === "string" && AI_DATA_DOMAINS.some((item) => item.id === domain),
       );
+      const rawSelectedAdminUserIds: unknown[] = Array.isArray(parsed.selectedAdminUserIds) ? parsed.selectedAdminUserIds as unknown[] : [];
+      const selectedAdminUserIds = [...new Set<number>(rawSelectedAdminUserIds.map((id) => Number(id)).filter((id): id is number => Number.isInteger(id) && id > 0))];
       return {
         accessRoles: ["admin", "super_admin"],
         mode: "read_only",
@@ -92,6 +100,9 @@ function parseAiAssistantGovernance(value?: string): AiAssistantGovernance {
         monthlyBudgetNgn: Math.max(0, parsed.monthlyBudgetNgn),
         auditRetentionDays: Math.max(30, parsed.auditRetentionDays),
         actionPolicy: "human_confirmation_required",
+        providerEnabled: typeof parsed.providerEnabled === "boolean" ? parsed.providerEnabled : true,
+        rolloutStage: parsed.rolloutStage === "super_admin_only" || parsed.rolloutStage === "selected_admins" || parsed.rolloutStage === "all_authorized_admins" ? parsed.rolloutStage : "all_authorized_admins",
+        selectedAdminUserIds,
       };
     }
   } catch {}
@@ -806,6 +817,14 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              <div className="grid gap-4 rounded-xl border border-border/60 bg-background/40 p-4 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-4"><div><Label>Natural-language provider</Label><p className="mt-1 text-xs text-muted-foreground">Kill switch for OpenAI requests. Approved local tools and report requests continue to work.</p></div><Switch checked={aiGovernance.providerEnabled} onCheckedChange={(providerEnabled) => { setAiGovernance((current) => ({ ...current, providerEnabled })); mark(); }} /></div>
+                </div>
+                <div className="space-y-2"><Label>Rollout access</Label><Select value={aiGovernance.rolloutStage} onValueChange={(rolloutStage: AiAssistantGovernance["rolloutStage"]) => { setAiGovernance((current) => ({ ...current, rolloutStage })); mark(); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="super_admin_only">Super Admins only</SelectItem><SelectItem value="selected_admins">Selected Admins</SelectItem><SelectItem value="all_authorized_admins">All Admins and Super Admins</SelectItem></SelectContent></Select><p className="text-xs text-muted-foreground">Super Admins always retain access to configure and monitor the assistant.</p></div>
+              </div>
+              {aiGovernance.rolloutStage === "selected_admins" && <div className="space-y-2"><Label>Selected Admins</Label><div className="grid gap-2 md:grid-cols-2">{users.filter((user) => user.isActive && user.role === "admin").map((user) => { const checked = aiGovernance.selectedAdminUserIds.includes(user.id); return <label key={user.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/40 p-3 text-sm"><Checkbox checked={checked} onCheckedChange={(next) => { setAiGovernance((current) => ({ ...current, selectedAdminUserIds: next ? [...new Set([...current.selectedAdminUserIds, user.id])] : current.selectedAdminUserIds.filter((id) => id !== user.id) })); mark(); }} />{user.name}</label>; })}</div><p className="text-xs text-muted-foreground">Choose at least one active Admin before saving this rollout stage.</p></div>}
             </CardContent>
           </Card>
 
