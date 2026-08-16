@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseEvidenceBasedAnswer, parseNaturalLanguageSelection, sanitizeToolArguments } from "../lib/ai-tool-selection.js";
+import { isPhysicalTerminalPresenceQuestion, parseEvidenceBasedAnswer, parseNaturalLanguageSelection, sanitizeToolArguments } from "../lib/ai-tool-selection.js";
 
 describe("AI natural-language tool selection", () => {
   const allowedTools = new Set(["stage_count", "stage_jobs", "container_lookup"]);
@@ -57,5 +57,14 @@ describe("AI evidence answer validation", () => {
   it("rejects invented citations and figures before they reach the user", () => {
     expect(parseEvidenceBasedAnswer({ directAnswer: "There are 99 containers.", factLabels: ["Invented fact"], recordHrefs: ["/containers/12"] }, evidence)).toBeNull();
     expect(parseEvidenceBasedAnswer({ directAnswer: "There are 99 containers.", factLabels: ["Open containers"], recordHrefs: ["/containers/12"] }, evidence)).toBeNull();
+  });
+});
+
+describe("AI operational business definitions", () => {
+  it("distinguishes physical terminal presence from the Terminal/TDO department queue", () => {
+    expect(isPhysicalTerminalPresenceQuestion("How many jobs are in the terminal?")).toBe(true);
+    expect(isPhysicalTerminalPresenceQuestion("Show containers at the terminal")).toBe(true);
+    expect(isPhysicalTerminalPresenceQuestion("How many Terminal / TDO active jobs are there?")).toBe(false);
+    expect(isPhysicalTerminalPresenceQuestion("Show jobs awaiting TDO release")).toBe(false);
   });
 });

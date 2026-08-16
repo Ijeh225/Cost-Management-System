@@ -30,7 +30,7 @@ import {
 import { and, desc, eq, gte, ilike, inArray, ne } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
 import { formatProactiveBriefing, generateProactiveBriefing } from "../lib/ai-proactive-intelligence.js";
-import { AiProviderUsage, generateEvidenceBasedAnswer, isNaturalLanguageRoutingConfigured, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
+import { AiProviderUsage, generateEvidenceBasedAnswer, isNaturalLanguageRoutingConfigured, isPhysicalTerminalPresenceQuestion, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
 import { AiConversationContext, buildAiConversationContext, parseAiConversationContext, resolveConversationFollowUp } from "../lib/ai-conversation-context.js";
 import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
@@ -284,6 +284,11 @@ function interpretQuestionFallback(question: string): CopilotIntent {
 }
 
 async function interpretNaturalLanguageQuestion(question: string, req: AuthRequest, context: AiConversationContext | null, onUsage?: (usage: AiProviderUsage) => void): Promise<CopilotIntent> {
+  // This must run before model/context routing: “in the terminal” is the
+  // dashboard's physical-location metric, not the Terminal/TDO work queue.
+  if (isPhysicalTerminalPresenceQuestion(question)) {
+    return { toolId: "operations_overview", args: {}, label: "physical terminal presence" };
+  }
   const contextualIntent = resolveConversationFollowUp(question, context, new Set(Object.keys(STAGE_TOOL_FIELDS)));
   if (contextualIntent && TOOL_IDS.has(contextualIntent.toolId)) {
     return { toolId: contextualIntent.toolId as ToolId, args: contextualIntent.args, label: contextualIntent.label };
