@@ -11,11 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 type AssistantStatus = {
-  phase: "controlled_assisted_actions";
+  phase: "natural_language_tool_selection";
   available: true;
-  modelConnected: false;
-  copilotMode: "guided_read_only_with_confirmed_actions";
+  modelConnected: boolean;
+  copilotMode: "guided_read_only_with_confirmed_actions" | "natural_language_read_only_with_confirmed_actions";
   approvedToolCount: number;
+  naturalLanguageRouting: { configured: boolean; provider: "OpenAI" | null; configurationHint: string | null };
   governance: { accessRoles: string[]; mode: "read_only"; auditRetentionDays: number; actionPolicy: "human_confirmation_required" };
   safeguards: string[];
 };
@@ -175,7 +176,9 @@ export default function AiAssistantPage() {
         <Button variant="outline" className="gap-2" onClick={() => setLocation("/settings")}><Settings2 className="h-4 w-4" />Review Governance</Button>
       </div>
 
-      <Card className="border-primary/20 bg-primary/[0.03] shadow-sm"><CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-primary" /><div><p className="font-medium">Phase 7: Proactive finance &amp; control intelligence</p><p className="mt-1 text-sm text-muted-foreground">Ask supported questions about live records, readable documents, financial summaries, receivables ageing, bank ledger entries, and review prompts. The copilot uses only {status.approvedToolCount} approved tools, cites each source record, and can surface evidence-based risks before they become larger issues.</p></div></div><span className="w-fit rounded-full border border-primary/20 bg-background px-3 py-1.5 text-xs font-medium">Draft + confirmation required</span></CardContent></Card>
+      <Card className="border-primary/20 bg-primary/[0.03] shadow-sm"><CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-primary" /><div><p className="font-medium">Natural-language routing with approved tools</p><p className="mt-1 text-sm text-muted-foreground">Ask in ordinary language. The copilot can select only from {status.approvedToolCount} approved, permission-scoped read tools, then cites the live source records it used. {status.naturalLanguageRouting.configured ? "Natural-language routing is enabled." : "Guided fallback remains active until natural-language routing is configured."}</p></div></div><span className="w-fit rounded-full border border-primary/20 bg-background px-3 py-1.5 text-xs font-medium">{status.naturalLanguageRouting.configured ? "AI routing enabled" : "Guided fallback"}</span></CardContent></Card>
+
+      {!status.naturalLanguageRouting.configured && <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-4 text-sm text-muted-foreground"><p className="font-medium text-foreground">Natural-language routing is not configured yet</p><p className="mt-1">{status.naturalLanguageRouting.configurationHint} Until then, the existing supported-question fallback remains available and all data access stays restricted to approved tools.</p></div>}
 
       <Card className="border-border/60 bg-card shadow-sm">
         <CardHeader className="flex flex-col gap-3 border-b border-border/60 p-6 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="flex items-center gap-2 text-lg"><AlertTriangle className="h-5 w-5 text-primary" />Proactive finance & control briefing</CardTitle><p className="mt-1 text-sm text-muted-foreground">Defined risk rules scan your authorised branch for berthing, operational, documentation, receivable, and payable issues. This is evidence, not speculation.</p></div><Button type="button" variant="outline" className="gap-2" onClick={() => generateBriefingMutation.mutate()} disabled={generateBriefingMutation.isPending}><RefreshCw className={`h-4 w-4 ${generateBriefingMutation.isPending ? "animate-spin" : ""}`} />{generateBriefingMutation.isPending ? "Generating..." : "Generate current briefing"}</Button></CardHeader>

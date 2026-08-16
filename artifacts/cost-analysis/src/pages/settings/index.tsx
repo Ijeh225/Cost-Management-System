@@ -783,7 +783,7 @@ export default function SettingsPage() {
                   <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Phase 0: Governance only</p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">No chatbot, provider key, document indexing, or live-data access is active yet. These settings define the boundaries that future implementation must obey.</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">The assistant is limited to approved, permission-scoped tools. Natural-language routing is enabled only after an administrator configures the Railway provider key; it never receives direct database access.</p>
                   </div>
                 </div>
               </div>

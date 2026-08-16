@@ -28,6 +28,7 @@ import {
 import { and, desc, eq, ilike, inArray, ne } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
 import { formatProactiveBriefing, generateProactiveBriefing } from "../lib/ai-proactive-intelligence.js";
+import { isNaturalLanguageRoutingConfigured, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 
 export const aiAssistantRouter = Router();
@@ -133,7 +134,7 @@ const TOOL_CATALOG = [
 type ToolId = typeof TOOL_CATALOG[number]["id"];
 const TOOL_IDS = new Set<string>(TOOL_CATALOG.map((tool) => tool.id));
 
-type CopilotIntent = { toolId: ToolId; args: Record<string, unknown>; label: string } | { toolId: null; args: Record<string, never>; label: string };
+type CopilotIntent = { toolId: ToolId; args: Record<string, unknown>; label: string; clarification?: never } | { toolId: null; args: Record<string, never>; label: string; clarification?: string };
 type CopilotAnswer = {
   sessionId: number;
   question: string;
@@ -171,7 +172,7 @@ function documentSearchQuery(question: string): string {
     .slice(0, 160);
 }
 
-function interpretQuestion(question: string): CopilotIntent {
+function interpretQuestionFallback(question: string): CopilotIntent {
   const normalised = question.trim().toLowerCase();
   if (/(document|file|attachment)/.test(normalised) && /(search|find|contain|mention|show|list)/.test(normalised)) {
     const query = documentSearchQuery(question);
@@ -196,6 +197,40 @@ function interpretQuestion(question: string): CopilotIntent {
   if (/(branch|branches).*(compare|performance)|(compare|performance).*(branch|branches)/.test(normalised)) return { toolId: "branch_performance", args: {}, label: "branch performance" };
   if (/(terminal|operations|container).*(count|summary|currently|how many)|(count|summary|currently|how many).*(terminal|operations|container)/.test(normalised)) return { toolId: "operations_overview", args: {}, label: "operations overview" };
   return { toolId: null, args: {}, label: "unsupported question" };
+}
+
+async function interpretNaturalLanguageQuestion(question: string, req: AuthRequest): Promise<CopilotIntent> {
+  if (!isNaturalLanguageRoutingConfigured()) return interpretQuestionFallback(question);
+
+  const [setting] = await db.select({ value: settingsTable.value })
+    .from(settingsTable)
+    .where(eq(settingsTable.key, "aiAssistantGovernance"))
+    .limit(1);
+  const governance = parseGovernance(setting?.value);
+  const approvedTools = TOOL_CATALOG
+    .filter((tool) => governance.dataDomains.includes(tool.domain))
+    .map((tool) => ({ id: tool.id, title: tool.title, description: tool.description }));
+
+  try {
+    const selection = await selectToolWithNaturalLanguage({
+      question,
+      tools: approvedTools,
+      role: req.user!.role,
+      branchScope: getBranchScope(req),
+    });
+    if (selection.kind === "tool" && TOOL_IDS.has(selection.toolId)) {
+      const tool = TOOL_CATALOG.find((candidate) => candidate.id === selection.toolId)!;
+      return { toolId: tool.id, args: selection.args, label: tool.title.toLowerCase() };
+    }
+    if (selection.kind === "tool") {
+      return { toolId: null, args: {}, label: "unsupported question", clarification: "I could not safely match that request to an approved read-only tool." };
+    }
+    return { toolId: null, args: {}, label: selection.label, clarification: selection.message };
+  } catch (error) {
+    // A provider outage must not broaden access or block the already-approved local fallback.
+    console.warn("[ai-assistant] Natural-language routing unavailable; using constrained local fallback", error);
+    return interpretQuestionFallback(question);
+  }
 }
 
 function toAmount(value: string | number | null | undefined): number {
@@ -349,7 +384,7 @@ function makeCopilotAnswer(sessionId: number, question: string, intent: CopilotI
       sessionId,
       question,
       status: "unsupported",
-      answer: "I can currently help with approved container status, overdue and delayed jobs, PAAR checks, receivables, approved payment schedules, overhead balances, and branch performance. Try one of the suggested questions.",
+      answer: intent.clarification ?? "I can currently help with approved container status, overdue and delayed jobs, PAAR checks, receivables, approved payment schedules, overhead balances, and branch performance. Try one of the suggested questions.",
       facts: [],
       calculations: [],
       assumptions: ["I do not guess, run arbitrary database searches, or take actions outside the approved read-only tools."],
@@ -1240,10 +1275,15 @@ aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit,
       .limit(1);
     const governance = parseGovernance(setting?.value);
     return res.json({
-      phase: "controlled_assisted_actions",
+      phase: "natural_language_tool_selection",
       available: true,
-      modelConnected: false,
-      copilotMode: "guided_read_only_with_confirmed_actions",
+      modelConnected: isNaturalLanguageRoutingConfigured(),
+      copilotMode: isNaturalLanguageRoutingConfigured() ? "natural_language_read_only_with_confirmed_actions" : "guided_read_only_with_confirmed_actions",
+      naturalLanguageRouting: {
+        configured: isNaturalLanguageRoutingConfigured(),
+        provider: isNaturalLanguageRoutingConfigured() ? "OpenAI" : null,
+        configurationHint: isNaturalLanguageRoutingConfigured() ? null : "Set AI_ASSISTANT_OPENAI_API_KEY in Railway to enable natural-language tool selection.",
+      },
       governance,
       approvedToolCount: TOOL_CATALOG.filter((tool) => governance.dataDomains.includes(tool.domain)).length,
       safeguards: [
@@ -1448,7 +1488,7 @@ aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, a
   try {
     const session = await getOrCreateSession(req, body.sessionId, question);
     activeSessionId = session.id;
-    const intent = interpretQuestion(question);
+    const intent = await interpretNaturalLanguageQuestion(question, req);
     const result = intent.toolId ? await runApprovedTool(intent.toolId, req, intent.args) : undefined;
     const answer = makeCopilotAnswer(session.id, question, intent, result);
     await db.update(aiAssistantSessionsTable).set({ updatedAt: new Date() }).where(eq(aiAssistantSessionsTable.id, session.id));
@@ -1461,7 +1501,7 @@ aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, a
       responseSummary: answer.answer,
       toolName: intent.toolId ?? "none",
       recordReferences: answer.citations,
-      metadata: { intent: intent.label, status: answer.status, factCount: answer.facts.length, citationCount: answer.citations.length },
+      metadata: { intent: intent.label, status: answer.status, factCount: answer.facts.length, citationCount: answer.citations.length, naturalLanguageRoutingConfigured: isNaturalLanguageRoutingConfigured() },
     });
     return res.json(answer);
   } catch (error) {
