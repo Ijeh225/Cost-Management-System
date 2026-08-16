@@ -35,6 +35,7 @@ import { AiConversationContext, buildAiConversationContext, parseAiConversationC
 import { isPhysicalTerminalPresenceQuestion, resolveAiOperationalStage } from "../lib/ai-business-definitions.js";
 import { understandAiQuestion } from "../lib/ai-question-understanding.js";
 import { buildAiInvestigationPlan } from "../lib/ai-investigation-plan.js";
+import { buildAiAnswerPresentation } from "../lib/ai-answer-presentation.js";
 import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 
@@ -220,7 +221,10 @@ type CopilotAnswer = {
   answer: string;
   facts: AssistantFact[];
   calculations: string[];
+  findings: string[];
+  recordedCauses: string[];
   recommendations: string[];
+  limitations: string[];
   evidenceNotice: string;
   evidenceFactLabels: string[];
   evidenceRecordHrefs: string[];
@@ -550,7 +554,10 @@ async function makeCopilotAnswer(sessionId: number, question: string, intent: Co
       answer: intent.clarification ?? "I can currently help with approved container status, overdue and delayed jobs, PAAR checks, receivables, approved payment schedules, overhead balances, and branch performance. Try one of the suggested questions.",
       facts: [],
       calculations: [],
+      findings: [],
+      recordedCauses: [],
       recommendations: [],
+      limitations: ["No approved data tool was run for this question."],
       evidenceNotice: "No data tool was run because the question needs clarification or is outside the approved scope.",
       evidenceFactLabels: [],
       evidenceRecordHrefs: [],
@@ -563,6 +570,7 @@ async function makeCopilotAnswer(sessionId: number, question: string, intent: Co
   const noData = result.facts.every((fact) => fact.value === 0 || fact.value === "₦0.00") && result.records.length === 0;
   const calculations = result.facts.filter((fact) => /invoiced|collected|outstanding|balance|overhead|payments/i.test(fact.label))
     .map((fact) => `${fact.label}: ${fact.value}`);
+  const presentation = buildAiAnswerPresentation({ facts: result.facts, notes: result.notes, recordCount: result.records.length, noData });
   const evidence = (providerEnabled ? await generateEvidenceBasedAnswer({
     question,
     toolTitle: result.title,
@@ -579,7 +587,10 @@ async function makeCopilotAnswer(sessionId: number, question: string, intent: Co
     answer: evidence.directAnswer,
     facts: result.facts,
     calculations,
-    recommendations: noData ? [] : ["Review the cited source records before taking action through the normal workflow."],
+    findings: presentation.keyFindings,
+    recordedCauses: presentation.recordedCauses,
+    recommendations: presentation.recommendations,
+    limitations: presentation.limitations,
     evidenceNotice: evidenceConfidenceNotice(result),
     evidenceFactLabels: evidence.factLabels,
     evidenceRecordHrefs: evidence.recordHrefs,
@@ -2016,11 +2027,10 @@ aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, a
       branchId: getBranchScope(req),
       lastToolId: intent.toolId,
       lastToolArgs: intent.args,
-      records: result.records.map((record) => ({
-        id: Number(record.href.match(/^\/containers\/(\d+)/)?.[1]) || null,
-        title: record.title,
-        href: record.href,
-      })),
+      records: [
+        ...result.records.map((record) => ({ id: null, title: record.title, href: record.href })),
+        ...result.sources.map((source) => ({ id: source.id ?? null, title: source.label, href: source.href })),
+      ],
       updatedAt: now.toISOString(),
     }) : null;
     await db.update(aiAssistantSessionsTable).set({
