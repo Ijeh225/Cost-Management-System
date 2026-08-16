@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseNaturalLanguageSelection, sanitizeToolArguments } from "../lib/ai-tool-selection.js";
+import { parseEvidenceBasedAnswer, parseNaturalLanguageSelection, sanitizeToolArguments } from "../lib/ai-tool-selection.js";
 
 describe("AI natural-language tool selection", () => {
   const allowedTools = new Set(["stage_count", "stage_jobs", "container_lookup"]);
@@ -33,5 +33,29 @@ describe("AI natural-language tool selection", () => {
       message: "Which branch and time period should I compare?",
     });
     expect(sanitizeToolArguments({ stage: "made_up_stage", limit: -1, rawSql: "select * from users" })).toEqual({});
+  });
+});
+
+describe("AI evidence answer validation", () => {
+  const evidence = {
+    facts: [{ label: "Open containers", value: 2 }, { label: "In terminal workflow", value: 1 }],
+    records: [{ href: "/containers/12" }],
+  };
+
+  it("accepts an answer only when its fact and record references are exact evidence", () => {
+    expect(parseEvidenceBasedAnswer({
+      directAnswer: "There are 2 open containers in the current result.",
+      factLabels: ["Open containers"],
+      recordHrefs: ["/containers/12"],
+    }, evidence)).toEqual({
+      directAnswer: "There are 2 open containers in the current result.",
+      factLabels: ["Open containers"],
+      recordHrefs: ["/containers/12"],
+    });
+  });
+
+  it("rejects invented citations and figures before they reach the user", () => {
+    expect(parseEvidenceBasedAnswer({ directAnswer: "There are 99 containers.", factLabels: ["Invented fact"], recordHrefs: ["/containers/12"] }, evidence)).toBeNull();
+    expect(parseEvidenceBasedAnswer({ directAnswer: "There are 99 containers.", factLabels: ["Open containers"], recordHrefs: ["/containers/12"] }, evidence)).toBeNull();
   });
 });

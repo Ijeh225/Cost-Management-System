@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 type AssistantStatus = {
-  phase: "natural_language_tool_selection";
+  phase: "evidence_and_conversation_context";
   available: true;
   modelConnected: boolean;
   copilotMode: "guided_read_only_with_confirmed_actions" | "natural_language_read_only_with_confirmed_actions";
@@ -28,6 +28,10 @@ type CopilotAnswer = {
   status: "answered" | "unsupported" | "no_data";
   facts: Array<{ label: string; value: string | number; detail?: string }>;
   calculations: string[];
+  recommendations: string[];
+  evidenceNotice: string;
+  evidenceFactLabels: string[];
+  evidenceRecordHrefs: string[];
   assumptions: string[];
   citations: Array<{ type: string; id?: number; label: string; href: string }>;
   records: Array<{ title: string; detail: string; href: string; badges?: string[] }>;
@@ -166,6 +170,12 @@ export default function AiAssistantPage() {
     askMutation.mutate(submittedQuestion);
   }
 
+  function startNewConversation() {
+    setSessionId(undefined);
+    setConversation([]);
+    setQuestion("");
+  }
+
   if (isLoading) return <div className="flex min-h-[50vh] items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
   if (isError || !status) return <div className="mx-auto max-w-xl rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-muted-foreground">Unable to load the Finance Copilot. Refresh the page and try again.</div>;
 
@@ -176,7 +186,7 @@ export default function AiAssistantPage() {
         <Button variant="outline" className="gap-2" onClick={() => setLocation("/settings")}><Settings2 className="h-4 w-4" />Review Governance</Button>
       </div>
 
-      <Card className="border-primary/20 bg-primary/[0.03] shadow-sm"><CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-primary" /><div><p className="font-medium">Natural-language routing with approved tools</p><p className="mt-1 text-sm text-muted-foreground">Ask in ordinary language. The copilot can select only from {status.approvedToolCount} approved, permission-scoped read tools, then cites the live source records it used. {status.naturalLanguageRouting.configured ? "Natural-language routing is enabled." : "Guided fallback remains active until natural-language routing is configured."}</p></div></div><span className="w-fit rounded-full border border-primary/20 bg-background px-3 py-1.5 text-xs font-medium">{status.naturalLanguageRouting.configured ? "AI routing enabled" : "Guided fallback"}</span></CardContent></Card>
+      <Card className="border-primary/20 bg-primary/[0.03] shadow-sm"><CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-primary" /><div><p className="font-medium">Evidence-based natural-language assistant</p><p className="mt-1 text-sm text-muted-foreground">Ask in ordinary language. The copilot can select only from {status.approvedToolCount} approved, permission-scoped read tools, cite the live source records it used, and keep a short-lived context for safe follow-up questions. {status.naturalLanguageRouting.configured ? "Natural-language routing is enabled." : "Guided fallback remains active until natural-language routing is configured."}</p></div></div><span className="w-fit rounded-full border border-primary/20 bg-background px-3 py-1.5 text-xs font-medium">{status.naturalLanguageRouting.configured ? "AI routing enabled" : "Guided fallback"}</span></CardContent></Card>
 
       {!status.naturalLanguageRouting.configured && <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-4 text-sm text-muted-foreground"><p className="font-medium text-foreground">Natural-language routing is not configured yet</p><p className="mt-1">{status.naturalLanguageRouting.configurationHint} Until then, the existing supported-question fallback remains available and all data access stays restricted to approved tools.</p></div>}
 
@@ -204,7 +214,7 @@ export default function AiAssistantPage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <Card className="min-h-[680px] border-border/60 bg-card shadow-sm">
-          <CardHeader className="border-b border-border/60 p-6"><CardTitle className="flex items-center gap-2 text-lg"><Bot className="h-5 w-5 text-primary" />Ask the copilot</CardTitle><p className="text-sm text-muted-foreground">It reports facts, calculations, assumptions, and the exact records used. It will say when it cannot answer safely.</p></CardHeader>
+        <CardHeader className="flex flex-col gap-3 border-b border-border/60 p-6 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="flex items-center gap-2 text-lg"><Bot className="h-5 w-5 text-primary" />Ask the copilot</CardTitle><p className="text-sm text-muted-foreground">It reports facts, calculations, assumptions, and the exact records used. It will say when it cannot answer safely.</p></div>{conversation.length > 0 && <Button type="button" variant="outline" size="sm" onClick={startNewConversation}>New conversation</Button>}</CardHeader>
           <CardContent className="flex min-h-[570px] flex-col p-0">
             <div className="flex-1 space-y-5 p-6">
               {conversation.length === 0 && <div className="flex min-h-[300px] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/[0.12] p-8 text-center"><div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"><FileSearch className="h-5 w-5" /></div><h2 className="mt-4 text-lg font-semibold">What would you like to review?</h2><p className="mt-2 max-w-md text-sm text-muted-foreground">Try a suggested management question, or ask about an exact container number such as <span className="font-medium">MSCU1234567</span>.</p></div>}
@@ -213,8 +223,9 @@ export default function AiAssistantPage() {
                 <div className="max-w-[95%] rounded-2xl rounded-tl-sm border border-border/70 bg-muted/[0.14] p-4"><p className="text-sm leading-6">{message.answer}</p>
                   {message.facts.length > 0 && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{message.facts.map((fact) => <div key={fact.label} className="rounded-lg border border-border/60 bg-background/80 p-3"><p className="text-xs text-muted-foreground">{fact.label}</p><p className="mt-1 font-semibold">{fact.value}</p>{fact.detail && <p className="mt-1 text-xs text-muted-foreground">{fact.detail}</p>}</div>)}</div>}
                   {message.calculations.length > 0 && <div className="mt-4 rounded-lg border border-border/60 bg-background/60 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calculations</p>{message.calculations.map((calculation) => <p key={calculation} className="mt-1 text-sm">{calculation}</p>)}</div>}
+                  {message.recommendations?.length > 0 && <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.035] p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Suggested next steps</p>{message.recommendations.map((recommendation) => <p key={recommendation} className="mt-1 text-sm">{recommendation}</p>)}</div>}
                   {message.records.length > 0 && <div className="mt-4 space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cited records</p>{message.records.map((record) => <button key={`${record.href}-${record.title}`} type="button" onClick={() => setLocation(record.href)} className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/80 p-3 text-left hover:bg-accent/40"><div className="min-w-0"><p className="font-medium">{record.title}</p><p className="mt-0.5 truncate text-sm text-muted-foreground">{record.detail}</p></div><ExternalLink className="h-4 w-4 shrink-0 text-primary" /></button>)}</div>}
-                  <div className="mt-4 border-t border-border/50 pt-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assumptions and limits</p>{message.assumptions.map((assumption) => <p key={assumption} className="mt-1 text-xs text-muted-foreground">{assumption}</p>)}</div>
+                  <div className="mt-4 border-t border-border/50 pt-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence, assumptions and limits</p><p className="mt-1 text-xs text-muted-foreground">{message.evidenceNotice}</p>{message.evidenceFactLabels.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Answer evidence: {message.evidenceFactLabels.join(", ")}</p>}{message.evidenceRecordHrefs.length > 0 && <p className="mt-1 text-xs text-muted-foreground">The answer is linked to {message.evidenceRecordHrefs.length} cited record{message.evidenceRecordHrefs.length === 1 ? "" : "s"} above.</p>}{message.assumptions.map((assumption) => <p key={assumption} className="mt-1 text-xs text-muted-foreground">{assumption}</p>)}</div>
                 </div>
               </div>)}
               {askMutation.isPending && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Checking authorised records...</div>}

@@ -751,6 +751,11 @@ async function runStartupMigrations() {
       await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_audit_session_idx ON ai_assistant_audit_logs(session_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_audit_created_at_idx ON ai_assistant_audit_logs(created_at)`);
     });
+    await runMigration("ai_assistant_conversation_context_v1", async () => {
+      await pool.query(`ALTER TABLE ai_assistant_sessions ADD COLUMN IF NOT EXISTS conversation_context TEXT`);
+      await pool.query(`ALTER TABLE ai_assistant_sessions ADD COLUMN IF NOT EXISTS context_expires_at TIMESTAMP`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_sessions_context_expiry_idx ON ai_assistant_sessions(context_expires_at)`);
+    });
     await runMigration("document_intelligence_v1", async () => {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS document_intelligence_index (

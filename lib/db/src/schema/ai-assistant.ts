@@ -12,6 +12,8 @@ export const aiAssistantSessionsTable = pgTable("ai_assistant_sessions", {
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   branchId: integer("branch_id").references(() => branchesTable.id, { onDelete: "set null" }),
   title: text("title").notNull().default("New assistant session"),
+  conversationContext: text("conversation_context"),
+  contextExpiresAt: timestamp("context_expires_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

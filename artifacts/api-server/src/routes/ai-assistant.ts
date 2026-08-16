@@ -28,7 +28,8 @@ import {
 import { and, desc, eq, ilike, inArray, ne } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
 import { formatProactiveBriefing, generateProactiveBriefing } from "../lib/ai-proactive-intelligence.js";
-import { isNaturalLanguageRoutingConfigured, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
+import { generateEvidenceBasedAnswer, isNaturalLanguageRoutingConfigured, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
+import { AiConversationContext, buildAiConversationContext, parseAiConversationContext, resolveConversationFollowUp } from "../lib/ai-conversation-context.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 
 export const aiAssistantRouter = Router();
@@ -141,11 +142,17 @@ type CopilotAnswer = {
   answer: string;
   facts: AssistantFact[];
   calculations: string[];
+  recommendations: string[];
+  evidenceNotice: string;
+  evidenceFactLabels: string[];
+  evidenceRecordHrefs: string[];
   assumptions: string[];
   citations: AssistantSource[];
   records: AssistantRecord[];
   status: "answered" | "unsupported" | "no_data";
 };
+
+const CONTEXT_TTL_MS = 20 * 60 * 1000;
 
 const SUGGESTED_QUESTIONS = [
   "How many containers are currently in the terminal?",
@@ -199,7 +206,11 @@ function interpretQuestionFallback(question: string): CopilotIntent {
   return { toolId: null, args: {}, label: "unsupported question" };
 }
 
-async function interpretNaturalLanguageQuestion(question: string, req: AuthRequest): Promise<CopilotIntent> {
+async function interpretNaturalLanguageQuestion(question: string, req: AuthRequest, context: AiConversationContext | null): Promise<CopilotIntent> {
+  const contextualIntent = resolveConversationFollowUp(question, context, new Set(Object.keys(STAGE_TOOL_FIELDS)));
+  if (contextualIntent && TOOL_IDS.has(contextualIntent.toolId)) {
+    return { toolId: contextualIntent.toolId as ToolId, args: contextualIntent.args, label: contextualIntent.label };
+  }
   if (!isNaturalLanguageRoutingConfigured()) return interpretQuestionFallback(question);
 
   const [setting] = await db.select({ value: settingsTable.value })
@@ -217,6 +228,7 @@ async function interpretNaturalLanguageQuestion(question: string, req: AuthReque
       tools: approvedTools,
       role: req.user!.role,
       branchScope: getBranchScope(req),
+      conversationContext: context ? { lastToolId: context.lastToolId, lastToolArgs: context.lastToolArgs, records: context.records.map(({ title, href }) => ({ title, href })) } : undefined,
     });
     if (selection.kind === "tool" && TOOL_IDS.has(selection.toolId)) {
       const tool = TOOL_CATALOG.find((candidate) => candidate.id === selection.toolId)!;
@@ -361,24 +373,58 @@ export async function recordAiAssistantAuditEvent(input: {
 
 async function getOrCreateSession(req: AuthRequest, sessionId: unknown, question: string) {
   const requestedId = Number(sessionId);
+  const branchScope = getBranchScope(req);
   if (Number.isInteger(requestedId) && requestedId > 0) {
     const [existing] = await db.select().from(aiAssistantSessionsTable)
       .where(and(eq(aiAssistantSessionsTable.id, requestedId), eq(aiAssistantSessionsTable.userId, req.user!.id)))
       .limit(1);
     if (!existing) throw new Error("AI assistant session was not found.");
+    const contextExpired = !!existing.contextExpiresAt && existing.contextExpiresAt.getTime() <= Date.now();
+    const branchChanged = existing.branchId !== branchScope;
+    if (contextExpired || branchChanged) {
+      const [reset] = await db.update(aiAssistantSessionsTable).set({
+        branchId: branchScope,
+        conversationContext: null,
+        contextExpiresAt: null,
+        updatedAt: new Date(),
+      }).where(eq(aiAssistantSessionsTable.id, existing.id)).returning();
+      return reset;
+    }
     return existing;
   }
 
   const title = question.trim().replace(/\s+/g, " ").slice(0, 100) || "New assistant session";
   const [created] = await db.insert(aiAssistantSessionsTable).values({
     userId: req.user!.id,
-    branchId: getBranchScope(req),
+    branchId: branchScope,
     title,
   }).returning();
   return created;
 }
 
-function makeCopilotAnswer(sessionId: number, question: string, intent: CopilotIntent, result?: AssistantToolResult): CopilotAnswer {
+function deterministicEvidenceAnswer(intent: CopilotIntent, noData: boolean) {
+  return {
+    directAnswer: noData
+      ? `I checked the current authorised data for ${intent.label} and found no matching records.`
+      : `I checked the current authorised data for ${intent.label}. The facts and linked source records are below.`,
+    recommendations: noData ? [] : ["Review the cited source records before taking action through the normal workflow."],
+    evidenceNotice: "This answer is based only on the live, permission-scoped tool result shown below.",
+    factLabels: [] as string[],
+    recordHrefs: [] as string[],
+  };
+}
+
+function evidenceConfidenceNotice(result: AssistantToolResult): string {
+  if (!result.facts.length && !result.records.length) {
+    return "Evidence is limited: the live tool returned no facts or source records for this question.";
+  }
+  if (!result.records.length) {
+    return "Evidence is limited: this live result contains summary facts but no individual source record to open.";
+  }
+  return "Evidence is current at the time of this request and is limited to the cited records within your authorised branch scope.";
+}
+
+async function makeCopilotAnswer(sessionId: number, question: string, intent: CopilotIntent, result?: AssistantToolResult): Promise<CopilotAnswer> {
   if (!intent.toolId || !result) {
     return {
       sessionId,
@@ -387,6 +433,10 @@ function makeCopilotAnswer(sessionId: number, question: string, intent: CopilotI
       answer: intent.clarification ?? "I can currently help with approved container status, overdue and delayed jobs, PAAR checks, receivables, approved payment schedules, overhead balances, and branch performance. Try one of the suggested questions.",
       facts: [],
       calculations: [],
+      recommendations: [],
+      evidenceNotice: "No data tool was run because the question needs clarification or is outside the approved scope.",
+      evidenceFactLabels: [],
+      evidenceRecordHrefs: [],
       assumptions: ["I do not guess, run arbitrary database searches, or take actions outside the approved read-only tools."],
       citations: [],
       records: [],
@@ -396,15 +446,25 @@ function makeCopilotAnswer(sessionId: number, question: string, intent: CopilotI
   const noData = result.facts.every((fact) => fact.value === 0 || fact.value === "₦0.00") && result.records.length === 0;
   const calculations = result.facts.filter((fact) => /invoiced|collected|outstanding|balance|overhead|payments/i.test(fact.label))
     .map((fact) => `${fact.label}: ${fact.value}`);
+  const evidence = (await generateEvidenceBasedAnswer({
+    question,
+    toolTitle: result.title,
+    scopeLabel: result.scope.label,
+    facts: result.facts,
+    records: result.records,
+    notes: result.notes,
+  })) ?? deterministicEvidenceAnswer(intent, noData);
   return {
     sessionId,
     question,
     status: noData ? "no_data" : "answered",
-    answer: noData
-      ? `I checked the current authorised data for ${intent.label} and found no matching records.`
-      : `I checked the current authorised data for ${intent.label}. The facts and linked source records are below.`,
+    answer: evidence.directAnswer,
     facts: result.facts,
     calculations,
+    recommendations: noData ? [] : ["Review the cited source records before taking action through the normal workflow."],
+    evidenceNotice: evidenceConfidenceNotice(result),
+    evidenceFactLabels: evidence.factLabels,
+    evidenceRecordHrefs: evidence.recordHrefs,
     assumptions: [
       "Figures and statuses are live at the time shown and use your current branch scope.",
       "Amounts marked as paid are actual recorded payments; approved-but-unpaid schedules remain separate.",
@@ -1275,7 +1335,7 @@ aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit,
       .limit(1);
     const governance = parseGovernance(setting?.value);
     return res.json({
-      phase: "natural_language_tool_selection",
+      phase: "evidence_and_conversation_context",
       available: true,
       modelConnected: isNaturalLanguageRoutingConfigured(),
       copilotMode: isNaturalLanguageRoutingConfigured() ? "natural_language_read_only_with_confirmed_actions" : "guided_read_only_with_confirmed_actions",
@@ -1488,10 +1548,30 @@ aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, a
   try {
     const session = await getOrCreateSession(req, body.sessionId, question);
     activeSessionId = session.id;
-    const intent = await interpretNaturalLanguageQuestion(question, req);
+    const sessionContext = !session.contextExpiresAt || session.contextExpiresAt.getTime() > Date.now()
+      ? parseAiConversationContext(session.conversationContext, getBranchScope(req), TOOL_IDS)
+      : null;
+    const intent = await interpretNaturalLanguageQuestion(question, req, sessionContext);
     const result = intent.toolId ? await runApprovedTool(intent.toolId, req, intent.args) : undefined;
-    const answer = makeCopilotAnswer(session.id, question, intent, result);
-    await db.update(aiAssistantSessionsTable).set({ updatedAt: new Date() }).where(eq(aiAssistantSessionsTable.id, session.id));
+    const answer = await makeCopilotAnswer(session.id, question, intent, result);
+    const now = new Date();
+    const nextContext = intent.toolId && result ? buildAiConversationContext({
+      branchId: getBranchScope(req),
+      lastToolId: intent.toolId,
+      lastToolArgs: intent.args,
+      records: result.records.map((record) => ({
+        id: Number(record.href.match(/^\/containers\/(\d+)/)?.[1]) || null,
+        title: record.title,
+        href: record.href,
+      })),
+      updatedAt: now.toISOString(),
+    }) : null;
+    await db.update(aiAssistantSessionsTable).set({
+      updatedAt: now,
+      ...(nextContext
+        ? { conversationContext: JSON.stringify(nextContext), contextExpiresAt: new Date(now.getTime() + CONTEXT_TTL_MS) }
+        : { conversationContext: null, contextExpiresAt: null }),
+    }).where(eq(aiAssistantSessionsTable.id, session.id));
     await recordAiAssistantAuditEvent({
       userId: req.user!.id,
       branchId: getBranchScope(req),
@@ -1501,7 +1581,7 @@ aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, a
       responseSummary: answer.answer,
       toolName: intent.toolId ?? "none",
       recordReferences: answer.citations,
-      metadata: { intent: intent.label, status: answer.status, factCount: answer.facts.length, citationCount: answer.citations.length, naturalLanguageRoutingConfigured: isNaturalLanguageRoutingConfigured() },
+      metadata: { intent: intent.label, status: answer.status, factCount: answer.facts.length, citationCount: answer.citations.length, naturalLanguageRoutingConfigured: isNaturalLanguageRoutingConfigured(), contextUsed: !!sessionContext, contextExpiresAt: nextContext ? new Date(now.getTime() + CONTEXT_TTL_MS).toISOString() : session.contextExpiresAt?.toISOString() ?? null },
     });
     return res.json(answer);
   } catch (error) {
