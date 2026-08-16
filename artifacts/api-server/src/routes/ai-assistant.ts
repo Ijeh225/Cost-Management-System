@@ -30,8 +30,9 @@ import {
 import { and, desc, eq, gte, ilike, inArray, ne } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
 import { formatProactiveBriefing, generateProactiveBriefing } from "../lib/ai-proactive-intelligence.js";
-import { AiProviderUsage, generateEvidenceBasedAnswer, isNaturalLanguageRoutingConfigured, isPhysicalTerminalPresenceQuestion, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
+import { AiProviderUsage, generateEvidenceBasedAnswer, isNaturalLanguageRoutingConfigured, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
 import { AiConversationContext, buildAiConversationContext, parseAiConversationContext, resolveConversationFollowUp } from "../lib/ai-conversation-context.js";
+import { isPhysicalTerminalPresenceQuestion, resolveAiOperationalStage } from "../lib/ai-business-definitions.js";
 import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 
@@ -256,6 +257,7 @@ function documentSearchQuery(question: string): string {
 function interpretQuestionFallback(question: string): CopilotIntent {
   const normalised = question.trim().toLowerCase();
   const containerMatch = question.toUpperCase().match(/\b[A-Z]{4}\d{7}\b/);
+  if (isPhysicalTerminalPresenceQuestion(question)) return { toolId: "operations_overview", args: {}, label: "physical terminal presence" };
   if (containerMatch && /\b(documents?|docs?|files?|attachments?)\b/.test(normalised)) {
     return { toolId: "container_documents", args: { containerNumber: containerMatch[0] }, label: "container documents" };
   }
@@ -271,6 +273,9 @@ function interpretQuestionFallback(question: string): CopilotIntent {
   if (/(overdue|late).*(container|vessel|berthing)|(container|vessel|berthing).*(overdue|late)/.test(normalised)) return { toolId: "overdue_containers", args: {}, label: "overdue containers" };
   if (/(documentation|paar).*(delay|missing|pending|check)|(delay|missing|pending).*(documentation|paar)/.test(normalised)) return { toolId: "documentation_checks", args: {}, label: "documentation checks" };
   if (/(delay|delayed|late|stalled).*(job|transire|shipping|do|terminal|tdo|pullout)|(job|transire|shipping|do|terminal|tdo|pullout).*(delay|delayed|late|stalled)/.test(normalised)) return { toolId: "delayed_jobs", args: {}, label: "delayed jobs" };
+  const stage = resolveAiOperationalStage(question);
+  if (stage && /\b(how many|count|number of)\b/.test(normalised)) return { toolId: "stage_count", args: { stage, status: "all" }, label: `${stage} job count` };
+  if (stage && /\b(show|list|which|active|released)\b/.test(normalised)) return { toolId: "stage_jobs", args: { stage, status: "all" }, label: `${stage} jobs` };
   if (/(receivable|invoice|collection).*(ageing|aging)|(ageing|aging).*(receivable|invoice|collection)/.test(normalised)) return { toolId: "receivables_ageing", args: {}, label: "receivables ageing" };
   if (/(outstanding|overdue|receivable|invoice|collected).*(invoice|balance|payment|receivable)|(invoice|balance|payment|receivable).*(outstanding|overdue|receivable|collected)/.test(normalised)) return { toolId: "receivables_overview", args: {}, label: "receivables overview" };
   if (/(approved|pending).*(schedule|payment)|(schedule|payment).*(approved|awaiting)/.test(normalised)) return { toolId: "approved_payment_schedules", args: {}, label: "approved payment schedules" };

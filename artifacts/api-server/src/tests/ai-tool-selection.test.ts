@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isPhysicalTerminalPresenceQuestion, parseEvidenceBasedAnswer, parseNaturalLanguageSelection, sanitizeToolArguments } from "../lib/ai-tool-selection.js";
+import { parseEvidenceBasedAnswer, parseNaturalLanguageSelection, sanitizeToolArguments } from "../lib/ai-tool-selection.js";
+import { AI_BUSINESS_DEFINITIONS, getAiBusinessDefinitionsPrompt, getRelevantAiBusinessDefinitionsPrompt, isPhysicalTerminalPresenceQuestion, resolveAiOperationalStage } from "../lib/ai-business-definitions.js";
 
 describe("AI natural-language tool selection", () => {
   const allowedTools = new Set(["stage_count", "stage_jobs", "container_lookup"]);
@@ -66,5 +67,25 @@ describe("AI operational business definitions", () => {
     expect(isPhysicalTerminalPresenceQuestion("Show containers at the terminal")).toBe(true);
     expect(isPhysicalTerminalPresenceQuestion("How many Terminal / TDO active jobs are there?")).toBe(false);
     expect(isPhysicalTerminalPresenceQuestion("Show jobs awaiting TDO release")).toBe(false);
+  });
+
+  it("uses approved logistics aliases and exposes their canonical definitions", () => {
+    expect(resolveAiOperationalStage("Show active Transire jobs")).toBe("transire_processing");
+    expect(resolveAiOperationalStage("List Delivery Order releases")).toBe("shipping");
+    expect(resolveAiOperationalStage("Which TDO jobs are active?")).toBe("terminal");
+    expect(resolveAiOperationalStage("Show pull out jobs")).toBe("pull_out");
+    expect(getAiBusinessDefinitionsPrompt()).toContain("Outstanding: The unpaid balance");
+    expect(getAiBusinessDefinitionsPrompt()).toContain("physically present in the terminal");
+  });
+
+  it("keeps a maintained glossary for every major application domain while selecting relevant terms per question", () => {
+    expect(new Set(AI_BUSINESS_DEFINITIONS.map((definition) => definition.category))).toEqual(new Set([
+      "access", "operations", "workflow", "finance", "documents", "reporting", "notifications", "ai",
+    ]));
+    const financePrompt = getRelevantAiBusinessDefinitionsPrompt("Show outstanding overhead expenses and approved payment schedules.");
+    expect(financePrompt).toContain("Outstanding: The unpaid balance");
+    expect(financePrompt).toContain("Overhead expense");
+    expect(financePrompt).toContain("Payment schedule");
+    expect(financePrompt).not.toContain("Transire release");
   });
 });

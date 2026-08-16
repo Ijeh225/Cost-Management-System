@@ -1,3 +1,5 @@
+import { getRelevantAiBusinessDefinitionsPrompt } from "./ai-business-definitions.js";
+
 export type ApprovedToolDescriptor = {
   id: string;
   title: string;
@@ -31,19 +33,6 @@ type ProviderSelection = {
 
 const VALID_STAGES = new Set(["transire_processing", "shipping", "terminal", "pull_out"]);
 const VALID_STAGE_STATES = new Set(["all", "active", "released"]);
-
-/**
- * In this application, physical terminal presence and the Terminal/TDO
- * department queue are different business concepts. Keep ordinary language
- * such as "jobs in the terminal" tied to the physical-container metric.
- */
-export function isPhysicalTerminalPresenceQuestion(question: string): boolean {
-  const normalised = question.trim().toLowerCase().replace(/\s+/g, " ");
-  const refersToTerminalLocation = /\b(?:in|at) (?:the )?terminal\b/.test(normalised);
-  const asksAboutJobsOrContainers = /\b(?:how many|count|list|show|which|job|jobs|container|containers)\b/.test(normalised);
-  const explicitlyRefersToDepartmentQueue = /\b(?:tdo|terminal\s*(?:\/|and)\s*tdo|terminal department|expected tdo|tdo release)\b/.test(normalised);
-  return refersToTerminalLocation && asksAboutJobsOrContainers && !explicitlyRefersToDepartmentQueue;
-}
 
 function compactText(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -145,7 +134,7 @@ export async function selectToolWithNaturalLanguage(input: {
     "Never invent a tool name, record ID, date, client, container, invoice, or financial value.",
     "Return JSON only with kind ('tool', 'clarify', or 'unsupported'), toolId, args, and message.",
     "Use operational stage IDs only: transire_processing, shipping, terminal, pull_out.",
-    "Business definition: 'jobs/containers in or at the terminal' means physical terminal presence and must use operations_overview. The Terminal/TDO department queue is different; use a stage tool only when the user explicitly says TDO, Terminal/TDO, terminal department, or a TDO release/expected date.",
+    `Relevant business definitions: ${getRelevantAiBusinessDefinitionsPrompt(input.question)}`,
   ].join(" ");
   const schema = {
     type: "object",
