@@ -33,6 +33,8 @@ import { formatProactiveBriefing, generateProactiveBriefing } from "../lib/ai-pr
 import { AiProviderUsage, generateEvidenceBasedAnswer, isNaturalLanguageRoutingConfigured, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
 import { AiConversationContext, buildAiConversationContext, parseAiConversationContext, resolveConversationFollowUp } from "../lib/ai-conversation-context.js";
 import { isPhysicalTerminalPresenceQuestion, resolveAiOperationalStage } from "../lib/ai-business-definitions.js";
+import { understandAiQuestion } from "../lib/ai-question-understanding.js";
+import { buildAiInvestigationPlan } from "../lib/ai-investigation-plan.js";
 import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 
@@ -191,6 +193,7 @@ const TOOL_CATALOG = [
   { id: "delayed_jobs", title: "Delayed jobs", description: "Find Transire, Shipping, Terminal, and Pullout jobs whose expected date has passed.", domain: "operations" as const },
   { id: "documentation_checks", title: "Documentation checks", description: "Identify open jobs without a PAAR number and link to their container record.", domain: "documentation" as const },
   { id: "container_lookup", title: "Container investigation", description: "Look up one container by exact container number or ID and inspect its live workflow state.", domain: "containers" as const, requiresContainer: true },
+  { id: "container_delay_investigation", title: "Container delay investigation", description: "Run the fixed read-only checks for one exact container: workflow state, documents, and payment history.", domain: "containers" as const, requiresContainer: true },
   { id: "container_documents", title: "Container documents", description: "List every uploaded document attached to one exact container, including files that are not text-searchable.", domain: "documents" as const, requiresContainer: true },
   { id: "container_payment_history", title: "Container payment history", description: "Show recorded container disbursements for one exact container.", domain: "finance" as const, requiresContainer: true },
   { id: "invoice_status", title: "Invoice status", description: "Show the total, collections, balance, and linked record for one exact invoice.", domain: "finance" as const, requiresInvoice: true },
@@ -255,11 +258,16 @@ function documentSearchQuery(question: string): string {
 }
 
 function interpretQuestionFallback(question: string): CopilotIntent {
+  const understanding = understandAiQuestion(question);
   const normalised = question.trim().toLowerCase();
-  const containerMatch = question.toUpperCase().match(/\b[A-Z]{4}\d{7}\b/);
+  const containerMatch = understanding.containerNumber;
   if (isPhysicalTerminalPresenceQuestion(question)) return { toolId: "operations_overview", args: {}, label: "physical terminal presence" };
+  const investigationPlan = buildAiInvestigationPlan(understanding);
+  if (investigationPlan) {
+    return { toolId: "container_delay_investigation", args: { containerNumber: investigationPlan.containerNumber }, label: investigationPlan.title.toLowerCase() };
+  }
   if (containerMatch && /\b(documents?|docs?|files?|attachments?)\b/.test(normalised)) {
-    return { toolId: "container_documents", args: { containerNumber: containerMatch[0] }, label: "container documents" };
+    return { toolId: "container_documents", args: { containerNumber: containerMatch }, label: "container documents" };
   }
   if (/(document|file|attachment)/.test(normalised) && /(search|find|contain|mention|show|list)/.test(normalised)) {
     const query = documentSearchQuery(question);
@@ -267,15 +275,29 @@ function interpretQuestionFallback(question: string): CopilotIntent {
       ? { toolId: "document_search", args: { query }, label: "uploaded document search" }
       : { toolId: null, args: {}, label: "unsupported question" };
   }
-  if (containerMatch && /(why|status|delay|container|job|where|investigate|check)/.test(normalised)) {
-    return { toolId: "container_lookup", args: { containerNumber: containerMatch[0] }, label: "container investigation" };
+  if (containerMatch && /\b(payment|paid|receipt|transaction|history)\b/.test(normalised)) {
+    return { toolId: "container_payment_history", args: { containerNumber: containerMatch }, label: "container payment history" };
   }
+  if (containerMatch) {
+    return { toolId: "container_lookup", args: { containerNumber: containerMatch }, label: "container investigation" };
+  }
+  if (understanding.invoiceNumber) return { toolId: "invoice_status", args: { invoiceNumber: understanding.invoiceNumber }, label: "invoice status" };
   if (/(overdue|late).*(container|vessel|berthing)|(container|vessel|berthing).*(overdue|late)/.test(normalised)) return { toolId: "overdue_containers", args: {}, label: "overdue containers" };
   if (/(documentation|paar).*(delay|missing|pending|check)|(delay|missing|pending).*(documentation|paar)/.test(normalised)) return { toolId: "documentation_checks", args: {}, label: "documentation checks" };
   if (/(delay|delayed|late|stalled).*(job|transire|shipping|do|terminal|tdo|pullout)|(job|transire|shipping|do|terminal|tdo|pullout).*(delay|delayed|late|stalled)/.test(normalised)) return { toolId: "delayed_jobs", args: {}, label: "delayed jobs" };
-  const stage = resolveAiOperationalStage(question);
-  if (stage && /\b(how many|count|number of)\b/.test(normalised)) return { toolId: "stage_count", args: { stage, status: "all" }, label: `${stage} job count` };
-  if (stage && /\b(show|list|which|active|released)\b/.test(normalised)) return { toolId: "stage_jobs", args: { stage, status: "all" }, label: `${stage} jobs` };
+  const stage = understanding.stage ?? resolveAiOperationalStage(question);
+  const stageArgs = stage
+    ? {
+        stage,
+        status: understanding.stageStatus,
+        ...(understanding.timeframe
+          ? { from: understanding.timeframe.from, to: understanding.timeframe.to }
+          : {}),
+      }
+    : null;
+  if (stage && understanding.asksForDelays) return { toolId: "stage_delays", args: stageArgs!, label: `${stage} delay review` };
+  if (stage && understanding.intent === "count") return { toolId: "stage_count", args: stageArgs!, label: `${stage} job count` };
+  if (stage && understanding.intent === "list") return { toolId: "stage_jobs", args: stageArgs!, label: `${stage} jobs` };
   if (/(receivable|invoice|collection).*(ageing|aging)|(ageing|aging).*(receivable|invoice|collection)/.test(normalised)) return { toolId: "receivables_ageing", args: {}, label: "receivables ageing" };
   if (/(outstanding|overdue|receivable|invoice|collected).*(invoice|balance|payment|receivable)|(invoice|balance|payment|receivable).*(outstanding|overdue|receivable|collected)/.test(normalised)) return { toolId: "receivables_overview", args: {}, label: "receivables overview" };
   if (/(approved|pending).*(schedule|payment)|(schedule|payment).*(approved|awaiting)/.test(normalised)) return { toolId: "approved_payment_schedules", args: {}, label: "approved payment schedules" };
@@ -294,6 +316,11 @@ async function interpretNaturalLanguageQuestion(question: string, req: AuthReque
   if (isPhysicalTerminalPresenceQuestion(question)) {
     return { toolId: "operations_overview", args: {}, label: "physical terminal presence" };
   }
+  const understanding = understandAiQuestion(question);
+  const deterministicIntent = interpretQuestionFallback(question);
+  if (deterministicIntent.toolId && (understanding.containerNumber || understanding.invoiceNumber || understanding.stage || understanding.asksForDelays)) {
+    return deterministicIntent;
+  }
   const contextualIntent = resolveConversationFollowUp(question, context, new Set(Object.keys(STAGE_TOOL_FIELDS)));
   if (contextualIntent && TOOL_IDS.has(contextualIntent.toolId)) {
     return { toolId: contextualIntent.toolId as ToolId, args: contextualIntent.args, label: contextualIntent.label };
@@ -310,6 +337,7 @@ async function interpretNaturalLanguageQuestion(question: string, req: AuthReque
       tools: approvedTools,
       role: req.user!.role,
       branchScope: getBranchScope(req),
+      understanding,
       conversationContext: context ? { lastToolId: context.lastToolId, lastToolArgs: context.lastToolArgs, records: context.records.map(({ title, href }) => ({ title, href })) } : undefined,
       onUsage,
     });
@@ -341,6 +369,12 @@ function dateOnly(value: Date | string | null | undefined): string {
   if (!value) return "Not set";
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? "Not set" : date.toISOString().slice(0, 10);
+}
+
+function dateFilterBound(value: unknown, endOfDay = false): Date | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function getRequestedLimit(value: unknown): number {
@@ -559,6 +593,79 @@ async function makeCopilotAnswer(sessionId: number, question: string, intent: Co
   };
 }
 
+function firstFactValue(result: AssistantToolResult, label: string): string | number | null {
+  return result.facts.find((fact) => fact.label === label)?.value ?? null;
+}
+
+async function runContainerDelayInvestigation(req: AuthRequest, body: Record<string, unknown>): Promise<AssistantToolResult> {
+  const requestedNumber = typeof body.containerNumber === "string" ? body.containerNumber.trim().toUpperCase() : "";
+  const requestedId = Number(body.containerId);
+  if ((!Number.isInteger(requestedId) || requestedId <= 0) && !requestedNumber) {
+    throw new Error("Provide an exact container number or container ID for an investigation.");
+  }
+
+  const lookup = await runApprovedTool("container_lookup", req, body);
+  const result = createResult("container_delay_investigation", "Container delay investigation", getBranchScope(req));
+  const containerSource = lookup.sources.find((source) => source.type === "container" && typeof source.id === "number");
+  if (!containerSource?.id) {
+    result.facts = [{ label: "Investigation checks completed", value: 1 }];
+    result.notes = ["The workflow check found no authorised container matching that exact identifier. No further checks were run."];
+    return result;
+  }
+
+  const stepFailures: string[] = [];
+  const runOptionalCheck = async (toolId: "container_documents" | "container_payment_history") => {
+    try {
+      return await runApprovedTool(toolId, req, { containerId: containerSource.id });
+    } catch (error) {
+      stepFailures.push(`${toolId}: ${error instanceof Error ? error.message : "check failed"}`);
+      return null;
+    }
+  };
+  const [documents, payments] = await Promise.all([
+    runOptionalCheck("container_documents"),
+    runOptionalCheck("container_payment_history"),
+  ]);
+
+  const fact = (label: string) => firstFactValue(lookup, label);
+  result.facts = [
+    { label: "Investigation checks completed", value: 1 + (documents ? 1 : 0) + (payments ? 1 : 0) },
+    { label: "Container", value: containerSource.label },
+    ...(fact("Workflow status") != null ? [{ label: "Workflow status", value: fact("Workflow status")! }] : []),
+    ...(fact("Berthing") != null ? [{ label: "Berthing", value: fact("Berthing")! }] : []),
+    ...(fact("PAAR") != null ? [{ label: "PAAR", value: fact("PAAR")! }] : []),
+    ...lookup.facts
+      .filter((item) => /delay reason$/i.test(item.label))
+      .map((item) => ({ label: item.label, value: item.value })),
+    ...(documents ? [{ label: "Attached documents", value: firstFactValue(documents, "Attached documents") ?? 0 }] : []),
+    ...(payments ? [{ label: "Recorded payments", value: firstFactValue(payments, "Recorded payments") ?? 0 }] : []),
+    ...(payments ? [{ label: "Total paid", value: firstFactValue(payments, "Total paid") ?? money(0) }] : []),
+  ];
+  const allRecords = [
+    ...lookup.records,
+    ...(documents?.records ?? []),
+    ...(payments?.records ?? []),
+  ];
+  result.records = allRecords.filter((record, index) => allRecords.findIndex((candidate) => candidate.href === record.href && candidate.title === record.title) === index).slice(0, 30);
+  const allSources = [
+    ...lookup.sources,
+    ...(documents?.sources ?? []),
+    ...(payments?.sources ?? []),
+  ];
+  result.sources = allSources.filter((source, index) => allSources.findIndex((candidate) => candidate.href === source.href && candidate.label === source.label) === index);
+  result.notes = [
+    "Completed fixed read-only checks for workflow state, supporting documents, and recorded payments.",
+    ...(fact("Berthing") === "Not confirmed" ? ["Potential blocker: vessel berthing is not confirmed."] : []),
+    ...(fact("PAAR") === "Not recorded" ? ["Potential blocker: PAAR is not recorded."] : []),
+    ...lookup.facts
+      .filter((item) => /delay reason$/i.test(item.label))
+      .map((item) => `Recorded ${item.label.toLowerCase()}: ${item.value}.`),
+    ...(documents && firstFactValue(documents, "Attached documents") === 0 ? ["No supporting documents are attached to this container."] : []),
+    ...stepFailures.map((failure) => `Evidence incomplete: ${failure}`),
+  ];
+  return result;
+}
+
 async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<string, unknown>): Promise<AssistantToolResult> {
   const branchId = getBranchScope(req);
   const limit = getRequestedLimit(body.limit);
@@ -571,6 +678,10 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
   const governance = parseGovernance(setting?.value);
   if (!governance.dataDomains.includes(tool.domain)) {
     throw new Error("This data domain is disabled by AI Assistant governance.");
+  }
+
+  if (toolId === "container_delay_investigation") {
+    return runContainerDelayInvestigation(req, body);
   }
 
   if (toolId === "operations_overview") {
@@ -616,7 +727,17 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       expectedTdoDate: containersTable.expectedTdoDate, tdoReleasedAt: containersTable.tdoReleasedAt,
       expectedPulloutDate: containersTable.expectedPulloutDate, pulloutReleasedAt: containersTable.pulloutReleasedAt,
     }).from(containersTable), branchId).filter((row) => row.status !== "closed");
-    const stageRows = rows.filter((row) => requestedState === "all" || stageState(row as unknown as Record<string, unknown>, stage) === requestedState);
+    const from = dateFilterBound(body.from);
+    const to = dateFilterBound(body.to, true);
+    const stageRows = rows.filter((row) => {
+      const data = row as unknown as Record<string, unknown>;
+      const state = stageState(data, stage);
+      if (requestedState !== "all" && state !== requestedState) return false;
+      if (!from && !to) return true;
+      const dateForState = state === "released" ? data[STAGE_TOOL_FIELDS[stage].released] : data[STAGE_TOOL_FIELDS[stage].expected];
+      if (!(dateForState instanceof Date)) return false;
+      return (!from || dateForState >= from) && (!to || dateForState <= to);
+    });
     const route = stage === "transire_processing" ? "/transire" : stage === "pull_out" ? "/pull-out" : `/${stage}`;
     const result = createResult(toolId, tool.title, branchId);
     if (toolId === "stage_delays") {
@@ -629,7 +750,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
         const expected = data[STAGE_TOOL_FIELDS[stage].expected];
         return stageState(data, stage) === "active" && expected instanceof Date && expected.getTime() < cutoff.getTime();
       });
-      result.facts = [{ label: `${operationalStageLabel(stage)} overdue jobs`, value: delayed.length }, { label: "Overdue after", value: `${overdueDays} day(s)` }];
+      result.facts = [{ label: `${operationalStageLabel(stage)} overdue jobs`, value: delayed.length }, { label: "Overdue after", value: `${overdueDays} day(s)` }, ...(from || to ? [{ label: "Date range", value: `${typeof body.from === "string" ? body.from : "Any date"} to ${typeof body.to === "string" ? body.to : "Any date"}` }] : [])];
       result.records = delayed.slice(0, limit).map((row) => ({
         title: row.containerNumber,
         detail: `${row.customerName} - expected ${dateOnly((row as unknown as Record<string, unknown>)[STAGE_TOOL_FIELDS[stage].expected] as Date)}.`,
@@ -638,9 +759,9 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       result.sources = delayed.slice(0, limit).map((row) => ({ type: "container", id: row.id, label: row.containerNumber, href: `/containers/${row.id}` }));
       return result;
     }
-    const activeCount = rows.filter((row) => stageState(row as unknown as Record<string, unknown>, stage) === "active").length;
-    const releasedCount = rows.length - activeCount;
-    result.facts = [{ label: `${operationalStageLabel(stage)} active`, value: activeCount }, { label: `${operationalStageLabel(stage)} released`, value: releasedCount }];
+    const activeCount = stageRows.filter((row) => stageState(row as unknown as Record<string, unknown>, stage) === "active").length;
+    const releasedCount = stageRows.length - activeCount;
+    result.facts = [{ label: `${operationalStageLabel(stage)} active`, value: activeCount }, { label: `${operationalStageLabel(stage)} released`, value: releasedCount }, ...(from || to ? [{ label: "Date range", value: `${typeof body.from === "string" ? body.from : "Any date"} to ${typeof body.to === "string" ? body.to : "Any date"}` }] : [])];
     if (toolId === "stage_jobs") {
       result.records = stageRows.slice(0, limit).map((row) => {
         const data = row as unknown as Record<string, unknown>;
@@ -726,11 +847,13 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber,
       customerName: containersTable.customerName, blNumber: containersTable.blNumber, vessel: containersTable.vessel,
       status: containersTable.status, eta: containersTable.eta, berthed: containersTable.berthed, stageOwner: containersTable.stageOwner,
-      paarNumber: containersTable.paarNumber, expectedTransireDate: containersTable.expectedTransireDate,
+      delayReason: containersTable.delayReason, paarNumber: containersTable.paarNumber, paarDelayReason: containersTable.paarDelayReason,
+      expectedTransireDate: containersTable.expectedTransireDate, transireDelayReason: containersTable.transireDelayReason,
       transireReleasedAt: containersTable.transireReleasedAt, expectedDoDate: containersTable.expectedDoDate,
-      doReleasedAt: containersTable.doReleasedAt, expectedTdoDate: containersTable.expectedTdoDate,
-      tdoReleasedAt: containersTable.tdoReleasedAt, expectedPulloutDate: containersTable.expectedPulloutDate,
-      pulloutReleasedAt: containersTable.pulloutReleasedAt,
+      doReleasedAt: containersTable.doReleasedAt, doDelayReason: containersTable.doDelayReason,
+      expectedTdoDate: containersTable.expectedTdoDate, tdoReleasedAt: containersTable.tdoReleasedAt,
+      tdoDelayReason: containersTable.tdoDelayReason, expectedPulloutDate: containersTable.expectedPulloutDate,
+      pulloutReleasedAt: containersTable.pulloutReleasedAt, pulloutDelayReason: containersTable.pulloutDelayReason,
     }).from(containersTable), branchId);
     const row = rows.find((candidate) => candidate.id === requestedId || candidate.containerNumber.toUpperCase() === requestedNumber);
     const result = createResult(toolId, tool.title, branchId);
@@ -742,6 +865,12 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       { label: "Customer", value: row.customerName }, { label: "Workflow status", value: row.status.replace(/_/g, " ") },
       { label: "ETA", value: dateOnly(row.eta) }, { label: "Berthing", value: row.berthed ? "Confirmed" : "Not confirmed" },
       { label: "Stage owner", value: row.stageOwner ?? "Unassigned" }, { label: "PAAR", value: row.paarNumber ?? "Not recorded" },
+      ...(row.delayReason ? [{ label: "General delay reason", value: row.delayReason }] : []),
+      ...(row.paarDelayReason ? [{ label: "PAAR delay reason", value: row.paarDelayReason }] : []),
+      ...(row.transireDelayReason ? [{ label: "Transire delay reason", value: row.transireDelayReason }] : []),
+      ...(row.doDelayReason ? [{ label: "DO delay reason", value: row.doDelayReason }] : []),
+      ...(row.tdoDelayReason ? [{ label: "TDO delay reason", value: row.tdoDelayReason }] : []),
+      ...(row.pulloutDelayReason ? [{ label: "Pullout delay reason", value: row.pulloutDelayReason }] : []),
       { label: "Transire", value: row.transireReleasedAt ? `Released ${dateOnly(row.transireReleasedAt)}` : `Expected ${dateOnly(row.expectedTransireDate)}` },
       { label: "DO", value: row.doReleasedAt ? `Released ${dateOnly(row.doReleasedAt)}` : `Expected ${dateOnly(row.expectedDoDate)}` },
       { label: "TDO", value: row.tdoReleasedAt ? `Released ${dateOnly(row.tdoReleasedAt)}` : `Expected ${dateOnly(row.expectedTdoDate)}` },
@@ -798,11 +927,14 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
   }
 
   if (toolId === "container_payment_history") {
-    const containerId = getLookupId(body.containerId, "container");
+    const requestedId = Number(body.containerId);
+    const requestedNumber = typeof body.containerNumber === "string" ? body.containerNumber.trim().toUpperCase() : "";
+    if ((!Number.isInteger(requestedId) || requestedId <= 0) && !requestedNumber) throw new Error("Provide an exact container number or container ID.");
     const containers = scoped(await db.select({ id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber, customerName: containersTable.customerName }).from(containersTable), branchId);
-    const container = containers.find((row) => row.id === containerId);
+    const container = containers.find((row) => row.id === requestedId || row.containerNumber.toUpperCase() === requestedNumber);
     const result = createResult(toolId, tool.title, branchId);
     if (!container) { result.notes = ["No authorised container matches that ID."]; return result; }
+    const containerId = container.id;
     const payments = scoped(await db.select({ id: containerExpensePaymentsTable.id, branchId: containerExpensePaymentsTable.branchId, containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount, section: containerExpensePaymentsTable.section, paymentMethod: containerExpensePaymentsTable.paymentMethod, reference: containerExpensePaymentsTable.reference, narration: containerExpensePaymentsTable.narration, paidAt: containerExpensePaymentsTable.paidAt }).from(containerExpensePaymentsTable), branchId)
       .filter((row) => row.containerId === containerId);
     result.facts = [{ label: "Container", value: container.containerNumber }, { label: "Recorded payments", value: payments.length }, { label: "Total paid", value: money(payments.reduce((sum, payment) => sum + toAmount(payment.amount), 0)) }];

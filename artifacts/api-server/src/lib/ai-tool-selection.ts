@@ -1,4 +1,5 @@
 import { getRelevantAiBusinessDefinitionsPrompt } from "./ai-business-definitions.js";
+import { AiQuestionUnderstanding, questionUnderstandingForRouting } from "./ai-question-understanding.js";
 
 export type ApprovedToolDescriptor = {
   id: string;
@@ -120,6 +121,7 @@ export async function selectToolWithNaturalLanguage(input: {
   tools: ApprovedToolDescriptor[];
   role: string;
   branchScope: number | null;
+  understanding?: AiQuestionUnderstanding;
   conversationContext?: { lastToolId: string; lastToolArgs: Record<string, unknown>; records: Array<{ title: string; href: string }> };
   onUsage?: (usage: AiProviderUsage) => void;
 }): Promise<NaturalLanguageToolSelection> {
@@ -166,7 +168,7 @@ export async function selectToolWithNaturalLanguage(input: {
       body: JSON.stringify({
         model: process.env.AI_ASSISTANT_OPENAI_MODEL?.trim() || "gpt-4.1-mini",
         instructions,
-        input: `User role: ${input.role}. Branch scope: ${input.branchScope == null ? "all authorised branches" : `branch ${input.branchScope}`}.\nApproved tools: ${JSON.stringify(input.tools)}\nRecent authorised context: ${JSON.stringify(input.conversationContext ?? null)}\nUser question: ${input.question}`,
+        input: `User role: ${input.role}. Branch scope: ${input.branchScope == null ? "all authorised branches" : `branch ${input.branchScope}`}.\nLocally recognised question signals: ${JSON.stringify(input.understanding ? questionUnderstandingForRouting(input.understanding) : null)}. Treat these signals as authoritative when present; do not invent missing identifiers, dates, stages, or statuses.\nApproved tools: ${JSON.stringify(input.tools)}\nRecent authorised context: ${JSON.stringify(input.conversationContext ?? null)}\nUser question: ${input.question}`,
         text: { format: { type: "json_schema", name: "approved_tool_selection", strict: false, schema } },
       }),
     });
