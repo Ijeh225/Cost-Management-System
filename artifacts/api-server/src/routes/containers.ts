@@ -5,6 +5,7 @@ import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, re
 import { calcTotalCost } from "../lib/calculations.js";
 import { getFinalWorkflowMissingStages } from "../lib/workflow-readiness.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
+import { isContainerPhysicallyInTerminal } from "../lib/operational-definitions.js";
 
 const router = Router();
 const VERIFICATION_OFFICER_SETTING_KEY = "verificationOfficerUserId";
@@ -2649,9 +2650,8 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     const inProgress = allContainers.filter(c => c.status !== "closed").length;
     const completed = 0;
     const closed = allContainers.filter(c => c.status === "closed").length;
-    const terminalStages = new Set(["gate_in", "examination", "final_release"]);
     const containersInTerminalList = allContainers
-      .filter(c => terminalStages.has(c.status) && !c.gateOutDate)
+      .filter(isContainerPhysicallyInTerminal)
       .map(c => ({
         id: c.id,
         containerNumber: c.containerNumber,

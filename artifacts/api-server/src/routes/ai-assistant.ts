@@ -27,6 +27,7 @@ import {
 import { and, desc, eq, ilike, inArray, ne } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
 import { formatProactiveBriefing, generateProactiveBriefing } from "../lib/ai-proactive-intelligence.js";
+import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 
 export const aiAssistantRouter = Router();
 
@@ -364,23 +365,30 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     const rows = scoped(await db.select({
       id: containersTable.id, branchId: containersTable.branchId, status: containersTable.status,
       berthed: containersTable.berthed, eta: containersTable.eta, containerNumber: containersTable.containerNumber,
-      customerName: containersTable.customerName,
+      customerName: containersTable.customerName, gateOutDate: containersTable.gateOutDate,
     }).from(containersTable), branchId);
     const result = createResult(toolId, tool.title, branchId);
-    const terminalStatuses = new Set(["terminal", "pull_out", "gate_in", "examination", "final_release"]);
+    const statusCounts = getOperationalStatusCounts(rows);
+    const inTerminal = rows.filter(isContainerPhysicallyInTerminal);
+    const awaitingPullout = rows.filter((row) => row.status === "pull_out");
+    const citedRows = [...inTerminal, ...awaitingPullout, ...rows.filter((row) => row.status !== "closed" && !isContainerPhysicallyInTerminal(row) && row.status !== "pull_out")].slice(0, limit);
     result.facts = [
       { label: "Open containers", value: rows.filter((row) => row.status !== "closed").length },
-      { label: "In terminal workflow", value: rows.filter((row) => terminalStatuses.has(row.status)).length },
+      { label: "Containers in Terminal", value: inTerminal.length, detail: "Physically gate-in, in examination, or final release; excludes gate-out containers." },
+      { label: "Awaiting Pullout", value: awaitingPullout.length, detail: "Pullout is reported separately and is not counted as being in Terminal." },
+      { label: "At Gate-In", value: statusCounts.gate_in ?? 0 },
+      { label: "In Examination", value: statusCounts.examination ?? 0 },
+      { label: "At Final Release", value: statusCounts.final_release ?? 0 },
       { label: "Awaiting verification", value: rows.filter((row) => row.status === "pending_verification").length },
       { label: "Awaiting berthing", value: rows.filter((row) => !row.berthed && !!row.eta).length },
     ];
-    result.records = rows.filter((row) => row.status !== "closed").slice(0, limit).map((row) => ({
+    result.records = citedRows.map((row) => ({
       title: row.containerNumber,
-      detail: `${row.customerName} - ${row.status.replace(/_/g, " ")}`,
+      detail: `${row.customerName} - ${operationalStageLabel(row.status)}`,
       href: `/containers/${row.id}`,
-      badges: [row.status.replace(/_/g, " ")],
+      badges: [operationalStageLabel(row.status)],
     }));
-    result.sources = result.records.map((record, index) => ({ type: "container", id: rows.filter((row) => row.status !== "closed")[index]?.id, label: record.title, href: record.href }));
+    result.sources = citedRows.map((row) => ({ type: "container", id: row.id, label: row.containerNumber, href: `/containers/${row.id}` }));
     return result;
   }
 
