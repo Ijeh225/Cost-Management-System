@@ -15,6 +15,13 @@ export type EvidenceBasedAnswer = {
   recordHrefs: string[];
 };
 
+export type AiProviderUsage = {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+};
+
 type ProviderSelection = {
   kind?: unknown;
   toolId?: unknown;
@@ -92,6 +99,16 @@ function extractResponseText(payload: unknown): string | undefined {
   return undefined;
 }
 
+export function extractProviderUsage(payload: unknown): AiProviderUsage | null {
+  if (!payload || typeof payload !== "object") return null;
+  const response = payload as { model?: unknown; usage?: { input_tokens?: unknown; output_tokens?: unknown; total_tokens?: unknown } };
+  const inputTokens = Number(response.usage?.input_tokens ?? 0);
+  const outputTokens = Number(response.usage?.output_tokens ?? 0);
+  const totalTokens = Number(response.usage?.total_tokens ?? inputTokens + outputTokens);
+  if (![inputTokens, outputTokens, totalTokens].every(Number.isFinite)) return null;
+  return { model: typeof response.model === "string" ? response.model : process.env.AI_ASSISTANT_OPENAI_MODEL?.trim() || "unknown", inputTokens, outputTokens, totalTokens };
+}
+
 export function isNaturalLanguageRoutingConfigured(): boolean {
   return Boolean(process.env.AI_ASSISTANT_OPENAI_API_KEY?.trim());
 }
@@ -102,6 +119,7 @@ export async function selectToolWithNaturalLanguage(input: {
   role: string;
   branchScope: number | null;
   conversationContext?: { lastToolId: string; lastToolArgs: Record<string, unknown>; records: Array<{ title: string; href: string }> };
+  onUsage?: (usage: AiProviderUsage) => void;
 }): Promise<NaturalLanguageToolSelection> {
   const apiKey = process.env.AI_ASSISTANT_OPENAI_API_KEY?.trim();
   if (!apiKey) throw new Error("AI natural-language routing is not configured.");
@@ -150,7 +168,10 @@ export async function selectToolWithNaturalLanguage(input: {
       }),
     });
     if (!response.ok) throw new Error(`AI provider request failed (${response.status}).`);
-    const outputText = extractResponseText(await response.json());
+    const payload = await response.json();
+    const usage = extractProviderUsage(payload);
+    if (usage) input.onUsage?.(usage);
+    const outputText = extractResponseText(payload);
     if (!outputText) throw new Error("AI provider returned no structured routing result.");
     let parsed: unknown;
     try {
@@ -208,6 +229,7 @@ export async function generateEvidenceBasedAnswer(input: {
   facts: Array<{ label: string; value: string | number; detail?: string }>;
   records: Array<{ title: string; detail: string; href: string; badges?: string[] }>;
   notes: string[];
+  onUsage?: (usage: AiProviderUsage) => void;
 }): Promise<EvidenceBasedAnswer | null> {
   const apiKey = process.env.AI_ASSISTANT_OPENAI_API_KEY?.trim();
   if (!apiKey) return null;
@@ -241,7 +263,10 @@ export async function generateEvidenceBasedAnswer(input: {
       }),
     });
     if (!response.ok) throw new Error(`AI provider request failed (${response.status}).`);
-    const outputText = extractResponseText(await response.json());
+    const payload = await response.json();
+    const usage = extractProviderUsage(payload);
+    if (usage) input.onUsage?.(usage);
+    const outputText = extractResponseText(payload);
     if (!outputText) throw new Error("AI provider returned no evidence summary.");
     const parsed = parseEvidenceBasedAnswer(JSON.parse(outputText), input);
     if (!parsed) throw new Error("AI provider returned an invalid or uncited evidence summary.");

@@ -50,6 +50,8 @@ type AiAssistantGovernance = {
   providerEnabled: boolean;
   rolloutStage: "super_admin_only" | "selected_admins" | "all_authorized_admins";
   selectedAdminUserIds: number[];
+  providerInputCostPerMillionNgn: number;
+  providerOutputCostPerMillionNgn: number;
 };
 type AiProactiveBriefingPreferences = { enabled: boolean; daily: boolean; weekly: boolean };
 
@@ -63,6 +65,8 @@ const DEFAULT_AI_GOVERNANCE: AiAssistantGovernance = {
   providerEnabled: false,
   rolloutStage: "super_admin_only",
   selectedAdminUserIds: [],
+  providerInputCostPerMillionNgn: 0,
+  providerOutputCostPerMillionNgn: 0,
 };
 const DEFAULT_AI_PROACTIVE_BRIEFINGS: AiProactiveBriefingPreferences = { enabled: false, daily: true, weekly: true };
 
@@ -103,6 +107,8 @@ function parseAiAssistantGovernance(value?: string): AiAssistantGovernance {
         providerEnabled: typeof parsed.providerEnabled === "boolean" ? parsed.providerEnabled : true,
         rolloutStage: parsed.rolloutStage === "super_admin_only" || parsed.rolloutStage === "selected_admins" || parsed.rolloutStage === "all_authorized_admins" ? parsed.rolloutStage : "all_authorized_admins",
         selectedAdminUserIds,
+        providerInputCostPerMillionNgn: Math.max(0, Number(parsed.providerInputCostPerMillionNgn) || 0),
+        providerOutputCostPerMillionNgn: Math.max(0, Number(parsed.providerOutputCostPerMillionNgn) || 0),
       };
     }
   } catch {}
@@ -825,6 +831,7 @@ export default function SettingsPage() {
                 <div className="space-y-2"><Label>Rollout access</Label><Select value={aiGovernance.rolloutStage} onValueChange={(rolloutStage: AiAssistantGovernance["rolloutStage"]) => { setAiGovernance((current) => ({ ...current, rolloutStage })); mark(); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="super_admin_only">Super Admins only</SelectItem><SelectItem value="selected_admins">Selected Admins</SelectItem><SelectItem value="all_authorized_admins">All Admins and Super Admins</SelectItem></SelectContent></Select><p className="text-xs text-muted-foreground">Super Admins always retain access to configure and monitor the assistant.</p></div>
               </div>
               {aiGovernance.rolloutStage === "selected_admins" && <div className="space-y-2"><Label>Selected Admins</Label><div className="grid gap-2 md:grid-cols-2">{users.filter((user) => user.isActive && user.role === "admin").map((user) => { const checked = aiGovernance.selectedAdminUserIds.includes(user.id); return <label key={user.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/40 p-3 text-sm"><Checkbox checked={checked} onCheckedChange={(next) => { setAiGovernance((current) => ({ ...current, selectedAdminUserIds: next ? [...new Set([...current.selectedAdminUserIds, user.id])] : current.selectedAdminUserIds.filter((id) => id !== user.id) })); mark(); }} />{user.name}</label>; })}</div><p className="text-xs text-muted-foreground">Choose at least one active Admin before saving this rollout stage.</p></div>}
+              <div className="grid gap-4 rounded-xl border border-border/60 bg-background/40 p-4 md:grid-cols-2"><div className="space-y-2"><Label>Input token price (NGN per 1M tokens)</Label><Input type="number" min="0" inputMode="decimal" value={aiGovernance.providerInputCostPerMillionNgn} onChange={(event) => { setAiGovernance((current) => ({ ...current, providerInputCostPerMillionNgn: Math.max(0, Number(event.target.value) || 0) })); mark(); }} /><p className="text-xs text-muted-foreground">Set this from your OpenAI model pricing so monthly spend is estimated from actual usage.</p></div><div className="space-y-2"><Label>Output token price (NGN per 1M tokens)</Label><Input type="number" min="0" inputMode="decimal" value={aiGovernance.providerOutputCostPerMillionNgn} onChange={(event) => { setAiGovernance((current) => ({ ...current, providerOutputCostPerMillionNgn: Math.max(0, Number(event.target.value) || 0) })); mark(); }} /><p className="text-xs text-muted-foreground">Leave both prices at zero only when you intentionally do not need cost estimates.</p></div></div>
             </CardContent>
           </Card>
 

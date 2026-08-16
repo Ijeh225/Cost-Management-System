@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 type AssistantStatus = {
-  phase: "evidence_and_conversation_context" | "report_and_document_requests" | "controlled_assisted_actions";
+  phase: "evidence_and_conversation_context" | "report_and_document_requests" | "controlled_assisted_actions" | "evaluation_monitoring_and_rollout";
   available: true;
   modelConnected: boolean;
   copilotMode: "guided_read_only_with_confirmed_actions" | "natural_language_read_only_with_confirmed_actions";
@@ -19,7 +19,10 @@ type AssistantStatus = {
   naturalLanguageRouting: { configured: boolean; provider: "OpenAI" | null; configurationHint: string | null };
   governance: { accessRoles: string[]; mode: "read_only"; auditRetentionDays: number; actionPolicy: "human_confirmation_required" };
   safeguards: string[];
+  canViewMonitoring: boolean;
 };
+
+type AssistantMonitoring = { periodDays: number; questions: number; failures: number; unsupported: number; averageLatencyMs: number | null; providerRequests: number; providerCost: { currency: string; amount: number; inputTokens: number; outputTokens: number; note: string }; feedback: { helpful: number; notHelpful: number } };
 
 type CopilotAnswer = {
   sessionId: number;
@@ -168,6 +171,7 @@ export default function AiAssistantPage() {
     queryFn: () => customFetch("/api/ai-assistant/suggestions"),
     staleTime: 60_000,
   });
+  const { data: monitoring } = useQuery<AssistantMonitoring>({ queryKey: ["/api/ai-assistant/monitoring"], queryFn: () => customFetch("/api/ai-assistant/monitoring"), enabled: status?.canViewMonitoring === true, staleTime: 30_000 });
   const { data: actionDrafts = [] } = useQuery<AssistantActionDraft[]>({
     queryKey: ["/api/ai-assistant/actions/drafts"],
     queryFn: () => customFetch("/api/ai-assistant/actions/drafts"),
@@ -270,6 +274,8 @@ export default function AiAssistantPage() {
       <Card className="border-primary/20 bg-primary/[0.03] shadow-sm"><CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><Sparkles className="mt-0.5 h-5 w-5 text-primary" /><div><p className="font-medium">Evidence-based natural-language assistant</p><p className="mt-1 text-sm text-muted-foreground">Ask in ordinary language. The copilot can select only from {status.approvedToolCount} approved, permission-scoped read tools, cite the live source records it used, and keep a short-lived context for safe follow-up questions. {status.naturalLanguageRouting.configured ? "Natural-language routing is enabled." : "Guided fallback remains active until natural-language routing is configured."}</p></div></div><span className="w-fit rounded-full border border-primary/20 bg-background px-3 py-1.5 text-xs font-medium">{status.naturalLanguageRouting.configured ? "AI routing enabled" : "Guided fallback"}</span></CardContent></Card>
 
       {!status.naturalLanguageRouting.configured && <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-4 text-sm text-muted-foreground"><p className="font-medium text-foreground">Natural-language routing is not configured yet</p><p className="mt-1">{status.naturalLanguageRouting.configurationHint} Until then, the existing supported-question fallback remains available and all data access stays restricted to approved tools.</p></div>}
+
+      {monitoring && <Card className="border-border/60 bg-card shadow-sm"><CardHeader className="p-5 pb-0"><CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-primary" />AI monitoring - last {monitoring.periodDays} days</CardTitle><p className="text-sm text-muted-foreground">Super Admin-only operational signals from the AI audit trail.</p></CardHeader><CardContent className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-lg border border-border/60 bg-background/50 p-3"><p className="text-xs text-muted-foreground">Questions / failures</p><p className="mt-1 font-semibold">{monitoring.questions} / {monitoring.failures}</p></div><div className="rounded-lg border border-border/60 bg-background/50 p-3"><p className="text-xs text-muted-foreground">Unsupported / average latency</p><p className="mt-1 font-semibold">{monitoring.unsupported} / {monitoring.averageLatencyMs == null ? "-" : `${monitoring.averageLatencyMs}ms`}</p></div><div className="rounded-lg border border-border/60 bg-background/50 p-3"><p className="text-xs text-muted-foreground">Provider tokens</p><p className="mt-1 font-semibold">{monitoring.providerCost.inputTokens.toLocaleString()} in / {monitoring.providerCost.outputTokens.toLocaleString()} out</p></div><div className="rounded-lg border border-border/60 bg-background/50 p-3"><p className="text-xs text-muted-foreground">Estimated provider cost</p><p className="mt-1 font-semibold">NGN {monitoring.providerCost.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p><p className="mt-1 text-xs text-muted-foreground">Helpful: {monitoring.feedback.helpful}; not helpful: {monitoring.feedback.notHelpful}</p></div><p className="sm:col-span-2 lg:col-span-4 text-xs text-muted-foreground">{monitoring.providerCost.note}</p></CardContent></Card>}
 
       <Card className="border-border/60 bg-card shadow-sm">
         <CardHeader className="flex flex-col gap-3 border-b border-border/60 p-6 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="flex items-center gap-2 text-lg"><AlertTriangle className="h-5 w-5 text-primary" />Proactive finance & control briefing</CardTitle><p className="mt-1 text-sm text-muted-foreground">Defined risk rules scan your authorised branch for berthing, operational, documentation, receivable, and payable issues. This is evidence, not speculation.</p></div><Button type="button" variant="outline" className="gap-2" onClick={() => generateBriefingMutation.mutate()} disabled={generateBriefingMutation.isPending}><RefreshCw className={`h-4 w-4 ${generateBriefingMutation.isPending ? "animate-spin" : ""}`} />{generateBriefingMutation.isPending ? "Generating..." : "Generate current briefing"}</Button></CardHeader>

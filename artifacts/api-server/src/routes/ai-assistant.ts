@@ -27,11 +27,12 @@ import {
   usersTable,
   workflowNotificationsTable,
 } from "@workspace/db";
-import { and, desc, eq, ilike, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, ne } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
 import { formatProactiveBriefing, generateProactiveBriefing } from "../lib/ai-proactive-intelligence.js";
-import { generateEvidenceBasedAnswer, isNaturalLanguageRoutingConfigured, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
+import { AiProviderUsage, generateEvidenceBasedAnswer, isNaturalLanguageRoutingConfigured, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
 import { AiConversationContext, buildAiConversationContext, parseAiConversationContext, resolveConversationFollowUp } from "../lib/ai-conversation-context.js";
+import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 
 export const aiAssistantRouter = Router();
@@ -47,6 +48,8 @@ type AiAssistantGovernance = {
   providerEnabled: boolean;
   rolloutStage: "super_admin_only" | "selected_admins" | "all_authorized_admins";
   selectedAdminUserIds: number[];
+  providerInputCostPerMillionNgn: number;
+  providerOutputCostPerMillionNgn: number;
 };
 
 const ALLOWED_DOMAINS = new Set<AiAssistantDataDomain>([
@@ -63,6 +66,8 @@ const DEFAULT_GOVERNANCE: AiAssistantGovernance = {
   providerEnabled: false,
   rolloutStage: "super_admin_only",
   selectedAdminUserIds: [],
+  providerInputCostPerMillionNgn: 0,
+  providerOutputCostPerMillionNgn: 0,
 };
 
 function parseGovernance(value: string | undefined): AiAssistantGovernance {
@@ -103,10 +108,37 @@ function parseGovernance(value: string | undefined): AiAssistantGovernance {
       providerEnabled: typeof parsed.providerEnabled === "boolean" ? parsed.providerEnabled : true,
       rolloutStage,
       selectedAdminUserIds,
+      providerInputCostPerMillionNgn: Number.isFinite(Number(parsed.providerInputCostPerMillionNgn)) && Number(parsed.providerInputCostPerMillionNgn) >= 0 ? Number(parsed.providerInputCostPerMillionNgn) : 0,
+      providerOutputCostPerMillionNgn: Number.isFinite(Number(parsed.providerOutputCostPerMillionNgn)) && Number(parsed.providerOutputCostPerMillionNgn) >= 0 ? Number(parsed.providerOutputCostPerMillionNgn) : 0,
     };
   } catch {
     return DEFAULT_GOVERNANCE;
   }
+}
+
+function providerCostNgn(usages: AiProviderUsage[], governance: AiAssistantGovernance): number {
+  return usages.reduce((total, usage) => total + (usage.inputTokens / 1_000_000) * governance.providerInputCostPerMillionNgn + (usage.outputTokens / 1_000_000) * governance.providerOutputCostPerMillionNgn, 0);
+}
+
+function parseAuditMetadata(value: string): Record<string, unknown> {
+  try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}; } catch { return {}; }
+}
+
+function providerUsageTokens(metadata: Record<string, unknown>, field: "inputTokens" | "outputTokens"): number {
+  const usages = metadata.providerUsage;
+  if (!Array.isArray(usages)) return 0;
+  return usages.reduce<number>((total, usage) => {
+    if (!usage || typeof usage !== "object" || Array.isArray(usage)) return total;
+    const value = Number((usage as Record<string, unknown>)[field]);
+    return total + (Number.isFinite(value) && value > 0 ? value : 0);
+  }, 0);
+}
+
+async function currentMonthProviderCostNgn(): Promise<number> {
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const rows = await db.select({ metadata: aiAssistantAuditLogsTable.metadata }).from(aiAssistantAuditLogsTable).where(gte(aiAssistantAuditLogsTable.createdAt, monthStart));
+  return rows.reduce((total, row) => total + Math.max(0, Number(parseAuditMetadata(row.metadata).estimatedProviderCostNgn) || 0), 0);
 }
 
 async function getAiGovernance(): Promise<AiAssistantGovernance> {
@@ -117,17 +149,10 @@ async function getAiGovernance(): Promise<AiAssistantGovernance> {
   return parseGovernance(setting?.value);
 }
 
-function canUseAiAssistant(user: NonNullable<AuthRequest["user"]>, governance: AiAssistantGovernance): boolean {
-  if (user.role === "super_admin") return true;
-  if (user.role !== "admin") return false;
-  if (governance.rolloutStage === "all_authorized_admins") return true;
-  return governance.rolloutStage === "selected_admins" && governance.selectedAdminUserIds.includes(user.id);
-}
-
 async function requireAiAssistantRollout(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const governance = await getAiGovernance();
-    if (!req.user || !canUseAiAssistant(req.user, governance)) {
+    if (!req.user || !canUseAiAssistantRollout({ userId: req.user.id, role: req.user.role, rolloutStage: governance.rolloutStage, selectedAdminUserIds: governance.selectedAdminUserIds })) {
       return res.status(403).json({ error: "AI Assistant access is not enabled for your account in the current rollout stage." });
     }
     return next();
@@ -258,7 +283,7 @@ function interpretQuestionFallback(question: string): CopilotIntent {
   return { toolId: null, args: {}, label: "unsupported question" };
 }
 
-async function interpretNaturalLanguageQuestion(question: string, req: AuthRequest, context: AiConversationContext | null): Promise<CopilotIntent> {
+async function interpretNaturalLanguageQuestion(question: string, req: AuthRequest, context: AiConversationContext | null, onUsage?: (usage: AiProviderUsage) => void): Promise<CopilotIntent> {
   const contextualIntent = resolveConversationFollowUp(question, context, new Set(Object.keys(STAGE_TOOL_FIELDS)));
   if (contextualIntent && TOOL_IDS.has(contextualIntent.toolId)) {
     return { toolId: contextualIntent.toolId as ToolId, args: contextualIntent.args, label: contextualIntent.label };
@@ -276,6 +301,7 @@ async function interpretNaturalLanguageQuestion(question: string, req: AuthReque
       role: req.user!.role,
       branchScope: getBranchScope(req),
       conversationContext: context ? { lastToolId: context.lastToolId, lastToolArgs: context.lastToolArgs, records: context.records.map(({ title, href }) => ({ title, href })) } : undefined,
+      onUsage,
     });
     if (selection.kind === "tool" && TOOL_IDS.has(selection.toolId)) {
       const tool = TOOL_CATALOG.find((candidate) => candidate.id === selection.toolId)!;
@@ -471,7 +497,7 @@ function evidenceConfidenceNotice(result: AssistantToolResult): string {
   return "Evidence is current at the time of this request and is limited to the cited records within your authorised branch scope.";
 }
 
-async function makeCopilotAnswer(sessionId: number, question: string, intent: CopilotIntent, result: AssistantToolResult | undefined, providerEnabled: boolean): Promise<CopilotAnswer> {
+async function makeCopilotAnswer(sessionId: number, question: string, intent: CopilotIntent, result: AssistantToolResult | undefined, providerEnabled: boolean, onUsage?: (usage: AiProviderUsage) => void): Promise<CopilotAnswer> {
   if (!intent.toolId || !result) {
     return {
       sessionId,
@@ -500,6 +526,7 @@ async function makeCopilotAnswer(sessionId: number, question: string, intent: Co
     facts: result.facts,
     records: result.records,
     notes: result.notes,
+    onUsage,
   }) : null) ?? deterministicEvidenceAnswer(intent, noData);
   return {
     sessionId,
@@ -1566,7 +1593,7 @@ function formatReportDraft(draft: typeof aiAssistantReportDraftsTable.$inferSele
   };
 }
 
-aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit, async (_req: AuthRequest, res) => {
+aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
   try {
     const governance = await getAiGovernance();
     const providerAvailable = governance.providerEnabled && isNaturalLanguageRoutingConfigured();
@@ -1581,6 +1608,7 @@ aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit,
         configurationHint: !governance.providerEnabled ? "Natural-language provider requests are disabled in AI Governance. Approved tools and report requests remain available." : isNaturalLanguageRoutingConfigured() ? null : "Set AI_ASSISTANT_OPENAI_API_KEY in Railway to enable natural-language tool selection.",
       },
       governance,
+      canViewMonitoring: req.user!.role === "super_admin",
       approvedToolCount: TOOL_CATALOG.filter((tool) => governance.dataDomains.includes(tool.domain)).length,
       safeguards: [
         "Admin and Super Admin access only",
@@ -1833,9 +1861,14 @@ aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, a
       ? parseAiConversationContext(session.conversationContext, getBranchScope(req), TOOL_IDS)
       : null;
     const governance = await getAiGovernance();
-    const intent = await interpretNaturalLanguageQuestion(question, req, sessionContext);
+    if (governance.providerEnabled && isNaturalLanguageRoutingConfigured() && governance.monthlyBudgetNgn > 0 && await currentMonthProviderCostNgn() >= governance.monthlyBudgetNgn) {
+      return res.status(429).json({ error: "The configured monthly AI budget has been reached. Approved local tools and reports remain available after the provider is disabled in Settings." });
+    }
+    const providerUsages: AiProviderUsage[] = [];
+    const trackUsage = (usage: AiProviderUsage) => providerUsages.push(usage);
+    const intent = await interpretNaturalLanguageQuestion(question, req, sessionContext, trackUsage);
     const result = intent.toolId ? await runApprovedTool(intent.toolId, req, intent.args) : undefined;
-    const answer = await makeCopilotAnswer(session.id, question, intent, result, governance.providerEnabled && isNaturalLanguageRoutingConfigured());
+    const answer = await makeCopilotAnswer(session.id, question, intent, result, governance.providerEnabled && isNaturalLanguageRoutingConfigured(), trackUsage);
     const now = new Date();
     const nextContext = intent.toolId && result ? buildAiConversationContext({
       branchId: getBranchScope(req),
@@ -1863,7 +1896,7 @@ aiAssistantRouter.post("/ai-assistant/ask", requireAdmin, foundationRateLimit, a
       responseSummary: answer.answer,
       toolName: intent.toolId ?? "none",
       recordReferences: answer.citations,
-      metadata: { intent: intent.label, status: answer.status, factCount: answer.facts.length, citationCount: answer.citations.length, naturalLanguageRoutingConfigured: governance.providerEnabled && isNaturalLanguageRoutingConfigured(), providerEnabled: governance.providerEnabled, latencyMs: Date.now() - startedAt, contextUsed: !!sessionContext, contextExpiresAt: nextContext ? new Date(now.getTime() + CONTEXT_TTL_MS).toISOString() : session.contextExpiresAt?.toISOString() ?? null },
+      metadata: { intent: intent.label, status: answer.status, factCount: answer.facts.length, citationCount: answer.citations.length, naturalLanguageRoutingConfigured: governance.providerEnabled && isNaturalLanguageRoutingConfigured(), providerEnabled: governance.providerEnabled, latencyMs: Date.now() - startedAt, contextUsed: !!sessionContext, providerUsage: providerUsages, estimatedProviderCostNgn: providerCostNgn(providerUsages, governance), contextExpiresAt: nextContext ? new Date(now.getTime() + CONTEXT_TTL_MS).toISOString() : session.contextExpiresAt?.toISOString() ?? null },
     });
     return res.json(answer);
   } catch (error) {
@@ -1906,9 +1939,12 @@ aiAssistantRouter.get("/ai-assistant/monitoring", requireAdmin, foundationRateLi
   const questions = recent.filter((row) => row.eventType === "copilot_question_answered");
   const failures = recent.filter((row) => row.eventType === "copilot_question_failed");
   const feedback = recent.filter((row) => row.eventType === "copilot_feedback");
-  const meta = (value: string) => parseJson<Record<string, unknown>>(value, {});
+  const meta = parseAuditMetadata;
   const latencies = questions.map((row) => Number(meta(row.metadata).latencyMs)).filter(Number.isFinite);
-  return res.json({ periodDays: 30, questions: questions.length, failures: failures.length, unsupported: questions.filter((row) => meta(row.metadata).status === "unsupported").length, averageLatencyMs: latencies.length ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length) : null, providerRequests: questions.filter((row) => meta(row.metadata).naturalLanguageRoutingConfigured === true).length, providerCost: { currency: "NGN", amount: null, note: "Token-cost metering is not enabled. Provider request counts are retained for budget review." }, feedback: { helpful: feedback.filter((row) => meta(row.metadata).rating === "helpful").length, notHelpful: feedback.filter((row) => meta(row.metadata).rating === "not_helpful").length } });
+  const inputTokens = questions.reduce((total, row) => total + providerUsageTokens(meta(row.metadata), "inputTokens"), 0);
+  const outputTokens = questions.reduce((total, row) => total + providerUsageTokens(meta(row.metadata), "outputTokens"), 0);
+  const estimatedCostNgn = questions.reduce((total, row) => total + (Number(meta(row.metadata).estimatedProviderCostNgn) || 0), 0);
+  return res.json({ periodDays: 30, questions: questions.length, failures: failures.length, unsupported: questions.filter((row) => meta(row.metadata).status === "unsupported").length, averageLatencyMs: latencies.length ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length) : null, providerRequests: questions.filter((row) => meta(row.metadata).naturalLanguageRoutingConfigured === true).length, providerCost: { currency: "NGN", amount: estimatedCostNgn, inputTokens, outputTokens, note: "Estimated from provider usage returned for each request and the token prices configured in AI Governance." }, feedback: { helpful: feedback.filter((row) => meta(row.metadata).rating === "helpful").length, notHelpful: feedback.filter((row) => meta(row.metadata).rating === "not_helpful").length } });
 });
 
 aiAssistantRouter.post("/ai-assistant/tools/:toolId", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {

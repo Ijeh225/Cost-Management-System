@@ -61,6 +61,16 @@ describe("settings validation", () => {
     }) }).error).toContain("AI governance settings");
   });
 
+  it("validates staged rollout and token-pricing controls", () => {
+    const governance = JSON.stringify({
+      accessRoles: ["admin", "super_admin"], mode: "read_only", dataDomains: ["finance"], monthlyBudgetNgn: 100000,
+      auditRetentionDays: 365, actionPolicy: "human_confirmation_required", providerEnabled: true,
+      rolloutStage: "selected_admins", selectedAdminUserIds: [2], providerInputCostPerMillionNgn: 500, providerOutputCostPerMillionNgn: 2000,
+    });
+    expect(validateSettingsPayload({ aiAssistantGovernance: governance }).error).toBeUndefined();
+    expect(validateSettingsPayload({ aiAssistantGovernance: governance.replace("[2]", "[]") }).error).toContain("AI governance");
+  });
+
   it("accepts only explicit proactive briefing switches", () => {
     expect(validateSettingsPayload({
       aiProactiveBriefingPreferences: JSON.stringify({ enabled: true, daily: true, weekly: false }),

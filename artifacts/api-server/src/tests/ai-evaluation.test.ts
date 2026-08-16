@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseEvidenceBasedAnswer, parseNaturalLanguageSelection, sanitizeToolArguments } from "../lib/ai-tool-selection.js";
+import { extractProviderUsage, parseEvidenceBasedAnswer, parseNaturalLanguageSelection, sanitizeToolArguments } from "../lib/ai-tool-selection.js";
+import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 
 /**
  * Phase 8 protected, anonymised evaluation cases. These never query a live
@@ -33,5 +34,17 @@ describe("AI Assistant safety evaluation set", () => {
       factLabels: ["Outstanding balance"],
       recordHrefs: [],
     }, { facts: [{ label: "Outstanding balance" }], records: [] })).toBeNull();
+  });
+
+  it("records only numeric provider token usage for budget monitoring", () => {
+    expect(extractProviderUsage({ model: "test-model", usage: { input_tokens: 120, output_tokens: 45, total_tokens: 165 } })).toEqual({ model: "test-model", inputTokens: 120, outputTokens: 45, totalTokens: 165 });
+    expect(extractProviderUsage({ usage: { input_tokens: "not-a-number" } })).toBeNull();
+  });
+
+  it("enforces staged rollout roles without granting staff access", () => {
+    expect(canUseAiAssistantRollout({ userId: 1, role: "super_admin", rolloutStage: "super_admin_only", selectedAdminUserIds: [] })).toBe(true);
+    expect(canUseAiAssistantRollout({ userId: 2, role: "admin", rolloutStage: "selected_admins", selectedAdminUserIds: [2] })).toBe(true);
+    expect(canUseAiAssistantRollout({ userId: 3, role: "admin", rolloutStage: "selected_admins", selectedAdminUserIds: [2] })).toBe(false);
+    expect(canUseAiAssistantRollout({ userId: 2, role: "staff", rolloutStage: "all_authorized_admins", selectedAdminUserIds: [] })).toBe(false);
   });
 });

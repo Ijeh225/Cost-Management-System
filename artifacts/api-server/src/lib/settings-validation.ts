@@ -107,7 +107,7 @@ export function validateSettingsPayload(payload: unknown): { values: Record<stri
       const policy = governance as Record<string, unknown>;
       const keys = Object.keys(policy);
       const allowedKeys = new Set([
-        "accessRoles", "mode", "dataDomains", "monthlyBudgetNgn", "auditRetentionDays", "actionPolicy", "providerEnabled", "rolloutStage", "selectedAdminUserIds",
+        "accessRoles", "mode", "dataDomains", "monthlyBudgetNgn", "auditRetentionDays", "actionPolicy", "providerEnabled", "rolloutStage", "selectedAdminUserIds", "providerInputCostPerMillionNgn", "providerOutputCostPerMillionNgn",
       ]);
       if (keys.some((key) => !allowedKeys.has(key))) throw new Error();
       if (!Array.isArray(policy.accessRoles) || policy.accessRoles.length === 0 || policy.accessRoles.some((role) => typeof role !== "string" || !AI_ASSISTANT_ACCESS_ROLES.has(role))) throw new Error();
@@ -120,6 +120,9 @@ export function validateSettingsPayload(payload: unknown): { values: Record<stri
       if ("rolloutStage" in policy && (typeof policy.rolloutStage !== "string" || !AI_ASSISTANT_ROLLOUT_STAGES.has(policy.rolloutStage))) throw new Error();
       if ("selectedAdminUserIds" in policy && (!Array.isArray(policy.selectedAdminUserIds) || policy.selectedAdminUserIds.some((id) => !Number.isInteger(id) || Number(id) <= 0))) throw new Error();
       if (policy.rolloutStage === "selected_admins" && (!Array.isArray(policy.selectedAdminUserIds) || policy.selectedAdminUserIds.length === 0)) throw new Error();
+      for (const key of ["providerInputCostPerMillionNgn", "providerOutputCostPerMillionNgn"]) {
+        if (key in policy && (!Number.isFinite(Number(policy[key])) || Number(policy[key]) < 0 || Number(policy[key]) > 50_000_000)) throw new Error();
+      }
     } catch {
       return { values: {}, officerIds: [], error: "AI governance settings must use the approved read-only access, scope, budget, and audit policy format." };
     }
