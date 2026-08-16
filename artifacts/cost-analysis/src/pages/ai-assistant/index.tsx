@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { AlertTriangle, Bell, Bot, CheckCircle2, ClipboardCheck, ExternalLink, FilePlus2, FileSearch, Loader2, LockKeyhole, RefreshCw, Send, Settings2, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, Bell, Bot, CheckCircle2, ClipboardCheck, Download, ExternalLink, FileBarChart, FilePlus2, FileSearch, Loader2, LockKeyhole, Printer, RefreshCw, Send, Settings2, ShieldCheck, Sparkles } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 type AssistantStatus = {
-  phase: "evidence_and_conversation_context";
+  phase: "evidence_and_conversation_context" | "report_and_document_requests";
   available: true;
   modelConnected: boolean;
   copilotMode: "guided_read_only_with_confirmed_actions" | "natural_language_read_only_with_confirmed_actions";
@@ -76,11 +76,60 @@ type ProactiveBriefing = {
   }>;
 };
 
+type AssistantReportType = "monthly_finance" | "receivables" | "branch_performance" | "operational_delays" | "payment_schedules";
+type AssistantReportDraft = {
+  id: number;
+  reportType: AssistantReportType;
+  title: string;
+  branchId: number | null;
+  filters: Record<string, unknown>;
+  facts: Array<{ label: string; value: string | number; detail?: string }>;
+  records: Array<{ title: string; detail: string; href: string; badges?: string[] }>;
+  sources: Array<{ type: string; id?: number; label: string; href: string }>;
+  notes: string[];
+  generatedAt: string;
+};
+
 const ACTION_DRAFT_TYPES: Array<{ value: AssistantDraftType; label: string; description: string; icon: typeof FilePlus2 }> = [
   { value: "payment_schedule", label: "Payment schedule", description: "Create a normal Pending Approval request. It cannot approve or pay money.", icon: FilePlus2 },
   { value: "workflow_notification", label: "Internal notification", description: "Send an in-app notification to the selected branch administrators.", icon: Bell },
   { value: "management_summary", label: "Management summary", description: "Finalise a read-only summary for management review.", icon: ClipboardCheck },
 ];
+
+const REPORT_TYPES: Array<{ value: AssistantReportType; label: string; description: string; needsPeriod?: boolean }> = [
+  { value: "monthly_finance", label: "Monthly finance", description: "Revenue, expenses, collections, and the selected reporting period.", needsPeriod: true },
+  { value: "receivables", label: "Receivables ageing", description: "Outstanding invoices, overdue balances, and ageing totals." },
+  { value: "branch_performance", label: "Branch performance", description: "Live branch operational and financial comparison." },
+  { value: "operational_delays", label: "Operational delays", description: "Delayed jobs and the responsible operational stage." },
+  { value: "payment_schedules", label: "Approved payment schedules", description: "Approved schedules that still need payment processing." },
+];
+
+function csvCell(value: string | number | undefined) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function printReportDraft(report: AssistantReportDraft) {
+  const popup = window.open("", "_blank", "noopener,noreferrer");
+  if (!popup) return;
+  const safe = (value: string | number | undefined) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  const facts = report.facts.map((fact) => `<tr><td>${safe(fact.label)}</td><td>${safe(fact.value)}</td><td>${safe(fact.detail)}</td></tr>`).join("");
+  const records = report.records.map((record) => `<tr><td>${safe(record.title)}</td><td>${safe(record.detail)}</td></tr>`).join("");
+  popup.document.write(`<!doctype html><html><head><title>${safe(report.title)}</title><style>body{font-family:Arial,sans-serif;margin:36px;color:#172033}h1{margin-bottom:4px}p{color:#526078}table{border-collapse:collapse;width:100%;margin:18px 0}th,td{border:1px solid #d8dee9;padding:9px;text-align:left;font-size:12px}th{background:#f3f6fa}</style></head><body><h1>${safe(report.title)}</h1><p>Generated ${safe(new Date(report.generatedAt).toLocaleString())}. This is a read-only snapshot of authorised live data.</p><h2>Summary</h2><table><thead><tr><th>Metric</th><th>Value</th><th>Detail</th></tr></thead><tbody>${facts}</tbody></table><h2>Source records</h2><table><thead><tr><th>Record</th><th>Detail</th></tr></thead><tbody>${records || "<tr><td colspan=\"2\">No individual records were returned for this report.</td></tr>"}</tbody></table><p>Source references: ${safe(report.sources.map((source) => source.label).join(", ") || "None")}</p></body></html>`);
+  popup.document.close();
+  popup.focus();
+  popup.print();
+}
+
+function downloadReportCsv(report: AssistantReportDraft) {
+  const rows = [["Report", report.title], ["Generated at", new Date(report.generatedAt).toLocaleString()], [], ["Metric", "Value", "Detail"], ...report.facts.map((fact) => [fact.label, fact.value, fact.detail ?? ""]), [], ["Source record", "Detail", "Link"], ...report.records.map((record) => [record.title, record.detail, record.href])];
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${report.title.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-").replaceAll(/(^-|-$)/g, "")}-${report.id}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 function BriefingView({ briefing, onOpen }: { briefing: ProactiveBriefing; onOpen: (href: string) => void }) {
   const severityClass = { critical: "border-destructive/30 bg-destructive/[0.06] text-destructive", warning: "border-amber-500/30 bg-amber-500/[0.07] text-amber-700 dark:text-amber-400", watch: "border-primary/20 bg-primary/[0.05] text-primary" } as const;
@@ -100,6 +149,13 @@ export default function AiAssistantPage() {
     message: "", actionUrl: "/notifications", title: "", content: "",
   });
   const [activeDraft, setActiveDraft] = useState<AssistantActionDraft | null>(null);
+  const [reportType, setReportType] = useState<AssistantReportType>("monthly_finance");
+  const [reportFrom, setReportFrom] = useState(() => {
+    const date = new Date();
+    return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10);
+  });
+  const [reportTo, setReportTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [activeReport, setActiveReport] = useState<AssistantReportDraft | null>(null);
   const { data: status, isLoading, isError } = useQuery<AssistantStatus>({
     queryKey: ["/api/ai-assistant/status"],
     queryFn: () => customFetch("/api/ai-assistant/status"),
@@ -119,6 +175,11 @@ export default function AiAssistantPage() {
     queryKey: ["/api/ai-assistant/briefings"],
     queryFn: () => customFetch("/api/ai-assistant/briefings"),
     staleTime: 30_000,
+  });
+  const { data: reportDrafts = [], isLoading: reportDraftsLoading } = useQuery<AssistantReportDraft[]>({
+    queryKey: ["/api/ai-assistant/reports/drafts"],
+    queryFn: () => customFetch("/api/ai-assistant/reports/drafts"),
+    staleTime: 15_000,
   });
   const askMutation = useMutation({
     mutationFn: (submittedQuestion: string) => customFetch<CopilotAnswer>("/api/ai-assistant/ask", {
@@ -162,6 +223,16 @@ export default function AiAssistantPage() {
     mutationFn: () => customFetch<ProactiveBriefing>("/api/ai-assistant/briefings/generate", { method: "POST" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/ai-assistant/briefings"] }),
   });
+  const generateReportMutation = useMutation({
+    mutationFn: () => customFetch<AssistantReportDraft>("/api/ai-assistant/reports/drafts", {
+      method: "POST",
+      body: JSON.stringify({ reportType, ...(reportType === "monthly_finance" ? { from: reportFrom, to: reportTo } : {}) }),
+    }),
+    onSuccess: (report) => {
+      setActiveReport(report);
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-assistant/reports/drafts"] });
+    },
+  });
 
   function submitQuestion(event: FormEvent) {
     event.preventDefault();
@@ -175,6 +246,9 @@ export default function AiAssistantPage() {
     setConversation([]);
     setQuestion("");
   }
+
+  const selectedReportType = REPORT_TYPES.find((type) => type.value === reportType)!;
+  const displayedReport = activeReport ?? reportDrafts[0] ?? null;
 
   if (isLoading) return <div className="flex min-h-[50vh] items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
   if (isError || !status) return <div className="mx-auto max-w-xl rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-muted-foreground">Unable to load the Finance Copilot. Refresh the page and try again.</div>;
@@ -193,6 +267,26 @@ export default function AiAssistantPage() {
       <Card className="border-border/60 bg-card shadow-sm">
         <CardHeader className="flex flex-col gap-3 border-b border-border/60 p-6 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="flex items-center gap-2 text-lg"><AlertTriangle className="h-5 w-5 text-primary" />Proactive finance & control briefing</CardTitle><p className="mt-1 text-sm text-muted-foreground">Defined risk rules scan your authorised branch for berthing, operational, documentation, receivable, and payable issues. This is evidence, not speculation.</p></div><Button type="button" variant="outline" className="gap-2" onClick={() => generateBriefingMutation.mutate()} disabled={generateBriefingMutation.isPending}><RefreshCw className={`h-4 w-4 ${generateBriefingMutation.isPending ? "animate-spin" : ""}`} />{generateBriefingMutation.isPending ? "Generating..." : "Generate current briefing"}</Button></CardHeader>
         <CardContent className="p-6">{briefingsLoading ? <div className="flex min-h-28 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div> : briefings[0] ? <BriefingView briefing={briefings[0]} onOpen={setLocation} /> : <div className="flex min-h-32 flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-muted/[0.12] p-5 text-center"><p className="font-medium">No proactive briefing has been generated yet</p><p className="mt-1 text-sm text-muted-foreground">Generate a current briefing now, or enable daily and weekly briefings in AI Governance settings.</p></div>}{generateBriefingMutation.isError && <p className="mt-3 text-sm text-destructive">{generateBriefingMutation.error instanceof Error ? generateBriefingMutation.error.message : "Unable to generate the briefing."}</p>}</CardContent>
+      </Card>
+
+      <Card className="border-border/60 bg-card shadow-sm">
+        <CardHeader className="border-b border-border/60 p-6"><CardTitle className="flex items-center gap-2 text-lg"><FileBarChart className="h-5 w-5 text-primary" />Report requests</CardTitle><p className="mt-1 text-sm text-muted-foreground">Prepare an immutable, read-only snapshot from approved live-data tools. Review its facts and sources before printing or exporting it.</p></CardHeader>
+        <CardContent className="grid gap-6 p-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+          <div className="space-y-4 rounded-xl border border-border/60 bg-muted/[0.1] p-4">
+            <div className="space-y-2"><Label htmlFor="ai-report-type">Report type</Label><Select value={reportType} onValueChange={(value) => setReportType(value as AssistantReportType)}><SelectTrigger id="ai-report-type"><SelectValue /></SelectTrigger><SelectContent>{REPORT_TYPES.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent></Select><p className="text-xs leading-5 text-muted-foreground">{selectedReportType.description}</p></div>
+            {selectedReportType.needsPeriod && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1"><div className="space-y-2"><Label htmlFor="ai-report-from">From</Label><Input id="ai-report-from" type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="ai-report-to">To</Label><Input id="ai-report-to" type="date" value={reportTo} onChange={(event) => setReportTo(event.target.value)} /></div></div>}
+            <Button type="button" className="w-full gap-2" onClick={() => generateReportMutation.mutate()} disabled={generateReportMutation.isPending || (selectedReportType.needsPeriod && (!reportFrom || !reportTo))}><FileBarChart className="h-4 w-4" />{generateReportMutation.isPending ? "Preparing report..." : "Prepare report draft"}</Button>
+            <p className="text-xs leading-5 text-muted-foreground">The report is saved to the AI audit trail with its filters, timestamp, and source references. It does not change any financial or operational record.</p>
+            {generateReportMutation.isError && <p className="text-sm text-destructive">{generateReportMutation.error instanceof Error ? generateReportMutation.error.message : "Unable to prepare the report."}</p>}
+          </div>
+          <div className="min-w-0">
+            {reportDraftsLoading ? <div className="flex min-h-48 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div> : displayedReport ? <div className="space-y-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-semibold">{displayedReport.title}</p><p className="mt-1 text-sm text-muted-foreground">Prepared {new Date(displayedReport.generatedAt).toLocaleString()} {displayedReport.branchId == null ? "across your authorised branches" : "for the selected branch"}.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => printReportDraft(displayedReport)}><Printer className="h-3.5 w-3.5" />Print / Save PDF</Button><Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => downloadReportCsv(displayedReport)}><Download className="h-3.5 w-3.5" />Export CSV</Button></div></div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{displayedReport.facts.map((fact) => <div key={fact.label} className="rounded-lg border border-border/60 bg-background/70 p-3"><p className="text-xs text-muted-foreground">{fact.label}</p><p className="mt-1 font-semibold">{fact.value}</p>{fact.detail && <p className="mt-1 text-xs text-muted-foreground">{fact.detail}</p>}</div>)}</div>
+              {displayedReport.records.length > 0 && <div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cited records</p>{displayedReport.records.slice(0, 6).map((record) => <button key={`${record.href}-${record.title}`} type="button" onClick={() => setLocation(record.href)} className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/60 p-3 text-left transition-colors hover:bg-accent/40"><div className="min-w-0"><p className="font-medium">{record.title}</p><p className="mt-0.5 truncate text-sm text-muted-foreground">{record.detail}</p></div><ExternalLink className="h-4 w-4 shrink-0 text-primary" /></button>)}{displayedReport.records.length > 6 && <p className="text-xs text-muted-foreground">Showing the first 6 of {displayedReport.records.length} cited records. The export includes the full report snapshot.</p>}</div>}
+              {displayedReport.notes.length > 0 && <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-3 text-sm text-muted-foreground">{displayedReport.notes.map((note) => <p key={note}>{note}</p>)}</div>}
+            </div> : <div className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/[0.1] p-6 text-center"><FileBarChart className="h-6 w-6 text-primary" /><p className="mt-3 font-medium">No report draft yet</p><p className="mt-1 max-w-sm text-sm text-muted-foreground">Choose a report type, then prepare a read-only snapshot of the authorised live data.</p></div>}
+          </div>
+        </CardContent>
       </Card>
 
       <Card className="border-border/60 bg-card shadow-sm">

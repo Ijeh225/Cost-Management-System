@@ -829,6 +829,26 @@ async function runStartupMigrations() {
         ON ai_assistant_briefings(branch_id, period, briefing_date)
         WHERE period IN ('daily', 'weekly')`);
     });
+    await runMigration("ai_assistant_report_drafts_v1", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ai_assistant_report_drafts (
+          id SERIAL PRIMARY KEY,
+          requested_by_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+          report_type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          filters TEXT NOT NULL DEFAULT '{}',
+          facts TEXT NOT NULL DEFAULT '[]',
+          records TEXT NOT NULL DEFAULT '[]',
+          source_records TEXT NOT NULL DEFAULT '[]',
+          notes TEXT NOT NULL DEFAULT '[]',
+          generated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_report_drafts_user_idx ON ai_assistant_report_drafts(requested_by_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_report_drafts_branch_idx ON ai_assistant_report_drafts(branch_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ai_assistant_report_drafts_generated_idx ON ai_assistant_report_drafts(generated_at)`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

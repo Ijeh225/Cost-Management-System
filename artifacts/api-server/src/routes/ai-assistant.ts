@@ -3,6 +3,7 @@ import {
   aiAssistantAuditLogsTable,
   aiAssistantActionDraftsTable,
   aiAssistantBriefingsTable,
+  aiAssistantReportDraftsTable,
   aiAssistantSessionsTable,
   branchesTable,
   banksTable,
@@ -1376,6 +1377,29 @@ async function executeAssistantDraft(draft: typeof aiAssistantActionDraftsTable.
   return { action: "management_summary_finalised", title: prepared.payload.title, href: "/reports" };
 }
 
+const REPORT_REQUESTS = {
+  monthly_finance: { toolId: "monthly_financial_report" as ToolId, title: "Monthly Revenue and Expense Report" },
+  receivables: { toolId: "receivables_ageing" as ToolId, title: "Receivables and Ageing Report" },
+  branch_performance: { toolId: "branch_performance" as ToolId, title: "Branch Performance Report" },
+  operational_delays: { toolId: "delayed_jobs" as ToolId, title: "Operational Delays Report" },
+  payment_schedules: { toolId: "approved_payment_schedules" as ToolId, title: "Approved Payment Schedules Report" },
+} as const;
+
+function formatReportDraft(draft: typeof aiAssistantReportDraftsTable.$inferSelect) {
+  return {
+    id: draft.id,
+    reportType: draft.reportType,
+    title: draft.title,
+    branchId: draft.branchId,
+    filters: parseJson<Record<string, unknown>>(draft.filters, {}),
+    facts: parseJson<AssistantFact[]>(draft.facts, []),
+    records: parseJson<AssistantRecord[]>(draft.records, []),
+    sources: parseJson<AssistantSource[]>(draft.sourceRecords, []),
+    notes: parseJson<string[]>(draft.notes, []),
+    generatedAt: draft.generatedAt.toISOString(),
+  };
+}
+
 aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit, async (_req: AuthRequest, res) => {
   try {
     const [setting] = await db.select({ value: settingsTable.value })
@@ -1384,7 +1408,7 @@ aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit,
       .limit(1);
     const governance = parseGovernance(setting?.value);
     return res.json({
-      phase: "evidence_and_conversation_context",
+      phase: "report_and_document_requests",
       available: true,
       modelConnected: isNaturalLanguageRoutingConfigured(),
       copilotMode: isNaturalLanguageRoutingConfigured() ? "natural_language_read_only_with_confirmed_actions" : "guided_read_only_with_confirmed_actions",
@@ -1407,6 +1431,48 @@ aiAssistantRouter.get("/ai-assistant/status", requireAdmin, foundationRateLimit,
   } catch (error) {
     console.error("[ai-assistant] Failed to load foundation status", error);
     return res.status(500).json({ error: "Unable to load AI assistant status" });
+  }
+});
+
+aiAssistantRouter.get("/ai-assistant/reports/drafts", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  const branchId = getBranchScope(req);
+  const rows = await db.select().from(aiAssistantReportDraftsTable)
+    .where(eq(aiAssistantReportDraftsTable.requestedById, req.user!.id))
+    .orderBy(desc(aiAssistantReportDraftsTable.generatedAt)).limit(20);
+  return res.json(rows.filter((row) => row.branchId === branchId).map(formatReportDraft));
+});
+
+aiAssistantRouter.post("/ai-assistant/reports/drafts", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
+  const reportType = typeof body.reportType === "string" ? body.reportType : "";
+  const requested = REPORT_REQUESTS[reportType as keyof typeof REPORT_REQUESTS];
+  if (!requested) return res.status(400).json({ error: "Choose a supported report type." });
+  try {
+    const filters = requested.toolId === "monthly_financial_report"
+      ? (() => { const period = getReportPeriod(body); return { from: period.from.toISOString().slice(0, 10), to: period.to.toISOString().slice(0, 10), limit: 50 }; })()
+      : { limit: 50 };
+    const result = await runApprovedTool(requested.toolId, req, filters);
+    const [draft] = await db.insert(aiAssistantReportDraftsTable).values({
+      requestedById: req.user!.id,
+      branchId: getBranchScope(req),
+      reportType,
+      title: requested.title,
+      filters: JSON.stringify(filters),
+      facts: JSON.stringify(result.facts),
+      records: JSON.stringify(result.records),
+      sourceRecords: JSON.stringify(result.sources),
+      notes: JSON.stringify(result.notes),
+    }).returning();
+    await recordAiAssistantAuditEvent({
+      userId: req.user!.id, branchId: getBranchScope(req), eventType: "report_draft_generated",
+      requestSummary: `Generated ${requested.title}`, responseSummary: `${result.facts.length} facts and ${result.records.length} records`,
+      toolName: `report:${requested.toolId}`, recordReferences: result.sources,
+      metadata: { reportDraftId: draft.id, reportType, filters, generatedAt: draft.generatedAt.toISOString() },
+    });
+    return res.status(201).json(formatReportDraft(draft));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to prepare report draft.";
+    return res.status(message.includes("disabled by AI Assistant governance") ? 403 : 400).json({ error: message });
   }
 });
 
