@@ -3,7 +3,7 @@ import { parseEvidenceBasedAnswer, parseNaturalLanguageSelection, sanitizeToolAr
 import { AI_BUSINESS_DEFINITIONS, getAiBusinessDefinitionsPrompt, getRelevantAiBusinessDefinitionsPrompt, isPhysicalTerminalPresenceQuestion, resolveAiOperationalStage } from "../lib/ai-business-definitions.js";
 
 describe("AI natural-language tool selection", () => {
-  const allowedTools = new Set(["stage_count", "stage_jobs", "container_lookup"]);
+  const allowedTools = new Set(["stage_count", "stage_jobs", "container_lookup", "duty_payments_overview", "client_wallet_overview", "bank_transfer_activity", "open_job_tasks"]);
 
   it("accepts only an approved selected tool and safe arguments", () => {
     expect(parseNaturalLanguageSelection({
@@ -24,6 +24,15 @@ describe("AI natural-language tool selection", () => {
       kind: "unsupported",
       label: "unsupported question",
       message: "I cannot safely match that request to an approved read-only data tool yet.",
+    });
+  });
+
+  it("permits only the newly approved read-only coverage tools", () => {
+    expect(parseNaturalLanguageSelection({ kind: "tool", toolId: "duty_payments_overview", args: { rawSql: "SELECT * FROM payments" }, message: "" }, allowedTools)).toMatchObject({
+      kind: "tool", toolId: "duty_payments_overview", args: {},
+    });
+    expect(parseNaturalLanguageSelection({ kind: "tool", toolId: "bank_transfer_activity", args: {}, message: "" }, allowedTools)).toMatchObject({
+      kind: "tool", toolId: "bank_transfer_activity", args: {},
     });
   });
 

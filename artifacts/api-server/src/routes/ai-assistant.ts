@@ -15,6 +15,7 @@ import {
   containerExpensePaymentsTable,
   clientDepositsTable,
   clientsTable,
+  customsChargesTable,
   documentIntelligenceIndexTable,
   db,
   expensePaymentsTable,
@@ -197,8 +198,10 @@ const TOOL_CATALOG = [
   { id: "container_delay_investigation", title: "Container delay investigation", description: "Run the fixed read-only checks for one exact container: workflow state, documents, and payment history.", domain: "containers" as const, requiresContainer: true },
   { id: "container_documents", title: "Container documents", description: "List every uploaded document attached to one exact container, including files that are not text-searchable.", domain: "documents" as const, requiresContainer: true },
   { id: "container_payment_history", title: "Container payment history", description: "Show recorded container disbursements for one exact container.", domain: "finance" as const, requiresContainer: true },
+  { id: "duty_payments_overview", title: "Duty payments overview", description: "Review assessed customs duty, recorded duty payments, and unpaid duty by authorised container.", domain: "finance" as const },
   { id: "invoice_status", title: "Invoice status", description: "Show the total, collections, balance, and linked record for one exact invoice.", domain: "finance" as const, requiresInvoice: true },
   { id: "client_balance", title: "Client balance", description: "Show receivable balance and credit for one authorised client.", domain: "finance" as const, requiresClient: true },
+  { id: "client_wallet_overview", title: "Client wallet activity", description: "Review client deposits, allocations, and remaining wallet credit in the authorised branch scope.", domain: "finance" as const },
   { id: "receivables_overview", title: "Receivables overview", description: "Review invoiced, collected, outstanding, and overdue client balances.", domain: "finance" as const },
   { id: "approved_payment_schedules", title: "Approved schedules awaiting payment", description: "Show approved or partially approved payment schedules with an unpaid balance.", domain: "finance" as const },
   { id: "overhead_overview", title: "Overhead expense overview", description: "Review recorded overhead, actual payments, and outstanding overhead balances.", domain: "finance" as const },
@@ -208,6 +211,8 @@ const TOOL_CATALOG = [
   { id: "monthly_financial_report", title: "Monthly financial report", description: "Prepare a read-only monthly income, collections, expense, and net-cash report from live records.", domain: "reports" as const },
   { id: "receivables_ageing", title: "Receivables ageing", description: "Group unpaid invoice balances by age and show overdue collection priorities.", domain: "finance" as const },
   { id: "bank_ledger_reconciliation", title: "Bank ledger reconciliation", description: "Reconcile recorded bank-ledger inflows, outflows, transfers, and balances. This is not a bank-statement confirmation.", domain: "banking" as const },
+  { id: "bank_transfer_activity", title: "Bank transfer activity", description: "List recent recorded transfers between company bank accounts.", domain: "banking" as const },
+  { id: "open_job_tasks", title: "Open job tasks", description: "List outstanding operational tasks, their due dates, priority, and linked containers.", domain: "operations" as const },
   { id: "financial_control_review", title: "Financial control review", description: "Find explainable review prompts for possible duplicates, overpayments, unallocated funds, delayed collections, unusual expenses, and incomplete payment controls.", domain: "finance" as const },
 ] as const;
 
@@ -249,6 +254,11 @@ const SUGGESTED_QUESTIONS = [
   "Show receivables ageing and overdue collections.",
   "Run a financial control review for unusual expenses or overpayments.",
   "Show the bank ledger reconciliation.",
+  "Show customs duty payments that are still outstanding.",
+  "Show client wallet deposits that have not been fully allocated.",
+  "Show recent bank transfers.",
+  "Show my recent workflow notifications.",
+  "Show outstanding job tasks.",
 ];
 
 function documentSearchQuery(question: string): string {
@@ -303,11 +313,16 @@ function interpretQuestionFallback(question: string): CopilotIntent {
   if (stage && understanding.intent === "count") return { toolId: "stage_count", args: stageArgs!, label: `${stage} job count` };
   if (stage && understanding.intent === "list") return { toolId: "stage_jobs", args: stageArgs!, label: `${stage} jobs` };
   if (/(receivable|invoice|collection).*(ageing|aging)|(ageing|aging).*(receivable|invoice|collection)/.test(normalised)) return { toolId: "receivables_ageing", args: {}, label: "receivables ageing" };
+  if (/(duty|customs).*(payment|paid|outstanding|unpaid|assessment)|(payment|paid|outstanding|unpaid|assessment).*(duty|customs)/.test(normalised)) return { toolId: "duty_payments_overview", args: {}, label: "duty payments overview" };
+  if (/(wallet|deposit|deposits).*(client|unallocated|allocation|credit)|(client|unallocated|allocation|credit).*(wallet|deposit|deposits)/.test(normalised)) return { toolId: "client_wallet_overview", args: {}, label: "client wallet activity" };
   if (/(outstanding|overdue|receivable|invoice|collected).*(invoice|balance|payment|receivable)|(invoice|balance|payment|receivable).*(outstanding|overdue|receivable|collected)/.test(normalised)) return { toolId: "receivables_overview", args: {}, label: "receivables overview" };
   if (/(approved|pending).*(schedule|payment)|(schedule|payment).*(approved|awaiting)/.test(normalised)) return { toolId: "approved_payment_schedules", args: {}, label: "approved payment schedules" };
   if (/(overhead|expense).*(outstanding|paid|payment|balance)|(outstanding|paid|payment|balance).*(overhead|expense)/.test(normalised)) return { toolId: "overhead_overview", args: {}, label: "overhead overview" };
   if (/(financial|profit|loss|revenue|cashflow|cash flow).*(report|month|summary)|(report|month|summary).*(financial|profit|loss|revenue|cashflow|cash flow)/.test(normalised)) return { toolId: "monthly_financial_report", args: {}, label: "monthly financial report" };
   if (/(bank|ledger).*(reconciliation|reconcile|balance)|(reconciliation|reconcile).*(bank|ledger)/.test(normalised)) return { toolId: "bank_ledger_reconciliation", args: {}, label: "bank ledger reconciliation" };
+  if (/(bank|account).*(transfer|transfers)|(transfer|transfers).*(bank|account)/.test(normalised)) return { toolId: "bank_transfer_activity", args: {}, label: "bank transfer activity" };
+  if (/\b(notification|notifications|alert|alerts)\b/.test(normalised)) return { toolId: "notifications_summary", args: {}, label: "notification summary" };
+  if (/\b(task|tasks|to[ -]?do|todo)\b/.test(normalised)) return { toolId: "open_job_tasks", args: {}, label: "open job tasks" };
   if (/(control|duplicate|unusual|overpayment|unallocated).*(review|expense|payment|fund|transaction)|(review|expense|payment|fund|transaction).*(control|duplicate|unusual|overpayment|unallocated)/.test(normalised)) return { toolId: "financial_control_review", args: {}, label: "financial control review" };
   if (/(branch|branches).*(compare|performance)|(compare|performance).*(branch|branches)/.test(normalised)) return { toolId: "branch_performance", args: {}, label: "branch performance" };
   if (/(terminal|operations|container).*(count|summary|currently|how many)|(count|summary|currently|how many).*(terminal|operations|container)/.test(normalised)) return { toolId: "operations_overview", args: {}, label: "operations overview" };
@@ -812,6 +827,42 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     return result;
   }
 
+  if (toolId === "open_job_tasks") {
+    const [allTasks, allContainers, allUsers] = await Promise.all([
+      db.select({ id: containerTasksTable.id, branchId: containerTasksTable.branchId, containerId: containerTasksTable.containerId, title: containerTasksTable.title, assignedStaffId: containerTasksTable.assignedStaffId, dueDate: containerTasksTable.dueDate, priority: containerTasksTable.priority, status: containerTasksTable.status, notes: containerTasksTable.notes }).from(containerTasksTable),
+      db.select({ id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber, customerName: containersTable.customerName }).from(containersTable),
+      db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable),
+    ]);
+    const containers = scoped(allContainers, branchId);
+    const containerById = new Map(containers.map((container) => [container.id, container]));
+    const userById = new Map(allUsers.map((user) => [user.id, user]));
+    const now = new Date();
+    const tasks = scoped(allTasks, branchId).filter((task) => task.status !== "completed" && containerById.has(task.containerId));
+    const overdue = tasks.filter((task) => task.dueDate && task.dueDate.getTime() < now.getTime());
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Open tasks", value: tasks.length },
+      { label: "Overdue tasks", value: overdue.length },
+      { label: "High-priority tasks", value: tasks.filter((task) => task.priority === "high" || task.priority === "urgent").length },
+    ];
+    result.records = tasks.sort((a, b) => (a.dueDate?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.dueDate?.getTime() ?? Number.MAX_SAFE_INTEGER)).slice(0, limit).map((task) => {
+      const container = containerById.get(task.containerId)!;
+      const assignee = task.assignedStaffId ? userById.get(task.assignedStaffId)?.name ?? "Unassigned" : "Unassigned";
+      return {
+        title: task.title,
+        detail: `${container.containerNumber} - ${container.customerName}. Due ${dateOnly(task.dueDate)}; assigned to ${assignee}${task.notes ? `; ${task.notes}` : ""}.`,
+        href: `/containers/${container.id}?tab=tasks`,
+        badges: [task.priority, task.dueDate && task.dueDate.getTime() < now.getTime() ? "Overdue" : "Open"],
+      };
+    });
+    result.sources = result.records.map((record) => {
+      const containerId = Number(record.href.match(/^\/containers\/(\d+)/)?.[1]);
+      const container = containers.find((candidate) => candidate.id === containerId)!;
+      return { type: "container", id: container.id, label: container.containerNumber, href: record.href };
+    });
+    return result;
+  }
+
   if (toolId === "overdue_containers") {
     const now = new Date();
     const rows = scoped(await db.select({
@@ -954,6 +1005,38 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     return result;
   }
 
+  if (toolId === "duty_payments_overview") {
+    const rows = scoped(await db.select({
+      id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber,
+      customerName: containersTable.customerName, duty: customsChargesTable.duty,
+      dutyPaid: customsChargesTable.dutyPaid, dutyNotPaid: customsChargesTable.dutyNotPaid,
+    }).from(containersTable).leftJoin(customsChargesTable, eq(customsChargesTable.containerId, containersTable.id)), branchId)
+      .map((row) => {
+        const assessed = toAmount(row.duty);
+        const paid = toAmount(row.dutyPaid);
+        const outstanding = assessed > 0 ? Math.max(0, assessed - paid) : Math.max(0, toAmount(row.dutyNotPaid));
+        return { ...row, assessed, paid, outstanding };
+      });
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Duty assessed", value: money(rows.reduce((sum, row) => sum + row.assessed, 0)) },
+      { label: "Duty paid", value: money(rows.reduce((sum, row) => sum + row.paid, 0)) },
+      { label: "Duty outstanding", value: money(rows.reduce((sum, row) => sum + row.outstanding, 0)) },
+      { label: "Containers with unpaid duty", value: rows.filter((row) => row.outstanding > 0).length },
+    ];
+    result.records = rows.filter((row) => row.outstanding > 0).sort((a, b) => b.outstanding - a.outstanding).slice(0, limit).map((row) => ({
+      title: row.containerNumber,
+      detail: `${row.customerName} - assessed ${money(row.assessed)}, paid ${money(row.paid)}, balance ${money(row.outstanding)}.`,
+      href: `/duty-payments?container=${row.id}`,
+      badges: [row.paid > 0 ? "Partial duty payment" : "Duty unpaid"],
+    }));
+    result.sources = result.records.map((record) => {
+      const row = rows.find((candidate) => candidate.containerNumber === record.title)!;
+      return { type: "container", id: row.id, label: row.containerNumber, href: record.href };
+    });
+    return result;
+  }
+
   if (toolId === "invoice_status") {
     const invoiceId = body.invoiceId == null ? null : getLookupId(body.invoiceId, "invoice");
     const invoiceNumber = typeof body.invoiceNumber === "string" ? body.invoiceNumber.trim() : "";
@@ -991,6 +1074,38 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     result.records = clientBalances.map(({ client, outstanding }) => ({ title: client.name, detail: `${money(outstanding)} outstanding; ${money(toAmount(client.creditBalance))} credit balance.`, href: `/accounts-receivable?client=${client.id}`, badges: ["Client balance"] }));
     result.facts = [{ label: "Matching clients", value: matchingClients.length }, { label: "Outstanding receivables", value: money(clientBalances.reduce((sum, item) => sum + item.outstanding, 0)) }];
     result.sources = matchingClients.map((client) => ({ type: "client", id: client.id, label: client.name, href: `/accounts-receivable?client=${client.id}` }));
+    return result;
+  }
+
+  if (toolId === "client_wallet_overview") {
+    const [allClients, allDeposits] = await Promise.all([
+      db.select({ id: clientsTable.id, branchId: clientsTable.branchId, name: clientsTable.name, creditBalance: clientsTable.creditBalance }).from(clientsTable),
+      db.select({ id: clientDepositsTable.id, branchId: clientDepositsTable.branchId, clientId: clientDepositsTable.clientId, amount: clientDepositsTable.amount, allocatedAmount: clientDepositsTable.allocatedAmount, paymentMethod: clientDepositsTable.paymentMethod, reference: clientDepositsTable.reference, createdAt: clientDepositsTable.createdAt }).from(clientDepositsTable),
+    ]);
+    const clients = scoped(allClients, branchId);
+    const deposits = scoped(allDeposits, branchId).filter((deposit) => clients.some((client) => client.id === deposit.clientId));
+    const clientById = new Map(clients.map((client) => [client.id, client]));
+    const rows = deposits.map((deposit) => ({ ...deposit, remaining: Math.max(0, toAmount(deposit.amount) - toAmount(deposit.allocatedAmount)) }));
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Client deposits", value: money(rows.reduce((sum, row) => sum + toAmount(row.amount), 0)) },
+      { label: "Allocated deposits", value: money(rows.reduce((sum, row) => sum + toAmount(row.allocatedAmount), 0)) },
+      { label: "Unallocated deposits", value: money(rows.reduce((sum, row) => sum + row.remaining, 0)) },
+      { label: "Deposits awaiting allocation", value: rows.filter((row) => row.remaining > 0).length },
+    ];
+    result.records = rows.filter((row) => row.remaining > 0).sort((a, b) => b.remaining - a.remaining).slice(0, limit).map((row) => {
+      const client = clientById.get(row.clientId);
+      return {
+        title: client?.name ?? `Client ${row.clientId}`,
+        detail: `${money(row.remaining)} unallocated from ${money(toAmount(row.amount))} ${row.paymentMethod} deposit on ${dateOnly(row.createdAt)}${row.reference ? `; ref ${row.reference}` : ""}.`,
+        href: `/clients/${row.clientId}`,
+        badges: ["Wallet credit"],
+      };
+    });
+    result.sources = result.records.map((record) => {
+      const client = clients.find((candidate) => candidate.name === record.title);
+      return { type: "client", id: client?.id, label: record.title, href: record.href };
+    });
     return result;
   }
 
@@ -1235,6 +1350,36 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       "This reconciles application ledger entries only: invoice payments, client deposits, fund additions, transfers, and recorded expenses.",
       "No imported bank statement is available, so this cannot confirm the external bank balance or detect statement-only transactions.",
     ];
+    return result;
+  }
+
+  if (toolId === "bank_transfer_activity") {
+    const [allTransfers, allBanks, allUsers] = await Promise.all([
+      db.select({ id: bankTransfersTable.id, branchId: bankTransfersTable.branchId, fromBankId: bankTransfersTable.fromBankId, toBankId: bankTransfersTable.toBankId, amount: bankTransfersTable.amount, narration: bankTransfersTable.narration, reference: bankTransfersTable.reference, createdBy: bankTransfersTable.createdBy, createdAt: bankTransfersTable.createdAt }).from(bankTransfersTable),
+      db.select({ id: banksTable.id, branchId: banksTable.branchId, name: banksTable.name }).from(banksTable),
+      db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable),
+    ]);
+    const banks = scoped(allBanks, branchId);
+    const bankById = new Map(banks.map((bank) => [bank.id, bank]));
+    const userById = new Map(allUsers.map((user) => [user.id, user]));
+    const transfers = scoped(allTransfers, branchId).filter((transfer) => (!transfer.fromBankId || bankById.has(transfer.fromBankId)) && (!transfer.toBankId || bankById.has(transfer.toBankId)));
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Recorded transfers", value: transfers.length },
+      { label: "Transfer value", value: money(transfers.reduce((sum, transfer) => sum + toAmount(transfer.amount), 0)) },
+    ];
+    result.records = transfers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit).map((transfer) => {
+      const from = transfer.fromBankId ? bankById.get(transfer.fromBankId)?.name ?? "Unknown bank" : "Unspecified source";
+      const to = transfer.toBankId ? bankById.get(transfer.toBankId)?.name ?? "Unknown bank" : "Unspecified destination";
+      const creator = transfer.createdBy ? userById.get(transfer.createdBy)?.name : null;
+      return {
+        title: `${from} to ${to}`,
+        detail: `${money(toAmount(transfer.amount))} on ${dateOnly(transfer.createdAt)}${transfer.reference ? `; ref ${transfer.reference}` : ""}${creator ? `; recorded by ${creator}` : ""}${transfer.narration ? `; ${transfer.narration}` : ""}.`,
+        href: "/banks",
+        badges: ["Bank transfer"],
+      };
+    });
+    result.sources = result.records.map((record, index) => ({ type: "bank_transfer", id: transfers[index]?.id, label: record.title, href: record.href }));
     return result;
   }
 
