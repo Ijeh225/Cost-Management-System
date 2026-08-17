@@ -22,6 +22,7 @@ import {
   invoicePaymentsTable,
   invoicesTable,
   overheadExpensesTable,
+  overheadExpenseTopupsTable,
   paymentSchedulesTable,
   paymentScheduleEventsTable,
   settingsTable,
@@ -206,6 +207,9 @@ const TOOL_CATALOG = [
   { id: "receivables_overview", title: "Receivables overview", description: "Review invoiced, collected, outstanding, and overdue client balances.", domain: "finance" as const },
   { id: "approved_payment_schedules", title: "Approved schedules awaiting payment", description: "Show approved or partially approved payment schedules with an unpaid balance.", domain: "finance" as const },
   { id: "overhead_overview", title: "Overhead expense overview", description: "Review recorded overhead, actual payments, and outstanding overhead balances.", domain: "finance" as const },
+  { id: "overhead_statements", title: "Overhead expense statements", description: "Prepare a read-only statement of overhead amounts, top-ups, actual payments, and balances.", domain: "reports" as const },
+  { id: "payment_summary", title: "Payment summary", description: "Summarise recorded client collections, deposits, overhead payments, and container disbursements for a reporting period.", domain: "reports" as const },
+  { id: "client_statements", title: "Client statements", description: "Prepare read-only client statements of invoices, collections, outstanding balances, and wallet credits.", domain: "reports" as const },
   { id: "branch_performance", title: "Branch performance", description: "Compare scoped branches using container volume, invoices, collections, and outstanding balances.", domain: "reports" as const },
   { id: "document_search", title: "Search uploaded documents", description: "Search readable uploaded documents and return permission-scoped file and page references.", domain: "documents" as const, requiresQuery: true },
   { id: "notifications_summary", title: "Notification summary", description: "Summarise recent workflow notifications in the current authorised branch.", domain: "notifications" as const },
@@ -313,6 +317,9 @@ function interpretQuestionFallback(question: string): CopilotIntent {
   if (stage && understanding.asksForDelays) return { toolId: "stage_delays", args: stageArgs!, label: `${stage} delay review` };
   if (stage && understanding.intent === "count") return { toolId: "stage_count", args: stageArgs!, label: `${stage} job count` };
   if (stage && understanding.intent === "list") return { toolId: "stage_jobs", args: stageArgs!, label: `${stage} jobs` };
+  if (/\b(payment summary|payments summary|payment report|payments report)\b/.test(normalised)) return { toolId: "payment_summary", args: {}, label: "payment summary" };
+  if (/\b(client statement|client statements)\b/.test(normalised)) return { toolId: "client_statements", args: {}, label: "client statements" };
+  if (/\b(overhead statement|overhead statements|expense statement|expense statements)\b/.test(normalised)) return { toolId: "overhead_statements", args: {}, label: "overhead statements" };
   if (/(receivable|invoice|collection).*(ageing|aging)|(ageing|aging).*(receivable|invoice|collection)/.test(normalised)) return { toolId: "receivables_ageing", args: {}, label: "receivables ageing" };
   if (/(duty|customs).*(payment|paid|outstanding|unpaid|assessment)|(payment|paid|outstanding|unpaid|assessment).*(duty|customs)/.test(normalised)) return { toolId: "duty_payments_overview", args: {}, label: "duty payments overview" };
   if (/(wallet|deposit|deposits).*(client|unallocated|allocation|credit)|(client|unallocated|allocation|credit).*(wallet|deposit|deposits)/.test(normalised)) return { toolId: "client_wallet_overview", args: {}, label: "client wallet activity" };
@@ -1216,6 +1223,125 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     return result;
   }
 
+  if (toolId === "overhead_statements") {
+    const requestedExpenseId = body.expenseId == null || body.expenseId === "" ? null : getLookupId(body.expenseId, "overhead expense");
+    const expenses = scoped(await db.select({
+      id: overheadExpensesTable.id, branchId: overheadExpensesTable.branchId, category: overheadExpensesTable.category,
+      description: overheadExpensesTable.description, amount: overheadExpensesTable.amount, createdAt: overheadExpensesTable.createdAt,
+    }).from(overheadExpensesTable), branchId).filter((expense) => requestedExpenseId == null || expense.id === requestedExpenseId);
+    if (requestedExpenseId != null && expenses.length === 0) throw new Error("The overhead expense was not found in your authorised branch scope.");
+    const expenseIds = expenses.map((expense) => expense.id);
+    const [topups, payments] = expenseIds.length ? await Promise.all([
+      db.select({ expenseId: overheadExpenseTopupsTable.expenseId, amount: overheadExpenseTopupsTable.amount, description: overheadExpenseTopupsTable.description, createdAt: overheadExpenseTopupsTable.createdAt })
+        .from(overheadExpenseTopupsTable).where(inArray(overheadExpenseTopupsTable.expenseId, expenseIds)),
+      db.select({ expenseId: expensePaymentsTable.expenseId, amount: expensePaymentsTable.amount, paymentMethod: expensePaymentsTable.paymentMethod, paidAt: expensePaymentsTable.paidAt, notes: expensePaymentsTable.notes })
+        .from(expensePaymentsTable).where(inArray(expensePaymentsTable.expenseId, expenseIds)),
+    ]) : [[], []] as const;
+    const totals = expenses.map((expense) => {
+      const added = topups.filter((topup) => topup.expenseId === expense.id).reduce((sum, topup) => sum + toAmount(topup.amount), 0);
+      const paid = payments.filter((payment) => payment.expenseId === expense.id).reduce((sum, payment) => sum + toAmount(payment.amount), 0);
+      const currentTotal = toAmount(expense.amount) + added;
+      return { ...expense, added, paid, currentTotal, balance: Math.max(0, currentTotal - paid) };
+    });
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Overhead records", value: totals.length },
+      { label: "Original recorded amount", value: money(totals.reduce((sum, expense) => sum + toAmount(expense.amount), 0)) },
+      { label: "Money added", value: money(totals.reduce((sum, expense) => sum + expense.added, 0)) },
+      { label: "Actual payments", value: money(totals.reduce((sum, expense) => sum + expense.paid, 0)) },
+      { label: "Outstanding balance", value: money(totals.reduce((sum, expense) => sum + expense.balance, 0)) },
+    ];
+    result.records = totals.sort((a, b) => b.balance - a.balance).slice(0, limit).map((expense) => ({
+      title: expense.description,
+      detail: `${expense.category}: ${money(expense.currentTotal)} total; ${money(expense.paid)} paid; ${money(expense.balance)} outstanding.`,
+      href: `/overhead-expenses?expenseId=${expense.id}`,
+      badges: [expense.balance > 0 ? "Outstanding" : "Paid"],
+    }));
+    result.sources = totals.slice(0, limit).map((expense) => ({ type: "overhead_expense", id: expense.id, label: expense.description, href: `/overhead-expenses?expenseId=${expense.id}` }));
+    result.notes = [
+      "This statement separates original overhead, later money-added entries, and actual recorded payments.",
+      "MD-approved but unpaid scheduled amounts are not treated as paid until an actual overhead payment is recorded.",
+    ];
+    return result;
+  }
+
+  if (toolId === "payment_summary") {
+    const period = getReportPeriod(body);
+    const [allInvoicePayments, allDeposits, allOverheadPayments, allContainerPayments] = await Promise.all([
+      db.select({ id: invoicePaymentsTable.id, branchId: invoicePaymentsTable.branchId, invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount, paidAt: invoicePaymentsTable.paidAt }).from(invoicePaymentsTable),
+      db.select({ id: clientDepositsTable.id, branchId: clientDepositsTable.branchId, clientId: clientDepositsTable.clientId, amount: clientDepositsTable.amount, createdAt: clientDepositsTable.createdAt }).from(clientDepositsTable),
+      db.select({ id: expensePaymentsTable.id, branchId: expensePaymentsTable.branchId, expenseId: expensePaymentsTable.expenseId, amount: expensePaymentsTable.amount, paidAt: expensePaymentsTable.paidAt }).from(expensePaymentsTable),
+      db.select({ id: containerExpensePaymentsTable.id, branchId: containerExpensePaymentsTable.branchId, containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount, paidAt: containerExpensePaymentsTable.paidAt }).from(containerExpensePaymentsTable),
+    ]);
+    const invoicePayments = scoped(allInvoicePayments, branchId).filter((payment) => occursWithin(payment.paidAt, period));
+    const deposits = scoped(allDeposits, branchId).filter((deposit) => occursWithin(deposit.createdAt, period));
+    const overheadPayments = scoped(allOverheadPayments, branchId).filter((payment) => occursWithin(payment.paidAt, period));
+    const containerPayments = scoped(allContainerPayments, branchId).filter((payment) => occursWithin(payment.paidAt, period));
+    const collections = invoicePayments.reduce((sum, payment) => sum + toAmount(payment.amount), 0);
+    const depositTotal = deposits.reduce((sum, deposit) => sum + toAmount(deposit.amount), 0);
+    const overheadTotal = overheadPayments.reduce((sum, payment) => sum + toAmount(payment.amount), 0);
+    const containerTotal = containerPayments.reduce((sum, payment) => sum + toAmount(payment.amount), 0);
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Report period", value: period.label },
+      { label: "Invoice collections", value: money(collections), detail: `${invoicePayments.length} recorded collection(s).` },
+      { label: "Client deposits", value: money(depositTotal), detail: `${deposits.length} recorded deposit(s); may include allocations already reflected in collections.` },
+      { label: "Overhead payments", value: money(overheadTotal), detail: `${overheadPayments.length} actual payment(s).` },
+      { label: "Container disbursements", value: money(containerTotal), detail: `${containerPayments.length} actual payment(s).` },
+      { label: "Recorded outflows", value: money(overheadTotal + containerTotal), detail: "Overhead and container payments only; excludes inter-bank transfers." },
+    ];
+    result.records = [
+      ...invoicePayments.slice(0, Math.ceil(limit / 2)).map((payment) => ({ title: `Invoice collection #${payment.id}`, detail: `${money(toAmount(payment.amount))} recorded on ${dateOnly(payment.paidAt)}.`, href: "/accounts-receivable", badges: ["Collection"] })),
+      ...overheadPayments.slice(0, Math.floor(limit / 4)).map((payment) => ({ title: `Overhead payment #${payment.id}`, detail: `${money(toAmount(payment.amount))} recorded on ${dateOnly(payment.paidAt)}.`, href: `/overhead-expenses?expenseId=${payment.expenseId}`, badges: ["Overhead"] })),
+      ...containerPayments.slice(0, Math.floor(limit / 4)).map((payment) => ({ title: `Container payment #${payment.id}`, detail: `${money(toAmount(payment.amount))} recorded on ${dateOnly(payment.paidAt)}.`, href: `/containers/${payment.containerId}?tab=payment-history`, badges: ["Container"] })),
+    ].slice(0, limit);
+    result.sources = result.records.map((record) => ({ type: "payment", label: record.title, href: record.href }));
+    result.notes = ["This report uses actual payment records in the selected period. It does not double-count approved-but-unpaid schedules or bank transfers."];
+    return result;
+  }
+
+  if (toolId === "client_statements") {
+    const requestedClientId = body.clientId == null || body.clientId === "" ? null : getLookupId(body.clientId, "client");
+    const clients = scoped(await db.select({ id: clientsTable.id, branchId: clientsTable.branchId, name: clientsTable.name, creditBalance: clientsTable.creditBalance })
+      .from(clientsTable), branchId).filter((client) => requestedClientId == null || client.id === requestedClientId);
+    if (requestedClientId != null && clients.length === 0) throw new Error("The client was not found in your authorised branch scope.");
+    const clientIds = clients.map((client) => client.id);
+    const [invoices, payments, deposits] = clientIds.length ? await Promise.all([
+      db.select({ id: invoicesTable.id, clientId: invoicesTable.clientId, invoiceNumber: invoicesTable.invoiceNumber, total: invoicesTable.total, status: invoicesTable.status })
+        .from(invoicesTable).where(inArray(invoicesTable.clientId, clientIds)),
+      db.select({ invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount }).from(invoicePaymentsTable),
+      db.select({ clientId: clientDepositsTable.clientId, amount: clientDepositsTable.amount, allocatedAmount: clientDepositsTable.allocatedAmount }).from(clientDepositsTable).where(inArray(clientDepositsTable.clientId, clientIds)),
+    ]) : [[], [], []] as const;
+    const paidByInvoice = new Map<number, number>();
+    payments.forEach((payment) => paidByInvoice.set(payment.invoiceId, (paidByInvoice.get(payment.invoiceId) ?? 0) + toAmount(payment.amount)));
+    const rows = clients.map((client) => {
+      const clientInvoices = invoices.filter((invoice) => invoice.clientId === client.id && invoice.status !== "written_off");
+      const invoiced = clientInvoices.reduce((sum, invoice) => sum + toAmount(invoice.total), 0);
+      const collected = clientInvoices.reduce((sum, invoice) => sum + (paidByInvoice.get(invoice.id) ?? 0), 0);
+      const depositsForClient = deposits.filter((deposit) => deposit.clientId === client.id);
+      const depositsTotal = depositsForClient.reduce((sum, deposit) => sum + toAmount(deposit.amount), 0);
+      const unallocated = depositsForClient.reduce((sum, deposit) => sum + Math.max(0, toAmount(deposit.amount) - toAmount(deposit.allocatedAmount)), 0);
+      return { ...client, invoiced, collected, outstanding: Math.max(0, invoiced - collected), depositsTotal, unallocated };
+    });
+    const result = createResult(toolId, tool.title, branchId);
+    result.facts = [
+      { label: "Clients in statement", value: rows.length },
+      { label: "Invoiced", value: money(rows.reduce((sum, client) => sum + client.invoiced, 0)) },
+      { label: "Collected", value: money(rows.reduce((sum, client) => sum + client.collected, 0)) },
+      { label: "Outstanding", value: money(rows.reduce((sum, client) => sum + client.outstanding, 0)) },
+      { label: "Unallocated deposits", value: money(rows.reduce((sum, client) => sum + client.unallocated, 0)) },
+    ];
+    result.records = rows.sort((a, b) => b.outstanding - a.outstanding).slice(0, limit).map((client) => ({
+      title: client.name,
+      detail: `${money(client.invoiced)} invoiced; ${money(client.collected)} collected; ${money(client.outstanding)} outstanding; ${money(client.unallocated)} unallocated wallet credit.`,
+      href: `/clients/${client.id}`,
+      badges: [client.outstanding > 0 ? "Outstanding" : "Settled"],
+    }));
+    result.sources = rows.slice(0, limit).map((client) => ({ type: "client", id: client.id, label: client.name, href: `/clients/${client.id}` }));
+    result.notes = ["This is a live receivables and wallet statement. Client deposits are reported separately because an allocated deposit may also be reflected in an invoice collection."];
+    return result;
+  }
+
   if (toolId === "monthly_financial_report") {
     const period = getReportPeriod(body);
     const [allInvoices, allInvoicePayments, allDeposits, allOverheadPayments, allContainerPayments] = await Promise.all([
@@ -1641,7 +1767,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
   return result;
 }
 
-type AssistantDraftType = "payment_schedule" | "workflow_notification" | "management_summary" | "follow_up_task" | "payment_schedule_reschedule";
+type AssistantDraftType = "payment_schedule" | "workflow_notification" | "management_summary" | "follow_up_task" | "payment_schedule_reschedule" | "debit_note";
 type AssistantActionPreview = {
   title: string;
   description: string;
@@ -1796,6 +1922,33 @@ async function draftPreview(type: AssistantDraftType, body: Record<string, unkno
     };
   }
 
+  if (type === "debit_note") {
+    const clientId = getLookupId(body.clientId, "client");
+    const amount = Number(body.amount);
+    const description = typeof body.description === "string" ? body.description.trim().slice(0, 1_000) : "";
+    const reference = typeof body.reference === "string" ? body.reference.trim().slice(0, 200) : "";
+    if (!Number.isFinite(amount) || amount <= 0 || !description) throw new Error("A client, description, and amount greater than zero are required for a debit note draft.");
+    const [client] = await db.select({ id: clientsTable.id, name: clientsTable.name })
+      .from(clientsTable).where(and(eq(clientsTable.id, clientId), eq(clientsTable.branchId, branchId))).limit(1);
+    if (!client) throw new Error("The client was not found in the selected branch.");
+    const payload = { clientId: client.id, clientName: client.name, amount, description, reference: reference || null };
+    return {
+      payload,
+      preview: {
+        title: "Debit Note Draft",
+        description: "This is a review-only draft. It will not create an invoice, change a client balance, post an accounting entry, or send a document.",
+        confirmationText: "Confirm finalisation of this draft for human review only? Issue it later through the normal reviewed finance workflow.",
+        fields: [
+          { label: "Client", value: client.name },
+          { label: "Amount", value: money(amount) },
+          { label: "Description", value: description },
+          { label: "Reference", value: reference || "Not set" },
+        ],
+        sourceRecords: [{ type: "client", id: client.id, label: client.name, href: `/clients/${client.id}` }],
+      },
+    };
+  }
+
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 200) : "";
   const content = typeof body.content === "string" ? body.content.trim().slice(0, 5_000) : "";
   if (!title || !content) throw new Error("A title and content are required for a management summary draft.");
@@ -1927,15 +2080,23 @@ async function executeAssistantDraft(draft: typeof aiAssistantActionDraftsTable.
   }
 
   const prepared = await draftPreview(type, payload, branchId);
+  if (type === "debit_note") {
+    return { action: "debit_note_draft_finalised", title: "Debit Note Draft", href: `/clients/${prepared.payload.clientId as number}` };
+  }
   return { action: "management_summary_finalised", title: prepared.payload.title, href: "/reports" };
 }
 
 const REPORT_REQUESTS = {
-  monthly_finance: { toolId: "monthly_financial_report" as ToolId, title: "Monthly Revenue and Expense Report" },
+  monthly_finance: { toolId: "monthly_financial_report" as ToolId, title: "Monthly Revenue and Expense Report", needsPeriod: true },
   receivables: { toolId: "receivables_ageing" as ToolId, title: "Receivables and Ageing Report" },
   branch_performance: { toolId: "branch_performance" as ToolId, title: "Branch Performance Report" },
   operational_delays: { toolId: "delayed_jobs" as ToolId, title: "Operational Delays Report" },
   payment_schedules: { toolId: "approved_payment_schedules" as ToolId, title: "Approved Payment Schedules Report" },
+  payment_summary: { toolId: "payment_summary" as ToolId, title: "Payment Summary Report", needsPeriod: true },
+  client_statements: { toolId: "client_statements" as ToolId, title: "Client Statements Report" },
+  overhead_statements: { toolId: "overhead_statements" as ToolId, title: "Overhead Expense Statements Report" },
+  financial_controls: { toolId: "financial_control_review" as ToolId, title: "Financial Control Review" },
+  management_briefing: { toolId: "financial_control_review" as ToolId, title: "Management Finance and Controls Briefing" },
 } as const;
 
 function formatReportDraft(draft: typeof aiAssistantReportDraftsTable.$inferSelect) {
@@ -2001,7 +2162,7 @@ aiAssistantRouter.post("/ai-assistant/reports/drafts", requireAdmin, foundationR
   const requested = REPORT_REQUESTS[reportType as keyof typeof REPORT_REQUESTS];
   if (!requested) return res.status(400).json({ error: "Choose a supported report type." });
   try {
-    const filters = requested.toolId === "monthly_financial_report"
+    const filters = ("needsPeriod" in requested && requested.needsPeriod === true)
       ? (() => { const period = getReportPeriod(body); return { from: period.from.toISOString().slice(0, 10), to: period.to.toISOString().slice(0, 10), limit: 50 }; })()
       : { limit: 50 };
     const result = await runApprovedTool(requested.toolId, req, filters);
@@ -2101,7 +2262,7 @@ aiAssistantRouter.get("/ai-assistant/actions/drafts", requireAdmin, foundationRa
 aiAssistantRouter.post("/ai-assistant/actions/drafts", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
   const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
   const type = String(body.type ?? "") as AssistantDraftType;
-  if (!["payment_schedule", "workflow_notification", "management_summary", "follow_up_task", "payment_schedule_reschedule"].includes(type)) {
+  if (!["payment_schedule", "workflow_notification", "management_summary", "follow_up_task", "payment_schedule_reschedule", "debit_note"].includes(type)) {
     return res.status(400).json({ error: "Unsupported assisted action type." });
   }
   try {
