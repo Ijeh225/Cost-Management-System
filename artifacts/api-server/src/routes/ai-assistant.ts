@@ -1767,7 +1767,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
   return result;
 }
 
-type AssistantDraftType = "payment_schedule" | "workflow_notification" | "management_summary" | "follow_up_task" | "payment_schedule_reschedule" | "debit_note";
+type AssistantDraftType = "payment_schedule" | "workflow_notification" | "management_summary" | "follow_up_task" | "delay_follow_up_task" | "invoice_payment_reminder" | "payment_schedule_reschedule" | "debit_note";
 type AssistantActionPreview = {
   title: string;
   description: string;
@@ -1892,6 +1892,94 @@ async function draftPreview(type: AssistantDraftType, body: Record<string, unkno
     };
   }
 
+  if (type === "delay_follow_up_task") {
+    const containerNumber = typeof body.containerNumber === "string" ? body.containerNumber.trim().toUpperCase().slice(0, 32) : "";
+    const stage = getStageToolId(body.stage);
+    const title = typeof body.title === "string" ? body.title.trim().slice(0, 300) : "";
+    const notes = typeof body.notes === "string" ? body.notes.trim().slice(0, 2_000) : "";
+    const priority = ["low", "medium", "high", "urgent"].includes(String(body.priority)) ? String(body.priority) : "high";
+    const dueDate = typeof body.dueDate === "string" && body.dueDate.trim() ? body.dueDate.trim() : null;
+    const parsedDueDate = dueDate ? new Date(`${dueDate}T00:00:00`) : null;
+    const assignedStaffId = body.assignedStaffId == null || body.assignedStaffId === "" ? null : Number(body.assignedStaffId);
+    if (!containerNumber || (parsedDueDate && Number.isNaN(parsedDueDate.getTime())) || (assignedStaffId != null && (!Number.isInteger(assignedStaffId) || assignedStaffId <= 0))) {
+      throw new Error("An exact container number is required. Use a valid due date and active branch staff member when provided.");
+    }
+    const [container] = await db.select().from(containersTable)
+      .where(and(eq(containersTable.branchId, branchId), eq(containersTable.containerNumber, containerNumber))).limit(1);
+    if (!container) throw new Error("The container was not found in the selected branch.");
+    const containerData = container as unknown as Record<string, unknown>;
+    const expectedDate = containerData[STAGE_TOOL_FIELDS[stage].expected] as Date | null;
+    const releasedAt = containerData[STAGE_TOOL_FIELDS[stage].released] as Date | null;
+    const stageLabel = operationalStageLabel(stage);
+    if (releasedAt) throw new Error(`${stageLabel} has already been released for this container; a delay follow-up task is not appropriate.`);
+    if (!expectedDate) throw new Error(`${stageLabel} has no expected date yet, so the assistant cannot classify it as overdue.`);
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    if (expectedDate.getTime() >= startOfToday.getTime()) throw new Error(`${stageLabel} is not overdue yet. The assistant only drafts delay follow-up tasks for an overdue stage.`);
+    const daysOverdue = Math.max(1, Math.floor((startOfToday.getTime() - expectedDate.getTime()) / 86_400_000));
+    let assigneeName: string | null = null;
+    if (assignedStaffId != null) {
+      const [assignee] = await db.select({ id: usersTable.id, name: usersTable.name })
+        .from(usersTable).where(and(eq(usersTable.id, assignedStaffId), eq(usersTable.branchId, branchId), eq(usersTable.isActive, true))).limit(1);
+      if (!assignee) throw new Error("The selected task assignee must be an active user in the selected branch.");
+      assigneeName = assignee.name;
+    }
+    const taskTitle = title || `Follow up: ${stageLabel} overdue`;
+    const payload = { containerId: container.id, containerNumber: container.containerNumber, stage, stageLabel, expectedDate: expectedDate.toISOString(), daysOverdue, title: taskTitle, notes, priority, dueDate, assignedStaffId };
+    return {
+      payload,
+      preview: {
+        title: "Overdue Stage Follow-up Task Draft",
+        description: "This will create an internal follow-up task for a verified overdue stage only. It does not release the stage, change the job workflow, or contact an external party.",
+        confirmationText: "Confirm creation of this internal overdue-stage follow-up task? The assigned staff member will receive an in-app task notification only.",
+        fields: [
+          { label: "Container", value: container.containerNumber },
+          { label: "Overdue stage", value: stageLabel },
+          { label: "Expected date", value: expectedDate.toISOString().slice(0, 10) },
+          { label: "Days overdue", value: String(daysOverdue) },
+          { label: "Task", value: taskTitle },
+          { label: "Assigned to", value: assigneeName ?? "Unassigned" },
+          { label: "Notes", value: notes || "None" },
+        ],
+        sourceRecords: [{ type: "container", id: container.id, label: container.containerNumber, href: `/containers/${container.id}?tab=tasks` }],
+      },
+    };
+  }
+
+  if (type === "invoice_payment_reminder") {
+    const invoiceNumber = typeof body.invoiceNumber === "string" ? body.invoiceNumber.trim().toUpperCase().slice(0, 100) : "";
+    const note = typeof body.note === "string" ? body.note.trim().slice(0, 1_000) : "";
+    if (!invoiceNumber) throw new Error("Enter the exact invoice number for the internal payment reminder.");
+    const [invoice] = await db.select().from(invoicesTable)
+      .where(and(eq(invoicesTable.branchId, branchId), eq(invoicesTable.invoiceNumber, invoiceNumber))).limit(1);
+    if (!invoice) throw new Error("The invoice was not found in the selected branch.");
+    if (invoice.status === "written_off") throw new Error("A written-off invoice cannot receive a payment reminder draft.");
+    const payments = await db.select({ amount: invoicePaymentsTable.amount }).from(invoicePaymentsTable)
+      .where(and(eq(invoicePaymentsTable.branchId, branchId), eq(invoicePaymentsTable.invoiceId, invoice.id)));
+    const paid = payments.reduce((total, payment) => total + toAmount(payment.amount), 0);
+    const outstanding = Math.max(0, toAmount(invoice.total) - paid);
+    if (outstanding <= 0.009) throw new Error("This invoice has no outstanding recorded balance, so no payment reminder is needed.");
+    const [client] = invoice.clientId == null ? [] : await db.select({ id: clientsTable.id, name: clientsTable.name })
+      .from(clientsTable).where(and(eq(clientsTable.id, invoice.clientId), eq(clientsTable.branchId, branchId))).limit(1);
+    const payload = { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, clientName: client?.name ?? "Unlinked client", outstanding, dueDate: invoice.dueDate ?? null, note: note || null };
+    return {
+      payload,
+      preview: {
+        title: "Internal Invoice Payment Reminder Draft",
+        description: "This creates an internal Accounts/Admin reminder only. It does not contact the client by email, WhatsApp, SMS, or any other external channel.",
+        confirmationText: "Confirm delivery of this internal receivables reminder? Review and contact the client later through the normal approved communication workflow if needed.",
+        fields: [
+          { label: "Invoice", value: invoice.invoiceNumber },
+          { label: "Client", value: client?.name ?? "Unlinked client" },
+          { label: "Outstanding balance", value: money(outstanding) },
+          { label: "Due date", value: invoice.dueDate ?? "Not set" },
+          { label: "Internal note", value: note || "None" },
+        ],
+        sourceRecords: [{ type: "invoice", id: invoice.id, label: invoice.invoiceNumber, href: `/invoices/${invoice.id}` }],
+      },
+    };
+  }
+
   if (type === "payment_schedule_reschedule") {
     const scheduleId = Number(body.scheduleId);
     const scheduleDate = typeof body.scheduleDate === "string" ? body.scheduleDate.trim() : "";
@@ -1969,6 +2057,18 @@ async function activeBranchAdministrators(branchId: number): Promise<number[]> {
   const users = await db.select({ id: usersTable.id, role: usersTable.role, branchId: usersTable.branchId })
     .from(usersTable).where(eq(usersTable.isActive, true));
   return users.filter((user) => user.role === "super_admin" || (user.branchId === branchId && user.role === "admin")).map((user) => user.id);
+}
+
+function hasRole(user: { role: string; roles: string | null }, role: string): boolean {
+  if (user.role === role) return true;
+  const roles = parseJson<unknown>(user.roles ?? "[]", []);
+  return Array.isArray(roles) && roles.includes(role);
+}
+
+async function activeBranchFinanceUsers(branchId: number): Promise<number[]> {
+  const users = await db.select({ id: usersTable.id, role: usersTable.role, roles: usersTable.roles, branchId: usersTable.branchId })
+    .from(usersTable).where(eq(usersTable.isActive, true));
+  return users.filter((user) => user.role === "super_admin" || (user.branchId === branchId && (hasRole(user, "admin") || hasRole(user, "accounts_user")))).map((user) => user.id);
 }
 
 async function executeAssistantDraft(draft: typeof aiAssistantActionDraftsTable.$inferSelect, userId: number) {
@@ -2049,6 +2149,46 @@ async function executeAssistantDraft(draft: typeof aiAssistantActionDraftsTable.
       actionUrl: `/containers/${task.containerId}?tab=tasks`,
     });
     return { action: "follow_up_task_created", taskId: task.id, href: `/containers/${task.containerId}?tab=tasks` };
+  }
+
+  if (type === "delay_follow_up_task") {
+    const prepared = await draftPreview(type, payload, branchId);
+    const [task] = await db.insert(containerTasksTable).values({
+      branchId,
+      containerId: prepared.payload.containerId as number,
+      title: prepared.payload.title as string,
+      assignedStaffId: prepared.payload.assignedStaffId as number | null,
+      dueDate: prepared.payload.dueDate ? new Date(`${prepared.payload.dueDate as string}T00:00:00`) : null,
+      priority: prepared.payload.priority as string,
+      notes: `AI Assistant detected ${prepared.payload.stageLabel as string} overdue by ${prepared.payload.daysOverdue as number} day(s).${prepared.payload.notes ? ` ${prepared.payload.notes as string}` : ""}`,
+      status: "pending",
+      createdById: userId,
+    }).returning();
+    if (task.assignedStaffId) await db.insert(workflowNotificationsTable).values({
+      branchId,
+      type: "task_assigned",
+      message: `Overdue ${prepared.payload.stageLabel as string} follow-up assigned: "${task.title}" - ${prepared.payload.containerNumber as string}`,
+      containerId: task.containerId,
+      containerNumber: prepared.payload.containerNumber as string,
+      targetUserId: task.assignedStaffId,
+      actionUrl: `/containers/${task.containerId}?tab=tasks`,
+    });
+    return { action: "delay_follow_up_task_created", taskId: task.id, href: `/containers/${task.containerId}?tab=tasks` };
+  }
+
+  if (type === "invoice_payment_reminder") {
+    const prepared = await draftPreview(type, payload, branchId);
+    const recipients = await activeBranchFinanceUsers(branchId);
+    if (!recipients.length) throw new Error("No active Accounts, Admin, or Super Admin users are available in this branch.");
+    const note = prepared.payload.note ? ` Note: ${prepared.payload.note as string}` : "";
+    await db.insert(workflowNotificationsTable).values(recipients.map((targetUserId) => ({
+      branchId,
+      type: "ai_assistant_invoice_payment_reminder",
+      message: `Internal payment follow-up: ${prepared.payload.invoiceNumber as string} for ${prepared.payload.clientName as string} has ${money(prepared.payload.outstanding as number)} outstanding.${note}`,
+      targetUserId,
+      actionUrl: `/invoices/${prepared.payload.invoiceId as number}`,
+    })));
+    return { action: "internal_invoice_payment_reminder_created", invoiceId: prepared.payload.invoiceId, recipientCount: recipients.length, href: `/invoices/${prepared.payload.invoiceId as number}` };
   }
 
   if (type === "payment_schedule_reschedule") {
@@ -2262,7 +2402,7 @@ aiAssistantRouter.get("/ai-assistant/actions/drafts", requireAdmin, foundationRa
 aiAssistantRouter.post("/ai-assistant/actions/drafts", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
   const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
   const type = String(body.type ?? "") as AssistantDraftType;
-  if (!["payment_schedule", "workflow_notification", "management_summary", "follow_up_task", "payment_schedule_reschedule", "debit_note"].includes(type)) {
+  if (!["payment_schedule", "workflow_notification", "management_summary", "follow_up_task", "delay_follow_up_task", "invoice_payment_reminder", "payment_schedule_reschedule", "debit_note"].includes(type)) {
     return res.status(400).json({ error: "Unsupported assisted action type." });
   }
   try {
