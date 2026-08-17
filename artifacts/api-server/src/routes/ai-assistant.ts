@@ -37,6 +37,7 @@ import { isPhysicalTerminalPresenceQuestion, resolveAiOperationalStage } from ".
 import { understandAiQuestion } from "../lib/ai-question-understanding.js";
 import { buildAiInvestigationPlan } from "../lib/ai-investigation-plan.js";
 import { buildAiAnswerPresentation } from "../lib/ai-answer-presentation.js";
+import { analyseAccountantControls } from "../lib/ai-accountant-intelligence.js";
 import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 
@@ -1384,14 +1385,17 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
   }
 
   if (toolId === "financial_control_review") {
-    const [allInvoices, allInvoicePayments, allDeposits, allExpenses, allSchedules, allContainers, allDocuments] = await Promise.all([
+    const [allInvoices, allInvoicePayments, allDeposits, allExpenses, allSchedules, allContainers, allDocuments, allDuties, allTransfers, allOverheadPayments] = await Promise.all([
       db.select({ id: invoicesTable.id, branchId: invoicesTable.branchId, invoiceNumber: invoicesTable.invoiceNumber, total: invoicesTable.total, dueDate: invoicesTable.dueDate, createdAt: invoicesTable.createdAt, status: invoicesTable.status }).from(invoicesTable),
       db.select({ id: invoicePaymentsTable.id, branchId: invoicePaymentsTable.branchId, invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount, reference: invoicePaymentsTable.reference, paidAt: invoicePaymentsTable.paidAt }).from(invoicePaymentsTable),
       db.select({ id: clientDepositsTable.id, branchId: clientDepositsTable.branchId, clientId: clientDepositsTable.clientId, amount: clientDepositsTable.amount, allocatedAmount: clientDepositsTable.allocatedAmount, createdAt: clientDepositsTable.createdAt }).from(clientDepositsTable),
       db.select({ id: overheadExpensesTable.id, branchId: overheadExpensesTable.branchId, category: overheadExpensesTable.category, description: overheadExpensesTable.description, amount: overheadExpensesTable.amount, createdAt: overheadExpensesTable.createdAt }).from(overheadExpensesTable),
-      db.select({ id: paymentSchedulesTable.id, branchId: paymentSchedulesTable.branchId, vendorBeneficiary: paymentSchedulesTable.vendorBeneficiary, description: paymentSchedulesTable.description, amountApproved: paymentSchedulesTable.amountApproved, amountPaid: paymentSchedulesTable.amountPaid, scheduleDate: paymentSchedulesTable.scheduleDate, status: paymentSchedulesTable.status }).from(paymentSchedulesTable),
+      db.select({ id: paymentSchedulesTable.id, branchId: paymentSchedulesTable.branchId, vendorBeneficiary: paymentSchedulesTable.vendorBeneficiary, description: paymentSchedulesTable.description, amountRequested: paymentSchedulesTable.amountRequested, amountApproved: paymentSchedulesTable.amountApproved, amountPaid: paymentSchedulesTable.amountPaid, scheduleDate: paymentSchedulesTable.scheduleDate, status: paymentSchedulesTable.status }).from(paymentSchedulesTable),
       db.select({ id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber, status: containersTable.status }).from(containersTable),
       db.select({ containerId: containerDocumentsTable.containerId, branchId: containerDocumentsTable.branchId }).from(containerDocumentsTable),
+      db.select({ containerId: customsChargesTable.containerId, branchId: customsChargesTable.branchId, duty: customsChargesTable.duty, dutyPaid: customsChargesTable.dutyPaid }).from(customsChargesTable),
+      db.select({ id: bankTransfersTable.id, branchId: bankTransfersTable.branchId, fromBankId: bankTransfersTable.fromBankId, toBankId: bankTransfersTable.toBankId, amount: bankTransfersTable.amount, reference: bankTransfersTable.reference }).from(bankTransfersTable),
+      db.select({ id: expensePaymentsTable.id, branchId: expensePaymentsTable.branchId, expenseId: expensePaymentsTable.expenseId, amount: expensePaymentsTable.amount, paymentMethod: expensePaymentsTable.paymentMethod, bankId: expensePaymentsTable.bankId, paidAt: expensePaymentsTable.paidAt }).from(expensePaymentsTable),
     ]);
     const invoices = scoped(allInvoices, branchId).filter((invoice) => invoice.status !== "written_off");
     const payments = scoped(allInvoicePayments, branchId);
@@ -1399,6 +1403,9 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     const expenses = scoped(allExpenses, branchId);
     const schedules = scoped(allSchedules, branchId);
     const containers = scoped(allContainers, branchId);
+    const duties = scoped(allDuties, branchId);
+    const transfers = scoped(allTransfers, branchId);
+    const overheadPayments = scoped(allOverheadPayments, branchId);
     const documentedContainerIds = new Set(scoped(allDocuments, branchId).map((document) => document.containerId));
     const flags: Array<{ title: string; detail: string; href: string; badge: string; source: AssistantSource }> = [];
     const paidByInvoice = new Map<number, number>();
@@ -1469,6 +1476,60 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       badge: "No uploaded documents",
       source: { type: "container", id: container.id, label: container.containerNumber, href: `/containers/${container.id}?tab=documents` },
     }));
+    const accountantFindings = analyseAccountantControls({ schedules, duties, bankTransfers: transfers, overheadPayments });
+    for (const finding of accountantFindings) {
+      if (finding.code === "schedule_overapproved" || finding.code === "schedule_overpaid") {
+        const schedule = schedules.find((item) => item.id === finding.ids[0]);
+        if (!schedule) continue;
+        const overapproved = finding.code === "schedule_overapproved";
+        flags.push({
+          title: schedule.vendorBeneficiary,
+          detail: overapproved
+            ? `Review payment schedule control: approved amount ${money(toAmount(schedule.amountApproved))} exceeds the requested amount ${money(toAmount(schedule.amountRequested))}.`
+            : `Review payment schedule control: recorded paid amount ${money(toAmount(schedule.amountPaid))} exceeds the approved amount ${money(toAmount(schedule.amountApproved))}.`,
+          href: `/payment-schedules?selected=${schedule.id}`,
+          badge: overapproved ? "Approval exceeds request" : "Payment exceeds approval",
+          source: { type: "payment_schedule", id: schedule.id, label: schedule.vendorBeneficiary, href: `/payment-schedules?selected=${schedule.id}` },
+        });
+      }
+      if (finding.code === "duty_overpaid") {
+        const container = containers.find((item) => item.id === finding.ids[0]);
+        const duty = duties.find((item) => item.containerId === finding.ids[0]);
+        if (!container || !duty) continue;
+        flags.push({
+          title: container.containerNumber,
+          detail: `Review customs-duty control: recorded duty paid ${money(toAmount(duty.dutyPaid))} exceeds assessed duty ${money(toAmount(duty.duty))}.`,
+          href: `/duty-payments?container=${container.id}`,
+          badge: "Duty overpayment",
+          source: { type: "container", id: container.id, label: container.containerNumber, href: `/duty-payments?container=${container.id}` },
+        });
+      }
+      if (finding.code === "duplicate_bank_transfer" || finding.code === "self_bank_transfer") {
+        const transfer = transfers.find((item) => item.id === finding.ids[0]);
+        if (!transfer) continue;
+        flags.push({
+          title: `Bank transfer ${transfer.id}`,
+          detail: finding.code === "duplicate_bank_transfer"
+            ? `Review possible duplicate bank transfer: ${finding.ids.length} transfers share reference "${transfer.reference}" and amount ${money(toAmount(transfer.amount))}.`
+            : `Review bank transfer control: the transfer uses the same source and destination bank account.`,
+          href: "/banks",
+          badge: finding.code === "duplicate_bank_transfer" ? "Possible duplicate transfer" : "Self bank transfer",
+          source: { type: "bank_transfer", id: transfer.id, label: `Bank transfer ${transfer.id}`, href: "/banks" },
+        });
+      }
+      if (finding.code === "duplicate_overhead_payment") {
+        const payment = overheadPayments.find((item) => item.id === finding.ids[0]);
+        const expense = payment ? expenses.find((item) => item.id === payment.expenseId) : undefined;
+        if (!payment || !expense) continue;
+        flags.push({
+          title: expense.description,
+          detail: `Review possible duplicate overhead payment: ${finding.ids.length} payments of ${money(toAmount(payment.amount))} were recorded for this expense on ${dateOnly(payment.paidAt)} using the same payment source.`,
+          href: `/overhead-expenses?expenseId=${expense.id}`,
+          badge: "Possible duplicate overhead payment",
+          source: { type: "overhead_expense", id: expense.id, label: expense.description, href: `/overhead-expenses?expenseId=${expense.id}` },
+        });
+      }
+    }
     const result = createResult(toolId, tool.title, branchId);
     result.facts = [
       { label: "Review prompts", value: flags.length },
@@ -1476,6 +1537,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       { label: "Unallocated deposits", value: deposits.filter((deposit) => toAmount(deposit.amount) - toAmount(deposit.allocatedAmount) > 0.01).length },
       { label: "Approved unpaid schedules", value: schedules.filter((schedule) => ["approved", "partially_approved"].includes(schedule.status) && toAmount(schedule.amountApproved) > toAmount(schedule.amountPaid)).length },
       { label: "Active containers without uploads", value: containers.filter((container) => !["pending_verification", "closed"].includes(container.status) && !documentedContainerIds.has(container.id)).length },
+      { label: "Additional accounting-control exceptions", value: accountantFindings.length },
     ];
     result.records = flags.slice(0, limit).map(({ title, detail, href, badge }) => ({ title, detail, href, badges: [badge, "Review needed"] }));
     result.sources = flags.slice(0, limit).map((flag) => flag.source);
