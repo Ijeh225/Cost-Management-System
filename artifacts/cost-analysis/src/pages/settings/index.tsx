@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useGetSettings, useUpdateSettings, customFetch, useListUsers } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +55,19 @@ type AiAssistantGovernance = {
   providerOutputCostPerMillionNgn: number;
 };
 type AiProactiveBriefingPreferences = { enabled: boolean; daily: boolean; weekly: boolean };
+type AiEvaluationCase = {
+  id: number;
+  caseKey: string;
+  question: string;
+  businessInterpretation: string;
+  expectedTool: string | null;
+  expectedStatus: "answered" | "unsupported";
+  expectedAnswer: string | null;
+  correctionGuidance: string;
+  isActive: boolean;
+  latestRun: null | { outcome: "passed" | "failed"; actualTool: string | null; actualStatus: string; correctionRequired: boolean; correctionNote: string | null; runAt: string };
+};
+type AiEvaluationResponse = { cases: AiEvaluationCase[]; summary: { activeCases: number; recentRuns: number; passed: number; failed: number; correctionsRequired: number } };
 
 const DEFAULT_AI_GOVERNANCE: AiAssistantGovernance = {
   accessRoles: ["admin", "super_admin"],
@@ -311,9 +325,28 @@ export default function SettingsPage() {
   const [aiGovernance, setAiGovernance] = useState<AiAssistantGovernance>(DEFAULT_AI_GOVERNANCE);
   const [aiProactiveBriefings, setAiProactiveBriefings] = useState<AiProactiveBriefingPreferences>(DEFAULT_AI_PROACTIVE_BRIEFINGS);
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [evaluationDraft, setEvaluationDraft] = useState({ caseKey: "", question: "", businessInterpretation: "", expectedTool: "operations_overview", expectedAnswer: "", correctionGuidance: "" });
   const [savingTab, setSavingTab] = useState<SettingsTab | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [dirtyTabs, setDirtyTabs] = useState<Partial<Record<SettingsTab, boolean>>>({});
+
+  const evaluationQuery = useQuery<AiEvaluationResponse>({
+    queryKey: ["/api/ai-assistant/evaluations"],
+    queryFn: () => customFetch("/api/ai-assistant/evaluations"),
+    enabled: activeTab === "ai_governance",
+    retry: false,
+    staleTime: 15_000,
+  });
+  const runEvaluationMutation = useMutation({
+    mutationFn: () => customFetch<{ total: number; passed: number; failed: number }>("/api/ai-assistant/evaluations/run", { method: "POST" }),
+    onSuccess: (result) => { toast({ title: "AI evaluation completed", description: `${result.passed} passed, ${result.failed} need review.` }); evaluationQuery.refetch(); },
+    onError: () => toast({ variant: "destructive", title: "Unable to run AI evaluation" }),
+  });
+  const createEvaluationCaseMutation = useMutation({
+    mutationFn: () => customFetch("/api/ai-assistant/evaluations/cases", { method: "POST", body: JSON.stringify(evaluationDraft) }),
+    onSuccess: () => { toast({ title: "Evaluation case added" }); setEvaluationDraft({ caseKey: "", question: "", businessInterpretation: "", expectedTool: "operations_overview", expectedAnswer: "", correctionGuidance: "" }); evaluationQuery.refetch(); },
+    onError: () => toast({ variant: "destructive", title: "Unable to add evaluation case" }),
+  });
 
   useEffect(() => {
     if (!isLoading) {
@@ -889,6 +922,18 @@ export default function SettingsPage() {
             <CardContent className="grid gap-5 p-6 md:grid-cols-2">
               <div className="space-y-2"><Label>Monthly AI budget (NGN)</Label><Input inputMode="numeric" min="0" type="number" value={aiGovernance.monthlyBudgetNgn} onChange={(event) => { setAiGovernance((current) => ({ ...current, monthlyBudgetNgn: Number(event.target.value) || 0 })); mark(); }} /><p className="text-xs text-muted-foreground">A maximum planned spend for model and document-processing usage. It will be enforced when the AI service is introduced.</p></div>
               <div className="space-y-2"><Label>AI audit retention (days)</Label><Input inputMode="numeric" min="30" max="3650" type="number" value={aiGovernance.auditRetentionDays} onChange={(event) => { setAiGovernance((current) => ({ ...current, auditRetentionDays: Math.max(30, Number(event.target.value) || 30) })); mark(); }} /><p className="text-xs text-muted-foreground">Future questions, answers, tools used, source records, generated drafts, and confirmed actions will be retained for this period.</p></div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl border-border/60 bg-card shadow-sm">
+            <CardHeader className="flex flex-col gap-3 p-6 pb-0 sm:flex-row sm:items-start sm:justify-between">
+              <div><CardTitle className="flex items-center gap-2 text-lg"><CheckCircle2 className="h-4 w-4 text-primary" />Continuous Evaluation</CardTitle><p className="mt-1 text-sm text-muted-foreground">Run anonymised business questions before an AI update. The suite checks interpretation and approved-tool selection only; it never queries live records or changes data.</p></div>
+              <Button type="button" variant="outline" className="gap-2" onClick={() => runEvaluationMutation.mutate()} disabled={runEvaluationMutation.isPending}><CheckCircle2 className="h-4 w-4" />{runEvaluationMutation.isPending ? "Running evaluation..." : "Run evaluation suite"}</Button>
+            </CardHeader>
+            <CardContent className="space-y-5 p-6">
+              {evaluationQuery.data && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><div className="rounded-lg border border-border/60 bg-background/50 p-3"><p className="text-xs text-muted-foreground">Active cases</p><p className="mt-1 text-xl font-semibold">{evaluationQuery.data.summary.activeCases}</p></div><div className="rounded-lg border border-border/60 bg-background/50 p-3"><p className="text-xs text-muted-foreground">Runs (30d)</p><p className="mt-1 text-xl font-semibold">{evaluationQuery.data.summary.recentRuns}</p></div><div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-3"><p className="text-xs text-muted-foreground">Passed</p><p className="mt-1 text-xl font-semibold text-emerald-700 dark:text-emerald-400">{evaluationQuery.data.summary.passed}</p></div><div className="rounded-lg border border-destructive/20 bg-destructive/[0.04] p-3"><p className="text-xs text-muted-foreground">Failed</p><p className="mt-1 text-xl font-semibold text-destructive">{evaluationQuery.data.summary.failed}</p></div><div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.05] p-3"><p className="text-xs text-muted-foreground">Corrections needed</p><p className="mt-1 text-xl font-semibold text-amber-700 dark:text-amber-400">{evaluationQuery.data.summary.correctionsRequired}</p></div></div>}
+              {evaluationQuery.isError ? <p className="rounded-lg border border-destructive/25 bg-destructive/[0.05] p-3 text-sm text-destructive">Evaluation management is available to Super Admins only.</p> : evaluationQuery.isLoading ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading evaluation library...</div> : <div className="space-y-3">{evaluationQuery.data?.cases.map((evaluationCase) => <div key={evaluationCase.id} className={`rounded-xl border p-4 ${evaluationCase.latestRun?.outcome === "failed" ? "border-destructive/30 bg-destructive/[0.035]" : "border-border/60 bg-background/40"}`}><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="font-medium">{evaluationCase.question}</p><p className="mt-1 text-sm text-muted-foreground">Expected: {evaluationCase.businessInterpretation}</p></div><span className={`w-fit rounded-full border px-2.5 py-1 text-xs font-medium ${evaluationCase.latestRun?.outcome === "failed" ? "border-destructive/30 text-destructive" : evaluationCase.latestRun?.outcome === "passed" ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-400" : "border-border/70 text-muted-foreground"}`}>{evaluationCase.latestRun ? evaluationCase.latestRun.outcome : "Not run"}</span></div><div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground"><span>Expected tool: {evaluationCase.expectedTool ?? "No tool"}</span><span>Expected status: {evaluationCase.expectedStatus}</span>{evaluationCase.latestRun && <span>Actual: {evaluationCase.latestRun.actualTool ?? "No tool"} / {evaluationCase.latestRun.actualStatus}</span>}</div>{evaluationCase.latestRun?.correctionNote && <p className="mt-3 rounded-lg border border-destructive/20 bg-background/60 p-3 text-sm text-muted-foreground">{evaluationCase.latestRun.correctionNote}</p>}{evaluationCase.correctionGuidance && <p className="mt-2 text-xs text-muted-foreground">Correction guidance: {evaluationCase.correctionGuidance}</p>}</div>)}</div>}
+              <details className="rounded-xl border border-border/60 bg-muted/[0.12] p-4"><summary className="cursor-pointer text-sm font-medium">Add an anonymised business question</summary><p className="mt-2 text-xs leading-5 text-muted-foreground">Do not enter client names, container numbers, uploaded-document text, or other production data. This library exists to protect business definitions and tool selection.</p><div className="mt-4 grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>Case key</Label><Input value={evaluationDraft.caseKey} onChange={(event) => setEvaluationDraft((current) => ({ ...current, caseKey: event.target.value }))} placeholder="terminal-physical-presence" /></div><div className="space-y-2"><Label>Expected tool</Label><Input value={evaluationDraft.expectedTool} onChange={(event) => setEvaluationDraft((current) => ({ ...current, expectedTool: event.target.value }))} placeholder="operations_overview" /></div><div className="space-y-2 md:col-span-2"><Label>Question</Label><Input value={evaluationDraft.question} onChange={(event) => setEvaluationDraft((current) => ({ ...current, question: event.target.value }))} placeholder="How many containers are physically in the terminal?" /></div><div className="space-y-2 md:col-span-2"><Label>Correct business interpretation</Label><Textarea value={evaluationDraft.businessInterpretation} onChange={(event) => setEvaluationDraft((current) => ({ ...current, businessInterpretation: event.target.value }))} className="min-h-[72px] resize-none" placeholder="Explain what the question must mean in this app." /></div><div className="space-y-2 md:col-span-2"><Label>Expected answer / result</Label><Textarea value={evaluationDraft.expectedAnswer} onChange={(event) => setEvaluationDraft((current) => ({ ...current, expectedAnswer: event.target.value }))} className="min-h-[72px] resize-none" placeholder="Describe the expected evidence-backed result." /></div><div className="space-y-2 md:col-span-2"><Label>Correction guidance</Label><Input value={evaluationDraft.correctionGuidance} onChange={(event) => setEvaluationDraft((current) => ({ ...current, correctionGuidance: event.target.value }))} placeholder="What should be checked if this case fails?" /></div></div><Button type="button" className="mt-4" onClick={() => createEvaluationCaseMutation.mutate()} disabled={createEvaluationCaseMutation.isPending}><Plus className="mr-2 h-4 w-4" />{createEvaluationCaseMutation.isPending ? "Adding case..." : "Add evaluation case"}</Button></details>
             </CardContent>
           </Card>
         </div>

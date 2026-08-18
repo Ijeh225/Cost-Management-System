@@ -1,6 +1,8 @@
 import { NextFunction, Response, Router } from "express";
 import {
   aiAssistantAuditLogsTable,
+  aiAssistantEvaluationCasesTable,
+  aiAssistantEvaluationRunsTable,
   aiAssistantActionDraftsTable,
   aiAssistantBriefingsTable,
   aiAssistantReportDraftsTable,
@@ -2605,6 +2607,148 @@ aiAssistantRouter.get("/ai-assistant/monitoring", requireAdmin, foundationRateLi
   const outputTokens = questions.reduce((total, row) => total + providerUsageTokens(meta(row.metadata), "outputTokens"), 0);
   const estimatedCostNgn = questions.reduce((total, row) => total + (Number(meta(row.metadata).estimatedProviderCostNgn) || 0), 0);
   return res.json({ periodDays: 30, questions: questions.length, failures: failures.length, unsupported: questions.filter((row) => meta(row.metadata).status === "unsupported").length, averageLatencyMs: latencies.length ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length) : null, providerRequests: questions.filter((row) => meta(row.metadata).naturalLanguageRoutingConfigured === true).length, providerCost: { currency: "NGN", amount: estimatedCostNgn, inputTokens, outputTokens, note: "Estimated from provider usage returned for each request and the token prices configured in AI Governance." }, feedback: { helpful: feedback.filter((row) => meta(row.metadata).rating === "helpful").length, notHelpful: feedback.filter((row) => meta(row.metadata).rating === "not_helpful").length } });
+});
+
+function requireEvaluationAdministrator(req: AuthRequest, res: Response): boolean {
+  if (req.user?.role === "super_admin") return true;
+  res.status(403).json({ error: "Only Super Admins can manage AI Assistant evaluation cases." });
+  return false;
+}
+
+function formatEvaluationCase(
+  evaluationCase: typeof aiAssistantEvaluationCasesTable.$inferSelect,
+  latestRun?: typeof aiAssistantEvaluationRunsTable.$inferSelect,
+) {
+  return {
+    id: evaluationCase.id,
+    caseKey: evaluationCase.caseKey,
+    question: evaluationCase.question,
+    businessInterpretation: evaluationCase.businessInterpretation,
+    expectedTool: evaluationCase.expectedTool,
+    expectedStatus: evaluationCase.expectedStatus,
+    expectedAnswer: evaluationCase.expectedAnswer,
+    correctionGuidance: evaluationCase.correctionGuidance,
+    isActive: evaluationCase.isActive,
+    updatedAt: evaluationCase.updatedAt.toISOString(),
+    latestRun: latestRun ? {
+      id: latestRun.id,
+      mode: latestRun.mode,
+      outcome: latestRun.outcome,
+      actualTool: latestRun.actualTool,
+      actualStatus: latestRun.actualStatus,
+      actualInterpretation: latestRun.actualInterpretation,
+      correctionRequired: latestRun.correctionRequired,
+      correctionNote: latestRun.correctionNote,
+      runAt: latestRun.runAt.toISOString(),
+    } : null,
+  };
+}
+
+aiAssistantRouter.get("/ai-assistant/evaluations", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  if (!requireEvaluationAdministrator(req, res)) return;
+  try {
+    const cases = await db.select().from(aiAssistantEvaluationCasesTable).orderBy(aiAssistantEvaluationCasesTable.caseKey).limit(250);
+    const runs = await db.select().from(aiAssistantEvaluationRunsTable).orderBy(desc(aiAssistantEvaluationRunsTable.runAt)).limit(1000);
+    const latestRuns = new Map<number, typeof aiAssistantEvaluationRunsTable.$inferSelect>();
+    for (const run of runs) if (!latestRuns.has(run.caseId)) latestRuns.set(run.caseId, run);
+    const recentRuns = runs.filter((run) => run.runAt >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+    const failed = recentRuns.filter((run) => run.outcome === "failed");
+    return res.json({
+      cases: cases.map((evaluationCase) => formatEvaluationCase(evaluationCase, latestRuns.get(evaluationCase.id))),
+      summary: {
+        activeCases: cases.filter((evaluationCase) => evaluationCase.isActive).length,
+        recentRuns: recentRuns.length,
+        passed: recentRuns.filter((run) => run.outcome === "passed").length,
+        failed: failed.length,
+        correctionsRequired: failed.filter((run) => run.correctionRequired).length,
+      },
+    });
+  } catch (error) {
+    console.error("[ai-assistant] Failed to load evaluation library", error);
+    return res.status(500).json({ error: "Unable to load AI Assistant evaluation library" });
+  }
+});
+
+aiAssistantRouter.post("/ai-assistant/evaluations/cases", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  if (!requireEvaluationAdministrator(req, res)) return;
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
+  const caseKey = typeof body.caseKey === "string" ? body.caseKey.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 100) : "";
+  const question = typeof body.question === "string" ? body.question.trim().slice(0, 1000) : "";
+  const businessInterpretation = typeof body.businessInterpretation === "string" ? body.businessInterpretation.trim().slice(0, 2000) : "";
+  const expectedTool = typeof body.expectedTool === "string" && TOOL_IDS.has(body.expectedTool) ? body.expectedTool : null;
+  const expectedStatus = body.expectedStatus === "unsupported" ? "unsupported" : "answered";
+  const expectedAnswer = typeof body.expectedAnswer === "string" ? body.expectedAnswer.trim().slice(0, 2000) || null : null;
+  const correctionGuidance = typeof body.correctionGuidance === "string" ? body.correctionGuidance.trim().slice(0, 2000) : "";
+  if (!caseKey || !question || !businessInterpretation || (expectedStatus === "answered" && !expectedTool)) {
+    return res.status(400).json({ error: "Provide a case key, question, business interpretation, and an expected approved tool for answered cases." });
+  }
+  try {
+    const [created] = await db.insert(aiAssistantEvaluationCasesTable).values({
+      caseKey, question, businessInterpretation, expectedTool, expectedStatus, expectedAnswer, correctionGuidance, createdById: req.user!.id,
+    }).returning();
+    await recordAiAssistantAuditEvent({ userId: req.user!.id, eventType: "evaluation_case_created", requestSummary: question, responseSummary: caseKey, metadata: { caseId: created.id, expectedTool, expectedStatus } });
+    return res.status(201).json(formatEvaluationCase(created));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to create evaluation case";
+    return res.status(400).json({ error: message.includes("unique") ? "That evaluation case key already exists." : message });
+  }
+});
+
+aiAssistantRouter.patch("/ai-assistant/evaluations/cases/:id", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  if (!requireEvaluationAdministrator(req, res)) return;
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid evaluation case id." });
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Record<string, unknown> : {};
+  const fields: Partial<typeof aiAssistantEvaluationCasesTable.$inferInsert> = { updatedAt: new Date() };
+  if (typeof body.businessInterpretation === "string") fields.businessInterpretation = body.businessInterpretation.trim().slice(0, 2000);
+  if (typeof body.expectedAnswer === "string") fields.expectedAnswer = body.expectedAnswer.trim().slice(0, 2000) || null;
+  if (typeof body.correctionGuidance === "string") fields.correctionGuidance = body.correctionGuidance.trim().slice(0, 2000);
+  if (typeof body.isActive === "boolean") fields.isActive = body.isActive;
+  if (typeof body.expectedTool === "string" && TOOL_IDS.has(body.expectedTool)) fields.expectedTool = body.expectedTool;
+  if (body.expectedStatus === "answered" || body.expectedStatus === "unsupported") fields.expectedStatus = body.expectedStatus;
+  try {
+    const [updated] = await db.update(aiAssistantEvaluationCasesTable).set(fields).where(eq(aiAssistantEvaluationCasesTable.id, id)).returning();
+    if (!updated) return res.status(404).json({ error: "Evaluation case not found." });
+    await recordAiAssistantAuditEvent({ userId: req.user!.id, eventType: "evaluation_case_updated", requestSummary: updated.caseKey, responseSummary: updated.correctionGuidance || null, metadata: { caseId: updated.id } });
+    return res.json(formatEvaluationCase(updated));
+  } catch (error) {
+    console.error("[ai-assistant] Failed to update evaluation case", error);
+    return res.status(400).json({ error: "Unable to update evaluation case" });
+  }
+});
+
+aiAssistantRouter.post("/ai-assistant/evaluations/run", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
+  if (!requireEvaluationAdministrator(req, res)) return;
+  try {
+    const cases = await db.select().from(aiAssistantEvaluationCasesTable).where(eq(aiAssistantEvaluationCasesTable.isActive, true)).orderBy(aiAssistantEvaluationCasesTable.caseKey).limit(250);
+    const runs = [] as Array<typeof aiAssistantEvaluationRunsTable.$inferSelect>;
+    for (const evaluationCase of cases) {
+      // Deliberately deterministic: the suite tests business routing without an
+      // OpenAI request, live data query, or external side effect.
+      const intent = interpretQuestionFallback(evaluationCase.question);
+      const actualTool = intent.toolId;
+      const actualStatus = actualTool ? "answered" : "unsupported";
+      const passed = actualTool === evaluationCase.expectedTool && actualStatus === evaluationCase.expectedStatus;
+      const [run] = await db.insert(aiAssistantEvaluationRunsTable).values({
+        caseId: evaluationCase.id,
+        runById: req.user!.id,
+        mode: "deterministic",
+        outcome: passed ? "passed" : "failed",
+        actualTool,
+        actualStatus,
+        actualInterpretation: intent.label,
+        correctionRequired: !passed,
+        correctionNote: passed ? null : `Expected ${evaluationCase.expectedStatus}${evaluationCase.expectedTool ? ` via ${evaluationCase.expectedTool}` : " without a tool"}; received ${actualStatus}${actualTool ? ` via ${actualTool}` : " without a tool"}.`,
+      }).returning();
+      runs.push(run);
+    }
+    const failed = runs.filter((run) => run.outcome === "failed");
+    await recordAiAssistantAuditEvent({ userId: req.user!.id, eventType: "evaluation_suite_run", requestSummary: `Ran ${runs.length} active evaluation cases`, responseSummary: `${runs.length - failed.length} passed, ${failed.length} failed`, metadata: { total: runs.length, passed: runs.length - failed.length, failed: failed.length, mode: "deterministic" } });
+    return res.status(201).json({ total: runs.length, passed: runs.length - failed.length, failed: failed.length, runs: runs.map((run) => ({ caseId: run.caseId, outcome: run.outcome, actualTool: run.actualTool, actualStatus: run.actualStatus, correctionNote: run.correctionNote })) });
+  } catch (error) {
+    console.error("[ai-assistant] Evaluation suite failed", error);
+    return res.status(500).json({ error: "Unable to run AI Assistant evaluation suite" });
+  }
 });
 
 aiAssistantRouter.post("/ai-assistant/tools/:toolId", requireAdmin, foundationRateLimit, async (req: AuthRequest, res) => {
