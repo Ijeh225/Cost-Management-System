@@ -207,8 +207,8 @@ export default function InvoicesPage() {
   const showWrittenOffSection = (statusFilter === "all" || statusFilter === "written_off") && filteredWrittenOff.length > 0;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 p-3 sm:p-6">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <FileText className="w-6 h-6 text-primary" />
@@ -226,7 +226,7 @@ export default function InvoicesPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Outstanding", value: formatCurrency(totalOutstanding), color: "text-amber-400" },
           { label: "Total Collected", value: formatCurrency(totalPaid), color: "text-emerald-400" },
@@ -236,13 +236,13 @@ export default function InvoicesPage() {
           <Card key={stat.label} className="border-border/50">
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
-              <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
+              <p className={`break-words text-xl font-bold sm:text-2xl ${stat.color}`}>{stat.value}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -253,7 +253,7 @@ export default function InvoicesPage() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-36 shrink-0">
+          <SelectTrigger className="w-full sm:w-36 shrink-0">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>

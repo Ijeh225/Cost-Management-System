@@ -153,7 +153,7 @@ export default function BranchComparisonPage() {
       ) : (
         <>
           {totals && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <SumCard label="Total Containers" value={String(totals.containers)} />
               <SumCard label="Total Revenue" value={formatCurrency(totals.revenue)} color="text-primary" />
               <SumCard label="Total Costs" value={formatCurrency(totals.costs)} color="text-orange-400" />

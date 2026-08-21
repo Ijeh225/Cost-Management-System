@@ -450,14 +450,14 @@ export default function AccountsReceivablePage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Net Outstanding</CardTitle>
             <CreditCard className="w-4 h-4 text-amber-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold text-amber-400">
+            <div className="break-words text-xl font-bold text-amber-400 sm:text-2xl">
               {formatCurrency(clients.reduce((s, c) => s + (c.effectiveOutstanding ?? c.outstanding), 0))}
             </div>
             <p className="text-xs text-muted-foreground mt-1">

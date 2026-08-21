@@ -631,7 +631,7 @@ export default function OverheadExpensesPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
             <TrendingDown className="w-5 h-5 text-red-400" />
@@ -749,7 +749,7 @@ export default function OverheadExpensesPage() {
                     return (
                       <div key={e.id}>
                         <div className="px-3 py-3 hover:bg-accent/10 transition-colors">
-                          <div className="flex items-start gap-2">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                             <button onClick={() => setExpandedId(isExpanded ? null : e.id)} className="mt-1 text-muted-foreground hover:text-foreground transition-colors shrink-0">
                               {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                             </button>
@@ -787,7 +787,7 @@ export default function OverheadExpensesPage() {
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                            <div className="flex w-full flex-wrap items-center gap-1 sm:mt-0.5 sm:w-auto sm:flex-nowrap">
                               <Button
                                 size="sm"
                                 variant="outline"

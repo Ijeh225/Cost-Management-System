@@ -40,7 +40,7 @@ function KpiCard({ title, value, sub, icon: Icon, colorClass = "" }: {
         </div>
       </CardHeader>
       <CardContent>
-        <div className={`text-2xl font-bold tracking-tight ${colorClass || "text-foreground"}`}>{value}</div>
+        <div className={`break-words text-xl font-bold tracking-tight sm:text-2xl ${colorClass || "text-foreground"}`}>{value}</div>
         {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
       </CardContent>
     </Card>
@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <BarChart2 className="w-6 h-6 text-primary" /> Analytics
@@ -114,23 +114,23 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Period filter — applies to operational metrics */}
-      <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border border-border/40 bg-muted/20">
+      <div className="flex flex-col gap-3 rounded-lg border border-border/40 bg-muted/20 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
         <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
         <span className="text-xs text-muted-foreground font-medium">Operational period:</span>
-        <div className="flex items-center gap-1.5">
+        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:items-center sm:gap-1.5">
           <span className="text-xs text-muted-foreground">From</span>
           <Input
             type="date"
             value={fromDate}
             onChange={e => setFromDate(e.target.value)}
-            className="h-7 text-xs w-34 bg-background border-border/60"
+            className="h-9 w-full bg-background text-sm sm:h-7 sm:w-34 sm:text-xs border-border/60"
           />
           <span className="text-xs text-muted-foreground">To</span>
           <Input
             type="date"
             value={toDate}
             onChange={e => setToDate(e.target.value)}
-            className="h-7 text-xs w-34 bg-background border-border/60"
+            className="h-9 w-full bg-background text-sm sm:h-7 sm:w-34 sm:text-xs border-border/60"
           />
         </div>
         {(fromDate || toDate) && (
@@ -144,7 +144,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Financial KPIs (all-time, same as before) */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard title="Containers" value={String(summary.containerCount ?? 0)} icon={Box} />
         <KpiCard title="Total Revenue" value={formatCurrency(summary.totalRevenue ?? 0)} icon={DollarSign} colorClass="text-primary" />
         <KpiCard title="Total Cost" value={formatCurrency(summary.totalCost ?? 0)} icon={DollarSign} colorClass="text-orange-400" />
@@ -163,7 +163,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Operational KPIs (period-filtered) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Avg Clearance Days"
           value={avgDaysDisplay}
