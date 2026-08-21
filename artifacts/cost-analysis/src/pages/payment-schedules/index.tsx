@@ -177,7 +177,7 @@ function CreateScheduleDialog({
       <DialogContent className="border-border/50 bg-card/95 max-w-lg">
         <DialogHeader><DialogTitle>Create Payment Schedule</DialogTitle></DialogHeader>
         <form onSubmit={submit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Schedule Date</Label>
               <Input type="date" value={form.scheduleDate} onChange={(e) => setForm(f => ({ ...f, scheduleDate: e.target.value }))} required />
@@ -279,7 +279,7 @@ function ActionDialogView({
         <div className="rounded-lg border border-border/40 bg-muted/30 p-3 text-sm">
           <p className="font-medium">{action.schedule.vendorBeneficiary}</p>
           <p className="text-xs text-muted-foreground">{action.schedule.description}</p>
-          <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
             <span>Requested: <b>{formatCurrency(action.schedule.amountRequested)}</b></span>
             <span>Paid: <b>{formatCurrency(action.schedule.amountPaid)}</b></span>
             <span>Balance: <b>{formatCurrency(action.schedule.balance)}</b></span>
@@ -300,7 +300,7 @@ function ActionDialogView({
           )}
           {action.type === "pay" && (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Payment Method</Label>
                   <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as "cash" | "bank")}>
@@ -388,7 +388,7 @@ function ScheduleDetailDialog({
                 </div>
                 <Badge variant="outline" className={STATUS_COLORS[data.status]}>{STATUS_LABELS[data.status]}</Badge>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 md:grid-cols-4">
                 <div><p className="text-xs text-muted-foreground">Schedule Date</p><p>{dateLabel(data.scheduleDate)}</p></div>
                 <div><p className="text-xs text-muted-foreground">Requested By</p><p>{data.requestedByName}</p></div>
                 <div><p className="text-xs text-muted-foreground">Branch</p><p><BranchChip branchId={data.branchId} /></p></div>

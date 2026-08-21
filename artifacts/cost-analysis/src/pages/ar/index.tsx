@@ -540,7 +540,7 @@ export default function AccountsReceivablePage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {agingBuckets.map(b => (
               <div key={b.label} className={`rounded-lg p-3 ${b.bg} border border-border/30`}>
                 <div className="text-[11px] text-muted-foreground font-medium mb-1">{b.label}</div>

@@ -217,10 +217,39 @@ html.light {
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    overflow-x: hidden;
   }
 
   html.dark body { color-scheme: dark; }
   html.light body { color-scheme: light; }
+}
+
+/* Responsive application foundation: keep content inside the viewport and
+   allow dense data controls to scroll within their own area on small screens. */
+html,
+body,
+#root {
+  min-width: 0;
+  min-height: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  [role="dialog"] {
+    max-width: calc(100vw - 1.5rem);
+  }
 }
 
 @layer utilities {

@@ -47,8 +47,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <AppSidebar />
         
         <div className="flex flex-col flex-1 relative min-w-0">
-          <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
-            <div className="flex items-center gap-4">
+          <header className="h-14 sm:h-16 flex-shrink-0 flex items-center justify-between gap-2 px-3 sm:px-4 lg:px-6 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-4">
               <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors" />
               <div className="h-6 w-px bg-border/50 hidden md:block"></div>
               <h2 className="text-sm font-medium text-muted-foreground hidden md:block font-mono">
@@ -56,10 +56,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </h2>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
               <GlobalSearch />
               <NotificationBeepBell isAuthenticated={!!user} />
-              <div className="h-6 w-px bg-border/50"></div>
+              <div className="hidden h-6 w-px bg-border/50 sm:block"></div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:ring-2 ring-primary/50 transition-all">
@@ -93,8 +93,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto bg-background p-4 md:p-8 scroll-smooth">
-            <div className="max-w-7xl mx-auto w-full h-full pb-12">
+          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-background p-3 sm:p-4 lg:p-8 scroll-smooth">
+            <div className="mx-auto h-full w-full max-w-[90rem] pb-8 sm:pb-12">
               {children}
             </div>
           </main>

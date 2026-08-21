@@ -179,7 +179,7 @@ function MakePaymentDialog({ expense, onOpenChange, onSubmit, isPending }: {
           </div>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Amount Paying (₦)</Label>
               <Input type="number" step="0.01" min="0.01" {...register("amount", { required: true, valueAsNumber: true, min: 0.01 })} />
@@ -408,7 +408,7 @@ function SchedulePaymentDialog({ expense, onOpenChange, onSubmit, isPending }: {
           <p className="text-xs text-muted-foreground">Outstanding balance: <span className="font-medium text-foreground">{formatCurrency(expense.balance)}</span></p>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Schedule Date</Label>
               <Input type="date" {...register("scheduleDate", { required: true })} />

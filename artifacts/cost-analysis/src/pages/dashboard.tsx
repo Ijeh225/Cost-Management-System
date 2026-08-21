@@ -691,7 +691,7 @@ export default function Dashboard() {
               </span>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   { label: "Current", value: arData.aging.current,    color: "text-foreground",  bg: "bg-muted/40" },
                   { label: "30d",     value: arData.aging.days1to30,  color: "text-amber-400",   bg: "bg-amber-500/10" },
