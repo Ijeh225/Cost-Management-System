@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, dutyPaymentTransactionsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, dutyPaymentTransactionsTable, reportSubscriptionsTable, reportDeliveryLogsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, desc, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, requireSuperAdmin, getBranchScope, AuthRequest } from "../lib/auth.js";
@@ -164,6 +164,99 @@ reportsRouter.get("/reports/reconciliation", requireAuth, requireBranchMemberOrA
   } catch (err) {
     console.error("Reconciliation report failed", err);
     return res.status(500).json({ error: "Unable to build reconciliation report." });
+  }
+});
+
+const SCHEDULED_REPORT_KINDS = new Set(["duty_payment_ledger", "workflow_stage_summary"]);
+const SCHEDULED_REPORT_FREQUENCIES = new Set(["daily", "weekly"]);
+const emailAddress = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function parseRecipients(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const recipients = [...new Set(value.map(item => String(item).trim().toLowerCase()).filter(Boolean))];
+  return recipients.length > 0 && recipients.length <= 20 && recipients.every(item => emailAddress.test(item)) ? recipients : null;
+}
+function subscriptionResponse(row: typeof reportSubscriptionsTable.$inferSelect) {
+  let recipients: string[] = [];
+  let filters: Record<string, unknown> = {};
+  try { recipients = JSON.parse(row.recipients); } catch {}
+  try { filters = JSON.parse(row.filters); } catch {}
+  return { ...row, recipients, filters };
+}
+
+reportsRouter.get("/reports/subscriptions", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const scope = getBranchScope(req);
+    const rows = await db.select().from(reportSubscriptionsTable)
+      .where(scope === null ? undefined : eq(reportSubscriptionsTable.branchId, scope))
+      .orderBy(desc(reportSubscriptionsTable.createdAt));
+    return res.json({ subscriptions: rows.map(subscriptionResponse) });
+  } catch (err) {
+    console.error("Report subscription list failed", err);
+    return res.status(500).json({ error: "Unable to load report subscriptions." });
+  }
+});
+
+reportsRouter.get("/reports/subscriptions/:id/logs", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid subscription id." });
+    const [subscription] = await db.select().from(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.id, id));
+    const scope = getBranchScope(req);
+    if (!subscription || (scope !== null && subscription.branchId !== scope)) return res.status(404).json({ error: "Report subscription not found." });
+    const rows = await db.select().from(reportDeliveryLogsTable).where(eq(reportDeliveryLogsTable.subscriptionId, id)).orderBy(desc(reportDeliveryLogsTable.deliveredAt)).limit(50);
+    return res.json({ logs: rows.map(row => ({ ...row, recipients: JSON.parse(row.recipients || "[]") })) });
+  } catch (err) {
+    console.error("Report delivery log failed", err);
+    return res.status(500).json({ error: "Unable to load report delivery history." });
+  }
+});
+
+reportsRouter.post("/reports/subscriptions", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const { reportKind, frequency, recipients, filters = {} } = req.body ?? {};
+    if (!SCHEDULED_REPORT_KINDS.has(reportKind) || !SCHEDULED_REPORT_FREQUENCIES.has(frequency)) return res.status(400).json({ error: "Choose a supported report and frequency." });
+    const safeRecipients = parseRecipients(recipients);
+    if (!safeRecipients) return res.status(400).json({ error: "Provide 1 to 20 valid recipient email addresses." });
+    if (!filters || typeof filters !== "object" || Array.isArray(filters)) return res.status(400).json({ error: "Invalid report filters." });
+    const branchId = getBranchScope(req);
+    const [row] = await db.insert(reportSubscriptionsTable).values({ branchId, reportKind, frequency, recipients: JSON.stringify(safeRecipients), filters: JSON.stringify(filters), createdById: req.user!.id }).returning();
+    return res.status(201).json({ subscription: subscriptionResponse(row) });
+  } catch (err) {
+    console.error("Report subscription create failed", err);
+    return res.status(500).json({ error: "Unable to create report subscription." });
+  }
+});
+
+reportsRouter.patch("/reports/subscriptions/:id", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid subscription id." });
+    const [existing] = await db.select().from(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.id, id));
+    const scope = getBranchScope(req);
+    if (!existing || (scope !== null && existing.branchId !== scope)) return res.status(404).json({ error: "Report subscription not found." });
+    const update: Partial<typeof reportSubscriptionsTable.$inferInsert> = { updatedAt: new Date() };
+    if (typeof req.body?.isActive === "boolean") update.isActive = req.body.isActive;
+    if (req.body?.frequency !== undefined) { if (!SCHEDULED_REPORT_FREQUENCIES.has(req.body.frequency)) return res.status(400).json({ error: "Unsupported frequency." }); update.frequency = req.body.frequency; }
+    if (req.body?.recipients !== undefined) { const parsed = parseRecipients(req.body.recipients); if (!parsed) return res.status(400).json({ error: "Provide valid recipient email addresses." }); update.recipients = JSON.stringify(parsed); }
+    const [row] = await db.update(reportSubscriptionsTable).set(update).where(eq(reportSubscriptionsTable.id, id)).returning();
+    return res.json({ subscription: subscriptionResponse(row) });
+  } catch (err) {
+    console.error("Report subscription update failed", err);
+    return res.status(500).json({ error: "Unable to update report subscription." });
+  }
+});
+
+reportsRouter.delete("/reports/subscriptions/:id", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [existing] = await db.select().from(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.id, id));
+    const scope = getBranchScope(req);
+    if (!existing || (scope !== null && existing.branchId !== scope)) return res.status(404).json({ error: "Report subscription not found." });
+    await db.delete(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.id, id));
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("Report subscription delete failed", err);
+    return res.status(500).json({ error: "Unable to delete report subscription." });
   }
 });
 

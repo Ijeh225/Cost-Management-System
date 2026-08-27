@@ -37,3 +37,4 @@ export * from "./ai-assistant-briefings";
 export * from "./ai-assistant-reports";
 export * from "./ai-assistant-evaluations";
 export * from "./document-intelligence";
+export * from "./report-subscriptions";

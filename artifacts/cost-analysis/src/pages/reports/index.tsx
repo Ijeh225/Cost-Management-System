@@ -16,7 +16,7 @@ import {
   TrendingDown, TrendingUp, DollarSign, CheckCircle2,
   Users, BarChart3, PieChart, CalendarRange, FileSpreadsheet, Printer,
   FileText, Receipt, Clock, ExternalLink, Truck, Scale, ArrowRight,
-  Globe, ClipboardCheck, Landmark, Workflow,
+  Globe, ClipboardCheck, Landmark, Workflow, Trash2, Mail,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
@@ -1190,6 +1190,7 @@ type DutyLedgerReport = {
 };
 type WorkflowLedgerReport = { stages: Array<{ id: string; label: string; total: number; active: number; released: number; overdue: number; rows: Array<{ id: number; containerNumber: string; customerName: string; expectedDate: string | null; actualDate: string | null; state: string; sourceLink: string }> }>; evidenceNote: string };
 type ReconciliationReport = { summary: { matched: number; historicalUnledgered: number; attention: number }; rows: Array<{ id: number; containerNumber: string; customerName: string; snapshotPaid: number; ledgerPaid: number; historicalUnledgeredAmount: number; state: string; sourceLink: string }>; evidenceNote: string };
+type ReportSubscription = { id: number; reportKind: "duty_payment_ledger" | "workflow_stage_summary"; frequency: "daily" | "weekly"; recipients: string[]; isActive: boolean; lastSentAt: string | null; createdAt: string };
 
 function isoDate(value: string | null) {
   return value ? new Date(value).toLocaleDateString("en-NG") : "Not recorded";
@@ -1203,6 +1204,12 @@ function ReportCentreSection({ from, to }: { from: string; to: string }) {
   const [duty, setDuty] = useState<DutyLedgerReport | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowLedgerReport | null>(null);
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
+  const [subscriptions, setSubscriptions] = useState<ReportSubscription[]>([]);
+  const [subscriptionsAllowed, setSubscriptionsAllowed] = useState(true);
+  const [deliveryKind, setDeliveryKind] = useState<ReportSubscription["reportKind"]>("duty_payment_ledger");
+  const [deliveryFrequency, setDeliveryFrequency] = useState<ReportSubscription["frequency"]>("daily");
+  const [deliveryRecipients, setDeliveryRecipients] = useState("");
+  const [deliveryBusy, setDeliveryBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1218,6 +1225,35 @@ function ReportCentreSection({ from, to }: { from: string; to: string }) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [from, to]);
+
+  const loadSubscriptions = () => customFetch<{ subscriptions: ReportSubscription[] }>("/api/reports/subscriptions")
+    .then(result => { setSubscriptions(result.subscriptions); setSubscriptionsAllowed(true); })
+    .catch((error: { status?: number }) => { if (error?.status === 401 || error?.status === 403) setSubscriptionsAllowed(false); });
+  useEffect(() => { void loadSubscriptions(); }, []);
+
+  const createSubscription = async () => {
+    const recipients = deliveryRecipients.split(",").map(item => item.trim()).filter(Boolean);
+    if (!recipients.length) { setError("Enter at least one recipient email address for the scheduled report."); return; }
+    setDeliveryBusy(true);
+    try {
+      await customFetch("/api/reports/subscriptions", { method: "POST", body: { reportKind: deliveryKind, frequency: deliveryFrequency, recipients, filters: { from, to } } });
+      setDeliveryRecipients(""); await loadSubscriptions();
+    } catch (error) { setError(error instanceof Error ? error.message : "Unable to save the report schedule."); }
+    finally { setDeliveryBusy(false); }
+  };
+  const updateSubscription = async (id: number, body: object) => {
+    setDeliveryBusy(true);
+    try { await customFetch(`/api/reports/subscriptions/${id}`, { method: "PATCH", body }); await loadSubscriptions(); }
+    catch { setError("Unable to update the report schedule."); }
+    finally { setDeliveryBusy(false); }
+  };
+  const deleteSubscription = async (id: number) => {
+    if (!window.confirm("Remove this scheduled report?")) return;
+    setDeliveryBusy(true);
+    try { await customFetch(`/api/reports/subscriptions/${id}`, { method: "DELETE" }); await loadSubscriptions(); }
+    catch { setError("Unable to remove the report schedule."); }
+    finally { setDeliveryBusy(false); }
+  };
 
   const exportDutyCsv = () => {
     if (!duty?.transactions.length) return;
@@ -1253,6 +1289,7 @@ function ReportCentreSection({ from, to }: { from: string; to: string }) {
       <TabsContent value="workflow-ledger" className="mt-4"><Card className="border-border/40 bg-card/40"><CardHeader className="pb-3"><CardTitle className="text-sm">Department Workflow Evidence</CardTitle><p className="text-xs text-muted-foreground mt-1">Expected dates leave a job active. Actual release dates complete only that department.</p></CardHeader><CardContent className="space-y-4">{workflow?.stages.map(stage => <div key={stage.id} className="rounded-lg border border-border/50 overflow-hidden"><div className="p-3 bg-muted/20 flex flex-wrap justify-between gap-3"><div><p className="font-medium text-sm">{stage.label}</p><p className="text-xs text-muted-foreground mt-0.5">{stage.active} active · {stage.released} released · {stage.overdue} overdue</p></div><Badge variant={stage.overdue ? "destructive" : "secondary"}>{stage.total} tracked</Badge></div>{stage.rows.length ? <div className="divide-y divide-border/40">{stage.rows.slice(0, 8).map(row => <button key={row.id} onClick={() => setLocation(row.sourceLink)} className="w-full text-left px-3 py-2.5 hover:bg-muted/20 flex justify-between gap-3"><span><span className="font-mono text-primary text-sm">{row.containerNumber}</span><span className="text-xs text-muted-foreground ml-2">{row.customerName}</span></span><span className="text-xs text-muted-foreground">{row.state === "released" ? `Released ${isoDate(row.actualDate)}` : `Expected ${isoDate(row.expectedDate)}`}</span></button>)}</div> : <p className="p-3 text-xs text-muted-foreground">No expected or actual dates recorded yet.</p>}</div>)}</CardContent></Card></TabsContent>
       <TabsContent value="reconciliation" className="mt-4"><Card className="border-border/40 bg-card/40"><CardHeader className="pb-3 border-b border-border/40"><CardTitle className="text-sm">Duty Snapshot Reconciliation</CardTitle><p className="text-xs text-muted-foreground mt-1">Separates genuine data issues from older duty balances that have no individual payment record.</p></CardHeader><CardContent className="p-0"><div className="grid grid-cols-3 gap-px bg-border/30">{[["Matched", reconciliation?.summary.matched ?? 0], ["Historical / unledgered", reconciliation?.summary.historicalUnledgered ?? 0], ["Needs attention", reconciliation?.summary.attention ?? 0]].map(([label, value]) => <div key={String(label)} className="bg-card px-4 py-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="font-mono font-semibold text-sm mt-1">{value}</p></div>)}</div>{!reconciliation?.rows.length ? <div className="py-10 text-center text-sm text-muted-foreground">No duty snapshot or ledger balances require reporting.</div> : <div className="divide-y divide-border/40">{reconciliation.rows.map(row => <button key={row.id} onClick={() => setLocation(row.sourceLink)} className="w-full text-left p-4 hover:bg-muted/20 flex flex-wrap justify-between gap-3"><span><span className="font-mono text-primary">{row.containerNumber}</span><span className="text-xs text-muted-foreground ml-2">{row.customerName}</span></span><span className="text-xs">Snapshot {formatCurrency(row.snapshotPaid)} · Ledger {formatCurrency(row.ledgerPaid)} · <span className={row.state === "attention" ? "text-destructive font-medium" : row.state === "historical_unledgered" ? "text-amber-500" : "text-emerald-500"}>{row.state === "historical_unledgered" ? `Historical ${formatCurrency(row.historicalUnledgeredAmount)}` : row.state === "attention" ? "Review required" : "Matched"}</span></span></button>)}</div>}<p className="px-4 py-3 text-[11px] text-muted-foreground border-t border-border/40">{reconciliation?.evidenceNote}</p></CardContent></Card></TabsContent>
     </Tabs>}
+    {subscriptionsAllowed && <Card className="border-border/40 bg-card/40"><CardHeader className="pb-3 border-b border-border/40"><CardTitle className="text-sm flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> Scheduled Report Delivery</CardTitle><p className="text-xs text-muted-foreground mt-1">Branch administrators can email a daily or weekly Duty Ledger or Workflow Summary. Delivery attempts are retained as evidence.</p></CardHeader><CardContent className="pt-4 space-y-4"><div className="grid gap-3 sm:grid-cols-[1fr_140px_1.4fr_auto] items-end"><div className="space-y-1.5"><Label className="text-xs">Report</Label><Select value={deliveryKind} onValueChange={value => setDeliveryKind(value as ReportSubscription["reportKind"])}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="duty_payment_ledger">Duty Payment Ledger</SelectItem><SelectItem value="workflow_stage_summary">Workflow Stage Summary</SelectItem></SelectContent></Select></div><div className="space-y-1.5"><Label className="text-xs">Frequency</Label><Select value={deliveryFrequency} onValueChange={value => setDeliveryFrequency(value as ReportSubscription["frequency"])}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem></SelectContent></Select></div><div className="space-y-1.5"><Label className="text-xs">Recipients</Label><Input className="h-9" value={deliveryRecipients} onChange={event => setDeliveryRecipients(event.target.value)} placeholder="finance@example.com, manager@example.com" /></div><Button className="h-9" onClick={createSubscription} disabled={deliveryBusy}>Save schedule</Button></div>{subscriptions.length ? <div className="rounded-lg border border-border/50 divide-y divide-border/40">{subscriptions.map(subscription => <div key={subscription.id} className="p-3 flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-medium">{subscription.reportKind === "duty_payment_ledger" ? "Duty Payment Ledger" : "Workflow Stage Summary"} <Badge variant="secondary" className="ml-2 text-[10px]">{subscription.frequency}</Badge>{!subscription.isActive && <Badge variant="outline" className="ml-2 text-[10px]">Paused</Badge>}</p><p className="text-xs text-muted-foreground mt-1">{subscription.recipients.join(", ")} · Last sent: {subscription.lastSentAt ? isoDate(subscription.lastSentAt) : "Not sent yet"}</p></div><div className="flex gap-2"><Button size="sm" variant="outline" className="h-8 text-xs" disabled={deliveryBusy} onClick={() => updateSubscription(subscription.id, { isActive: !subscription.isActive })}>{subscription.isActive ? "Pause" : "Resume"}</Button><Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" disabled={deliveryBusy} onClick={() => deleteSubscription(subscription.id)}><Trash2 className="w-3.5 h-3.5" /></Button></div></div>)}</div> : <p className="text-xs text-muted-foreground">No scheduled reports yet.</p>}</CardContent></Card>}
   </section>;
 }
 

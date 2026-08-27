@@ -48,4 +48,15 @@ The first Report Centre delivery provides three source-linked reports inside the
 - **Department Workflow Evidence**: reports Transire, Shipping/DO, Terminal/TDO, and Pullout independently. Expected dates remain planned work; actual release dates determine a released stage.
 - **Duty Snapshot Reconciliation**: compares the current Customs-duty running balance to immutable ledger totals. A positive historical difference is labelled `Historical / unledgered`; it is not invented as a payment or automatically treated as an error. A ledger total above the current running balance is `Needs attention`.
 
-Existing cashflow, P&L, accounts-receivable, client statement, delivery, branch-comparison, and disbursement-reconciliation reports remain available through their existing report cards. Saved report presets and scheduled email delivery are intentionally deferred until their recipient, retention, and approval rules are agreed.
+Existing cashflow, P&L, accounts-receivable, client statement, delivery, branch-comparison, and disbursement-reconciliation reports remain available through their existing report cards.
+
+## Scheduled Delivery Controls
+
+The first controlled delivery release supports **Duty Payment Ledger** and **Workflow Stage Summary** emails.
+
+- Only branch administrators and super administrators can create, pause, resume, or delete schedules.
+- A schedule is bound to the creator's current branch scope. A super administrator in all-branches mode may create a consolidated schedule.
+- Recipients are validated email addresses, limited to 20 per schedule.
+- Delivery runs through the existing server scheduler and Resend configuration. A schedule is marked sent only after Resend accepts the message.
+- Every attempt is stored in `report_delivery_logs` with recipients, report type, item count, delivery time, and an error message when it failed.
+- Scheduled reports are read-only summaries. They never approve, pay, update, or otherwise change a job or financial record.

@@ -2,6 +2,7 @@ import app from "./app";
 import { db, pool, containersTable, appMigrationsTable, settingsTable, usersTable } from "@workspace/db";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { runScheduledDigest } from "./routes/notifications";
+import { runScheduledReportDelivery } from "./lib/report-delivery";
 import { runScheduledAiProactiveBriefings } from "./lib/ai-proactive-intelligence";
 import { getDocumentStorageConfigurationError } from "./lib/document-storage";
 
@@ -917,6 +918,40 @@ async function runStartupMigrations() {
         ON CONFLICT (case_key) DO NOTHING
       `);
     });
+    await runMigration("report_subscriptions_v1", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS report_subscriptions (
+          id SERIAL PRIMARY KEY,
+          branch_id INTEGER REFERENCES branches(id) ON DELETE CASCADE,
+          report_kind TEXT NOT NULL,
+          frequency TEXT NOT NULL,
+          recipients TEXT NOT NULL DEFAULT '[]',
+          filters TEXT NOT NULL DEFAULT '{}',
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_by_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          last_sent_at TIMESTAMP,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS report_delivery_logs (
+          id SERIAL PRIMARY KEY,
+          subscription_id INTEGER NOT NULL REFERENCES report_subscriptions(id) ON DELETE CASCADE,
+          branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+          report_kind TEXT NOT NULL,
+          recipients TEXT NOT NULL DEFAULT '[]',
+          status TEXT NOT NULL,
+          item_count INTEGER NOT NULL DEFAULT 0,
+          error TEXT,
+          delivered_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS report_subscriptions_branch_idx ON report_subscriptions(branch_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS report_subscriptions_active_idx ON report_subscriptions(is_active)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS report_delivery_logs_subscription_idx ON report_delivery_logs(subscription_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS report_delivery_logs_delivered_idx ON report_delivery_logs(delivered_at)`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);
@@ -943,6 +978,7 @@ runStartupMigrations().then(() => {
   });
   setInterval(() => {
     runScheduledDigest().catch(console.error);
+    runScheduledReportDelivery().catch(console.error);
     // Uses the same one-minute scheduler; database deduplication limits each briefing to its configured period.
     db.select().from(settingsTable).then((rows) => {
       const settings = Object.fromEntries(rows.map((row) => [row.key, row.value]));
