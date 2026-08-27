@@ -406,7 +406,7 @@ export default function CashFlowPrint() {
         <div className="footer">
           <p>Bonded Terminal Clearing · Cash Flow Statement · {periodLabel} · {bankLabel}</p>
           <p style={{ marginTop: 4 }}>Net Cash Position: <strong style={{ color: totals.netCashFlow < 0 ? "#dc2626" : "#0f766e" }}>{fmt(totals.netCashFlow)}</strong></p>
-          <p className="note">Note: Customs duty payments are recorded as snapshots; bank attribution is not available for duty entries and they are excluded when filtering by a specific bank.</p>
+          <p className="note">Note: Duty payments recorded after the payment-ledger upgrade include their source and appear in bank-filtered cash flow. Earlier duty balance snapshots remain outside the transaction ledger.</p>
         </div>
       </div>
     </>

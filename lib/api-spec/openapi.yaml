@@ -2203,4 +2203,7 @@ components:
         amount: {type: number}
         paymentDate: {type: string, format: date, nullable: true}
         notes: {type: string, nullable: true}
+        paymentMethod: {type: string, enum: [cash, bank], default: cash}
+        bankId: {type: integer, nullable: true}
+        reference: {type: string, nullable: true}
       required: [amount]

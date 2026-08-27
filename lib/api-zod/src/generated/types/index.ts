@@ -68,6 +68,7 @@ export * from "./messageResponse";
 export * from "./myTasksResponse";
 export * from "./operationsCharges";
 export * from "./recordDutyPaymentRequest";
+export * from "./recordDutyPaymentRequestPaymentMethod";
 export * from "./rejectSectionRequest";
 export * from "./saveCustomFieldValuesRequest";
 export * from "./saveCustomFieldValuesRequestValuesItem";

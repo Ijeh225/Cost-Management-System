@@ -1612,10 +1612,17 @@ export const RecordDutyPaymentParams = zod.object({
   containerId: zod.coerce.number(),
 });
 
+export const recordDutyPaymentBodyPaymentMethodDefault = `cash`;
+
 export const RecordDutyPaymentBody = zod.object({
   amount: zod.number(),
   paymentDate: zod.date().nullish(),
   notes: zod.string().nullish(),
+  paymentMethod: zod
+    .enum(["cash", "bank"])
+    .default(recordDutyPaymentBodyPaymentMethodDefault),
+  bankId: zod.number().nullish(),
+  reference: zod.string().nullish(),
 });
 
 export const RecordDutyPaymentResponse = zod.object({

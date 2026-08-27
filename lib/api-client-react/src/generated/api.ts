@@ -4273,6 +4273,9 @@ export function useGetIntelligenceAlerts<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
+/**
+ * @summary List containers with duty-payment status (admin / accounts only)
+ */
 export const getListDutyPaymentsUrl = (params?: ListDutyPaymentsParams) => {
   const normalizedParams = new URLSearchParams();
 

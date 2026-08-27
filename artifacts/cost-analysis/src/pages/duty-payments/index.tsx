@@ -5,6 +5,7 @@ import {
   useRecordDutyPayment,
   useAdvanceContainerStatus,
   listDutyPayments,
+  useListActiveBanks,
   type DutyPaymentRow,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -555,12 +556,12 @@ export default function DutyPaymentsPage() {
       <RecordPaymentDialog
         row={recordFor}
         onClose={() => setRecordFor(null)}
-        onSubmit={(amount, paymentDate, notes) => {
+        onSubmit={(amount, paymentDate, notes, paymentMethod, bankId, reference) => {
           if (!recordFor) return;
           pendingRecordRef.current = recordFor;
           recordMut.mutate({
             containerId: recordFor.containerId,
-            data: { amount, paymentDate: paymentDate || null, notes: notes || null },
+            data: { amount, paymentDate: paymentDate || null, notes: notes || null, paymentMethod, bankId, reference: reference || null },
           });
         }}
         isPending={recordMut.isPending}
@@ -574,18 +575,25 @@ function RecordPaymentDialog({
 }: {
   row: DutyPaymentRow | null;
   onClose: () => void;
-  onSubmit: (amount: number, paymentDate: string, notes: string) => void;
+  onSubmit: (amount: number, paymentDate: string, notes: string, paymentMethod: "cash" | "bank", bankId: number | null, reference: string) => void;
   isPending: boolean;
 }) {
   const [amountStr, setAmountStr] = useState("");
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [reference, setReference] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank">("cash");
+  const [bankId, setBankId] = useState("");
+  const { data: activeBanks = [] } = useListActiveBanks();
 
   useEffect(() => {
     if (row) {
       setAmountStr("");
       setPaymentDate(new Date().toISOString().slice(0, 10));
       setNotes("");
+      setReference("");
+      setPaymentMethod("cash");
+      setBankId("");
     }
   }, [row]);
 
@@ -603,6 +611,7 @@ function RecordPaymentDialog({
     if (amountStr.trim() === "") return "";
     if (amount <= 0) return "Amount must be greater than zero.";
     if (amount > outstanding + 0.005) return `Amount exceeds outstanding (${formatCurrency(outstanding)}).`;
+    if (paymentMethod === "bank" && !bankId) return "Select the bank account used for this payment.";
     return "";
   })();
 
@@ -670,6 +679,35 @@ function RecordPaymentDialog({
               <Input id="paymentDate" type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Payment Source</Label>
+                <Select value={paymentMethod} onValueChange={(value) => { setPaymentMethod(value as "cash" | "bank"); if (value === "cash") setBankId(""); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="bank">Bank Account</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {paymentMethod === "bank" && (
+                <div className="space-y-1">
+                  <Label>Bank Account</Label>
+                  <Select value={bankId} onValueChange={setBankId}>
+                    <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
+                    <SelectContent>
+                      {activeBanks.map((bank) => <SelectItem key={bank.id} value={String(bank.id)}>{bank.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="reference">Reference (optional)</Label>
+              <Input id="reference" value={reference} onChange={e => setReference(e.target.value)} placeholder="Receipt, transfer, or teller number" maxLength={200} />
+            </div>
+
             <div className="space-y-1">
               <Label htmlFor="notes">Notes (optional)</Label>
               <Textarea id="notes" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Receipt #, channel, etc." />
@@ -680,7 +718,7 @@ function RecordPaymentDialog({
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
           <Button
-            onClick={() => onSubmit(amount, paymentDate, notes)}
+            onClick={() => onSubmit(amount, paymentDate, notes, paymentMethod, paymentMethod === "bank" ? Number(bankId) : null, reference)}
             disabled={!canSubmit}
             className="bg-orange-600 hover:bg-orange-700 gap-1"
             data-testid="button-confirm-payment"

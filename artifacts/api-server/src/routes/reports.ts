@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, dutyPaymentTransactionsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, requireSuperAdmin, getBranchScope, AuthRequest } from "../lib/auth.js";
@@ -1079,6 +1079,32 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
       .where(cepConds.length > 0 ? and(...cepConds) : undefined)
       .orderBy(containerExpensePaymentsTable.paidAt);
 
+    // OUTFLOWS - actual Customs duty payments. Snapshot balances are deliberately
+    // excluded; only dated ledger rows represent a cash movement.
+    const dutyConds: SQL[] = [];
+    if (fromDate) dutyConds.push(gte(dutyPaymentTransactionsTable.paidAt, fromDate));
+    if (toDate) dutyConds.push(lte(dutyPaymentTransactionsTable.paidAt, toDate));
+    if (bankIdNum !== null) dutyConds.push(eq(dutyPaymentTransactionsTable.bankId, bankIdNum));
+    if (branchScope.id !== null) dutyConds.push(eq(dutyPaymentTransactionsTable.branchId, branchScope.id));
+
+    const dutyRows = await db
+      .select({
+        id: dutyPaymentTransactionsTable.id,
+        amount: dutyPaymentTransactionsTable.amount,
+        paidAt: dutyPaymentTransactionsTable.paidAt,
+        paymentMethod: dutyPaymentTransactionsTable.paymentMethod,
+        notes: dutyPaymentTransactionsTable.notes,
+        reference: dutyPaymentTransactionsTable.reference,
+        bankId: dutyPaymentTransactionsTable.bankId,
+        bankName: banksTable.name,
+        containerNumber: containersTable.containerNumber,
+      })
+      .from(dutyPaymentTransactionsTable)
+      .leftJoin(banksTable, eq(dutyPaymentTransactionsTable.bankId, banksTable.id))
+      .leftJoin(containersTable, eq(dutyPaymentTransactionsTable.containerId, containersTable.id))
+      .where(dutyConds.length > 0 ? and(...dutyConds) : undefined)
+      .orderBy(dutyPaymentTransactionsTable.paidAt);
+
     // List of banks — queried early so builders can look up names by id
     const allBanks = await db.select({ id: banksTable.id, name: banksTable.name }).from(banksTable);
     const bankNameById = (id: number | null) => allBanks.find(b => b.id === id)?.name ?? null;
@@ -1086,7 +1112,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
     type Txn = {
       id: string;
       date: string;
-      type: "invoice_payment" | "client_deposit" | "overhead_expense" | "fund_addition" | "container_expense" | "bank_transfer";
+      type: "invoice_payment" | "client_deposit" | "overhead_expense" | "fund_addition" | "container_expense" | "duty_payment" | "bank_transfer";
       direction: "in" | "out";
       description: string;
       category: string | null;
@@ -1170,6 +1196,21 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
         direction: "out",
         description: `${sectionLabel} disbursement${r.containerNumber ? ` — ${r.containerNumber}` : ""}${r.narration ? ` (${r.narration})` : ""}`,
         category: sectionLabel,
+        bankId: r.bankId ?? null,
+        bankName: r.bankName ?? null,
+        reference: r.reference ?? null,
+        amount: parseFloat(r.amount as string ?? "0"),
+      });
+    }
+
+    for (const r of dutyRows) {
+      outflows.push({
+        id: `duty-${r.id}`,
+        date: r.paidAt instanceof Date ? r.paidAt.toISOString() : String(r.paidAt),
+        type: "duty_payment",
+        direction: "out",
+        description: `Customs duty payment${r.containerNumber ? ` - ${r.containerNumber}` : ""}${r.notes ? ` (${r.notes})` : ""}`,
+        category: "Customs Duty",
         bankId: r.bankId ?? null,
         bankName: r.bankName ?? null,
         reference: r.reference ?? null,

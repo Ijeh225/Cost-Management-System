@@ -5,9 +5,13 @@
  * Cost Analysis Per Container API
  * OpenAPI spec version: 0.1.0
  */
+import type { RecordDutyPaymentRequestPaymentMethod } from "./recordDutyPaymentRequestPaymentMethod";
 
 export interface RecordDutyPaymentRequest {
   amount: number;
   paymentDate?: Date | null;
   notes?: string | null;
+  paymentMethod?: RecordDutyPaymentRequestPaymentMethod;
+  bankId?: number | null;
+  reference?: string | null;
 }

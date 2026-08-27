@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, customsChargesTable, auditLogTable } from "@workspace/db";
+import { db, containersTable, customsChargesTable, auditLogTable, banksTable, dutyPaymentTransactionsTable } from "@workspace/db";
 import { eq, and, gte, lte, ilike, or, desc, sql, type SQL } from "drizzle-orm";
 import { requireAuth, AuthRequest, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 
@@ -177,11 +177,24 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
     return res.status(400).json({ error: "Invalid containerId" });
   }
 
-  const { amount, paymentDate, notes } = req.body ?? {};
+  const { amount, paymentDate, notes, paymentMethod: paymentMethodRaw, bankId: bankIdRaw, reference: referenceRaw } = req.body ?? {};
   const amt = typeof amount === "number" ? amount : parseFloat(amount);
   if (!Number.isFinite(amt) || amt <= 0) {
     return res.status(400).json({ error: "Amount must be greater than zero" });
   }
+
+  const paymentMethod = String(paymentMethodRaw ?? "cash").trim().toLowerCase();
+  if (paymentMethod !== "cash" && paymentMethod !== "bank") {
+    return res.status(400).json({ error: "paymentMethod must be cash or bank" });
+  }
+  const bankId = paymentMethod === "bank" ? Number(bankIdRaw) : null;
+  if (paymentMethod === "bank" && (bankId === null || !Number.isInteger(bankId) || bankId <= 0)) {
+    return res.status(400).json({ error: "An active bank account is required for bank payments" });
+  }
+  const notesClean = notes == null ? null : String(notes).trim();
+  const referenceClean = referenceRaw == null ? null : String(referenceRaw).trim();
+  if (notesClean && notesClean.length > 2_000) return res.status(400).json({ error: "Notes must be 2,000 characters or fewer" });
+  if (referenceClean && referenceClean.length > 200) return res.status(400).json({ error: "Reference must be 200 characters or fewer" });
 
   // paymentDate is optional, but if provided must be a parseable date string.
   let paymentDateClean: string | null = null;
@@ -207,6 +220,15 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
         branchId:        containersTable.branchId,
       }).from(containersTable).where(eq(containersTable.id, containerId));
       if (!container || !userCanAccessBranch(req, container.branchId)) return { error: { code: 404, message: "Container not found" } } as const;
+
+      if (bankId) {
+        const [bank] = await tx.select({ id: banksTable.id, branchId: banksTable.branchId, isActive: banksTable.isActive })
+          .from(banksTable)
+          .where(eq(banksTable.id, bankId));
+        if (!bank || !bank.isActive || bank.branchId !== container.branchId || !userCanAccessBranch(req, bank.branchId)) {
+          return { error: { code: 400, message: "Selected bank account is unavailable for this container branch" } } as const;
+        }
+      }
 
       // Lock or insert the customs row to prevent concurrent duplicate writes.
       type CustomsRow = { duty: string | null; dutyPaid: string | null; duty_paid?: string | null };
@@ -253,9 +275,25 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
         .where(eq(customsChargesTable.containerId, containerId))
         .returning();
 
+      const paidAt = paymentDateClean ? new Date(`${paymentDateClean}T12:00:00.000Z`) : new Date();
+      const [transaction] = await tx.insert(dutyPaymentTransactionsTable).values({
+        branchId: container.branchId,
+        containerId,
+        amount: String(amt),
+        paymentMethod,
+        bankId,
+        reference: referenceClean || null,
+        notes: notesClean || null,
+        paidAt,
+        recordedBy: req.user!.id,
+      }).returning();
+
       const reasonParts: string[] = [];
       if (paymentDateClean) reasonParts.push(`date=${paymentDateClean}`);
-      if (notes && String(notes).trim()) reasonParts.push(String(notes).trim());
+      reasonParts.push(`method=${paymentMethod}`);
+      if (bankId) reasonParts.push(`bankId=${bankId}`);
+      if (referenceClean) reasonParts.push(`reference=${referenceClean}`);
+      if (notesClean) reasonParts.push(notesClean);
 
       await tx.insert(auditLogTable).values({
         containerId,
@@ -276,6 +314,14 @@ dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req:
           dutyNotPaid: newOutstanding,
           dutyStatus: deriveDutyStatus(duty, newPaid, newOutstanding),
           updatedAt: updated.updatedAt instanceof Date ? updated.updatedAt.toISOString() : null,
+          transaction: {
+            id: transaction.id,
+            amount: toNum(transaction.amount),
+            paymentMethod: transaction.paymentMethod,
+            bankId: transaction.bankId,
+            reference: transaction.reference,
+            paidAt: transaction.paidAt instanceof Date ? transaction.paidAt.toISOString() : transaction.paidAt,
+          },
         },
       } as const;
     });

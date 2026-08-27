@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable } from "@workspace/db";
+import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable, dutyPaymentTransactionsTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
@@ -15,7 +15,7 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
     const filtered = activeOnly ? scoped.filter(b => b.isActive) : scoped;
 
     // Compute current balance for each bank from all transaction sources
-    const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows, fundAddRows, containerExpRows] = await Promise.all([
+    const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows, fundAddRows, containerExpRows, dutyPaymentRows] = await Promise.all([
       db.select({ bankId: invoicePaymentsTable.bankId, total: sum(invoicePaymentsTable.amount) })
         .from(invoicePaymentsTable).where(isNotNull(invoicePaymentsTable.bankId)).groupBy(invoicePaymentsTable.bankId),
       db.select({ bankId: clientDepositsTable.bankId, total: sum(clientDepositsTable.amount) })
@@ -30,6 +30,8 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
         .from(bankFundAdditionsTable).groupBy(bankFundAdditionsTable.bankId),
       db.select({ bankId: containerExpensePaymentsTable.bankId, total: sum(containerExpensePaymentsTable.amount) })
         .from(containerExpensePaymentsTable).where(isNotNull(containerExpensePaymentsTable.bankId)).groupBy(containerExpensePaymentsTable.bankId),
+      db.select({ bankId: dutyPaymentTransactionsTable.bankId, total: sum(dutyPaymentTransactionsTable.amount) })
+        .from(dutyPaymentTransactionsTable).where(isNotNull(dutyPaymentTransactionsTable.bankId)).groupBy(dutyPaymentTransactionsTable.bankId),
     ]);
 
     const toMap = (arr: { bankId: number | null; total: string | null }[]) =>
@@ -42,6 +44,7 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
     const expMap       = toMap(expensesRows);
     const fadMap       = toMap(fundAddRows);
     const cExpMap      = toMap(containerExpRows);
+    const dutyMap      = toMap(dutyPaymentRows);
 
     const result = filtered.map(b => ({
       ...b,
@@ -52,7 +55,8 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
         (fadMap[b.id] ?? 0) -
         (toutMap[b.id] ?? 0) -
         (expMap[b.id] ?? 0) -
-        (cExpMap[b.id] ?? 0),
+        (cExpMap[b.id] ?? 0) -
+        (dutyMap[b.id] ?? 0),
     }));
 
     return res.json(result);
@@ -199,7 +203,7 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
     type RawTx = {
       id: string;
       date: Date;
-      type: "payment" | "deposit" | "transfer_in" | "transfer_out" | "fund_addition" | "expense_payment" | "container_expense_payment";
+      type: "payment" | "deposit" | "transfer_in" | "transfer_out" | "fund_addition" | "expense_payment" | "container_expense_payment" | "duty_payment";
       description: string;
       reference: string | null;
       clientName: string | null;
@@ -463,6 +467,40 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
           clientName: null,
           invoiceNumber: null,
           debit: parseFloat(ep.amount),
+          credit: 0,
+        });
+      }
+    }
+
+    // 8. Customs duty payments debited from this bank
+    if (!typeFilter || typeFilter === "duty_payment") {
+      const dutyConditions: SQL<unknown>[] = [eq(dutyPaymentTransactionsTable.bankId, id)];
+      if (fromDate) dutyConditions.push(gte(dutyPaymentTransactionsTable.paidAt, fromDate));
+      if (toDate) dutyConditions.push(lte(dutyPaymentTransactionsTable.paidAt, toDate));
+
+      const dutyRows = await db
+        .select({
+          id: dutyPaymentTransactionsTable.id,
+          amount: dutyPaymentTransactionsTable.amount,
+          paidAt: dutyPaymentTransactionsTable.paidAt,
+          reference: dutyPaymentTransactionsTable.reference,
+          notes: dutyPaymentTransactionsTable.notes,
+          containerNumber: containersTable.containerNumber,
+        })
+        .from(dutyPaymentTransactionsTable)
+        .leftJoin(containersTable, eq(dutyPaymentTransactionsTable.containerId, containersTable.id))
+        .where(and(...dutyConditions));
+
+      for (const duty of dutyRows) {
+        txs.push({
+          id: `duty_payment_${duty.id}`,
+          date: duty.paidAt,
+          type: "duty_payment",
+          description: `Customs duty - ${duty.containerNumber ?? "Container"}${duty.notes ? ` (${duty.notes})` : ""}`,
+          reference: duty.reference ?? null,
+          clientName: null,
+          invoiceNumber: null,
+          debit: parseFloat(duty.amount),
           credit: 0,
         });
       }

@@ -27,6 +27,7 @@ export * from "./expense-categories";
 export * from "./expense-payments";
 export * from "./container-expense-categories";
 export * from "./container-expense-payments";
+export * from "./duty-payment-transactions";
 export * from "./container-stage-notes";
 export * from "./intelligence-alert-log";
 export * from "./payment-schedules";
