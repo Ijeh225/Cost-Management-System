@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useGetContainerReport, useListClients, useDeliveryAnalyticsReport, useListBanks, useGetFxHistory, useGetInvoiceAging, customFetch, type DeliveryAnalyticsResponse, type FxHistoryEntry, type AgingRow } from "@workspace/api-client-react";
 import { useBranchScope } from "@/components/layout/branch-provider";
 import { useLocation } from "wouter";
@@ -16,7 +16,7 @@ import {
   TrendingDown, TrendingUp, DollarSign, CheckCircle2,
   Users, BarChart3, PieChart, CalendarRange, FileSpreadsheet, Printer,
   FileText, Receipt, Clock, ExternalLink, Truck, Scale, ArrowRight,
-  Globe,
+  Globe, ClipboardCheck, Landmark, Workflow,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
@@ -1183,6 +1183,79 @@ function PrintableReportsSection() {
   );
 }
 
+type DutyLedgerReport = {
+  summary: { transactionCount: number; totalPaid: number; bankPaid: number; cashPaid: number };
+  transactions: Array<{ id: number; amount: number; paymentMethod: string; paidAt: string | null; reference: string | null; notes: string | null; containerId: number | null; containerNumber: string | null; customerName: string | null; bankName: string | null; recordedByName: string | null; sourceLink: string | null }>;
+  evidenceNote: string;
+};
+type WorkflowLedgerReport = { stages: Array<{ id: string; label: string; total: number; active: number; released: number; overdue: number; rows: Array<{ id: number; containerNumber: string; customerName: string; expectedDate: string | null; actualDate: string | null; state: string; sourceLink: string }> }>; evidenceNote: string };
+type ReconciliationReport = { summary: { matched: number; historicalUnledgered: number; attention: number }; rows: Array<{ id: number; containerNumber: string; customerName: string; snapshotPaid: number; ledgerPaid: number; historicalUnledgeredAmount: number; state: string; sourceLink: string }>; evidenceNote: string };
+
+function isoDate(value: string | null) {
+  return value ? new Date(value).toLocaleDateString("en-NG") : "Not recorded";
+}
+
+function ReportCentreSection({ from, to }: { from: string; to: string }) {
+  const [, setLocation] = useLocation();
+  const [tab, setTab] = useState("duty-ledger");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [duty, setDuty] = useState<DutyLedgerReport | null>(null);
+  const [workflow, setWorkflow] = useState<WorkflowLedgerReport | null>(null);
+  const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const query = buildQueryString({ from, to });
+    setLoading(true); setError("");
+    Promise.all([
+      customFetch<DutyLedgerReport>(`/api/reports/duty-payment-ledger${query ? `?${query}` : ""}`),
+      customFetch<WorkflowLedgerReport>("/api/reports/workflow-stage-ledger"),
+      customFetch<ReconciliationReport>("/api/reports/reconciliation"),
+    ]).then(([d, w, r]) => {
+      if (!cancelled) { setDuty(d); setWorkflow(w); setReconciliation(r); }
+    }).catch(() => { if (!cancelled) setError("The Report Centre could not load its evidence. Please retry."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [from, to]);
+
+  const exportDutyCsv = () => {
+    if (!duty?.transactions.length) return;
+    const esc = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const lines = [["Payment date", "Container", "Customer", "Amount", "Method", "Bank / cash source", "Reference", "Notes", "Recorded by"], ...duty.transactions.map(row => [
+      isoDate(row.paidAt), row.containerNumber, row.customerName, row.amount.toFixed(2), row.paymentMethod, row.bankName ?? "Cash", row.reference, row.notes, row.recordedByName,
+    ])].map(row => row.map(esc).join(","));
+    const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a"); link.href = url; link.download = `duty-payment-ledger-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url);
+  };
+
+  return <section className="border-t border-border/40 pt-6 space-y-4">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 className="text-base font-semibold flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-primary" /> Report Centre</h2>
+        <p className="text-xs text-muted-foreground mt-1">Source-linked actual payment, stage-progress, and reconciliation evidence.</p>
+      </div>
+      <Badge variant="outline" className="font-normal text-[10px]">Actual records only. Planned dates are not payments.</Badge>
+    </div>
+    {loading ? <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div> : error ? <Card><CardContent className="py-8 text-sm text-destructive">{error}</CardContent></Card> : <Tabs value={tab} onValueChange={setTab}>
+      <TabsList className="bg-card/40 border border-border/50 h-auto flex-wrap justify-start">
+        <TabsTrigger value="duty-ledger" className="gap-1.5 text-xs"><Landmark className="w-3.5 h-3.5" /> Duty Payment Ledger</TabsTrigger>
+        <TabsTrigger value="workflow-ledger" className="gap-1.5 text-xs"><Workflow className="w-3.5 h-3.5" /> Department Workflow</TabsTrigger>
+        <TabsTrigger value="reconciliation" className="gap-1.5 text-xs"><Scale className="w-3.5 h-3.5" /> Duty Reconciliation</TabsTrigger>
+      </TabsList>
+      <TabsContent value="duty-ledger" className="mt-4">
+        <Card className="border-border/40 bg-card/40"><CardHeader className="pb-3 border-b border-border/40 flex-row items-start justify-between space-y-0 gap-3"><div><CardTitle className="text-sm">Duty Payment Ledger</CardTitle><p className="text-xs text-muted-foreground mt-1">Every new duty payment has a date, amount, source, recorder, and container link.</p></div><Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={exportDutyCsv} disabled={!duty?.transactions.length}><FileDown className="w-3.5 h-3.5" /> Export CSV</Button></CardHeader><CardContent className="p-0">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/30">{[["Transactions", duty?.summary.transactionCount ?? 0], ["Actual paid", formatCurrency(duty?.summary.totalPaid ?? 0)], ["Bank paid", formatCurrency(duty?.summary.bankPaid ?? 0)], ["Cash paid", formatCurrency(duty?.summary.cashPaid ?? 0)]].map(([label, value]) => <div key={String(label)} className="bg-card px-4 py-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="font-mono font-semibold text-sm mt-1">{value}</p></div>)}</div>
+          {!duty?.transactions.length ? <div className="py-10 text-center text-sm text-muted-foreground">No dated duty-payment ledger entries match this period.</div> : <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-sm"><thead className="bg-muted/30 text-xs text-muted-foreground"><tr><th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">Container</th><th className="px-4 py-3 text-right">Amount</th><th className="px-4 py-3 text-left">Source</th><th className="px-4 py-3 text-left">Reference</th><th className="px-4 py-3 text-left">Recorded by</th></tr></thead><tbody className="divide-y divide-border/40">{duty.transactions.map(row => <tr key={row.id}><td className="px-4 py-3 text-xs">{isoDate(row.paidAt)}</td><td className="px-4 py-3"><button className="text-primary font-mono hover:underline" onClick={() => row.sourceLink && setLocation(row.sourceLink)}>{row.containerNumber ?? "Unknown container"}</button><div className="text-xs text-muted-foreground">{row.customerName}</div></td><td className="px-4 py-3 text-right font-mono font-semibold">{formatCurrency(row.amount)}</td><td className="px-4 py-3 text-xs">{row.paymentMethod === "bank" ? row.bankName ?? "Bank" : "Cash"}</td><td className="px-4 py-3 text-xs text-muted-foreground">{row.reference || row.notes || "—"}</td><td className="px-4 py-3 text-xs">{row.recordedByName || "—"}</td></tr>)}</tbody></table></div>}
+          <p className="px-4 py-3 text-[11px] text-muted-foreground border-t border-border/40">{duty?.evidenceNote}</p>
+        </CardContent></Card>
+      </TabsContent>
+      <TabsContent value="workflow-ledger" className="mt-4"><Card className="border-border/40 bg-card/40"><CardHeader className="pb-3"><CardTitle className="text-sm">Department Workflow Evidence</CardTitle><p className="text-xs text-muted-foreground mt-1">Expected dates leave a job active. Actual release dates complete only that department.</p></CardHeader><CardContent className="space-y-4">{workflow?.stages.map(stage => <div key={stage.id} className="rounded-lg border border-border/50 overflow-hidden"><div className="p-3 bg-muted/20 flex flex-wrap justify-between gap-3"><div><p className="font-medium text-sm">{stage.label}</p><p className="text-xs text-muted-foreground mt-0.5">{stage.active} active · {stage.released} released · {stage.overdue} overdue</p></div><Badge variant={stage.overdue ? "destructive" : "secondary"}>{stage.total} tracked</Badge></div>{stage.rows.length ? <div className="divide-y divide-border/40">{stage.rows.slice(0, 8).map(row => <button key={row.id} onClick={() => setLocation(row.sourceLink)} className="w-full text-left px-3 py-2.5 hover:bg-muted/20 flex justify-between gap-3"><span><span className="font-mono text-primary text-sm">{row.containerNumber}</span><span className="text-xs text-muted-foreground ml-2">{row.customerName}</span></span><span className="text-xs text-muted-foreground">{row.state === "released" ? `Released ${isoDate(row.actualDate)}` : `Expected ${isoDate(row.expectedDate)}`}</span></button>)}</div> : <p className="p-3 text-xs text-muted-foreground">No expected or actual dates recorded yet.</p>}</div>)}</CardContent></Card></TabsContent>
+      <TabsContent value="reconciliation" className="mt-4"><Card className="border-border/40 bg-card/40"><CardHeader className="pb-3 border-b border-border/40"><CardTitle className="text-sm">Duty Snapshot Reconciliation</CardTitle><p className="text-xs text-muted-foreground mt-1">Separates genuine data issues from older duty balances that have no individual payment record.</p></CardHeader><CardContent className="p-0"><div className="grid grid-cols-3 gap-px bg-border/30">{[["Matched", reconciliation?.summary.matched ?? 0], ["Historical / unledgered", reconciliation?.summary.historicalUnledgered ?? 0], ["Needs attention", reconciliation?.summary.attention ?? 0]].map(([label, value]) => <div key={String(label)} className="bg-card px-4 py-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="font-mono font-semibold text-sm mt-1">{value}</p></div>)}</div>{!reconciliation?.rows.length ? <div className="py-10 text-center text-sm text-muted-foreground">No duty snapshot or ledger balances require reporting.</div> : <div className="divide-y divide-border/40">{reconciliation.rows.map(row => <button key={row.id} onClick={() => setLocation(row.sourceLink)} className="w-full text-left p-4 hover:bg-muted/20 flex flex-wrap justify-between gap-3"><span><span className="font-mono text-primary">{row.containerNumber}</span><span className="text-xs text-muted-foreground ml-2">{row.customerName}</span></span><span className="text-xs">Snapshot {formatCurrency(row.snapshotPaid)} · Ledger {formatCurrency(row.ledgerPaid)} · <span className={row.state === "attention" ? "text-destructive font-medium" : row.state === "historical_unledgered" ? "text-amber-500" : "text-emerald-500"}>{row.state === "historical_unledgered" ? `Historical ${formatCurrency(row.historicalUnledgeredAmount)}` : row.state === "attention" ? "Review required" : "Matched"}</span></span></button>)}</div>}<p className="px-4 py-3 text-[11px] text-muted-foreground border-t border-border/40">{reconciliation?.evidenceNote}</p></CardContent></Card></TabsContent>
+    </Tabs>}
+  </section>;
+}
+
 export default function ReportsPage() {
   const { toast } = useToast();
   const [status, setStatus] = useState("");
@@ -1520,6 +1593,7 @@ export default function ReportsPage() {
             </Tabs>
           </div>
         )}
+        <ReportCentreSection from={applied.from} to={applied.to} />
         {/* Delivery Tracking Report */}
         <div className="border-t border-border/40 pt-6">
           <DeliveryReportSection />

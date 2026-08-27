@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, dutyPaymentTransactionsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
-import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, type SQL } from "drizzle-orm";
+import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, desc, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, requireSuperAdmin, getBranchScope, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
@@ -23,6 +23,149 @@ async function loadBranchNameMap(): Promise<Map<number, string>> {
   const rows = await db.select({ id: branchesTable.id, name: branchesTable.name }).from(branchesTable);
   return new Map(rows.map(r => [r.id, r.name]));
 }
+
+function reportDateRange(query: Record<string, string>) {
+  const from = query.from ? new Date(query.from) : null;
+  const to = query.to ? new Date(`${query.to}T23:59:59.999`) : null;
+  if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime())) || (from && to && from > to)) {
+    return { error: "Use a valid date range where From is on or before To." } as const;
+  }
+  return { from, to } as const;
+}
+
+// Report Centre: immutable actual duty-payment history. This deliberately does
+// not use the customs-charge snapshot as a payment date/source would be guessed.
+reportsRouter.get("/reports/duty-payment-ledger", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const range = reportDateRange(req.query as Record<string, string>);
+    if ("error" in range) return res.status(400).json(range);
+    const branchScope = await resolveBranchScopeInfo(req);
+    const conditions: SQL[] = [];
+    if (range.from) conditions.push(gte(dutyPaymentTransactionsTable.paidAt, range.from));
+    if (range.to) conditions.push(lte(dutyPaymentTransactionsTable.paidAt, range.to));
+    if (branchScope.id !== null) conditions.push(eq(dutyPaymentTransactionsTable.branchId, branchScope.id));
+
+    const rows = await db.select({
+      id: dutyPaymentTransactionsTable.id,
+      amount: dutyPaymentTransactionsTable.amount,
+      paymentMethod: dutyPaymentTransactionsTable.paymentMethod,
+      paidAt: dutyPaymentTransactionsTable.paidAt,
+      reference: dutyPaymentTransactionsTable.reference,
+      notes: dutyPaymentTransactionsTable.notes,
+      containerId: containersTable.id,
+      containerNumber: containersTable.containerNumber,
+      customerName: containersTable.customerName,
+      branchId: dutyPaymentTransactionsTable.branchId,
+      bankName: banksTable.name,
+      recordedByName: usersTable.name,
+    })
+      .from(dutyPaymentTransactionsTable)
+      .leftJoin(containersTable, eq(dutyPaymentTransactionsTable.containerId, containersTable.id))
+      .leftJoin(banksTable, eq(dutyPaymentTransactionsTable.bankId, banksTable.id))
+      .leftJoin(usersTable, eq(dutyPaymentTransactionsTable.recordedBy, usersTable.id))
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(dutyPaymentTransactionsTable.paidAt), desc(dutyPaymentTransactionsTable.id));
+
+    const totalPaid = rows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+    const bankPaid = rows.filter(row => row.paymentMethod === "bank").reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+    const cashPaid = totalPaid - bankPaid;
+    return res.json({
+      branchScope,
+      period: { from: range.from?.toISOString() ?? null, to: range.to?.toISOString() ?? null },
+      summary: { transactionCount: rows.length, totalPaid, bankPaid, cashPaid },
+      transactions: rows.map(row => ({
+        ...row,
+        amount: Number(row.amount ?? 0),
+        paidAt: row.paidAt?.toISOString() ?? null,
+        sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : null,
+      })),
+      evidenceNote: "Only dated duty-payment ledger entries are included. Older snapshot balances without a ledger entry remain visible in reconciliation as historical/unledgered amounts.",
+    });
+  } catch (err) {
+    console.error("Duty payment ledger report failed", err);
+    return res.status(500).json({ error: "Unable to build duty payment ledger." });
+  }
+});
+
+// Operational evidence by independent department. A planned date keeps a job
+// active; only its actual release date makes that department released.
+reportsRouter.get("/reports/workflow-stage-ledger", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const branchScope = await resolveBranchScopeInfo(req);
+    const conditions: SQL[] = [];
+    if (branchScope.id !== null) conditions.push(eq(containersTable.branchId, branchScope.id));
+    const rows = await db.select({
+      id: containersTable.id, containerNumber: containersTable.containerNumber, customerName: containersTable.customerName,
+      branchId: containersTable.branchId, status: containersTable.status,
+      expectedTransireDate: containersTable.expectedTransireDate, transireReleasedAt: containersTable.transireReleasedAt,
+      expectedDoDate: containersTable.expectedDoDate, doReleasedAt: containersTable.doReleasedAt,
+      expectedTdoDate: containersTable.expectedTdoDate, tdoReleasedAt: containersTable.tdoReleasedAt,
+      expectedPulloutDate: containersTable.expectedPulloutDate, pulloutReleasedAt: containersTable.pulloutReleasedAt,
+    }).from(containersTable).where(conditions.length ? and(...conditions) : undefined);
+    const now = new Date();
+    const definitions = [
+      { id: "transire", label: "Transire", expected: "expectedTransireDate", actual: "transireReleasedAt" },
+      { id: "shipping", label: "Shipping / DO", expected: "expectedDoDate", actual: "doReleasedAt" },
+      { id: "terminal", label: "Terminal / TDO", expected: "expectedTdoDate", actual: "tdoReleasedAt" },
+      { id: "pullout", label: "Pullout", expected: "expectedPulloutDate", actual: "pulloutReleasedAt" },
+    ] as const;
+    const stages = definitions.map(stage => {
+      const items = rows.map(row => ({ ...row, expected: row[stage.expected], actual: row[stage.actual] }));
+      const active = items.filter(item => !item.actual);
+      return {
+        id: stage.id, label: stage.label, total: items.length,
+        active: active.length, released: items.length - active.length,
+        overdue: active.filter(item => item.expected && item.expected < now).length,
+        rows: items.filter(item => item.expected || item.actual).map(item => ({
+          id: item.id, containerNumber: item.containerNumber, customerName: item.customerName, status: item.status,
+          expectedDate: item.expected?.toISOString() ?? null, actualDate: item.actual?.toISOString() ?? null,
+          state: item.actual ? "released" : "active", sourceLink: `/containers/${item.id}`,
+        })),
+      };
+    });
+    return res.json({ branchScope, generatedAt: now.toISOString(), stages, evidenceNote: "Each department is measured independently. Saving an expected date does not release its stage." });
+  } catch (err) {
+    console.error("Workflow stage ledger report failed", err);
+    return res.status(500).json({ error: "Unable to build workflow stage report." });
+  }
+});
+
+// Reconciliation compares the running Customs-duty snapshot with immutable
+// ledger entries. A positive historical amount is labelled, not guessed.
+reportsRouter.get("/reports/reconciliation", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const branchScope = await resolveBranchScopeInfo(req);
+    const containerConditions: SQL[] = [];
+    if (branchScope.id !== null) containerConditions.push(eq(containersTable.branchId, branchScope.id));
+    const containers = await db.select({ id: containersTable.id, containerNumber: containersTable.containerNumber, customerName: containersTable.customerName, branchId: containersTable.branchId })
+      .from(containersTable).where(containerConditions.length ? and(...containerConditions) : undefined);
+    const ids = containers.map(row => row.id);
+    if (!ids.length) return res.json({ branchScope, summary: { matched: 0, historicalUnledgered: 0, attention: 0 }, rows: [], evidenceNote: "No containers in the selected branch scope." });
+    const [snapshots, ledger] = await Promise.all([
+      db.select({ containerId: customsChargesTable.containerId, dutyPaid: customsChargesTable.dutyPaid }).from(customsChargesTable).where(inArray(customsChargesTable.containerId, ids)),
+      db.select({ containerId: dutyPaymentTransactionsTable.containerId, amount: dutyPaymentTransactionsTable.amount }).from(dutyPaymentTransactionsTable).where(inArray(dutyPaymentTransactionsTable.containerId, ids)),
+    ]);
+    const snapshotMap = new Map(snapshots.map(row => [row.containerId, Number(row.dutyPaid ?? 0)]));
+    const ledgerMap = new Map<number, number>();
+    ledger.forEach(row => ledgerMap.set(row.containerId, (ledgerMap.get(row.containerId) ?? 0) + Number(row.amount ?? 0)));
+    const rows = containers.map(container => {
+      const snapshotPaid = snapshotMap.get(container.id) ?? 0;
+      const ledgerPaid = ledgerMap.get(container.id) ?? 0;
+      const difference = Number((snapshotPaid - ledgerPaid).toFixed(2));
+      const state = difference < 0 ? "attention" : difference > 0 ? "historical_unledgered" : "matched";
+      return { ...container, snapshotPaid, ledgerPaid, historicalUnledgeredAmount: Math.max(0, difference), difference, state, sourceLink: `/containers/${container.id}?section=payment-history` };
+    }).filter(row => row.snapshotPaid !== 0 || row.ledgerPaid !== 0);
+    return res.json({
+      branchScope,
+      summary: { matched: rows.filter(row => row.state === "matched").length, historicalUnledgered: rows.filter(row => row.state === "historical_unledgered").length, attention: rows.filter(row => row.state === "attention").length },
+      rows,
+      evidenceNote: "Historical/unledgered means a pre-ledger running balance exists without dated source transactions. It is not automatically an error. Attention means ledger entries exceed the running snapshot and should be reviewed.",
+    });
+  } catch (err) {
+    console.error("Reconciliation report failed", err);
+    return res.status(500).json({ error: "Unable to build reconciliation report." });
+  }
+});
 
 reportsRouter.get("/reports/containers", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {

@@ -39,3 +39,13 @@ The Report Centre must distinguish a job's operational progress from financial f
 1. Establish report definitions and permanent duty-payment ledger.
 2. Add report screens and exports for duty, workflow stages, job costing, AR, overhead/schedules, and bank/cashflow.
 3. Add reconciliation checks, saved report filters, scheduled delivery, and audit evidence.
+
+## Initial Report Centre Delivery
+
+The first Report Centre delivery provides three source-linked reports inside the existing Reports page:
+
+- **Duty Payment Ledger**: exports each dated duty payment recorded after the ledger was introduced. It includes the payment source, bank/cash classification, reference, notes, recorder, and linked container.
+- **Department Workflow Evidence**: reports Transire, Shipping/DO, Terminal/TDO, and Pullout independently. Expected dates remain planned work; actual release dates determine a released stage.
+- **Duty Snapshot Reconciliation**: compares the current Customs-duty running balance to immutable ledger totals. A positive historical difference is labelled `Historical / unledgered`; it is not invented as a payment or automatically treated as an error. A ledger total above the current running balance is `Needs attention`.
+
+Existing cashflow, P&L, accounts-receivable, client statement, delivery, branch-comparison, and disbursement-reconciliation reports remain available through their existing report cards. Saved report presets and scheduled email delivery are intentionally deferred until their recipient, retention, and approval rules are agreed.
