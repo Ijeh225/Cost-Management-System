@@ -4,6 +4,8 @@ import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, desc, type SQL 
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, requireSuperAdmin, getBranchScope, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
+import { deliverReportSubscription } from "../lib/report-delivery.js";
+import { normalizeReportRecipients, SCHEDULED_REPORT_FREQUENCIES, SCHEDULED_REPORT_KINDS } from "../lib/report-delivery-rules.js";
 
 export const reportsRouter = Router();
 
@@ -167,14 +169,6 @@ reportsRouter.get("/reports/reconciliation", requireAuth, requireBranchMemberOrA
   }
 });
 
-const SCHEDULED_REPORT_KINDS = new Set(["duty_payment_ledger", "workflow_stage_summary"]);
-const SCHEDULED_REPORT_FREQUENCIES = new Set(["daily", "weekly"]);
-const emailAddress = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function parseRecipients(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
-  const recipients = [...new Set(value.map(item => String(item).trim().toLowerCase()).filter(Boolean))];
-  return recipients.length > 0 && recipients.length <= 20 && recipients.every(item => emailAddress.test(item)) ? recipients : null;
-}
 function subscriptionResponse(row: typeof reportSubscriptionsTable.$inferSelect) {
   let recipients: string[] = [];
   let filters: Record<string, unknown> = {};
@@ -215,7 +209,7 @@ reportsRouter.post("/reports/subscriptions", requireAuth, requireBranchAdminOrAb
   try {
     const { reportKind, frequency, recipients, filters = {} } = req.body ?? {};
     if (!SCHEDULED_REPORT_KINDS.has(reportKind) || !SCHEDULED_REPORT_FREQUENCIES.has(frequency)) return res.status(400).json({ error: "Choose a supported report and frequency." });
-    const safeRecipients = parseRecipients(recipients);
+    const safeRecipients = normalizeReportRecipients(recipients);
     if (!safeRecipients) return res.status(400).json({ error: "Provide 1 to 20 valid recipient email addresses." });
     if (!filters || typeof filters !== "object" || Array.isArray(filters)) return res.status(400).json({ error: "Invalid report filters." });
     const branchId = getBranchScope(req);
@@ -237,12 +231,27 @@ reportsRouter.patch("/reports/subscriptions/:id", requireAuth, requireBranchAdmi
     const update: Partial<typeof reportSubscriptionsTable.$inferInsert> = { updatedAt: new Date() };
     if (typeof req.body?.isActive === "boolean") update.isActive = req.body.isActive;
     if (req.body?.frequency !== undefined) { if (!SCHEDULED_REPORT_FREQUENCIES.has(req.body.frequency)) return res.status(400).json({ error: "Unsupported frequency." }); update.frequency = req.body.frequency; }
-    if (req.body?.recipients !== undefined) { const parsed = parseRecipients(req.body.recipients); if (!parsed) return res.status(400).json({ error: "Provide valid recipient email addresses." }); update.recipients = JSON.stringify(parsed); }
+    if (req.body?.recipients !== undefined) { const parsed = normalizeReportRecipients(req.body.recipients); if (!parsed) return res.status(400).json({ error: "Provide valid recipient email addresses." }); update.recipients = JSON.stringify(parsed); }
     const [row] = await db.update(reportSubscriptionsTable).set(update).where(eq(reportSubscriptionsTable.id, id)).returning();
     return res.json({ subscription: subscriptionResponse(row) });
   } catch (err) {
     console.error("Report subscription update failed", err);
     return res.status(500).json({ error: "Unable to update report subscription." });
+  }
+});
+
+reportsRouter.post("/reports/subscriptions/:id/send-test", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid subscription id." });
+    const [subscription] = await db.select().from(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.id, id));
+    const scope = getBranchScope(req);
+    if (!subscription || (scope !== null && subscription.branchId !== scope)) return res.status(404).json({ error: "Report subscription not found." });
+    const result = await deliverReportSubscription(subscription, new Date(), { test: true });
+    return result.status === "sent" ? res.json(result) : res.status(502).json(result);
+  } catch (err) {
+    console.error("Report test delivery failed", err);
+    return res.status(500).json({ error: "Unable to send the report test." });
   }
 });
 

@@ -1,11 +1,6 @@
 import { and, eq, gte, lte } from "drizzle-orm";
 import { containersTable, db, dutyPaymentTransactionsTable, reportDeliveryLogsTable, reportSubscriptionsTable } from "@workspace/db";
-
-function due(subscription: { frequency: string; lastSentAt: Date | null }, now: Date) {
-  if (!subscription.lastSentAt) return true;
-  const elapsed = now.getTime() - subscription.lastSentAt.getTime();
-  return subscription.frequency === "weekly" ? elapsed >= 7 * 24 * 60 * 60 * 1000 : elapsed >= 24 * 60 * 60 * 1000;
-}
+import { isReportDeliveryDue } from "./report-delivery-rules.js";
 
 function recipients(value: string): string[] {
   try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : []; } catch { return []; }
@@ -36,26 +31,41 @@ async function prepareReport(kind: string, branchId: number | null, now: Date) {
 }
 
 /** Runs on the existing minute scheduler. No report is marked sent unless Resend accepts it. */
-export async function runScheduledReportDelivery(): Promise<void> {
+export async function deliverReportSubscription(
+  subscription: typeof reportSubscriptionsTable.$inferSelect,
+  now = new Date(),
+  options: { test?: boolean } = {},
+): Promise<{ status: "sent" | "failed"; itemCount: number; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return;
-  const now = new Date();
-  const subscriptions = await db.select().from(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.isActive, true));
-  for (const subscription of subscriptions) {
-    if (!due(subscription, now)) continue;
-    const to = recipients(subscription.recipients);
-    if (!to.length) continue;
-    try {
-      const report = await prepareReport(subscription.reportKind, subscription.branchId, now);
-      const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: process.env.RESEND_DEFAULT_FROM || "Cost Management <onboarding@resend.dev>", to, subject: `[Cost Management] ${report.title}`, html: report.html }) });
-      if (!response.ok) throw new Error(`Resend rejected the report delivery (${response.status}).`);
-      await db.transaction(async (tx) => {
+  const to = recipients(subscription.recipients);
+  let itemCount = 0;
+  try {
+    if (!apiKey) throw new Error("RESEND_API_KEY is not configured.");
+    if (!to.length) throw new Error("No valid recipients are configured.");
+    const report = await prepareReport(subscription.reportKind, subscription.branchId, now);
+    itemCount = report.itemCount;
+    const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: process.env.RESEND_DEFAULT_FROM || "Cost Management <onboarding@resend.dev>", to, subject: `[Cost Management] ${report.title}`, html: report.html }) });
+    if (!response.ok) throw new Error(`Resend rejected the report delivery (${response.status}).`);
+    await db.transaction(async (tx) => {
+      if (!options.test) {
         await tx.update(reportSubscriptionsTable).set({ lastSentAt: now, updatedAt: now }).where(eq(reportSubscriptionsTable.id, subscription.id));
-        await tx.insert(reportDeliveryLogsTable).values({ subscriptionId: subscription.id, branchId: subscription.branchId, reportKind: subscription.reportKind, recipients: JSON.stringify(to), status: "sent", itemCount: report.itemCount, deliveredAt: now });
-      });
-    } catch (error) {
-      await db.insert(reportDeliveryLogsTable).values({ subscriptionId: subscription.id, branchId: subscription.branchId, reportKind: subscription.reportKind, recipients: JSON.stringify(to), status: "failed", itemCount: 0, error: error instanceof Error ? error.message.slice(0, 1000) : "Unknown delivery error", deliveredAt: now });
-      console.error("[scheduled-report] delivery failed", subscription.id, error);
-    }
+      }
+      await tx.insert(reportDeliveryLogsTable).values({ subscriptionId: subscription.id, branchId: subscription.branchId, reportKind: subscription.reportKind, recipients: JSON.stringify(to), status: options.test ? "test_sent" : "sent", itemCount, deliveredAt: now });
+    });
+    return { status: "sent", itemCount };
+  } catch (error) {
+    const message = error instanceof Error ? error.message.slice(0, 1000) : "Unknown delivery error";
+    await db.insert(reportDeliveryLogsTable).values({ subscriptionId: subscription.id, branchId: subscription.branchId, reportKind: subscription.reportKind, recipients: JSON.stringify(to), status: options.test ? "test_failed" : "failed", itemCount, error: message, deliveredAt: now });
+    console.error("[scheduled-report] delivery failed", subscription.id, error);
+    return { status: "failed", itemCount, error: message };
+  }
+}
+
+/** Runs on the existing minute scheduler. */
+export async function runScheduledReportDelivery(): Promise<void> {
+  const subscriptions = await db.select().from(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.isActive, true));
+  const now = new Date();
+  for (const subscription of subscriptions) {
+    if (isReportDeliveryDue(subscription.frequency, subscription.lastSentAt, now)) await deliverReportSubscription(subscription, now);
   }
 }

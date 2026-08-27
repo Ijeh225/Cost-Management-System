@@ -59,4 +59,6 @@ The first controlled delivery release supports **Duty Payment Ledger** and **Wor
 - Recipients are validated email addresses, limited to 20 per schedule.
 - Delivery runs through the existing server scheduler and Resend configuration. A schedule is marked sent only after Resend accepts the message.
 - Every attempt is stored in `report_delivery_logs` with recipients, report type, item count, delivery time, and an error message when it failed.
+- Administrators can use **Send test** to prove a subscription and recipient list work immediately. Test sends are separately labelled in the delivery history and do not change the next scheduled delivery time.
+- Administrators can open **History** to review the latest 50 sent, failed, and test delivery attempts before relying on a schedule.
 - Scheduled reports are read-only summaries. They never approve, pay, update, or otherwise change a job or financial record.
