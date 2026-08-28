@@ -34,9 +34,9 @@ function readablePipelineStages(req: AuthRequest): Set<string> | null {
   return new Set(profile.workspaces.flatMap((workspace) => MODERN_WORKSPACE_STAGES[workspace] ?? []));
 }
 
-function canPerformModernStageAction(req: AuthRequest, stage: string): boolean | null {
+function canPerformModernStageAction(req: AuthRequest, stage: string): boolean {
   const profile = req.user?.accessProfile;
-  if (!profile || profile.source !== "modern") return null;
+  if (!profile || profile.source !== "modern") return false;
   if (hasAuthority(profile, "admin")) return true;
 
   const workspaceForStage: Record<string, "transire" | "shipping" | "terminal" | "pullout" | "terminal_manager"> = {
@@ -148,26 +148,18 @@ async function requireAssignedBerthingOfficer(req: AuthRequest, container: { ber
   return { ok: true as const, officerIds: assignedOfficerIds };
 }
 
-function canUserEditSection(
-  user: { role: string; sectionPermission: string | null; sectionPermissions: string | null },
-  section: string
-): boolean {
-  if (user.role === "admin" || user.role === "super_admin") return true;
-  // Granular permissions: only explicit "edit" level grants write access ("view" and "no_access" do not)
-  if (user.sectionPermissions) {
-    try {
-      const perms = JSON.parse(user.sectionPermissions) as Record<string, string>;
-      if (Object.keys(perms).length > 0) {
-        return perms[section] === "edit";
-      }
-    } catch {}
-  }
-  // Legacy single-section permission: staff can only edit their assigned section
-  if (user.sectionPermission) {
-    return user.sectionPermission === section;
-  }
-  // No permission restrictions configured: allow (matches PUT /charges behavior for unrestricted staff)
-  return true;
+function canUserEditSection(user: AuthRequest["user"], section: string): boolean {
+  if (!user) return false;
+  const profile = user.accessProfile;
+  if (hasAuthority(profile, "admin")) return true;
+  const permitted: Record<string, boolean> = {
+    shipping: hasWorkspace(profile, "shipping"),
+    customs: hasWorkspace(profile, "documentation") || hasWorkspace(profile, "accounts"),
+    terminal: hasWorkspace(profile, "terminal"),
+    delivery: hasWorkspace(profile, "delivery"),
+    operations: profile.jobFunction === "operations" || hasWorkspace(profile, "terminal_manager"),
+  };
+  return permitted[section] === true;
 }
 
 function formatContainer(
@@ -1145,32 +1137,21 @@ const PIPELINE_STAGE_ORDER = [
   "closed",
 ];
 
-const DEPT_OWNED_STAGES: Record<string, string[]> = {
-  documentation_user: ["registered", "documentation", "duty_assessment"],
-  accounts_user: ["duty_payment"],
-  operations_user: ["transire_processing", "shipping", "terminal", "pull_out"],
-  transire_user: ["transire_processing"],
-  shipping_user: ["shipping"],
-  terminal_user: ["terminal"],
-  pull_out_user: ["pull_out"],
-  shipping_terminal_user: ["shipping", "terminal"],
-  terminal_manager: ["gate_in", "examination", "final_release"],
-  security_user: ["gate_in"],
-  delivery_user: ["delivery"],
-};
-
 // Roles permitted to perform status ADVANCEMENT (moving the container to the next stage).
 // transire_user and operations_user are data-entry only — they may NOT advance pipeline status.
-const STAGE_ADVANCE_ALLOWED: Record<string, string[]> = {
-  documentation_user: ["registered", "documentation", "duty_assessment"],
-  accounts_user: ["duty_payment"],
-  shipping_user: ["shipping"],
-  terminal_user: ["terminal"],
-  pull_out_user: ["pull_out"],
-  shipping_terminal_user: ["shipping", "terminal"],
-  terminal_manager: ["gate_in", "examination", "final_release"],
-  delivery_user: ["delivery"],
-};
+function canAdvanceFromStage(req: AuthRequest, stage: string): boolean {
+  const profile = req.user?.accessProfile;
+  if (!profile || profile.source !== "modern") return false;
+  if (hasAuthority(profile, "admin")) return true;
+  if (["registered", "documentation", "duty_assessment"].includes(stage)) return hasWorkspace(profile, "documentation");
+  if (stage === "duty_payment") return hasWorkspace(profile, "accounts");
+  if (stage === "shipping") return hasWorkspace(profile, "shipping");
+  if (stage === "terminal") return hasWorkspace(profile, "terminal");
+  if (stage === "pull_out") return hasWorkspace(profile, "pullout");
+  if (["gate_in", "examination", "final_release"].includes(stage)) return hasWorkspace(profile, "terminal_manager");
+  if (stage === "delivery") return hasWorkspace(profile, "delivery");
+  return false;
+}
 
 function finalWorkflowReadinessError(container: Parameters<typeof getFinalWorkflowMissingStages>[0]) {
   const missingStages = getFinalWorkflowMissingStages(container);
@@ -1184,8 +1165,7 @@ function finalWorkflowReadinessError(container: Parameters<typeof getFinalWorkfl
 router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id));
-    const userRole = req.user!.role;
-    const isAdmin = userRole === "admin" || userRole === "super_admin";
+    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
     const requestedStatus: string | undefined = req.body?.status;
 
     const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
@@ -1199,8 +1179,9 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
     }
 
     if (requestedStatus === "gate_in" && existing.pulloutReleasedAt) {
-      const userRoles: string[] = req.user!.roles ?? [userRole];
-      const canStartGateIn = isAdmin || userRoles.includes("terminal_manager") || userRoles.includes("security_user");
+      const canStartGateIn = isAdmin
+        || hasWorkspace(req.user!.accessProfile, "terminal_manager")
+        || hasWorkspace(req.user!.accessProfile, "security");
       if (!canStartGateIn) {
         return res.status(403).json({ error: "Only terminal managers, security users, or administrators can move a pull-out released job to Gate-In." });
       }
@@ -1259,10 +1240,7 @@ router.patch("/containers/:id/status", requireAuth, async (req: AuthRequest, res
       if (isNavigation) {
         return res.status(403).json({ error: "Stage navigation is restricted to administrators." });
       }
-      const userRoles: string[] = req.user!.roles ?? [userRole];
-      const advanceAllowed = [...new Set(userRoles.flatMap(r => STAGE_ADVANCE_ALLOWED[r] ?? []))];
-      // Forward advance: current stage must be in the user's advancement-allowed stages
-      if (!advanceAllowed.includes(existing.status)) {
+      if (!canAdvanceFromStage(req, existing.status)) {
         return res.status(403).json({ error: "You don't have permission to advance this container from its current stage" });
       }
     }
@@ -1509,25 +1487,8 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       return res.status(409).json({ error: "Pull-Out cannot be submitted until Terminal/TDO is submitted." });
     }
 
-    const modernStagePermission = canPerformModernStageAction(req, status);
-    const userRoles: string[] = req.user!.roles;
-    const isAdmin = modernStagePermission === true || (modernStagePermission === null && userRoles.some(r => r === "admin" || r === "super_admin"));
-    if (!isAdmin) {
-      if (modernStagePermission === false) {
-        return res.status(403).json({ error: "You do not have access to this operational workspace." });
-      }
-      const STAGE_ALLOWED_ROLES: Record<string, string[]> = {
-        transire_processing: ["transire_user", "operations_user"],
-        shipping:            ["shipping_user", "shipping_terminal_user"],
-        terminal:            ["terminal_user", "shipping_terminal_user"],
-        pull_out:            ["pull_out_user"],
-        final_release:       ["terminal_manager"],
-      };
-      const allowedRoles = STAGE_ALLOWED_ROLES[status] ?? [];
-      const hasRole = userRoles.some(r => allowedRoles.includes(r));
-      if (!hasRole) {
-        return res.status(403).json({ error: "You do not have permission to perform actions at this stage." });
-      }
+    if (!canPerformModernStageAction(req, status)) {
+      return res.status(403).json({ error: "You do not have access to this operational workspace." });
     }
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -1577,10 +1538,8 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
 // GET /containers/gate-log — gate events log (security + admin)
 router.get("/containers/gate-log", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const userRole = req.user!.role;
-    const isAdmin = userRole === "admin" || userRole === "super_admin";
-    const userRoles: string[] = (req.user as any).roles ?? [userRole];
-    const isSecurityUser = userRoles.includes("security_user");
+    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
+    const isSecurityUser = hasWorkspace(req.user!.accessProfile, "security");
     if (!isAdmin && !isSecurityUser) {
       return res.status(403).json({ error: "Access denied" });
     }
@@ -1658,10 +1617,8 @@ router.get("/containers/gate-log", requireAuth, async (req: AuthRequest, res) =>
 router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id));
-    const userRole = req.user!.role;
-    const isAdmin = userRole === "admin" || userRole === "super_admin";
-    const userRoles: string[] = (req.user as any).roles ?? [userRole];
-    const isSecurityUser = userRoles.includes("security_user");
+    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
+    const isSecurityUser = hasWorkspace(req.user!.accessProfile, "security");
     if (!isAdmin && !isSecurityUser) {
       return res.status(403).json({ error: "Only security personnel or administrators can record Gate-In" });
     }
@@ -1709,10 +1666,8 @@ router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res
 router.post("/containers/:id/gate-out", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id));
-    const userRole = req.user!.role;
-    const isAdmin = userRole === "admin" || userRole === "super_admin";
-    const userRoles: string[] = (req.user as any).roles ?? [userRole];
-    const isSecurityUser = userRoles.includes("security_user");
+    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
+    const isSecurityUser = hasWorkspace(req.user!.accessProfile, "security");
     if (!isAdmin && !isSecurityUser) {
       return res.status(403).json({ error: "Only security personnel or administrators can record Gate-Out" });
     }
@@ -1752,10 +1707,8 @@ router.post("/containers/:id/gate-out", requireAuth, async (req: AuthRequest, re
 router.post("/containers/:id/empty-gate-in", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id));
-    const userRole = req.user!.role;
-    const isAdmin = userRole === "admin" || userRole === "super_admin";
-    const userRoles: string[] = (req.user as any).roles ?? [userRole];
-    const isSecurityUser = userRoles.includes("security_user");
+    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
+    const isSecurityUser = hasWorkspace(req.user!.accessProfile, "security");
     if (!isAdmin && !isSecurityUser) {
       return res.status(403).json({ error: "Only security personnel or administrators can record Empty Gate-In" });
     }
@@ -1795,10 +1748,8 @@ router.post("/containers/:id/empty-gate-in", requireAuth, async (req: AuthReques
 router.post("/containers/:id/empty-gate-out", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id));
-    const userRole = req.user!.role;
-    const isAdmin = userRole === "admin" || userRole === "super_admin";
-    const userRoles: string[] = (req.user as any).roles ?? [userRole];
-    const isSecurityUser = userRoles.includes("security_user");
+    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
+    const isSecurityUser = hasWorkspace(req.user!.accessProfile, "security");
     if (!isAdmin && !isSecurityUser) {
       return res.status(403).json({ error: "Only security personnel or administrators can record Empty Gate-Out" });
     }
@@ -1953,8 +1904,7 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (existing.isLocked) {
       return res.status(403).json({ error: "Container is locked" });
     }
-    const userRole = req.user!.role;
-    const isAdmin = userRole === "admin" || userRole === "super_admin";
+    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
     const { customerName, containerNumber, blNumber, declaration, size, vessel, status, assignedStaffId, clearingCharges, deliveredAt, eta, consignee } = req.body;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (customerName !== undefined) updates.customerName = customerName;
@@ -1967,12 +1917,10 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     // Non-admin dept users may only perform the natural forward advance from stages they're allowed to advance.
     if (status !== undefined) {
       if (!isAdmin) {
-        const userRoles: string[] = req.user!.roles ?? [userRole];
-        const advanceAllowed = [...new Set(userRoles.flatMap(r => STAGE_ADVANCE_ALLOWED[r] ?? []))];
         const currentIdx = PIPELINE_STAGE_ORDER.indexOf(existing.status);
         const naturalNext = currentIdx !== -1 ? PIPELINE_STAGE_ORDER[currentIdx + 1] : undefined;
         // Allow only if: current stage is in advancement-allowed set AND requested status is the natural next stage
-        if (!advanceAllowed.includes(existing.status) || status !== naturalNext) {
+        if (!canAdvanceFromStage(req, existing.status) || status !== naturalNext) {
           return res.status(403).json({ error: "You can only advance this container from its current stage to the next stage." });
         }
       }
@@ -2856,7 +2804,7 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       ? await recentLogsBase.orderBy(desc(auditLogTable.createdAt)).limit(10)
       : await recentLogsBase.where(eq(auditLogTable.branchId, _scope)).orderBy(desc(auditLogTable.createdAt)).limit(10);
 
-    // Role-aware: pendingApprovals and myPendingSections
+    // Access-profile-aware pending approvals and personal work.
     const user = (req as AuthRequest).user!;
     let pendingApprovals = 0;
     let myPendingSections = 0;
@@ -2868,12 +2816,14 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       : [];
     pendingApprovals = allApprovals.filter(a => a.status === "submitted").length;
 
-    if (user.role !== "admin" && user.role !== "super_admin") {
-      let permsObj: Record<string, string> = {};
-      try { if (user.sectionPermissions) permsObj = JSON.parse(user.sectionPermissions as string); } catch {}
-      mySections = Object.keys(permsObj).length > 0
-        ? Object.entries(permsObj).filter(([, v]) => v !== "no_access").map(([k]) => k)
-        : user.sectionPermission ? [user.sectionPermission as string] : [];
+    if (!hasAuthority(user.accessProfile, "admin")) {
+      mySections = [
+        ...(hasWorkspace(user.accessProfile, "shipping") ? ["shipping"] : []),
+        ...(hasWorkspace(user.accessProfile, "documentation") || hasWorkspace(user.accessProfile, "accounts") ? ["customs"] : []),
+        ...(hasWorkspace(user.accessProfile, "terminal") ? ["terminal"] : []),
+        ...(hasWorkspace(user.accessProfile, "delivery") ? ["delivery"] : []),
+        ...(user.accessProfile.jobFunction === "operations" || hasWorkspace(user.accessProfile, "terminal_manager") ? ["operations"] : []),
+      ];
 
       const myContainerIds = allContainers
         .filter(c => c.assignedStaffId === user.id)

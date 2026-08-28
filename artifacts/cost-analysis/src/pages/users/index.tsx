@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Shield, ShieldCheck, User as UserIcon, Pencil, PowerOff, Power, UploadCloud, Users2, X, Check, Truck, Info } from "lucide-react";
+import { Loader2, Plus, Shield, ShieldCheck, User as UserIcon, Pencil, PowerOff, Power, Users2, X, Check, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -17,111 +17,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { SECTION_LABELS, CHARGE_SECTIONS, parseSectionPermissions, type SectionPermLevel } from "@/lib/format";
 import { Switch } from "@/components/ui/switch";
 import { useBranches, type Branch } from "@/pages/branches/index";
-
-type SectionPermissionsMap = Record<string, SectionPermLevel>;
-
-const PERM_LEVELS: { value: SectionPermLevel; label: string }[] = [
-  { value: "no_access", label: "No Access" },
-  { value: "view", label: "View Only" },
-  { value: "edit", label: "Edit" },
-];
-
-function GranularPermissionsEditor({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: SectionPermissionsMap;
-  onChange: (v: SectionPermissionsMap) => void;
-  disabled?: boolean;
-}) {
-  const handleChange = (section: string, perm: SectionPermLevel) => {
-    onChange({ ...value, [section]: perm });
-  };
-
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Section Permissions</p>
-      <div className="border border-border/50 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/30 text-xs text-muted-foreground uppercase tracking-wider">
-            <tr>
-              <th className="px-4 py-2 text-left font-medium">Section</th>
-              {PERM_LEVELS.map(p => (
-                <th key={p.value} className="px-3 py-2 text-center font-medium">{p.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/40">
-            {CHARGE_SECTIONS.map(section => {
-              const current = value[section] ?? "no_access";
-              return (
-                <tr key={section} className="hover:bg-accent/20 transition-colors">
-                  <td className="px-4 py-2.5 font-medium capitalize text-foreground/80">{SECTION_LABELS[section] ?? section}</td>
-                  {PERM_LEVELS.map(p => (
-                    <td key={p.value} className="px-3 py-2.5 text-center">
-                      <input
-                        type="radio"
-                        name={`perm-${section}`}
-                        value={p.value}
-                        checked={current === p.value}
-                        disabled={disabled}
-                        onChange={() => handleChange(section, p.value)}
-                        className="w-4 h-4 accent-primary cursor-pointer"
-                      />
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-const ALL_ROLES = [
-  "super_admin", "admin", "branch_admin", "staff",
-  "documentation_user", "accounts_user", "operations_user",
-  "transire_user", "shipping_user", "terminal_user", "pull_out_user",
-  "shipping_terminal_user",
-  "terminal_manager", "delivery_user", "security_user",
-] as const;
-
-const ELEVATED_ROLES = ["super_admin", "admin", "branch_admin"];
-
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: "Super Admin",
-  admin: "Administrator",
-  branch_admin: "Branch Admin",
-  staff: "Staff",
-  documentation_user: "Documentation",
-  accounts_user: "Accounts",
-  operations_user: "Operations (Legacy)",
-  transire_user: "Transire",
-  shipping_user: "Shipping",
-  terminal_user: "Terminal",
-  pull_out_user: "Pull-Out",
-  shipping_terminal_user: "Shipping & Terminal (Legacy)",
-  terminal_manager: "Terminal Manager",
-  delivery_user: "Delivery / Transport",
-  security_user: "Gate Security",
-};
 
 const createSchema = z.object({
   name:     z.string().min(2, "Name required"),
   email:    z.string().email("Valid email required"),
   password: z.string().min(8, "At least 8 characters").regex(/[a-z]/, "Include a lowercase letter").regex(/[A-Z]/, "Include an uppercase letter").regex(/\d/, "Include a number"),
-  role:     z.enum(ALL_ROLES),
+  authorityLevel: z.enum(["super_admin", "admin", "branch_admin", "staff"]),
+  jobFunction: z.enum(["general_staff", "documentation", "accounts", "operations", "terminal_manager", "delivery", "security"]),
 });
 
 const editSchema = z.object({
   name:     z.string().min(2, "Name required"),
-  role:     z.enum(ALL_ROLES),
   password: z.string().optional().refine((value) => !value || (value.length >= 8 && /[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value)), "Use 8+ characters with uppercase, lowercase, and number"),
 });
 
@@ -135,7 +43,7 @@ type UserRow = {
   workspaceAccess?: string | null;
   accessProfileMigratedAt?: string | null;
   accessProfile?: {
-    source: "modern" | "legacy" | "invalid";
+    source: "modern" | "invalid";
     authorityLevel: string | null;
     jobFunction: string | null;
     workspaces: string[];
@@ -152,6 +60,8 @@ const AUTHORITY_OPTIONS = [
   { value: "branch_admin", label: "Branch Admin" },
   { value: "staff", label: "Staff" },
 ] as const;
+
+const ELEVATED_AUTHORITIES = ["super_admin", "admin", "branch_admin"];
 
 const JOB_FUNCTION_OPTIONS = [
   { value: "general_staff", label: "General Staff" },
@@ -188,13 +98,6 @@ const FIXED_WORKSPACES: Record<Exclude<JobFunction, "operations">, string[]> = {
 
 type AccessProfileResponse = {
   user: UserRow;
-  recommendation: {
-    proposedAuthority: string | null;
-    proposedJobFunction: string | null;
-    proposedWorkspaces: string[];
-    flags: string[];
-    requiresManualReview: boolean;
-  };
 };
 
 type RbacMigrationAudit = {
@@ -203,7 +106,7 @@ type RbacMigrationAudit = {
   summary: {
     totalUsers: number;
     activeUsers: number;
-    requiresManualReview: number;
+    invalidProfiles: number;
     migration: {
       modernProfiles: number;
       legacyProfiles: number;
@@ -212,7 +115,7 @@ type RbacMigrationAudit = {
       activeProfilesPending: number;
       activeProfileMigrationComplete: boolean;
       allProfilesMigrated: boolean;
-      legacyRetirementReady: false;
+      legacyRetirementReady: boolean;
       retirementBlockers: string[];
     };
   };
@@ -250,78 +153,13 @@ function BranchSelectField({
   );
 }
 
-const WORKSPACE_ROLES: { value: string; label: string; color: string }[] = [
-  { value: "transire_user",  label: "Transire",     color: "border-violet-500 text-violet-400 bg-violet-500/10" },
-  { value: "shipping_user",  label: "Shipping",     color: "border-sky-500 text-sky-400 bg-sky-500/10"         },
-  { value: "terminal_user",  label: "Terminal Ops", color: "border-amber-500 text-amber-400 bg-amber-500/10"   },
-  { value: "pull_out_user",  label: "Pull-Out",     color: "border-emerald-500 text-emerald-400 bg-emerald-500/10" },
-];
-
-const DEPT_ROLES = [
-  "documentation_user", "accounts_user", "operations_user",
-  "transire_user", "shipping_user", "terminal_user", "pull_out_user",
-  "shipping_terminal_user", "terminal_manager", "delivery_user", "security_user",
-];
-
 function formatPermissionsSummary(user: UserRow): string {
   if (user.accessProfile?.source === "modern") {
     const workspaceNames = user.accessProfile.workspaces
       .map((workspace) => WORKSPACE_OPTIONS.find((option) => option.value === workspace)?.label ?? workspace);
     return `${user.accessProfile.authorityLevel} | ${user.accessProfile.jobFunction}${workspaceNames.length ? ` | ${workspaceNames.join(", ")}` : ""}`;
   }
-  if (user.role === "super_admin") return "Full system control";
-  if (user.role === "admin") return "All sections";
-  if (DEPT_ROLES.includes(user.role)) return `${ROLE_LABELS[user.role] ?? user.role} department access`;
-  if (user.sectionPermissions) {
-    const perms = parseSectionPermissions(user.sectionPermissions);
-    const editSections = Object.entries(perms).filter(([, v]) => v === "edit").map(([k]) => SECTION_LABELS[k] ?? k);
-    const viewSections = Object.entries(perms).filter(([, v]) => v === "view").map(([k]) => SECTION_LABELS[k] ?? k);
-    const parts: string[] = [];
-    if (editSections.length > 0) parts.push(`Edit: ${editSections.join(", ")}`);
-    if (viewSections.length > 0) parts.push(`View: ${viewSections.join(", ")}`);
-    return parts.length > 0 ? parts.join(" | ") : "No access";
-  }
-  if (user.sectionPermission) return `${SECTION_LABELS[user.sectionPermission] ?? user.sectionPermission} (legacy)`;
-  return "All sections";
-}
-
-function WorkspaceRoleCheckboxes({
-  selected,
-  onChange,
-}: {
-  selected: string[];
-  onChange: (v: string[]) => void;
-}) {
-  const toggle = (value: string) => {
-    onChange(selected.includes(value) ? selected.filter(r => r !== value) : [...selected, value]);
-  };
-  return (
-    <div className="space-y-2">
-      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Department Workspace Access</p>
-      <p className="text-xs text-muted-foreground">Tick all workspace queues this user can work in simultaneously.</p>
-      <div className="grid grid-cols-2 gap-2">
-        {WORKSPACE_ROLES.map(wr => (
-          <button
-            key={wr.value}
-            type="button"
-            onClick={() => toggle(wr.value)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-              selected.includes(wr.value)
-                ? `${wr.color} border-current`
-                : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground bg-secondary/10"
-            }`}
-          >
-            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
-              selected.includes(wr.value) ? "border-current bg-current/20" : "border-muted-foreground/40"
-            }`}>
-              {selected.includes(wr.value) && <Check className="w-2.5 h-2.5" />}
-            </span>
-            {wr.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+  return "Access profile needs configuration";
 }
 
 function AccessProfileDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
@@ -338,16 +176,9 @@ function AccessProfileDialog({ user, onClose }: { user: UserRow; onClose: () => 
   useEffect(() => {
     if (!data) return;
     const profile = data.user.accessProfile;
-    const suggestedFunction = data.recommendation.proposedJobFunction;
-    const nextFunction = profile?.source === "modern"
-      ? profile.jobFunction
-      : suggestedFunction;
-    const nextAuthority = profile?.source === "modern"
-      ? profile.authorityLevel
-      : data.recommendation.proposedAuthority;
-    const nextWorkspaces = profile?.source === "modern"
-      ? profile.workspaces
-      : data.recommendation.proposedWorkspaces;
+    const nextFunction = profile?.jobFunction;
+    const nextAuthority = profile?.authorityLevel;
+    const nextWorkspaces = profile?.workspaces;
 
     if (AUTHORITY_OPTIONS.some((option) => option.value === nextAuthority)) setAuthorityLevel(nextAuthority!);
     if (JOB_FUNCTION_OPTIONS.some((option) => option.value === nextFunction)) {
@@ -386,8 +217,7 @@ function AccessProfileDialog({ user, onClose }: { user: UserRow; onClose: () => 
     }),
   });
 
-  const profileState = data?.user.accessProfile?.source ?? "legacy";
-  const recommendationFlags = data?.recommendation.flags ?? [];
+  const profileState = data?.user.accessProfile?.source ?? "invalid";
   const fixedWorkspaces = jobFunction === "operations" ? null : FIXED_WORKSPACES[jobFunction];
 
   return (
@@ -404,7 +234,7 @@ function AccessProfileDialog({ user, onClose }: { user: UserRow; onClose: () => 
       ) : (
         <div className="space-y-5 pt-2">
           <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-            This saves the new access profile only. The current legacy role and section permissions remain unchanged until the final migration phase.
+            This profile is the user&apos;s live access control. Authority, job function, and workspace access are managed here.
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -466,8 +296,7 @@ function AccessProfileDialog({ user, onClose }: { user: UserRow; onClose: () => 
           </div>
 
           <div className="rounded-lg border border-border/50 bg-secondary/15 px-4 py-3 text-xs text-muted-foreground space-y-1">
-            <p><span className="font-medium text-foreground">Current profile state:</span> {profileState === "modern" ? "Modern profile active" : profileState === "invalid" ? "Incomplete profile - review required" : "Legacy access still in use"}</p>
-            {recommendationFlags.length > 0 && <p><span className="font-medium text-foreground">Review flags:</span> {recommendationFlags.join(", ")}</p>}
+            <p><span className="font-medium text-foreground">Current profile state:</span> {profileState === "modern" ? "Access profile active" : "Incomplete profile - access is blocked until corrected"}</p>
           </div>
 
           <div className="flex justify-end gap-3 pt-1">
@@ -483,7 +312,8 @@ function AccessProfileDialog({ user, onClose }: { user: UserRow; onClose: () => 
   );
 }
 
-function CreateUserDialog() {
+function RetiredLegacyCreateUserDialog() {
+  /* Retained only in source history during the role cutover. It is not rendered.
   const [open, setOpen] = useState(false);
   const [sectionPerms, setSectionPerms] = useState<SectionPermissionsMap>({});
   const [canUpload, setCanUpload] = useState(false);
@@ -624,9 +454,12 @@ function CreateUserDialog() {
       </DialogContent>
     </Dialog>
   );
+  */
+  return null;
 }
 
-function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
+function RetiredLegacyEditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
+  /* Retained only in source history during the role cutover. It is not rendered.
   const updateMutation = useUpdateUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -769,6 +602,108 @@ function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void 
       </Form>
     </DialogContent>
   );
+  */
+  return null;
+}
+
+function CreateUserDialog() {
+  const [open, setOpen] = useState(false);
+  const [canUpload, setCanUpload] = useState(false);
+  const [workspaces, setWorkspaces] = useState<string[]>([]);
+  const { user: currentUser, isBranchAdmin } = useAuth();
+  const { data: branches } = useBranches();
+  const [branchId, setBranchId] = useState<number | null>(currentUser?.branchId ?? null);
+  const createMutation = useCreateUser();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const form = useForm({
+    resolver: zodResolver(createSchema),
+    defaultValues: { name: "", email: "", password: "", authorityLevel: "staff" as const, jobFunction: "general_staff" as JobFunction },
+  });
+  const jobFunction = form.watch("jobFunction") as JobFunction;
+
+  const setJobFunction = (value: JobFunction) => {
+    form.setValue("jobFunction", value);
+    setWorkspaces(value === "operations" ? [] : FIXED_WORKSPACES[value]);
+  };
+  const toggleWorkspace = (workspace: string) => setWorkspaces((current) => current.includes(workspace)
+    ? current.filter((value) => value !== workspace)
+    : [...current, workspace]);
+  const onSubmit = (data: z.infer<typeof createSchema>) => {
+    createMutation.mutate({ data: {
+      ...data,
+      workspaceAccess: data.jobFunction === "operations" ? workspaces : FIXED_WORKSPACES[data.jobFunction],
+      canUpload,
+      ...(branchId != null ? { branchId } : {}),
+    } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+        toast({ title: "User created successfully." });
+        setOpen(false);
+        form.reset();
+        setCanUpload(false);
+        setWorkspaces([]);
+      },
+      onError: (error: Error) => toast({ variant: "destructive", title: "User was not created", description: error.message }),
+    });
+  };
+
+  return <Dialog open={open} onOpenChange={setOpen}>
+    <DialogTrigger asChild><Button className="hover-elevate active:scale-95 shadow-md shadow-primary/20"><Plus className="mr-2 h-4 w-4" />Add User</Button></DialogTrigger>
+    <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto border-border/50 bg-card/95 backdrop-blur">
+      <DialogHeader><DialogTitle>Create User</DialogTitle></DialogHeader>
+      <Form {...form}><form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+        <FormField control={form.control} name="name" render={({ field }) => <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>} />
+        <FormField control={form.control} name="email" render={({ field }) => <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>} />
+        <FormField control={form.control} name="password" render={({ field }) => <FormItem><FormLabel>Password</FormLabel><FormControl><PasswordInput autoComplete="new-password" {...field} /></FormControl><FormMessage /></FormItem>} />
+        <FormField control={form.control} name="authorityLevel" render={({ field }) => <FormItem><FormLabel>Authority Level</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>
+          {!isBranchAdmin && AUTHORITY_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+          {isBranchAdmin && <SelectItem value="staff">Staff</SelectItem>}
+        </SelectContent></Select><FormMessage /></FormItem>} />
+        <FormField control={form.control} name="jobFunction" render={({ field }) => <FormItem><FormLabel>Job Function</FormLabel><Select value={field.value} onValueChange={(value) => setJobFunction(value as JobFunction)}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{JOB_FUNCTION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} />
+        {!isBranchAdmin && <BranchSelectField branches={branches} value={branchId} onChange={setBranchId} />}
+        <div className="space-y-2"><FormLabel>Workspace Access</FormLabel>
+          {jobFunction === "operations" ? <div className="grid grid-cols-2 gap-2">{WORKSPACE_OPTIONS.filter((option) => ["transire", "shipping", "terminal", "pullout"].includes(option.value)).map((option) => <Button key={option.value} type="button" variant={workspaces.includes(option.value) ? "default" : "outline"} onClick={() => toggleWorkspace(option.value)} className="justify-start"><Check className={`mr-2 h-4 w-4 ${workspaces.includes(option.value) ? "opacity-100" : "opacity-0"}`} />{option.label}</Button>)}</div>
+          : <p className="rounded-lg border border-border/50 bg-secondary/20 px-3 py-2 text-sm text-muted-foreground">{FIXED_WORKSPACES[jobFunction].length ? FIXED_WORKSPACES[jobFunction].map((workspace) => WORKSPACE_OPTIONS.find((option) => option.value === workspace)?.label).join(", ") : "No specialist workspace"}</p>}
+        </div>
+        <div className="flex items-center justify-between rounded-lg border border-border/50 bg-secondary/20 px-4 py-3"><div><p className="text-sm font-medium">Upload Access</p><p className="text-xs text-muted-foreground">Allow bulk container-data upload.</p></div><Switch checked={canUpload} onCheckedChange={setCanUpload} /></div>
+        <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create User</Button></div>
+      </form></Form>
+    </DialogContent>
+  </Dialog>;
+}
+
+function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
+  const updateMutation = useUpdateUser();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: branches } = useBranches();
+  const { isBranchAdmin, user: currentUser } = useAuth();
+  const [branchId, setBranchId] = useState<number | null>(user.branchId ?? null);
+  const [canUpload, setCanUpload] = useState(user.canUpload ?? false);
+  const form = useForm({ resolver: zodResolver(editSchema), defaultValues: { name: user.name, password: "" } });
+  const isSelf = currentUser?.id === user.id;
+  const onSubmit = (data: z.infer<typeof editSchema>) => updateMutation.mutate({ id: user.id, data: {
+    name: data.name,
+    canUpload,
+    ...(data.password ? { password: data.password } : {}),
+    ...(!isSelf && branchId != null && branchId !== user.branchId ? { branchId } : {}),
+  } }, {
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/users"] }); toast({ title: "User details updated." }); onClose(); },
+    onError: (error: Error) => toast({ variant: "destructive", title: "User was not updated", description: error.message }),
+  });
+  return <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto border-border/50 bg-card/95 backdrop-blur">
+    <DialogHeader><DialogTitle>Edit User - {user.name}</DialogTitle></DialogHeader>
+    <Form {...form}><form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+      <FormField control={form.control} name="name" render={({ field }) => <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>} />
+      <div className="rounded-lg bg-secondary/30 px-3 py-2 text-sm text-muted-foreground">Email: <span className="font-mono text-foreground">{user.email}</span></div>
+      <div className="rounded-lg border border-border/50 bg-secondary/20 px-3 py-2 text-sm text-muted-foreground">Access Profile: <span className="font-medium text-foreground">{user.accessProfile?.authorityLevel ?? "Not configured"} / {user.accessProfile?.jobFunction ?? "Not configured"}</span></div>
+      {!isBranchAdmin && <BranchSelectField branches={branches} value={branchId} onChange={setBranchId} disabled={isSelf} />}
+      <div className="flex items-center justify-between rounded-lg border border-border/50 bg-secondary/20 px-4 py-3"><div><p className="text-sm font-medium">Upload Access</p><p className="text-xs text-muted-foreground">Allow bulk container-data upload.</p></div><Switch checked={canUpload} onCheckedChange={setCanUpload} /></div>
+      <FormField control={form.control} name="password" render={({ field }) => <FormItem><FormLabel>New Password <span className="font-normal text-muted-foreground">(leave blank to keep current)</span></FormLabel><FormControl><PasswordInput autoComplete="new-password" {...field} /></FormControl><FormMessage /></FormItem>} />
+      <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes</Button></div>
+    </form></Form>
+  </DialogContent>;
 }
 
 function AssignClientsDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
@@ -905,7 +840,7 @@ export default function Users() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">User Management</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage system access, roles, and section permissions.</p>
+          <p className="text-muted-foreground text-sm mt-1">Manage access profiles, workspaces, and branch membership.</p>
         </div>
         {isAdminOrAbove && <CreateUserDialog />}
       </div>
@@ -915,10 +850,10 @@ export default function Users() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 font-semibold text-foreground">
-                <ShieldCheck className="h-4 w-4 text-primary" /> RBAC migration progress
+                <ShieldCheck className="h-4 w-4 text-primary" /> Access control status
               </div>
               <p className="max-w-2xl text-sm text-muted-foreground">
-                Configure each user with the new access profile, test their login and key workspace, then keep the legacy role as a fallback until the final retirement release.
+                Access profiles are now the only source of permission checks. Historical role fields are retained only as recovery data and cannot grant access.
               </p>
             </div>
             <Badge variant="outline" className={migrationAudit.summary.migration.activeProfileMigrationComplete
@@ -933,7 +868,7 @@ export default function Users() {
               <p className="mt-1 text-lg font-semibold">{migrationAudit.summary.migration.modernProfiles}</p>
             </div>
             <div className="rounded-lg border border-border/50 bg-card/60 px-4 py-3">
-              <p className="text-xs text-muted-foreground">Still using legacy access</p>
+              <p className="text-xs text-muted-foreground">Legacy access paths</p>
               <p className="mt-1 text-lg font-semibold">{migrationAudit.summary.migration.legacyProfiles}</p>
             </div>
             <div className="rounded-lg border border-border/50 bg-card/60 px-4 py-3">
@@ -943,7 +878,7 @@ export default function Users() {
           </div>
           <div className="mt-4 flex items-start gap-2 rounded-lg border border-border/50 bg-card/40 px-3 py-2.5 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>{migrationAudit.summary.migration.retirementBlockers[0] ?? "Legacy cleanup is intentionally blocked until a separate approval."}</span>
+            <span>{migrationAudit.summary.migration.retirementBlockers[0] ?? "All accounts have valid modern access profiles."}</span>
           </div>
         </Card>
       )}
@@ -954,9 +889,9 @@ export default function Users() {
             <thead className="text-xs text-muted-foreground bg-secondary/30 uppercase font-mono tracking-wider border-b border-border/50">
               <tr>
                 <th className="px-6 py-4 font-medium">User</th>
-                <th className="px-6 py-4 font-medium">Role</th>
+                <th className="px-6 py-4 font-medium">Authority</th>
                 {isSuperAdmin && <th className="px-6 py-4 font-medium">Branch</th>}
-                <th className="px-6 py-4 font-medium">Section Access</th>
+                <th className="px-6 py-4 font-medium">Access Profile</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Created</th>
                 <th className="px-6 py-4 font-medium text-right">Actions</th>
@@ -976,8 +911,7 @@ export default function Users() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
-                        {((u as UserRow).roles ?? [u.role]).map(r => {
-                          const wsRole = WORKSPACE_ROLES.find(w => w.value === r);
+                        {[(u as UserRow).accessProfile?.authorityLevel].filter((value): value is string => Boolean(value)).map(r => {
                           return (
                             <Badge key={r} variant="outline" className={
                               r === "super_admin"
@@ -986,20 +920,13 @@ export default function Users() {
                                 ? "border-primary text-primary bg-primary/10"
                                 : r === "branch_admin"
                                 ? "border-orange-500 text-orange-400 bg-orange-500/10"
-                                : wsRole
-                                ? wsRole.color
                                 : "border-border text-muted-foreground"
                             }>
-                              {ELEVATED_ROLES.includes(r) ? <Shield className="w-3 h-3 mr-1" /> : <UserIcon className="w-3 h-3 mr-1" />}
-                              {ROLE_LABELS[r] ?? r}
+                              {ELEVATED_AUTHORITIES.includes(r) ? <Shield className="w-3 h-3 mr-1" /> : <UserIcon className="w-3 h-3 mr-1" />}
+                              {AUTHORITY_OPTIONS.find((option) => option.value === r)?.label ?? r}
                             </Badge>
                           );
                         })}
-                        {(u as UserRow).accessProfile?.source === "modern" && (
-                          <Badge variant="outline" className="border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                            <ShieldCheck className="w-3 h-3 mr-1" /> Modern profile
-                          </Badge>
-                        )}
                       </div>
                     </td>
                     {isSuperAdmin && (
@@ -1047,7 +974,7 @@ export default function Users() {
                             )}
                           </Dialog>
                         )}
-                        {(isSuperAdmin || (isAdminOrAbove && !(isBranchAdmin && ELEVATED_ROLES.includes(u.role)))) && (
+                        {(isSuperAdmin || (isAdminOrAbove && !(isBranchAdmin && (u as UserRow).accessProfile?.authorityLevel !== "staff"))) && (
                           <Dialog open={editingUser?.id === u.id} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
                             <DialogTrigger asChild>
                               <Button variant="ghost" size="sm" onClick={() => setEditingUser(u as UserRow)}
@@ -1060,7 +987,7 @@ export default function Users() {
                             )}
                           </Dialog>
                         )}
-                        {u.role !== "super_admin" && (
+                        {(u as UserRow).accessProfile?.authorityLevel !== "super_admin" && (
                           <Dialog open={assigningUser?.id === u.id} onOpenChange={(open) => { if (!open) setAssigningUser(null); }}>
                             <DialogTrigger asChild>
                               <Button variant="ghost" size="sm" onClick={() => setAssigningUser(u as UserRow)}
@@ -1073,7 +1000,7 @@ export default function Users() {
                             )}
                           </Dialog>
                         )}
-                        {(isSuperAdmin || (isAdminOrAbove && !(isBranchAdmin && ELEVATED_ROLES.includes(u.role)))) && (
+                        {(isSuperAdmin || (isAdminOrAbove && !(isBranchAdmin && ELEVATED_AUTHORITIES.includes((u as UserRow).accessProfile?.authorityLevel ?? "staff")))) && (
                           <Button variant="ghost" size="sm" onClick={() => handleToggleActive(u as UserRow)}
                             disabled={updateMutation.isPending || u.id === currentUser?.id}
                             className={`h-8 px-3 text-xs ${u.isActive ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-emerald-500/10 hover:text-emerald-500"}`}>

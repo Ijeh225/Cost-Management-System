@@ -1184,36 +1184,28 @@ components:
           type: string
         password:
           type: string
-        role:
+        authorityLevel:
           type: string
-          enum: [admin, super_admin, branch_admin, staff, documentation_user, accounts_user, operations_user, transire_user, shipping_user, terminal_user, pull_out_user, shipping_terminal_user, terminal_manager, delivery_user, security_user]
-        sectionPermission:
+          enum: [super_admin, admin, branch_admin, staff]
+        jobFunction:
           type: string
-          nullable: true
-        sectionPermissions:
-          type: string
-          nullable: true
+          enum: [general_staff, documentation, accounts, operations, terminal_manager, delivery, security]
+        workspaceAccess:
+          type: array
+          items:
+            type: string
         branchId:
           type: integer
           nullable: true
         canUpload:
           type: boolean
-      required: [email, name, password, role]
+      required: [email, name, password, authorityLevel, jobFunction]
 
     UpdateUserRequest:
       type: object
       properties:
         name:
           type: string
-        role:
-          type: string
-          enum: [admin, super_admin, branch_admin, staff, documentation_user, accounts_user, operations_user, transire_user, shipping_user, terminal_user, pull_out_user, shipping_terminal_user, terminal_manager, delivery_user, security_user]
-        sectionPermission:
-          type: string
-          nullable: true
-        sectionPermissions:
-          type: string
-          nullable: true
         isActive:
           type: boolean
         password:
@@ -1222,6 +1214,9 @@ components:
           type: string
         canUpload:
           type: boolean
+        branchId:
+          type: integer
+          nullable: true
 
     Container:
       type: object

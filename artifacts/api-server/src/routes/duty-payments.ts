@@ -2,10 +2,14 @@ import { Router } from "express";
 import { db, containersTable, customsChargesTable, auditLogTable, banksTable, dutyPaymentTransactionsTable } from "@workspace/db";
 import { eq, and, gte, lte, ilike, or, desc, sql, type SQL } from "drizzle-orm";
 import { requireAuth, AuthRequest, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
+import { hasAuthority } from "../lib/authorization.js";
 
 export const dutyPaymentsRouter = Router();
 
-const ALLOWED_ROLES = new Set(["admin", "super_admin", "accounts_user"]);
+function canAccessDutyPayments(req: AuthRequest): boolean {
+  const profile = req.user?.accessProfile;
+  return Boolean(profile && (hasAuthority(profile, "admin") || profile.jobFunction === "accounts"));
+}
 
 function deriveDutyStatus(duty: number, paid: number, outstanding: number): "paid" | "partial" | "unpaid" | "not_assessed" {
   if (duty <= 0) return "not_assessed";
@@ -22,7 +26,7 @@ const toNum = (v: Numericish): number => {
 };
 
 dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, res) => {
-  if (!req.user || !ALLOWED_ROLES.has(req.user.role)) {
+  if (!canAccessDutyPayments(req)) {
     return res.status(403).json({ error: "Duty Payments access required" });
   }
 
@@ -168,7 +172,7 @@ dutyPaymentsRouter.get("/duty-payments", requireAuth, async (req: AuthRequest, r
 });
 
 dutyPaymentsRouter.patch("/duty-payments/:containerId", requireAuth, async (req: AuthRequest, res) => {
-  if (!req.user || !ALLOWED_ROLES.has(req.user.role)) {
+  if (!canAccessDutyPayments(req)) {
     return res.status(403).json({ error: "Duty Payments access required" });
   }
 

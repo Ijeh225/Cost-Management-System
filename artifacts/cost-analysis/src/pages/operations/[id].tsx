@@ -176,12 +176,12 @@ function StageRail({
 }
 
 const DEPT_SUBMIT_LABELS: Record<string, Record<string, string>> = {
-  documentation_user: {
+  documentation: {
     registered:      "Submit to Documentation",
     documentation:   "Submit to Duty Assessment",
     duty_assessment: "Submit to Accounts",
   },
-  accounts_user: {
+  accounts: {
     duty_payment: "Submit to Operations",
   },
   terminal_manager: {
@@ -189,20 +189,20 @@ const DEPT_SUBMIT_LABELS: Record<string, Record<string, string>> = {
     examination:   "Submit to Final Release",
     final_release: "Submit to Delivery",
   },
-  delivery_user: {
+  delivery: {
     delivery: "Mark as Closed",
   },
-  operations_user: {
+  operations: {
     terminal:            "Submit to Pull-Out",
     pull_out:            "Submit to Terminal Manager",
   },
-  shipping_user: {
+  shipping: {
     shipping: "Mark DO Released",
   },
-  terminal_user: {
+  terminal: {
     terminal: "Submit to Pull-Out",
   },
-  pull_out_user: {
+  pullout: {
     pull_out: "Release to Gate-In",
   },
 };
@@ -1457,14 +1457,14 @@ function OperationalForm({
 
       {/* Submit to Next Stage — not shown for terminal/pull_out stages; those actions belong in /workspace/terminal-ops */}
       {isEditable && nextStage && !["terminal", "pull_out"].includes(container.status) && (!deptScope || isAdmin) && (() => {
-        const deptRole = isDocumentationUser ? "documentation_user"
-          : isAccountsUser    ? "accounts_user"
+        const deptRole = isDocumentationUser ? "documentation"
+          : isAccountsUser    ? "accounts"
           : isTerminalManager ? "terminal_manager"
-          : isDeliveryUser    ? "delivery_user"
-          : isOperationsUser  ? "operations_user"
-          : isShippingUser    ? "shipping_user"
-          : isTerminalUser    ? "terminal_user"
-          : isPullOutUser     ? "pull_out_user"
+          : isDeliveryUser    ? "delivery"
+          : isOperationsUser  ? "operations"
+          : isShippingUser    ? "shipping"
+          : isTerminalUser    ? "terminal"
+          : isPullOutUser     ? "pullout"
           : null;
         const deptLabel = deptRole
           ? DEPT_SUBMIT_LABELS[deptRole]?.[container.status]

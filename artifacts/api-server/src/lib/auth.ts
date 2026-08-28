@@ -99,16 +99,6 @@ export function clearAuthCookie(res: Response) {
   });
 }
 
-export function parseRoles(role: string, rolesJson: string | null | undefined): string[] {
-  if (rolesJson) {
-    try {
-      const parsed = JSON.parse(rolesJson);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed as string[];
-    } catch {}
-  }
-  return [role];
-}
-
 export interface AuthRequest extends Request {
   user?: {
     id: number;
@@ -128,27 +118,9 @@ export interface AuthRequest extends Request {
   };
 }
 
-const LEGACY_AUTHORITY_RANK: Record<string, number> = {
-  staff: 0,
-  branch_admin: 1,
-  admin: 2,
-  super_admin: 3,
-};
-
-/**
- * During migration, a complete new profile is authoritative. Users without a
- * complete profile keep precisely their legacy role behaviour. That makes the
- * change reversible and prevents a partially saved profile from widening
- * access.
- */
 export function hasEffectiveAuthority(req: AuthRequest, minimum: AuthorityLevel): boolean {
   const user = req.user;
-  if (!user) return false;
-  if (user.accessProfile.source === "modern") {
-    return hasAuthority(user.accessProfile, minimum);
-  }
-  const minimumRank = LEGACY_AUTHORITY_RANK[minimum];
-  return (LEGACY_AUTHORITY_RANK[user.role] ?? -1) >= minimumRank;
+  return Boolean(user && hasAuthority(user.accessProfile, minimum));
 }
 
 export function isEffectiveSuperAdmin(req: AuthRequest): boolean {
@@ -182,9 +154,11 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       return;
     }
     const accessProfile = resolveAccessProfile(user);
-    const effectiveSuperAdmin = accessProfile.source === "modern"
-      ? hasAuthority(accessProfile, "super_admin")
-      : user.role === "super_admin";
+    if (accessProfile.source !== "modern" || accessProfile.authorityLevel == null) {
+      res.status(403).json({ error: "Your account access profile is not configured. Contact a Super Admin." });
+      return;
+    }
+    const effectiveSuperAdmin = hasAuthority(accessProfile, "super_admin");
     // Task #74: hard-fail when branch scope inputs are invalid. Non-super-admin
     // users must have a branchId; super-admin's X-Branch-Id header (if any)
     // must be "all", empty, or a positive integer — never silently fall back.
@@ -214,20 +188,20 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
         }
       }
     }
-    const isElevated = accessProfile.source === "modern"
-      ? hasAuthority(accessProfile, "admin")
-      : user.role === "admin" || user.role === "super_admin";
+    const isElevated = hasAuthority(accessProfile, "admin");
     req.user = {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role,
-      roles: parseRoles(user.role, user.roles),
-      sectionPermission: user.sectionPermission ?? null,
-      sectionPermissions: user.sectionPermissions ?? null,
-      authorityLevel: user.authorityLevel ?? null,
-      jobFunction: user.jobFunction ?? null,
-      workspaceAccess: user.workspaceAccess ?? null,
+      // Compatibility fields now expose only canonical authority values.
+      // They are not read from legacy database role/section columns.
+      role: accessProfile.authorityLevel,
+      roles: [accessProfile.authorityLevel],
+      sectionPermission: null,
+      sectionPermissions: null,
+      authorityLevel: accessProfile.authorityLevel,
+      jobFunction: accessProfile.jobFunction,
+      workspaceAccess: JSON.stringify(accessProfile.workspaces),
       accessProfileMigratedAt: user.accessProfileMigratedAt ?? null,
       accessProfile,
       canUpload: isElevated ? true : (user.canUpload ?? false),

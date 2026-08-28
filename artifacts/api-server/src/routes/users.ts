@@ -1,26 +1,12 @@
 import { Router } from "express";
 import { db, usersTable, clientsTable, userClientAssignmentsTable, branchesTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireSuperAdmin, requireBranchAdminOrAbove, AuthRequest, hashPassword, isStrongPassword, STRONG_PASSWORD_MESSAGE, parseRoles, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
-import { reviewLegacyUserAccess } from "../lib/access-policy.js";
-import { resolveAccessProfile, summarizeAccessProfileMigration, validateAccessProfileUpdate } from "../lib/authorization.js";
+import { requireAuth, requireSuperAdmin, requireBranchAdminOrAbove, AuthRequest, hashPassword, isStrongPassword, STRONG_PASSWORD_MESSAGE, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
+import { hasAuthority, resolveAccessProfile, summarizeAccessProfileMigration, validateAccessProfileUpdate } from "../lib/authorization.js";
 
 // Roles a branch_admin is permitted to assign to users they create/edit (Task #75).
 // Explicitly excludes super_admin, admin, and branch_admin itself — branch admins
 // can never elevate users to peer or higher privilege levels.
-const BRANCH_ADMIN_ASSIGNABLE_ROLES = new Set([
-  "staff",
-  "documentation_user", "accounts_user", "operations_user",
-  "transire_user", "shipping_user", "terminal_user", "pull_out_user",
-  "shipping_terminal_user", "terminal_manager", "delivery_user", "security_user",
-]);
-
-function rolesAllowedForActor(actorRole: string | undefined): (role: string) => boolean {
-  if (actorRole === "branch_admin") return (r) => BRANCH_ADMIN_ASSIGNABLE_ROLES.has(r);
-  // admin / super_admin can assign any role (existing behavior).
-  return () => true;
-}
-
 const router = Router();
 
 const userFields = {
@@ -59,21 +45,23 @@ type UserRow = {
   branchId: number;
 };
 
-const ELEVATED_ROLES = new Set(["admin", "super_admin"]);
-
-const formatUser = (u: UserRow) => ({
-  ...u,
-  roles: parseRoles(u.role, u.roles),
-  sectionPermission: u.sectionPermission ?? null,
-  sectionPermissions: u.sectionPermissions ?? null,
-  authorityLevel: u.authorityLevel ?? null,
-  jobFunction: u.jobFunction ?? null,
-  workspaceAccess: u.workspaceAccess ?? null,
-  accessProfileMigratedAt: u.accessProfileMigratedAt instanceof Date ? u.accessProfileMigratedAt.toISOString() : u.accessProfileMigratedAt ?? null,
-  accessProfile: resolveAccessProfile(u),
-  canUpload: ELEVATED_ROLES.has(u.role) ? true : (u.canUpload ?? false),
-  createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
-});
+const formatUser = (u: UserRow) => {
+  const accessProfile = resolveAccessProfile(u);
+  return {
+    ...u,
+    role: accessProfile.authorityLevel,
+    roles: accessProfile.authorityLevel ? [accessProfile.authorityLevel] : [],
+    sectionPermission: null,
+    sectionPermissions: null,
+    authorityLevel: accessProfile.authorityLevel,
+    jobFunction: accessProfile.jobFunction,
+    workspaceAccess: accessProfile.source === "modern" ? JSON.stringify(accessProfile.workspaces) : null,
+    accessProfileMigratedAt: u.accessProfileMigratedAt instanceof Date ? u.accessProfileMigratedAt.toISOString() : u.accessProfileMigratedAt ?? null,
+    accessProfile,
+    canUpload: hasAuthority(accessProfile, "admin") ? true : (u.canUpload ?? false),
+    createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
+  };
+};
 
 router.get("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
@@ -90,11 +78,7 @@ router.get("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) =>
   }
 });
 
-/**
- * Read-only inventory for the RBAC migration. This is intentionally limited
- * to super admins because it exposes all users and their proposed access
- * profiles. It never writes roles, assignments, or permissions.
- */
+/** Read-only cutover status for Super Admins. */
 router.get("/users/rbac-migration-audit", requireSuperAdmin, async (_req: AuthRequest, res) => {
   try {
     const rows = await db
@@ -113,35 +97,25 @@ router.get("/users/rbac-migration-audit", requireSuperAdmin, async (_req: AuthRe
         jobFunction: usersTable.jobFunction,
         workspaceAccess: usersTable.workspaceAccess,
         accessProfileMigratedAt: usersTable.accessProfileMigratedAt,
+        canUpload: usersTable.canUpload,
+        createdAt: usersTable.createdAt,
       })
       .from(usersTable)
       .innerJoin(branchesTable, eq(usersTable.branchId, branchesTable.id))
       .orderBy(asc(branchesTable.name), asc(usersTable.name));
 
-    const users = rows.map((user) => ({
-      ...user,
-      review: reviewLegacyUserAccess(user),
-    }));
-    const countWithFlag = (flag: string) => users.filter((user) => user.review.flags.includes(flag as never)).length;
     const migration = summarizeAccessProfileMigration(rows);
 
     return res.json({
       generatedAt: new Date().toISOString(),
       readOnly: true,
       summary: {
-        totalUsers: users.length,
-        activeUsers: users.filter((user) => user.isActive).length,
-        requiresManualReview: users.filter((user) => user.review.requiresManualReview).length,
-        invalidRolesJson: countWithFlag("invalid_roles_json"),
-        missingPrimaryRole: countWithFlag("primary_role_missing_from_roles"),
-        unknownLegacyRole: countWithFlag("unknown_legacy_role"),
-        multipleJobFunctions: countWithFlag("multiple_job_functions"),
-        legacyCombinedWorkspaceRole: countWithFlag("legacy_combined_workspace_role"),
-        operationsWorkspaceSelectionRequired: countWithFlag("operations_workspace_selection_required"),
-        legacySectionPermissionsPresent: countWithFlag("legacy_section_permissions_present"),
+        totalUsers: rows.length,
+        activeUsers: rows.filter((user) => user.isActive).length,
+        invalidProfiles: migration.invalidProfiles,
         migration,
       },
-      users,
+      users: rows.map(formatUser),
     });
   } catch (error) {
     console.error("Failed to generate RBAC migration audit", error);
@@ -150,9 +124,7 @@ router.get("/users/rbac-migration-audit", requireSuperAdmin, async (_req: AuthRe
 });
 
 /**
- * Access profiles are intentionally a Super Admin-only migration control.
- * The profile never edits legacy role fields; it is stored beside them so a
- * failed or incomplete migration cannot change an existing user's access.
+ * Access profiles are the only supported authorization configuration.
  */
 router.get("/users/:id/access-profile", requireSuperAdmin, async (req: AuthRequest, res) => {
   const id = Number(req.params.id);
@@ -164,8 +136,6 @@ router.get("/users/:id/access-profile", requireSuperAdmin, async (req: AuthReque
 
     return res.json({
       user: formatUser(user),
-      recommendation: reviewLegacyUserAccess(user),
-      readOnlyLegacyFields: ["role", "roles", "sectionPermission", "sectionPermissions"],
     });
   } catch (error) {
     console.error("Failed to read user access profile", error);
@@ -194,6 +164,12 @@ router.put("/users/:id/access-profile", requireSuperAdmin, async (req: AuthReque
     if (!target || !userCanAccessBranch(req, target.branchId)) return res.status(404).json({ error: "User not found" });
 
     const [updated] = await db.update(usersTable).set({
+      // Keep compatibility columns canonical for integrations that still read
+      // them, but do not use them for authorization.
+      role: validated.value.authorityLevel,
+      roles: JSON.stringify([validated.value.authorityLevel]),
+      sectionPermission: null,
+      sectionPermissions: null,
       authorityLevel: validated.value.authorityLevel,
       jobFunction: validated.value.jobFunction,
       workspaceAccess: JSON.stringify(validated.value.workspaceAccess),
@@ -204,7 +180,7 @@ router.put("/users/:id/access-profile", requireSuperAdmin, async (req: AuthReque
     if (!updated) return res.status(404).json({ error: "User not found" });
     return res.json({
       user: formatUser(updated),
-      message: "Access profile saved. Legacy role fields remain unchanged during the migration.",
+      message: "Access profile saved.",
     });
   } catch (error) {
     console.error("Failed to save user access profile", error);
@@ -214,22 +190,17 @@ router.put("/users/:id/access-profile", requireSuperAdmin, async (req: AuthReque
 
 router.post("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const { email, name, password, role, roles, sectionPermission, sectionPermissions, canUpload, branchId } = req.body;
-    if (!email || !name || !password || !role) {
+    const { email, name, password, authorityLevel, jobFunction, workspaceAccess, canUpload, branchId } = req.body;
+    if (!email || !name || !password) {
       return res.status(400).json({ error: "All fields required" });
     }
     if (!isStrongPassword(password)) {
       return res.status(400).json({ error: STRONG_PASSWORD_MESSAGE });
     }
-    // Task #75: branch_admin can only assign non-elevated roles.
-    const allowRole = rolesAllowedForActor(req.user?.role);
-    if (!allowRole(role)) {
-      return res.status(403).json({ error: "You are not allowed to assign that role." });
-    }
-    if (Array.isArray(roles)) {
-      for (const r of roles) {
-        if (!allowRole(r)) { res.status(403).json({ error: "You are not allowed to assign that role." }); return; }
-      }
+    const validated = validateAccessProfileUpdate({ authorityLevel, jobFunction, workspaceAccess });
+    if (!validated.value) return res.status(400).json({ error: "Invalid access profile", details: validated.errors });
+    if (req.user?.accessProfile.authorityLevel === "branch_admin" && validated.value.authorityLevel !== "staff") {
+      return res.status(403).json({ error: "Branch Admins can only create Staff authority accounts." });
     }
     // Resolve target branch. If the caller explicitly supplies branchId in the
     // body (form branch picker), use it directly — no need to also have the
@@ -264,13 +235,19 @@ router.post("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) =
       return res.status(403).json({ error: "You can only create users within your own branch." });
     }
     const passwordHash = await hashPassword(password);
-    const rolesJson = Array.isArray(roles) && roles.length > 0 ? JSON.stringify(roles) : null;
     const [user] = await db.insert(usersTable).values({
-      email, name, passwordHash, role,
-      roles: rolesJson,
-      sectionPermission: sectionPermission ?? null,
-      sectionPermissions: sectionPermissions ?? null,
-      canUpload: ELEVATED_ROLES.has(role) ? true : (canUpload === true),
+      email: String(email).trim().toLowerCase(),
+      name,
+      passwordHash,
+      role: validated.value.authorityLevel,
+      roles: JSON.stringify([validated.value.authorityLevel]),
+      sectionPermission: null,
+      sectionPermissions: null,
+      authorityLevel: validated.value.authorityLevel,
+      jobFunction: validated.value.jobFunction,
+      workspaceAccess: JSON.stringify(validated.value.workspaceAccess),
+      accessProfileMigratedAt: new Date(),
+      canUpload: validated.value.authorityLevel === "admin" || validated.value.authorityLevel === "super_admin" ? true : (canUpload === true),
       isActive: true,
       branchId: resolvedBranchId,
     }).returning();
@@ -287,7 +264,7 @@ router.get("/users/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
-    if (!ELEVATED_ROLES.has(req.user?.role ?? "") && req.user?.id !== id) {
+    if (!hasAuthority(req.user!.accessProfile, "admin") && req.user?.id !== id) {
       return res.status(403).json({ error: "Access denied" });
     }
     const [user] = await db.select(userFields).from(usersTable).where(eq(usersTable.id, id));
@@ -302,35 +279,22 @@ router.put("/users/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res
   try {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user ID" }); return; }
-    const [_target] = await db.select({ branchId: usersTable.branchId, role: usersTable.role }).from(usersTable).where(eq(usersTable.id, id));
+    const [_target] = await db.select(userFields).from(usersTable).where(eq(usersTable.id, id));
     if (!_target || !userCanAccessBranch(req, _target.branchId)) { res.status(404).json({ error: "User not found" }); return; }
-    const { name, role, roles, isActive, password, sectionPermission, sectionPermissions, canUpload, branchId } = req.body;
-    // Task #75: branch_admin restrictions.
-    //  - Cannot edit users with admin/super_admin/branch_admin role.
-    //  - Cannot assign elevated roles.
-    //  - Cannot move users to another branch.
-    //  - Cannot edit own role / branch / active status.
+    const { name, isActive, password, canUpload, branchId } = req.body;
+    if (["role", "roles", "sectionPermission", "sectionPermissions"].some((field) => req.body?.[field] !== undefined)) {
+      return res.status(400).json({ error: "Legacy role and section-permission fields have been retired. Use Access Profile settings instead." });
+    }
+    const targetProfile = resolveAccessProfile(_target);
     if (req.user?.role === "branch_admin") {
-      if (["admin", "super_admin", "branch_admin"].includes(_target.role)) {
+      if (targetProfile.source !== "modern" || targetProfile.authorityLevel !== "staff") {
         return res.status(403).json({ error: "You cannot edit a user with this role." });
-      }
-      const allowRole = rolesAllowedForActor("branch_admin");
-      if (role !== undefined && !allowRole(role)) {
-        return res.status(403).json({ error: "You are not allowed to assign that role." });
-      }
-      if (Array.isArray(roles)) {
-        for (const r of roles) {
-          if (!allowRole(r)) { res.status(403).json({ error: "You are not allowed to assign that role." }); return; }
-        }
       }
       if (branchId !== undefined && Number(branchId) !== req.user.branchId) {
         return res.status(403).json({ error: "You cannot move users to another branch." });
       }
     }
     if (req.user?.id === id) {
-      if (role !== undefined && role !== _target.role) {
-        return res.status(400).json({ error: "You cannot change your own role." });
-      }
       if (branchId !== undefined && Number(branchId) !== _target.branchId) {
         return res.status(400).json({ error: "You cannot change your own branch assignment." });
       }
@@ -345,15 +309,9 @@ router.put("/users/:id", requireBranchAdminOrAbove, async (req: AuthRequest, res
       updatedAt: new Date(),
     };
     if (name !== undefined) updates.name = name;
-    if (role !== undefined) updates.role = role;
-    if (roles !== undefined) {
-      updates.roles = Array.isArray(roles) && roles.length > 0 ? JSON.stringify(roles) : null;
-    }
     if (isActive !== undefined) updates.isActive = isActive;
     if (password) updates.passwordHash = await hashPassword(password);
-    if (sectionPermission !== undefined) updates.sectionPermission = sectionPermission || null;
-    if (sectionPermissions !== undefined) updates.sectionPermissions = sectionPermissions || null;
-    if (canUpload !== undefined) updates.canUpload = ELEVATED_ROLES.has(updates.role ?? "") ? true : (canUpload === true);
+    if (canUpload !== undefined) updates.canUpload = hasAuthority(targetProfile, "admin") ? true : (canUpload === true);
     if (branchId !== undefined) {
       const parsed = Number(branchId);
       if (!Number.isInteger(parsed)) {

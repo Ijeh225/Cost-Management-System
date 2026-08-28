@@ -19,10 +19,10 @@ import {
 import {
   AuthRequest,
   getBranchScope,
-  parseRoles,
   requireAuth,
   userCanAccessBranch,
 } from "../lib/auth.js";
+import { hasAuthority, resolveAccessProfile } from "../lib/authorization.js";
 import { deleteDocument, documentExists, getDocument, saveDocument } from "../lib/document-storage.js";
 import { exceedsApprovedPaymentBalance, exceedsOverheadPaymentBalance, isScheduleReadyToComplete } from "../lib/payment-rules.js";
 
@@ -62,12 +62,11 @@ function formatDate(value: Date | string | null | undefined) {
 }
 
 function isApprover(req: AuthRequest) {
-  return req.user?.role === "admin" || req.user?.role === "super_admin";
+  return Boolean(req.user && hasAuthority(req.user.accessProfile, "admin"));
 }
 
 function canMarkPaid(req: AuthRequest) {
-  const roles = req.user?.roles ?? [];
-  return isApprover(req) || roles.includes("accounts_user");
+  return isApprover(req) || req.user?.accessProfile.jobFunction === "accounts";
 }
 
 function bucketForSchedule(scheduleDate: Date, status: string, today = startOfDay(new Date())) {
@@ -184,17 +183,19 @@ async function notifyUsers(params: {
     } else {
       const users = await db.select({
         id: usersTable.id,
-        role: usersTable.role,
-        roles: usersTable.roles,
+        authorityLevel: usersTable.authorityLevel,
+        jobFunction: usersTable.jobFunction,
+        workspaceAccess: usersTable.workspaceAccess,
+        accessProfileMigratedAt: usersTable.accessProfileMigratedAt,
         branchId: usersTable.branchId,
       }).from(usersTable).where(eq(usersTable.isActive, true));
       targets = users
         .filter((u) => {
-          const roles = parseRoles(u.role, u.roles);
-          const sameBranchOrGlobal = u.role === "super_admin" || u.branchId === params.branchId;
+          const profile = resolveAccessProfile(u);
+          const sameBranchOrGlobal = hasAuthority(profile, "super_admin") || u.branchId === params.branchId;
           if (!sameBranchOrGlobal) return false;
-          if (params.target === "approvers") return u.role === "admin" || u.role === "super_admin";
-          return roles.includes("accounts_user") || u.role === "admin" || u.role === "super_admin";
+          if (params.target === "approvers") return hasAuthority(profile, "admin");
+          return profile.jobFunction === "accounts" || hasAuthority(profile, "admin");
         })
         .map((u) => u.id);
     }

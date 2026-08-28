@@ -20,33 +20,21 @@ import { hasAuthority, resolveAccessProfile } from "../lib/authorization.js";
 const router = Router();
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function parseUserRoles(user: { role: string; roles: string | null }): string[] {
-  if (!user.roles) return [user.role];
-  try {
-    const parsed = JSON.parse(user.roles);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [user.role];
-  } catch {
-    return [user.role];
-  }
-}
-
 function formatAuthenticatedUser(user: typeof usersTable.$inferSelect, branchName: string | null) {
   const accessProfile = resolveAccessProfile(user);
-  const isElevated = accessProfile.source === "modern"
-    ? hasAuthority(accessProfile, "admin")
-    : user.role === "admin" || user.role === "super_admin";
+  const isElevated = hasAuthority(accessProfile, "admin");
 
   return {
     id: user.id,
     email: user.email,
     name: user.name,
-    role: user.role,
-    roles: parseUserRoles(user),
-    sectionPermission: user.sectionPermission ?? null,
-    sectionPermissions: user.sectionPermissions ?? null,
-    authorityLevel: user.authorityLevel ?? null,
-    jobFunction: user.jobFunction ?? null,
-    workspaceAccess: user.workspaceAccess ?? null,
+    role: accessProfile.authorityLevel,
+    roles: accessProfile.authorityLevel ? [accessProfile.authorityLevel] : [],
+    sectionPermission: null,
+    sectionPermissions: null,
+    authorityLevel: accessProfile.authorityLevel,
+    jobFunction: accessProfile.jobFunction,
+    workspaceAccess: accessProfile.source === "modern" ? JSON.stringify(accessProfile.workspaces) : null,
     accessProfileMigratedAt: user.accessProfileMigratedAt instanceof Date
       ? user.accessProfileMigratedAt.toISOString()
       : user.accessProfileMigratedAt ?? null,
@@ -105,9 +93,10 @@ router.post("/auth/login", loginIpLimiter, loginLimiter, async (req, res) => {
     // Task #75: branch_admin (and any non-super_admin) cannot log in if their
     // branch has been deactivated. Check BEFORE issuing a session cookie.
     const accessProfile = resolveAccessProfile(user);
-    const isSuperAdmin = accessProfile.source === "modern"
-      ? accessProfile.authorityLevel === "super_admin"
-      : user.role === "super_admin";
+    if (accessProfile.source !== "modern") {
+      return res.status(403).json({ error: "Your account access profile is not configured. Contact a Super Admin." });
+    }
+    const isSuperAdmin = accessProfile.authorityLevel === "super_admin";
     if (!isSuperAdmin && (!loginBranch || !loginBranch.isActive)) {
       return res.status(401).json({ error: "Your branch is currently disabled. Please contact an administrator." });
     }
@@ -199,7 +188,12 @@ router.post("/auth/setup", async (req, res) => {
       name,
       email,
       passwordHash,
+      authorityLevel: "super_admin",
+      jobFunction: "general_staff",
+      workspaceAccess: "[]",
+      accessProfileMigratedAt: new Date(),
       role: "super_admin",
+      roles: JSON.stringify(["super_admin"]),
       isActive: true,
       sessionToken,
       branchId: defaultBranch.id,

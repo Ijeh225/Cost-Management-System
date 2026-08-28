@@ -3,6 +3,7 @@ import { db, sectionApprovalsTable, containersTable, usersTable, shippingCharges
 import { eq, inArray, and } from "drizzle-orm";
 import { requireAuth, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
+import { hasAuthority, hasWorkspace } from "../lib/authorization.js";
 
 const router = Router();
 
@@ -36,27 +37,21 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
   try {
     const user = req.user!;
 
-    // Determine which sections this user can see
-    let mySections: string[] = [];
-    if (user.role === "admin" || user.role === "super_admin") {
-      mySections = ["shipping", "customs", "terminal", "delivery", "operations"];
-    } else {
-      if (user.sectionPermissions) {
-        try {
-          const perms: Record<string, string> = JSON.parse(user.sectionPermissions as string);
-          mySections = Object.entries(perms)
-            .filter(([, v]) => v === "edit" || v === "view")
-            .map(([k]) => k);
-        } catch {}
-      }
-      if (mySections.length === 0 && user.sectionPermission) {
-        mySections = [user.sectionPermission as string];
-      }
-    }
+    // Modern access profiles are the only source of section visibility.
+    const profile = user.accessProfile;
+    const isElevated = hasAuthority(profile, "admin");
+    const mySections = isElevated
+      ? ["shipping", "customs", "terminal", "delivery", "operations"]
+      : [
+          ...(hasWorkspace(profile, "shipping") ? ["shipping"] : []),
+          ...(hasWorkspace(profile, "documentation") || hasWorkspace(profile, "accounts") ? ["customs"] : []),
+          ...(hasWorkspace(profile, "terminal") ? ["terminal"] : []),
+          ...(hasWorkspace(profile, "delivery") ? ["delivery"] : []),
+          ...(profile.jobFunction === "operations" || hasWorkspace(profile, "terminal_manager") ? ["operations"] : []),
+        ];
 
     // Get containers assigned to this user (scoped by branch — Task #74)
     const branchScope = getBranchScope(req);
-    const isElevated = user.role === "admin" || user.role === "super_admin";
     const conds: any[] = [];
     if (!isElevated) conds.push(eq(containersTable.assignedStaffId, user.id));
     if (branchScope !== null) conds.push(eq(containersTable.branchId, branchScope));

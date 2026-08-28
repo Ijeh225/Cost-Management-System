@@ -69,9 +69,8 @@ export function AppSidebar() {
 
   const staffCanUpload = !isAdmin && !isDepartmentUser && (user?.canUpload ?? false);
 
-  // Duty Payments is restricted to admin / super_admin / accounts_user
-  // (accounts_user lands on this entry via deptNav below). Hiding it from
-  // every other role on the main nav, including `staff`.
+  // Duty Payments is available to administrative users and the Accounts workspace.
+  // Users without either access profile capability do not see this navigation item.
   const canSeeDutyPayments = isAdmin || isSuperAdmin || isAccountsUser;
 
   const mainNav: NavItem[] = [

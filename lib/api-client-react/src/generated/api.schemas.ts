@@ -62,68 +62,35 @@ export interface LoginResponse {
   message: string;
 }
 
-export type CreateUserRequestRole =
-  (typeof CreateUserRequestRole)[keyof typeof CreateUserRequestRole];
+export type UserAuthorityLevel = "super_admin" | "admin" | "branch_admin" | "staff";
 
-export const CreateUserRequestRole = {
-  admin: "admin",
-  super_admin: "super_admin",
-  branch_admin: "branch_admin",
-  staff: "staff",
-  documentation_user: "documentation_user",
-  accounts_user: "accounts_user",
-  operations_user: "operations_user",
-  transire_user: "transire_user",
-  shipping_user: "shipping_user",
-  terminal_user: "terminal_user",
-  pull_out_user: "pull_out_user",
-  shipping_terminal_user: "shipping_terminal_user",
-  terminal_manager: "terminal_manager",
-  delivery_user: "delivery_user",
-  security_user: "security_user",
-} as const;
+export type UserJobFunction =
+  | "general_staff"
+  | "documentation"
+  | "accounts"
+  | "operations"
+  | "terminal_manager"
+  | "delivery"
+  | "security";
 
 export interface CreateUserRequest {
   email: string;
   name: string;
   password: string;
-  role: CreateUserRequestRole;
-  sectionPermission?: string | null;
-  sectionPermissions?: string | null;
+  authorityLevel: UserAuthorityLevel;
+  jobFunction: UserJobFunction;
+  workspaceAccess?: string[];
   branchId?: number | null;
   canUpload?: boolean;
 }
 
-export type UpdateUserRequestRole =
-  (typeof UpdateUserRequestRole)[keyof typeof UpdateUserRequestRole];
-
-export const UpdateUserRequestRole = {
-  admin: "admin",
-  super_admin: "super_admin",
-  branch_admin: "branch_admin",
-  staff: "staff",
-  documentation_user: "documentation_user",
-  accounts_user: "accounts_user",
-  operations_user: "operations_user",
-  transire_user: "transire_user",
-  shipping_user: "shipping_user",
-  terminal_user: "terminal_user",
-  pull_out_user: "pull_out_user",
-  shipping_terminal_user: "shipping_terminal_user",
-  terminal_manager: "terminal_manager",
-  delivery_user: "delivery_user",
-  security_user: "security_user",
-} as const;
-
 export interface UpdateUserRequest {
   name?: string;
-  role?: UpdateUserRequestRole;
-  sectionPermission?: string | null;
-  sectionPermissions?: string | null;
   isActive?: boolean;
   password?: string;
   status?: string;
   canUpload?: boolean;
+  branchId?: number | null;
 }
 
 export type ContainerStatus =

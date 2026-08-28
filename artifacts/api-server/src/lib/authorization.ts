@@ -8,7 +8,7 @@ import {
   type Workspace,
 } from "./access-policy.js";
 
-export type AccessProfileSource = "modern" | "legacy" | "invalid";
+export type AccessProfileSource = "modern" | "invalid";
 
 export interface StoredAccessProfile {
   authorityLevel: string | null | undefined;
@@ -45,7 +45,7 @@ export interface AccessProfileMigrationSummary {
   activeProfilesPending: number;
   activeProfileMigrationComplete: boolean;
   allProfilesMigrated: boolean;
-  legacyRetirementReady: false;
+  legacyRetirementReady: boolean;
   retirementBlockers: string[];
 }
 
@@ -139,27 +139,20 @@ export function validateAccessProfileUpdate(input: AccessProfileUpdateInput): {
 }
 
 /**
- * Resolves only a complete, explicitly migrated profile. Any missing or
- * malformed field stays in legacy mode so that later route conversions cannot
- * accidentally change an existing user's permissions.
+ * Resolves a complete modern access profile. Legacy role fields are not an
+ * authorization source: accounts without a valid profile cannot sign in.
  */
 export function resolveAccessProfile(profile: StoredAccessProfile): ResolvedAccessProfile {
-  const hasAnyModernValue = Boolean(
-    profile.authorityLevel || profile.jobFunction || profile.workspaceAccess || profile.accessProfileMigratedAt,
-  );
   const hasCompleteModernProfile = Boolean(
     profile.authorityLevel && profile.jobFunction && profile.workspaceAccess && profile.accessProfileMigratedAt,
   );
-  if (!hasAnyModernValue) {
-    return { source: "legacy", authorityLevel: null, jobFunction: null, workspaces: [], errors: [] };
-  }
   if (!hasCompleteModernProfile) {
     return {
       source: "invalid",
       authorityLevel: null,
       jobFunction: null,
       workspaces: [],
-      errors: ["Access profile is incomplete and cannot be enforced."],
+      errors: ["Access profile is missing or incomplete."],
     };
   }
 
@@ -211,9 +204,8 @@ export function hasWorkspace(profile: ResolvedAccessProfile, workspace: Workspac
 }
 
 /**
- * Summarises migration progress without changing a single legacy value. The
- * legacy-role retirement flag is intentionally always false: removal needs a
- * separately approved release after every account has been tested.
+ * Summarises the profile-only access cutover. The old columns may remain in
+ * the database for rollback/audit, but they are not used for authorization.
  */
 export function summarizeAccessProfileMigration(
   rows: readonly AccessProfileMigrationRow[],
@@ -221,7 +213,7 @@ export function summarizeAccessProfileMigration(
   const resolved = rows.map((row) => ({ row, profile: resolveAccessProfile(row) }));
   const active = resolved.filter(({ row }) => row.isActive);
   const modernProfiles = resolved.filter(({ profile }) => profile.source === "modern").length;
-  const legacyProfiles = resolved.filter(({ profile }) => profile.source === "legacy").length;
+  const legacyProfiles = 0;
   const invalidProfiles = resolved.filter(({ profile }) => profile.source === "invalid").length;
   const activeProfilesMigrated = active.filter(({ profile }) => profile.source === "modern").length;
   const activeProfilesPending = active.length - activeProfilesMigrated;
@@ -233,9 +225,8 @@ export function summarizeAccessProfileMigration(
     retirementBlockers.push(`${activeProfilesPending} active user profile(s) still require migration or correction.`);
   }
   if (!allProfilesMigrated) {
-    retirementBlockers.push("Inactive and archived accounts still need an explicit migration or retirement decision.");
+    retirementBlockers.push("Every account must have a valid access profile before it can use the system.");
   }
-  retirementBlockers.push("Legacy role and section-permission fields are intentionally preserved until a separately approved retirement release.");
 
   return {
     totalUsers: rows.length,
@@ -247,7 +238,7 @@ export function summarizeAccessProfileMigration(
     activeProfilesPending,
     activeProfileMigrationComplete,
     allProfilesMigrated,
-    legacyRetirementReady: false,
+    legacyRetirementReady: allProfilesMigrated,
     retirementBlockers,
   };
 }

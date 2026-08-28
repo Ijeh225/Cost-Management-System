@@ -995,8 +995,6 @@ async function runStartupMigrations() {
       `);
     });
     await runMigration("rbac_access_profile_foundation_v1", async () => {
-      // Additive only: existing role, roles, and section-permission values stay
-      // untouched until a Super Admin approves each user's migration profile.
       await pool.query(`
         ALTER TABLE users
           ADD COLUMN IF NOT EXISTS authority_level TEXT,
@@ -1006,6 +1004,55 @@ async function runStartupMigrations() {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS users_authority_level_idx ON users(authority_level)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS users_job_function_idx ON users(job_function)`);
+    });
+    await runMigration("rbac_retire_legacy_role_access_v1", async () => {
+      // Populate complete modern profiles for existing accounts once. Old role
+      // and section-permission columns are intentionally retained as dormant
+      // rollback evidence, but authentication no longer reads them.
+      await pool.query(`
+        UPDATE users
+        SET
+          authority_level = CASE role
+            WHEN 'super_admin' THEN 'super_admin'
+            WHEN 'admin' THEN 'admin'
+            WHEN 'branch_admin' THEN 'branch_admin'
+            ELSE 'staff'
+          END,
+          job_function = CASE role
+            WHEN 'documentation_user' THEN 'documentation'
+            WHEN 'accounts_user' THEN 'accounts'
+            WHEN 'operations_user' THEN 'operations'
+            WHEN 'transire_user' THEN 'operations'
+            WHEN 'shipping_user' THEN 'operations'
+            WHEN 'terminal_user' THEN 'operations'
+            WHEN 'pull_out_user' THEN 'operations'
+            WHEN 'shipping_terminal_user' THEN 'operations'
+            WHEN 'terminal_manager' THEN 'terminal_manager'
+            WHEN 'delivery_user' THEN 'delivery'
+            WHEN 'security_user' THEN 'security'
+            ELSE 'general_staff'
+          END,
+          workspace_access = CASE role
+            WHEN 'documentation_user' THEN '["documentation"]'
+            WHEN 'accounts_user' THEN '["accounts"]'
+            WHEN 'operations_user' THEN '["transire","shipping","terminal","pullout"]'
+            WHEN 'transire_user' THEN '["transire"]'
+            WHEN 'shipping_user' THEN '["shipping"]'
+            WHEN 'terminal_user' THEN '["terminal"]'
+            WHEN 'pull_out_user' THEN '["pullout"]'
+            WHEN 'shipping_terminal_user' THEN '["shipping","terminal"]'
+            WHEN 'terminal_manager' THEN '["terminal_manager"]'
+            WHEN 'delivery_user' THEN '["delivery"]'
+            WHEN 'security_user' THEN '["security"]'
+            ELSE '[]'
+          END,
+          access_profile_migrated_at = COALESCE(access_profile_migrated_at, NOW()),
+          updated_at = NOW()
+        WHERE authority_level IS NULL
+          OR job_function IS NULL
+          OR workspace_access IS NULL
+          OR access_profile_migrated_at IS NULL
+      `);
     });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);

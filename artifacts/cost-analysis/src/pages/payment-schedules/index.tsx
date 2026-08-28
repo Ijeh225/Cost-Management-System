@@ -113,8 +113,8 @@ function canApprove(role: string | null) {
   return role === "admin" || role === "super_admin";
 }
 
-function canPay(role: string | null, roles: string[]) {
-  return canApprove(role) || roles.includes("accounts_user");
+function canPay(role: string | null, jobFunction: string | null) {
+  return canApprove(role) || jobFunction === "accounts";
 }
 
 function SummaryCard({
@@ -473,7 +473,7 @@ function ScheduleDetailDialog({
 }
 
 export default function PaymentSchedulesPage() {
-  const { userRole, userRoles } = useAuth();
+  const { userRole, accessProfile } = useAuth();
   const { activeBranchId, isSuperAdmin } = useBranchScope();
   const { toast } = useToast();
   const [location] = useLocation();
@@ -525,7 +525,7 @@ export default function PaymentSchedulesPage() {
   const cancel = useCancelPaymentSchedule();
   const comment = useAddPaymentScheduleComment();
   const canMdApprove = canApprove(userRole);
-  const canAccountsPay = canPay(userRole, userRoles);
+  const canAccountsPay = canPay(userRole, accessProfile?.jobFunction ?? null);
 
   const schedules = data?.schedules ?? [];
   const summary = data?.summary;

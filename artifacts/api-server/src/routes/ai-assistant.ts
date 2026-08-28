@@ -43,6 +43,7 @@ import { buildAiAnswerPresentation } from "../lib/ai-answer-presentation.js";
 import { analyseAccountantControls } from "../lib/ai-accountant-intelligence.js";
 import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
+import { hasAuthority, resolveAccessProfile } from "../lib/authorization.js";
 
 export const aiAssistantRouter = Router();
 
@@ -2056,21 +2057,21 @@ async function draftPreview(type: AssistantDraftType, body: Record<string, unkno
 }
 
 async function activeBranchAdministrators(branchId: number): Promise<number[]> {
-  const users = await db.select({ id: usersTable.id, role: usersTable.role, branchId: usersTable.branchId })
+  const users = await db.select({ id: usersTable.id, branchId: usersTable.branchId, authorityLevel: usersTable.authorityLevel, jobFunction: usersTable.jobFunction, workspaceAccess: usersTable.workspaceAccess, accessProfileMigratedAt: usersTable.accessProfileMigratedAt })
     .from(usersTable).where(eq(usersTable.isActive, true));
-  return users.filter((user) => user.role === "super_admin" || (user.branchId === branchId && user.role === "admin")).map((user) => user.id);
-}
-
-function hasRole(user: { role: string; roles: string | null }, role: string): boolean {
-  if (user.role === role) return true;
-  const roles = parseJson<unknown>(user.roles ?? "[]", []);
-  return Array.isArray(roles) && roles.includes(role);
+  return users.filter((user) => {
+    const profile = resolveAccessProfile(user);
+    return hasAuthority(profile, "super_admin") || (user.branchId === branchId && profile.authorityLevel === "admin");
+  }).map((user) => user.id);
 }
 
 async function activeBranchFinanceUsers(branchId: number): Promise<number[]> {
-  const users = await db.select({ id: usersTable.id, role: usersTable.role, roles: usersTable.roles, branchId: usersTable.branchId })
+  const users = await db.select({ id: usersTable.id, branchId: usersTable.branchId, authorityLevel: usersTable.authorityLevel, jobFunction: usersTable.jobFunction, workspaceAccess: usersTable.workspaceAccess, accessProfileMigratedAt: usersTable.accessProfileMigratedAt })
     .from(usersTable).where(eq(usersTable.isActive, true));
-  return users.filter((user) => user.role === "super_admin" || (user.branchId === branchId && (hasRole(user, "admin") || hasRole(user, "accounts_user")))).map((user) => user.id);
+  return users.filter((user) => {
+    const profile = resolveAccessProfile(user);
+    return hasAuthority(profile, "super_admin") || (user.branchId === branchId && (profile.authorityLevel === "admin" || profile.jobFunction === "accounts"));
+  }).map((user) => user.id);
 }
 
 async function executeAssistantDraft(draft: typeof aiAssistantActionDraftsTable.$inferSelect, userId: number) {
