@@ -111,3 +111,130 @@ export const LEGACY_ROLE_MAPPINGS = {
   jobFunction: JobFunction;
   workspaces: readonly Workspace[];
 }>;
+
+export type LegacyRole = keyof typeof LEGACY_ROLE_MAPPINGS;
+
+export function isLegacyRole(value: string): value is LegacyRole {
+  return Object.hasOwn(LEGACY_ROLE_MAPPINGS, value);
+}
+
+export function legacyRoleMappingFor(value: string) {
+  return isLegacyRole(value) ? LEGACY_ROLE_MAPPINGS[value] : null;
+}
+
+export type LegacyAccessReviewFlag =
+  | "invalid_roles_json"
+  | "primary_role_missing_from_roles"
+  | "unknown_legacy_role"
+  | "multiple_job_functions"
+  | "legacy_combined_workspace_role"
+  | "operations_workspace_selection_required"
+  | "legacy_section_permissions_present";
+
+export interface LegacyUserAccessInput {
+  role: string;
+  roles: string | null | undefined;
+  sectionPermission: string | null | undefined;
+  sectionPermissions: string | null | undefined;
+}
+
+export interface LegacyUserAccessReview {
+  storedRoles: string[];
+  proposedAuthority: AuthorityLevel | null;
+  proposedJobFunction: JobFunction | null;
+  proposedWorkspaces: Workspace[];
+  flags: LegacyAccessReviewFlag[];
+  requiresManualReview: boolean;
+}
+
+function uniqueValues<T>(values: readonly T[]): T[] {
+  return [...new Set(values)];
+}
+
+/**
+ * Parses the existing roles JSON without adopting its legacy behaviour. The
+ * current auth helper can intentionally return only rolesJson; this audit
+ * instead always compares that value with the primary role to reveal drift.
+ */
+export function parseStoredRolesForReview(rolesJson: string | null | undefined): {
+  roles: string[];
+  isValid: boolean;
+} {
+  if (!rolesJson) return { roles: [], isValid: true };
+
+  try {
+    const parsed = JSON.parse(rolesJson);
+    if (!Array.isArray(parsed) || !parsed.every((role) => typeof role === "string")) {
+      return { roles: [], isValid: false };
+    }
+    return {
+      roles: uniqueValues(parsed.map((role) => role.trim()).filter(Boolean)),
+      isValid: true,
+    };
+  } catch {
+    return { roles: [], isValid: false };
+  }
+}
+
+/**
+ * Produces a dry-run migration recommendation for one existing user. It never
+ * changes a database row and intentionally marks ambiguous access for human
+ * review instead of guessing an expanded permission profile.
+ */
+export function reviewLegacyUserAccess(input: LegacyUserAccessInput): LegacyUserAccessReview {
+  const parsed = parseStoredRolesForReview(input.roles);
+  const storedRoles = uniqueValues([input.role, ...parsed.roles]);
+  const flags: LegacyAccessReviewFlag[] = [];
+
+  if (!parsed.isValid) flags.push("invalid_roles_json");
+  if (parsed.roles.length > 0 && !parsed.roles.includes(input.role)) {
+    flags.push("primary_role_missing_from_roles");
+  }
+
+  const mappings = storedRoles.flatMap((role) => {
+    const mapping = legacyRoleMappingFor(role);
+    return mapping ? [{ role, mapping }] : [];
+  });
+  const unknownRoles = storedRoles.filter((role) => !isLegacyRole(role));
+  if (unknownRoles.length > 0) flags.push("unknown_legacy_role");
+
+  const primaryMapping = legacyRoleMappingFor(input.role);
+  const jobFunctions = uniqueValues(
+    mappings
+      .map(({ mapping }) => mapping.jobFunction)
+      .filter((jobFunction) => jobFunction !== "general_staff"),
+  );
+  if (jobFunctions.length > 1) flags.push("multiple_job_functions");
+  if (storedRoles.includes("shipping_terminal_user")) {
+    flags.push("legacy_combined_workspace_role");
+  }
+
+  const proposedJobFunction = jobFunctions.length === 1
+    ? jobFunctions[0]
+    : jobFunctions.length === 0
+      ? (primaryMapping?.jobFunction ?? null)
+      : null;
+  const proposedWorkspaces = proposedJobFunction
+    ? uniqueValues(
+      mappings
+        .filter(({ mapping }) => mapping.jobFunction === proposedJobFunction)
+        .flatMap(({ mapping }) => mapping.workspaces),
+    )
+    : [];
+
+  if (proposedJobFunction === "operations" && proposedWorkspaces.length === 0) {
+    flags.push("operations_workspace_selection_required");
+  }
+  if (input.sectionPermission || input.sectionPermissions) {
+    flags.push("legacy_section_permissions_present");
+  }
+
+  return {
+    storedRoles,
+    proposedAuthority: primaryMapping?.authority ?? null,
+    proposedJobFunction,
+    proposedWorkspaces,
+    flags,
+    requiresManualReview: flags.length > 0 || proposedJobFunction == null || primaryMapping == null,
+  };
+}

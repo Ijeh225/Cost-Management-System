@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, usersTable, clientsTable, userClientAssignmentsTable, branchesTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireSuperAdmin, requireBranchAdminOrAbove, AuthRequest, hashPassword, isStrongPassword, STRONG_PASSWORD_MESSAGE, parseRoles, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
+import { reviewLegacyUserAccess } from "../lib/access-policy.js";
 
 // Roles a branch_admin is permitted to assign to users they create/edit (Task #75).
 // Explicitly excludes super_admin, admin, and branch_admin itself — branch admins
@@ -72,6 +73,59 @@ router.get("/users", requireBranchAdminOrAbove, async (req: AuthRequest, res) =>
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * Read-only inventory for the RBAC migration. This is intentionally limited
+ * to super admins because it exposes all users and their proposed access
+ * profiles. It never writes roles, assignments, or permissions.
+ */
+router.get("/users/rbac-migration-audit", requireSuperAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: usersTable.id,
+        name: usersTable.name,
+        email: usersTable.email,
+        branchId: usersTable.branchId,
+        branchName: branchesTable.name,
+        isActive: usersTable.isActive,
+        role: usersTable.role,
+        roles: usersTable.roles,
+        sectionPermission: usersTable.sectionPermission,
+        sectionPermissions: usersTable.sectionPermissions,
+      })
+      .from(usersTable)
+      .innerJoin(branchesTable, eq(usersTable.branchId, branchesTable.id))
+      .orderBy(asc(branchesTable.name), asc(usersTable.name));
+
+    const users = rows.map((user) => ({
+      ...user,
+      review: reviewLegacyUserAccess(user),
+    }));
+    const countWithFlag = (flag: string) => users.filter((user) => user.review.flags.includes(flag as never)).length;
+
+    return res.json({
+      generatedAt: new Date().toISOString(),
+      readOnly: true,
+      summary: {
+        totalUsers: users.length,
+        activeUsers: users.filter((user) => user.isActive).length,
+        requiresManualReview: users.filter((user) => user.review.requiresManualReview).length,
+        invalidRolesJson: countWithFlag("invalid_roles_json"),
+        missingPrimaryRole: countWithFlag("primary_role_missing_from_roles"),
+        unknownLegacyRole: countWithFlag("unknown_legacy_role"),
+        multipleJobFunctions: countWithFlag("multiple_job_functions"),
+        legacyCombinedWorkspaceRole: countWithFlag("legacy_combined_workspace_role"),
+        operationsWorkspaceSelectionRequired: countWithFlag("operations_workspace_selection_required"),
+        legacySectionPermissionsPresent: countWithFlag("legacy_section_permissions_present"),
+      },
+      users,
+    });
+  } catch (error) {
+    console.error("Failed to generate RBAC migration audit", error);
+    return res.status(500).json({ error: "Failed to generate RBAC migration audit" });
   }
 });
 
