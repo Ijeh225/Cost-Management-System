@@ -10,6 +10,20 @@ export type ContainerStatus =
   (typeof ContainerStatus)[keyof typeof ContainerStatus];
 
 export const ContainerStatus = {
+  pending_verification: "pending_verification",
+  registered: "registered",
+  documentation: "documentation",
+  duty_assessment: "duty_assessment",
+  duty_payment: "duty_payment",
+  transire_processing: "transire_processing",
+  shipping: "shipping",
+  terminal: "terminal",
+  pull_out: "pull_out",
+  gate_in: "gate_in",
+  examination: "examination",
+  final_release: "final_release",
+  delivery: "delivery",
+  empty_return: "empty_return",
   new_upload: "new_upload",
   documentation_review: "documentation_review",
   shipping_entry: "shipping_entry",

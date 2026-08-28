@@ -39,6 +39,7 @@ function TxTypeBadge({ type }: { type: BankTransaction["type"] }) {
     fund_addition:    { label: "Fund Addition",    cls: "bg-teal-500/10 text-teal-400 border-teal-500/30",   icon: ArrowDownLeft },
     expense_payment:           { label: "Expense Payment",    cls: "bg-red-500/10 text-red-400 border-red-500/30",       icon: ArrowUpRight },
     container_expense_payment: { label: "Container Expense",  cls: "bg-orange-500/10 text-orange-400 border-orange-500/30", icon: ArrowUpRight },
+    duty_payment:              { label: "Duty Payment",       cls: "bg-rose-500/10 text-rose-400 border-rose-500/30",       icon: ArrowUpRight },
   }[type] ?? { label: type, cls: "bg-muted/60 text-muted-foreground border-border/40", icon: Receipt };
   const Icon = config.icon;
   return (

@@ -12,5 +12,17 @@ export type CreateUserRequestRole =
 export const CreateUserRequestRole = {
   admin: "admin",
   super_admin: "super_admin",
+  branch_admin: "branch_admin",
   staff: "staff",
+  documentation_user: "documentation_user",
+  accounts_user: "accounts_user",
+  operations_user: "operations_user",
+  transire_user: "transire_user",
+  shipping_user: "shipping_user",
+  terminal_user: "terminal_user",
+  pull_out_user: "pull_out_user",
+  shipping_terminal_user: "shipping_terminal_user",
+  terminal_manager: "terminal_manager",
+  delivery_user: "delivery_user",
+  security_user: "security_user",
 } as const;

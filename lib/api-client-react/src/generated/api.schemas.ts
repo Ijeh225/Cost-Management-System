@@ -27,7 +27,19 @@ export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 export const UserRole = {
   admin: "admin",
   super_admin: "super_admin",
+  branch_admin: "branch_admin",
   staff: "staff",
+  documentation_user: "documentation_user",
+  accounts_user: "accounts_user",
+  operations_user: "operations_user",
+  transire_user: "transire_user",
+  shipping_user: "shipping_user",
+  terminal_user: "terminal_user",
+  pull_out_user: "pull_out_user",
+  shipping_terminal_user: "shipping_terminal_user",
+  terminal_manager: "terminal_manager",
+  delivery_user: "delivery_user",
+  security_user: "security_user",
 } as const;
 
 export interface User {
@@ -35,9 +47,11 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  roles: string[];
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
   isActive: boolean;
+  canUpload: boolean;
   branchId?: number | null;
   branchName?: string | null;
   createdAt: string;
@@ -54,7 +68,19 @@ export type CreateUserRequestRole =
 export const CreateUserRequestRole = {
   admin: "admin",
   super_admin: "super_admin",
+  branch_admin: "branch_admin",
   staff: "staff",
+  documentation_user: "documentation_user",
+  accounts_user: "accounts_user",
+  operations_user: "operations_user",
+  transire_user: "transire_user",
+  shipping_user: "shipping_user",
+  terminal_user: "terminal_user",
+  pull_out_user: "pull_out_user",
+  shipping_terminal_user: "shipping_terminal_user",
+  terminal_manager: "terminal_manager",
+  delivery_user: "delivery_user",
+  security_user: "security_user",
 } as const;
 
 export interface CreateUserRequest {
@@ -65,6 +91,7 @@ export interface CreateUserRequest {
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
   branchId?: number | null;
+  canUpload?: boolean;
 }
 
 export type UpdateUserRequestRole =
@@ -73,7 +100,19 @@ export type UpdateUserRequestRole =
 export const UpdateUserRequestRole = {
   admin: "admin",
   super_admin: "super_admin",
+  branch_admin: "branch_admin",
   staff: "staff",
+  documentation_user: "documentation_user",
+  accounts_user: "accounts_user",
+  operations_user: "operations_user",
+  transire_user: "transire_user",
+  shipping_user: "shipping_user",
+  terminal_user: "terminal_user",
+  pull_out_user: "pull_out_user",
+  shipping_terminal_user: "shipping_terminal_user",
+  terminal_manager: "terminal_manager",
+  delivery_user: "delivery_user",
+  security_user: "security_user",
 } as const;
 
 export interface UpdateUserRequest {
@@ -84,12 +123,27 @@ export interface UpdateUserRequest {
   isActive?: boolean;
   password?: string;
   status?: string;
+  canUpload?: boolean;
 }
 
 export type ContainerStatus =
   (typeof ContainerStatus)[keyof typeof ContainerStatus];
 
 export const ContainerStatus = {
+  pending_verification: "pending_verification",
+  registered: "registered",
+  documentation: "documentation",
+  duty_assessment: "duty_assessment",
+  duty_payment: "duty_payment",
+  transire_processing: "transire_processing",
+  shipping: "shipping",
+  terminal: "terminal",
+  pull_out: "pull_out",
+  gate_in: "gate_in",
+  examination: "examination",
+  final_release: "final_release",
+  delivery: "delivery",
+  empty_return: "empty_return",
   new_upload: "new_upload",
   documentation_review: "documentation_review",
   shipping_entry: "shipping_entry",
@@ -125,6 +179,78 @@ export interface Container {
   clientName?: string | null;
   deliveredAt?: string | null;
   deliveredAtEstimated?: boolean;
+  branchId?: number | null;
+  stageOwner?: string | null;
+  nextAction?: string | null;
+  nextActionDueDate?: string | null;
+  delayReason?: string | null;
+  deliveryTime?: string | null;
+  deliveryLocation?: string | null;
+  truckNumber?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  dispatchOfficer?: string | null;
+  deliveryStatus?: string;
+  offloadingConfirmed?: boolean;
+  emptyReturnDueDate?: string | null;
+  emptyReturnDate?: string | null;
+  paarNumber?: string | null;
+  paarOfficer?: string | null;
+  paarReleasedAt?: string | null;
+  paarDelayReason?: string | null;
+  eta?: string | null;
+  command?: string | null;
+  consignee?: string | null;
+  berthed?: boolean;
+  berthingConfirmedAt?: string | null;
+  berthingConfirmedById?: number | null;
+  berthingConfirmedByName?: string | null;
+  verifiedAt?: string | null;
+  verifiedBy?: number | null;
+  verifiedByName?: string | null;
+  verificationOfficerId?: number | null;
+  verificationOfficerName?: string | null;
+  verificationOfficerIds?: number[];
+  verificationOfficerNames?: string[];
+  berthingOfficerId?: number | null;
+  berthingOfficerName?: string | null;
+  berthingOfficerIds?: number[];
+  berthingOfficerNames?: string[];
+  expectedTransireDate?: string | null;
+  transireStageOwner?: string | null;
+  transireReleasedAt?: string | null;
+  transireDelayReason?: string | null;
+  transireFinalDate?: string | null;
+  expectedDoDate?: string | null;
+  shippingStageOwner?: string | null;
+  doReleasedAt?: string | null;
+  doDelayReason?: string | null;
+  doFinalDate?: string | null;
+  expectedTdoDate?: string | null;
+  terminalStageOwner?: string | null;
+  tdoReleasedAt?: string | null;
+  tdoDelayReason?: string | null;
+  tdoFinalDate?: string | null;
+  expectedPulloutDate?: string | null;
+  pulloutStageOwner?: string | null;
+  pulloutReleasedAt?: string | null;
+  pulloutDelayReason?: string | null;
+  pulloutFinalDate?: string | null;
+  expectedReleaseDate?: string | null;
+  releaseConfirmedAt?: string | null;
+  releaseDelayReason?: string | null;
+  releaseFinalDate?: string | null;
+  earlyStartAuthorized?: boolean;
+  earlyStartAuthorizedById?: number | null;
+  earlyStartAuthorizedAt?: string | null;
+  earlyStartReason?: string | null;
+  gateInDate?: string | null;
+  gateOutDate?: string | null;
+  emptyGateInDate?: string | null;
+  emptyGateOutDate?: string | null;
+  stageEnteredAt?: string | null;
+  lifespanDays?: number | null;
+  lifespanClosed?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -143,6 +269,9 @@ export interface CreateContainerRequest {
   declaration?: string;
   size?: string;
   vessel?: string;
+  command?: string;
+  eta?: string;
+  consignee?: string;
   clearingCharges?: number;
   clientId?: number | null;
   branchId?: number;
@@ -159,6 +288,27 @@ export interface UpdateContainerRequest {
   assignedStaffId?: number | null;
   clearingCharges?: number;
   deliveredAt?: string | null;
+  stageOwner?: string | null;
+  nextAction?: string | null;
+  nextActionDueDate?: string | null;
+  delayReason?: string | null;
+  deliveryTime?: string | null;
+  deliveryLocation?: string | null;
+  truckNumber?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  dispatchOfficer?: string | null;
+  deliveryStatus?: string;
+  offloadingConfirmed?: boolean;
+  emptyReturnDueDate?: string | null;
+  emptyReturnDate?: string | null;
+  paarNumber?: string | null;
+  paarOfficer?: string | null;
+  paarReleasedAt?: string | null;
+  paarDelayReason?: string | null;
+  eta?: string | null;
+  consignee?: string | null;
+  tdoReleasedAt?: string | null;
 }
 
 export interface UploadRow {
@@ -168,6 +318,9 @@ export interface UploadRow {
   declaration?: string;
   size?: string;
   vessel?: string;
+  command?: string;
+  eta?: string;
+  consignee?: string;
   clearingCharges?: number;
 }
 
@@ -360,6 +513,17 @@ export type DashboardStatsAlerts = {
   delayedContainers: number;
 };
 
+export type DashboardStatsContainersInTerminalListItem = {
+  id: number;
+  containerNumber: string;
+  blNumber: string;
+  customerName: string;
+  size: string;
+  command: string | null;
+  status: string;
+  gateInDate: string | null;
+};
+
 export type DashboardStatsMonthlyTrendItem = {
   month: string;
   label: string;
@@ -388,6 +552,8 @@ export interface DashboardStats {
   totalInvoiced?: number;
   totalCollected?: number;
   totalOutstanding?: number;
+  containersInTerminal?: number;
+  containersInTerminalList?: DashboardStatsContainersInTerminalListItem[];
   monthlyTrend?: DashboardStatsMonthlyTrendItem[];
 }
 

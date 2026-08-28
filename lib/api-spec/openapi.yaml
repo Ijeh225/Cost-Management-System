@@ -1150,7 +1150,11 @@ components:
           type: string
         role:
           type: string
-          enum: [admin, super_admin, staff]
+          enum: [admin, super_admin, branch_admin, staff, documentation_user, accounts_user, operations_user, transire_user, shipping_user, terminal_user, pull_out_user, shipping_terminal_user, terminal_manager, delivery_user, security_user]
+        roles:
+          type: array
+          items:
+            type: string
         sectionPermission:
           type: string
           nullable: true
@@ -1158,6 +1162,8 @@ components:
           type: string
           nullable: true
         isActive:
+          type: boolean
+        canUpload:
           type: boolean
         branchId:
           type: integer
@@ -1167,7 +1173,7 @@ components:
           nullable: true
         createdAt:
           type: string
-      required: [id, email, name, role, isActive, createdAt]
+      required: [id, email, name, role, roles, isActive, canUpload, createdAt]
 
     CreateUserRequest:
       type: object
@@ -1180,7 +1186,7 @@ components:
           type: string
         role:
           type: string
-          enum: [admin, super_admin, staff]
+          enum: [admin, super_admin, branch_admin, staff, documentation_user, accounts_user, operations_user, transire_user, shipping_user, terminal_user, pull_out_user, shipping_terminal_user, terminal_manager, delivery_user, security_user]
         sectionPermission:
           type: string
           nullable: true
@@ -1190,6 +1196,8 @@ components:
         branchId:
           type: integer
           nullable: true
+        canUpload:
+          type: boolean
       required: [email, name, password, role]
 
     UpdateUserRequest:
@@ -1199,7 +1207,7 @@ components:
           type: string
         role:
           type: string
-          enum: [admin, super_admin, staff]
+          enum: [admin, super_admin, branch_admin, staff, documentation_user, accounts_user, operations_user, transire_user, shipping_user, terminal_user, pull_out_user, shipping_terminal_user, terminal_manager, delivery_user, security_user]
         sectionPermission:
           type: string
           nullable: true
@@ -1212,6 +1220,8 @@ components:
           type: string
         status:
           type: string
+        canUpload:
+          type: boolean
 
     Container:
       type: object
@@ -1232,7 +1242,7 @@ components:
           type: string
         status:
           type: string
-          enum: [new_upload, documentation_review, shipping_entry, customs_entry, terminal_entry, delivery_entry, accounting_review, management_approval, completed, closed]
+          enum: [pending_verification, registered, documentation, duty_assessment, duty_payment, transire_processing, shipping, terminal, pull_out, gate_in, examination, final_release, delivery, empty_return, new_upload, documentation_review, shipping_entry, customs_entry, terminal_entry, delivery_entry, accounting_review, management_approval, completed, closed]
         isLocked:
           type: boolean
         lockedSections:
@@ -1267,6 +1277,221 @@ components:
           type: string
           nullable: true
         deliveredAtEstimated:
+          type: boolean
+        branchId:
+          type: integer
+          nullable: true
+        stageOwner:
+          type: string
+          nullable: true
+        nextAction:
+          type: string
+          nullable: true
+        nextActionDueDate:
+          type: string
+          nullable: true
+        delayReason:
+          type: string
+          nullable: true
+        deliveryTime:
+          type: string
+          nullable: true
+        deliveryLocation:
+          type: string
+          nullable: true
+        truckNumber:
+          type: string
+          nullable: true
+        driverName:
+          type: string
+          nullable: true
+        driverPhone:
+          type: string
+          nullable: true
+        dispatchOfficer:
+          type: string
+          nullable: true
+        deliveryStatus:
+          type: string
+        offloadingConfirmed:
+          type: boolean
+        emptyReturnDueDate:
+          type: string
+          nullable: true
+        emptyReturnDate:
+          type: string
+          nullable: true
+        paarNumber:
+          type: string
+          nullable: true
+        paarOfficer:
+          type: string
+          nullable: true
+        paarReleasedAt:
+          type: string
+          nullable: true
+        paarDelayReason:
+          type: string
+          nullable: true
+        eta:
+          type: string
+          nullable: true
+        command:
+          type: string
+          nullable: true
+        consignee:
+          type: string
+          nullable: true
+        berthed:
+          type: boolean
+        berthingConfirmedAt:
+          type: string
+          nullable: true
+        berthingConfirmedById:
+          type: integer
+          nullable: true
+        berthingConfirmedByName:
+          type: string
+          nullable: true
+        verifiedAt:
+          type: string
+          nullable: true
+        verifiedBy:
+          type: integer
+          nullable: true
+        verifiedByName:
+          type: string
+          nullable: true
+        verificationOfficerId:
+          type: integer
+          nullable: true
+        verificationOfficerName:
+          type: string
+          nullable: true
+        verificationOfficerIds:
+          type: array
+          items:
+            type: integer
+        verificationOfficerNames:
+          type: array
+          items:
+            type: string
+        berthingOfficerId:
+          type: integer
+          nullable: true
+        berthingOfficerName:
+          type: string
+          nullable: true
+        berthingOfficerIds:
+          type: array
+          items:
+            type: integer
+        berthingOfficerNames:
+          type: array
+          items:
+            type: string
+        expectedTransireDate:
+          type: string
+          nullable: true
+        transireStageOwner:
+          type: string
+          nullable: true
+        transireReleasedAt:
+          type: string
+          nullable: true
+        transireDelayReason:
+          type: string
+          nullable: true
+        transireFinalDate:
+          type: string
+          nullable: true
+        expectedDoDate:
+          type: string
+          nullable: true
+        shippingStageOwner:
+          type: string
+          nullable: true
+        doReleasedAt:
+          type: string
+          nullable: true
+        doDelayReason:
+          type: string
+          nullable: true
+        doFinalDate:
+          type: string
+          nullable: true
+        expectedTdoDate:
+          type: string
+          nullable: true
+        terminalStageOwner:
+          type: string
+          nullable: true
+        tdoReleasedAt:
+          type: string
+          nullable: true
+        tdoDelayReason:
+          type: string
+          nullable: true
+        tdoFinalDate:
+          type: string
+          nullable: true
+        expectedPulloutDate:
+          type: string
+          nullable: true
+        pulloutStageOwner:
+          type: string
+          nullable: true
+        pulloutReleasedAt:
+          type: string
+          nullable: true
+        pulloutDelayReason:
+          type: string
+          nullable: true
+        pulloutFinalDate:
+          type: string
+          nullable: true
+        expectedReleaseDate:
+          type: string
+          nullable: true
+        releaseConfirmedAt:
+          type: string
+          nullable: true
+        releaseDelayReason:
+          type: string
+          nullable: true
+        releaseFinalDate:
+          type: string
+          nullable: true
+        earlyStartAuthorized:
+          type: boolean
+        earlyStartAuthorizedById:
+          type: integer
+          nullable: true
+        earlyStartAuthorizedAt:
+          type: string
+          nullable: true
+        earlyStartReason:
+          type: string
+          nullable: true
+        gateInDate:
+          type: string
+          nullable: true
+        gateOutDate:
+          type: string
+          nullable: true
+        emptyGateInDate:
+          type: string
+          nullable: true
+        emptyGateOutDate:
+          type: string
+          nullable: true
+        stageEnteredAt:
+          type: string
+          nullable: true
+        lifespanDays:
+          type: integer
+          nullable: true
+        lifespanClosed:
           type: boolean
         createdAt:
           type: string
@@ -1304,6 +1529,12 @@ components:
           type: string
         vessel:
           type: string
+        command:
+          type: string
+        eta:
+          type: string
+        consignee:
+          type: string
         clearingCharges:
           type: number
         clientId:
@@ -1338,6 +1569,67 @@ components:
         deliveredAt:
           type: string
           nullable: true
+        stageOwner:
+          type: string
+          nullable: true
+        nextAction:
+          type: string
+          nullable: true
+        nextActionDueDate:
+          type: string
+          nullable: true
+        delayReason:
+          type: string
+          nullable: true
+        deliveryTime:
+          type: string
+          nullable: true
+        deliveryLocation:
+          type: string
+          nullable: true
+        truckNumber:
+          type: string
+          nullable: true
+        driverName:
+          type: string
+          nullable: true
+        driverPhone:
+          type: string
+          nullable: true
+        dispatchOfficer:
+          type: string
+          nullable: true
+        deliveryStatus:
+          type: string
+        offloadingConfirmed:
+          type: boolean
+        emptyReturnDueDate:
+          type: string
+          nullable: true
+        emptyReturnDate:
+          type: string
+          nullable: true
+        paarNumber:
+          type: string
+          nullable: true
+        paarOfficer:
+          type: string
+          nullable: true
+        paarReleasedAt:
+          type: string
+          nullable: true
+        paarDelayReason:
+          type: string
+          nullable: true
+        eta:
+          type: string
+          nullable: true
+        consignee:
+          type: string
+          nullable: true
+        tdoReleasedAt:
+          type: string
+          nullable: true
 
     UploadContainersRequest:
       type: object
@@ -1365,6 +1657,12 @@ components:
         size:
           type: string
         vessel:
+          type: string
+        command:
+          type: string
+        eta:
+          type: string
+        consignee:
           type: string
         clearingCharges:
           type: number
@@ -1697,6 +1995,32 @@ components:
           type: number
         totalOutstanding:
           type: number
+        containersInTerminal:
+          type: integer
+        containersInTerminalList:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              containerNumber:
+                type: string
+              blNumber:
+                type: string
+              customerName:
+                type: string
+              size:
+                type: string
+              command:
+                type: string
+                nullable: true
+              status:
+                type: string
+              gateInDate:
+                type: string
+                nullable: true
+            required: [id, containerNumber, blNumber, customerName, size, command, status, gateInDate]
         monthlyTrend:
           type: array
           items:

@@ -13,5 +13,8 @@ export interface UploadRow {
   declaration?: string;
   size?: string;
   vessel?: string;
+  command?: string;
+  eta?: string;
+  consignee?: string;
   clearingCharges?: number;
 }

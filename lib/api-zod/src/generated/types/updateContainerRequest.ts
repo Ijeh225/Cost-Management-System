@@ -17,4 +17,25 @@ export interface UpdateContainerRequest {
   assignedStaffId?: number | null;
   clearingCharges?: number;
   deliveredAt?: string | null;
+  stageOwner?: string | null;
+  nextAction?: string | null;
+  nextActionDueDate?: string | null;
+  delayReason?: string | null;
+  deliveryTime?: string | null;
+  deliveryLocation?: string | null;
+  truckNumber?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  dispatchOfficer?: string | null;
+  deliveryStatus?: string;
+  offloadingConfirmed?: boolean;
+  emptyReturnDueDate?: string | null;
+  emptyReturnDate?: string | null;
+  paarNumber?: string | null;
+  paarOfficer?: string | null;
+  paarReleasedAt?: string | null;
+  paarDelayReason?: string | null;
+  eta?: string | null;
+  consignee?: string | null;
+  tdoReleasedAt?: string | null;
 }

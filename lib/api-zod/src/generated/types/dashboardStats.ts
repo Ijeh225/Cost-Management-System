@@ -8,6 +8,7 @@
 import type { AuditEntry } from "./auditEntry";
 import type { DashboardStatsAlerts } from "./dashboardStatsAlerts";
 import type { DashboardStatsContainersByStatusItem } from "./dashboardStatsContainersByStatusItem";
+import type { DashboardStatsContainersInTerminalListItem } from "./dashboardStatsContainersInTerminalListItem";
 import type { DashboardStatsCostByVesselItem } from "./dashboardStatsCostByVesselItem";
 import type { DashboardStatsMonthlyTrendItem } from "./dashboardStatsMonthlyTrendItem";
 import type { DashboardStatsProfitByCustomerItem } from "./dashboardStatsProfitByCustomerItem";
@@ -32,5 +33,7 @@ export interface DashboardStats {
   totalInvoiced?: number;
   totalCollected?: number;
   totalOutstanding?: number;
+  containersInTerminal?: number;
+  containersInTerminalList?: DashboardStatsContainersInTerminalListItem[];
   monthlyTrend?: DashboardStatsMonthlyTrendItem[];
 }

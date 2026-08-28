@@ -15,4 +15,5 @@ export interface UpdateUserRequest {
   isActive?: boolean;
   password?: string;
   status?: string;
+  canUpload?: boolean;
 }

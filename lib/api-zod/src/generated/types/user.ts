@@ -12,9 +12,11 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  roles: string[];
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
   isActive: boolean;
+  canUpload: boolean;
   branchId?: number | null;
   branchName?: string | null;
   createdAt: string;

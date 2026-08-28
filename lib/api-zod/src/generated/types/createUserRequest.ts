@@ -15,4 +15,5 @@ export interface CreateUserRequest {
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
   branchId?: number | null;
+  canUpload?: boolean;
 }

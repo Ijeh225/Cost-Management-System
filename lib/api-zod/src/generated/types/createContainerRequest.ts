@@ -13,6 +13,9 @@ export interface CreateContainerRequest {
   declaration?: string;
   size?: string;
   vessel?: string;
+  command?: string;
+  eta?: string;
+  consignee?: string;
   clearingCharges?: number;
   clientId?: number | null;
   branchId?: number;

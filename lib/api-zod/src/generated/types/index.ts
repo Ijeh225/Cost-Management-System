@@ -40,6 +40,7 @@ export * from "./customSectionWithFields";
 export * from "./dashboardStats";
 export * from "./dashboardStatsAlerts";
 export * from "./dashboardStatsContainersByStatusItem";
+export * from "./dashboardStatsContainersInTerminalListItem";
 export * from "./dashboardStatsCostByVesselItem";
 export * from "./dashboardStatsMonthlyTrendItem";
 export * from "./dashboardStatsProfitByCustomerItem";
