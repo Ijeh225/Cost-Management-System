@@ -641,6 +641,15 @@ async function runStartupMigrations() {
           ADD COLUMN IF NOT EXISTS berthing_officer_ids TEXT NOT NULL DEFAULT '[]'
       `);
     });
+    await runMigration("container_department_stage_owners_v1", async () => {
+      await pool.query(`
+        ALTER TABLE containers
+          ADD COLUMN IF NOT EXISTS transire_stage_owner TEXT,
+          ADD COLUMN IF NOT EXISTS shipping_stage_owner TEXT,
+          ADD COLUMN IF NOT EXISTS terminal_stage_owner TEXT,
+          ADD COLUMN IF NOT EXISTS pullout_stage_owner TEXT
+      `);
+    });
     await runMigration("whatsapp_messages_meta_provider_v1", async () => {
       await pool.query(`
         ALTER TABLE whatsapp_messages

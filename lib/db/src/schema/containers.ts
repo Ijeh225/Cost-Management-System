@@ -52,21 +52,25 @@ export const containersTable = pgTable("containers", {
   berthingConfirmedAt: timestamp("berthing_confirmed_at"),
   berthingConfirmedById: integer("berthing_confirmed_by_id").references(() => usersTable.id),
   // Transire stage tracking
+  transireStageOwner: text("transire_stage_owner"),
   expectedTransireDate: timestamp("expected_transire_date"),
   transireReleasedAt: timestamp("transire_released_at"),
   transireDelayReason: text("transire_delay_reason"),
   transireFinalDate: timestamp("transire_final_date"),
   // Shipping / DO stage tracking
+  shippingStageOwner: text("shipping_stage_owner"),
   expectedDoDate: timestamp("expected_do_date"),
   doReleasedAt: timestamp("do_released_at"),
   doDelayReason: text("do_delay_reason"),
   doFinalDate: timestamp("do_final_date"),
   // Terminal / TDO stage tracking
+  terminalStageOwner: text("terminal_stage_owner"),
   expectedTdoDate: timestamp("expected_tdo_date"),
   tdoReleasedAt: timestamp("tdo_released_at"),
   tdoDelayReason: text("tdo_delay_reason"),
   tdoFinalDate: timestamp("tdo_final_date"),
   // Pullout stage tracking
+  pulloutStageOwner: text("pullout_stage_owner"),
   expectedPulloutDate: timestamp("expected_pullout_date"),
   pulloutReleasedAt: timestamp("pullout_released_at"),
   pulloutDelayReason: text("pullout_delay_reason"),

@@ -6,6 +6,7 @@ import { calcTotalCost } from "../lib/calculations.js";
 import { getFinalWorkflowMissingStages } from "../lib/workflow-readiness.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
 import { isContainerPhysicallyInTerminal } from "../lib/operational-definitions.js";
+import { stageOwnerFieldFor, stageOwnerFor } from "../lib/department-stage-owners.js";
 
 const router = Router();
 const VERIFICATION_OFFICER_SETTING_KEY = "verificationOfficerUserId";
@@ -209,18 +210,22 @@ function formatContainer(
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
     updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
     expectedTransireDate: c.expectedTransireDate instanceof Date ? c.expectedTransireDate.toISOString() : (c.expectedTransireDate ?? null),
+    transireStageOwner: c.transireStageOwner ?? null,
     transireReleasedAt: c.transireReleasedAt instanceof Date ? c.transireReleasedAt.toISOString() : (c.transireReleasedAt ?? null),
     transireDelayReason: c.transireDelayReason ?? null,
     transireFinalDate: c.transireFinalDate instanceof Date ? c.transireFinalDate.toISOString() : (c.transireFinalDate ?? null),
     expectedDoDate: c.expectedDoDate instanceof Date ? c.expectedDoDate.toISOString() : (c.expectedDoDate ?? null),
+    shippingStageOwner: c.shippingStageOwner ?? null,
     doReleasedAt: c.doReleasedAt instanceof Date ? c.doReleasedAt.toISOString() : (c.doReleasedAt ?? null),
     doDelayReason: c.doDelayReason ?? null,
     doFinalDate: c.doFinalDate instanceof Date ? c.doFinalDate.toISOString() : (c.doFinalDate ?? null),
     expectedTdoDate: c.expectedTdoDate instanceof Date ? c.expectedTdoDate.toISOString() : (c.expectedTdoDate ?? null),
+    terminalStageOwner: c.terminalStageOwner ?? null,
     tdoReleasedAt: c.tdoReleasedAt instanceof Date ? c.tdoReleasedAt.toISOString() : (c.tdoReleasedAt ?? null),
     tdoDelayReason: c.tdoDelayReason ?? null,
     tdoFinalDate: c.tdoFinalDate instanceof Date ? c.tdoFinalDate.toISOString() : (c.tdoFinalDate ?? null),
     expectedPulloutDate: c.expectedPulloutDate instanceof Date ? c.expectedPulloutDate.toISOString() : (c.expectedPulloutDate ?? null),
+    pulloutStageOwner: c.pulloutStageOwner ?? null,
     pulloutReleasedAt: c.pulloutReleasedAt instanceof Date ? c.pulloutReleasedAt.toISOString() : (c.pulloutReleasedAt ?? null),
     pulloutDelayReason: c.pulloutDelayReason ?? null,
     pulloutFinalDate: c.pulloutFinalDate instanceof Date ? c.pulloutFinalDate.toISOString() : (c.pulloutFinalDate ?? null),
@@ -809,6 +814,10 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
       stageEnteredAt: containersTable.stageEnteredAt,
       assignedStaffName: usersTable.name,
       stageOwner: containersTable.stageOwner,
+      transireStageOwner: containersTable.transireStageOwner,
+      shippingStageOwner: containersTable.shippingStageOwner,
+      terminalStageOwner: containersTable.terminalStageOwner,
+      pulloutStageOwner: containersTable.pulloutStageOwner,
       nextAction: containersTable.nextAction,
       nextActionDueDate: containersTable.nextActionDueDate,
       delayReason: containersTable.delayReason,
@@ -933,7 +942,7 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
         updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : String(c.updatedAt),
         daysInStage,
         assignedStaffName: c.assignedStaffName ?? null,
-        stageOwnerName: c.stageOwner ?? null,
+        stageOwnerName: stageOwnerFor(c.status, c),
         nextAction: c.nextAction ?? null,
         nextActionDueAt: c.nextActionDueDate instanceof Date ? c.nextActionDueDate.toISOString() : (c.nextActionDueDate ?? null),
         delayReason: c.delayReason ?? null,
@@ -973,24 +982,29 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
       stages[c.status].push(entry);
 
       if (VERIFIED_PARALLEL_START_STAGES.has(c.status)) {
-        const parallelEntry = {
-          ...entry,
-          isEarlyStart: c.earlyStartAuthorized,
-          earlyStartReason: c.earlyStartReason ?? null,
-          earlyStartAuthorizedAt: c.earlyStartAuthorizedAt instanceof Date
-            ? c.earlyStartAuthorizedAt.toISOString()
-            : (c.earlyStartAuthorizedAt ?? null),
-        };
         for (const opsStage of PARALLEL_OPS_STAGES) {
           if (opsStage === c.status && PARALLEL_OPS_SET.has(c.status)) continue;
           if (!stages[opsStage]) stages[opsStage] = [];
-          stages[opsStage].push(parallelEntry);
+          stages[opsStage].push({
+            ...entry,
+            status: opsStage,
+            stageOwnerName: stageOwnerFor(opsStage, c),
+            isEarlyStart: c.earlyStartAuthorized,
+            earlyStartReason: c.earlyStartReason ?? null,
+            earlyStartAuthorizedAt: c.earlyStartAuthorizedAt instanceof Date
+              ? c.earlyStartAuthorizedAt.toISOString()
+              : (c.earlyStartAuthorizedAt ?? null),
+          });
         }
       }
 
       if (c.tdoReleasedAt && !c.pulloutReleasedAt) {
         if (!stages.pull_out) stages.pull_out = [];
-        stages.pull_out.push({ ...entry, status: "pull_out" });
+        stages.pull_out.push({
+          ...entry,
+          status: "pull_out",
+          stageOwnerName: stageOwnerFor("pull_out", c),
+        });
       }
 
       if (c.pulloutReleasedAt && !c.gateInDate) {
@@ -1485,7 +1499,7 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       if (finalDate) updates[fields.finalDate] = new Date(finalDate);
       notifMsg = `Delay recorded for ${existing.containerNumber} at ${fields.label}: ${delayReason}`;
     } else if (action === "update_stage_owner") {
-      updates.stageOwner = req.body.stageOwner || null;
+      updates[stageOwnerFieldFor(status)] = req.body.stageOwner || null;
     } else {
       return res.status(400).json({ error: `Unknown action: ${action}` });
     }
