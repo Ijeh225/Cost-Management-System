@@ -1,0 +1,151 @@
+SMART AI ASSISTANT PLAN
+
+Goal
+Turn the current safe tool console into a genuinely useful Admin/Super Admin finance and operations copilot, without allowing it to guess, expose unauthorised data, or change records without confirmation.
+
+PHASE 1: BUSINESS LANGUAGE DICTIONARY
+
+Create one official definition layer for terms used in the business.
+
+Examples:
+- "In the terminal" means physically present in the terminal.
+- "Terminal/TDO jobs" means jobs in the Terminal department workflow.
+- "Released" means an actual release date has been recorded.
+- "Outstanding" means unpaid balance, not MD-approved-but-unpaid money.
+
+Add aliases and Nigerian logistics terms such as PAAR, DO, TDO, transire, gate-in, pullout, duty, demurrage, and storage.
+
+Result: The AI stops answering the wrong business question.
+
+PHASE 2: BETTER QUESTION UNDERSTANDING
+
+Upgrade question routing so it can detect:
+- Intent: count, list, explain, compare, investigate, report.
+- Record: container, client, invoice, branch, bank, expense.
+- Timeframe: today, this week, this month, overdue.
+- Department/stage: Documentation, Transire, Shipping, Terminal, Pullout.
+
+Example: "How many shipping jobs are overdue this week?" correctly combines stage, condition, and period.
+
+Result: Questions are interpreted using their complete business meaning.
+
+PHASE 3: MULTI-STEP INVESTIGATION
+
+Allow safe plans that call more than one approved read tool.
+
+Example: "Why is container ABCD1234567 delayed?"
+1. Find the container.
+2. Check each stage's expected and actual dates.
+3. Check assigned officers and delay notes.
+4. Check documentation, payment, and berthing blockers.
+5. Return a short explanation with direct links.
+
+Result: The AI explains issues rather than only displaying counts.
+
+PHASE 4: STRONG CONVERSATION MEMORY
+
+Store safe, limited context for a conversation:
+- Selected branch.
+- Last container, client, invoice, or report.
+- Last timeframe and department.
+- Previous answer's cited records.
+
+Example:
+- User: "Show overdue Shipping jobs."
+- User: "Only Dangote's."
+- User: "Why is the first one delayed?"
+
+Result: Natural follow-up questions work properly while preserving branch permissions.
+
+PHASE 5: BETTER ANSWER PRESENTATION
+
+Make each answer follow a consistent structure:
+- Direct answer in plain English.
+- Important facts and calculations.
+- Reason or cause where available.
+- Recommended next step.
+- Clickable links to the exact container, invoice, payment, or report.
+
+Result: Answers feel like advice from an experienced operations accountant, not raw database output.
+
+PHASE 6: FULL READ-ONLY COVERAGE
+
+Complete safe tools for all major modules:
+- Containers, stages, berthing, delays, documentation.
+- Duty payments, invoices, receivables, client wallets.
+- Bank balances, reconciliations, transfers.
+- Overhead expenses and payment schedules.
+- Branch comparisons, analytics, notifications.
+- Uploaded documents and document intelligence.
+
+Result: The assistant can answer app-wide questions using live authorised data.
+
+PHASE 7: ACCOUNTANT INTELLIGENCE
+
+Add approved financial analysis rules:
+- Unusual expenses.
+- Duplicate or possible duplicate payments.
+- Overpayments and unallocated funds.
+- Expenses without approval.
+- Approved payments awaiting settlement.
+- Bank reconciliation gaps.
+- Revenue, expense, profit, and branch comparisons.
+
+Result: It starts identifying risks and opportunities, not only responding to requests.
+
+PHASE 8: REPORT AND DOCUMENT DRAFTING
+
+Let the AI prepare, but not silently issue:
+- Monthly finance reports.
+- Branch performance reports.
+- Client statements.
+- Payment summaries.
+- Overhead expense statements.
+- Debit note drafts.
+- Management briefing documents.
+
+Every draft must show source records and require human review before download, sending, or saving.
+
+Result: It can prepare useful documents while humans remain responsible for approval.
+
+PHASE 9: CONTROLLED ACTIONS
+
+Allow only selected actions through a two-step confirmation flow:
+- Draft a payment schedule.
+- Draft a debit note.
+- Draft a reminder.
+- Prepare a report.
+- Create a task from a detected delay.
+
+Never allow the AI to approve payments, verify containers, delete data, send external messages, or change financial records automatically.
+
+Result: It helps staff work faster, but humans retain control.
+
+PHASE 10: CONTINUOUS EVALUATION
+
+Build a real test library from business questions.
+
+For each question, record:
+- Correct business interpretation.
+- Expected data source.
+- Expected answer.
+- Whether the answer was accurate.
+- Any correction required.
+
+Test this before each AI update and monitor failed questions in Settings.
+
+Result: The assistant becomes smarter from real business use instead of becoming unpredictable.
+
+SECURITY THROUGHOUT
+
+- Admin/Super Admin access only.
+- Same branch permissions as the application.
+- No direct unrestricted SQL or raw database access.
+- Every question, data tool, answer, report draft, and action draft audited.
+- Rate limits and cost limits.
+- Evidence links on every factual answer.
+- A clear "I cannot confirm this safely" response when data is missing.
+
+RECOMMENDED IMPLEMENTATION ORDER
+
+Start with Phases 1 to 5, then add Finance Intelligence and reports, then controlled actions. This builds intelligence on reliable definitions rather than making the assistant sound clever while being wrong.
