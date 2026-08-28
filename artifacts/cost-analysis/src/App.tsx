@@ -231,61 +231,21 @@ function SuperAdminGuard({ children }: { children: ReactNode }) {
 function HomeRoute() {
   const {
     isLoading,
-    isTransireUser,
-    isShippingUser,
-    isTerminalUser,
-    isPullOutUser,
-    isShippingTerminalUser,
-    isOperationsUser,
-    isDocumentationUser,
-    isAccountsUser,
-    isTerminalManager,
-    isDeliveryUser,
-    isSecurityUser,
+    isDepartmentUser,
+    workspaceHome,
   } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (isLoading) return;
-    if (isTransireUser || isOperationsUser) setLocation("/workspace/transire", { replace: true });
-    else if (isShippingUser || isShippingTerminalUser) setLocation("/workspace/shipping", { replace: true });
-    else if (isTerminalUser) setLocation("/workspace/terminal-ops", { replace: true });
-    else if (isPullOutUser) setLocation("/workspace/pull-out", { replace: true });
-    else if (isDocumentationUser) setLocation("/documentation", { replace: true });
-    else if (isAccountsUser) setLocation("/workspace/accounts", { replace: true });
-    else if (isTerminalManager) setLocation("/workspace/terminal", { replace: true });
-    else if (isDeliveryUser) setLocation("/workspace/delivery", { replace: true });
-    else if (isSecurityUser) setLocation("/gate", { replace: true });
+    if (workspaceHome) setLocation(workspaceHome, { replace: true });
   }, [
     isLoading,
-    isTransireUser,
-    isShippingUser,
-    isTerminalUser,
-    isPullOutUser,
-    isShippingTerminalUser,
-    isOperationsUser,
-    isDocumentationUser,
-    isAccountsUser,
-    isTerminalManager,
-    isDeliveryUser,
-    isSecurityUser,
+    workspaceHome,
     setLocation,
   ]);
 
-  if (
-    isLoading ||
-    isTransireUser ||
-    isShippingUser ||
-    isTerminalUser ||
-    isPullOutUser ||
-    isShippingTerminalUser ||
-    isOperationsUser ||
-    isDocumentationUser ||
-    isAccountsUser ||
-    isTerminalManager ||
-    isDeliveryUser ||
-    isSecurityUser
-  ) {
+  if (isLoading || (isDepartmentUser && workspaceHome)) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-7 h-7 animate-spin text-primary" />

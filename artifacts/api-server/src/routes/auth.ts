@@ -15,9 +15,49 @@ import {
   isStrongPassword,
   STRONG_PASSWORD_MESSAGE,
 } from "../lib/auth.js";
+import { hasAuthority, resolveAccessProfile } from "../lib/authorization.js";
 
 const router = Router();
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function parseUserRoles(user: { role: string; roles: string | null }): string[] {
+  if (!user.roles) return [user.role];
+  try {
+    const parsed = JSON.parse(user.roles);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [user.role];
+  } catch {
+    return [user.role];
+  }
+}
+
+function formatAuthenticatedUser(user: typeof usersTable.$inferSelect, branchName: string | null) {
+  const accessProfile = resolveAccessProfile(user);
+  const isElevated = accessProfile.source === "modern"
+    ? hasAuthority(accessProfile, "admin")
+    : user.role === "admin" || user.role === "super_admin";
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    roles: parseUserRoles(user),
+    sectionPermission: user.sectionPermission ?? null,
+    sectionPermissions: user.sectionPermissions ?? null,
+    authorityLevel: user.authorityLevel ?? null,
+    jobFunction: user.jobFunction ?? null,
+    workspaceAccess: user.workspaceAccess ?? null,
+    accessProfileMigratedAt: user.accessProfileMigratedAt instanceof Date
+      ? user.accessProfileMigratedAt.toISOString()
+      : user.accessProfileMigratedAt ?? null,
+    accessProfile,
+    canUpload: isElevated ? true : (user.canUpload ?? false),
+    isActive: user.isActive,
+    createdAt: user.createdAt.toISOString(),
+    branchId: user.branchId,
+    branchName,
+  };
+}
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -64,7 +104,11 @@ router.post("/auth/login", loginIpLimiter, loginLimiter, async (req, res) => {
     const [loginBranch] = await db.select().from(branchesTable).where(eq(branchesTable.id, user.branchId)).limit(1);
     // Task #75: branch_admin (and any non-super_admin) cannot log in if their
     // branch has been deactivated. Check BEFORE issuing a session cookie.
-    if (user.role !== "super_admin" && (!loginBranch || !loginBranch.isActive)) {
+    const accessProfile = resolveAccessProfile(user);
+    const isSuperAdmin = accessProfile.source === "modern"
+      ? accessProfile.authorityLevel === "super_admin"
+      : user.role === "super_admin";
+    if (!isSuperAdmin && (!loginBranch || !loginBranch.isActive)) {
       return res.status(401).json({ error: "Your branch is currently disabled. Please contact an administrator." });
     }
     const sessionToken = generateSessionToken();
@@ -74,25 +118,8 @@ router.post("/auth/login", loginIpLimiter, loginLimiter, async (req, res) => {
       .where(eq(usersTable.id, user.id));
     const token = signToken(user.id, sessionToken);
     setAuthCookie(res, token);
-    let parsedRoles: string[] = [user.role];
-    if (user.roles) {
-      try {
-        const arr = JSON.parse(user.roles);
-        if (Array.isArray(arr) && arr.length > 0) parsedRoles = arr;
-      } catch {}
-    }
     return res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        roles: parsedRoles,
-        isActive: user.isActive,
-        createdAt: user.createdAt.toISOString(),
-        branchId: user.branchId,
-        branchName: loginBranch?.name ?? null,
-      },
+      user: formatAuthenticatedUser(user, loginBranch?.name ?? null),
       message: "Login successful",
     });
   } catch (err) {
@@ -129,28 +156,8 @@ router.get("/auth/me", requireAuth, async (req: AuthRequest, res) => {
     if (!u) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    let parsedRoles: string[] = [u.role];
-    if (u.roles) {
-      try {
-        const arr = JSON.parse(u.roles);
-        if (Array.isArray(arr) && arr.length > 0) parsedRoles = arr;
-      } catch {}
-    }
     const [meBranch] = await db.select().from(branchesTable).where(eq(branchesTable.id, u.branchId)).limit(1);
-    return res.json({
-      id: u.id,
-      email: u.email,
-      name: u.name,
-      role: u.role,
-      roles: parsedRoles,
-      sectionPermission: u.sectionPermission ?? null,
-      sectionPermissions: u.sectionPermissions ?? null,
-      canUpload: (u.role === "admin" || u.role === "super_admin") ? true : (u.canUpload ?? false),
-      isActive: u.isActive,
-      createdAt: u.createdAt.toISOString(),
-      branchId: u.branchId,
-      branchName: meBranch?.name ?? null,
-    });
+    return res.json(formatAuthenticatedUser(u, meBranch?.name ?? null));
   } catch {
     return res.status(500).json({ error: "Server error" });
   }

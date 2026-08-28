@@ -7,12 +7,48 @@ import { getFinalWorkflowMissingStages } from "../lib/workflow-readiness.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
 import { isContainerPhysicallyInTerminal } from "../lib/operational-definitions.js";
 import { stageOwnerFieldFor, stageOwnerFor } from "../lib/department-stage-owners.js";
+import { hasAuthority, hasWorkspace } from "../lib/authorization.js";
 
 const router = Router();
 const VERIFICATION_OFFICER_SETTING_KEY = "verificationOfficerUserId";
 const BERTHING_OFFICER_SETTING_KEY = "berthingOfficerUserId";
 const VERIFICATION_OFFICERS_SETTING_KEY = "verificationOfficerUserIds";
 const BERTHING_OFFICERS_SETTING_KEY = "berthingOfficerUserIds";
+
+const MODERN_WORKSPACE_STAGES: Record<string, string[]> = {
+  documentation: ["registered", "documentation", "duty_assessment"],
+  accounts: ["duty_payment"],
+  transire: ["transire_processing"],
+  shipping: ["shipping"],
+  terminal: ["terminal"],
+  pullout: ["pull_out"],
+  terminal_manager: ["gate_in", "examination", "final_release"],
+  delivery: ["delivery", "empty_return", "closed"],
+  security: ["gate_in"],
+};
+
+function readablePipelineStages(req: AuthRequest): Set<string> | null {
+  const profile = req.user?.accessProfile;
+  if (!profile || profile.source !== "modern" || hasAuthority(profile, "admin")) return null;
+
+  return new Set(profile.workspaces.flatMap((workspace) => MODERN_WORKSPACE_STAGES[workspace] ?? []));
+}
+
+function canPerformModernStageAction(req: AuthRequest, stage: string): boolean | null {
+  const profile = req.user?.accessProfile;
+  if (!profile || profile.source !== "modern") return null;
+  if (hasAuthority(profile, "admin")) return true;
+
+  const workspaceForStage: Record<string, "transire" | "shipping" | "terminal" | "pullout" | "terminal_manager"> = {
+    transire_processing: "transire",
+    shipping: "shipping",
+    terminal: "terminal",
+    pull_out: "pullout",
+    final_release: "terminal_manager",
+  };
+  const workspace = workspaceForStage[stage];
+  return workspace ? hasWorkspace(profile, workspace) : false;
+}
 
 function uniquePositiveIds(ids: Array<number | null | undefined>): number[] {
   return [...new Set(ids.filter((id): id is number => typeof id === "number" && Number.isFinite(id) && id > 0))];
@@ -1017,7 +1053,12 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
       stages[status].sort((a, b) => b.daysInStage - a.daysInStage);
     }
 
-    return res.json({ stages, total: rows.length });
+    const allowedStages = readablePipelineStages(req);
+    const visibleStages = allowedStages
+      ? Object.fromEntries(Object.entries(stages).filter(([stage]) => allowedStages.has(stage)))
+      : stages;
+    const visibleContainerIds = new Set(Object.values(visibleStages).flat().map((container) => container.id));
+    return res.json({ stages: visibleStages, total: allowedStages ? visibleContainerIds.size : rows.length });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -1468,9 +1509,13 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       return res.status(409).json({ error: "Pull-Out cannot be submitted until Terminal/TDO is submitted." });
     }
 
+    const modernStagePermission = canPerformModernStageAction(req, status);
     const userRoles: string[] = req.user!.roles;
-    const isAdmin = userRoles.some(r => r === "admin" || r === "super_admin");
+    const isAdmin = modernStagePermission === true || (modernStagePermission === null && userRoles.some(r => r === "admin" || r === "super_admin"));
     if (!isAdmin) {
+      if (modernStagePermission === false) {
+        return res.status(403).json({ error: "You do not have access to this operational workspace." });
+      }
       const STAGE_ALLOWED_ROLES: Record<string, string[]> = {
         transire_processing: ["transire_user", "operations_user"],
         shipping:            ["shipping_user", "shipping_terminal_user"],

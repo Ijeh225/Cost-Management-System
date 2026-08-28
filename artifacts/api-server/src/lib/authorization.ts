@@ -31,6 +31,24 @@ export interface AccessProfileUpdateInput {
   workspaceAccess: unknown;
 }
 
+export interface AccessProfileMigrationRow extends StoredAccessProfile {
+  isActive: boolean;
+}
+
+export interface AccessProfileMigrationSummary {
+  totalUsers: number;
+  activeUsers: number;
+  modernProfiles: number;
+  legacyProfiles: number;
+  invalidProfiles: number;
+  activeProfilesMigrated: number;
+  activeProfilesPending: number;
+  activeProfileMigrationComplete: boolean;
+  allProfilesMigrated: boolean;
+  legacyRetirementReady: false;
+  retirementBlockers: string[];
+}
+
 export type ValidatedAccessProfileUpdate = {
   authorityLevel: AuthorityLevel;
   jobFunction: JobFunction;
@@ -190,6 +208,48 @@ export function hasAuthority(
 
 export function hasWorkspace(profile: ResolvedAccessProfile, workspace: Workspace): boolean {
   return profile.source === "modern" && profile.workspaces.includes(workspace);
+}
+
+/**
+ * Summarises migration progress without changing a single legacy value. The
+ * legacy-role retirement flag is intentionally always false: removal needs a
+ * separately approved release after every account has been tested.
+ */
+export function summarizeAccessProfileMigration(
+  rows: readonly AccessProfileMigrationRow[],
+): AccessProfileMigrationSummary {
+  const resolved = rows.map((row) => ({ row, profile: resolveAccessProfile(row) }));
+  const active = resolved.filter(({ row }) => row.isActive);
+  const modernProfiles = resolved.filter(({ profile }) => profile.source === "modern").length;
+  const legacyProfiles = resolved.filter(({ profile }) => profile.source === "legacy").length;
+  const invalidProfiles = resolved.filter(({ profile }) => profile.source === "invalid").length;
+  const activeProfilesMigrated = active.filter(({ profile }) => profile.source === "modern").length;
+  const activeProfilesPending = active.length - activeProfilesMigrated;
+  const activeProfileMigrationComplete = activeProfilesPending === 0;
+  const allProfilesMigrated = resolved.every(({ profile }) => profile.source === "modern");
+  const retirementBlockers: string[] = [];
+
+  if (!activeProfileMigrationComplete) {
+    retirementBlockers.push(`${activeProfilesPending} active user profile(s) still require migration or correction.`);
+  }
+  if (!allProfilesMigrated) {
+    retirementBlockers.push("Inactive and archived accounts still need an explicit migration or retirement decision.");
+  }
+  retirementBlockers.push("Legacy role and section-permission fields are intentionally preserved until a separately approved retirement release.");
+
+  return {
+    totalUsers: rows.length,
+    activeUsers: active.length,
+    modernProfiles,
+    legacyProfiles,
+    invalidProfiles,
+    activeProfilesMigrated,
+    activeProfilesPending,
+    activeProfileMigrationComplete,
+    allProfilesMigrated,
+    legacyRetirementReady: false,
+    retirementBlockers,
+  };
 }
 
 /**

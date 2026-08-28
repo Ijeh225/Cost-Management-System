@@ -197,6 +197,27 @@ type AccessProfileResponse = {
   };
 };
 
+type RbacMigrationAudit = {
+  generatedAt: string;
+  readOnly: true;
+  summary: {
+    totalUsers: number;
+    activeUsers: number;
+    requiresManualReview: number;
+    migration: {
+      modernProfiles: number;
+      legacyProfiles: number;
+      invalidProfiles: number;
+      activeProfilesMigrated: number;
+      activeProfilesPending: number;
+      activeProfileMigrationComplete: boolean;
+      allProfilesMigrated: boolean;
+      legacyRetirementReady: false;
+      retirementBlockers: string[];
+    };
+  };
+};
+
 function BranchSelectField({
   branches, value, onChange, disabled,
 }: {
@@ -853,6 +874,12 @@ export default function Users() {
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [assigningUser, setAssigningUser] = useState<UserRow | null>(null);
   const [configuringAccessUser, setConfiguringAccessUser] = useState<UserRow | null>(null);
+  const { data: migrationAudit } = useQuery<RbacMigrationAudit>({
+    queryKey: ["/api/users/rbac-migration-audit"],
+    queryFn: () => customFetch<RbacMigrationAudit>("/api/users/rbac-migration-audit"),
+    enabled: isSuperAdmin,
+    staleTime: 30_000,
+  });
 
   if (!isAdminOrAbove) { setLocation("/"); return null; }
 
@@ -882,6 +909,44 @@ export default function Users() {
         </div>
         {isAdminOrAbove && <CreateUserDialog />}
       </div>
+
+      {isSuperAdmin && migrationAudit && (
+        <Card className="border-primary/20 bg-primary/[0.03] p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 font-semibold text-foreground">
+                <ShieldCheck className="h-4 w-4 text-primary" /> RBAC migration progress
+              </div>
+              <p className="max-w-2xl text-sm text-muted-foreground">
+                Configure each user with the new access profile, test their login and key workspace, then keep the legacy role as a fallback until the final retirement release.
+              </p>
+            </div>
+            <Badge variant="outline" className={migrationAudit.summary.migration.activeProfileMigrationComplete
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+              : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"}>
+              {migrationAudit.summary.migration.activeProfilesMigrated}/{migrationAudit.summary.activeUsers} active profiles migrated
+            </Badge>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-border/50 bg-card/60 px-4 py-3">
+              <p className="text-xs text-muted-foreground">Modern profiles</p>
+              <p className="mt-1 text-lg font-semibold">{migrationAudit.summary.migration.modernProfiles}</p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-card/60 px-4 py-3">
+              <p className="text-xs text-muted-foreground">Still using legacy access</p>
+              <p className="mt-1 text-lg font-semibold">{migrationAudit.summary.migration.legacyProfiles}</p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-card/60 px-4 py-3">
+              <p className="text-xs text-muted-foreground">Profiles needing correction</p>
+              <p className="mt-1 text-lg font-semibold">{migrationAudit.summary.migration.invalidProfiles}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex items-start gap-2 rounded-lg border border-border/50 bg-card/40 px-3 py-2.5 text-xs text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>{migrationAudit.summary.migration.retirementBlockers[0] ?? "Legacy cleanup is intentionally blocked until a separate approval."}</span>
+          </div>
+        </Card>
+      )}
 
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm shadow-lg overflow-hidden">
         <div className="overflow-x-auto">

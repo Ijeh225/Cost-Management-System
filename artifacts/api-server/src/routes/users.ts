@@ -3,7 +3,7 @@ import { db, usersTable, clientsTable, userClientAssignmentsTable, branchesTable
 import { eq, and, asc } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireSuperAdmin, requireBranchAdminOrAbove, AuthRequest, hashPassword, isStrongPassword, STRONG_PASSWORD_MESSAGE, parseRoles, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 import { reviewLegacyUserAccess } from "../lib/access-policy.js";
-import { resolveAccessProfile, validateAccessProfileUpdate } from "../lib/authorization.js";
+import { resolveAccessProfile, summarizeAccessProfileMigration, validateAccessProfileUpdate } from "../lib/authorization.js";
 
 // Roles a branch_admin is permitted to assign to users they create/edit (Task #75).
 // Explicitly excludes super_admin, admin, and branch_admin itself — branch admins
@@ -123,6 +123,7 @@ router.get("/users/rbac-migration-audit", requireSuperAdmin, async (_req: AuthRe
       review: reviewLegacyUserAccess(user),
     }));
     const countWithFlag = (flag: string) => users.filter((user) => user.review.flags.includes(flag as never)).length;
+    const migration = summarizeAccessProfileMigration(rows);
 
     return res.json({
       generatedAt: new Date().toISOString(),
@@ -138,6 +139,7 @@ router.get("/users/rbac-migration-audit", requireSuperAdmin, async (_req: AuthRe
         legacyCombinedWorkspaceRole: countWithFlag("legacy_combined_workspace_role"),
         operationsWorkspaceSelectionRequired: countWithFlag("operations_workspace_selection_required"),
         legacySectionPermissionsPresent: countWithFlag("legacy_section_permissions_present"),
+        migration,
       },
       users,
     });

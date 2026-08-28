@@ -6,7 +6,7 @@ import {
   isWorkspaceAllowedForFunction,
   reviewLegacyUserAccess,
 } from "../lib/access-policy.js";
-import { hasCapability, hasWorkspace, resolveAccessProfile, validateAccessProfileUpdate } from "../lib/authorization.js";
+import { hasCapability, hasWorkspace, resolveAccessProfile, summarizeAccessProfileMigration, validateAccessProfileUpdate } from "../lib/authorization.js";
 
 describe("access policy foundation", () => {
   it("keeps administrative authority separate from job function", () => {
@@ -152,5 +152,29 @@ describe("access policy foundation", () => {
     expect(hasCapability(branchAdmin, "users.manage_branch_members")).toBe(true);
     expect(hasCapability(branchAdmin, "users.manage_authority")).toBe(false);
     expect(hasCapability(branchAdmin, "finance.access")).toBe(false);
+  });
+
+  it("reports migration progress without claiming legacy cleanup is safe", () => {
+    const summary = summarizeAccessProfileMigration([
+      {
+        authorityLevel: "staff",
+        jobFunction: "operations",
+        workspaceAccess: JSON.stringify(["shipping"]),
+        accessProfileMigratedAt: new Date(),
+        isActive: true,
+      },
+      {
+        authorityLevel: null,
+        jobFunction: null,
+        workspaceAccess: null,
+        accessProfileMigratedAt: null,
+        isActive: true,
+      },
+    ]);
+
+    expect(summary.activeProfilesMigrated).toBe(1);
+    expect(summary.activeProfilesPending).toBe(1);
+    expect(summary.activeProfileMigrationComplete).toBe(false);
+    expect(summary.legacyRetirementReady).toBe(false);
   });
 });

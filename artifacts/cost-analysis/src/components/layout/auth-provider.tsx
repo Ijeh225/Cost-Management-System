@@ -28,6 +28,19 @@ export type AuthContextType = {
   isTerminalManager: boolean;
   isDeliveryUser: boolean;
   isSecurityUser: boolean;
+  accessProfile: ClientAccessProfile | null;
+  isModernAccessProfile: boolean;
+  workspaceHome: string | null;
+};
+
+type WorkspaceKey = "documentation" | "accounts" | "transire" | "shipping" | "terminal" | "pullout" | "terminal_manager" | "delivery" | "security";
+
+export type ClientAccessProfile = {
+  source: "modern" | "legacy" | "invalid";
+  authorityLevel: "super_admin" | "admin" | "branch_admin" | "staff" | null;
+  jobFunction: "general_staff" | "documentation" | "accounts" | "operations" | "terminal_manager" | "delivery" | "security" | null;
+  workspaces: WorkspaceKey[];
+  errors: string[];
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -47,6 +60,9 @@ const AuthContext = createContext<AuthContextType>({
   isTerminalManager: false,
   isDeliveryUser: false,
   isSecurityUser: false,
+  accessProfile: null,
+  isModernAccessProfile: false,
+  workspaceHome: null,
   isAuthenticated: false,
   isAdmin: false,
   isSuperAdmin: false,
@@ -65,6 +81,40 @@ const DEPT_ROLE_KEYS = [
   "transire_user", "shipping_user", "terminal_user", "pull_out_user",
   "shipping_terminal_user", "terminal_manager", "delivery_user", "security_user",
 ];
+
+const WORKSPACE_HOME: Record<WorkspaceKey, string> = {
+  documentation: "/documentation",
+  accounts: "/workspace/accounts",
+  transire: "/workspace/transire",
+  shipping: "/workspace/shipping",
+  terminal: "/workspace/terminal-ops",
+  pullout: "/workspace/pull-out",
+  terminal_manager: "/workspace/terminal",
+  delivery: "/workspace/delivery",
+  security: "/gate",
+};
+
+const LEGACY_DEPARTMENT_HOME: Record<string, string> = {
+  transire_user: "/workspace/transire",
+  shipping_user: "/workspace/shipping",
+  terminal_user: "/workspace/terminal-ops",
+  pull_out_user: "/workspace/pull-out",
+  shipping_terminal_user: "/workspace/shipping",
+  operations_user: "/workspace/transire",
+  documentation_user: "/documentation",
+  accounts_user: "/workspace/accounts",
+  terminal_manager: "/workspace/terminal",
+  delivery_user: "/workspace/delivery",
+  security_user: "/gate",
+};
+
+function readAccessProfile(user: User | null): ClientAccessProfile | null {
+  const profile = (user as (User & { accessProfile?: ClientAccessProfile }) | null)?.accessProfile;
+  if (!profile || !["modern", "legacy", "invalid"].includes(profile.source) || !Array.isArray(profile.workspaces)) {
+    return null;
+  }
+  return profile;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -107,6 +157,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ? null
       : lastKnownUser.current
   );
+  const role: string = effectiveUser?.role ?? "";
+  const roles: string[] = (effectiveUser as any)?.roles ?? [role];
+  const accessProfile = readAccessProfile(effectiveUser);
+  const modernAccessProfile = accessProfile?.source === "modern" ? accessProfile : null;
+  const isModernAccessProfile = modernAccessProfile !== null;
+  const workspaceHome = modernAccessProfile?.workspaces.length
+    ? WORKSPACE_HOME[modernAccessProfile.workspaces[0]] ?? null
+    : roles.map((candidateRole) => LEGACY_DEPARTMENT_HOME[candidateRole]).find(Boolean) ?? LEGACY_DEPARTMENT_HOME[role] ?? null;
 
   // CSRF tokens are bound to a server-side session. Clear the cached token
   // whenever the authenticated user changes (login, logout, or session expiry).
@@ -128,25 +186,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (isAuthPage || isSetupPage) {
         const role = (effectiveUser as any)?.role ?? "";
         const roles: string[] = (effectiveUser as any)?.roles ?? [role];
-        const deptHomeMap: Record<string, string> = {
-          transire_user:          "/workspace/transire",
-          shipping_user:          "/workspace/shipping",
-          terminal_user:          "/workspace/terminal-ops",
-          pull_out_user:          "/workspace/pull-out",
-          shipping_terminal_user: "/workspace/shipping",
-          operations_user:        "/workspace/transire",
-          documentation_user:     "/documentation",
-          accounts_user:          "/workspace/accounts",
-          terminal_manager:       "/workspace/terminal",
-          delivery_user:          "/workspace/delivery",
-          security_user:          "/gate",
-        };
-        // Pick first dept home from the user's roles
-        const home = roles.map(r => deptHomeMap[r]).find(Boolean);
-        setLocation(home ?? deptHomeMap[role] ?? "/");
+        const home = workspaceHome ?? roles.map(r => LEGACY_DEPARTMENT_HOME[r]).find(Boolean);
+        setLocation(home ?? LEGACY_DEPARTMENT_HOME[role] ?? "/");
       }
     }
-  }, [effectiveUser, userLoading, isFetching, isAuthPage, isSetupPage, setupStatus, setupLoading, setLocation]);
+  }, [effectiveUser, userLoading, isFetching, isAuthPage, isSetupPage, setupStatus, setupLoading, setLocation, workspaceHome]);
 
   if (isLoading && !isAuthPage && !isSetupPage) {
     return (
@@ -159,9 +203,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const role: string = effectiveUser?.role ?? "";
-  const roles: string[] = (effectiveUser as any)?.roles ?? [role];
   const hasRole = (r: string) => roles.includes(r);
+  const authorityLevel = modernAccessProfile?.authorityLevel ?? null;
+  const hasModernWorkspace = (workspace: WorkspaceKey) => modernAccessProfile?.workspaces.includes(workspace) ?? false;
+  const isSuperAdmin = isModernAccessProfile ? authorityLevel === "super_admin" : role === "super_admin";
+  const isAdmin = isModernAccessProfile
+    ? authorityLevel === "admin" || authorityLevel === "super_admin"
+    : role === "admin" || role === "super_admin";
+  const isBranchAdmin = isModernAccessProfile ? authorityLevel === "branch_admin" : role === "branch_admin";
+  const isAdminOrAbove = isModernAccessProfile
+    ? authorityLevel === "super_admin" || authorityLevel === "admin" || authorityLevel === "branch_admin"
+    : role === "admin" || role === "super_admin" || role === "branch_admin";
+  const isBranchMember = isModernAccessProfile
+    ? authorityLevel !== null
+    : role === "admin" || role === "super_admin" || role === "branch_admin" || role === "staff";
 
   return (
     <AuthContext.Provider
@@ -169,25 +224,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: effectiveUser,
         isLoading: !!isLoading,
         isAuthenticated: !!effectiveUser,
-        isSuperAdmin: role === "super_admin",
-        isAdmin: role === "admin" || role === "super_admin",
-        isBranchAdmin: role === "branch_admin",
-        isAdminOrAbove: role === "admin" || role === "super_admin" || role === "branch_admin",
-        isBranchMember: role === "admin" || role === "super_admin" || role === "branch_admin" || role === "staff",
+        isSuperAdmin,
+        isAdmin,
+        isBranchAdmin,
+        isAdminOrAbove,
+        isBranchMember,
         userRole: role || null,
         userRoles: roles,
-        isDocumentationUser: hasRole("documentation_user"),
-        isAccountsUser: hasRole("accounts_user"),
-        isOperationsUser: hasRole("operations_user"),
-        isTransireUser: hasRole("transire_user"),
-        isShippingUser: hasRole("shipping_user"),
-        isTerminalUser: hasRole("terminal_user"),
-        isPullOutUser: hasRole("pull_out_user"),
-        isShippingTerminalUser: hasRole("shipping_terminal_user"),
-        isTerminalManager: hasRole("terminal_manager"),
-        isDeliveryUser: hasRole("delivery_user"),
-        isSecurityUser: hasRole("security_user"),
-        isDepartmentUser: DEPT_ROLE_KEYS.some(r => roles.includes(r)),
+        isDocumentationUser: isModernAccessProfile ? hasModernWorkspace("documentation") : hasRole("documentation_user"),
+        isAccountsUser: isModernAccessProfile ? hasModernWorkspace("accounts") : hasRole("accounts_user"),
+        isOperationsUser: isModernAccessProfile ? modernAccessProfile.jobFunction === "operations" : hasRole("operations_user"),
+        isTransireUser: isModernAccessProfile ? hasModernWorkspace("transire") : hasRole("transire_user") || hasRole("operations_user"),
+        isShippingUser: isModernAccessProfile ? hasModernWorkspace("shipping") : hasRole("shipping_user"),
+        isTerminalUser: isModernAccessProfile ? hasModernWorkspace("terminal") : hasRole("terminal_user"),
+        isPullOutUser: isModernAccessProfile ? hasModernWorkspace("pullout") : hasRole("pull_out_user"),
+        isShippingTerminalUser: isModernAccessProfile
+          ? hasModernWorkspace("shipping") && hasModernWorkspace("terminal")
+          : hasRole("shipping_terminal_user"),
+        isTerminalManager: isModernAccessProfile ? hasModernWorkspace("terminal_manager") : hasRole("terminal_manager"),
+        isDeliveryUser: isModernAccessProfile ? hasModernWorkspace("delivery") : hasRole("delivery_user"),
+        isSecurityUser: isModernAccessProfile ? hasModernWorkspace("security") : hasRole("security_user"),
+        isDepartmentUser: isModernAccessProfile ? modernAccessProfile.jobFunction !== "general_staff" : DEPT_ROLE_KEYS.some(r => roles.includes(r)),
+        accessProfile,
+        isModernAccessProfile,
+        workspaceHome,
       }}
     >
       {children}

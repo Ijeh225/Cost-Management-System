@@ -55,7 +55,7 @@ function isNavItemActive(location: string, item: NavItem) {
 export function AppSidebar() {
   const [location] = useLocation();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const { isAdmin, isSuperAdmin, isBranchAdmin, isAdminOrAbove, isBranchMember, isAuthenticated, user, isDocumentationUser, isAccountsUser, isOperationsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser } = useAuth();
+  const { isAdmin, isSuperAdmin, isBranchAdmin, isAdminOrAbove, isBranchMember, isAuthenticated, user, isDocumentationUser, isAccountsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { activeBranchId, setActiveBranch, branches } = useBranchScope();
   const userBranchName = user?.branchName
@@ -122,15 +122,14 @@ export function AppSidebar() {
     ...(isAccountsUser      ? [{ title: "Duty Payments",      url: "/duty-payments",           icon: Banknote    },
                                 { title: "Payment Schedule",  url: "/payment-schedules",       icon: CalendarClock },
                                 { title: "Accounts Workspace", url: "/workspace/accounts",      icon: BookOpen    }] : []),
-    ...((isTransireUser || isOperationsUser) ? [{ title: "My Jobs", url: "/workspace/transire", icon: FileCheck2 }] : []),
-    ...(isShippingUser      ? [{ title: "My Jobs", url: "/workspace/shipping",     icon: Ship        }] : []),
+    ...(isTransireUser      ? [{ title: "Transire Jobs", url: "/workspace/transire", icon: FileCheck2 }] : []),
+    ...(isShippingUser      ? [{ title: "Shipping Jobs", url: "/workspace/shipping", icon: Ship        }] : []),
     ...(isShippingTerminalUser && !isShippingUser
-                            ? [{ title: "My Jobs", url: "/workspace/shipping",     icon: Ship        }] : []),
-    ...(isTerminalUser      ? [{ title: "My Jobs", url: "/workspace/terminal-ops", icon: Building2   }] : []),
-    ...(isPullOutUser       ? [{ title: "My Jobs", url: "/workspace/pull-out",     icon: PackageOpen }] : []),
+                            ? [{ title: "Shipping Jobs", url: "/workspace/shipping", icon: Ship        }] : []),
+    ...(isTerminalUser      ? [{ title: "Terminal Jobs", url: "/workspace/terminal-ops", icon: Building2   }] : []),
+    ...(isPullOutUser       ? [{ title: "Pull-Out Jobs", url: "/workspace/pull-out", icon: PackageOpen }] : []),
     ...(isTerminalManager   ? [{ title: "Terminal Workspace", url: "/workspace/terminal",      icon: Building2   }] : []),
-    ...(isDeliveryUser      ? [{ title: "Deliveries",         url: "/workspace/delivery",      icon: Truck       },
-                                { title: "Active Jobs",        url: "/operations",              icon: Activity    }] : []),
+    ...(isDeliveryUser      ? [{ title: "Deliveries",         url: "/workspace/delivery",      icon: Truck       }] : []),
     ...(isSecurityUser      ? [{ title: "Gate Security",      url: "/gate",                    icon: ShieldCheck }] : []),
   ];
 
