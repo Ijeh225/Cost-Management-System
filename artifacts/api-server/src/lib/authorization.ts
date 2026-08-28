@@ -25,6 +25,18 @@ export interface ResolvedAccessProfile {
   errors: string[];
 }
 
+export interface AccessProfileUpdateInput {
+  authorityLevel: unknown;
+  jobFunction: unknown;
+  workspaceAccess: unknown;
+}
+
+export type ValidatedAccessProfileUpdate = {
+  authorityLevel: AuthorityLevel;
+  jobFunction: JobFunction;
+  workspaceAccess: Workspace[];
+};
+
 export const CAPABILITIES = [
   "system.configure",
   "users.manage_authority",
@@ -46,16 +58,16 @@ const AUTHORITY_RANK: Record<AuthorityLevel, number> = {
   super_admin: 3,
 };
 
-function isAuthorityLevel(value: string): value is AuthorityLevel {
-  return AUTHORITY_LEVELS.includes(value as AuthorityLevel);
+function isAuthorityLevel(value: unknown): value is AuthorityLevel {
+  return typeof value === "string" && AUTHORITY_LEVELS.includes(value as AuthorityLevel);
 }
 
-function isJobFunction(value: string): value is JobFunction {
-  return JOB_FUNCTIONS.includes(value as JobFunction);
+function isJobFunction(value: unknown): value is JobFunction {
+  return typeof value === "string" && JOB_FUNCTIONS.includes(value as JobFunction);
 }
 
-function isWorkspace(value: string): value is Workspace {
-  return WORKSPACES.includes(value as Workspace);
+function isWorkspace(value: unknown): value is Workspace {
+  return typeof value === "string" && WORKSPACES.includes(value as Workspace);
 }
 
 function sameValues(left: readonly string[], right: readonly string[]): boolean {
@@ -72,6 +84,40 @@ export function parseWorkspaceAccess(workspaceAccess: string): Workspace[] | nul
   } catch {
     return null;
   }
+}
+
+/**
+ * Validates the API payload before it is written to the user record. The
+ * caller receives normal arrays; the database serialization happens only in
+ * the user-management route after this check succeeds.
+ */
+export function validateAccessProfileUpdate(input: AccessProfileUpdateInput): {
+  value: ValidatedAccessProfileUpdate | null;
+  errors: string[];
+} {
+  const authorityCandidate = input.authorityLevel;
+  const jobFunctionCandidate = input.jobFunction;
+  const workspaceCandidate = input.workspaceAccess;
+  const errors: string[] = [];
+  if (!isAuthorityLevel(authorityCandidate)) errors.push("Choose a valid authority level.");
+  if (!isJobFunction(jobFunctionCandidate)) errors.push("Choose a valid job function.");
+  if (!Array.isArray(workspaceCandidate) || !workspaceCandidate.every(isWorkspace)) {
+    errors.push("Workspace access must be an array of approved workspaces.");
+  }
+  if (errors.length > 0) return { value: null, errors };
+
+  const authorityLevel = authorityCandidate as AuthorityLevel;
+  const jobFunction = jobFunctionCandidate as JobFunction;
+  const workspaceAccess = [...new Set(workspaceCandidate as Workspace[])];
+  const resolved = resolveAccessProfile({
+    authorityLevel,
+    jobFunction,
+    workspaceAccess: JSON.stringify(workspaceAccess),
+    accessProfileMigratedAt: new Date(),
+  });
+  if (resolved.source !== "modern") return { value: null, errors: resolved.errors };
+
+  return { value: { authorityLevel, jobFunction, workspaceAccess }, errors: [] };
 }
 
 /**

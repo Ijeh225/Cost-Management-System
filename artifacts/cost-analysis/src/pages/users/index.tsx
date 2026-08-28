@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { useListUsers, useCreateUser, useUpdateUser, useListClients, useGetUserClientAssignments, useAddClientAssignment, useRemoveClientAssignment } from "@workspace/api-client-react";
+import { useEffect, useState } from "react";
+import { customFetch, useListUsers, useCreateUser, useUpdateUser, useListClients, useGetUserClientAssignments, useAddClientAssignment, useRemoveClientAssignment } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Shield, User as UserIcon, Pencil, PowerOff, Power, UploadCloud, Users2, X, Check, Truck, Info } from "lucide-react";
+import { Loader2, Plus, Shield, ShieldCheck, User as UserIcon, Pencil, PowerOff, Power, UploadCloud, Users2, X, Check, Truck, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { SECTION_LABELS, CHARGE_SECTIONS, parseSectionPermissions, type SectionPermLevel } from "@/lib/format";
 import { Switch } from "@/components/ui/switch";
@@ -130,9 +130,71 @@ type UserRow = {
   roles?: string[];
   sectionPermission?: string | null;
   sectionPermissions?: string | null;
+  authorityLevel?: string | null;
+  jobFunction?: string | null;
+  workspaceAccess?: string | null;
+  accessProfileMigratedAt?: string | null;
+  accessProfile?: {
+    source: "modern" | "legacy" | "invalid";
+    authorityLevel: string | null;
+    jobFunction: string | null;
+    workspaces: string[];
+    errors: string[];
+  };
   canUpload?: boolean;
   branchId?: number | null;
   isActive: boolean; createdAt: string;
+};
+
+const AUTHORITY_OPTIONS = [
+  { value: "super_admin", label: "Super Admin" },
+  { value: "admin", label: "Administrator" },
+  { value: "branch_admin", label: "Branch Admin" },
+  { value: "staff", label: "Staff" },
+] as const;
+
+const JOB_FUNCTION_OPTIONS = [
+  { value: "general_staff", label: "General Staff" },
+  { value: "documentation", label: "Documentation" },
+  { value: "accounts", label: "Accounts" },
+  { value: "operations", label: "Operations" },
+  { value: "terminal_manager", label: "Terminal Manager" },
+  { value: "delivery", label: "Delivery / Transport" },
+  { value: "security", label: "Gate Security" },
+] as const;
+
+const WORKSPACE_OPTIONS = [
+  { value: "documentation", label: "Documentation" },
+  { value: "accounts", label: "Accounts" },
+  { value: "transire", label: "Transire" },
+  { value: "shipping", label: "Shipping" },
+  { value: "terminal", label: "Terminal" },
+  { value: "pullout", label: "Pullout" },
+  { value: "terminal_manager", label: "Terminal Manager" },
+  { value: "delivery", label: "Delivery / Transport" },
+  { value: "security", label: "Gate Security" },
+] as const;
+
+type JobFunction = (typeof JOB_FUNCTION_OPTIONS)[number]["value"];
+
+const FIXED_WORKSPACES: Record<Exclude<JobFunction, "operations">, string[]> = {
+  general_staff: [],
+  documentation: ["documentation"],
+  accounts: ["accounts"],
+  terminal_manager: ["terminal_manager"],
+  delivery: ["delivery"],
+  security: ["security"],
+};
+
+type AccessProfileResponse = {
+  user: UserRow;
+  recommendation: {
+    proposedAuthority: string | null;
+    proposedJobFunction: string | null;
+    proposedWorkspaces: string[];
+    flags: string[];
+    requiresManualReview: boolean;
+  };
 };
 
 function BranchSelectField({
@@ -181,6 +243,11 @@ const DEPT_ROLES = [
 ];
 
 function formatPermissionsSummary(user: UserRow): string {
+  if (user.accessProfile?.source === "modern") {
+    const workspaceNames = user.accessProfile.workspaces
+      .map((workspace) => WORKSPACE_OPTIONS.find((option) => option.value === workspace)?.label ?? workspace);
+    return `${user.accessProfile.authorityLevel} | ${user.accessProfile.jobFunction}${workspaceNames.length ? ` | ${workspaceNames.join(", ")}` : ""}`;
+  }
   if (user.role === "super_admin") return "Full system control";
   if (user.role === "admin") return "All sections";
   if (DEPT_ROLES.includes(user.role)) return `${ROLE_LABELS[user.role] ?? user.role} department access`;
@@ -233,6 +300,165 @@ function WorkspaceRoleCheckboxes({
         ))}
       </div>
     </div>
+  );
+}
+
+function AccessProfileDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data, isLoading } = useQuery<AccessProfileResponse>({
+    queryKey: ["/api/users", user.id, "access-profile"],
+    queryFn: () => customFetch<AccessProfileResponse>(`/api/users/${user.id}/access-profile`),
+  });
+  const [authorityLevel, setAuthorityLevel] = useState("staff");
+  const [jobFunction, setJobFunction] = useState<JobFunction>("general_staff");
+  const [workspaces, setWorkspaces] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!data) return;
+    const profile = data.user.accessProfile;
+    const suggestedFunction = data.recommendation.proposedJobFunction;
+    const nextFunction = profile?.source === "modern"
+      ? profile.jobFunction
+      : suggestedFunction;
+    const nextAuthority = profile?.source === "modern"
+      ? profile.authorityLevel
+      : data.recommendation.proposedAuthority;
+    const nextWorkspaces = profile?.source === "modern"
+      ? profile.workspaces
+      : data.recommendation.proposedWorkspaces;
+
+    if (AUTHORITY_OPTIONS.some((option) => option.value === nextAuthority)) setAuthorityLevel(nextAuthority!);
+    if (JOB_FUNCTION_OPTIONS.some((option) => option.value === nextFunction)) {
+      setJobFunction(nextFunction as JobFunction);
+      setWorkspaces(nextWorkspaces ?? []);
+    }
+  }, [data]);
+
+  const changeJobFunction = (next: JobFunction) => {
+    setJobFunction(next);
+    setWorkspaces(next === "operations" ? [] : FIXED_WORKSPACES[next]);
+  };
+
+  const toggleWorkspace = (workspace: string) => {
+    setWorkspaces((current) => current.includes(workspace)
+      ? current.filter((value) => value !== workspace)
+      : [...current, workspace]);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () => customFetch<{ user: UserRow; message: string }>(`/api/users/${user.id}/access-profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ authorityLevel, jobFunction, workspaceAccess: workspaces }),
+    }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", user.id, "access-profile"] });
+      toast({ title: "Access profile saved", description: result.message });
+      onClose();
+    },
+    onError: (error: Error) => toast({
+      variant: "destructive",
+      title: "Access profile was not saved",
+      description: error.message,
+    }),
+  });
+
+  const profileState = data?.user.accessProfile?.source ?? "legacy";
+  const recommendationFlags = data?.recommendation.flags ?? [];
+  const fixedWorkspaces = jobFunction === "operations" ? null : FIXED_WORKSPACES[jobFunction];
+
+  return (
+    <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-xl max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-primary" />
+          Configure Access: {user.name}
+        </DialogTitle>
+      </DialogHeader>
+
+      {isLoading ? (
+        <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+      ) : (
+        <div className="space-y-5 pt-2">
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
+            This saves the new access profile only. The current legacy role and section permissions remain unchanged until the final migration phase.
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Authority level</label>
+              <Select value={authorityLevel} onValueChange={setAuthorityLevel}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {AUTHORITY_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Administrative level, separate from the person&apos;s work area.</p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Job function</label>
+              <Select value={jobFunction} onValueChange={(value) => changeJobFunction(value as JobFunction)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {JOB_FUNCTION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Determines the workspace family this person can receive.</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <p className="text-sm font-medium">Workspace access</p>
+              <p className="text-xs text-muted-foreground">
+                {jobFunction === "operations"
+                  ? "Choose one or more operational workspaces."
+                  : "This job function has a fixed workspace assignment."}
+              </p>
+            </div>
+            {jobFunction === "operations" ? (
+              <div className="grid grid-cols-2 gap-2">
+                {WORKSPACE_OPTIONS.filter((workspace) => ["transire", "shipping", "terminal", "pullout"].includes(workspace.value)).map((workspace) => (
+                  <Button
+                    key={workspace.value}
+                    type="button"
+                    variant={workspaces.includes(workspace.value) ? "default" : "outline"}
+                    onClick={() => toggleWorkspace(workspace.value)}
+                    className="justify-start"
+                  >
+                    <Check className={`mr-2 h-4 w-4 ${workspaces.includes(workspace.value) ? "opacity-100" : "opacity-0"}`} />
+                    {workspace.label}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2 rounded-lg border border-border/50 bg-secondary/20 p-3">
+                {fixedWorkspaces?.length ? fixedWorkspaces.map((workspace) => (
+                  <Badge key={workspace} variant="outline" className="border-primary/40 bg-primary/10 text-primary">
+                    {WORKSPACE_OPTIONS.find((option) => option.value === workspace)?.label ?? workspace}
+                  </Badge>
+                )) : <span className="text-sm text-muted-foreground">No specialist workspace is assigned.</span>}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-border/50 bg-secondary/15 px-4 py-3 text-xs text-muted-foreground space-y-1">
+            <p><span className="font-medium text-foreground">Current profile state:</span> {profileState === "modern" ? "Modern profile active" : profileState === "invalid" ? "Incomplete profile - review required" : "Legacy access still in use"}</p>
+            {recommendationFlags.length > 0 && <p><span className="font-medium text-foreground">Review flags:</span> {recommendationFlags.join(", ")}</p>}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-1">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Access Profile
+            </Button>
+          </div>
+        </div>
+      )}
+    </DialogContent>
   );
 }
 
@@ -626,6 +852,7 @@ export default function Users() {
   const { toast } = useToast();
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [assigningUser, setAssigningUser] = useState<UserRow | null>(null);
+  const [configuringAccessUser, setConfiguringAccessUser] = useState<UserRow | null>(null);
 
   if (!isAdminOrAbove) { setLocation("/"); return null; }
 
@@ -703,6 +930,11 @@ export default function Users() {
                             </Badge>
                           );
                         })}
+                        {(u as UserRow).accessProfile?.source === "modern" && (
+                          <Badge variant="outline" className="border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            <ShieldCheck className="w-3 h-3 mr-1" /> Modern profile
+                          </Badge>
+                        )}
                       </div>
                     </td>
                     {isSuperAdmin && (
@@ -737,6 +969,19 @@ export default function Users() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {isSuperAdmin && (
+                          <Dialog open={configuringAccessUser?.id === u.id} onOpenChange={(open) => { if (!open) setConfiguringAccessUser(null); }}>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="sm" onClick={() => setConfiguringAccessUser(u as UserRow)}
+                                className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary">
+                                <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Access
+                              </Button>
+                            </DialogTrigger>
+                            {configuringAccessUser?.id === u.id && (
+                              <AccessProfileDialog user={configuringAccessUser} onClose={() => setConfiguringAccessUser(null)} />
+                            )}
+                          </Dialog>
+                        )}
                         {(isSuperAdmin || (isAdminOrAbove && !(isBranchAdmin && ELEVATED_ROLES.includes(u.role)))) && (
                           <Dialog open={editingUser?.id === u.id} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
                             <DialogTrigger asChild>

@@ -6,7 +6,7 @@ import {
   isWorkspaceAllowedForFunction,
   reviewLegacyUserAccess,
 } from "../lib/access-policy.js";
-import { hasCapability, hasWorkspace, resolveAccessProfile } from "../lib/authorization.js";
+import { hasCapability, hasWorkspace, resolveAccessProfile, validateAccessProfileUpdate } from "../lib/authorization.js";
 
 describe("access policy foundation", () => {
   it("keeps administrative authority separate from job function", () => {
@@ -118,5 +118,39 @@ describe("access policy foundation", () => {
     expect(valid.source).toBe("modern");
     expect(hasWorkspace(valid, "shipping")).toBe(true);
     expect(hasWorkspace(valid, "terminal")).toBe(true);
+  });
+
+  it("validates an access-profile update before any database write", () => {
+    const valid = validateAccessProfileUpdate({
+      authorityLevel: "staff",
+      jobFunction: "operations",
+      workspaceAccess: ["shipping", "terminal"],
+    });
+    const invalid = validateAccessProfileUpdate({
+      authorityLevel: "staff",
+      jobFunction: "accounts",
+      workspaceAccess: ["shipping"],
+    });
+
+    expect(valid.value).toEqual({
+      authorityLevel: "staff",
+      jobFunction: "operations",
+      workspaceAccess: ["shipping", "terminal"],
+    });
+    expect(invalid.value).toBeNull();
+    expect(invalid.errors).toContain("Workspace access includes a workspace not allowed for this job function.");
+  });
+
+  it("does not give a branch admin finance or authority-management capability", () => {
+    const branchAdmin = resolveAccessProfile({
+      authorityLevel: "branch_admin",
+      jobFunction: "general_staff",
+      workspaceAccess: "[]",
+      accessProfileMigratedAt: new Date(),
+    });
+
+    expect(hasCapability(branchAdmin, "users.manage_branch_members")).toBe(true);
+    expect(hasCapability(branchAdmin, "users.manage_authority")).toBe(false);
+    expect(hasCapability(branchAdmin, "finance.access")).toBe(false);
   });
 });

@@ -4,7 +4,8 @@ import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { Request, Response, NextFunction } from "express";
 import { db, usersTable, branchesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { resolveAccessProfile, type ResolvedAccessProfile } from "./authorization.js";
+import { hasAuthority, resolveAccessProfile, type ResolvedAccessProfile } from "./authorization.js";
+import type { AuthorityLevel } from "./access-policy.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_ISSUER = "cost-management-system";
@@ -127,6 +128,33 @@ export interface AuthRequest extends Request {
   };
 }
 
+const LEGACY_AUTHORITY_RANK: Record<string, number> = {
+  staff: 0,
+  branch_admin: 1,
+  admin: 2,
+  super_admin: 3,
+};
+
+/**
+ * During migration, a complete new profile is authoritative. Users without a
+ * complete profile keep precisely their legacy role behaviour. That makes the
+ * change reversible and prevents a partially saved profile from widening
+ * access.
+ */
+export function hasEffectiveAuthority(req: AuthRequest, minimum: AuthorityLevel): boolean {
+  const user = req.user;
+  if (!user) return false;
+  if (user.accessProfile.source === "modern") {
+    return hasAuthority(user.accessProfile, minimum);
+  }
+  const minimumRank = LEGACY_AUTHORITY_RANK[minimum];
+  return (LEGACY_AUTHORITY_RANK[user.role] ?? -1) >= minimumRank;
+}
+
+export function isEffectiveSuperAdmin(req: AuthRequest): boolean {
+  return hasEffectiveAuthority(req, "super_admin");
+}
+
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const token = req.cookies?.[COOKIE_NAME];
@@ -153,23 +181,27 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       res.status(403).json({ error: "Invalid or missing CSRF token. Refresh the page and try again." });
       return;
     }
+    const accessProfile = resolveAccessProfile(user);
+    const effectiveSuperAdmin = accessProfile.source === "modern"
+      ? hasAuthority(accessProfile, "super_admin")
+      : user.role === "super_admin";
     // Task #74: hard-fail when branch scope inputs are invalid. Non-super-admin
     // users must have a branchId; super-admin's X-Branch-Id header (if any)
     // must be "all", empty, or a positive integer — never silently fall back.
-    if (user.role !== "super_admin" && (user.branchId == null || !Number.isFinite(user.branchId))) {
+    if (!effectiveSuperAdmin && (user.branchId == null || !Number.isFinite(user.branchId))) {
       res.status(403).json({ error: "Account is not assigned to a branch. Contact a super admin." });
       return;
     }
     // Task #75: reject sessions for non-super-admin users whose branch was
     // deactivated after they logged in.
-    if (user.role !== "super_admin") {
+    if (!effectiveSuperAdmin) {
       const [b] = await db.select({ isActive: branchesTable.isActive }).from(branchesTable).where(eq(branchesTable.id, user.branchId)).limit(1);
       if (!b || !b.isActive) {
         res.status(401).json({ error: "Your branch is currently disabled. Please contact an administrator." });
         return;
       }
     }
-    if (user.role === "super_admin") {
+    if (effectiveSuperAdmin) {
       const hdr = req.header("x-branch-id") ?? req.header("X-Branch-Id");
       if (hdr != null) {
         const t = String(hdr).trim();
@@ -182,7 +214,9 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
         }
       }
     }
-    const isElevated = user.role === "admin" || user.role === "super_admin";
+    const isElevated = accessProfile.source === "modern"
+      ? hasAuthority(accessProfile, "admin")
+      : user.role === "admin" || user.role === "super_admin";
     req.user = {
       id: user.id,
       email: user.email,
@@ -195,7 +229,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       jobFunction: user.jobFunction ?? null,
       workspaceAccess: user.workspaceAccess ?? null,
       accessProfileMigratedAt: user.accessProfileMigratedAt ?? null,
-      accessProfile: resolveAccessProfile(user),
+      accessProfile,
       canUpload: isElevated ? true : (user.canUpload ?? false),
       branchId: user.branchId,
     };
@@ -214,8 +248,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
  */
 export async function requireBranchAdminOrAbove(req: AuthRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {
-    const role = req.user?.role;
-    if (role !== "admin" && role !== "super_admin" && role !== "branch_admin") {
+    if (!hasEffectiveAuthority(req, "branch_admin")) {
       res.status(403).json({ error: "Admin access required" });
       return;
     }
@@ -230,8 +263,7 @@ export async function requireBranchAdminOrAbove(req: AuthRequest, res: Response,
  */
 export async function requireBranchMemberOrAbove(req: AuthRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {
-    const role = req.user?.role;
-    if (role !== "admin" && role !== "super_admin" && role !== "branch_admin" && role !== "staff") {
+    if (!hasEffectiveAuthority(req, "staff")) {
       res.status(403).json({ error: "Branch member access required" });
       return;
     }
@@ -241,8 +273,7 @@ export async function requireBranchMemberOrAbove(req: AuthRequest, res: Response
 
 export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {
-    const role = req.user?.role;
-    if (role !== "admin" && role !== "super_admin") {
+    if (!hasEffectiveAuthority(req, "admin")) {
       res.status(403).json({ error: "Admin access required" });
       return;
     }
@@ -265,7 +296,7 @@ export function userCanAccessBranch(req: AuthRequest, branchId: number | null | 
   const scope = getBranchScope(req);
   if (scope === null) {
     // Only super-admin can be in null scope (non-super-admin always has scope).
-    return req.user.role === "super_admin";
+    return isEffectiveSuperAdmin(req);
   }
   return scope === branchId;
 }
@@ -282,7 +313,7 @@ export function userCanAccessBranch(req: AuthRequest, branchId: number | null | 
  */
 export function getBranchScope(req: AuthRequest): number | null {
   if (!req.user) return null;
-  if (req.user.role !== "super_admin") return req.user.branchId;
+  if (!isEffectiveSuperAdmin(req)) return req.user.branchId;
   const raw = req.header("x-branch-id") ?? req.header("X-Branch-Id");
   if (!raw) return null;
   const trimmed = String(raw).trim();
@@ -307,7 +338,7 @@ export function resolveCreateBranch(req: AuthRequest, res: Response): number | n
 
 export async function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {
-    if (req.user?.role !== "super_admin") {
+    if (!isEffectiveSuperAdmin(req)) {
       res.status(403).json({ error: "Super Admin access required" });
       return;
     }

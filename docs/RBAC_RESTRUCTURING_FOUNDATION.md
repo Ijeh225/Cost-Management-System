@@ -28,6 +28,21 @@ eligible for future enforcement only when all four values are present and pass
 the shared authorization validation. Until then, the application continues to
 use its existing guards and legacy role fields.
 
+## Migration API And User Management
+
+Only a Super Admin can read or save a user's new access profile. The protected
+endpoints are `GET /api/users/:id/access-profile` and
+`PUT /api/users/:id/access-profile`. Saving requires a valid authority level,
+job function, and allowed workspace list. The API writes the new profile and
+migration timestamp only; it never silently changes `role`, `roles`, or legacy
+section permissions.
+
+User Management now exposes this as the **Access** action for Super Admins.
+The dialog uses the server's read-only migration recommendation, highlights
+ambiguous legacy records, and allows a deliberate profile to be saved. A valid
+modern profile becomes authoritative for the shared elevation guards, while
+users without one continue under their unchanged legacy role checks.
+
 ## Authority Levels
 
 | Authority | Scope | Intended responsibility |

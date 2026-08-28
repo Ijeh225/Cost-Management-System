@@ -3,6 +3,7 @@ import { db, usersTable, clientsTable, userClientAssignmentsTable, branchesTable
 import { eq, and, asc } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireSuperAdmin, requireBranchAdminOrAbove, AuthRequest, hashPassword, isStrongPassword, STRONG_PASSWORD_MESSAGE, parseRoles, getBranchScope, userCanAccessBranch } from "../lib/auth.js";
 import { reviewLegacyUserAccess } from "../lib/access-policy.js";
+import { resolveAccessProfile, validateAccessProfileUpdate } from "../lib/authorization.js";
 
 // Roles a branch_admin is permitted to assign to users they create/edit (Task #75).
 // Explicitly excludes super_admin, admin, and branch_admin itself — branch admins
@@ -69,6 +70,7 @@ const formatUser = (u: UserRow) => ({
   jobFunction: u.jobFunction ?? null,
   workspaceAccess: u.workspaceAccess ?? null,
   accessProfileMigratedAt: u.accessProfileMigratedAt instanceof Date ? u.accessProfileMigratedAt.toISOString() : u.accessProfileMigratedAt ?? null,
+  accessProfile: resolveAccessProfile(u),
   canUpload: ELEVATED_ROLES.has(u.role) ? true : (u.canUpload ?? false),
   createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
 });
@@ -142,6 +144,69 @@ router.get("/users/rbac-migration-audit", requireSuperAdmin, async (_req: AuthRe
   } catch (error) {
     console.error("Failed to generate RBAC migration audit", error);
     return res.status(500).json({ error: "Failed to generate RBAC migration audit" });
+  }
+});
+
+/**
+ * Access profiles are intentionally a Super Admin-only migration control.
+ * The profile never edits legacy role fields; it is stored beside them so a
+ * failed or incomplete migration cannot change an existing user's access.
+ */
+router.get("/users/:id/access-profile", requireSuperAdmin, async (req: AuthRequest, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid user ID" });
+
+  try {
+    const [user] = await db.select(userFields).from(usersTable).where(eq(usersTable.id, id)).limit(1);
+    if (!user || !userCanAccessBranch(req, user.branchId)) return res.status(404).json({ error: "User not found" });
+
+    return res.json({
+      user: formatUser(user),
+      recommendation: reviewLegacyUserAccess(user),
+      readOnlyLegacyFields: ["role", "roles", "sectionPermission", "sectionPermissions"],
+    });
+  } catch (error) {
+    console.error("Failed to read user access profile", error);
+    return res.status(500).json({ error: "Failed to read user access profile" });
+  }
+});
+
+router.put("/users/:id/access-profile", requireSuperAdmin, async (req: AuthRequest, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid user ID" });
+
+  const validated = validateAccessProfileUpdate({
+    authorityLevel: req.body?.authorityLevel,
+    jobFunction: req.body?.jobFunction,
+    workspaceAccess: req.body?.workspaceAccess,
+  });
+  if (!validated.value) {
+    return res.status(400).json({ error: "Invalid access profile", details: validated.errors });
+  }
+
+  try {
+    const [target] = await db.select({ id: usersTable.id, branchId: usersTable.branchId })
+      .from(usersTable)
+      .where(eq(usersTable.id, id))
+      .limit(1);
+    if (!target || !userCanAccessBranch(req, target.branchId)) return res.status(404).json({ error: "User not found" });
+
+    const [updated] = await db.update(usersTable).set({
+      authorityLevel: validated.value.authorityLevel,
+      jobFunction: validated.value.jobFunction,
+      workspaceAccess: JSON.stringify(validated.value.workspaceAccess),
+      accessProfileMigratedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(usersTable.id, id)).returning();
+
+    if (!updated) return res.status(404).json({ error: "User not found" });
+    return res.json({
+      user: formatUser(updated),
+      message: "Access profile saved. Legacy role fields remain unchanged during the migration.",
+    });
+  } catch (error) {
+    console.error("Failed to save user access profile", error);
+    return res.status(500).json({ error: "Failed to save user access profile" });
   }
 });
 
