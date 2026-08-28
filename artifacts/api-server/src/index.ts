@@ -952,6 +952,39 @@ async function runStartupMigrations() {
       await pool.query(`CREATE INDEX IF NOT EXISTS report_delivery_logs_subscription_idx ON report_delivery_logs(subscription_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS report_delivery_logs_delivered_idx ON report_delivery_logs(delivered_at)`);
     });
+    await runMigration("report_subscriptions_v2", async () => {
+      await pool.query(`
+        ALTER TABLE report_subscriptions
+          ADD COLUMN IF NOT EXISTS send_at TEXT NOT NULL DEFAULT '08:00',
+          ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'Africa/Lagos',
+          ADD COLUMN IF NOT EXISTS send_day_of_week INTEGER NOT NULL DEFAULT 1,
+          ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS archived_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS report_subscriptions_archived_idx ON report_subscriptions(archived_at)`);
+      await pool.query(`
+        DO $$
+        DECLARE existing_constraint TEXT;
+        BEGIN
+          SELECT conname INTO existing_constraint
+          FROM pg_constraint
+          WHERE conrelid = 'report_delivery_logs'::regclass
+            AND confrelid = 'report_subscriptions'::regclass
+            AND contype = 'f'
+          LIMIT 1;
+
+          IF existing_constraint IS NOT NULL THEN
+            EXECUTE format('ALTER TABLE report_delivery_logs DROP CONSTRAINT %I', existing_constraint);
+          END IF;
+
+          ALTER TABLE report_delivery_logs
+            ADD CONSTRAINT report_delivery_logs_subscription_fkey
+            FOREIGN KEY (subscription_id) REFERENCES report_subscriptions(id) ON DELETE RESTRICT;
+        EXCEPTION WHEN duplicate_object THEN
+          NULL;
+        END $$;
+      `);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

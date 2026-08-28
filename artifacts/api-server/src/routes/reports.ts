@@ -5,7 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, requireSuperAdmin, getBranchScope, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
 import { deliverReportSubscription } from "../lib/report-delivery.js";
-import { normalizeReportRecipients, SCHEDULED_REPORT_FREQUENCIES, SCHEDULED_REPORT_KINDS } from "../lib/report-delivery-rules.js";
+import { normalizeReportRecipients, normalizeReportSendAt, normalizeReportSendDayOfWeek, SCHEDULED_REPORT_FREQUENCIES, SCHEDULED_REPORT_KINDS } from "../lib/report-delivery-rules.js";
 
 export const reportsRouter = Router();
 
@@ -177,6 +177,21 @@ function subscriptionResponse(row: typeof reportSubscriptionsTable.$inferSelect)
   return { ...row, recipients, filters };
 }
 
+function normalizeSubscriptionFilters(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const from = typeof raw.from === "string" ? raw.from.trim() : "";
+  const to = typeof raw.to === "string" ? raw.to.trim() : "";
+  const valid = (date: string) => {
+    if (!date) return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+    const parsed = new Date(`${date}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
+  };
+  if (!valid(from) || !valid(to) || (from && to && from > to)) return null;
+  return { from, to };
+}
+
 reportsRouter.get("/reports/subscriptions", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const scope = getBranchScope(req);
@@ -207,13 +222,17 @@ reportsRouter.get("/reports/subscriptions/:id/logs", requireAuth, requireBranchA
 
 reportsRouter.post("/reports/subscriptions", requireAuth, requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
-    const { reportKind, frequency, recipients, filters = {} } = req.body ?? {};
+    const { reportKind, frequency, recipients, filters = {}, sendAt = "08:00", sendDayOfWeek = 1 } = req.body ?? {};
     if (!SCHEDULED_REPORT_KINDS.has(reportKind) || !SCHEDULED_REPORT_FREQUENCIES.has(frequency)) return res.status(400).json({ error: "Choose a supported report and frequency." });
     const safeRecipients = normalizeReportRecipients(recipients);
     if (!safeRecipients) return res.status(400).json({ error: "Provide 1 to 20 valid recipient email addresses." });
-    if (!filters || typeof filters !== "object" || Array.isArray(filters)) return res.status(400).json({ error: "Invalid report filters." });
+    const safeFilters = normalizeSubscriptionFilters(filters);
+    if (!safeFilters) return res.status(400).json({ error: "Use a valid optional date range where From is on or before To." });
+    const safeSendAt = normalizeReportSendAt(sendAt);
+    const safeSendDayOfWeek = normalizeReportSendDayOfWeek(sendDayOfWeek);
+    if (!safeSendAt || safeSendDayOfWeek === null) return res.status(400).json({ error: "Use a valid Lagos send time and weekly day." });
     const branchId = getBranchScope(req);
-    const [row] = await db.insert(reportSubscriptionsTable).values({ branchId, reportKind, frequency, recipients: JSON.stringify(safeRecipients), filters: JSON.stringify(filters), createdById: req.user!.id }).returning();
+    const [row] = await db.insert(reportSubscriptionsTable).values({ branchId, reportKind, frequency, recipients: JSON.stringify(safeRecipients), filters: JSON.stringify(safeFilters), sendAt: safeSendAt, timezone: "Africa/Lagos", sendDayOfWeek: safeSendDayOfWeek, createdById: req.user!.id }).returning();
     return res.status(201).json({ subscription: subscriptionResponse(row) });
   } catch (err) {
     console.error("Report subscription create failed", err);
@@ -228,10 +247,18 @@ reportsRouter.patch("/reports/subscriptions/:id", requireAuth, requireBranchAdmi
     const [existing] = await db.select().from(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.id, id));
     const scope = getBranchScope(req);
     if (!existing || (scope !== null && existing.branchId !== scope)) return res.status(404).json({ error: "Report subscription not found." });
+    if (existing.archivedAt) {
+      if (req.body?.restore !== true) return res.status(409).json({ error: "Archived schedules are read-only. Restore it before editing." });
+      const [restored] = await db.update(reportSubscriptionsTable).set({ archivedAt: null, archivedById: null, isActive: false, updatedAt: new Date() }).where(eq(reportSubscriptionsTable.id, id)).returning();
+      return res.json({ subscription: subscriptionResponse(restored) });
+    }
     const update: Partial<typeof reportSubscriptionsTable.$inferInsert> = { updatedAt: new Date() };
     if (typeof req.body?.isActive === "boolean") update.isActive = req.body.isActive;
     if (req.body?.frequency !== undefined) { if (!SCHEDULED_REPORT_FREQUENCIES.has(req.body.frequency)) return res.status(400).json({ error: "Unsupported frequency." }); update.frequency = req.body.frequency; }
     if (req.body?.recipients !== undefined) { const parsed = normalizeReportRecipients(req.body.recipients); if (!parsed) return res.status(400).json({ error: "Provide valid recipient email addresses." }); update.recipients = JSON.stringify(parsed); }
+    if (req.body?.filters !== undefined) { const filters = normalizeSubscriptionFilters(req.body.filters); if (!filters) return res.status(400).json({ error: "Use a valid optional date range where From is on or before To." }); update.filters = JSON.stringify(filters); }
+    if (req.body?.sendAt !== undefined) { const sendAt = normalizeReportSendAt(req.body.sendAt); if (!sendAt) return res.status(400).json({ error: "Use a valid Lagos send time." }); update.sendAt = sendAt; }
+    if (req.body?.sendDayOfWeek !== undefined) { const day = normalizeReportSendDayOfWeek(req.body.sendDayOfWeek); if (day === null) return res.status(400).json({ error: "Use a valid weekly day." }); update.sendDayOfWeek = day; }
     const [row] = await db.update(reportSubscriptionsTable).set(update).where(eq(reportSubscriptionsTable.id, id)).returning();
     return res.json({ subscription: subscriptionResponse(row) });
   } catch (err) {
@@ -247,6 +274,7 @@ reportsRouter.post("/reports/subscriptions/:id/send-test", requireAuth, requireB
     const [subscription] = await db.select().from(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.id, id));
     const scope = getBranchScope(req);
     if (!subscription || (scope !== null && subscription.branchId !== scope)) return res.status(404).json({ error: "Report subscription not found." });
+    if (subscription.archivedAt) return res.status(409).json({ error: "Archived schedules cannot send reports. Restore the schedule first." });
     const result = await deliverReportSubscription(subscription, new Date(), { test: true });
     return result.status === "sent" ? res.json(result) : res.status(502).json(result);
   } catch (err) {
@@ -261,8 +289,12 @@ reportsRouter.delete("/reports/subscriptions/:id", requireAuth, requireBranchAdm
     const [existing] = await db.select().from(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.id, id));
     const scope = getBranchScope(req);
     if (!existing || (scope !== null && existing.branchId !== scope)) return res.status(404).json({ error: "Report subscription not found." });
-    await db.delete(reportSubscriptionsTable).where(eq(reportSubscriptionsTable.id, id));
-    return res.json({ success: true });
+    if (existing.archivedAt) return res.json({ success: true, archived: true });
+    const [archived] = await db.update(reportSubscriptionsTable)
+      .set({ isActive: false, archivedAt: new Date(), archivedById: req.user!.id, updatedAt: new Date() })
+      .where(eq(reportSubscriptionsTable.id, id))
+      .returning();
+    return res.json({ success: true, archived: true, subscription: subscriptionResponse(archived) });
   } catch (err) {
     console.error("Report subscription delete failed", err);
     return res.status(500).json({ error: "Unable to delete report subscription." });

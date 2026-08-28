@@ -54,11 +54,15 @@ Existing cashflow, P&L, accounts-receivable, client statement, delivery, branch-
 
 The first controlled delivery release supports **Duty Payment Ledger** and **Workflow Stage Summary** emails.
 
-- Only branch administrators and super administrators can create, pause, resume, or delete schedules.
+- Only branch administrators and super administrators can create, pause, resume, restore, or archive schedules.
 - A schedule is bound to the creator's current branch scope. A super administrator in all-branches mode may create a consolidated schedule.
 - Recipients are validated email addresses, limited to 20 per schedule.
+- Delivery uses the configured **Africa/Lagos** wall-clock time. Weekly schedules also use their selected weekday; saving a schedule never sends it immediately.
+- Saved Report Centre date filters are used for the Duty Payment Summary delivery. Workflow Stage Summary is an as-of-now operational snapshot and intentionally does not pretend to be a historical ledger.
+- The emailed Duty Payment Summary contains totals for the selected period. The on-screen Duty Payment Ledger and CSV export contain the individual payment rows.
 - Delivery runs through the existing server scheduler and Resend configuration. A schedule is marked sent only after Resend accepts the message.
 - Every attempt is stored in `report_delivery_logs` with recipients, report type, item count, delivery time, and an error message when it failed.
 - Administrators can use **Send test** to prove a subscription and recipient list work immediately. Test sends are separately labelled in the delivery history and do not change the next scheduled delivery time.
 - Administrators can open **History** to review the latest 50 sent, failed, and test delivery attempts before relying on a schedule.
+- Archiving a schedule pauses it and retains the schedule plus its delivery history as audit evidence. A physical deletion is blocked while delivery evidence exists.
 - Scheduled reports are read-only summaries. They never approve, pay, update, or otherwise change a job or financial record.
