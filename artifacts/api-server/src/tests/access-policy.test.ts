@@ -43,4 +43,3 @@ describe("access policy foundation", () => {
     });
   });
 });
-

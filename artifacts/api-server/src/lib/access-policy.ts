@@ -111,4 +111,3 @@ export const LEGACY_ROLE_MAPPINGS = {
   jobFunction: JobFunction;
   workspaces: readonly Workspace[];
 }>;
-
