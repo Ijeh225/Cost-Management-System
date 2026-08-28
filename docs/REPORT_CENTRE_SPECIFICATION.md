@@ -25,6 +25,8 @@ The Report Centre must distinguish a job's operational progress from financial f
 6. **Overhead and Payment Schedule**: original expense, top-ups, approved-but-unpaid schedule amounts, actual payments, balance, source, and approvals.
 7. **Bank and Cashflow**: all dated credits/debits by source. Duty payments paid from a bank appear as debits; cash payments are not attributed to a bank.
 8. **Branch Comparison**: the same definitions by branch, with an explicit period and no mixed scope.
+9. **Financial Ledger**: a source-linked, date-ordered view of actual invoice collections, duty payments, overhead payments, container disbursements, bank funding, and both sides of bank transfers. Estimates, approvals, and running balances are excluded until an actual transaction exists.
+10. **Finance Review Queue**: narrow data-quality exceptions that need a human check. The first control identifies payments marked as bank payments without a selected bank account; it never labels a record as fraud or corrects it automatically.
 
 ## Integrity Rules
 
@@ -49,6 +51,14 @@ The first Report Centre delivery provides three source-linked reports inside the
 - **Duty Snapshot Reconciliation**: compares the current Customs-duty running balance to immutable ledger totals. A positive historical difference is labelled `Historical / unledgered`; it is not invented as a payment or automatically treated as an error. A ledger total above the current running balance is `Needs attention`.
 
 Existing cashflow, P&L, accounts-receivable, client statement, delivery, branch-comparison, and disbursement-reconciliation reports remain available through their existing report cards.
+
+## Accounting Control Reports
+
+The Reports page also provides an **Accounting Control** section that applies the same visible date range and authorised branch scope as the rest of the report page.
+
+- **Financial Ledger** is read-only and exports the displayed rows to CSV. Each row links back to its invoice, container payment history, overhead expense, or bank-management source page.
+- A bank transfer is represented by an outflow from the sending bank and an inflow to the receiving bank. This makes the bank movement traceable while keeping the transfer's net effect at zero.
+- **Finance Review Queue** is a review prompt, not a correction workflow. It currently shows bank-marked payments with no bank account. A user must open the source record and follow the normal controlled workflow to make any correction.
 
 ## Scheduled Delivery Controls
 

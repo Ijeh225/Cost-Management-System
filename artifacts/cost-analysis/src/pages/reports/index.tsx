@@ -1197,6 +1197,55 @@ function isoDate(value: string | null) {
   return value ? new Date(value).toLocaleDateString("en-NG") : "Not recorded";
 }
 
+type FinancialLedgerReport = {
+  summary: { entries: number; totalIn: number; totalOut: number; net: number };
+  entries: Array<{ id: string; date: string; direction: "in" | "out"; source: string; description: string; amount: number; method: string; bankName: string | null; reference: string | null; sourceLink: string }>;
+  evidenceNote: string;
+};
+type FinancialControlExceptions = {
+  summary: { needsReview: number; missingBankAccount: number };
+  exceptions: Array<{ id: string; date: string; source: string; description: string; amount: number; sourceLink: string }>;
+  evidenceNote: string;
+};
+
+function FinancialControlSection({ from, to }: { from: string; to: string }) {
+  const [, setLocation] = useLocation();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [ledger, setLedger] = useState<FinancialLedgerReport | null>(null);
+  const [exceptions, setExceptions] = useState<FinancialControlExceptions | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const query = buildQueryString({ from, to });
+    setLoading(true); setError("");
+    Promise.all([
+      customFetch<FinancialLedgerReport>(`/api/reports/financial-ledger${query ? `?${query}` : ""}`),
+      customFetch<FinancialControlExceptions>(`/api/reports/financial-control-exceptions${query ? `?${query}` : ""}`),
+    ]).then(([ledgerResult, exceptionResult]) => {
+      if (!cancelled) { setLedger(ledgerResult); setExceptions(exceptionResult); }
+    }).catch(() => { if (!cancelled) setError("Accounting control reports could not load. Please retry."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [from, to]);
+
+  const exportLedgerCsv = () => {
+    if (!ledger?.entries.length) return;
+    const esc = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const rows = [["Date", "Direction", "Source", "Description", "Amount", "Method", "Bank", "Reference"], ...ledger.entries.map(entry => [isoDate(entry.date), entry.direction, entry.source, entry.description, entry.amount.toFixed(2), entry.method, entry.bankName ?? "Cash / unassigned", entry.reference ?? ""])].map(row => row.map(esc).join(","));
+    const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a"); link.href = url; link.download = `financial-ledger-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url);
+  };
+
+  return <section className="border-t border-border/40 pt-6 space-y-4">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-semibold flex items-center gap-2"><Landmark className="w-4 h-4 text-primary" /> Accounting Control</h2><p className="text-xs text-muted-foreground mt-1">A source-linked ledger of actual money movement, plus only the records that need review.</p></div><Badge variant="outline" className="font-normal text-[10px]">Actual dated transactions only</Badge></div>
+    {loading ? <div className="py-10 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div> : error ? <Card><CardContent className="py-7 text-sm text-destructive">{error}</CardContent></Card> : <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <Card className="border-border/40 bg-card/40"><CardHeader className="pb-3 border-b border-border/40 flex-row items-start justify-between space-y-0 gap-3"><div><CardTitle className="text-sm">Financial Ledger</CardTitle><p className="text-xs text-muted-foreground mt-1">Invoice collections, duty, overhead, disbursements, funding, and both sides of bank transfers.</p></div><Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={exportLedgerCsv} disabled={!ledger?.entries.length}><FileDown className="w-3.5 h-3.5" /> Export CSV</Button></CardHeader><CardContent className="p-0"><div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border/30">{[["Entries", ledger?.summary.entries ?? 0], ["Money in", formatCurrency(ledger?.summary.totalIn ?? 0)], ["Money out", formatCurrency(ledger?.summary.totalOut ?? 0)], ["Net movement", formatCurrency(ledger?.summary.net ?? 0)]].map(([label, value]) => <div key={String(label)} className="bg-card px-4 py-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="font-mono font-semibold text-sm mt-1">{value}</p></div>)}</div>{!ledger?.entries.length ? <div className="py-10 text-center text-sm text-muted-foreground">No dated financial transactions match this period.</div> : <div className="max-h-[460px] overflow-auto"><table className="w-full min-w-[800px] text-sm"><thead className="sticky top-0 bg-muted/80 text-xs text-muted-foreground"><tr><th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">Source</th><th className="px-4 py-3 text-left">Description</th><th className="px-4 py-3 text-right">In</th><th className="px-4 py-3 text-right">Out</th></tr></thead><tbody className="divide-y divide-border/40">{ledger.entries.map(entry => <tr key={entry.id} className="hover:bg-muted/20 cursor-pointer" onClick={() => setLocation(entry.sourceLink)}><td className="px-4 py-3 text-xs whitespace-nowrap">{isoDate(entry.date)}</td><td className="px-4 py-3 text-xs"><p>{entry.source}</p><p className="text-muted-foreground">{entry.bankName ?? entry.method}</p></td><td className="px-4 py-3"><p className="text-xs">{entry.description}</p>{entry.reference && <p className="text-[11px] text-muted-foreground">{entry.reference}</p>}</td><td className="px-4 py-3 text-right font-mono text-xs text-emerald-600">{entry.direction === "in" ? formatCurrency(entry.amount) : "—"}</td><td className="px-4 py-3 text-right font-mono text-xs text-destructive">{entry.direction === "out" ? formatCurrency(entry.amount) : "—"}</td></tr>)}</tbody></table></div>}<p className="px-4 py-3 text-[11px] text-muted-foreground border-t border-border/40">{ledger?.evidenceNote}</p></CardContent></Card>
+      <Card className="border-border/40 bg-card/40"><CardHeader className="pb-3 border-b border-border/40"><CardTitle className="text-sm">Finance Review Queue</CardTitle><p className="text-xs text-muted-foreground mt-1">Data-quality checks. These are prompts for review, not accusations or automatic corrections.</p></CardHeader><CardContent className="p-0"><div className="p-4 border-b border-border/40"><p className="text-2xl font-mono font-semibold">{exceptions?.summary.needsReview ?? 0}</p><p className="text-xs text-muted-foreground mt-1">Bank payments missing a bank account</p></div>{!exceptions?.exceptions.length ? <div className="py-8 px-4 text-center text-sm text-muted-foreground">No financial data-quality exceptions match this period.</div> : <div className="divide-y divide-border/40 max-h-[380px] overflow-auto">{exceptions.exceptions.map(exception => <button key={exception.id} className="w-full text-left px-4 py-3 hover:bg-muted/20" onClick={() => setLocation(exception.sourceLink)}><p className="text-xs font-medium">{exception.source}</p><p className="text-xs text-muted-foreground mt-1">{exception.description}</p><p className="mt-1 text-xs font-mono text-destructive">{formatCurrency(exception.amount)} · {isoDate(exception.date)}</p></button>)}</div>}<p className="px-4 py-3 text-[11px] text-muted-foreground border-t border-border/40">{exceptions?.evidenceNote}</p></CardContent></Card>
+    </div>}
+  </section>;
+}
+
 function ReportCentreSection({ from, to }: { from: string; to: string }) {
   const [, setLocation] = useLocation();
   const [tab, setTab] = useState("duty-ledger");
@@ -1246,14 +1295,14 @@ function ReportCentreSection({ from, to }: { from: string; to: string }) {
     if (!recipients.length) { setError("Enter at least one recipient email address for the scheduled report."); return; }
     setDeliveryBusy(true);
     try {
-      await customFetch("/api/reports/subscriptions", { method: "POST", body: { reportKind: deliveryKind, frequency: deliveryFrequency, recipients, filters: { from, to }, sendAt: deliverySendAt, sendDayOfWeek: Number(deliverySendDayOfWeek) } });
+      await customFetch("/api/reports/subscriptions", { method: "POST", body: JSON.stringify({ reportKind: deliveryKind, frequency: deliveryFrequency, recipients, filters: { from, to }, sendAt: deliverySendAt, sendDayOfWeek: Number(deliverySendDayOfWeek) }) });
       setDeliveryRecipients(""); await loadSubscriptions();
     } catch (error) { setError(error instanceof Error ? error.message : "Unable to save the report schedule."); }
     finally { setDeliveryBusy(false); }
   };
   const updateSubscription = async (id: number, body: object) => {
     setDeliveryBusy(true);
-    try { await customFetch(`/api/reports/subscriptions/${id}`, { method: "PATCH", body }); await loadSubscriptions(); }
+    try { await customFetch(`/api/reports/subscriptions/${id}`, { method: "PATCH", body: JSON.stringify(body) }); await loadSubscriptions(); }
     catch { setError("Unable to update the report schedule."); }
     finally { setDeliveryBusy(false); }
   };
@@ -1658,6 +1707,7 @@ export default function ReportsPage() {
           </div>
         )}
         <ReportCentreSection from={applied.from} to={applied.to} />
+        <FinancialControlSection from={applied.from} to={applied.to} />
         {/* Delivery Tracking Report */}
         <div className="border-t border-border/40 pt-6">
           <DeliveryReportSection />

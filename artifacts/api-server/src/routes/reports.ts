@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, dutyPaymentTransactionsTable, reportSubscriptionsTable, reportDeliveryLogsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
-import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, sql, desc, type SQL } from "drizzle-orm";
+import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, isNull, sql, desc, type SQL, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, requireSuperAdmin, getBranchScope, AuthRequest } from "../lib/auth.js";
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
@@ -166,6 +166,108 @@ reportsRouter.get("/reports/reconciliation", requireAuth, requireBranchMemberOrA
   } catch (err) {
     console.error("Reconciliation report failed", err);
     return res.status(500).json({ error: "Unable to build reconciliation report." });
+  }
+});
+
+type FinancialLedgerEntry = {
+  id: string;
+  date: string;
+  direction: "in" | "out";
+  source: string;
+  description: string;
+  amount: number;
+  method: string;
+  bankName: string | null;
+  reference: string | null;
+  sourceLink: string;
+};
+
+/**
+ * A read-only union of the application's dated money movements. This does not
+ * invent an accounting entry from a charge, approval, or running balance.
+ */
+reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const range = reportDateRange(req.query as Record<string, string>);
+    if ("error" in range) return res.status(400).json(range);
+    const branchScope = await resolveBranchScopeInfo(req);
+    const byDateAndBranch = (date: SQLWrapper, branch: SQLWrapper): SQL[] => {
+      const conditions: SQL[] = [];
+      if (range.from) conditions.push(gte(date, range.from));
+      if (range.to) conditions.push(lte(date, range.to));
+      if (branchScope.id !== null) conditions.push(eq(branch, branchScope.id));
+      return conditions;
+    };
+
+    const fromBank = alias(banksTable, "financial_ledger_from_bank");
+    const toBank = alias(banksTable, "financial_ledger_to_bank");
+    const [invoiceRows, dutyRows, overheadRows, containerRows, fundingRows, transferRows] = await Promise.all([
+      db.select({ id: invoicePaymentsTable.id, date: invoicePaymentsTable.paidAt, amount: invoicePaymentsTable.amount, method: invoicePaymentsTable.paymentMethod, reference: invoicePaymentsTable.reference, notes: invoicePaymentsTable.notes, invoiceNumber: invoicesTable.invoiceNumber, bankName: banksTable.name })
+        .from(invoicePaymentsTable).leftJoin(invoicesTable, eq(invoicePaymentsTable.invoiceId, invoicesTable.id)).leftJoin(banksTable, eq(invoicePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(invoicePaymentsTable.paidAt, invoicePaymentsTable.branchId))),
+      db.select({ id: dutyPaymentTransactionsTable.id, date: dutyPaymentTransactionsTable.paidAt, amount: dutyPaymentTransactionsTable.amount, method: dutyPaymentTransactionsTable.paymentMethod, reference: dutyPaymentTransactionsTable.reference, notes: dutyPaymentTransactionsTable.notes, containerId: containersTable.id, containerNumber: containersTable.containerNumber, bankName: banksTable.name })
+        .from(dutyPaymentTransactionsTable).leftJoin(containersTable, eq(dutyPaymentTransactionsTable.containerId, containersTable.id)).leftJoin(banksTable, eq(dutyPaymentTransactionsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(dutyPaymentTransactionsTable.paidAt, dutyPaymentTransactionsTable.branchId))),
+      db.select({ id: expensePaymentsTable.id, date: expensePaymentsTable.paidAt, amount: expensePaymentsTable.amount, method: expensePaymentsTable.paymentMethod, notes: expensePaymentsTable.notes, expenseId: overheadExpensesTable.id, description: overheadExpensesTable.description, category: overheadExpensesTable.category, bankName: banksTable.name })
+        .from(expensePaymentsTable).leftJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id)).leftJoin(banksTable, eq(expensePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(expensePaymentsTable.paidAt, expensePaymentsTable.branchId))),
+      db.select({ id: containerExpensePaymentsTable.id, date: containerExpensePaymentsTable.paidAt, amount: containerExpensePaymentsTable.amount, method: containerExpensePaymentsTable.paymentMethod, reference: containerExpensePaymentsTable.reference, narration: containerExpensePaymentsTable.narration, section: containerExpensePaymentsTable.section, containerId: containersTable.id, containerNumber: containersTable.containerNumber, bankName: banksTable.name })
+        .from(containerExpensePaymentsTable).leftJoin(containersTable, eq(containerExpensePaymentsTable.containerId, containersTable.id)).leftJoin(banksTable, eq(containerExpensePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(containerExpensePaymentsTable.paidAt, containerExpensePaymentsTable.branchId))),
+      db.select({ id: bankFundAdditionsTable.id, date: bankFundAdditionsTable.createdAt, amount: bankFundAdditionsTable.amount, reference: bankFundAdditionsTable.reference, narration: bankFundAdditionsTable.narration, bankName: banksTable.name })
+        .from(bankFundAdditionsTable).leftJoin(banksTable, eq(bankFundAdditionsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(bankFundAdditionsTable.createdAt, bankFundAdditionsTable.branchId))),
+      db.select({ id: bankTransfersTable.id, date: bankTransfersTable.createdAt, amount: bankTransfersTable.amount, reference: bankTransfersTable.reference, narration: bankTransfersTable.narration, fromBank: fromBank.name, toBank: toBank.name })
+        .from(bankTransfersTable)
+        .leftJoin(fromBank, eq(bankTransfersTable.fromBankId, fromBank.id))
+        .leftJoin(toBank, eq(bankTransfersTable.toBankId, toBank.id))
+        .where(and(...byDateAndBranch(bankTransfersTable.createdAt, bankTransfersTable.branchId))),
+    ]);
+
+    const entries: FinancialLedgerEntry[] = [
+      ...invoiceRows.map(row => ({ id: `invoice-${row.id}`, date: row.date.toISOString(), direction: "in" as const, source: "Invoice collection", description: row.invoiceNumber ? `Collection for ${row.invoiceNumber}` : "Invoice collection", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: "/invoices" })),
+      ...dutyRows.map(row => ({ id: `duty-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Customs duty payment", description: row.containerNumber ? `Duty payment for ${row.containerNumber}` : "Customs duty payment", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
+      ...overheadRows.map(row => ({ id: `overhead-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Overhead payment", description: row.description ? `${row.category ?? "Overhead"}: ${row.description}` : "Overhead payment", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.notes || null, sourceLink: "/overhead-expenses" })),
+      ...containerRows.map(row => ({ id: `container-expense-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Container disbursement", description: row.containerNumber ? `${row.section ?? "Operations"} for ${row.containerNumber}` : "Container disbursement", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.narration || null, sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
+      ...fundingRows.map(row => ({ id: `funding-${row.id}`, date: row.date.toISOString(), direction: "in" as const, source: "Bank funding", description: row.narration || "Bank fund addition", amount: Number(row.amount ?? 0), method: "bank", bankName: row.bankName, reference: row.reference || null, sourceLink: "/bank-management" })),
+      ...transferRows.flatMap(row => [
+        { id: `transfer-out-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Bank transfer", description: `Transfer to ${row.toBank ?? "unassigned bank"}${row.narration ? `: ${row.narration}` : ""}`, amount: Number(row.amount ?? 0), method: "bank transfer", bankName: row.fromBank ?? null, reference: row.reference || null, sourceLink: "/bank-management" },
+        { id: `transfer-in-${row.id}`, date: row.date.toISOString(), direction: "in" as const, source: "Bank transfer", description: `Transfer from ${row.fromBank ?? "unassigned bank"}${row.narration ? `: ${row.narration}` : ""}`, amount: Number(row.amount ?? 0), method: "bank transfer", bankName: row.toBank ?? null, reference: row.reference || null, sourceLink: "/bank-management" },
+      ]),
+    ].sort((a, b) => b.date.localeCompare(a.date));
+    const totalIn = entries.filter(entry => entry.direction === "in").reduce((sum, entry) => sum + entry.amount, 0);
+    const totalOut = entries.filter(entry => entry.direction === "out").reduce((sum, entry) => sum + entry.amount, 0);
+    return res.json({ branchScope, period: { from: range.from?.toISOString() ?? null, to: range.to?.toISOString() ?? null }, summary: { entries: entries.length, totalIn, totalOut, net: totalIn - totalOut }, entries, evidenceNote: "This ledger includes only dated money movements from source payment and bank tables. Charge estimates, approved schedules, and running balances are excluded until an actual transaction is recorded." });
+  } catch (err) {
+    console.error("Financial ledger report failed", err);
+    return res.status(500).json({ error: "Unable to build financial ledger." });
+  }
+});
+
+/** Specific data-quality controls, deliberately labelled for review rather than treated as accounting facts. */
+reportsRouter.get("/reports/financial-control-exceptions", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const range = reportDateRange(req.query as Record<string, string>);
+    if ("error" in range) return res.status(400).json(range);
+    const branchScope = await resolveBranchScopeInfo(req);
+    const bankMethodWithoutBank = (date: SQLWrapper, branch: SQLWrapper, method: SQLWrapper, bankId: SQLWrapper): SQL[] => {
+      const conditions: SQL[] = [eq(method, "bank"), isNull(bankId)];
+      if (range.from) conditions.push(gte(date, range.from));
+      if (range.to) conditions.push(lte(date, range.to));
+      if (branchScope.id !== null) conditions.push(eq(branch, branchScope.id));
+      return conditions;
+    };
+    const [invoiceRows, dutyRows, overheadRows, containerRows] = await Promise.all([
+      db.select({ id: invoicePaymentsTable.id, amount: invoicePaymentsTable.amount, paidAt: invoicePaymentsTable.paidAt, invoiceNumber: invoicesTable.invoiceNumber }).from(invoicePaymentsTable).leftJoin(invoicesTable, eq(invoicePaymentsTable.invoiceId, invoicesTable.id)).where(and(...bankMethodWithoutBank(invoicePaymentsTable.paidAt, invoicePaymentsTable.branchId, invoicePaymentsTable.paymentMethod, invoicePaymentsTable.bankId))),
+      db.select({ id: dutyPaymentTransactionsTable.id, amount: dutyPaymentTransactionsTable.amount, paidAt: dutyPaymentTransactionsTable.paidAt, containerId: containersTable.id, containerNumber: containersTable.containerNumber }).from(dutyPaymentTransactionsTable).leftJoin(containersTable, eq(dutyPaymentTransactionsTable.containerId, containersTable.id)).where(and(...bankMethodWithoutBank(dutyPaymentTransactionsTable.paidAt, dutyPaymentTransactionsTable.branchId, dutyPaymentTransactionsTable.paymentMethod, dutyPaymentTransactionsTable.bankId))),
+      db.select({ id: expensePaymentsTable.id, amount: expensePaymentsTable.amount, paidAt: expensePaymentsTable.paidAt, description: overheadExpensesTable.description }).from(expensePaymentsTable).leftJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id)).where(and(...bankMethodWithoutBank(expensePaymentsTable.paidAt, expensePaymentsTable.branchId, expensePaymentsTable.paymentMethod, expensePaymentsTable.bankId))),
+      db.select({ id: containerExpensePaymentsTable.id, amount: containerExpensePaymentsTable.amount, paidAt: containerExpensePaymentsTable.paidAt, containerId: containersTable.id, containerNumber: containersTable.containerNumber }).from(containerExpensePaymentsTable).leftJoin(containersTable, eq(containerExpensePaymentsTable.containerId, containersTable.id)).where(and(...bankMethodWithoutBank(containerExpensePaymentsTable.paidAt, containerExpensePaymentsTable.branchId, containerExpensePaymentsTable.paymentMethod, containerExpensePaymentsTable.bankId))),
+    ]);
+    const exceptions = [
+      ...invoiceRows.map(row => ({ id: `invoice-${row.id}`, date: row.paidAt.toISOString(), source: "Invoice collection", description: row.invoiceNumber ? `Bank collection for ${row.invoiceNumber} has no bank account.` : "Bank collection has no bank account.", amount: Number(row.amount ?? 0), sourceLink: "/invoices" })),
+      ...dutyRows.map(row => ({ id: `duty-${row.id}`, date: row.paidAt.toISOString(), source: "Customs duty payment", description: `Bank duty payment for ${row.containerNumber ?? "a container"} has no bank account.`, amount: Number(row.amount ?? 0), sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
+      ...overheadRows.map(row => ({ id: `overhead-${row.id}`, date: row.paidAt.toISOString(), source: "Overhead payment", description: `Bank overhead payment${row.description ? ` for ${row.description}` : ""} has no bank account.`, amount: Number(row.amount ?? 0), sourceLink: "/overhead-expenses" })),
+      ...containerRows.map(row => ({ id: `container-${row.id}`, date: row.paidAt.toISOString(), source: "Container disbursement", description: `Bank disbursement for ${row.containerNumber ?? "a container"} has no bank account.`, amount: Number(row.amount ?? 0), sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
+    ].sort((a, b) => b.date.localeCompare(a.date));
+    return res.json({ branchScope, period: { from: range.from?.toISOString() ?? null, to: range.to?.toISOString() ?? null }, summary: { needsReview: exceptions.length, missingBankAccount: exceptions.length }, exceptions, evidenceNote: "These are data-quality exceptions: a payment was marked as bank but has no bank account recorded. They are not assumed fraud, debt, or a duplicated payment." });
+  } catch (err) {
+    console.error("Financial control exceptions report failed", err);
+    return res.status(500).json({ error: "Unable to build financial control exceptions." });
   }
 });
 
