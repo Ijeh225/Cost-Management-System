@@ -19,6 +19,15 @@ The current `role`, `roles`, `sectionPermission`, and `sectionPermissions`
 fields remain in place until the migration is complete. They must not be
 deleted, rewritten, or reinterpreted by this foundation phase.
 
+## Additive Access-Profile Storage
+
+The user table now also has nullable fields for `authority_level`,
+`job_function`, `workspace_access`, and `access_profile_migrated_at`. They are
+an additive profile, not a replacement for the legacy fields. A profile becomes
+eligible for future enforcement only when all four values are present and pass
+the shared authorization validation. Until then, the application continues to
+use its existing guards and legacy role fields.
+
 ## Authority Levels
 
 | Authority | Scope | Intended responsibility |

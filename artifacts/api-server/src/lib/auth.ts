@@ -4,6 +4,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { Request, Response, NextFunction } from "express";
 import { db, usersTable, branchesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { resolveAccessProfile, type ResolvedAccessProfile } from "./authorization.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_ISSUER = "cost-management-system";
@@ -116,6 +117,11 @@ export interface AuthRequest extends Request {
     roles: string[];
     sectionPermission: string | null;
     sectionPermissions: string | null;
+    authorityLevel: string | null;
+    jobFunction: string | null;
+    workspaceAccess: string | null;
+    accessProfileMigratedAt: Date | null;
+    accessProfile: ResolvedAccessProfile;
     canUpload: boolean;
     branchId: number;
   };
@@ -185,6 +191,11 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       roles: parseRoles(user.role, user.roles),
       sectionPermission: user.sectionPermission ?? null,
       sectionPermissions: user.sectionPermissions ?? null,
+      authorityLevel: user.authorityLevel ?? null,
+      jobFunction: user.jobFunction ?? null,
+      workspaceAccess: user.workspaceAccess ?? null,
+      accessProfileMigratedAt: user.accessProfileMigratedAt ?? null,
+      accessProfile: resolveAccessProfile(user),
       canUpload: isElevated ? true : (user.canUpload ?? false),
       branchId: user.branchId,
     };

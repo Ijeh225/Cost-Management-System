@@ -30,6 +30,10 @@ const userFields = {
   roles: usersTable.roles,
   sectionPermission: usersTable.sectionPermission,
   sectionPermissions: usersTable.sectionPermissions,
+  authorityLevel: usersTable.authorityLevel,
+  jobFunction: usersTable.jobFunction,
+  workspaceAccess: usersTable.workspaceAccess,
+  accessProfileMigratedAt: usersTable.accessProfileMigratedAt,
   canUpload: usersTable.canUpload,
   isActive: usersTable.isActive,
   createdAt: usersTable.createdAt,
@@ -44,6 +48,10 @@ type UserRow = {
   roles: string | null;
   sectionPermission: string | null;
   sectionPermissions: string | null;
+  authorityLevel: string | null;
+  jobFunction: string | null;
+  workspaceAccess: string | null;
+  accessProfileMigratedAt: Date | null;
   canUpload: boolean;
   isActive: boolean;
   createdAt: Date;
@@ -57,6 +65,10 @@ const formatUser = (u: UserRow) => ({
   roles: parseRoles(u.role, u.roles),
   sectionPermission: u.sectionPermission ?? null,
   sectionPermissions: u.sectionPermissions ?? null,
+  authorityLevel: u.authorityLevel ?? null,
+  jobFunction: u.jobFunction ?? null,
+  workspaceAccess: u.workspaceAccess ?? null,
+  accessProfileMigratedAt: u.accessProfileMigratedAt instanceof Date ? u.accessProfileMigratedAt.toISOString() : u.accessProfileMigratedAt ?? null,
   canUpload: ELEVATED_ROLES.has(u.role) ? true : (u.canUpload ?? false),
   createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
 });
@@ -95,6 +107,10 @@ router.get("/users/rbac-migration-audit", requireSuperAdmin, async (_req: AuthRe
         roles: usersTable.roles,
         sectionPermission: usersTable.sectionPermission,
         sectionPermissions: usersTable.sectionPermissions,
+        authorityLevel: usersTable.authorityLevel,
+        jobFunction: usersTable.jobFunction,
+        workspaceAccess: usersTable.workspaceAccess,
+        accessProfileMigratedAt: usersTable.accessProfileMigratedAt,
       })
       .from(usersTable)
       .innerJoin(branchesTable, eq(usersTable.branchId, branchesTable.id))

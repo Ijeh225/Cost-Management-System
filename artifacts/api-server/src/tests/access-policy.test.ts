@@ -6,6 +6,7 @@ import {
   isWorkspaceAllowedForFunction,
   reviewLegacyUserAccess,
 } from "../lib/access-policy.js";
+import { hasCapability, hasWorkspace, resolveAccessProfile } from "../lib/authorization.js";
 
 describe("access policy foundation", () => {
   it("keeps administrative authority separate from job function", () => {
@@ -69,5 +70,53 @@ describe("access policy foundation", () => {
     expect(review.proposedJobFunction).toBe("operations");
     expect(review.proposedWorkspaces).toEqual([]);
     expect(review.flags).toContain("operations_workspace_selection_required");
+  });
+
+  it("does not enforce a profile until all migration fields are present", () => {
+    expect(resolveAccessProfile({
+      authorityLevel: "staff",
+      jobFunction: "accounts",
+      workspaceAccess: JSON.stringify(["accounts"]),
+      accessProfileMigratedAt: null,
+    })).toMatchObject({ source: "invalid" });
+    expect(resolveAccessProfile({
+      authorityLevel: null,
+      jobFunction: null,
+      workspaceAccess: null,
+      accessProfileMigratedAt: null,
+    })).toMatchObject({ source: "legacy" });
+  });
+
+  it("keeps a migrated Accounts profile out of operational workspaces", () => {
+    const profile = resolveAccessProfile({
+      authorityLevel: "staff",
+      jobFunction: "accounts",
+      workspaceAccess: JSON.stringify(["accounts"]),
+      accessProfileMigratedAt: new Date(),
+    });
+
+    expect(profile.source).toBe("modern");
+    expect(hasCapability(profile, "finance.access")).toBe(true);
+    expect(hasWorkspace(profile, "shipping")).toBe(false);
+  });
+
+  it("requires an Operations workspace and preserves explicit multi-workspace access", () => {
+    const invalid = resolveAccessProfile({
+      authorityLevel: "staff",
+      jobFunction: "operations",
+      workspaceAccess: "[]",
+      accessProfileMigratedAt: new Date(),
+    });
+    const valid = resolveAccessProfile({
+      authorityLevel: "staff",
+      jobFunction: "operations",
+      workspaceAccess: JSON.stringify(["shipping", "terminal"]),
+      accessProfileMigratedAt: new Date(),
+    });
+
+    expect(invalid.source).toBe("invalid");
+    expect(valid.source).toBe("modern");
+    expect(hasWorkspace(valid, "shipping")).toBe(true);
+    expect(hasWorkspace(valid, "terminal")).toBe(true);
   });
 });

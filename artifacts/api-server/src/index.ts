@@ -994,6 +994,19 @@ async function runStartupMigrations() {
         END $$;
       `);
     });
+    await runMigration("rbac_access_profile_foundation_v1", async () => {
+      // Additive only: existing role, roles, and section-permission values stay
+      // untouched until a Super Admin approves each user's migration profile.
+      await pool.query(`
+        ALTER TABLE users
+          ADD COLUMN IF NOT EXISTS authority_level TEXT,
+          ADD COLUMN IF NOT EXISTS job_function TEXT,
+          ADD COLUMN IF NOT EXISTS workspace_access TEXT,
+          ADD COLUMN IF NOT EXISTS access_profile_migrated_at TIMESTAMP
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS users_authority_level_idx ON users(authority_level)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS users_job_function_idx ON users(job_function)`);
+    });
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);
