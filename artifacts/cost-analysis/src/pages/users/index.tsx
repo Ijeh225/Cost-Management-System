@@ -662,7 +662,7 @@ function CreateUserDialog() {
         </SelectContent></Select><FormMessage /></FormItem>} />
         <FormField control={form.control} name="jobFunction" render={({ field }) => <FormItem><FormLabel>Job Function</FormLabel><Select value={field.value} onValueChange={(value) => setJobFunction(value as JobFunction)}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{JOB_FUNCTION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} />
         {!isBranchAdmin && <BranchSelectField branches={branches} value={branchId} onChange={setBranchId} />}
-        <div className="space-y-2"><FormLabel>Workspace Access</FormLabel>
+        <div className="space-y-2"><label className="text-sm font-medium leading-none">Workspace Access</label>
           {jobFunction === "operations" ? <div className="grid grid-cols-2 gap-2">{WORKSPACE_OPTIONS.filter((option) => ["transire", "shipping", "terminal", "pullout"].includes(option.value)).map((option) => <Button key={option.value} type="button" variant={workspaces.includes(option.value) ? "default" : "outline"} onClick={() => toggleWorkspace(option.value)} className="justify-start"><Check className={`mr-2 h-4 w-4 ${workspaces.includes(option.value) ? "opacity-100" : "opacity-0"}`} />{option.label}</Button>)}</div>
           : <p className="rounded-lg border border-border/50 bg-secondary/20 px-3 py-2 text-sm text-muted-foreground">{FIXED_WORKSPACES[jobFunction].length ? FIXED_WORKSPACES[jobFunction].map((workspace) => WORKSPACE_OPTIONS.find((option) => option.value === workspace)?.label).join(", ") : "No specialist workspace"}</p>}
         </div>
