@@ -4,11 +4,15 @@ import bcrypt from "bcryptjs";
 import app from "../app";
 import {
   db,
+  banksTable,
   branchesTable,
   containersTable,
   expensePaymentsTable,
+  invoicePaymentsTable,
+  invoicesTable,
   overheadExpensesTable,
   paymentSchedulesTable,
+  shippingChargesTable,
   usersTable,
   workflowNotificationsTable,
 } from "@workspace/db";
@@ -31,6 +35,8 @@ let otherBranchUser: Session;
 let protectedContainerId = 0;
 let paymentExpenseId = 0;
 let paymentScheduleId = 0;
+let collectionBankId = 0;
+let collectionInvoiceId = 0;
 let createdStaffUserId = 0;
 
 async function login(email: string): Promise<Session> {
@@ -120,6 +126,30 @@ beforeAll(async () => {
   }).returning({ id: containersTable.id });
   protectedContainerId = container.id;
 
+  await db.insert(shippingChargesTable).values({
+    branchId: branchAId,
+    containerId: protectedContainerId,
+    shippingCompany: "100",
+  }).onConflictDoUpdate({
+    target: shippingChargesTable.containerId,
+    set: { branchId: branchAId, shippingCompany: "100", updatedAt: new Date() },
+  });
+
+  const [bank] = await db.insert(banksTable).values({
+    name: `Integration Collection Bank ${suffix}`,
+    branchId: branchAId,
+  }).returning({ id: banksTable.id });
+  collectionBankId = bank.id;
+  const [invoice] = await db.insert(invoicesTable).values({
+    branchId: branchAId,
+    containerId: protectedContainerId,
+    invoiceNumber: `INT-COLLECTION-${suffix}`,
+    status: "sent",
+    subtotal: "250",
+    total: "250",
+  }).returning({ id: invoicesTable.id });
+  collectionInvoiceId = invoice.id;
+
   const [expense] = await db.insert(overheadExpensesTable).values({
     branchId: branchAId,
     category: "Other",
@@ -144,6 +174,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (collectionInvoiceId) await db.delete(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, collectionInvoiceId));
+  if (collectionInvoiceId) await db.delete(invoicesTable).where(eq(invoicesTable.id, collectionInvoiceId));
+  if (collectionBankId) await db.delete(banksTable).where(eq(banksTable.id, collectionBankId));
   if (paymentExpenseId) await db.delete(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, paymentExpenseId));
   if (paymentScheduleId) await db.delete(paymentSchedulesTable).where(eq(paymentSchedulesTable.id, paymentScheduleId));
   if (paymentExpenseId) await db.delete(overheadExpensesTable).where(eq(overheadExpensesTable.id, paymentExpenseId));
@@ -278,5 +311,37 @@ describe("sensitive workflow integration", () => {
 
     const paymentsAfter = await db.select().from(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, paymentExpenseId));
     expect(paymentsAfter).toHaveLength(1);
+  });
+
+  it("does not treat metadata IDs as container charge amounts", async () => {
+    const reconciliation = await admin.agent.get(`/api/containers/${protectedContainerId}/reconciliation`);
+    expect(reconciliation.status).toBe(200);
+    expect(reconciliation.body.totals.budgeted).toBe(100);
+    expect(reconciliation.body.sections.find((section: { section: string }) => section.section === "shipping")?.budgeted).toBe(100);
+    expect(reconciliation.body.sections.find((section: { section: string }) => section.section === "customs")?.budgeted).toBe(0);
+  });
+
+  it("requires a bank for non-cash invoice collections and includes valid collections in the bank ledger", async () => {
+    const missingBank = await admin.agent
+      .post(`/api/invoices/${collectionInvoiceId}/payments`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ amount: 250, paymentMethod: "transfer" });
+    expect(missingBank.status).toBe(400);
+
+    const posted = await admin.agent
+      .post(`/api/invoices/${collectionInvoiceId}/payments`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ amount: 250, paymentMethod: "transfer", bankId: collectionBankId, reference: "integration-bank-posting" });
+    expect(posted.status).toBe(201);
+    expect(posted.body.status).toBe("paid");
+    expect(posted.body.totalPaid).toBe(250);
+
+    const [storedPayment] = await db.select().from(invoicePaymentsTable)
+      .where(eq(invoicePaymentsTable.invoiceId, collectionInvoiceId));
+    expect(storedPayment.bankId).toBe(collectionBankId);
+
+    const banks = await admin.agent.get("/api/banks");
+    expect(banks.status).toBe(200);
+    expect(banks.body.find((bank: { id: number }) => bank.id === collectionBankId)?.currentBalance).toBe(250);
   });
 });

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
 
 export type ExpenseCategory = {
@@ -134,6 +134,10 @@ export function useGetOverheadExpenses(params?: {
   return useQuery<OverheadExpensesResponse>({
     queryKey: [QK, params],
     queryFn: () => customFetch<OverheadExpensesResponse>(`/api/overhead-expenses${qs ? `?${qs}` : ""}`),
+    // Do not replace the current ledger with zero values while a branch/filter
+    // refresh is in flight. The new result replaces it as soon as it arrives.
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
   });
 }
 

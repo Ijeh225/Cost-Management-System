@@ -941,17 +941,29 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
     const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
-    const { amount, paymentMethod, reference, notes, paidAt, bankId } = req.body as {
+    const { amount, paymentMethod: rawPaymentMethod, reference, notes, paidAt, bankId: rawBankId } = req.body as {
       amount: number;
       paymentMethod?: string;
       reference?: string;
       notes?: string;
       paidAt?: string;
-      bankId?: number | null;
+      bankId?: number | string | null;
     };
 
     if (!amount || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: "Valid amount is required" });
+    }
+
+    const paymentMethod = rawPaymentMethod ?? "transfer";
+    if (!["transfer", "cash", "cheque", "pos"].includes(paymentMethod)) {
+      return res.status(400).json({ error: "Unsupported payment method" });
+    }
+    const bankId = rawBankId == null || rawBankId === "" ? null : Number(rawBankId);
+    if (bankId != null && (!Number.isInteger(bankId) || bankId <= 0)) {
+      return res.status(400).json({ error: "Invalid bank account" });
+    }
+    if (paymentMethod !== "cash" && bankId == null) {
+      return res.status(400).json({ error: "A receiving bank account is required for non-cash payments" });
     }
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
@@ -963,28 +975,35 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
         return res.status(400).json({ error: "Select a specific branch to record a payment." });
       }
     }
+
+    const result = await db.transaction(async (tx) => {
+      // Serialize collections for one invoice so concurrent clicks cannot post
+      // from the same old paid total.
+      await tx.execute(sql`SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE`);
+      const [inv] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+      if (!inv) throw new Error("Invoice was not found while recording payment");
+
     // Bank guard: the chosen bank must also belong to the invoice's branch.
-    if (bankId) {
-      const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, bankId));
-      if (bk && bk.branchId !== inv.branchId) {
-        return res.status(400).json({ error: "Selected bank belongs to a different branch than the invoice." });
-      }
+    if (bankId != null) {
+      const [bk] = await tx.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, bankId));
+      if (!bk) throw new Error("Selected bank account was not found");
+      if (bk.branchId !== inv.branchId) throw new Error("Selected bank belongs to a different branch than the invoice");
     }
 
     // Capture pre-insert total so we can compute incremental overpayment
-    const preInsertPayments = await db.select({ amount: invoicePaymentsTable.amount })
+    const preInsertPayments = await tx.select({ amount: invoicePaymentsTable.amount })
       .from(invoicePaymentsTable)
       .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
     const prevTotalPaid = preInsertPayments.reduce((s, p) => s + parseFloat(p.amount), 0);
 
-    await db.insert(invoicePaymentsTable).values({
+    await tx.insert(invoicePaymentsTable).values({
       invoiceId,
       amount: String(amount),
-      paymentMethod: paymentMethod ?? "transfer",
+      paymentMethod,
       reference: reference ?? "",
       notes: notes ?? "",
       paidAt: paidAt ? new Date(paidAt) : new Date(),
-      bankId: bankId ?? null,
+      bankId,
       branchId: inv.branchId,
     });
 
@@ -998,7 +1017,7 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       newStatus = "partial";
     }
 
-    await db.update(invoicesTable)
+    await tx.update(invoicesTable)
       .set({ status: newStatus, updatedAt: new Date() })
       .where(eq(invoicesTable.id, invoiceId));
 
@@ -1009,26 +1028,31 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       const nowOverpaid = Math.max(0, totalPaid - total);
       const creditIncrement = nowOverpaid - prevOverpaid;
       if (creditIncrement > 0) {
-        await db.update(clientsTable)
+        await tx.update(clientsTable)
           .set({ creditBalance: sql`${clientsTable.creditBalance}::numeric + ${String(creditIncrement)}` })
           .where(eq(clientsTable.id, inv.clientId));
         overpaymentStored = creditIncrement;
       }
     }
 
-    try {
-      await db.insert(workflowNotificationsTable).values({
+    await tx.insert(workflowNotificationsTable).values({
         type: "invoice_paid", branchId: inv.branchId,
         message: `Payment of ₦${Math.round(amount).toLocaleString("en-NG")} recorded on ${inv.invoiceNumber} (${newStatus})`,
         containerId: inv.containerId ?? null,
         containerNumber: null,
         actionUrl: `/invoices/${invoiceId}`,
       });
-    } catch {}
-    return res.status(201).json({ success: true, totalPaid, status: newStatus, overpaymentStored });
+    return { totalPaid, status: newStatus, overpaymentStored };
+    });
+    return res.status(201).json({ success: true, ...result });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: "Failed to record payment" });
+    const message = err instanceof Error ? err.message : "Failed to record payment";
+    const isValidationError = message === "Selected bank account was not found"
+      || message === "Selected bank belongs to a different branch than the invoice";
+    return res.status(isValidationError ? 400 : 500).json({
+      error: isValidationError ? message : "Failed to record payment",
+    });
   }
 });
 

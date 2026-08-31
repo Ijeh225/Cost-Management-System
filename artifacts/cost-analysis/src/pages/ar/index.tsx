@@ -93,13 +93,17 @@ function RecordPaymentDialog({
       toast({ variant: "destructive", title: "Enter a valid amount" });
       return;
     }
+    if (form.paymentMethod !== "cash" && !form.bankId) {
+      toast({ variant: "destructive", title: "Select the receiving bank account" });
+      return;
+    }
     try {
       await recordMutation.mutateAsync({ invoiceId, data: form });
       toast({ title: "Payment recorded" });
       onSuccess();
       handleClose();
-    } catch {
-      toast({ variant: "destructive", title: "Failed to record payment" });
+    } catch (err) {
+      toast({ variant: "destructive", title: err instanceof Error ? err.message : "Failed to record payment" });
     }
   };
 
@@ -140,15 +144,15 @@ function RecordPaymentDialog({
               </SelectContent>
             </Select>
           </div>
-          {form.paymentMethod === "transfer" && banks.length > 0 && (
+          {form.paymentMethod !== "cash" && (
             <div>
-              <Label htmlFor="ar-bank">Bank Account</Label>
+              <Label htmlFor="ar-bank">Receiving Bank Account *</Label>
               <Select
                 value={form.bankId != null ? String(form.bankId) : ""}
                 onValueChange={v => setForm(f => ({ ...f, bankId: v ? parseInt(v) : null }))}
               >
                 <SelectTrigger id="ar-bank" className="mt-1">
-                  <SelectValue placeholder="Select bank (optional)..." />
+                  <SelectValue placeholder={banks.length ? "Select bank account..." : "No active bank accounts"} />
                 </SelectTrigger>
                 <SelectContent>
                   {banks.map(b => (

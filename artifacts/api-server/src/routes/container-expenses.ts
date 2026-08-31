@@ -12,13 +12,22 @@ export const containerExpensesRouter = Router();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const EXCLUDE_KEYS = new Set(["id", "containerId", "updatedAt"]);
+// Only these fields are money budgeted for each operational section. Never sum
+// infrastructure IDs, exchange-rate helpers, or derived values such as dutyPaid.
+// The previous generic numeric-field summation incorrectly counted branchId as
+// money, which made an otherwise empty section display a small false charge.
+const SECTION_CHARGE_FIELDS = {
+  shipping: ["shippingCompany", "shippingPaymentVat", "consignee", "finalInvoiceShippingCompany", "telexCharge", "shippingRunnings", "shippingDetentionToBePaidByCustomer"],
+  customs: ["duty", "valuation", "ciu", "upCountryCustom", "dciu", "mdReleasingPackage", "ocSettlement", "ocReleaseLocal", "dcEnforcementForTransire", "complianceTeam", "cacSettlement", "crffn", "soncap", "alerts", "examinationBonus"],
+  terminal: ["terminalCharges", "terminalAdditions1", "ikorouduTerminalAdditions2", "terminalDemurrageToBePaidByCustomer", "terminalPaymentVat", "wharfageFeeForNpa", "sifaxGmtSigning", "tsDcAdmin", "tincanBond", "bond", "manifest"],
+  delivery: ["passingOfTruck", "passingOfTruckForEmptyReturn", "parkingForPullout", "pullout", "delivery", "emptyReturn", "unchainingTruck", "emptyCallUp", "pulloutExpenses", "transferToIkorodu", "transportAllowance"],
+  operations: ["fouBooking", "fou", "scanningToPhysical", "security", "additionalDeliveryExpenses", "miscellaneous", "abandoned", "agenciesBlocks", "callUp", "transireRunnings", "officePtml", "freshPayment"],
+} as const;
 
-function sumRow(row: Record<string, unknown>): number {
-  return Object.entries(row).reduce((s, [k, v]) => {
-    if (EXCLUDE_KEYS.has(k)) return s;
-    const n = parseFloat(String(v ?? "0"));
-    return s + (isNaN(n) ? 0 : n);
+function sumChargeFields(row: Record<string, unknown>, fields: readonly string[]): number {
+  return fields.reduce((total, field) => {
+    const amount = Number.parseFloat(String(row[field] ?? "0"));
+    return total + (Number.isFinite(amount) ? amount : 0);
   }, 0);
 }
 
@@ -42,11 +51,11 @@ async function getSectionChargedTotals(containerId: number): Promise<Record<stri
   }
 
   return {
-    shipping:   (shippingRow[0]   ? sumRow(shippingRow[0]   as Record<string, unknown>) : 0) + (extraBySection.shipping   ?? 0),
-    customs:    (customsRow[0]    ? sumRow(customsRow[0]    as Record<string, unknown>) : 0) + (extraBySection.customs    ?? 0),
-    terminal:   (terminalRow[0]   ? sumRow(terminalRow[0]   as Record<string, unknown>) : 0) + (extraBySection.terminal   ?? 0),
-    delivery:   (deliveryRow[0]   ? sumRow(deliveryRow[0]   as Record<string, unknown>) : 0) + (extraBySection.delivery   ?? 0),
-    operations: (operationsRow[0] ? sumRow(operationsRow[0] as Record<string, unknown>) : 0) + (extraBySection.operations ?? 0),
+    shipping:   (shippingRow[0]   ? sumChargeFields(shippingRow[0]   as Record<string, unknown>, SECTION_CHARGE_FIELDS.shipping)   : 0) + (extraBySection.shipping   ?? 0),
+    customs:    (customsRow[0]    ? sumChargeFields(customsRow[0]    as Record<string, unknown>, SECTION_CHARGE_FIELDS.customs)    : 0) + (extraBySection.customs    ?? 0),
+    terminal:   (terminalRow[0]   ? sumChargeFields(terminalRow[0]   as Record<string, unknown>, SECTION_CHARGE_FIELDS.terminal)   : 0) + (extraBySection.terminal   ?? 0),
+    delivery:   (deliveryRow[0]   ? sumChargeFields(deliveryRow[0]   as Record<string, unknown>, SECTION_CHARGE_FIELDS.delivery)   : 0) + (extraBySection.delivery   ?? 0),
+    operations: (operationsRow[0] ? sumChargeFields(operationsRow[0] as Record<string, unknown>, SECTION_CHARGE_FIELDS.operations) : 0) + (extraBySection.operations ?? 0),
   };
 }
 

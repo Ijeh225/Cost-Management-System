@@ -515,6 +515,7 @@ export default function OverheadExpensesPage() {
   const totalOutstanding = data?.totalOutstanding ?? 0;
   const totalPaidThisMonth = data?.totalPaidThisMonth ?? 0;
   const byCategory = data?.byCategory ?? {};
+  const summaryReady = Boolean(data);
 
   const handleCreate = (v: ExpenseFormValues) => {
     createMutation.mutate({ category: v.category, description: v.description, amount: v.amount, reference: v.reference || undefined }, {
@@ -666,14 +667,14 @@ export default function OverheadExpensesPage() {
             <Card className="border-border/50 bg-card/40">
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground">Outstanding Balance</p>
-                <p className="text-2xl font-bold text-amber-400 mt-1">{formatCurrency(totalOutstanding)}</p>
+                <p className="text-2xl font-bold text-amber-400 mt-1">{summaryReady ? formatCurrency(totalOutstanding) : "—"}</p>
                 <p className="text-xs text-muted-foreground/60 mt-1">Unpaid + partially paid</p>
               </CardContent>
             </Card>
             <Card className="border-border/50 bg-card/40">
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground">Paid This Month</p>
-                <p className="text-2xl font-bold text-green-400 mt-1">{formatCurrency(totalPaidThisMonth)}</p>
+                <p className="text-2xl font-bold text-green-400 mt-1">{summaryReady ? formatCurrency(totalPaidThisMonth) : "—"}</p>
               </CardContent>
             </Card>
             <Card className="border-border/50 bg-card/40">

@@ -189,6 +189,7 @@ export function useRecordPayment() {
     onSuccess: (_, { invoiceId }) => {
       qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+      qc.invalidateQueries({ queryKey: ["/api/banks"] });
     },
   });
 }
@@ -203,6 +204,7 @@ export function useDeletePayment() {
     onSuccess: (_, { invoiceId }) => {
       qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+      qc.invalidateQueries({ queryKey: ["/api/banks"] });
     },
   });
 }
