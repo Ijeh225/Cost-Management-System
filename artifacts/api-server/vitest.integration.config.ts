@@ -4,15 +4,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    setupFiles: [],
-    include: ["src/**/*.test.ts"],
-    exclude: [
+    include: [
       "src/**/*.integration.test.ts",
       "src/tests/delivery.test.ts",
       "src/tests/duty-payments.test.ts",
     ],
-    testTimeout: 15000,
-    // Unit tests must be safe to run without any database credentials.
+    setupFiles: ["./src/tests/integration-setup.ts"],
+    testTimeout: 30000,
     fileParallelism: false,
   },
 });

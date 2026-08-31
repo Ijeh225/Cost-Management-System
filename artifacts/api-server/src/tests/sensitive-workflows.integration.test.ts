@@ -21,14 +21,17 @@ const password = "IntegrationPass123!";
 let branchAId = 0;
 let branchBId = 0;
 let adminId = 0;
+let branchAdminId = 0;
 let officerId = 0;
 let otherBranchUserId = 0;
 let admin: Session;
+let branchAdmin: Session;
 let officer: Session;
 let otherBranchUser: Session;
 let protectedContainerId = 0;
 let paymentExpenseId = 0;
 let paymentScheduleId = 0;
+let createdStaffUserId = 0;
 
 async function login(email: string): Promise<Session> {
   const agent = request.agent(app);
@@ -48,16 +51,59 @@ beforeAll(async () => {
   branchAId = branchA.id;
   branchBId = branchB.id;
 
-  const [adminUser, officerUser, otherUser] = await db.insert(usersTable).values([
-    { name: "Integration Admin", email: `integration-admin-${suffix}@example.test`, passwordHash, role: "admin", branchId: branchAId },
-    { name: "Integration Officer", email: `integration-officer-${suffix}@example.test`, passwordHash, role: "staff", branchId: branchAId },
-    { name: "Integration Other Branch", email: `integration-other-${suffix}@example.test`, passwordHash, role: "staff", branchId: branchBId },
+  const [adminUser, branchAdminUser, officerUser, otherUser] = await db.insert(usersTable).values([
+    {
+      name: "Integration Admin",
+      email: `integration-admin-${suffix}@example.test`,
+      passwordHash,
+      role: "admin",
+      authorityLevel: "admin",
+      jobFunction: "general_staff",
+      workspaceAccess: JSON.stringify([]),
+      accessProfileMigratedAt: new Date(),
+      branchId: branchAId,
+    },
+    {
+      name: "Integration Branch Admin",
+      email: `integration-branch-admin-${suffix}@example.test`,
+      passwordHash,
+      role: "branch_admin",
+      authorityLevel: "branch_admin",
+      jobFunction: "general_staff",
+      workspaceAccess: JSON.stringify([]),
+      accessProfileMigratedAt: new Date(),
+      branchId: branchAId,
+    },
+    {
+      name: "Integration Officer",
+      email: `integration-officer-${suffix}@example.test`,
+      passwordHash,
+      role: "staff",
+      authorityLevel: "staff",
+      jobFunction: "general_staff",
+      workspaceAccess: JSON.stringify([]),
+      accessProfileMigratedAt: new Date(),
+      branchId: branchAId,
+    },
+    {
+      name: "Integration Other Branch",
+      email: `integration-other-${suffix}@example.test`,
+      passwordHash,
+      role: "staff",
+      authorityLevel: "staff",
+      jobFunction: "general_staff",
+      workspaceAccess: JSON.stringify([]),
+      accessProfileMigratedAt: new Date(),
+      branchId: branchBId,
+    },
   ]).returning({ id: usersTable.id });
   adminId = adminUser.id;
+  branchAdminId = branchAdminUser.id;
   officerId = officerUser.id;
   otherBranchUserId = otherUser.id;
 
   admin = await login(`integration-admin-${suffix}@example.test`);
+  branchAdmin = await login(`integration-branch-admin-${suffix}@example.test`);
   officer = await login(`integration-officer-${suffix}@example.test`);
   otherBranchUser = await login(`integration-other-${suffix}@example.test`);
 
@@ -102,14 +148,59 @@ afterAll(async () => {
   if (paymentScheduleId) await db.delete(paymentSchedulesTable).where(eq(paymentSchedulesTable.id, paymentScheduleId));
   if (paymentExpenseId) await db.delete(overheadExpensesTable).where(eq(overheadExpensesTable.id, paymentExpenseId));
   if (protectedContainerId) await db.delete(containersTable).where(eq(containersTable.id, protectedContainerId));
-  if (adminId || officerId || otherBranchUserId) {
-    await db.delete(workflowNotificationsTable).where(inArray(workflowNotificationsTable.targetUserId, [adminId, officerId, otherBranchUserId].filter(Boolean)));
-    await db.delete(usersTable).where(inArray(usersTable.id, [adminId, officerId, otherBranchUserId].filter(Boolean)));
+  if (adminId || branchAdminId || officerId || otherBranchUserId || createdStaffUserId) {
+    const testUserIds = [adminId, branchAdminId, officerId, otherBranchUserId, createdStaffUserId].filter(Boolean);
+    await db.delete(workflowNotificationsTable).where(inArray(workflowNotificationsTable.targetUserId, testUserIds));
+    await db.delete(usersTable).where(inArray(usersTable.id, testUserIds));
   }
   if (branchAId || branchBId) await db.delete(branchesTable).where(inArray(branchesTable.id, [branchAId, branchBId].filter(Boolean)));
 });
 
 describe("sensitive workflow integration", () => {
+  it("enforces branch-admin user management boundaries", async () => {
+    const visibleUsers = await branchAdmin.agent.get("/api/users");
+    expect(visibleUsers.status).toBe(200);
+    expect(visibleUsers.body.some((user: { id: number }) => user.id === otherBranchUserId)).toBe(false);
+
+    const created = await branchAdmin.agent
+      .post("/api/users")
+      .set("X-CSRF-Token", branchAdmin.csrf)
+      .send({
+        name: "Integration Shipping Staff",
+        email: `integration-shipping-${suffix}@example.test`,
+        password,
+        authorityLevel: "staff",
+        jobFunction: "operations",
+        workspaceAccess: ["shipping"],
+        branchId: branchAId,
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.authorityLevel).toBe("staff");
+    expect(created.body.jobFunction).toBe("operations");
+    expect(created.body.workspaceAccess).toBe(JSON.stringify(["shipping"]));
+    createdStaffUserId = created.body.id;
+
+    const elevated = await branchAdmin.agent
+      .post("/api/users")
+      .set("X-CSRF-Token", branchAdmin.csrf)
+      .send({
+        name: "Unauthorized Admin",
+        email: `integration-elevated-${suffix}@example.test`,
+        password,
+        authorityLevel: "admin",
+        jobFunction: "general_staff",
+        workspaceAccess: [],
+        branchId: branchAId,
+      });
+    expect(elevated.status).toBe(403);
+
+    const crossBranchRead = await branchAdmin.agent.get(`/api/users/${otherBranchUserId}`);
+    expect(crossBranchRead.status).toBe(404);
+
+    const staffDenied = await officer.agent.get("/api/users");
+    expect(staffDenied.status).toBe(403);
+  });
+
   it("blocks cross-branch task reads and writes", async () => {
     const read = await otherBranchUser.agent.get(`/api/containers/${protectedContainerId}/tasks`);
     expect(read.status).toBe(404);
