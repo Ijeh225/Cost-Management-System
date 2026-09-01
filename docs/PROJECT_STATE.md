@@ -71,6 +71,11 @@ test before beginning any new large product feature.
   are `E2EL260901` (ID 26, Lagos) and `E2EA260901` (ID 25, Abuja). The
   container form initially displayed Head Office as Branch under the Lagos
   global scope, expanding `BRN-001` to include an unsafe/misleading default.
+- Container branch isolation has passed: Lagos scope returned only the Lagos
+  controlled container, Abuja scope returned only the Abuja controlled
+  container, and the completed All Branches refresh returned both. Moving a
+  controlled container into Operations requires an explicit verification
+  approval before the stage-workspace tests can begin.
 
 ## Current Release Status
 
