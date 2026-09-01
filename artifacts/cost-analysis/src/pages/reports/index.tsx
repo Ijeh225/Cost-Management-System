@@ -924,7 +924,7 @@ function PrintableReportsSection() {
   const [plFrom, setPlFrom] = useState("");
   const [plTo, setPlTo] = useState("");
   const [plClientId, setPlClientId] = useState("all");
-  const [plCostBasis, setPlCostBasis] = useState<"budgeted" | "disbursements">("budgeted");
+  const [plCostBasis, setPlCostBasis] = useState<"budgeted" | "actual_paid">("budgeted");
   const [, setLocation] = useLocation();
 
   const openReport = (path: string, params: Record<string, string>) => {
@@ -1131,7 +1131,7 @@ function PrintableReportsSection() {
             <div className="space-y-1">
               <Label className="text-xs">Cost Basis</Label>
               <div className="flex gap-1.5">
-                {(["budgeted", "disbursements"] as const).map(v => (
+                {(["budgeted", "actual_paid"] as const).map(v => (
                   <button
                     key={v}
                     type="button"
@@ -1142,7 +1142,7 @@ function PrintableReportsSection() {
                         : "border-border/40 bg-background/40 text-muted-foreground hover:bg-muted/30"
                     }`}
                   >
-                    {v === "budgeted" ? "Budgeted Charges" : "Actual Disbursements"}
+                    {v === "budgeted" ? "Budgeted Costs" : "Actual Paid Costs"}
                   </button>
                 ))}
               </div>

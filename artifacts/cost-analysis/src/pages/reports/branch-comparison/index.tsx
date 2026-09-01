@@ -24,7 +24,7 @@ export default function BranchComparisonPage() {
     { enabled: !!isSuperAdmin }
   );
 
-  type SortKey = "branchName" | "containers" | "revenue" | "costs" | "grossProfit" | "marginPct" | "avgTurnaroundDays" | "outstandingReceivables";
+  type SortKey = "branchName" | "containers" | "revenue" | "costs" | "grossProfit" | "overheads" | "netProfit" | "marginPct" | "avgTurnaroundDays" | "outstandingReceivables";
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const handleSort = (k: SortKey) => {
@@ -56,6 +56,7 @@ export default function BranchComparisonPage() {
   const exportCSV = () => {
     if (!rows.length) return;
     const headers = ["Branch", "Containers", "Revenue (₦)", "Costs (₦)", "Gross Profit (₦)", "Margin %", "Avg Turnaround (days)", "Outstanding AR (₦)"];
+    headers.splice(5, 0, "Actual Paid Overhead (NGN)", "Net Profit After Overhead (NGN)");
     const lines = [headers.join(",")];
     for (const r of rows) {
       lines.push([
@@ -64,6 +65,8 @@ export default function BranchComparisonPage() {
         r.revenue.toFixed(2),
         r.costs.toFixed(2),
         r.grossProfit.toFixed(2),
+        r.overheads.toFixed(2),
+        r.netProfit.toFixed(2),
         r.marginPct.toFixed(2),
         r.avgTurnaroundDays.toFixed(1),
         r.outstandingReceivables.toFixed(2),
@@ -152,17 +155,23 @@ export default function BranchComparisonPage() {
         </div>
       ) : (
         <>
+          {data?.financialBasis && (
+            <p className="text-xs text-muted-foreground rounded-md border border-border/40 bg-muted/20 px-3 py-2">
+              <span className="font-medium text-foreground">Financial basis:</span> {data.financialBasis.summary}
+            </p>
+          )}
           {totals && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <SumCard label="Total Containers" value={String(totals.containers)} />
-              <SumCard label="Total Revenue" value={formatCurrency(totals.revenue)} color="text-primary" />
-              <SumCard label="Total Costs" value={formatCurrency(totals.costs)} color="text-orange-400" />
-              <SumCard label="Net Profit" value={formatCurrency(totals.grossProfit)} color={totals.grossProfit >= 0 ? "text-emerald-400" : "text-destructive"} />
+              <SumCard label="Accrual Revenue" value={formatCurrency(totals.revenue)} color="text-primary" />
+              <SumCard label="Actual Paid Costs" value={formatCurrency(totals.costs)} color="text-orange-400" />
+              <SumCard label="Gross Profit before Overhead" value={formatCurrency(totals.grossProfit)} color={totals.grossProfit >= 0 ? "text-emerald-400" : "text-destructive"} />
+              <SumCard label="Net Profit after Overhead" value={formatCurrency(totals.netProfit)} color={totals.netProfit >= 0 ? "text-emerald-400" : "text-destructive"} />
             </div>
           )}
 
           <Card className="border-border/40 bg-card/40">
-            <CardHeader><CardTitle className="text-sm font-semibold">Revenue vs Costs by Branch</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm font-semibold">Accrual Revenue vs Actual Paid Costs by Branch</CardTitle></CardHeader>
             <CardContent>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
@@ -189,9 +198,11 @@ export default function BranchComparisonPage() {
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("branchName")}>Branch<SortIcon col="branchName" /></th>
                       <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("containers")}>Containers<SortIcon col="containers" /></th>
-                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("revenue")}>Revenue<SortIcon col="revenue" /></th>
-                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("costs")}>Costs<SortIcon col="costs" /></th>
-                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("grossProfit")}>Gross Profit<SortIcon col="grossProfit" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("revenue")}>Accrual Revenue<SortIcon col="revenue" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("costs")}>Actual Paid Costs<SortIcon col="costs" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("grossProfit")}>Gross Before OH<SortIcon col="grossProfit" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("overheads")}>Actual Paid OH<SortIcon col="overheads" /></th>
+                      <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("netProfit")}>Net After OH<SortIcon col="netProfit" /></th>
                       <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("marginPct")}>Margin %<SortIcon col="marginPct" /></th>
                       <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("avgTurnaroundDays")}>Avg Turnaround<SortIcon col="avgTurnaroundDays" /></th>
                       <th className="px-4 py-3 text-right font-semibold cursor-pointer select-none hover:text-foreground" onClick={() => handleSort("outstandingReceivables")}>Outstanding AR<SortIcon col="outstandingReceivables" /></th>
@@ -213,6 +224,8 @@ export default function BranchComparisonPage() {
                             {formatCurrency(r.grossProfit)}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-right font-mono text-orange-400">{formatCurrency(r.overheads)}</td>
+                        <td className={`px-4 py-3 text-right font-mono font-semibold ${r.netProfit >= 0 ? "text-emerald-400" : "text-destructive"}`}>{formatCurrency(r.netProfit)}</td>
                         <td className={`px-4 py-3 text-right font-mono ${r.marginPct >= 0 ? "text-emerald-400" : "text-destructive"}`}>
                           {r.marginPct.toFixed(1)}%
                         </td>
@@ -221,7 +234,7 @@ export default function BranchComparisonPage() {
                       </tr>
                     ))}
                     {rows.length === 0 && (
-                      <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground text-sm">No branches found.</td></tr>
+                      <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground text-sm">No branches found.</td></tr>
                     )}
                   </tbody>
                   {totals && rows.length > 0 && (
@@ -234,6 +247,8 @@ export default function BranchComparisonPage() {
                         <td className={`px-4 py-3 text-right font-mono ${totals.grossProfit >= 0 ? "text-emerald-400" : "text-destructive"}`}>
                           {formatCurrency(totals.grossProfit)}
                         </td>
+                        <td className="px-4 py-3 text-right font-mono text-orange-400">{formatCurrency(totals.overheads)}</td>
+                        <td className={`px-4 py-3 text-right font-mono ${totals.netProfit >= 0 ? "text-emerald-400" : "text-destructive"}`}>{formatCurrency(totals.netProfit)}</td>
                         <td className="px-4 py-3" />
                         <td className="px-4 py-3" />
                         <td className="px-4 py-3 text-right font-mono text-amber-400">{formatCurrency(totals.outstandingReceivables)}</td>

@@ -143,7 +143,13 @@ export function useGetInvoiceAging(options?: { enabled?: boolean }) {
 export type ProfitLossResponse = {
   period: { from: string | null; to: string | null };
   filters: { clientId: number | null };
-  costBasis?: "budgeted" | "disbursements";
+  costBasis?: "budgeted" | "actual_paid";
+  financialBasis?: {
+    revenue: { id: "accrual"; label: string; description: string };
+    containerCosts: { id: "budgeted" | "actual_paid"; label: string; description: string };
+    overheads: { id: "actual_paid"; label: string; description: string };
+    summary: string;
+  };
   revenue: {
     totalRevenue: number;
     totalInvoicedInclVat: number;
@@ -192,7 +198,7 @@ export function useGetProfitLoss(params: { from?: string; to?: string; clientId?
       if (params.from) qs.set("from", params.from);
       if (params.to) qs.set("to", params.to);
       if (params.clientId && params.clientId !== "all") qs.set("clientId", params.clientId);
-      if (params.costBasis === "disbursements") qs.set("costBasis", "disbursements");
+      if (params.costBasis === "actual_paid") qs.set("costBasis", "actual_paid");
       return customFetch(`/api/reports/pl?${qs}`);
     },
   });
@@ -202,6 +208,12 @@ export type DisbursementReconciliationSection = {
   budgeted: number;
   disbursed: number;
   variance: number;
+};
+
+export type DisbursementFinancialBasis = {
+  budgeted: { id: "budgeted"; label: string; description: string };
+  actualPaid: { id: "actual_paid"; label: string; description: string };
+  summary: string;
 };
 
 export type DisbursementReconciliationRow = {
@@ -218,6 +230,7 @@ export type DisbursementReconciliationRow = {
 
 export type DisbursementReconciliationResponse = {
   period: { from: string | null; to: string | null; status: string | null };
+  financialBasis: DisbursementFinancialBasis;
   rows: DisbursementReconciliationRow[];
   aggregate: {
     sections: Record<string, DisbursementReconciliationSection>;
@@ -413,6 +426,8 @@ export type BranchComparisonRow = {
   revenue: number;
   costs: number;
   grossProfit: number;
+  overheads: number;
+  netProfit: number;
   marginPct: number;
   avgTurnaroundDays: number;
   outstandingReceivables: number;
@@ -426,7 +441,15 @@ export type BranchComparisonResponse = {
     revenue: number;
     costs: number;
     grossProfit: number;
+    overheads: number;
+    netProfit: number;
     outstandingReceivables: number;
+  };
+  financialBasis: {
+    revenue: { id: "accrual"; label: string; description: string };
+    containerCosts: { id: "actual_paid"; label: string; description: string };
+    overheads: { id: "actual_paid"; label: string; description: string };
+    summary: string;
   };
   generatedAt: string;
 };

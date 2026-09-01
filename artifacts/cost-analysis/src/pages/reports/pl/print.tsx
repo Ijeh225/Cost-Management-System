@@ -28,6 +28,11 @@ function useQueryParams() {
 function downloadCsv(data: ProfitLossResponse, filename: string) {
   const lines: string[] = [];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  lines.push("Financial basis,Type,Definition");
+  lines.push(`Revenue,${data.financialBasis?.revenue.label ?? "Accrual"},${data.financialBasis?.revenue.description ?? "Issued invoice revenue excluding VAT."}`);
+  lines.push(`Container costs,${data.financialBasis?.containerCosts.label ?? "Budgeted"},${data.financialBasis?.containerCosts.description ?? "Configured charge amounts."}`);
+  lines.push(`Overheads,${data.financialBasis?.overheads.label ?? "Actual Paid"},${data.financialBasis?.overheads.description ?? "Dated overhead payment records."}`);
+  lines.push("");
   lines.push("Section,Line,Amount");
   lines.push(`Revenue,Net Sales (excl. VAT),${data.revenue.totalRevenue.toFixed(2)}`);
   lines.push(`Revenue,VAT Collected (liability — not revenue),${data.revenue.totalVatCollected.toFixed(2)}`);
@@ -88,7 +93,7 @@ export default function ProfitLossPrint() {
     );
   }
 
-  const { period, revenue, costOfSales, grossProfit, grossMarginPct, overheads, netProfit, netMarginPct, containerCount, avgProfitPerContainer, monthly, clients } = data;
+  const { period, revenue, costOfSales, grossProfit, grossMarginPct, overheads, netProfit, netMarginPct, containerCount, avgProfitPerContainer, monthly, clients, financialBasis } = data;
 
   const periodLabel = (() => {
     if (period.from && period.to) return `${fmtDate(period.from)} \u2013 ${fmtDate(period.to)}`;
@@ -186,7 +191,7 @@ export default function ProfitLossPrint() {
           <span style={{ fontWeight: 700, flexShrink: 0 }}>ℹ</span>
           <span>
             Revenue is recognised from <strong>issued invoices</strong> (net of VAT). Draft invoices are excluded.
-            Net profit deducts <strong>branch overhead expenses</strong> from gross profit.
+            Net profit deducts <strong>actual paid branch overheads</strong> from gross profit.
             The Dashboard and Analytics page show gross profit based on <em>budgeted clearing charges</em> — figures may differ from this report.
           </span>
         </div>
@@ -198,7 +203,7 @@ export default function ProfitLossPrint() {
             <div className="sub">{revenue.invoiceCount} issued invoice{revenue.invoiceCount !== 1 ? "s" : ""}</div>
           </div>
           <div className="summary-card cogs">
-            <div className="lbl">Cost of Sales</div>
+            <div className="lbl">Cost of Sales ({financialBasis?.containerCosts.label ?? "Budgeted"})</div>
             <div className="val">{fmt(costOfSales.total)}</div>
             <div className="sub">{containerCount} container{containerCount !== 1 ? "s" : ""}</div>
           </div>
@@ -231,7 +236,7 @@ export default function ProfitLossPrint() {
                 <td className="amt" style={{ color: "#94a3b8" }}>{fmt(revenue.totalInvoicedInclVat)}</td>
               </tr>
 
-              <tr className="section-header"><td colSpan={2}>Cost of Sales</td></tr>
+              <tr className="section-header"><td colSpan={2}>Cost of Sales ({financialBasis?.containerCosts.label ?? "Budgeted"})</td></tr>
               <tr><td className="lbl indent">Shipping</td><td className="amt">{fmt(costOfSales.shipping)}</td></tr>
               <tr><td className="lbl indent">Customs (incl. duty)</td><td className="amt">{fmt(costOfSales.customs)}</td></tr>
               <tr><td className="lbl indent">Terminal</td><td className="amt">{fmt(costOfSales.terminal)}</td></tr>
@@ -248,7 +253,7 @@ export default function ProfitLossPrint() {
                 <td className="amt">{fmt(grossProfit)}</td>
               </tr>
 
-              <tr className="section-header"><td colSpan={2}>Operating Expenses (Overheads)</td></tr>
+              <tr className="section-header"><td colSpan={2}>Operating Expenses (Actual Paid Overheads)</td></tr>
               {sortedOverheads.length === 0 ? (
                 <tr><td className="lbl indent" colSpan={2} style={{ color: "#94a3b8", fontStyle: "italic" }}>No overhead expenses in period.</td></tr>
               ) : sortedOverheads.map(([cat, amt]) => (

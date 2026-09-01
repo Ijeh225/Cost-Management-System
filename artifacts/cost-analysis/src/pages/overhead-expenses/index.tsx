@@ -479,7 +479,7 @@ export default function OverheadExpensesPage() {
   useEffect(() => { if (!isAdmin) setLocation("/"); }, [isAdmin]);
   if (!isAdmin) return null;
 
-  const { data, isLoading } = useGetOverheadExpenses({
+  const { data, isLoading, isFetching } = useGetOverheadExpenses({
     category: filterCategory !== "all" ? filterCategory : undefined,
     from: filterFrom || undefined,
     to: filterTo || undefined,
@@ -705,6 +705,11 @@ export default function OverheadExpensesPage() {
                   </button>
                 ))}
               </div>
+              {isFetching && !isLoading && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Updating expenses...
+                </div>
+              )}
               {/* Filters */}
               <div className="flex items-center gap-2 flex-wrap pb-3">
                 <Filter className="w-4 h-4 text-muted-foreground shrink-0" />

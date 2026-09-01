@@ -3,6 +3,7 @@ import { db, containersTable, usersTable, shippingChargesTable, customsChargesTa
 import { eq, desc, gte, lte, and, inArray, isNotNull, ne, type SQL } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
+import { FINANCIAL_BASIS } from "../lib/financial-reporting.js";
 
 async function resolveBranchScopeInfo(req: AuthRequest): Promise<{ id: number | null; name: string }> {
   const id = getBranchScope(req);
@@ -36,6 +37,11 @@ analyticsRouter.get("/analytics", requireAuth, requireBranchAdminOrAbove, async 
         profitByCustomer: [], costBySection: [], profitByVessel: [],
         monthlyTrend: [], negativeProfitContainers: [], staffProductivity: [],
         summary: { totalRevenue: 0, totalCost: 0, grossProfit: 0, profitMargin: 0, containerCount: 0 },
+        financialBasis: {
+          revenue: FINANCIAL_BASIS.budgeted,
+          costs: FINANCIAL_BASIS.budgeted,
+          summary: "Operational estimate based on configured clearing charges and configured container charges. Overhead is excluded.",
+        },
       });
     }
 
@@ -213,6 +219,11 @@ analyticsRouter.get("/analytics", requireAuth, requireBranchAdminOrAbove, async 
       monthlyTrend,
       negativeProfitContainers,
       staffProductivity,
+      financialBasis: {
+        revenue: FINANCIAL_BASIS.budgeted,
+        costs: FINANCIAL_BASIS.budgeted,
+        summary: "Operational estimate based on configured clearing charges and configured container charges. Overhead is excluded.",
+      },
     });
   } catch (err) {
     console.error(err);

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable, workflowNotificationsTable, containerStageNotesTable, settingsTable } from "@workspace/db";
+import { db, containersTable, usersTable, clientsTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, auditLogTable, sectionApprovalsTable, containerTasksTable, containerTimelineTable, containerDocumentsTable, customFieldValuesTable, invoicesTable, invoicePaymentsTable, containerExtraChargesTable, userClientAssignmentsTable, workflowNotificationsTable, containerStageNotesTable, settingsTable, expensePaymentsTable } from "@workspace/db";
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
@@ -8,6 +8,7 @@ import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fx
 import { isContainerPhysicallyInTerminal } from "../lib/operational-definitions.js";
 import { stageOwnerFieldFor, stageOwnerFor } from "../lib/department-stage-owners.js";
 import { hasAuthority, hasWorkspace } from "../lib/authorization.js";
+import { FINANCIAL_BASIS } from "../lib/financial-reporting.js";
 
 const router = Router();
 const VERIFICATION_OFFICER_SETTING_KEY = "verificationOfficerUserId";
@@ -2710,6 +2711,11 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     }
 
     const totalGrossProfit = totalClearingCharges - totalCost;
+    const overheadPayments = _scope === null
+      ? await db.select({ amount: expensePaymentsTable.amount }).from(expensePaymentsTable)
+      : await db.select({ amount: expensePaymentsTable.amount }).from(expensePaymentsTable).where(eq(expensePaymentsTable.branchId, _scope));
+    const totalOverheadPaid = overheadPayments.reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0);
+    const totalNetProfitAfterOverhead = totalGrossProfit - totalOverheadPaid;
 
     // Containers by status
     const statusCounts: Record<string, number> = {};
@@ -2843,6 +2849,14 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       totalCost,
       totalClearingCharges,
       totalGrossProfit,
+      totalOverheadPaid,
+      totalNetProfitAfterOverhead,
+      financialBasis: {
+        revenue: FINANCIAL_BASIS.budgeted,
+        containerCosts: FINANCIAL_BASIS.budgeted,
+        overheads: FINANCIAL_BASIS.actual_paid,
+        summary: "Dashboard gross profit is a budgeted operational estimate. Net profit after overhead deducts actual paid overhead expense rows.",
+      },
       totalDutyNotPaid,
       totalInvoiced,
       totalCollected,

@@ -233,6 +233,9 @@ export default function DisbursementReconciliationPage() {
           Compare budgeted charges to actual disbursements (money paid out) per container and section.
           Filter by payment date range and container status.
         </p>
+        <p className="text-xs text-muted-foreground mt-2 rounded-md border border-border/40 bg-muted/20 px-3 py-2">
+          <span className="font-medium text-foreground">Financial basis:</span> Budgeted charge amounts versus actual dated payments. A variance is not an unpaid bill by itself.
+        </p>
       </div>
 
       {/* Filters */}

@@ -6,6 +6,7 @@ import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, req
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
 import { deliverReportSubscription } from "../lib/report-delivery.js";
 import { normalizeReportRecipients, normalizeReportSendAt, normalizeReportSendDayOfWeek, SCHEDULED_REPORT_FREQUENCIES, SCHEDULED_REPORT_KINDS } from "../lib/report-delivery-rules.js";
+import { FINANCIAL_BASIS, normalizeContainerCostBasis, profitLossBasis } from "../lib/financial-reporting.js";
 
 export const reportsRouter = Router();
 
@@ -75,6 +76,10 @@ reportsRouter.get("/reports/duty-payment-ledger", requireAuth, requireBranchMemb
       branchScope,
       period: { from: range.from?.toISOString() ?? null, to: range.to?.toISOString() ?? null },
       summary: { transactionCount: rows.length, totalPaid, bankPaid, cashPaid },
+      financialBasis: {
+        payments: FINANCIAL_BASIS.actual_paid,
+        summary: "Actual paid duty only. Each total comes from a dated duty-payment ledger transaction.",
+      },
       transactions: rows.map(row => ({
         ...row,
         amount: Number(row.amount ?? 0),
@@ -980,6 +985,7 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchMemberOrAb
 reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const { from, to, clientId, costBasis } = req.query as Record<string, string>;
+    const normalizedCostBasis = normalizeContainerCostBasis(costBasis);
     const branchScope = await resolveBranchScopeInfo(req);
 
     let fromDate: Date | null = null;
@@ -1113,7 +1119,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
     const totalCostByContainer: Map<number, number> = new Map();
 
     if (allCostIds.length > 0) {
-      if (costBasis === "disbursements") {
+      if (normalizedCostBasis === "actual_paid") {
         // Use actual disbursements (container_expense_payments) instead of charge-table budgets
         const disbPayments = await db
           .select({
@@ -1197,18 +1203,19 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
     // Note: overheads are organisation-wide; when a client filter is set we still show
     // company overheads (a client filter on overheads would be meaningless).
     const ohConds: SQL[] = [];
-    if (fromDate) ohConds.push(gte(overheadExpensesTable.paidAt, fromDate));
-    if (toDate)   ohConds.push(lte(overheadExpensesTable.paidAt, toDate));
-    if (branchScope.id !== null) ohConds.push(eq(overheadExpensesTable.branchId, branchScope.id));
+    if (fromDate) ohConds.push(gte(expensePaymentsTable.paidAt, fromDate));
+    if (toDate)   ohConds.push(lte(expensePaymentsTable.paidAt, toDate));
+    if (branchScope.id !== null) ohConds.push(eq(expensePaymentsTable.branchId, branchScope.id));
 
     const overheadRows = await db
       .select({
-        id: overheadExpensesTable.id,
-        amount: overheadExpensesTable.amount,
-        paidAt: overheadExpensesTable.paidAt,
+        id: expensePaymentsTable.id,
+        amount: expensePaymentsTable.amount,
+        paidAt: expensePaymentsTable.paidAt,
         category: overheadExpensesTable.category,
       })
-      .from(overheadExpensesTable)
+      .from(expensePaymentsTable)
+      .innerJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id))
       .where(ohConds.length > 0 ? and(...ohConds) : undefined);
 
     let totalOverheads = 0;
@@ -1268,7 +1275,8 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
       period: { from: from ?? null, to: to ?? null },
       branchScope,
       filters: { clientId: clientIdNum },
-      costBasis: costBasis === "disbursements" ? "disbursements" : "budgeted",
+      costBasis: normalizedCostBasis,
+      financialBasis: profitLossBasis(normalizedCostBasis),
       revenue: {
         totalRevenue,                 // ex-VAT (recognised revenue)
         totalInvoicedInclVat,         // gross invoiced (informational)
@@ -1797,6 +1805,11 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
 
     const emptyResponse = {
       period: { from: from ?? null, to: to ?? null, status: status ?? null },
+      financialBasis: {
+        budgeted: FINANCIAL_BASIS.budgeted,
+        actualPaid: FINANCIAL_BASIS.actual_paid,
+        summary: "Budgeted charge amounts are compared with actual dated disbursement payments.",
+      },
       rows: [] as ReturnType<typeof buildRow>[],
       aggregate: {
         sections: {
@@ -1955,6 +1968,11 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
     return res.json({
       period: { from: from ?? null, to: to ?? null, status: status ?? null },
       branchScope,
+      financialBasis: {
+        budgeted: FINANCIAL_BASIS.budgeted,
+        actualPaid: FINANCIAL_BASIS.actual_paid,
+        summary: "Budgeted charge amounts are compared with actual dated disbursement payments.",
+      },
       rows,
       aggregate: {
         sections: aggSections,
@@ -2163,7 +2181,8 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       .from(branchesTable)
       .where(eq(branchesTable.isActive, true));
 
-    // Container counts + revenue + costs per branch
+    // Container counts are operational. Financial amounts below deliberately use
+    // immutable invoice/payment records, never a mixture of budget and payment.
     const containerConds: SQL[] = [];
     if (fromDate) containerConds.push(gte(containersTable.createdAt, fromDate));
     if (toDate)   containerConds.push(lte(containersTable.createdAt, toDate));
@@ -2171,55 +2190,39 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
     const containers = await db.select({
       id: containersTable.id,
       branchId: containersTable.branchId,
-      clearingCharges: containersTable.clearingCharges,
       status: containersTable.status,
       createdAt: containersTable.createdAt,
       gateInDate: containersTable.gateInDate,
       deliveredAt: containersTable.deliveredAt,
     }).from(containersTable).where(containerConds.length > 0 ? and(...containerConds) : undefined);
 
-    const containerIds = containers.map(c => c.id);
+    const issuedInvoiceConds: SQL[] = [ne(invoicesTable.status, "draft"), ne(invoicesTable.status, "cancelled")];
+    if (fromDate) issuedInvoiceConds.push(gte(invoicesTable.createdAt, fromDate));
+    if (toDate) issuedInvoiceConds.push(lte(invoicesTable.createdAt, toDate));
+    const containerPaymentConds: SQL[] = [];
+    if (fromDate) containerPaymentConds.push(gte(containerExpensePaymentsTable.paidAt, fromDate));
+    if (toDate) containerPaymentConds.push(lte(containerExpensePaymentsTable.paidAt, toDate));
+    const overheadPaymentConds: SQL[] = [];
+    if (fromDate) overheadPaymentConds.push(gte(expensePaymentsTable.paidAt, fromDate));
+    if (toDate) overheadPaymentConds.push(lte(expensePaymentsTable.paidAt, toDate));
 
-    // Costs = charges (shipping + customs + terminal + delivery + operations + extras)
-    //         + expenses (container_expense_payments).
-    // Charges are the contracted/budgeted cost categories per container; expenses are
-    // additional disbursed costs tied to the container outside of the standard charge sets.
-    const [sRows, cRows, tRows, dRows, oRows, exRows, cepRows] = containerIds.length > 0
-      ? await Promise.all([
-          db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, containerIds)),
-          db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, containerIds)),
-          db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, containerIds)),
-          db.select().from(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, containerIds)),
-          db.select().from(operationsChargesTable).where(inArray(operationsChargesTable.containerId, containerIds)),
-          db.select({ containerId: containerExtraChargesTable.containerId, amount: containerExtraChargesTable.amount })
-            .from(containerExtraChargesTable).where(inArray(containerExtraChargesTable.containerId, containerIds)),
-          db.select({ containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount })
-            .from(containerExpensePaymentsTable).where(inArray(containerExpensePaymentsTable.containerId, containerIds)),
-        ])
-      : [[], [], [], [], [], [], []] as const;
+    const [issuedInvoices, containerPayments, overheadPayments] = await Promise.all([
+      db.select({ branchId: invoicesTable.branchId, subtotal: invoicesTable.subtotal })
+        .from(invoicesTable).where(and(...issuedInvoiceConds)),
+      db.select({ branchId: containerExpensePaymentsTable.branchId, amount: containerExpensePaymentsTable.amount })
+        .from(containerExpensePaymentsTable).where(containerPaymentConds.length ? and(...containerPaymentConds) : undefined),
+      db.select({ branchId: expensePaymentsTable.branchId, amount: expensePaymentsTable.amount })
+        .from(expensePaymentsTable).where(overheadPaymentConds.length ? and(...overheadPaymentConds) : undefined),
+    ]);
 
-    const sMap: Record<number, ShippingCharges> = {};   for (const r of sRows) sMap[r.containerId] = r as ShippingCharges;
-    const cMap: Record<number, CustomsCharges> = {};    for (const r of cRows) cMap[r.containerId] = r as CustomsCharges;
-    const tMap: Record<number, TerminalCharges> = {};   for (const r of tRows) tMap[r.containerId] = r as TerminalCharges;
-    const dMap: Record<number, DeliveryCharges> = {};   for (const r of dRows) dMap[r.containerId] = r as DeliveryCharges;
-    const oMap: Record<number, OperationsCharges> = {}; for (const r of oRows) oMap[r.containerId] = r as OperationsCharges;
-
-    const extrasByContainer = new Map<number, number>();
-    for (const r of exRows) {
-      extrasByContainer.set(r.containerId, (extrasByContainer.get(r.containerId) ?? 0) + parseFloat(r.amount as string ?? "0"));
-    }
-    const expensesByContainer = new Map<number, number>();
-    for (const r of cepRows) {
-      expensesByContainer.set(r.containerId, (expensesByContainer.get(r.containerId) ?? 0) + parseFloat(r.amount as string ?? "0"));
-    }
-
-    const costByContainer = new Map<number, number>();
-    for (const c of containers) {
-      const charges = calcTotalCost(sMap[c.id] ?? {}, cMap[c.id] ?? {}, tMap[c.id] ?? {}, dMap[c.id] ?? {}, oMap[c.id] ?? {});
-      const extras  = extrasByContainer.get(c.id) ?? 0;
-      const expenses = expensesByContainer.get(c.id) ?? 0;
-      costByContainer.set(c.id, charges + extras + expenses);
-    }
+    const sumByBranch = (rows: Array<{ branchId: number; amount: string | null }>) => {
+      const result = new Map<number, number>();
+      for (const row of rows) result.set(row.branchId, (result.get(row.branchId) ?? 0) + parseFloat(row.amount ?? "0"));
+      return result;
+    };
+    const revenueByBranch = sumByBranch(issuedInvoices.map(row => ({ branchId: row.branchId, amount: row.subtotal })));
+    const costsByBranch = sumByBranch(containerPayments);
+    const overheadsByBranch = sumByBranch(overheadPayments);
 
     // Outstanding receivables per branch (sum of unpaid invoice balances).
     // Period-filtered to match container metrics: only invoices issued within range.
@@ -2252,9 +2255,11 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
     const rows = branches.map(b => {
       const branchContainers = containers.filter(c => c.branchId === b.id);
       const containerCount = branchContainers.length;
-      const revenue = branchContainers.reduce((s, c) => s + parseFloat(c.clearingCharges ?? "0"), 0);
-      const costs = branchContainers.reduce((s, c) => s + (costByContainer.get(c.id) ?? 0), 0);
+      const revenue = revenueByBranch.get(b.id) ?? 0;
+      const costs = costsByBranch.get(b.id) ?? 0;
       const grossProfit = revenue - costs;
+      const overheads = overheadsByBranch.get(b.id) ?? 0;
+      const netProfit = grossProfit - overheads;
       const marginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
       // Turnaround = gate-in → delivered (operational lifecycle), not created → closed.
@@ -2275,6 +2280,8 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
         revenue,
         costs,
         grossProfit,
+        overheads,
+        netProfit,
         marginPct,
         avgTurnaroundDays: Math.round(turnaroundDays * 10) / 10,
         outstandingReceivables: outstandingByBranch.get(b.id) ?? 0,
@@ -2286,6 +2293,8 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       revenue: rows.reduce((s, r) => s + r.revenue, 0),
       costs: rows.reduce((s, r) => s + r.costs, 0),
       grossProfit: rows.reduce((s, r) => s + r.grossProfit, 0),
+      overheads: rows.reduce((s, r) => s + r.overheads, 0),
+      netProfit: rows.reduce((s, r) => s + r.netProfit, 0),
       outstandingReceivables: rows.reduce((s, r) => s + r.outstandingReceivables, 0),
     };
 
@@ -2293,6 +2302,12 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       period: { from: from ?? null, to: to ?? null },
       rows,
       totals,
+      financialBasis: {
+        revenue: FINANCIAL_BASIS.accrual,
+        containerCosts: FINANCIAL_BASIS.actual_paid,
+        overheads: FINANCIAL_BASIS.actual_paid,
+        summary: "Issued invoice revenue less actual paid container costs and actual paid overhead.",
+      },
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {

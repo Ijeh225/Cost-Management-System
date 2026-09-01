@@ -553,7 +553,12 @@ export default function Dashboard() {
     );
   }
 
-  const grossProfit = stats.totalGrossProfit ?? 0;
+  const financialStats = stats as typeof stats & {
+    totalOverheadPaid?: number;
+    totalNetProfitAfterOverhead?: number;
+  };
+  const grossProfit = financialStats.totalGrossProfit ?? 0;
+  const netProfitAfterOverhead = financialStats.totalNetProfitAfterOverhead ?? grossProfit;
 
   return (
     <motion.div
@@ -585,15 +590,15 @@ export default function Dashboard() {
         <StatCard title="In Progress"            value={stats.inProgress}             icon={Activity}    colorClass="text-blue-400" branchLabel={branchLabel} />
         <StatCard title="Completed"              value={stats.completed}              icon={CheckCircle2} colorClass="text-emerald-400" branchLabel={branchLabel} />
         <StatCard
-          title="Total Cost"
+          title="Budgeted Total Cost"
           value={stats.totalCost}
           icon={DollarSign}
           isCurrency
           branchLabel={branchLabel}
-          tooltip="Sum of all actual costs across shipping, customs, terminal, delivery, and operations charges."
+          tooltip="Configured container charges across shipping, customs, terminal, delivery, and operations. This is a budgeted cost estimate, not a cash-payment ledger."
         />
         <StatCard
-          title="Total Clearing Charges"
+          title="Budgeted Clearing Charges"
           value={stats.totalClearingCharges}
           icon={FileText}
           isCurrency
@@ -601,13 +606,22 @@ export default function Dashboard() {
           tooltip="Budgeted clearing charge entered per container — the estimated revenue figure used on this dashboard. See the P&L Report for revenue recognised from issued invoices."
         />
         <StatCard
-          title="Gross Profit"
+          title="Gross Profit before Overhead"
           value={grossProfit}
           icon={grossProfit >= 0 ? TrendingUp : TrendingDown}
           isCurrency
           colorClass={grossProfit >= 0 ? "text-emerald-400" : "text-destructive"}
           branchLabel={branchLabel}
-          tooltip="Gross profit = Clearing Charges minus actual costs. Based on budgeted revenue — does not deduct overhead expenses. See the P&L Report for net profit after overheads."
+          tooltip="Budgeted clearing charges minus budgeted container costs. Overhead is not deducted here."
+        />
+        <StatCard
+          title="Net Profit after Overhead"
+          value={netProfitAfterOverhead}
+          icon={netProfitAfterOverhead >= 0 ? TrendingUp : TrendingDown}
+          isCurrency
+          colorClass={netProfitAfterOverhead >= 0 ? "text-emerald-400" : "text-destructive"}
+          branchLabel={branchLabel}
+          tooltip="Gross profit before overhead less actual paid overhead expense rows. Use the P&L Report for accrual reporting based on issued invoices."
         />
         <StatCard title="Total Invoiced"         value={stats.totalInvoiced ?? 0}     icon={ReceiptText} isCurrency branchLabel={branchLabel} />
         <StatCard title="Total Collected"        value={stats.totalCollected ?? 0}    icon={Wallet}      isCurrency colorClass="text-emerald-400" branchLabel={branchLabel} />
@@ -790,7 +804,7 @@ export default function Dashboard() {
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <ReceiptText className="w-4 h-4 text-primary" /> Monthly Revenue vs Cost
+              <ReceiptText className="w-4 h-4 text-primary" /> Monthly Budgeted Revenue vs Cost
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -804,10 +818,10 @@ export default function Dashboard() {
                     contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px" }}
                     formatter={(value: number, name: string) => [
                       formatCurrency(value),
-                      name === "revenue" ? "Revenue" : name === "cost" ? "Total Cost" : "Gross Profit",
+                      name === "revenue" ? "Budgeted Revenue" : name === "cost" ? "Budgeted Cost" : "Gross Profit before Overhead",
                     ]}
                   />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: "12px" }} formatter={(v) => v === "revenue" ? "Revenue" : v === "cost" ? "Total Cost" : "Gross Profit"} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: "12px" }} formatter={(v) => v === "revenue" ? "Budgeted Revenue" : v === "cost" ? "Budgeted Cost" : "Gross Profit before Overhead"} />
                   <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
                   <Bar dataKey="cost" fill="hsl(var(--chart-3))" radius={[3, 3, 0, 0]} />
                   <Bar dataKey="grossProfit" fill="hsl(var(--chart-2))" radius={[3, 3, 0, 0]} />
@@ -895,7 +909,7 @@ export default function Dashboard() {
                   <th className="px-6 py-3 text-left font-medium">Customer</th>
                   <th className="px-6 py-3 text-left font-medium">Size</th>
                   <th className="px-6 py-3 text-left font-medium">Status</th>
-                  <th className="px-6 py-3 text-right font-medium">Gross Profit</th>
+                  <th className="px-6 py-3 text-right font-medium">Gross Profit before Overhead</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">

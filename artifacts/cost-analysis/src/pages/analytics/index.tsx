@@ -146,10 +146,10 @@ export default function AnalyticsPage() {
       {/* Financial KPIs (all-time, same as before) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard title="Containers" value={String(summary.containerCount ?? 0)} icon={Box} />
-        <KpiCard title="Total Revenue" value={formatCurrency(summary.totalRevenue ?? 0)} icon={DollarSign} colorClass="text-primary" />
-        <KpiCard title="Total Cost" value={formatCurrency(summary.totalCost ?? 0)} icon={DollarSign} colorClass="text-orange-400" />
+        <KpiCard title="Budgeted Revenue" value={formatCurrency(summary.totalRevenue ?? 0)} icon={DollarSign} colorClass="text-primary" />
+        <KpiCard title="Budgeted Cost" value={formatCurrency(summary.totalCost ?? 0)} icon={DollarSign} colorClass="text-orange-400" />
         <KpiCard
-          title="Gross Profit"
+          title="Estimated Gross Profit before Overhead"
           value={formatCurrency(summary.grossProfit ?? 0)}
           icon={isProfitable ? TrendingUp : TrendingDown}
           colorClass={isProfitable ? "text-emerald-400" : "text-destructive"}

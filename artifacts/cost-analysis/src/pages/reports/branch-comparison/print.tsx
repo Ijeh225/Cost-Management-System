@@ -25,6 +25,7 @@ type Response = {
   rows: Row[];
   totals: { containers: number; revenue: number; costs: number; grossProfit: number; outstandingReceivables: number };
   generatedAt: string;
+  financialBasis?: { summary: string };
 };
 
 function useQueryParams() {
@@ -95,7 +96,7 @@ export default function BranchComparisonPrint() {
     );
   }
 
-  const { rows, totals, period, generatedAt } = data;
+  const { rows, totals, period, generatedAt, financialBasis } = data;
 
   const periodLabel = (() => {
     if (period.from && period.to) return `${fmtDate(period.from)} \u2013 ${fmtDate(period.to)}`;
@@ -178,6 +179,10 @@ export default function BranchComparisonPrint() {
             <div className="report-sub">Generated: {fmtDate(generatedAt ?? new Date().toISOString())}</div>
           </div>
         </div>
+
+        <p style={{ margin: "0 0 20px", padding: "10px 12px", border: "1px solid #bfdbfe", borderRadius: 8, background: "#eff6ff", color: "#1e3a8a", fontSize: 12, lineHeight: 1.5 }}>
+          <strong>Financial basis:</strong> {financialBasis?.summary ?? "Accrual revenue less actual paid container costs and actual paid overhead."}
+        </p>
 
         <div className="summary-cards">
           <div className="summary-card">
