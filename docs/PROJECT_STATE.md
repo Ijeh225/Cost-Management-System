@@ -124,6 +124,12 @@ test before beginning any new large product feature.
   the controlled Lagos bank with reference `E2E-20260901-CONTAINER-001`. Its
   container-payment section, budget-versus-disbursement view, and Financial
   Ledger all agree; `CP-01` has passed.
+- A fresh controlled direct overhead path also reconciles: category
+  `E2E-20260901 Test Overhead`, ₦300 expense `E2E-20260901-OVERHEAD-001`, and
+  bank payment `E2E-20260901-OVERHEAD-001-PAID` progressed to Paid with a ₦0
+  balance and a matching ₦300 Financial Ledger debit. This isolates
+  `SCHED-001` to the scheduled-payment path rather than general overhead or
+  bank ledger posting.
 
 ## Current Release Status
 
