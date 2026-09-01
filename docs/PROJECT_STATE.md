@@ -111,9 +111,11 @@ test before beginning any new large product feature.
   Draft → Sent → Partially Paid → Paid lifecycle through two controlled
   ₦1,000 Bank Transfer collections. AR now shows ₦2,000 invoiced, ₦2,000
   collected, and ₦0 outstanding; Financial Ledger has both matching credits.
-  A controlled ₦1 post-paid overpayment attempt was blocked by the backend and
-  created no entry, but exposed Medium defect `INV-002` because Record Payment
-  remains enabled without a clear rejection message. Controlled bank
+  Critical `INV-002` was then found: a visible post-paid ₦1 payment attempt
+  created a real `E2E-20260901-INV-001-OVERPAY-REJECT` Financial Ledger credit
+  and ₦1 AR credit balance, but it is absent from invoice Payment History and
+  the invoice still says ₦2,000 paid. All further live financial posting is
+  paused pending review of this data-integrity defect. Controlled bank
   `E2E-20260901 Lagos Test Bank` has a zero opening balance. `BRN-001` also
   affects the invoice dialog, which displayed Head Office until Lagos was
   selected manually.
@@ -158,10 +160,9 @@ test before beginning any new large product feature.
 3. Use an upload-capable browser session to complete the `DOC-01` controlled
    upload/search/open/link check against `E2EL260901`; do not delete the test
    document without explicit confirmation.
-4. Continue the controlled invoice lifecycle: test the remaining paid,
-   due-date/overdue, cancelled, and repeated-action cases. Keep all new
-   financial entries labelled `E2E-20260901` and reconcile each one to AR and
-   Financial Ledger.
+4. Do not create further live financial records until Critical `INV-002` has a
+   reviewed correction/reversal plan. Preserve the controlled ₦1 entry and its
+   invoice, AR, and Financial Ledger evidence for diagnosis.
 5. Trace and correct `SCHED-001` only after the audit is approved; meanwhile,
    retain the controlled schedule and bank record as evidence and continue the
    remaining non-destructive lifecycle checks.
