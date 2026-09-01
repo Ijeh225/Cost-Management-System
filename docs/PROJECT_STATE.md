@@ -172,6 +172,9 @@ test before beginning any new large product feature.
   physically delivered, so the report's empty result is a verified pass.
 - Exchange Rate History loaded normally and correctly returned no entries for
   the present live data; this read-only empty-state path has passed.
+- Printable Invoice Aging renders, but repeats the cancelled-invoice error from
+  the live aging view. `AR-002` therefore affects both on-screen and printable
+  receivables reporting.
 
 ## Current Release Status
 
