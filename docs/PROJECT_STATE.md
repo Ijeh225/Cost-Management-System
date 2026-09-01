@@ -93,6 +93,12 @@ test before beginning any new large product feature.
   released Pull-Out records before the workspace can place them in its Released
   tab. The backend condition and required correction are in the live test
   register.
+- Documentation UI was reached for `E2EL260901`; the Documents tab, section
+  selector, and file picker render. The actual upload/search/open test is
+  blocked only because this signed-in browser-control surface cannot provide a
+  local file to the operating-system file chooser. This is not an application
+  finding and needs a manual browser upload or an approved upload-capable test
+  surface.
 
 ## Current Release Status
 
@@ -109,8 +115,9 @@ test before beginning any new large product feature.
 1. Complete `ENV-02` and catalogue the current test data without changing it.
 2. Complete branch/date-range coverage for `FIN-01`; retain `RPT-001` for the
    final defect report and do not fix it before approval of the audit.
-3. Complete safe Documentation upload/search/open/link checks against
-   `E2EL260901`; do not delete the test document without explicit confirmation.
+3. Use an upload-capable browser session to complete the `DOC-01` controlled
+   upload/search/open/link check against `E2EL260901`; do not delete the test
+   document without explicit confirmation.
 4. With explicit action-time confirmation, create the remaining labelled
    schedule and lifecycle test records required for `TD-03` through `TD-05`.
 5. Obtain separate authenticated sessions or test credentials for at least one
