@@ -182,6 +182,8 @@ test before beginning any new large product feature.
 - Disbursement Reconciliation confirms `FIN-002` is broader than the P&L and
   dashboard: it records the ₦200 Shipping disbursement, but omits the verified
   ₦200 Customs Duty payment from the controlled duty container's actual spend.
+- Duty Reconciliation itself is correct for the controlled partial payment:
+  `E2ED260901` shows Snapshot ₦200 and Ledger ₦200 as Matched.
 
 ## Current Release Status
 
