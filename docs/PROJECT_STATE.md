@@ -167,6 +167,9 @@ test before beginning any new large product feature.
   hook-order rule by calling `useMemo` only after loading/error early returns;
   this High `VAT-001` defect needs a small route-render repair and regression
   test.
+- Delivery Tracking generated normally with no date filters and reported zero
+  deliveries. This is expected because no controlled container has been marked
+  physically delivered, so the report's empty result is a verified pass.
 
 ## Current Release Status
 
