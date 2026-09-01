@@ -105,6 +105,10 @@ test before beginning any new large product feature.
   and P&L agree on ₦500,002 Actual Paid Overhead, but Branch Comparison reports
   ₦10,710,002 as the same metric because their payment-row inclusion rules
   differ.
+- Controlled draft invoice `INV-202609-001` (ID 8) is now created for
+  `E2EL260901` in Lagos: ₦2,000 total, ₦0 paid, and an explicit test note. It
+  has not been issued or collected. `BRN-001` also affects the invoice dialog,
+  which displayed Head Office until Lagos was selected manually.
 
 ## Current Release Status
 
@@ -126,14 +130,16 @@ test before beginning any new large product feature.
 3. Use an upload-capable browser session to complete the `DOC-01` controlled
    upload/search/open/link check against `E2EL260901`; do not delete the test
    document without explicit confirmation.
-4. With explicit action-time confirmation, create the remaining labelled
+4. With explicit action-time confirmation, mark only `INV-202609-001` Sent;
+   then test its receivable and later controlled payment behaviour.
+5. With explicit action-time confirmation, create the remaining labelled
    schedule and lifecycle test records required for `TD-03` through `TD-05`.
-5. Obtain separate authenticated sessions or test credentials for at least one
+6. Obtain separate authenticated sessions or test credentials for at least one
    restricted profile and one branch-scoped profile before `SEC-01` can pass.
-6. Execute the operational, documentation, financial, reporting, security,
+7. Execute the operational, documentation, financial, reporting, security,
    and UI cases in `docs/LIVE_E2E_TEST_REGISTER.md` in dependency order.
-7. Update the defect log and project state after every verified result.
-8. Produce a final audit report before any corrective implementation begins.
+8. Update the defect log and project state after every verified result.
+9. Produce a final audit report before any corrective implementation begins.
 
 ## Workstream Status
 
