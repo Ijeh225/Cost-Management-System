@@ -107,10 +107,12 @@ test before beginning any new large product feature.
   ₦10,710,002 as the same metric because their payment-row inclusion rules
   differ.
 - Controlled invoice `INV-202609-001` (ID 8) was created for `E2EL260901` in
-  Lagos with ₦2,000 total, ₦0 paid, and an explicit test note. It was marked
-  Sent only after explicit confirmation. Lagos Accounts Receivable then
-  reconciled it as one invoice for the controlled client: ₦2,000 invoiced,
-  ₦0 collected, ₦2,000 current outstanding, and no overdue or credit balance.
+  Lagos with ₦2,000 total and an explicit test note. It was marked Sent and
+  then received a controlled ₦1,000 Bank Transfer collection with reference
+  `E2E-20260901-INV-001-PARTIAL-001`. The invoice is Partially Paid: Lagos AR
+  shows ₦2,000 invoiced, ₦1,000 collected, and ₦1,000 current outstanding.
+  Controlled bank `E2E-20260901 Lagos Test Bank` was created with a zero
+  opening balance and Financial Ledger shows the matching ₦1,000 credit.
   `BRN-001` also affects the invoice dialog, which displayed Head Office until
   Lagos was selected manually.
 
@@ -134,11 +136,10 @@ test before beginning any new large product feature.
 3. Use an upload-capable browser session to complete the `DOC-01` controlled
    upload/search/open/link check against `E2EL260901`; do not delete the test
    document without explicit confirmation.
-4. Obtain explicit action-time confirmation before recording any payment against
-   `INV-202609-001`; decide the controlled amount and payment method first so
-   the partial-payment, AR, and bank-posting checks remain auditable. Cash,
-   Cheque, and POS can be tested without a bank account; Bank Transfer cannot
-   be tested in Lagos until an active Lagos bank account exists.
+4. Continue the controlled invoice lifecycle: test the remaining paid,
+   due-date/overdue, cancelled, and repeated-action cases. Keep all new
+   financial entries labelled `E2E-20260901` and reconcile each one to AR and
+   Financial Ledger.
 5. With explicit action-time confirmation, create the remaining labelled
    schedule and lifecycle test records required for `TD-03` through `TD-05`.
 6. Obtain separate authenticated sessions or test credentials for at least one
