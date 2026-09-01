@@ -162,6 +162,11 @@ test before beginning any new large product feature.
   Receivable correctly excludes it. This is the new High `AR-002` defect and
   confirms invoice-status rules are still inconsistent across receivables
   views.
+- VAT Summary is currently unavailable: both its Generate button and direct
+  print route produce a blank page. `vat-summary/print.tsx` violates React's
+  hook-order rule by calling `useMemo` only after loading/error early returns;
+  this High `VAT-001` defect needs a small route-render repair and regression
+  test.
 
 ## Current Release Status
 
