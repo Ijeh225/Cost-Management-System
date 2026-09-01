@@ -184,6 +184,9 @@ test before beginning any new large product feature.
   ₦200 Customs Duty payment from the controlled duty container's actual spend.
 - Duty Reconciliation itself is correct for the controlled partial payment:
   `E2ED260901` shows Snapshot ₦200 and Ledger ₦200 as Matched.
+- Monthly Summary is functional but confirms `RPT-002`: it labels budgeted
+  container clearing charges and costs as Revenue and Expenses, even though
+  those values are not the actual invoice and payment financial basis.
 
 ## Current Release Status
 
