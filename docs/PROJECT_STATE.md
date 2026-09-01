@@ -130,6 +130,11 @@ test before beginning any new large product feature.
   balance and a matching ₦300 Financial Ledger debit. This isolates
   `SCHED-001` to the scheduled-payment path rather than general overhead or
   bank ledger posting.
+- Dedicated duty-test container `E2ED260901` (ID 27) was verified and given a
+  controlled ₦400 Documentation assessment. Its controlled ₦200 bank duty
+  payment (`E2E-20260901-DUTY-001-PARTIAL`) correctly reports Partial with
+  ₦200 outstanding in Duty Payments, and appears as the matching dated debit
+  in both Duty Payment Ledger and Financial Ledger.
 
 ## Current Release Status
 
