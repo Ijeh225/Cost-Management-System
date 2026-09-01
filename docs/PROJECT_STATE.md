@@ -76,6 +76,15 @@ test before beginning any new large product feature.
   container, and the completed All Branches refresh returned both. Moving a
   controlled container into Operations requires an explicit verification
   approval before the stage-workspace tests can begin.
+- `E2EL260901` was verified after explicit confirmation. The dedicated
+  Documentation, Transire, Shipping, and Terminal workspaces now retain
+  independent test owners, confirming the intended per-department owner model.
+  Pull-Out correctly remains unavailable until Terminal/TDO is released. High
+  defect `OPS-001` was found: the generic Operations detail stage-control form
+  reports a successful save but loses its values after navigation, unlike the
+  authoritative department workspaces. The browser driver could not commit a
+  native date field to React state, so expected-date entry needs a manual
+  browser confirmation before it is accepted as a product defect.
 
 ## Current Release Status
 
@@ -92,9 +101,9 @@ test before beginning any new large product feature.
 1. Complete `ENV-02` and catalogue the current test data without changing it.
 2. Complete branch/date-range coverage for `FIN-01`; retain `RPT-001` for the
    final defect report and do not fix it before approval of the audit.
-3. Use the two identified pending-verification containers to execute the
-   Documentation, Transire, Shipping, Terminal, Pullout, and stage-isolation
-   cases without approving, paying, or deleting data.
+3. With explicit confirmation before the irreversible release action, mark
+   only `E2EL260901` Terminal/TDO released to open the controlled Pull-Out
+   workspace; then test Pull-Out owner, submitted status, and actual date.
 4. With explicit action-time confirmation, create the remaining labelled
    schedule and lifecycle test records required for `TD-03` through `TD-05`.
 5. Obtain separate authenticated sessions or test credentials for at least one
