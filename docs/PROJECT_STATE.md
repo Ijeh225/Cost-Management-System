@@ -6,11 +6,19 @@ This is the authoritative handoff record for the Cost Management System. Every
 new work session must read it before planning, changing code, testing, or
 deploying. Update it in the same commit as the work it records.
 
+## Standing Project Command
+
+Record every change to this application automatically. This includes new
+features, fixes, discovered issues, tests, build results, deployment outcomes,
+business decisions, blockers, commits, and the next action. Do this without
+asking the user for a reminder. Keep the current status concise and append
+important completed milestones so previous work remains traceable.
+
 ## Repository and Safety
 
 - Canonical working repository: `Cost-Management-System-restored`
 - Main branch: `master`
-- Last known local/pushed commit: `c06d356 Guard dashboard statistics by active view`
+- Last confirmed project-state commit: `ac8c9b4 Add project continuity state`
 - Preserved rollback tags:
   - `checkpoint-before-rbac-user-migration-2026-08-28`
   - `checkpoint-before-user-role-restructuring-2026-08-28`
@@ -20,6 +28,14 @@ deploying. Update it in the same commit as the work it records.
 
 Stabilise and accept the new Financial Dashboard, then return to the remaining
 live acceptance checks before beginning any new large product feature.
+
+## Current Session Record
+
+- On 2026-09-01, the user made automatic project-state recording a standing
+  command. `AGENTS.md` now requires every future session to record all
+  features, fixes, discovered issues, verification results, deployment
+  outcomes, decisions, blockers, and next actions without waiting for a
+  reminder.
 
 ## Current Release Status
 
