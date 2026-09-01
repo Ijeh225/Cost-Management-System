@@ -170,6 +170,8 @@ test before beginning any new large product feature.
 - Delivery Tracking generated normally with no date filters and reported zero
   deliveries. This is expected because no controlled container has been marked
   physically delivered, so the report's empty result is a verified pass.
+- Exchange Rate History loaded normally and correctly returned no entries for
+  the present live data; this read-only empty-state path has passed.
 
 ## Current Release Status
 
