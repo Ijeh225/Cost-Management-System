@@ -99,6 +99,12 @@ test before beginning any new large product feature.
   local file to the operating-system file chooser. This is not an application
   finding and needs a manual browser upload or an approved upload-capable test
   surface.
+- Report testing confirmed Terminal/TDO and Pullout actual releases in the
+  Department Workflow report and the presence of both controlled branches in
+  Branch Comparison. It also found High defect `RPT-003`: Financial Dashboard
+  and P&L agree on ₦500,002 Actual Paid Overhead, but Branch Comparison reports
+  ₦10,710,002 as the same metric because their payment-row inclusion rules
+  differ.
 
 ## Current Release Status
 
@@ -107,8 +113,10 @@ test before beginning any new large product feature.
   dashboard statistics before they were available.
 - The fix was pushed in `c06d356`.
 - Local frontend typecheck and production build passed after the fix.
-- Railway deployment of `c06d356` and live browser acceptance are still to be
-  confirmed. Do not state that Financial Dashboard is live until confirmed.
+- On 2026-09-01, live browser testing confirmed Financial Dashboard renders
+  under All Branches and its current all-time values reconcile to live P&L
+  (₦1 revenue, ₦1 actual container cost, ₦500,002 actual paid overhead, and
+  -₦500,002 net profit). Branch Comparison is not reconciled; see `RPT-003`.
 
 ## Next Actions, In Order
 
