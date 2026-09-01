@@ -136,7 +136,9 @@ test before beginning any new large product feature.
    document without explicit confirmation.
 4. Obtain explicit action-time confirmation before recording any payment against
    `INV-202609-001`; decide the controlled amount and payment method first so
-   the partial-payment, AR, and bank-posting checks remain auditable.
+   the partial-payment, AR, and bank-posting checks remain auditable. Cash,
+   Cheque, and POS can be tested without a bank account; Bank Transfer cannot
+   be tested in Lagos until an active Lagos bank account exists.
 5. With explicit action-time confirmation, create the remaining labelled
    schedule and lifecycle test records required for `TD-03` through `TD-05`.
 6. Obtain separate authenticated sessions or test credentials for at least one
