@@ -26,8 +26,8 @@ important completed milestones so previous work remains traceable.
 
 ## Current Objective
 
-Stabilise and accept the new Financial Dashboard, then return to the remaining
-live acceptance checks before beginning any new large product feature.
+Carry out and document a controlled, comprehensive live end-to-end acceptance
+test before beginning any new large product feature.
 
 ## Current Session Record
 
@@ -36,6 +36,30 @@ live acceptance checks before beginning any new large product feature.
   features, fixes, discovered issues, verification results, deployment
   outcomes, decisions, blockers, and next actions without waiting for a
   reminder.
+- On 2026-09-01, the user authorised a comprehensive pre-delivery live test.
+  The execution source of truth is now `docs/LIVE_E2E_TEST_REGISTER.md`.
+  It began with a read-only inventory: the signed-in dashboard rendered and
+  showed six existing containers, one invoice, and existing financial data.
+  These figures are not yet reconciled or accepted as correct.
+- `FIN-01` reconciled the main all-time financial amounts between Financial
+  Dashboard and P&L, but identified High-priority defect `RPT-001`: P&L uses
+  an all-cost-container count in its recognised-COS label and per-container
+  average even though recognised cost totals include invoiced containers only.
+- Report Centre inspection identified High-priority defect `RPT-002`: its
+  headline cards and exports use budgeted container clearing charges/costs but
+  label them as generic revenue, expenses, and net profit beside actual-based
+  P&L reporting.
+- Invoice testing confirmed the zero-value issuance safeguard holds at the
+  backend. It also identified Medium-priority defect `INV-001`: the front end
+  permits the failed action and gives only a generic error rather than the
+  actual validation reason.
+- A controlled existing invoice collection reconciled across invoice,
+  receivables, and bank ledger: `INV-202608-002`, its ₦1 payment reference,
+  zero outstanding balance, and matching bank credit all agree.
+- Existing controlled duty, container-disbursement, and overhead-payment
+  records also reconcile to their bank and report ledgers. The live test now
+  has two setup blockers: there is only one branch, and separate authenticated
+  sessions for the existing test profiles have not been provided.
 
 ## Current Release Status
 
@@ -49,18 +73,17 @@ live acceptance checks before beginning any new large product feature.
 
 ## Next Actions, In Order
 
-1. Confirm Railway deployed `c06d356` successfully.
-2. In the live application, open `Dashboard > Financial View`.
-3. For one branch and one date range, compare these four values with the P&L
-   opened from the Financial View: Accrual Revenue, Actual Paid Container
-   Costs, Actual Paid Overhead, and True Net Profit.
-4. Repeat the same comparison for consolidated All Branches, where the user is
-   authorised to use that scope.
-5. Complete the deferred controlled-job live acceptance test for Documentation,
-   Transire, Shipping, Terminal, and Pullout. Verify independent owner,
-   expected date, actual release date, and submitted views without duplicate
-   records.
-6. Only after the above acceptance checks, choose the next product workstream.
+1. Complete `ENV-02` and catalogue the current test data without changing it.
+2. Complete branch/date-range coverage for `FIN-01`; retain `RPT-001` for the
+   final defect report and do not fix it before approval of the audit.
+3. With explicit action-time confirmation, create two clearly labelled test
+   branches and the minimum controlled records for `TD-01` through `TD-05`.
+4. Obtain separate authenticated sessions or test credentials for at least one
+   restricted profile and one branch-scoped profile before `SEC-01` can pass.
+5. Execute the operational, documentation, financial, reporting, security,
+   and UI cases in `docs/LIVE_E2E_TEST_REGISTER.md` in dependency order.
+6. Update the defect log and project state after every verified result.
+7. Produce a final audit report before any corrective implementation begins.
 
 ## Workstream Status
 
