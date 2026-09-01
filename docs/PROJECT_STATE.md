@@ -115,6 +115,11 @@ test before beginning any new large product feature.
   opening balance and Financial Ledger shows the matching ₦1,000 credit.
   `BRN-001` also affects the invoice dialog, which displayed Head Office until
   Lagos was selected manually.
+- The controlled schedule `E2E-20260901 Scheduled Test Vendor` was created for
+  ₦500, approved, and marked Paid with the controlled Lagos bank. Its schedule
+  timeline and ₦0 balance are correct, but its expected ₦500 money-out entry is
+  absent from Financial Ledger. This High report/bank reconciliation defect is
+  logged as `SCHED-001`; no corrective code has been applied.
 
 ## Current Release Status
 
@@ -140,8 +145,9 @@ test before beginning any new large product feature.
    due-date/overdue, cancelled, and repeated-action cases. Keep all new
    financial entries labelled `E2E-20260901` and reconcile each one to AR and
    Financial Ledger.
-5. With explicit action-time confirmation, create the remaining labelled
-   schedule and lifecycle test records required for `TD-03` through `TD-05`.
+5. Trace and correct `SCHED-001` only after the audit is approved; meanwhile,
+   retain the controlled schedule and bank record as evidence and continue the
+   remaining non-destructive lifecycle checks.
 6. Obtain separate authenticated sessions or test credentials for at least one
    restricted profile and one branch-scoped profile before `SEC-01` can pass.
 7. Execute the operational, documentation, financial, reporting, security,
