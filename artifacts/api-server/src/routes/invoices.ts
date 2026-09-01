@@ -3,6 +3,7 @@ import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersT
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { toE164Nigerian, sendWhatsAppTemplate, assertBranchWhatsAppSenderSupported } from "../lib/whatsapp.js";
+import { getEffectiveInvoiceStatus, isInvoiceCollectable, isInvoiceEditable } from "../lib/invoice-status.js";
 
 const router = Router();
 
@@ -105,11 +106,12 @@ async function formatInvoice(inv: any, payments: any[], items?: any[], creditNot
   const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
   const total = parseFloat(inv.total ?? "0");
   const outstanding = Math.max(0, total - totalPaid);
+  const status = getEffectiveInvoiceStatus({ status: inv.status, total, totalPaid, dueDate: inv.dueDate });
 
   return {
     id: inv.id,
     invoiceNumber: inv.invoiceNumber,
-    status: inv.status,
+    status,
     containerId: inv.containerId ?? null,
     containerNumber: inv.containerNumber ?? null,
     blNumber: inv.blNumber ?? null,
@@ -373,7 +375,13 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req: AuthRequest
     const toDate = to ? new Date(to + "T23:59:59") : null;
 
     const branchScope = getBranchScope(req);
-    const conditions: any[] = [ne(invoicesTable.status, "written_off")];
+    // AR contains only issued invoices that can still be collected. Drafts and
+    // cancelled invoices are not receivables; written-off invoices are shown separately.
+    const conditions: any[] = [
+      ne(invoicesTable.status, "draft"),
+      ne(invoicesTable.status, "cancelled"),
+      ne(invoicesTable.status, "written_off"),
+    ];
     if (branchScope !== null) conditions.push(eq(invoicesTable.branchId, branchScope));
     if (fromDate) conditions.push(gte(invoicesTable.createdAt, fromDate));
     if (toDate) conditions.push(lte(invoicesTable.createdAt, toDate));
@@ -646,7 +654,11 @@ router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
+    const [_inv] = await db.select({
+      branchId: invoicesTable.branchId,
+      status: invoicesTable.status,
+      total: invoicesTable.total,
+    }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
 
     const { status, dueDate, notes, subtotal, vatAmount, total } = req.body as {
@@ -658,15 +670,24 @@ router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
       total?: number;
     };
 
-    // written_off is a controlled transition that must go through POST /invoices/:id/write-off
-    // (which enforces overdue check, creates overhead expense, and writes audit log).
-    // Allowing arbitrary status mutations would bypass all those invariants.
-    if (status === "written_off") {
-      return res.status(400).json({ error: "Use POST /invoices/:id/write-off to write off an invoice" });
+    if (status !== undefined) {
+      if (status !== "sent") {
+        return res.status(400).json({ error: "Invoice payment and due-date status is calculated automatically. Use the controlled cancellation or write-off actions when needed." });
+      }
+      if (!isInvoiceEditable(_inv.status)) {
+        return res.status(400).json({ error: "Only a draft invoice can be issued" });
+      }
+      if (parseFloat(_inv.total ?? "0") <= 0) {
+        return res.status(400).json({ error: "A zero-value invoice cannot be issued. Add a positive charge or delete the draft." });
+      }
+    }
+
+    if ((subtotal !== undefined || vatAmount !== undefined || total !== undefined) && !isInvoiceEditable(_inv.status)) {
+      return res.status(400).json({ error: "Invoice amounts can only be edited while the invoice is a draft" });
     }
 
     const updates: Record<string, any> = { updatedAt: new Date() };
-    if (status !== undefined) updates.status = status;
+    if (status !== undefined) updates.status = "sent";
     if (dueDate !== undefined) updates.dueDate = dueDate;
     if (notes !== undefined) updates.notes = notes;
     if (subtotal !== undefined) updates.subtotal = String(subtotal);
@@ -716,13 +737,52 @@ router.delete("/invoices/:id", requireBranchAdminOrAbove, async (req: AuthReques
   try {
     const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, id));
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId, status: invoicesTable.status }).from(invoicesTable).where(eq(invoicesTable.id, id));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
+    if (!isInvoiceEditable(_inv.status)) return res.status(400).json({ error: "Only draft invoices can be deleted. Cancel an issued invoice to preserve its audit trail." });
     await db.delete(invoicesTable).where(eq(invoicesTable.id, id));
     return res.json({ success: true });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to delete invoice" });
+  }
+});
+
+router.post("/invoices/:id/cancel", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+  try {
+    const invoiceId = parseInt(String(req.params.id), 10);
+    if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
+
+    const [invoice] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    if (!invoice || !userCanAccessBranch(req, invoice.branchId)) return res.status(404).json({ error: "Invoice not found" });
+    if (invoice.status === "cancelled") return res.status(400).json({ error: "Invoice is already cancelled" });
+    if (!isInvoiceCollectable(invoice.status)) return res.status(400).json({ error: "This invoice cannot be cancelled" });
+
+    const payments = await db.select({ amount: invoicePaymentsTable.amount })
+      .from(invoicePaymentsTable)
+      .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const totalPaid = payments.reduce((sum, payment) => sum + parseFloat(payment.amount ?? "0"), 0);
+    if (totalPaid > 0) {
+      return res.status(400).json({ error: "An invoice with recorded payments cannot be cancelled. Use a credit note or the normal correction workflow." });
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.update(invoicesTable)
+        .set({ status: "cancelled", updatedAt: new Date() })
+        .where(eq(invoicesTable.id, invoiceId));
+      await tx.insert(invoiceAuditLogTable).values({
+        invoiceId,
+        action: "cancelled",
+        details: `Invoice ${invoice.invoiceNumber} cancelled before any payment was recorded`,
+        performedBy: req.user?.id ?? null,
+        branchId: invoice.branchId,
+      });
+    });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to cancel invoice" });
   }
 });
 
@@ -756,6 +816,9 @@ router.post("/invoices/:id/items", requireAuth, async (req: AuthRequest, res) =>
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
+    if (!isInvoiceEditable(inv.status)) {
+      return res.status(400).json({ error: "Invoice items can only be changed while the invoice is a draft" });
+    }
 
     let resolvedAmount = amount;
     let resolvedDescription = description ?? "Clearing Charges";
@@ -775,7 +838,9 @@ router.post("/invoices/:id/items", requireAuth, async (req: AuthRequest, res) =>
         resolvedAmount = agreedRate != null ? agreedRate : parseFloat(container.clearingCharges ?? "0");
       }
     }
-    if (resolvedAmount === undefined || isNaN(resolvedAmount)) resolvedAmount = 0;
+    if (resolvedAmount === undefined || isNaN(resolvedAmount) || resolvedAmount <= 0) {
+      return res.status(400).json({ error: "Invoice item amount must be greater than zero" });
+    }
 
     const existingItems = await db.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, invoiceId));
     const maxSort = existingItems.reduce((m, it) => Math.max(m, it.sortOrder), -1);
@@ -834,14 +899,18 @@ router.patch("/invoices/:id/items/:itemId", requireAuth, async (req: AuthRequest
 
     const { description, amount } = req.body as { description?: string; amount?: number };
 
-    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId, status: invoicesTable.status }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
+    if (!isInvoiceEditable(_inv.status)) return res.status(400).json({ error: "Invoice items can only be changed while the invoice is a draft" });
     const [item] = await db.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.id, itemId));
     if (!item || item.invoiceId !== invoiceId) return res.status(404).json({ error: "Item not found" });
 
     const updates: Record<string, any> = {};
     if (description !== undefined) updates.description = description;
-    if (amount !== undefined) updates.amount = String(amount);
+    if (amount !== undefined) {
+      if (isNaN(amount) || amount <= 0) return res.status(400).json({ error: "Invoice item amount must be greater than zero" });
+      updates.amount = String(amount);
+    }
 
     await db.transaction(async (tx) => {
       if (Object.keys(updates).length > 0) {
@@ -889,8 +958,9 @@ router.delete("/invoices/:id/items/:itemId", requireBranchAdminOrAbove, async (r
     const itemId = parseInt(String(req.params.itemId), 10);
     if (isNaN(invoiceId) || isNaN(itemId)) return res.status(400).json({ error: "Invalid id" });
 
-    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+    const [_inv] = await db.select({ branchId: invoicesTable.branchId, status: invoicesTable.status }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
+    if (!isInvoiceEditable(_inv.status)) return res.status(400).json({ error: "Invoice items can only be changed while the invoice is a draft" });
     const existingItems = await db.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, invoiceId));
     if (existingItems.length <= 1) {
       return res.status(400).json({ error: "Cannot remove the last line item from an invoice. Delete the invoice instead." });
@@ -968,6 +1038,9 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
+    if (!isInvoiceCollectable(inv.status)) {
+      return res.status(400).json({ error: "A draft, cancelled, or written-off invoice cannot receive a payment" });
+    }
     {
       const _scope = getBranchScope(req);
       if (_scope !== null && inv.branchId !== _scope) return res.status(404).json({ error: "Invoice not found" });
@@ -1010,12 +1083,12 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
     const totalPaid = prevTotalPaid + amount;
 
     const total = parseFloat(inv.total);
-    let newStatus = inv.status;
-    if (totalPaid >= total) {
-      newStatus = "paid";
-    } else if (totalPaid > 0) {
-      newStatus = "partial";
-    }
+    const newStatus = getEffectiveInvoiceStatus({
+      status: inv.status,
+      total,
+      totalPaid,
+      dueDate: inv.dueDate,
+    });
 
     await tx.update(invoicesTable)
       .set({ status: newStatus, updatedAt: new Date() })
@@ -1071,6 +1144,7 @@ router.post("/invoices/:id/apply-credit", requireBranchAdminOrAbove, async (req:
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
+    if (!isInvoiceCollectable(inv.status)) return res.status(400).json({ error: "A draft, cancelled, or written-off invoice cannot receive client credit" });
     if (!inv.clientId) return res.status(400).json({ error: "Invoice has no linked client" });
 
     const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, inv.clientId));
@@ -1108,9 +1182,12 @@ router.post("/invoices/:id/apply-credit", requireBranchAdminOrAbove, async (req:
         .where(eq(clientsTable.id, inv.clientId!));
 
       const newTotalPaid = totalPaid + actualApply;
-      let newStatus = inv.status;
-      if (newTotalPaid >= invoiceTotal) newStatus = "paid";
-      else if (newTotalPaid > 0) newStatus = "partial";
+      const newStatus = getEffectiveInvoiceStatus({
+        status: inv.status,
+        total: invoiceTotal,
+        totalPaid: newTotalPaid,
+        dueDate: inv.dueDate,
+      });
       await tx.update(invoicesTable)
         .set({ status: newStatus, updatedAt: new Date() })
         .where(eq(invoicesTable.id, invoiceId));
@@ -1184,11 +1261,12 @@ router.delete("/invoices/:id/payments/:paymentId", requireBranchAdminOrAbove, as
         const payments = await tx.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
         const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
         const total = parseFloat(inv.total);
-        let newStatus = "sent";
-        if (totalPaid >= total) newStatus = "paid";
-        else if (totalPaid > 0) newStatus = "partial";
-        else if (inv.status === "paid" || inv.status === "partial") newStatus = "sent";
-        else newStatus = inv.status;
+        const newStatus = getEffectiveInvoiceStatus({
+          status: inv.status,
+          total,
+          totalPaid,
+          dueDate: inv.dueDate,
+        });
         await tx.update(invoicesTable).set({ status: newStatus, updatedAt: new Date() }).where(eq(invoicesTable.id, invoiceId));
       }
     });
@@ -1291,6 +1369,7 @@ router.post("/invoices/:id/send-whatsapp", requireBranchAdminOrAbove, async (req
         clientName: clientsTable.name,
         clientPhone: clientsTable.contactPhone,
         total: invoicesTable.total,
+        status: invoicesTable.status,
         outstanding: sql<number>`(${invoicesTable.total}::numeric - COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0))`,
         dueDate: invoicesTable.dueDate,
         branchId: invoicesTable.branchId,
@@ -1301,6 +1380,12 @@ router.post("/invoices/:id/send-whatsapp", requireBranchAdminOrAbove, async (req
       .where(eq(invoicesTable.id, id));
 
     if (!row) return res.status(404).json({ error: "Invoice not found" });
+    if (!isInvoiceCollectable(row.status)) {
+      return res.status(400).json({ error: "Only an issued invoice can be sent to a client" });
+    }
+    if (parseFloat(row.total as unknown as string ?? "0") <= 0) {
+      return res.status(400).json({ error: "A zero-value invoice cannot be sent" });
+    }
     if (!row.clientPhone) return res.status(400).json({ error: "Client has no phone number" });
 
     const itemsMap = await fetchItemsForInvoices([id]);
@@ -1376,6 +1461,9 @@ router.post("/invoices/:id/send-reminder", requireBranchAdminOrAbove, async (req
       .where(eq(invoicesTable.id, id));
 
     if (!row) return res.status(404).json({ error: "Invoice not found" });
+    if (!isInvoiceCollectable(row.status)) {
+      return res.status(400).json({ error: "A reminder cannot be sent for a draft, cancelled, or written-off invoice" });
+    }
     if (!row.clientPhone) return res.status(400).json({ error: "Client has no phone number" });
 
     const outstanding = Number(row.outstanding ?? 0);
@@ -1444,6 +1532,7 @@ router.post("/invoices/:id/send-receipt", requireBranchAdminOrAbove, async (req:
         clientName: clientsTable.name,
         clientPhone: clientsTable.contactPhone,
         total: invoicesTable.total,
+        status: invoicesTable.status,
         outstanding: sql<number>`(${invoicesTable.total}::numeric - COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0))`,
         totalPaid: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM invoice_payments WHERE invoice_id = ${invoicesTable.id}), 0)`,
         branchId: invoicesTable.branchId,
@@ -1454,6 +1543,9 @@ router.post("/invoices/:id/send-receipt", requireBranchAdminOrAbove, async (req:
       .where(eq(invoicesTable.id, id));
 
     if (!row) return res.status(404).json({ error: "Invoice not found" });
+    if (!isInvoiceCollectable(row.status)) {
+      return res.status(400).json({ error: "A receipt cannot be sent for a draft, cancelled, or written-off invoice" });
+    }
     if (!row.clientPhone) return res.status(400).json({ error: "Client has no phone number" });
 
     const totalPaid = Number(row.totalPaid ?? 0);
@@ -1577,8 +1669,7 @@ router.post("/invoices/:id/credit-note", requireBranchAdminOrAbove, async (req: 
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
-    if (inv.status === "written_off") return res.status(400).json({ error: "Cannot raise credit note on a written-off invoice" });
-    if (inv.status === "draft") return res.status(400).json({ error: "Cannot raise credit note on a draft invoice" });
+    if (!isInvoiceCollectable(inv.status)) return res.status(400).json({ error: "Cannot raise a credit note on a draft, cancelled, or written-off invoice" });
     if (inv.clientId) {
       const [cnClient] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, inv.clientId));
       if (cnClient && cnClient.branchId !== inv.branchId) {
@@ -1631,9 +1722,12 @@ router.post("/invoices/:id/credit-note", requireBranchAdminOrAbove, async (req: 
       }
 
       const newTotalPaid = totalPaid + applyToInvoice;
-      let newStatus = inv.status;
-      if (newTotalPaid >= invoiceTotal) newStatus = "paid";
-      else if (newTotalPaid > 0) newStatus = "partial";
+      const newStatus = getEffectiveInvoiceStatus({
+        status: inv.status,
+        total: invoiceTotal,
+        totalPaid: newTotalPaid,
+        dueDate: inv.dueDate,
+      });
       await tx.update(invoicesTable)
         .set({ status: newStatus, updatedAt: new Date() })
         .where(eq(invoicesTable.id, invoiceId));
@@ -1710,6 +1804,7 @@ router.post("/invoices/:id/write-off", requireBranchAdminOrAbove, async (req: Au
 
     const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
     if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
+    if (!isInvoiceCollectable(inv.status)) return res.status(400).json({ error: "A draft, cancelled, or written-off invoice cannot be written off" });
     if (inv.status === "written_off") return res.status(400).json({ error: "Invoice is already written off" });
     if (inv.status === "paid") return res.status(400).json({ error: "Invoice is already fully paid" });
     if (!inv.dueDate) return res.status(400).json({ error: "Cannot write off an invoice without a due date" });

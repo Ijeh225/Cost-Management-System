@@ -541,7 +541,11 @@ analyticsRouter.get("/analytics/ar-summary", requireAuth, requireBranchAdminOrAb
     const _scope = getBranchScope(req);
     const { from: fromStr, to: toStr } = req.query as Record<string, string | undefined>;
 
-    const conditions: SQL[] = [ne(invoicesTable.status, "draft")];
+    const conditions: SQL[] = [
+      ne(invoicesTable.status, "draft"),
+      ne(invoicesTable.status, "cancelled"),
+      ne(invoicesTable.status, "written_off"),
+    ];
     if (_scope !== null) conditions.push(eq(invoicesTable.branchId, _scope));
     if (fromStr) conditions.push(gte(invoicesTable.createdAt, new Date(fromStr)));
     if (toStr) {

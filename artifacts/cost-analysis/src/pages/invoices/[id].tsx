@@ -6,7 +6,7 @@ import {
   useAddInvoiceItem, useEditInvoiceItem, useRemoveInvoiceItem,
   useListActiveBanks, useApplyClientCredit, useGetClientWalletSummary,
   useGetClientDeposits, useAllocateDeposit,
-  useRaiseCreditNote, useWriteOffInvoice, useGetInvoiceAuditLog,
+  useRaiseCreditNote, useWriteOffInvoice, useGetInvoiceAuditLog, useCancelInvoice,
   type RecordPaymentBody, type InvoiceItem, type CreditNote, type InvoiceAuditLogEntry,
 } from "@workspace/api-client-react";
 import { useListContainers, getListContainersQueryKey } from "@workspace/api-client-react";
@@ -307,6 +307,8 @@ function statusConfig(status: string) {
       return { label: "Sent", color: "bg-amber-500/20 text-amber-400 border-amber-500/50", icon: Clock };
     case "overdue":
       return { label: "Overdue", color: "bg-red-500/20 text-red-400 border-red-500/50", icon: AlertTriangle };
+    case "cancelled":
+      return { label: "Cancelled", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/50", icon: FileX };
     case "written_off":
       return { label: "Written Off", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/50", icon: FileX };
     default:
@@ -706,6 +708,7 @@ export default function InvoiceDetailPage() {
   const sendReceiptMutation = useSendInvoiceReceipt();
   const removeItemMutation = useRemoveInvoiceItem();
   const writeOffMutation = useWriteOffInvoice();
+  const cancelMutation = useCancelInvoice();
   const { data: whatsappLog } = useGetInvoiceWhatsAppLog(isNaN(invoiceId) ? null : invoiceId);
   const { data: auditLog } = useGetInvoiceAuditLog(isNaN(invoiceId) ? null : invoiceId);
   const [auditLogOpen, setAuditLogOpen] = useState(false);
@@ -728,7 +731,7 @@ export default function InvoiceDetailPage() {
     });
   }, [invoice?.invoiceNumber]);
 
-  const handleStatusChange = async (status: string) => {
+  const handleStatusChange = async (status: "sent") => {
     try {
       await updateMutation.mutateAsync({ id: invoiceId, data: { status } });
       toast({ title: "Status updated" });
@@ -795,6 +798,17 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  const handleCancel = async () => {
+    if (!confirm(`Cancel invoice ${invoice?.invoiceNumber}? It will remain in the audit trail but will no longer affect receivables.`)) return;
+    try {
+      await cancelMutation.mutateAsync(invoiceId);
+      toast({ title: "Invoice cancelled" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to cancel invoice";
+      toast({ variant: "destructive", title: "Error", description: msg });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -819,9 +833,14 @@ export default function InvoiceDetailPage() {
   const hasPhone = !!invoice.clientPhone;
   const waIsPending = sendWhatsAppMutation.isPending || sendReminderMutation.isPending || sendReceiptMutation.isPending;
   const isWrittenOff = invoice.status === "written_off";
-  const canRaiseCreditNote = isAdmin && !isWrittenOff && invoice.status !== "draft" && invoice.outstanding > 0;
+  const isCancelled = invoice.status === "cancelled";
+  const isLocked = isWrittenOff || isCancelled;
+  const isDraft = invoice.status === "draft";
+  const canCollect = !isLocked && !isDraft && invoice.total > 0;
+  const canRaiseCreditNote = isAdmin && canCollect && invoice.outstanding > 0;
   const isOverdue = !!invoice.dueDate && new Date(invoice.dueDate) < new Date();
-  const canWriteOff = isAdmin && !isWrittenOff && invoice.status !== "paid" && invoice.outstanding > 0 && isOverdue;
+  const canWriteOff = isAdmin && canCollect && invoice.status !== "paid" && invoice.outstanding > 0 && isOverdue;
+  const canCancel = isAdmin && (invoice.status === "sent" || invoice.status === "overdue") && invoice.totalPaid === 0;
 
   const regularPayments = (invoice.payments ?? []).filter(p => p.paymentMethod !== "credit_note");
   const creditNotePayments = (invoice.payments ?? []).filter(p => p.paymentMethod === "credit_note");
@@ -854,6 +873,16 @@ export default function InvoiceDetailPage() {
         </div>
       )}
 
+      {isCancelled && (
+        <div className="bg-zinc-500/10 border border-zinc-500/30 rounded-lg p-4 flex items-center gap-3">
+          <FileX className="w-5 h-5 text-zinc-400 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-zinc-300">This invoice has been cancelled.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">It is retained for audit purposes and excluded from active receivables and financial reports.</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-border/50">
           <CardHeader className="pb-2">
@@ -865,7 +894,7 @@ export default function InvoiceDetailPage() {
                 <div className="flex items-center gap-2 text-sm mb-2">
                   <Box className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground font-medium">Containers ({invoice.items.length})</span>
-                  {isAdmin && !isWrittenOff && (
+                  {isAdmin && isDraft && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -885,7 +914,7 @@ export default function InvoiceDetailPage() {
                         <th className="text-left text-muted-foreground font-medium pb-1.5 pr-3">B/L Number</th>
                         <th className="text-left text-muted-foreground font-medium pb-1.5 pr-3">Description</th>
                         <th className="text-right text-muted-foreground font-medium pb-1.5">Amount</th>
-                        {isAdmin && !isWrittenOff && <th className="pb-1.5 w-16" />}
+                        {isAdmin && isDraft && <th className="pb-1.5 w-16" />}
                       </tr>
                     </thead>
                     <tbody>
@@ -901,7 +930,7 @@ export default function InvoiceDetailPage() {
                           <td className="py-2 pr-3 font-mono text-muted-foreground">{item.blNumber ?? "—"}</td>
                           <td className="py-2 pr-3 text-foreground">{item.description}</td>
                           <td className="py-2 text-right font-mono font-semibold text-foreground">{formatCurrency(item.amount)}</td>
-                          {isAdmin && !isWrittenOff && (
+                          {isAdmin && isDraft && (
                             <td className="py-2 pl-2">
                               <div className="flex items-center gap-1 justify-end">
                                 <Tooltip>
@@ -1042,12 +1071,14 @@ export default function InvoiceDetailPage() {
         </Card>
       </div>
 
-      {!isWrittenOff && (
+      {!isLocked && (
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setPaymentOpen(true)} className="gap-2">
-            <PlusCircle className="w-4 h-4" />
-            Record Payment
-          </Button>
+          {canCollect && (
+            <Button onClick={() => setPaymentOpen(true)} className="gap-2">
+              <PlusCircle className="w-4 h-4" />
+              Record Payment
+            </Button>
+          )}
 
           {canRaiseCreditNote && (
             <Button
@@ -1060,7 +1091,7 @@ export default function InvoiceDetailPage() {
             </Button>
           )}
 
-          {isAdmin && invoice.outstanding > 0 && (
+          {isAdmin && canCollect && invoice.outstanding > 0 && (
             <Button
               variant="outline"
               className="gap-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
@@ -1071,7 +1102,7 @@ export default function InvoiceDetailPage() {
             </Button>
           )}
 
-          {isAdmin && invoice.outstanding > 0 && (
+          {isAdmin && canCollect && invoice.outstanding > 0 && (
             <Button
               variant="outline"
               className="gap-2 border-violet-500/50 text-violet-400 hover:bg-violet-500/10"
@@ -1091,7 +1122,7 @@ export default function InvoiceDetailPage() {
             Print Receipt
           </Button>
 
-          {isAdmin && invoice.totalPaid > 0 && (
+          {isAdmin && canCollect && invoice.totalPaid > 0 && (
             hasPhone ? (
               <Button
                 variant="outline"
@@ -1120,7 +1151,7 @@ export default function InvoiceDetailPage() {
             )
           )}
 
-          {isAdmin && (
+          {isAdmin && canCollect && (
             hasPhone ? (
               <Button
                 variant="outline"
@@ -1149,7 +1180,7 @@ export default function InvoiceDetailPage() {
             )
           )}
 
-          {isAdmin && invoice.outstanding > 0 && (
+          {isAdmin && canCollect && invoice.outstanding > 0 && (
             hasPhone ? (
               <Button
                 variant="outline"
@@ -1190,18 +1221,6 @@ export default function InvoiceDetailPage() {
             </Button>
           )}
 
-          {isAdmin && invoice.status !== "overdue" && invoice.outstanding > 0 && invoice.status !== "draft" && (
-            <Button
-              variant="outline"
-              className="gap-2 border-red-600 text-red-500 hover:bg-red-500/10"
-              onClick={() => handleStatusChange("overdue")}
-              disabled={updateMutation.isPending}
-            >
-              <AlertTriangle className="w-4 h-4" />
-              Mark as Overdue
-            </Button>
-          )}
-
           {canWriteOff && (
             <Button
               variant="outline"
@@ -1211,6 +1230,18 @@ export default function InvoiceDetailPage() {
             >
               {writeOffMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileX className="w-4 h-4" />}
               Write Off
+            </Button>
+          )}
+
+          {canCancel && (
+            <Button
+              variant="outline"
+              className="gap-2 border-zinc-500/60 text-zinc-400 hover:bg-zinc-500/10"
+              onClick={handleCancel}
+              disabled={cancelMutation.isPending}
+            >
+              {cancelMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileX className="w-4 h-4" />}
+              Cancel Invoice
             </Button>
           )}
         </div>

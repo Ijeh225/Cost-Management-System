@@ -1010,7 +1010,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
     }
 
     // ===== REVENUE: issued invoices in period (excludes drafts; uses ex-VAT net sales) =====
-    const invConds: SQL[] = [ne(invoicesTable.status, "draft")];
+    const invConds: SQL[] = [ne(invoicesTable.status, "draft"), ne(invoicesTable.status, "cancelled")];
     if (fromDate) invConds.push(gte(invoicesTable.createdAt, fromDate));
     if (toDate)   invConds.push(lte(invoicesTable.createdAt, toDate));
     if (clientIdNum !== null) invConds.push(eq(invoicesTable.clientId, clientIdNum));
@@ -1054,7 +1054,11 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
     // the earliest-ever invoice date per container. COGS is recognised exactly ONCE — in the
     // period that first-ever date falls in. This prevents double-counting when a container
     // appears on multiple invoices across different periods.
-    const allInvoiceItemConds: SQL[] = [isNotNull(invoiceItemsTable.containerId), ne(invoicesTable.status, "draft")];
+    const allInvoiceItemConds: SQL[] = [
+      isNotNull(invoiceItemsTable.containerId),
+      ne(invoicesTable.status, "draft"),
+      ne(invoicesTable.status, "cancelled"),
+    ];
     if (clientIdNum !== null) allInvoiceItemConds.push(eq(invoicesTable.clientId, clientIdNum));
     if (branchScope.id !== null) allInvoiceItemConds.push(eq(invoicesTable.branchId, branchScope.id));
 

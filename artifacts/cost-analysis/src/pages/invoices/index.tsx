@@ -30,6 +30,8 @@ function statusConfig(status: string) {
       return { label: "Sent", color: "bg-amber-500/20 text-amber-400 border-amber-500/50", icon: Clock };
     case "overdue":
       return { label: "Overdue", color: "bg-red-500/20 text-red-400 border-red-500/50", icon: AlertTriangle };
+    case "cancelled":
+      return { label: "Cancelled", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/50", icon: FileText };
     case "written_off":
       return { label: "Written Off", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/50", icon: FileText };
     default:
@@ -174,8 +176,9 @@ export default function InvoicesPage() {
   const [writtenOffOpen, setWrittenOffOpen] = useState(false);
 
   const allInvoices = invoices ?? [];
-  const activeInvoices = allInvoices.filter(i => i.status !== "written_off");
+  const activeInvoices = allInvoices.filter(i => i.status !== "written_off" && i.status !== "cancelled");
   const writtenOffInvoices = allInvoices.filter(i => i.status === "written_off");
+  const cancelledInvoices = allInvoices.filter(i => i.status === "cancelled");
 
   const filtered = activeInvoices.filter(inv => {
     const q = search.toLowerCase();
@@ -199,12 +202,23 @@ export default function InvoicesPage() {
     );
   });
 
+  const filteredCancelled = cancelledInvoices.filter(inv => {
+    const q = search.toLowerCase();
+    const containerNums = inv.items?.map(it => it.containerNumber ?? "").join(" ") ?? (inv.containerNumber ?? "");
+    return (
+      inv.invoiceNumber.toLowerCase().includes(q) ||
+      (inv.clientName ?? "").toLowerCase().includes(q) ||
+      containerNums.toLowerCase().includes(q)
+    );
+  });
+
   const totalOutstanding = activeInvoices.reduce((s, i) => s + i.outstanding, 0);
   const totalPaid = activeInvoices.reduce((s, i) => s + i.totalPaid, 0);
   const paidCount = activeInvoices.filter(i => i.status === "paid").length;
   const overdueCount = activeInvoices.filter(i => i.status === "overdue").length;
 
   const showWrittenOffSection = (statusFilter === "all" || statusFilter === "written_off") && filteredWrittenOff.length > 0;
+  const showCancelledSection = (statusFilter === "all" || statusFilter === "cancelled") && filteredCancelled.length > 0;
 
   return (
     <div className="space-y-6 p-3 sm:p-6">
@@ -263,6 +277,7 @@ export default function InvoicesPage() {
             <SelectItem value="partial">Partial</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
             <SelectItem value="overdue">Overdue</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
             <SelectItem value="written_off">Written Off</SelectItem>
           </SelectContent>
         </Select>
@@ -285,7 +300,20 @@ export default function InvoicesPage() {
             ))}
           </div>
         )
-      ) : filtered.length === 0 && !showWrittenOffSection ? (
+      ) : statusFilter === "cancelled" ? (
+        filteredCancelled.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground space-y-2">
+            <FileText className="w-10 h-10 mx-auto opacity-30" />
+            <p className="text-sm">No cancelled invoices.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredCancelled.map(inv => (
+              <InvoiceRow key={inv.id} invoice={inv} isAdmin={!!isAdmin} />
+            ))}
+          </div>
+        )
+      ) : filtered.length === 0 && !showWrittenOffSection && !showCancelledSection ? (
         <div className="text-center py-16 text-muted-foreground space-y-2">
           <FileText className="w-10 h-10 mx-auto opacity-30" />
           <p className="text-sm">
@@ -323,6 +351,20 @@ export default function InvoicesPage() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {showCancelledSection && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-500/30 bg-zinc-500/5 text-zinc-400 text-sm font-medium">
+                <FileText className="w-4 h-4" />
+                Cancelled ({filteredCancelled.length})
+              </div>
+              <div className="space-y-2 pl-2">
+                {filteredCancelled.map(inv => (
+                  <InvoiceRow key={inv.id} invoice={inv} isAdmin={!!isAdmin} />
+                ))}
+              </div>
             </div>
           )}
         </>

@@ -70,6 +70,7 @@ export default function InvoicePrintPage() {
         .status-paid { background: #dcfce7; color: #15803d; border: 2px solid #16a34a; }
         .status-partial { background: #dbeafe; color: #1d4ed8; border: 2px solid #2563eb; }
         .status-overdue { background: #fee2e2; color: #b91c1c; border: 2px solid #dc2626; }
+        .status-cancelled { background: #fef2f2; color: #991b1b; border: 2px solid #ef4444; }
         .status-draft { background: #f1f5f9; color: #475569; border: 2px solid #94a3b8; }
         .status-sent { background: #fef9c3; color: #854d0e; border: 2px solid #ca8a04; }
 
@@ -135,6 +136,7 @@ export default function InvoicePrintPage() {
                   : invoice.status === "partial" ? "PARTIALLY PAID"
                   : invoice.status === "overdue" ? "OVERDUE"
                   : invoice.status === "sent" ? "SENT"
+                  : invoice.status === "cancelled" ? "CANCELLED"
                   : "DRAFT"}
               </span>
             </div>

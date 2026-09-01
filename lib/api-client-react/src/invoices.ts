@@ -72,7 +72,7 @@ export type CreditNote = {
 export type Invoice = {
   id: number;
   invoiceNumber: string;
-  status: "draft" | "sent" | "paid" | "partial" | "overdue" | "written_off";
+  status: "draft" | "sent" | "paid" | "partial" | "overdue" | "cancelled" | "written_off";
   containerId: number | null;
   containerNumber: string | null;
   blNumber: string | null;
@@ -171,6 +171,19 @@ export function useDeleteInvoice() {
     mutationFn: (id: number) =>
       customFetch<{ success: boolean }>(`/api/invoices/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY }),
+  });
+}
+
+export function useCancelInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (invoiceId: number) =>
+      customFetch<{ success: boolean }>(`/api/invoices/${invoiceId}/cancel`, { method: "POST" }),
+    onSuccess: (_, invoiceId) => {
+      qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
+    },
   });
 }
 
