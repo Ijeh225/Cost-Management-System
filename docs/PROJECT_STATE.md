@@ -107,14 +107,16 @@ test before beginning any new large product feature.
   ₦10,710,002 as the same metric because their payment-row inclusion rules
   differ.
 - Controlled invoice `INV-202609-001` (ID 8) was created for `E2EL260901` in
-  Lagos with ₦2,000 total and an explicit test note. It was marked Sent and
-  then received a controlled ₦1,000 Bank Transfer collection with reference
-  `E2E-20260901-INV-001-PARTIAL-001`. The invoice is Partially Paid: Lagos AR
-  shows ₦2,000 invoiced, ₦1,000 collected, and ₦1,000 current outstanding.
-  Controlled bank `E2E-20260901 Lagos Test Bank` was created with a zero
-  opening balance and Financial Ledger shows the matching ₦1,000 credit.
-  `BRN-001` also affects the invoice dialog, which displayed Head Office until
-  Lagos was selected manually.
+  Lagos with ₦2,000 total and an explicit test note. It completed the
+  Draft → Sent → Partially Paid → Paid lifecycle through two controlled
+  ₦1,000 Bank Transfer collections. AR now shows ₦2,000 invoiced, ₦2,000
+  collected, and ₦0 outstanding; Financial Ledger has both matching credits.
+  A controlled ₦1 post-paid overpayment attempt was blocked by the backend and
+  created no entry, but exposed Medium defect `INV-002` because Record Payment
+  remains enabled without a clear rejection message. Controlled bank
+  `E2E-20260901 Lagos Test Bank` has a zero opening balance. `BRN-001` also
+  affects the invoice dialog, which displayed Head Office until Lagos was
+  selected manually.
 - The controlled schedule `E2E-20260901 Scheduled Test Vendor` was created for
   ₦500, approved, and marked Paid with the controlled Lagos bank. Its schedule
   timeline and ₦0 balance are correct, but its expected ₦500 money-out entry is
