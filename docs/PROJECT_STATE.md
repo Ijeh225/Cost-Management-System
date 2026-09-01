@@ -57,9 +57,20 @@ test before beginning any new large product feature.
   receivables, and bank ledger: `INV-202608-002`, its ₦1 payment reference,
   zero outstanding balance, and matching bank credit all agree.
 - Existing controlled duty, container-disbursement, and overhead-payment
-  records also reconcile to their bank and report ledgers. The live test now
-  has two setup blockers: there is only one branch, and separate authenticated
-  sessions for the existing test profiles have not been provided.
+  records also reconcile to their bank and report ledgers. The live test
+  initially had two setup blockers: only one branch and no separate
+  authenticated sessions for the existing test profiles. The branch blocker is
+  resolved; separate authenticated sessions are still required for permission
+  acceptance.
+- Two controlled branches are now created: `E2E-20260901-Lagos` (ID 2) and
+  `E2E-20260901-Abuja` (ID 3). Client setup identified High-priority defect
+  `BRN-001`: branch selection in the client form conflicts with the required
+  global branch scope and the UI hides the server's actionable error.
+- The controlled clients are `E2E-20260901 Lagos Client` (ID 6) and
+  `E2E-20260901 Abuja Client` (ID 7). Their pending-verification containers
+  are `E2EL260901` (ID 26, Lagos) and `E2EA260901` (ID 25, Abuja). The
+  container form initially displayed Head Office as Branch under the Lagos
+  global scope, expanding `BRN-001` to include an unsafe/misleading default.
 
 ## Current Release Status
 
@@ -76,14 +87,17 @@ test before beginning any new large product feature.
 1. Complete `ENV-02` and catalogue the current test data without changing it.
 2. Complete branch/date-range coverage for `FIN-01`; retain `RPT-001` for the
    final defect report and do not fix it before approval of the audit.
-3. With explicit action-time confirmation, create two clearly labelled test
-   branches and the minimum controlled records for `TD-01` through `TD-05`.
-4. Obtain separate authenticated sessions or test credentials for at least one
+3. Use the two identified pending-verification containers to execute the
+   Documentation, Transire, Shipping, Terminal, Pullout, and stage-isolation
+   cases without approving, paying, or deleting data.
+4. With explicit action-time confirmation, create the remaining labelled
+   schedule and lifecycle test records required for `TD-03` through `TD-05`.
+5. Obtain separate authenticated sessions or test credentials for at least one
    restricted profile and one branch-scoped profile before `SEC-01` can pass.
-5. Execute the operational, documentation, financial, reporting, security,
+6. Execute the operational, documentation, financial, reporting, security,
    and UI cases in `docs/LIVE_E2E_TEST_REGISTER.md` in dependency order.
-6. Update the defect log and project state after every verified result.
-7. Produce a final audit report before any corrective implementation begins.
+7. Update the defect log and project state after every verified result.
+8. Produce a final audit report before any corrective implementation begins.
 
 ## Workstream Status
 
