@@ -120,6 +120,10 @@ test before beginning any new large product feature.
   timeline and ₦0 balance are correct, but its expected ₦500 money-out entry is
   absent from Financial Ledger. This High report/bank reconciliation defect is
   logged as `SCHED-001`; no corrective code has been applied.
+- A fresh controlled ₦200 Shipping disbursement for `E2EL260901` was posted to
+  the controlled Lagos bank with reference `E2E-20260901-CONTAINER-001`. Its
+  container-payment section, budget-versus-disbursement view, and Financial
+  Ledger all agree; `CP-01` has passed.
 
 ## Current Release Status
 
