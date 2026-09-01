@@ -157,6 +157,11 @@ test before beginning any new large product feature.
   shows ₦2,001 collected against ₦2,000 invoiced while capping Collection Rate
   at 100% and hiding the overpayment credit; this extends `INV-002` into the
   analytics module.
+- The live Invoice Aging report excludes the paid controlled invoice but counts
+  cancelled `INV-202609-002` as ₦1,000 Current outstanding, while Accounts
+  Receivable correctly excludes it. This is the new High `AR-002` defect and
+  confirms invoice-status rules are still inconsistent across receivables
+  views.
 
 ## Current Release Status
 
