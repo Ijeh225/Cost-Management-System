@@ -189,6 +189,9 @@ test before beginning any new large product feature.
   those values are not the actual invoice and payment financial basis.
 - Client Report repeats `RPT-002`: its controlled Lagos-client “Revenue” is
   the ₦3,000 total of two container budgets, not recognised invoice revenue.
+- Operations Report reconciles to the current container population: nine
+  containers with correct vessel and size distribution, and zero completed as
+  expected because no job has reached Delivery/Closed.
 
 ## Current Release Status
 
