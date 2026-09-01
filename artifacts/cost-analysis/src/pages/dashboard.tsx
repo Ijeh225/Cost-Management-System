@@ -800,7 +800,7 @@ export default function Dashboard() {
           onToChange={setFinancialTo}
           branchLabel={branchLabel}
         />
-      ) : (
+      ) : stats ? (
         <>
 
       {/* KPI Cards */}
@@ -1178,7 +1178,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
       </>
-      )}
+      ) : null}
     </motion.div>
   );
 }
