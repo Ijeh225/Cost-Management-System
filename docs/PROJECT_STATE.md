@@ -139,6 +139,12 @@ test before beginning any new large product feature.
   payment (`E2E-20260901-DUTY-001-PARTIAL`) correctly reports Partial with
   ₦200 outstanding in Duty Payments, and appears as the matching dated debit
   in both Duty Payment Ledger and Financial Ledger.
+- Dashboard reconciliation found two further High defects. Operations View
+  includes cancelled `INV-202609-002` in Lagos Total Invoiced/Outstanding
+  Receivables while AR correctly excludes it (`DASH-001`). Financial View uses
+  the stated P&L basis and excludes the verified ₦200 Customs Duty payment from
+  Actual Paid Container Costs, overstating net profit by the same amount
+  (`FIN-002`).
 
 ## Current Release Status
 
