@@ -166,6 +166,9 @@ export type ProfitLossResponse = {
     delivery: number;
     operations: number;
     extras: number;
+    uninvoicedCogs?: number;
+    invoicedContainerCount?: number;
+    uninvoicedContainerCount?: number;
   };
   grossProfit: number;
   grossMarginPct: number;

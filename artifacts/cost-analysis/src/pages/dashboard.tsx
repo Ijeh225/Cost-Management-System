@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useGetDashboardStats, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks, useGetVatLiability, useGetBerthingOverview, useSendAlertDigest, type BerthingRow } from "@workspace/api-client-react";
+import { useGetDashboardStats, useGetProfitLoss, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks, useGetVatLiability, useGetBerthingOverview, useSendAlertDigest, type BerthingRow } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useBranchScope } from "@/components/layout/branch-provider";
@@ -512,6 +512,191 @@ function BankBalanceBar() {
   );
 }
 
+function FinancialDashboardView({
+  from,
+  to,
+  onFromChange,
+  onToChange,
+  branchLabel,
+}: {
+  from: string;
+  to: string;
+  onFromChange: (value: string) => void;
+  onToChange: (value: string) => void;
+  branchLabel?: string;
+}) {
+  const { data, isLoading, isError } = useGetProfitLoss({ from, to, costBasis: "actual_paid" });
+  const query = new URLSearchParams({ costBasis: "actual_paid" });
+  if (from) query.set("from", from);
+  if (to) query.set("to", to);
+  const matchingProfitLossUrl = `/reports/pl/print?${query.toString()}`;
+
+  return (
+    <section className="space-y-5" aria-label="Financial dashboard">
+      <Card className="border-primary/25 bg-primary/5">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-primary" />
+                <h2 className="text-base font-semibold">Financial period</h2>
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Accrual revenue from issued invoices, less actual paid container costs and actual paid overhead. These figures use the same calculation as P&amp;L.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] sm:items-end">
+              <label className="space-y-1 text-xs text-muted-foreground">
+                <span>From</span>
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(event) => onFromChange(event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm"
+                />
+              </label>
+              <label className="space-y-1 text-xs text-muted-foreground">
+                <span>To</span>
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(event) => onToChange(event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => { onFromChange(""); onToChange(""); }}
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent"
+              >
+                All time
+              </button>
+              <Link href={matchingProfitLossUrl} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                Open P&amp;L <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((index) => (
+            <Card key={index}><CardContent className="space-y-3 p-5"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-44" /></CardContent></Card>
+          ))}
+        </div>
+      )}
+
+      {isError && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+            Financial figures could not be loaded. Open the P&amp;L report to retry with the same filters.
+          </CardContent>
+        </Card>
+      )}
+
+      {data && (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              title="Accrual Revenue"
+              value={data.revenue.totalRevenue}
+              icon={ReceiptText}
+              isCurrency
+              colorClass="text-primary"
+              branchLabel={branchLabel}
+              tooltip="Issued invoice revenue excluding VAT. Draft and cancelled invoices are excluded."
+            />
+            <StatCard
+              title="Actual Paid Container Costs"
+              value={data.costOfSales.total}
+              icon={DollarSign}
+              isCurrency
+              colorClass="text-orange-400"
+              branchLabel={branchLabel}
+              tooltip="Actual posted disbursement payments attributed to invoiced containers, using the P&L cost-of-sales rule."
+            />
+            <StatCard
+              title="Actual Paid Overhead"
+              value={data.overheads.total}
+              icon={Wallet}
+              isCurrency
+              colorClass="text-amber-400"
+              branchLabel={branchLabel}
+              tooltip="Dated overhead payments in the selected period."
+            />
+            <StatCard
+              title="True Net Profit"
+              value={data.netProfit}
+              icon={data.netProfit >= 0 ? TrendingUp : TrendingDown}
+              isCurrency
+              colorClass={data.netProfit >= 0 ? "text-emerald-400" : "text-destructive"}
+              branchLabel={branchLabel}
+              tooltip="Accrual revenue minus actual paid container costs and actual paid overhead, matching P&L."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <Card className="border-border/40 bg-card/40 lg:col-span-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold">Accrual Revenue, Actual Costs and Net Profit</CardTitle>
+                <p className="text-xs text-muted-foreground">Monthly finance trend from the same P&amp;L records.</p>
+              </CardHeader>
+              <CardContent>
+                {data.monthly.length > 0 ? (
+                  <div className="h-[260px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={data.monthly} margin={{ top: 5, right: 12, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                        <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                        <YAxis tickFormatter={(value) => `₦${(value / 1_000_000).toFixed(1)}M`} stroke="hsl(var(--muted-foreground))" fontSize={11} width={58} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px" }}
+                          formatter={(value: number, name: string) => [formatCurrency(value), name === "revenue" ? "Accrual Revenue" : name === "costOfSales" ? "Actual Paid Costs" : name === "overheads" ? "Actual Paid Overhead" : "True Net Profit"]}
+                        />
+                        <Legend iconType="circle" wrapperStyle={{ fontSize: "11px" }} formatter={(value) => value === "revenue" ? "Revenue" : value === "costOfSales" ? "Costs" : value === "overheads" ? "Overhead" : "Net Profit"} />
+                        <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="costOfSales" fill="hsl(var(--chart-3))" radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="overheads" fill="hsl(var(--chart-4))" radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="netProfit" fill="hsl(var(--chart-2))" radius={[3, 3, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">No issued-invoice finance activity in this period.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/40 bg-card/40">
+              <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">P&amp;L Reconciliation</CardTitle></CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Gross Profit</span><span className="font-mono font-semibold">{formatCurrency(data.grossProfit)}</span></div>
+                <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Net Margin</span><span className="font-mono font-semibold">{data.netMarginPct.toFixed(1)}%</span></div>
+                <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Issued Invoices</span><span className="font-mono font-semibold">{formatNumber(data.revenue.invoiceCount)}</span></div>
+                <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Invoiced Containers</span><span className="font-mono font-semibold">{formatNumber(data.costOfSales.invoicedContainerCount ?? data.containerCount)}</span></div>
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-muted-foreground">
+                  <span className="font-medium text-foreground">Basis:</span> {data.financialBasis?.summary ?? "Accrual revenue less actual paid costs and overhead."}
+                </div>
+                <Link href={matchingProfitLossUrl} className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent">
+                  View matching P&amp;L <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Link href="/invoices" className="block"><Card className="h-full border-border/40 hover:bg-accent/40"><CardContent className="p-4"><ReceiptText className="mb-2 h-4 w-4 text-primary" /><p className="text-sm font-medium">Revenue evidence</p><p className="mt-1 text-xs text-muted-foreground">Issued invoices used for accrual revenue.</p></CardContent></Card></Link>
+            <Link href="/reports/disbursement-reconciliation" className="block"><Card className="h-full border-border/40 hover:bg-accent/40"><CardContent className="p-4"><DollarSign className="mb-2 h-4 w-4 text-orange-400" /><p className="text-sm font-medium">Cost evidence</p><p className="mt-1 text-xs text-muted-foreground">Actual payments against container costs.</p></CardContent></Card></Link>
+            <Link href="/overhead-expenses" className="block"><Card className="h-full border-border/40 hover:bg-accent/40"><CardContent className="p-4"><Wallet className="mb-2 h-4 w-4 text-amber-400" /><p className="text-sm font-medium">Overhead evidence</p><p className="mt-1 text-xs text-muted-foreground">Recorded overhead expenses and payments.</p></CardContent></Card></Link>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const { isAdmin } = useAuth();
   const { isSuperAdmin: scopeIsSuperAdmin, activeBranchId, branches } = useBranchScope();
@@ -521,6 +706,9 @@ export default function Dashboard() {
         : (branches.find((b: { id: number; name: string }) => b.id === activeBranchId)?.name ?? `Branch #${activeBranchId}`))
     : undefined;
   const [terminalDrillOpen, setTerminalDrillOpen] = useState(false);
+  const [dashboardView, setDashboardView] = useState<"operations" | "financial">("operations");
+  const [financialFrom, setFinancialFrom] = useState("");
+  const [financialTo, setFinancialTo] = useState("");
 
   const { data: stats, isLoading, isError } = useGetDashboardStats();
   const { data: arData } = useGetArLedger();
@@ -529,7 +717,7 @@ export default function Dashboard() {
     { page: 1, limit: 5 }
   );
 
-  if (isLoading) {
+  if (dashboardView === "operations" && isLoading) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -544,7 +732,7 @@ export default function Dashboard() {
     );
   }
 
-  if (isError || !stats) {
+  if (dashboardView === "operations" && (isError || !stats)) {
     return (
       <div className="h-[50vh] flex flex-col items-center justify-center text-muted-foreground">
         <AlertTriangle className="w-12 h-12 mb-4 text-destructive/50" />
@@ -553,12 +741,12 @@ export default function Dashboard() {
     );
   }
 
-  const financialStats = stats as typeof stats & {
+  const financialStats = stats as (typeof stats & {
     totalOverheadPaid?: number;
     totalNetProfitAfterOverhead?: number;
-  };
-  const grossProfit = financialStats.totalGrossProfit ?? 0;
-  const netProfitAfterOverhead = financialStats.totalNetProfitAfterOverhead ?? grossProfit;
+  }) | undefined;
+  const grossProfit = financialStats?.totalGrossProfit ?? 0;
+  const netProfitAfterOverhead = financialStats?.totalNetProfitAfterOverhead ?? grossProfit;
 
   return (
     <motion.div
@@ -581,8 +769,39 @@ export default function Dashboard() {
           </div>
           <AlertBeacon />
         </div>
-
       </div>
+
+      <div className="inline-flex w-full rounded-lg border border-border/50 bg-muted/30 p-1 sm:w-auto" role="tablist" aria-label="Dashboard view">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={dashboardView === "operations"}
+          onClick={() => setDashboardView("operations")}
+          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${dashboardView === "operations" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          Operations View
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={dashboardView === "financial"}
+          onClick={() => setDashboardView("financial")}
+          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${dashboardView === "financial" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          Financial View
+        </button>
+      </div>
+
+      {dashboardView === "financial" ? (
+        <FinancialDashboardView
+          from={financialFrom}
+          to={financialTo}
+          onFromChange={setFinancialFrom}
+          onToChange={setFinancialTo}
+          branchLabel={branchLabel}
+        />
+      ) : (
+        <>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -958,6 +1177,8 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+      </>
+      )}
     </motion.div>
   );
 }
