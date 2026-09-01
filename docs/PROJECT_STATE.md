@@ -87,6 +87,12 @@ test before beginning any new large product feature.
   driver could not commit a native date field to React state, so expected-date
   entry needs a manual browser confirmation before it is accepted as a product
   defect.
+- The explicitly confirmed Pullout release on `E2EL260901` succeeded and
+  correctly created the derived Gate-In work item. High defect `OPS-002` was
+  found: Pull-Out Released remains empty because the pipeline endpoint removes
+  released Pull-Out records before the workspace can place them in its Released
+  tab. The backend condition and required correction are in the live test
+  register.
 
 ## Current Release Status
 
@@ -103,9 +109,8 @@ test before beginning any new large product feature.
 1. Complete `ENV-02` and catalogue the current test data without changing it.
 2. Complete branch/date-range coverage for `FIN-01`; retain `RPT-001` for the
    final defect report and do not fix it before approval of the audit.
-3. With explicit confirmation before the final irreversible release action,
-   mark only `E2EL260901` Pullout released; then verify its submitted list and
-   actual date.
+3. Complete safe Documentation upload/search/open/link checks against
+   `E2EL260901`; do not delete the test document without explicit confirmation.
 4. With explicit action-time confirmation, create the remaining labelled
    schedule and lifecycle test records required for `TD-03` through `TD-05`.
 5. Obtain separate authenticated sessions or test credentials for at least one
