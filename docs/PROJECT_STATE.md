@@ -179,6 +179,9 @@ test before beginning any new large product feature.
   cancelled invoice history is valid, but its cancelled ₦1,000 balance is
   included in Gross Outstanding and produces a false ₦999 Net Balance Owed
   instead of matching Accounts Receivable's zero balance.
+- Disbursement Reconciliation confirms `FIN-002` is broader than the P&L and
+  dashboard: it records the ₦200 Shipping disbursement, but omits the verified
+  ₦200 Customs Duty payment from the controlled duty container's actual spend.
 
 ## Current Release Status
 
