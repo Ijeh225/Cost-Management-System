@@ -192,6 +192,9 @@ test before beginning any new large product feature.
 - Operations Report reconciles to the current container population: nine
   containers with correct vessel and size distribution, and zero completed as
   expected because no job has reached Delivery/Closed.
+- The Reports Financial tab also extends `RPT-002`: it presents budgeted
+  clearing charges and costs as a financial report without clearly declaring
+  the different basis from P&L and the Financial Dashboard.
 
 ## Current Release Status
 
