@@ -67,8 +67,9 @@ test before beginning any new large product feature.
   `BRN-001`: branch selection in the client form conflicts with the required
   global branch scope and the UI hides the server's actionable error.
 - The controlled clients are `E2E-20260901 Lagos Client` (ID 6) and
-  `E2E-20260901 Abuja Client` (ID 7). Their pending-verification containers
-  are `E2EL260901` (ID 26, Lagos) and `E2EA260901` (ID 25, Abuja). The
+  `E2E-20260901 Abuja Client` (ID 7). `E2EL260901` (ID 26, Lagos) was
+  verified and released through Pullout; `E2EA260901` (ID 25, Abuja) remains
+  pending verification. The
   container form initially displayed Head Office as Branch under the Lagos
   global scope, expanding `BRN-001` to include an unsafe/misleading default.
 - Container branch isolation has passed: Lagos scope returned only the Lagos
@@ -105,10 +106,13 @@ test before beginning any new large product feature.
   and P&L agree on ₦500,002 Actual Paid Overhead, but Branch Comparison reports
   ₦10,710,002 as the same metric because their payment-row inclusion rules
   differ.
-- Controlled draft invoice `INV-202609-001` (ID 8) is now created for
-  `E2EL260901` in Lagos: ₦2,000 total, ₦0 paid, and an explicit test note. It
-  has not been issued or collected. `BRN-001` also affects the invoice dialog,
-  which displayed Head Office until Lagos was selected manually.
+- Controlled invoice `INV-202609-001` (ID 8) was created for `E2EL260901` in
+  Lagos with ₦2,000 total, ₦0 paid, and an explicit test note. It was marked
+  Sent only after explicit confirmation. Lagos Accounts Receivable then
+  reconciled it as one invoice for the controlled client: ₦2,000 invoiced,
+  ₦0 collected, ₦2,000 current outstanding, and no overdue or credit balance.
+  `BRN-001` also affects the invoice dialog, which displayed Head Office until
+  Lagos was selected manually.
 
 ## Current Release Status
 
@@ -130,8 +134,9 @@ test before beginning any new large product feature.
 3. Use an upload-capable browser session to complete the `DOC-01` controlled
    upload/search/open/link check against `E2EL260901`; do not delete the test
    document without explicit confirmation.
-4. With explicit action-time confirmation, mark only `INV-202609-001` Sent;
-   then test its receivable and later controlled payment behaviour.
+4. Obtain explicit action-time confirmation before recording any payment against
+   `INV-202609-001`; decide the controlled amount and payment method first so
+   the partial-payment, AR, and bank-posting checks remain auditable.
 5. With explicit action-time confirmation, create the remaining labelled
    schedule and lifecycle test records required for `TD-03` through `TD-05`.
 6. Obtain separate authenticated sessions or test credentials for at least one
