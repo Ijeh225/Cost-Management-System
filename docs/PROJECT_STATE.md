@@ -187,6 +187,8 @@ test before beginning any new large product feature.
 - Monthly Summary is functional but confirms `RPT-002`: it labels budgeted
   container clearing charges and costs as Revenue and Expenses, even though
   those values are not the actual invoice and payment financial basis.
+- Client Report repeats `RPT-002`: its controlled Lagos-client “Revenue” is
+  the ₦3,000 total of two container budgets, not recognised invoice revenue.
 
 ## Current Release Status
 
