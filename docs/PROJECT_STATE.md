@@ -149,6 +149,10 @@ test before beginning any new large product feature.
   and ₦0 Customs (including duty), despite the dated ₦200 duty payment. It also
   reports two containers for one issued invoice, providing current controlled
   evidence for `FIN-002` and the pre-existing `RPT-001` count/average defect.
+- Cash Flow independently confirms both core financial findings: it reports
+  only ₦700 of the ₦1,200 controlled money-out total because the Paid schedule
+  is absent (`SCHED-001`), and reports ₦2,001 invoice cash received across
+  three inflows because it includes the hidden ₦1 overpayment (`INV-002`).
 
 ## Current Release Status
 
