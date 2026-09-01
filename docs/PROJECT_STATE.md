@@ -175,6 +175,10 @@ test before beginning any new large product feature.
 - Printable Invoice Aging renders, but repeats the cancelled-invoice error from
   the live aging view. `AR-002` therefore affects both on-screen and printable
   receivables reporting.
+- The controlled Client Statement exposes a separate High `STMT-001` defect:
+  cancelled invoice history is valid, but its cancelled ₦1,000 balance is
+  included in Gross Outstanding and produces a false ₦999 Net Balance Owed
+  instead of matching Accounts Receivable's zero balance.
 
 ## Current Release Status
 
