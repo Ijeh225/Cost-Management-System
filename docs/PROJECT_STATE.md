@@ -153,6 +153,10 @@ test before beginning any new large product feature.
   only ₦700 of the ₦1,200 controlled money-out total because the Paid schedule
   is absent (`SCHED-001`), and reports ₦2,001 invoice cash received across
   three inflows because it includes the hidden ₦1 overpayment (`INV-002`).
+- Analytics correctly labels its main profitability cards as budgeted, but also
+  shows ₦2,001 collected against ₦2,000 invoiced while capping Collection Rate
+  at 100% and hiding the overpayment credit; this extends `INV-002` into the
+  analytics module.
 
 ## Current Release Status
 
