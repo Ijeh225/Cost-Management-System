@@ -145,6 +145,10 @@ test before beginning any new large product feature.
   the stated P&L basis and excludes the verified ₦200 Customs Duty payment from
   Actual Paid Container Costs, overstating net profit by the same amount
   (`FIN-002`).
+- The matching actual-paid P&L was directly inspected: it reports ₦200 Shipping
+  and ₦0 Customs (including duty), despite the dated ₦200 duty payment. It also
+  reports two containers for one issued invoice, providing current controlled
+  evidence for `FIN-002` and the pre-existing `RPT-001` count/average defect.
 
 ## Current Release Status
 
