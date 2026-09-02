@@ -242,8 +242,9 @@ test before beginning any new large product feature.
 2. Complete branch/date-range coverage for `FIN-01`; retain `RPT-001` for the
    final defect report and do not fix it before approval of the audit.
 3. Use an upload-capable browser session to complete the `DOC-01` controlled
-   upload/search/open/link check against `E2EL260901`; do not delete the test
-   document without explicit confirmation.
+   upload/search/open/link check against `E2EL260901` and `UPL-01` actual
+   file-validation/import check; do not delete any test document or imported
+   record without explicit confirmation.
 4. Do not create further live financial records until Critical `INV-002` has a
    reviewed correction/reversal plan. Preserve the controlled ₦1 entry and its
    invoice, AR, and Financial Ledger evidence for diagnosis.
@@ -353,6 +354,15 @@ test before beginning any new large product feature.
   `E2EL260901` after the active list loads. Actual document upload, open, and
   link verification remains blocked only by the current browser automation's
   inability to provide a file to the operating-system picker.
+
+### Upload Data
+
+- 2026-09-02: The Upload Containers screen renders both General and
+  Customer-Linked import modes, its CSV/XLSX 10 MB constraint, file picker,
+  format guide, and template-download control. The guide correctly identifies
+  Customer Name, Container Number, and Bill of Lading as required columns. An
+  actual file validation/import remains blocked by the browser-control
+  environment's lack of OS file-picker input; no records were created.
 
 ### Invoice Lifecycle
 
