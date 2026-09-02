@@ -283,6 +283,14 @@ test before beginning any new large product feature.
   filters does not reset an entered search term. This is a Low-priority
   financial-investigation usability defect; no financial amount is affected.
 
+### Payment Schedule Views
+
+- 2026-09-02: the controlled Lagos ₦500 schedule correctly remains Paid with
+  a zero balance in Completed Schedules. `SCHED-002` is a new Low-priority
+  UI/reporting defect: branch badges do not follow the selected schedule view.
+  Completed shows six records but badges totaling seven; Cancelled shows zero
+  records but the same badges.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
