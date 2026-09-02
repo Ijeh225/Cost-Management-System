@@ -306,6 +306,9 @@ test before beginning any new large product feature.
   cancelled invoice. Overdue and written-off lifecycle coverage still requires
   suitable controlled cases and must not create new live financial records
   until `INV-002` has an approved correction plan.
+- 2026-09-02 invoice branch isolation passes: Lagos scope exposes only the two
+  controlled Lagos invoices and Abuja scope exposes none. The browser was
+  restored to All Branches after the check.
 
 ### Department Workspaces
 
