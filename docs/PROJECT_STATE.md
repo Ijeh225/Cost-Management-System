@@ -324,6 +324,14 @@ test before beginning any new large product feature.
   ₦0 outstanding/₦1 credit values; Abuja correctly shows no receivable client
   or amount. All Branches was restored after the read-only check.
 
+### Analytics Re-check
+
+- 2026-09-02: Analytics correctly limits its Lagos operational metrics to two
+  controlled containers and labels those metrics as budgeted. It also confirms
+  `INV-002` in another module: ₦2,001 collected versus ₦2,000 invoiced is
+  capped at a 100% collection rate without explaining the ₦1 credit. All
+  Branches was restored after the check.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
