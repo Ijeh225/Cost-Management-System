@@ -415,6 +415,16 @@ test before beginning any new large product feature.
   stage data, and one cited record. Its cited-record control opened the
   matching `/containers/25` detail page. No business record was changed.
 
+### AI Stage-Owner Reconciliation
+
+- 2026-09-02: The AI correctly found delayed Transire job `HLCU8765432` and
+  its expected date, but incorrectly named `Jdjdh` as the Transire owner. The
+  dedicated Transire workspace shows Unassigned; only the generic Operations
+  detail shows `Jdjdh`. High `AI-002` is open: the AI is reading the stale
+  generic owner instead of the authoritative stage-specific owner. This is
+  connected to existing `OPS-001` and must be fixed before relying on AI
+  ownership recommendations.
+
 ### Documentation Search
 
 - 2026-09-02: Documentation workspace search correctly isolates controlled
