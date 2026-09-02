@@ -197,6 +197,9 @@ test before beginning any new large product feature.
   the different basis from P&L and the Financial Dashboard.
 - On 2026-09-02, the Reports Pending Verification filter correctly isolated
   controlled Abuja container `E2EA260901` and its expected operational values.
+- Approval Queue was checked read-only on 2026-09-02: its empty state renders
+  correctly with no pending submitted sections. Approval/rejection actions
+  remain outstanding until a controlled pending submission can be reviewed.
 
 ## Current Release Status
 
