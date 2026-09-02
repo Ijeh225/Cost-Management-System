@@ -425,6 +425,19 @@ test before beginning any new large product feature.
   connected to existing `OPS-001` and must be fixed before relying on AI
   ownership recommendations.
 
+### AI Terminal, Tasks, and Report-Draft Checks
+
+- 2026-09-02: The AI terminal question passes: it correctly defines physical
+  Terminal as Gate-In, Examination, and Final Release, returning zero and
+  separating the nine open containers from Terminal occupancy.
+- The AI task tool correctly reports zero actual open/overdue/high-priority
+  tasks. The My Tasks page still displays all nine containers with blank
+  review values, confirming `TASK-001` is a screen-design/data-source issue.
+- High `AI-003` is open: the AI monthly finance draft counted Draft and
+  Cancelled invoices as issued finance activity. Do not use its invoice count
+  or issued-value result for management reporting until its status filtering
+  is corrected and reconciled.
+
 ### Documentation Search
 
 - 2026-09-02: Documentation workspace search correctly isolates controlled
