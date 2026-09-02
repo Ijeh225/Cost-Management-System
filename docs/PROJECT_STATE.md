@@ -292,6 +292,11 @@ test before beginning any new large product feature.
 - Draft and cancelled invoices are excluded from active receivables and the
   relevant financial reports.
 - Related commit: `956d965`.
+- 2026-09-02 live re-check: the controlled paid invoice now visibly shows all
+  three payment records and ₦2,001 Total Paid against its ₦2,000 total. This
+  improves the evidence trail but does not resolve `INV-002`: Record Payment
+  remains enabled at zero outstanding and the extra amount is not presented as
+  an explicit, confirmed customer-credit/deposit workflow.
 
 ### Department Workspaces
 
