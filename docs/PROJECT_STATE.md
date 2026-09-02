@@ -269,6 +269,16 @@ test before beginning any new large product feature.
   period; do not duplicate its formulas in Dashboard.
 - Related commits: `134458c`, `0f63688`, `c06d356`.
 
+### Live Bank Reconciliation
+
+- 2026-09-02 read-only verification: `E2E-20260901 Lagos Test Bank` has six
+  visible transactions, with ₦2,001 credits minus ₦700 debits producing its
+  ₦1,301 closing balance. Its exact-reference search finds the controlled
+  ₦200 duty payment. The same statement confirms the existing `SCHED-001`
+  defect: the approved and paid ₦500 payment schedule is not a bank debit.
+- No bank transaction was posted, edited, disabled, or deleted during this
+  check. Branch and duplicate-entry tests are still pending.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
