@@ -340,6 +340,13 @@ test before beginning any new large product feature.
   ₦2,000 invoiced, ₦0 outstanding, and ₦1 credit. This extends the existing
   cancelled-invoice reporting problem into client-facing financial screens.
 
+### Container Branch Scope
+
+- 2026-09-02: Container Directory branch isolation passes. Lagos shows exactly
+  controlled `E2EL260901` and `E2ED260901`; Abuja shows exactly pending
+  verification `E2EA260901`. The global selector was returned to All Branches
+  after the check.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
