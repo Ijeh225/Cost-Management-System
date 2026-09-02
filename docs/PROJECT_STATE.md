@@ -297,6 +297,11 @@ test before beginning any new large product feature.
   improves the evidence trail but does not resolve `INV-002`: Record Payment
   remains enabled at zero outstanding and the extra amount is not presented as
   an explicit, confirmed customer-credit/deposit workflow.
+- The controlled cancelled invoice correctly blocks collection from its detail
+  page. Its on-screen promise that cancelled invoices are excluded from active
+  receivables and financial reports is not yet true across the application:
+  the Invoice Aging and Client Statement defects remain recorded as `AR-002`
+  and `STMT-001`.
 
 ### Department Workspaces
 
