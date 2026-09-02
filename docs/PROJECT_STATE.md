@@ -305,6 +305,12 @@ test before beginning any new large product feature.
   defect: initial load shows unexplained dashes and no records before the
   data arrives.
 
+### Duty Payment Views
+
+- 2026-09-02: the Duty Payments Partial filter correctly returns the one
+  controlled record with ₦400 assessed, ₦200 paid, and ₦200 outstanding.
+  No assessment, payment, approval, or reversal was made during the check.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
