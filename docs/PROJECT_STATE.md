@@ -455,6 +455,14 @@ test before beginning any new large product feature.
   payment-schedule events for the same transition. Preserve the existing audit
   history while tracing the duplicate event creation/query path.
 
+### Container Dashboard Counter Reconciliation
+
+- 2026-09-02: the consolidated Operations Dashboard reports 9 Total
+  Containers, 9 In Progress, 0 Completed, and 0 Containers in Terminal. This
+  matches the current container population and the established physical
+  Terminal definition. It does not resolve the separate financial dashboard
+  inconsistencies (`DASH-001` and `FIN-002`).
+
 ### Documentation Search
 
 - 2026-09-02: Documentation workspace search correctly isolates controlled
