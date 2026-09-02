@@ -442,6 +442,19 @@ test before beginning any new large product feature.
   confirms the same ₦2,001 paid against a ₦2,000 total. This read-only control
   path passed; it created no payment or workflow action.
 
+### Notification and AI Reconciliation
+
+- 2026-09-02: read-only notification review confirms two live views: 7 active
+  System Alerts and 67 unread Workflow History events. No alert card was
+  opened and no item was marked read.
+- High `AI-004` is open: a prior AI response reported 60 visible notifications,
+  48 unread, and 14 types without identifying a source or reconciling to either
+  live notification view. AI notification answers must name their scope and
+  use the same count logic as the application.
+- Medium `NOTIF-002` is open: Workflow History contains repeated identical
+  payment-schedule events for the same transition. Preserve the existing audit
+  history while tracing the duplicate event creation/query path.
+
 ### Documentation Search
 
 - 2026-09-02: Documentation workspace search correctly isolates controlled
