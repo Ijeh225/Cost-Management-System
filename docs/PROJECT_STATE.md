@@ -208,6 +208,9 @@ test before beginning any new large product feature.
   workflow deadline alerts are misclassified as Low Profit Margin. This Medium
   `NOTIF-001` taxonomy defect is recorded; navigation was not clicked because
   it may mark live alerts as read.
+- My Tasks renders as an unfiltered nine-container list with blank Review
+  values and no ownership, due date, or task status. This Medium `TASK-001`
+  workflow-usability defect is recorded without creating or changing tasks.
 
 ## Current Release Status
 
