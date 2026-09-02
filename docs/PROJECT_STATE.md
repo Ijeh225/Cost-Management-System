@@ -302,6 +302,10 @@ test before beginning any new large product feature.
   receivables and financial reports is not yet true across the application:
   the Invoice Aging and Client Statement defects remain recorded as `AR-002`
   and `STMT-001`.
+- The Invoice status picker correctly narrows the list to the controlled
+  cancelled invoice. Overdue and written-off lifecycle coverage still requires
+  suitable controlled cases and must not create new live financial records
+  until `INV-002` has an approved correction plan.
 
 ### Department Workspaces
 
