@@ -284,8 +284,13 @@ test before beginning any new large product feature.
 - Architecture stores separate owner fields for Documentation, Transire,
   Shipping, Terminal, and Pullout.
 - Automated tests confirm owner-field separation and no cross-stage carryover.
-- The live controlled-job acceptance test remains outstanding; see Next
-  Actions.
+- 2026-09-02 read-only live re-test confirms the controlled Lagos job retains
+  the correct independent owner in Documentation, Transire, Shipping, and
+  Terminal, and those workspaces render their Active and submitted/released
+  views. Pull-Out remains incomplete: its Released tab reports zero despite
+  the controlled job having an existing Pull-Out release. `OPS-002` remains
+  open. Expected-date browser-entry and a document upload test still require
+  a supported manual upload-capable session.
 
 ### AI Assistant
 
