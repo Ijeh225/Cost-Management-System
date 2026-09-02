@@ -370,6 +370,14 @@ test before beginning any new large product feature.
   the queue stayed visually stale immediately after the successful rejection
   until a page reload.
 
+### Operations Visibility
+
+- 2026-09-02: After verification, `E2EA260901` is present in Documentation
+  Active and on the Operations Board in its parallel Transire Processing,
+  Shipping, and Terminal lanes. It has no owner or next action set there. This
+  is expected independent-stage visibility, not duplicate creation; no board
+  action was taken.
+
 ### Documentation Search
 
 - 2026-09-02: Documentation workspace search correctly isolates controlled
