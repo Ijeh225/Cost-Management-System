@@ -214,6 +214,9 @@ test before beginning any new large product feature.
 - Settings tabs were checked read-only on 2026-09-02. All eight sections load
   independently; Workflow and Container Aging current values render correctly,
   and no save action is enabled without a user change.
+- Branch Management correctly lists the controlled active branches and their
+  isolated active-container counts: Lagos 2 and Abuja 1. No branch changes
+  were made.
 
 ## Current Release Status
 
