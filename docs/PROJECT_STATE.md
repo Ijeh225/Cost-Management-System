@@ -360,6 +360,16 @@ test before beginning any new large product feature.
   workflow test; do not progress it further without recording the next
   explicit test case.
 
+### Controlled Approval Rejection
+
+- 2026-09-02: `E2EA260901` was submitted for a Full Container Review and then
+  rejected with the recorded reason `E2E test rejection: no charge sections
+  were submitted.` No charges, invoice, payment, or external message were
+  created. Reloading Approval Queue correctly moved the record from Pending
+  Review to Recently Reviewed with a Rejected label. `APR-001` is open because
+  the queue stayed visually stale immediately after the successful rejection
+  until a page reload.
+
 ### Documentation Search
 
 - 2026-09-02: Documentation workspace search correctly isolates controlled
