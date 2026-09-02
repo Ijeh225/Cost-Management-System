@@ -358,6 +358,15 @@ test before beginning any new large product feature.
   when the global scope is All Branches, and prevents the remaining duplicate
   validation check from running.
 
+### Container Print Summary
+
+- 2026-09-02: Print summaries for controlled containers 25 and 26 are not
+  reliable. They omit core identity values, render `Invalid Date`, and repeat
+  the record's branch ID as a currency value in each charge section. Source
+  tracing confirms a frontend/API field-shape mismatch and incomplete metadata
+  filtering. High defect `CONT-RPT-001` is open; do not treat these printouts
+  as valid reports until it is fixed and re-tested.
+
 ### Controlled Container Verification
 
 - 2026-09-02: The dedicated Abuja controlled record `E2EA260901` (ID 25) was
