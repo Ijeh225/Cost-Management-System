@@ -437,6 +437,10 @@ test before beginning any new large product feature.
   Cancelled invoices as issued finance activity. Do not use its invoice count
   or issued-value result for management reporting until its status filtering
   is corrected and reconciled.
+- The AI financial-control review correctly detects the existing controlled
+  ₦1 invoice overpayment and cites its invoice. Direct invoice verification
+  confirms the same ₦2,001 paid against a ₦2,000 total. This read-only control
+  path passed; it created no payment or workflow action.
 
 ### Documentation Search
 
