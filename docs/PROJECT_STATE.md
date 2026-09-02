@@ -348,6 +348,16 @@ test before beginning any new large product feature.
   verification `E2EA260901`. The global selector was returned to All Branches
   after the check.
 
+### Controlled Container Verification
+
+- 2026-09-02: The dedicated Abuja controlled record `E2EA260901` (ID 25) was
+  verified from Pending Verification. It changed to Registered, recorded
+  `christian ifeanyi` with the verification time, and appeared in the
+  Documentation Active queue. It still has zero charges, no invoice, no
+  documents, no payments, and no delivery date. This was a deliberate,
+  non-financial workflow test; do not progress it further without recording
+  the next explicit test case.
+
 ### Documentation Search
 
 - 2026-09-02: Documentation workspace search correctly isolates controlled
