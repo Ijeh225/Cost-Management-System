@@ -304,6 +304,12 @@ test before beginning any new large product feature.
   profiles and workspaces.
 - Preserve the rollback checkpoints listed above and retain auditability for
   user-access changes.
+- 2026-09-02 continuation check: the authenticated owner session remains
+  healthy after production account cleanup. User Management loads with
+  `ijehifeany@gmail.com` as the sole Active Super Admin and all seven former
+  test/legacy accounts Disabled. The owner can still see the full operations
+  and administration navigation. This is a current-session verification only;
+  a fresh owner sign-out/sign-in remains a later acceptance check.
 
 ## Verification Rules
 

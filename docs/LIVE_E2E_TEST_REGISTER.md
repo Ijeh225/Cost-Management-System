@@ -57,6 +57,16 @@ branch scopes have been reconciled.
 | SET-01 | Settings | Verify tab navigation, scoped section rendering, current values, and unchanged-save behaviour | Passed | 2026-09-02: Settings loads General, Container Aging, Documentation, Email Alerts, Notifications, Workflow, AI Governance, and Other Settings as distinct tabs. Workflow correctly lists `christian ifeanyi` as Verification and Berthing Officer. Container Aging shows 7-day reminder/inactivity values and 30/60/90-day thresholds. Save buttons remain disabled until a change is made. No settings were changed. |
 | BRANCH-01 | Branch Management | Load branch list and reconcile controlled branch identity, user count, active-container count, and status without changing branches | Passed | 2026-09-02: Branch list correctly shows active `E2E-20260901-Lagos` / `E2ELAG` with 2 active containers and `E2E-20260901-Abuja` / `E2EABJ` with 1 active container. Counts match the controlled container matrix. No branch was edited or deactivated. |
 
+### Continuation Verification
+
+- 2026-09-02: after the account cleanup, the current authenticated owner session
+  still opened User Management successfully and retained access to every
+  administration and operations navigation module. The table confirms
+  `ijehifeany@gmail.com` is Active and each of the seven former test/legacy
+  accounts is Disabled with only an Enable recovery action. This confirms that
+  current owner access remains healthy and the cleanup remains in effect. It
+  does not replace the separate fresh sign-out/sign-in verification.
+
 ## Defect Log
 
 | ID | Priority | Module | Finding | Cause | Required correction | Cross-module impact | Status |
