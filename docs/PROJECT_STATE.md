@@ -347,6 +347,13 @@ test before beginning any new large product feature.
   verification `E2EA260901`. The global selector was returned to All Branches
   after the check.
 
+### Documentation Search
+
+- 2026-09-02: Documentation workspace search correctly isolates controlled
+  `E2EL260901` after the active list loads. Actual document upload, open, and
+  link verification remains blocked only by the current browser automation's
+  inability to provide a file to the operating-system picker.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
