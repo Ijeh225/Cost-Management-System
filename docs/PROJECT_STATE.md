@@ -408,6 +408,13 @@ test before beginning any new large product feature.
   Pull-Out correctly excludes the job before Terminal/TDO release. No stage
   owner, date, or release action was changed during this check.
 
+### AI Assistant Exact-Record Check
+
+- 2026-09-02: The read-only AI query `Show me E2EA260901.` returned the
+  controlled Abuja job's correct client, Registered workflow state, unset
+  stage data, and one cited record. Its cited-record control opened the
+  matching `/containers/25` detail page. No business record was changed.
+
 ### Documentation Search
 
 - 2026-09-02: Documentation workspace search correctly isolates controlled
