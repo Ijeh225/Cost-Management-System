@@ -364,6 +364,14 @@ test before beginning any new large product feature.
   actual file validation/import remains blocked by the browser-control
   environment's lack of OS file-picker input; no records were created.
 
+### Usability Check
+
+- 2026-09-02: A focused Container Directory desktop check found a labelled Add
+  Container dialog with clear required-field validation. Empty submission kept
+  the user in the dialog, showed the missing fields, and created no record.
+  This is only partial UI coverage: mobile layout, keyboard-only navigation,
+  repeated-submit protection, and the other module dialogs remain to test.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
