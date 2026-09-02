@@ -348,6 +348,16 @@ test before beginning any new large product feature.
   verification `E2EA260901`. The global selector was returned to All Branches
   after the check.
 
+### Branch-Scoped Creation Re-check
+
+- 2026-09-02: A duplicate-container validation attempt selected the existing
+  controlled Abuja container number and B/L plus the visible
+  `E2E-20260901-Abuja` branch. The server nevertheless returned HTTP 400
+  `Select a specific branch to create records.` No duplicate or other record
+  was created. This confirms that `BRN-001` also blocks container creation
+  when the global scope is All Branches, and prevents the remaining duplicate
+  validation check from running.
+
 ### Controlled Container Verification
 
 - 2026-09-02: The dedicated Abuja controlled record `E2EA260901` (ID 25) was
