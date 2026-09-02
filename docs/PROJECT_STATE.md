@@ -195,6 +195,8 @@ test before beginning any new large product feature.
 - The Reports Financial tab also extends `RPT-002`: it presents budgeted
   clearing charges and costs as a financial report without clearly declaring
   the different basis from P&L and the Financial Dashboard.
+- On 2026-09-02, the Reports Pending Verification filter correctly isolated
+  controlled Abuja container `E2EA260901` and its expected operational values.
 
 ## Current Release Status
 
