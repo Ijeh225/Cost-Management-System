@@ -217,6 +217,11 @@ test before beginning any new large product feature.
 - Branch Management correctly lists the controlled active branches and their
   isolated active-container counts: Lagos 2 and Abuja 1. No branch changes
   were made.
+- Critical `SEC-002`: the live User Management list still has eight active
+  accounts, including unexpected Super Admin and test/staff accounts, despite
+  the intended live account being `ijehifeany@gmail.com`. No account was
+  disabled during the audit; a reviewed, explicit access-removal plan is now
+  required before further privileged live testing.
 
 ## Current Release Status
 
