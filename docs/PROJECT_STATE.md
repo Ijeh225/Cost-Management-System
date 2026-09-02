@@ -298,6 +298,13 @@ test before beginning any new large product feature.
   `CP-002` is a Low-priority landing-page message defect: the page initially
   says no payments exist, then reveals them after a container search.
 
+### Overhead Expense Views
+
+- 2026-09-02: the controlled ₦300 Lagos direct overhead is correctly shown as
+  Paid and the Paid filter returns it. `OH-002` is a Low-priority refresh UI
+  defect: initial load shows unexplained dashes and no records before the
+  data arrives.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
