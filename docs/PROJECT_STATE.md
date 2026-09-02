@@ -211,6 +211,9 @@ test before beginning any new large product feature.
 - My Tasks renders as an unfiltered nine-container list with blank Review
   values and no ownership, due date, or task status. This Medium `TASK-001`
   workflow-usability defect is recorded without creating or changing tasks.
+- Settings tabs were checked read-only on 2026-09-02. All eight sections load
+  independently; Workflow and Container Aging current values render correctly,
+  and no save action is enabled without a user change.
 
 ## Current Release Status
 
