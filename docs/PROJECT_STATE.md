@@ -332,6 +332,14 @@ test before beginning any new large product feature.
   capped at a 100% collection rate without explaining the ₦1 credit. All
   Branches was restored after the check.
 
+### Client Financial Display
+
+- 2026-09-02: `CLT-001` identified. The controlled Lagos client list and
+  detail/wallet count cancelled `INV-202609-002` as ₦1,000 owed, yielding
+  ₦3,000 invoiced and ₦999 outstanding. Accounts Receivable correctly shows
+  ₦2,000 invoiced, ₦0 outstanding, and ₦1 credit. This extends the existing
+  cancelled-invoice reporting problem into client-facing financial screens.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
