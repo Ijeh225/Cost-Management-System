@@ -378,6 +378,14 @@ test before beginning any new large product feature.
   is expected independent-stage visibility, not duplicate creation; no board
   action was taken.
 
+### Stage Separation Re-check
+
+- 2026-09-02: The newly verified `E2EA260901` renders independently in the
+  Transire, Shipping, and Terminal workspaces. Each has its own expected-date
+  label and an Unassigned owner, with no carry-over value from another stage.
+  Pull-Out correctly excludes the job before Terminal/TDO release. No stage
+  owner, date, or release action was changed during this check.
+
 ### Documentation Search
 
 - 2026-09-02: Documentation workspace search correctly isolates controlled
