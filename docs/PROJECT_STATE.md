@@ -311,6 +311,13 @@ test before beginning any new large product feature.
   controlled record with ₦400 assessed, ₦200 paid, and ₦200 outstanding.
   No assessment, payment, approval, or reversal was made during the check.
 
+### Accounts Receivable Branch Scope
+
+- 2026-09-02: Receivables branch isolation passes. The Lagos scope contains
+  only the controlled Lagos client, its ₦2,000 invoiced/₦2,001 collected/
+  ₦0 outstanding/₦1 credit values; Abuja correctly shows no receivable client
+  or amount. All Branches was restored after the read-only check.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
