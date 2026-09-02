@@ -204,6 +204,10 @@ test before beginning any new large product feature.
   still presents a Terminal Advance action after that Terminal stage was
   released and Gate-In opened. This Medium `PIPE-001` consistency risk was
   recorded without attempting the potentially repeated action.
+- Notifications render and correctly flag the controlled ₦200 unpaid duty, but
+  workflow deadline alerts are misclassified as Low Profit Margin. This Medium
+  `NOTIF-001` taxonomy defect is recorded; navigation was not clicked because
+  it may mark live alerts as read.
 
 ## Current Release Status
 
