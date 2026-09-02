@@ -388,6 +388,9 @@ test before beginning any new large product feature.
   Review to Recently Reviewed with a Rejected label. `APR-001` is open because
   the queue stayed visually stale immediately after the successful rejection
   until a page reload.
+- The controlled container Audit Trail independently records the verification,
+  review submission, and rejection actions, including actor, timestamp, and
+  rejection reason. This audit-evidence path passed its live check.
 
 ### Operations Visibility
 
