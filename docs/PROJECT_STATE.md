@@ -268,6 +268,12 @@ test before beginning any new large product feature.
   with `actual_paid` cost basis. It must match P&L for the same branch and
   period; do not duplicate its formulas in Dashboard.
 - Related commits: `134458c`, `0f63688`, `c06d356`.
+- 2026-09-02 dashboard re-check: Lagos scope correctly contains its two
+  controlled containers. Financial View reconciles to its stated P&L basis
+  at ₦2,000 accrual revenue, ₦200 actual container cost, ₦300 actual overhead,
+  and ₦1,500 true net profit. This reconfirms `FIN-002`: the verified ₦200
+  duty payment is absent from its actual container costs. Operations View
+  still includes the cancelled invoice, reconfirming `DASH-001`.
 
 ### Live Bank Reconciliation
 
