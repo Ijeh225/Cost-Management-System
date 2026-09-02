@@ -200,6 +200,10 @@ test before beginning any new large product feature.
 - Approval Queue was checked read-only on 2026-09-02: its empty state renders
   correctly with no pending submitted sections. Approval/rejection actions
   remain outstanding until a controlled pending submission can be reviewed.
+- Pipeline Board preserves the controlled job's separate stage owners, but
+  still presents a Terminal Advance action after that Terminal stage was
+  released and Gate-In opened. This Medium `PIPE-001` consistency risk was
+  recorded without attempting the potentially repeated action.
 
 ## Current Release Status
 
