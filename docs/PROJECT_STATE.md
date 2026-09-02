@@ -291,6 +291,13 @@ test before beginning any new large product feature.
   Completed shows six records but badges totaling seven; Cancelled shows zero
   records but the same badges.
 
+### Container Payment Views
+
+- 2026-09-02: the selected controlled container correctly shows its ₦200
+  Shipping payment and its +₦200 variance against a zero charge budget.
+  `CP-002` is a Low-priority landing-page message defect: the page initially
+  says no payments exist, then reveals them after a container search.
+
 ### Invoice Lifecycle
 
 - Draft invoices are editable; issued invoices preserve their audit trail.
