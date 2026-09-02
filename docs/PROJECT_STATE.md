@@ -278,6 +278,10 @@ test before beginning any new large product feature.
   defect: the approved and paid ₦500 payment schedule is not a bank debit.
 - No bank transaction was posted, edited, disabled, or deleted during this
   check. Branch and duplicate-entry tests are still pending.
+- `BANK-002` was identified during the same check: Bank Statement Type filters
+  omit Duty Payment even though it is a visible transaction type, and Clear
+  filters does not reset an entered search term. This is a Low-priority
+  financial-investigation usability defect; no financial amount is affected.
 
 ### Invoice Lifecycle
 
