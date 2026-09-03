@@ -605,6 +605,16 @@ test before beginning any new large product feature.
   remains a manual-browser acceptance item because the current browser driver
   did not preserve a typed date value in the creation form.
 
+### Mobile Interface Re-check
+
+- 2026-09-03: at a 390x844 viewport, the Invoice list reflowed into a
+  readable single-column card layout without observed horizontal page overflow.
+  The New Invoice, search, status filter, and record controls remained visible.
+- The mobile Create User dialog retained all labelled controls and its Close,
+  Cancel, and Create User actions within the viewport. `No users found` under
+  the selected Lagos branch was expected; All Branches correctly showed the
+  one active owner and seven disabled historical accounts.
+
 ### Department Workspaces
 
 - Architecture stores separate owner fields for Documentation, Transire,
