@@ -431,6 +431,12 @@ test before beginning any new large product feature.
   ₦2,000,401 assessed, the same amount paid, ₦0 outstanding, and zero unpaid
   duty containers. The empty result appropriately has no individual record to
   cite; direct Duty Payments verification shows the same values.
+- AI current-briefing generation works with a specific branch: controlled
+  Lagos refreshed to a 2026-09-03 briefing with zero configured exceptions.
+  With All Branches selected, however, the enabled button failed with HTTP 400
+  requiring a specific branch and left an August 19 briefing labelled Current.
+  Medium `AI-006` is open: consolidated mode must be supported or prevented
+  clearly, and stale content must be labelled after a refresh failure.
 
 ### AI Stage-Owner Reconciliation
 
