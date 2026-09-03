@@ -550,6 +550,11 @@ test before beginning any new large product feature.
   warning; it disappeared, the outstanding total returned to ₦0, and the paid
   overhead remained unchanged. This confirms the tested delete path only
   removed the purpose-created E2E record.
+- The 2026-09-03 report follow-up passes for the completed duty lifecycle:
+  Duty Payment Ledger shows both labelled ₦200 payments, Financial Ledger
+  shows both references within seven total entries and ₦900 money out, and
+  Duty Reconciliation confirms `E2ED260901` at Snapshot ₦400, Ledger ₦400,
+  Matched.
 - `E2EA260901` was resubmitted for Full Container Review. A controlled Approve
   attempt correctly remained pending until the backend's required release
   fields existed: Documentation/PAAR, Transire, Shipping/DO, Terminal/TDO, and
