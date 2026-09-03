@@ -627,6 +627,13 @@ test before beginning any new large product feature.
   action, so only file retrieval remains environment-limited; no app defect is
   recorded from that limitation.
 
+### Controlled Import Validation
+
+- 2026-09-03: the same non-sensitive E2E CSV was selected in Upload Containers
+  General mode to test live validation without an import. The preview returned
+  `Missing required fields (CON or B/Lading)`, reported 0 records ready, and
+  disabled the import action. No container was created.
+
 ### Department Workspaces
 
 - Architecture stores separate owner fields for Documentation, Transire,
@@ -637,8 +644,8 @@ test before beginning any new large product feature.
   Terminal, and those workspaces render their Active and submitted/released
   views. Pull-Out remains incomplete: its Released tab reports zero despite
   the controlled job having an existing Pull-Out release. `OPS-002` remains
-  open. Expected-date browser-entry and a document upload test still require
-  a supported manual upload-capable session.
+  open. Expected-date browser-entry still requires a supported manual-browser
+  acceptance test. Document upload has since been verified separately.
 
 ### AI Assistant
 
