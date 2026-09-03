@@ -245,9 +245,11 @@ test before beginning any new large product feature.
    upload/search/open/link check against `E2EL260901` and `UPL-01` actual
    file-validation/import check; do not delete any test document or imported
    record without explicit confirmation.
-4. Do not create further live financial records until Critical `INV-002` has a
-   reviewed correction/reversal plan. Preserve the controlled ₦1 entry and its
-   invoice, AR, and Financial Ledger evidence for diagnosis.
+4. Complete the isolated `INV-002` API integration test and preserve the
+   historic controlled ₦1 entry, invoice, AR balance, and Financial Ledger
+   evidence for later correction. The deployed payment guard has passed its
+   live UI verification, so further explicitly authorised financial tests may
+   use only labelled E2E records and the controlled Lagos test bank.
 5. Trace and correct `SCHED-001` only after the audit is approved; meanwhile,
    retain the controlled schedule and bank record as evidence and continue the
    remaining non-destructive lifecycle checks.
@@ -526,10 +528,34 @@ test before beginning any new large product feature.
 - The Invoice status picker correctly narrows the list to the controlled
   cancelled invoice. Overdue and written-off lifecycle coverage still requires
   suitable controlled cases and must not create new live financial records
-  until `INV-002` has an approved correction plan.
+  until the remaining lifecycle cases have suitable, clearly labelled E2E
+  records.
 - 2026-09-02 invoice branch isolation passes: Lagos scope exposes only the two
   controlled Lagos invoices and Abuja scope exposes none. The browser was
   restored to All Branches after the check.
+
+### Controlled Write-Test Continuation
+
+- 2026-09-03: `E2ED260901` received its final controlled duty payment of ₦200
+  from `E2E-20260901 Lagos Test Bank` with reference
+  `E2E-20260903-DUTY-001-FINAL`. The duty record now shows ₦400 paid, ₦0
+  outstanding, and Paid. The bank statement independently shows the exact ₦200
+  debit; its reconciled balance changed from ₦1,301 to ₦1,101.
+- The controlled paid schedule has no Pay control in Completed Schedules, which
+  confirms the normal duplicate-payment UI route is blocked. It does not
+  resolve `SCHED-001`: the existing ₦500 schedule payment is still absent from
+  Financial Ledger and cash-flow reporting.
+- The paid ₦300 E2E overhead has no Pay Now action. A separate labelled ₦1
+  overhead deletion candidate was created and deleted after its explicit
+  warning; it disappeared, the outstanding total returned to ₦0, and the paid
+  overhead remained unchanged. This confirms the tested delete path only
+  removed the purpose-created E2E record.
+- `E2EA260901` was resubmitted for Full Container Review. A controlled Approve
+  attempt remained pending because the backend correctly enforces all required
+  release fields before closing a container: Documentation/PAAR, Transire,
+  Shipping/DO, Terminal/TDO, and Pullout. This is a valid readiness block, not
+  an approval-write failure. A success-path approval test requires a dedicated
+  completed E2E workflow.
 
 ### Department Workspaces
 
