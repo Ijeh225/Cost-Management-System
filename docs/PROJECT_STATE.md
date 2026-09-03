@@ -463,6 +463,20 @@ test before beginning any new large product feature.
   Terminal definition. It does not resolve the separate financial dashboard
   inconsistencies (`DASH-001` and `FIN-002`).
 
+### Critical Invoice Payment Guard
+
+- 2026-09-03: `INV-002` remediation is implemented locally. The invoice-payment
+  API now locks the invoice, recalculates its live outstanding balance, and
+  returns a validation error before inserting anything when the invoice is
+  already paid or the requested amount exceeds the balance. The invoice-detail
+  page no longer offers Record Payment at a zero balance.
+- The regression test covers both an above-balance attempt and a second payment
+  after settlement, confirming that neither should create an additional payment
+  row. Full workspace typecheck plus the production frontend and API-server
+  builds pass. The integration suite needs an isolated `TEST_DATABASE_URL`; it
+  was deliberately not run against production. Deploy and verify one controlled
+  rejected request before resuming financial writes.
+
 ### Documentation Search
 
 - 2026-09-02: Documentation workspace search correctly isolates controlled

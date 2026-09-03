@@ -1020,7 +1020,8 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       bankId?: number | string | null;
     };
 
-    if (!amount || isNaN(amount) || amount <= 0) {
+    const paymentAmount = Number(amount);
+    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
       return res.status(400).json({ error: "Valid amount is required" });
     }
 
@@ -1056,6 +1057,22 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       const [inv] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
       if (!inv) throw new Error("Invoice was not found while recording payment");
 
+    // Calculate the live balance while the invoice row is locked. A normal
+    // collection must never become an implicit customer-credit transaction.
+    const preInsertPayments = await tx.select({ amount: invoicePaymentsTable.amount })
+      .from(invoicePaymentsTable)
+      .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+    const prevTotalPaid = preInsertPayments.reduce((s, p) => s + parseFloat(p.amount), 0);
+    const total = parseFloat(inv.total);
+    const outstanding = Math.max(0, total - prevTotalPaid);
+
+    if (outstanding <= 0) {
+      return { validationError: "Invoice is already fully paid and cannot receive another payment" };
+    }
+    if (paymentAmount > outstanding + 0.000001) {
+      return { validationError: `Payment amount exceeds the outstanding balance (₦${outstanding.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` };
+    }
+
     // Bank guard: the chosen bank must also belong to the invoice's branch.
     if (bankId != null) {
       const [bk] = await tx.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, bankId));
@@ -1063,15 +1080,9 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       if (bk.branchId !== inv.branchId) throw new Error("Selected bank belongs to a different branch than the invoice");
     }
 
-    // Capture pre-insert total so we can compute incremental overpayment
-    const preInsertPayments = await tx.select({ amount: invoicePaymentsTable.amount })
-      .from(invoicePaymentsTable)
-      .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
-    const prevTotalPaid = preInsertPayments.reduce((s, p) => s + parseFloat(p.amount), 0);
-
     await tx.insert(invoicePaymentsTable).values({
       invoiceId,
-      amount: String(amount),
+      amount: String(paymentAmount),
       paymentMethod,
       reference: reference ?? "",
       notes: notes ?? "",
@@ -1080,9 +1091,8 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       branchId: inv.branchId,
     });
 
-    const totalPaid = prevTotalPaid + amount;
+    const totalPaid = prevTotalPaid + paymentAmount;
 
-    const total = parseFloat(inv.total);
     const newStatus = getEffectiveInvoiceStatus({
       status: inv.status,
       total,
@@ -1094,29 +1104,16 @@ router.post("/invoices/:id/payments", requireAuth, async (req: AuthRequest, res)
       .set({ status: newStatus, updatedAt: new Date() })
       .where(eq(invoicesTable.id, invoiceId));
 
-    // Capture only the incremental overpayment delta as credit balance
-    let overpaymentStored = 0;
-    if (inv.clientId) {
-      const prevOverpaid = Math.max(0, prevTotalPaid - total);
-      const nowOverpaid = Math.max(0, totalPaid - total);
-      const creditIncrement = nowOverpaid - prevOverpaid;
-      if (creditIncrement > 0) {
-        await tx.update(clientsTable)
-          .set({ creditBalance: sql`${clientsTable.creditBalance}::numeric + ${String(creditIncrement)}` })
-          .where(eq(clientsTable.id, inv.clientId));
-        overpaymentStored = creditIncrement;
-      }
-    }
-
     await tx.insert(workflowNotificationsTable).values({
         type: "invoice_paid", branchId: inv.branchId,
-        message: `Payment of ₦${Math.round(amount).toLocaleString("en-NG")} recorded on ${inv.invoiceNumber} (${newStatus})`,
+        message: `Payment of ₦${Math.round(paymentAmount).toLocaleString("en-NG")} recorded on ${inv.invoiceNumber} (${newStatus})`,
         containerId: inv.containerId ?? null,
         containerNumber: null,
         actionUrl: `/invoices/${invoiceId}`,
       });
-    return { totalPaid, status: newStatus, overpaymentStored };
+    return { totalPaid, status: newStatus };
     });
+    if ("validationError" in result) return res.status(400).json({ error: result.validationError });
     return res.status(201).json({ success: true, ...result });
   } catch (err) {
     console.error(err);

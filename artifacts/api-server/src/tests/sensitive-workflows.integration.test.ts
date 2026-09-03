@@ -328,6 +328,13 @@ describe("sensitive workflow integration", () => {
       .send({ amount: 250, paymentMethod: "transfer" });
     expect(missingBank.status).toBe(400);
 
+    const exceedsOutstanding = await admin.agent
+      .post(`/api/invoices/${collectionInvoiceId}/payments`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ amount: 251, paymentMethod: "transfer", bankId: collectionBankId });
+    expect(exceedsOutstanding.status).toBe(400);
+    expect(exceedsOutstanding.body.error).toMatch(/exceeds.*outstanding/i);
+
     const posted = await admin.agent
       .post(`/api/invoices/${collectionInvoiceId}/payments`)
       .set("X-CSRF-Token", admin.csrf)
@@ -339,6 +346,17 @@ describe("sensitive workflow integration", () => {
     const [storedPayment] = await db.select().from(invoicePaymentsTable)
       .where(eq(invoicePaymentsTable.invoiceId, collectionInvoiceId));
     expect(storedPayment.bankId).toBe(collectionBankId);
+
+    const repeatPayment = await admin.agent
+      .post(`/api/invoices/${collectionInvoiceId}/payments`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ amount: 1, paymentMethod: "transfer", bankId: collectionBankId, reference: "must-not-post" });
+    expect(repeatPayment.status).toBe(400);
+    expect(repeatPayment.body.error).toMatch(/already fully paid/i);
+
+    const paymentsAfterRepeat = await db.select().from(invoicePaymentsTable)
+      .where(eq(invoicePaymentsTable.invoiceId, collectionInvoiceId));
+    expect(paymentsAfterRepeat).toHaveLength(1);
 
     const banks = await admin.agent.get("/api/banks");
     expect(banks.status).toBe(200);

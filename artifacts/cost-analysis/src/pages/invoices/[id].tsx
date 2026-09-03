@@ -837,6 +837,7 @@ export default function InvoiceDetailPage() {
   const isLocked = isWrittenOff || isCancelled;
   const isDraft = invoice.status === "draft";
   const canCollect = !isLocked && !isDraft && invoice.total > 0;
+  const canRecordPayment = canCollect && invoice.outstanding > 0;
   const canRaiseCreditNote = isAdmin && canCollect && invoice.outstanding > 0;
   const isOverdue = !!invoice.dueDate && new Date(invoice.dueDate) < new Date();
   const canWriteOff = isAdmin && canCollect && invoice.status !== "paid" && invoice.outstanding > 0 && isOverdue;
@@ -1073,7 +1074,7 @@ export default function InvoiceDetailPage() {
 
       {!isLocked && (
         <div className="flex flex-wrap gap-2">
-          {canCollect && (
+          {canRecordPayment && (
             <Button onClick={() => setPaymentOpen(true)} className="gap-2">
               <PlusCircle className="w-4 h-4" />
               Record Payment
