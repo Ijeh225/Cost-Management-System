@@ -437,6 +437,11 @@ test before beginning any new large product feature.
   requiring a specific branch and left an August 19 briefing labelled Current.
   Medium `AI-006` is open: consolidated mode must be supported or prevented
   clearly, and stale content must be labelled after a refresh failure.
+- High `AI-007` is open: the controlled `E2E-20260903-document-upload.csv`
+  remains visibly linked to `E2ED260901` and labelled Searchable in the Lagos
+  Documents tab, but the AI exact filename query returns zero indexed
+  documents. Trace the searchable-document index and AI branch scope before
+  relying on the assistant for document retrieval.
 
 ### AI Stage-Owner Reconciliation
 
