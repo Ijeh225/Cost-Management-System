@@ -621,6 +621,10 @@ test before beginning any new large product feature.
   the selected Lagos branch was expected; All Branches correctly showed the
   one active owner and seven disabled historical accounts. The same dialog
   closes correctly with Escape on desktop.
+- Two consecutive empty Create User submissions retained one set of clear
+  field-level errors and did not create an account. A valid double-submit is
+  intentionally not exercised against production because it could create a
+  live account; it remains a separate UI test gap.
 
 ### Controlled Document Upload
 
