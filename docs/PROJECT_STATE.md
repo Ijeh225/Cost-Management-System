@@ -416,6 +416,13 @@ test before beginning any new large product feature.
   controlled Abuja job's correct client, Registered workflow state, unset
   stage data, and one cited record. Its cited-record control opened the
   matching `/containers/25` detail page. No business record was changed.
+- 2026-09-03: the exact schedule query `Show the payment schedule for
+  E2E-20260901 Scheduled Test Vendor.` failed. Instead of the controlled
+  completed ₦500 schedule, the assistant answered the generic
+  approved-schedules question and cited unrelated ₦25,000 schedule `tuykguh`.
+  High `AI-005` is open. Exact named payment-schedule requests must resolve to
+  the named record with matching status/amount evidence, or explicitly say
+  that no exact record was found.
 
 ### AI Stage-Owner Reconciliation
 
