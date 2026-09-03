@@ -423,6 +423,10 @@ test before beginning any new large product feature.
   High `AI-005` is open. Exact named payment-schedule requests must resolve to
   the named record with matching status/amount evidence, or explicitly say
   that no exact record was found.
+- The generic read-only transfer question passes: `Show recent bank transfers.`
+  returned the one controlled ₦1 transfer, its exact source and destination
+  E2E bank accounts, date, reference `E2E-20260903-BANK-TRANSFER-001`, and one
+  matching cited record.
 
 ### AI Stage-Owner Reconciliation
 
