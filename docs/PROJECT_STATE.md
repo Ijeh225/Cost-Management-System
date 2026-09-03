@@ -427,6 +427,10 @@ test before beginning any new large product feature.
   returned the one controlled ₦1 transfer, its exact source and destination
   E2E bank accounts, date, reference `E2E-20260903-BANK-TRANSFER-001`, and one
   matching cited record.
+- The AI outstanding-duty query passes against the live Duty Payments totals:
+  ₦2,000,401 assessed, the same amount paid, ₦0 outstanding, and zero unpaid
+  duty containers. The empty result appropriately has no individual record to
+  cite; direct Duty Payments verification shows the same values.
 
 ### AI Stage-Owner Reconciliation
 
