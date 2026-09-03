@@ -551,11 +551,31 @@ test before beginning any new large product feature.
   overhead remained unchanged. This confirms the tested delete path only
   removed the purpose-created E2E record.
 - `E2EA260901` was resubmitted for Full Container Review. A controlled Approve
-  attempt remained pending because the backend correctly enforces all required
-  release fields before closing a container: Documentation/PAAR, Transire,
-  Shipping/DO, Terminal/TDO, and Pullout. This is a valid readiness block, not
-  an approval-write failure. A success-path approval test requires a dedicated
-  completed E2E workflow.
+  attempt correctly remained pending until the backend's required release
+  fields existed: Documentation/PAAR, Transire, Shipping/DO, Terminal/TDO, and
+  Pullout. This is a valid readiness block, not an approval-write failure. The
+  same E2E record then completed those prerequisites and one final Approve
+  action succeeded, moved the queue entry to Approved, and closed the record.
+
+### Completed Controlled Workflow
+
+- 2026-09-03: the Abuja E2E container `E2EA260901` completed the live
+  operational acceptance path. It advanced from Registered through
+  Documentation to Duty Payment, then recorded `E2E-PAAR-260901` with a
+  Documentation owner and PAAR release date. Independent stage owners and
+  releases were saved for Transire, Shipping/DO, Terminal/TDO, and Pullout.
+- The final Full Container Review first refused approval while those releases
+  were absent, then succeeded as soon as all prerequisites existed. Approval
+  Queue immediately removed the item from Pending Review, showed Approved in
+  Recently Reviewed, and `/containers/25` now reports Closed. This confirms
+  the intended readiness guard and success path together.
+- The Pull-Out release action itself succeeded, but its workspace still showed
+  Active (0) and Released (0) immediately afterward. This is a fresh live
+  reproduction of existing `OPS-002`, not a failure of the stored release.
+- The generic container detail's Stage Control now displays the Documentation
+  owner after the independent stage owners were saved. It remains
+  non-authoritative legacy presentation covered by `OPS-001`; department
+  workspaces are the authoritative source for stage ownership.
 
 ### Department Workspaces
 
