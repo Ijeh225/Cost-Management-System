@@ -594,6 +594,17 @@ test before beginning any new large product feature.
   destination is ₦1 after its ₦1 Transfer In. The reference is retained as
   auditable test evidence.
 
+### Controlled Invoice Cancellation
+
+- 2026-09-03: created `INV-202609-003` only to verify the live invoice
+  Draft-to-Sent-to-Cancelled path against `E2ED260901`. The note clearly marks
+  it as an E2E-only invoice, not a customer receivable.
+- It remains visible as Cancelled for audit purposes. Accounts Receivable
+  correctly excludes it: Lagos still reports ₦0 outstanding and only the
+  original paid invoice in its eligible population. Due-date/overdue testing
+  remains a manual-browser acceptance item because the current browser driver
+  did not preserve a typed date value in the creation form.
+
 ### Department Workspaces
 
 - Architecture stores separate owner fields for Documentation, Transire,
