@@ -470,6 +470,9 @@ test before beginning any new large product feature.
   returns a validation error before inserting anything when the invoice is
   already paid or the requested amount exceeds the balance. The invoice-detail
   page no longer offers Record Payment at a zero balance.
+- The deployed application was checked read-only with paid `INV-202609-001`:
+  Record Payment is no longer rendered. No request was submitted and no live
+  financial data changed during this verification.
 - The regression test covers both an above-balance attempt and a second payment
   after settlement, confirming that neither should create an additional payment
   row. Full workspace typecheck plus the production frontend and API-server
