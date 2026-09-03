@@ -545,6 +545,12 @@ test before beginning any new large product feature.
   confirms the normal duplicate-payment UI route is blocked. It does not
   resolve `SCHED-001`: the existing ₦500 schedule payment is still absent from
   Financial Ledger and cash-flow reporting.
+- The existing controlled ₦1 scheduled-overhead payment is correctly linked at
+  the schedule level: Completed Schedules identifies `Source: Overhead Expense`,
+  names `SYSTEM E2E TEST OVERHEAD - DIRECT AND SCHEDULE - DO NOT PROCESS`, and
+  shows ₦1 requested, ₦1 paid, and a ₦0 balance. The remaining defect is the
+  shared scheduled-payment financial-ledger and cash-flow omission in
+  `SCHED-001`, not the overhead-to-schedule relationship.
 - The paid ₦300 E2E overhead has no Pay Now action. A separate labelled ₦1
   overhead deletion candidate was created and deleted after its explicit
   warning; it disappeared, the outstanding total returned to ₦0, and the paid
