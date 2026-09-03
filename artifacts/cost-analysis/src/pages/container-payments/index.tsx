@@ -558,7 +558,8 @@ export default function ContainerPaymentsPage() {
   const { data: searchResults = [], isLoading: searchLoading } = useContainerSearch(searchQuery);
   const { data: banks = [] } = useActiveBanks();
   const { data: sectionSettings } = useGetSettings();
-  const { data: recentPayments = [] } = useGetRecentContainerExpensePayments(15);
+  const { data: recentPayments, isLoading: recentPaymentsLoading } = useGetRecentContainerExpensePayments(15);
+  const visibleRecentPayments = recentPayments ?? [];
 
   const sn = (sectionSettings ?? {}) as Record<string, string>;
 
@@ -679,14 +680,19 @@ export default function ContainerPaymentsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3">
-              {recentPayments.length === 0 ? (
+              {recentPaymentsLoading ? (
+                <div className="flex flex-col items-center py-8 gap-2 text-muted-foreground">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <p className="text-xs text-center">Loading recent payments…</p>
+                </div>
+              ) : visibleRecentPayments.length === 0 ? (
                 <div className="flex flex-col items-center py-8 gap-2">
                   <CreditCard className="w-8 h-8 text-muted-foreground/20" />
                   <p className="text-xs text-muted-foreground text-center">No payments recorded yet</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
-                  {recentPayments.map((p: any) => {
+                  {visibleRecentPayments.map((p: any) => {
                     const sec = p.section as PaymentSection | null;
                     const style = sec ? SECTION_STYLE[sec] : null;
                     return (

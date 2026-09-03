@@ -156,6 +156,11 @@ const ALERT_CONFIG: Record<string, { icon: any; color: string; bg: string; borde
   action_overdue:               { icon: ShieldAlert, color: "text-rose-400",   bg: "bg-rose-400/10",   border: "border-rose-400/20",   label: "Action Overdue"          },
   empty_return_overdue:         { icon: Clock,       color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", label: "Empty Return Overdue"    },
   berthing_confirmation_needed: { icon: Anchor,      color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "Confirm Berthing"        },
+  transire_due:                { icon: Clock,       color: "text-violet-400", bg: "bg-violet-400/10", border: "border-violet-400/20", label: "Transire Due"            },
+  shipping_due:                { icon: Clock,       color: "text-cyan-400",   bg: "bg-cyan-400/10",   border: "border-cyan-400/20",   label: "Shipping / DO Due"      },
+  terminal_due:                { icon: Clock,       color: "text-amber-400",  bg: "bg-amber-400/10",  border: "border-amber-400/20",  label: "Terminal / TDO Due"     },
+  pullout_due:                 { icon: Clock,       color: "text-emerald-400",bg: "bg-emerald-400/10",border: "border-emerald-400/20",label: "Pull-Out Due"            },
+  exam_release_due:            { icon: Clock,       color: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/20",   label: "Final Release Due"      },
 };
 
 const WORKFLOW_TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string; border: string; label: string }> = {

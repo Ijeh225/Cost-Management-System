@@ -143,6 +143,7 @@ describe("PATCH /api/containers/:id — delivered date", () => {
     expect(res.status).toBe(200);
     expect(res.body.deliveredAt).toBeTruthy();
     expect(res.body.deliveredAtEstimated).toBe(false);
+    expect(res.body.deliveryStatus).toBe("delivered");
   });
 
   it("changes deliveredAt on an already-delivered container", async () => {

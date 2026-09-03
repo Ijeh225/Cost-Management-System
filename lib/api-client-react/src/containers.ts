@@ -169,6 +169,8 @@ export function useUpdateDeliveredAt() {
     onSuccess: (_data, { id }) => {
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
+      qc.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      qc.invalidateQueries({ queryKey: ["/api/containers"] });
     },
   });
 }

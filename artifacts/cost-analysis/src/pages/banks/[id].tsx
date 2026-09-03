@@ -367,13 +367,13 @@ export default function BankDetailPage() {
               />
             </div>
           </div>
-          {(from || to || typeFilter !== "all") && (
+          {(from || to || typeFilter !== "all" || search.trim()) && (
             <div className="mt-3 flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
                 className="text-xs text-muted-foreground h-7"
-                onClick={() => { setFrom(""); setTo(""); setTypeFilter("all"); }}
+                onClick={() => { setFrom(""); setTo(""); setTypeFilter("all"); setSearch(""); }}
               >
                 <RefreshCw className="w-3 h-3 mr-1" /> Clear filters
               </Button>

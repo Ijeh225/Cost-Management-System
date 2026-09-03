@@ -78,7 +78,13 @@ export default function ApprovalsPage() {
   const handleApprove = (containerId: number, section: string) => {
     approveSection.mutate({ id: containerId, section }, {
       onSuccess: () => {
+        queryClient.setQueryData(["/api/approvals"], (old: any[] | undefined) =>
+          old?.map(item => item.containerId === containerId && item.section === section
+            ? { ...item, status: "approved", updatedAt: new Date().toISOString() }
+            : item)
+        );
         queryClient.invalidateQueries({ queryKey: ["/api/approvals"] });
+        queryClient.refetchQueries({ queryKey: ["/api/approvals"] });
         queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
         toast({ title: `${SECTION_LABELS[section] ?? section} section approved and locked.` });
       },
@@ -90,7 +96,14 @@ export default function ApprovalsPage() {
     if (!rejectTarget) return;
     rejectSection.mutate({ id: rejectTarget.containerId, section: rejectTarget.section, data: { reason } }, {
       onSuccess: () => {
+        queryClient.setQueryData(["/api/approvals"], (old: any[] | undefined) =>
+          old?.map(item => item.containerId === rejectTarget.containerId && item.section === rejectTarget.section
+            ? { ...item, status: "rejected", rejectionReason: reason, updatedAt: new Date().toISOString() }
+            : item)
+        );
         queryClient.invalidateQueries({ queryKey: ["/api/approvals"] });
+        queryClient.refetchQueries({ queryKey: ["/api/approvals"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/my-tasks"] });
         toast({ title: "Section rejected.", description: "Staff will be able to edit and resubmit." });
         setRejectTarget(null);
       },

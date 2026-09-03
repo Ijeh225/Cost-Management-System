@@ -82,11 +82,7 @@ export type PaymentSchedulesResponse = {
     totalApproved: number;
     totalPaidToday: number;
     overdueSchedules: number;
-    today: number;
-    tomorrow: number;
-    upcoming: number;
-    completed: number;
-    cancelled: number;
+    bucketCounts: Record<PaymentScheduleBucket, number>;
   };
   byStaff: Array<{ userId: number | null; name: string; count: number; amount: number }>;
   byBranch: Array<{ branchId: number; name: string; count: number; amount: number }>;

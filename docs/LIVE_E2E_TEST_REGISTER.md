@@ -199,6 +199,19 @@ All failed and blocked items have a priority, impact, and required correction in
 the defect register below. The next work should be remediation and targeted
 re-tests, not additional uncontrolled production writes.
 
+## Remediation Follow-up: Steps 9-11 (2026-09-03)
+
+| Step | Status | Implementation and re-test requirement |
+| --- | --- | --- |
+| Step 9 | Implemented locally; deployment re-test required | Operational due alerts now have their own labels, repeat schedule decisions and repeat stage releases are rejected before another workflow-history record is emitted, My Tasks is task-driven rather than a general container list, Approval Queue updates and refetches immediately after a decision, and setting an actual delivery date synchronises delivery status and Dashboard/container queries. Historic duplicate history was retained for audit review. |
+| Step 10 | Implemented locally; UI re-test required | Statement reset clears date, type, and text search; schedule tab counts come from backend bucket counts for the active filtered scope; Container Payments distinguishes loading from no payments; and Overhead Expenses retains its prior verified data while refreshing. |
+| Step 11 | Controls implemented; live execution blocked | `docs/CONTROLLED_VERIFICATION_RUNBOOK.md` is the mandatory procedure for the overdue-invoice, reversible-duty, duplicate-bank-reference, document-retrieval, and non-production cross-role checks. Do not run those writes in production. |
+
+Local verification passed: workspace typecheck, frontend typecheck, API
+typecheck, API suite (70 tests), and whitespace validation. After deployment,
+repeat the affected workflow, UI, delivery-persistence, and controlled
+non-production checks before marking these defects closed.
+
 ## Completion Criteria
 
 The test is complete only when every execution item is marked Passed, Failed,

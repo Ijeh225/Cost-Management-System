@@ -852,6 +852,32 @@ before planning any further changes.
   passed, the API test suite passed (70 tests), and `git diff --check` passed.
   No live deployment verification has been recorded for these changes yet.
 
+### Remediation Follow-up: Steps 9-11 (2026-09-03)
+
+- **Step 9 - implemented locally; deployment re-test required.** Notifications
+  now recognise operational due-date alerts instead of falling back to a profit
+  label. Payment schedule decisions and stage releases reject repeat transitions
+  so one user action cannot create another history event. My Tasks now derives
+  its container list from open tasks assigned to the current user, and Approval
+  Queue updates its cached row immediately before refetching. Recording a
+  delivery date now also records delivery status and invalidates the Dashboard
+  and container lists; the API refuses to report success if the date is absent
+  from the returned persisted row.
+- **Step 10 - implemented locally; UI re-test required.** Bank statement Clear
+  filters now also clears the search term. Payment Schedule tab labels use
+  server-provided bucket counts from the same filtered scope. Container
+  Payments shows a loading state before an empty state, while Overhead Expenses
+  retains the last verified result during a refresh and labels the refresh.
+- **Step 11 - verification controls implemented; execution remains blocked.**
+  `docs/CONTROLLED_VERIFICATION_RUNBOOK.md` defines the required isolated
+  non-production records, reload checks, reversals, and role sessions. No
+  production write was made for the overdue-date, duty-reversal, duplicate-bank
+  reference, document-retrieval, or cross-role tests.
+- **Verification before commit:** workspace typecheck passed, frontend
+  typecheck passed, API typecheck passed, API suite passed (70 tests), and
+  `git diff --check` passed. Deployment and the controlled re-tests described
+  above remain required.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

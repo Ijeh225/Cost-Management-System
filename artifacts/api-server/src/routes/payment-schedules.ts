@@ -275,7 +275,7 @@ paymentSchedulesRouter.get("/payment-schedules", requireAuth, async (req: AuthRe
     } = req.query;
 
     const today = startOfDay(new Date());
-    let schedules = rows.map((r) => formatSchedule(r));
+    const allRows = rows.map((r) => formatSchedule(r));
     const queryBranch = branchId ? Number(branchId) : null;
     const min = amountMin ? Number(amountMin) : null;
     const max = amountMax ? Number(amountMax) : null;
@@ -283,8 +283,7 @@ paymentSchedulesRouter.get("/payment-schedules", requireAuth, async (req: AuthRe
     const to = dateTo ? addDays(startOfDay(new Date(String(dateTo))), 1) : null;
     const q = typeof search === "string" ? search.trim().toLowerCase() : "";
 
-    schedules = schedules.filter((s) => {
-      if (bucket && s.bucket !== bucket) return false;
+    const scopedSchedules = allRows.filter((s) => {
       if (requestedById && s.requestedById !== Number(requestedById)) return false;
       if (status && status !== "all" && s.status !== status) return false;
       if (vendor && !s.vendorBeneficiary.toLowerCase().includes(String(vendor).toLowerCase())) return false;
@@ -310,25 +309,32 @@ paymentSchedulesRouter.get("/payment-schedules", requireAuth, async (req: AuthRe
       return true;
     });
 
-    const allRows = rows.map((r) => formatSchedule(r));
+    // Tab counts should reflect the current filters, rather than only the tab
+    // being viewed. Apply the bucket after calculating the filtered scope.
+    const schedules = bucket
+      ? scopedSchedules.filter((schedule) => schedule.bucket === bucket)
+      : scopedSchedules;
+    const bucketCounts = {
+      today: scopedSchedules.filter((s) => s.bucket === "today").length,
+      tomorrow: scopedSchedules.filter((s) => s.bucket === "tomorrow").length,
+      upcoming: scopedSchedules.filter((s) => s.bucket === "upcoming").length,
+      completed: scopedSchedules.filter((s) => s.bucket === "completed").length,
+      cancelled: scopedSchedules.filter((s) => s.bucket === "cancelled").length,
+    };
     const summary = {
-      totalScheduledToday: allRows.filter((s) => s.bucket === "today").length,
-      totalPendingApproval: allRows.filter((s) => s.status === "pending_approval").length,
-      totalApproved: allRows.filter((s) => s.status === "approved" || s.status === "partially_approved").length,
-      totalPaidToday: allRows.filter((s) => {
+      totalScheduledToday: scopedSchedules.filter((s) => s.bucket === "today").length,
+      totalPendingApproval: scopedSchedules.filter((s) => s.status === "pending_approval").length,
+      totalApproved: scopedSchedules.filter((s) => s.status === "approved" || s.status === "partially_approved").length,
+      totalPaidToday: scopedSchedules.filter((s) => {
         if (s.status !== "paid" && s.status !== "completed") return false;
         const updated = startOfDay(new Date(s.updatedAt));
         return updated.getTime() === today.getTime();
       }).length,
-      overdueSchedules: allRows.filter((s) => s.overdueDays > 0).length,
-      today: allRows.filter((s) => s.bucket === "today").length,
-      tomorrow: allRows.filter((s) => s.bucket === "tomorrow").length,
-      upcoming: allRows.filter((s) => s.bucket === "upcoming").length,
-      completed: allRows.filter((s) => s.bucket === "completed").length,
-      cancelled: allRows.filter((s) => s.bucket === "cancelled").length,
+      overdueSchedules: scopedSchedules.filter((s) => s.overdueDays > 0).length,
+      bucketCounts,
     };
 
-    const byStaff = Object.values(allRows.reduce<Record<string, { userId: number | null; name: string; count: number; amount: number }>>((acc, s) => {
+    const byStaff = Object.values(scopedSchedules.reduce<Record<string, { userId: number | null; name: string; count: number; amount: number }>>((acc, s) => {
       const key = String(s.requestedById ?? "unknown");
       if (!acc[key]) acc[key] = { userId: s.requestedById, name: s.requestedByName, count: 0, amount: 0 };
       acc[key].count += 1;
@@ -336,7 +342,7 @@ paymentSchedulesRouter.get("/payment-schedules", requireAuth, async (req: AuthRe
       return acc;
     }, {})).sort((a, b) => b.count - a.count);
 
-    const byBranch = Object.values(allRows.reduce<Record<string, { branchId: number; name: string; count: number; amount: number }>>((acc, s) => {
+    const byBranch = Object.values(scopedSchedules.reduce<Record<string, { branchId: number; name: string; count: number; amount: number }>>((acc, s) => {
       const key = String(s.branchId);
       if (!acc[key]) acc[key] = { branchId: s.branchId, name: s.branchName ?? `Branch ${s.branchId}`, count: 0, amount: 0 };
       acc[key].count += 1;
@@ -475,7 +481,9 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/approve", requireAuth, asyn
     const id = Number(req.params.id);
     const schedule = await getScheduleForRequest(req, id);
     if (!schedule) return res.status(404).json({ error: "Payment schedule not found" });
-    if (FINAL_STATUSES.has(schedule.status)) return res.status(400).json({ error: "Cannot approve a final schedule" });
+    if (schedule.status !== "pending_approval") {
+      return res.status(409).json({ error: "Only a pending payment schedule can be approved." });
+    }
     const [updated] = await db.update(paymentSchedulesTable).set({
       status: "approved",
       amountApproved: schedule.amountRequested,
@@ -496,7 +504,9 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/partial-approve", requireAu
     const id = Number(req.params.id);
     const schedule = await getScheduleForRequest(req, id);
     if (!schedule) return res.status(404).json({ error: "Payment schedule not found" });
-    if (FINAL_STATUSES.has(schedule.status)) return res.status(400).json({ error: "Cannot approve a final schedule" });
+    if (schedule.status !== "pending_approval") {
+      return res.status(409).json({ error: "Only a pending payment schedule can be partially approved." });
+    }
     const approvedAmount = Number(req.body.approvedAmount);
     if (!Number.isFinite(approvedAmount) || approvedAmount <= 0) return res.status(400).json({ error: "approvedAmount must be greater than zero" });
     if (approvedAmount > toNumber(schedule.amountRequested)) return res.status(400).json({ error: "Approved amount cannot exceed requested amount" });
@@ -520,6 +530,9 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/reject", requireAuth, async
     const id = Number(req.params.id);
     const schedule = await getScheduleForRequest(req, id);
     if (!schedule) return res.status(404).json({ error: "Payment schedule not found" });
+    if (schedule.status !== "pending_approval") {
+      return res.status(409).json({ error: "Only a pending payment schedule can be rejected." });
+    }
     const comment = String(req.body.comment ?? req.body.reason ?? "").trim();
     if (!comment) return res.status(400).json({ error: "Rejection reason is required" });
     const [updated] = await db.update(paymentSchedulesTable).set({ status: "rejected", updatedAt: new Date() }).where(eq(paymentSchedulesTable.id, id)).returning();

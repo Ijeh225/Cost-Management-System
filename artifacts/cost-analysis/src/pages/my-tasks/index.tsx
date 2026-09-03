@@ -128,7 +128,7 @@ export default function MyTasksPage() {
           )}
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          {isAdmin ? "Container review requests and workflow management." : "Your assigned containers and section status."}
+          {isAdmin ? "Your assigned follow-ups. Use Approval Queue for all submitted section reviews." : "Your assigned follow-ups and section corrections."}
           {!isAdmin && mySections.length > 0 && (
             <span className="ml-2">
               Your sections:
@@ -356,19 +356,19 @@ export default function MyTasksPage() {
             </Card>
           )}
 
-          {/* Assigned Containers */}
+          {/* Containers attached to the user's open tasks only. */}
           <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <Box className="w-4 h-4" />
-                {isAdmin ? "All Containers" : "Assigned Containers"}
+                Task Containers
                 <Badge variant="outline" className="ml-1 text-xs">{assignedContainers.length}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {assignedContainers.length === 0 ? (
                 <div className="px-6 py-10 text-center text-muted-foreground text-sm">
-                  No containers assigned to you.
+                  No open tasks assigned to you.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -437,8 +437,8 @@ export default function MyTasksPage() {
           {isAdmin && containerReviews.length === 0 && regularApprovals.length === 0 && assignedContainers.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
               <ClipboardCheck className="w-12 h-12 opacity-20" />
-              <p className="text-sm font-medium">No pending reviews</p>
-              <p className="text-xs">Container review requests from staff will appear here.</p>
+              <p className="text-sm font-medium">No open tasks</p>
+              <p className="text-xs">Submitted section reviews are available in Approval Queue.</p>
             </div>
           )}
         </>

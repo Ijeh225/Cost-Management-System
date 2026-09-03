@@ -1500,6 +1500,9 @@ router.post("/containers/:id/stage-action", requireAuth, async (req: AuthRequest
       if (!expectedDate) { res.status(400).json({ error: "expectedDate required" }); return; }
       updates[fields.expected] = new Date(expectedDate);
     } else if (action === "mark_released") {
+      if (existing[fields.releasedAt as keyof typeof existing]) {
+        return res.status(409).json({ error: `${fields.label} has already been released.` });
+      }
       updates[fields.releasedAt] = finalDate ? new Date(finalDate) : new Date();
       notifMsg = `${fields.label} released for ${existing.containerNumber}`;
     } else if (action === "record_delay") {
@@ -1990,6 +1993,9 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (deliveredAt !== undefined) {
       updates.deliveredAt = deliveredAt ? new Date(deliveredAt as string) : null;
       updates.deliveredAtEstimated = false;
+      // A recorded actual delivery is the authoritative completion signal used
+      // by delivery analytics and the Dashboard. Keep both delivery fields in sync.
+      if (deliveredAt) updates.deliveryStatus = "delivered";
     }
     if (deliveryTime !== undefined) updates.deliveryTime = deliveryTime || null;
     if (deliveryLocation !== undefined) updates.deliveryLocation = deliveryLocation || null;
@@ -2084,6 +2090,9 @@ router.patch("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Delay Reason is required when the Next Action Due Date is overdue" });
     }
     const [updated] = await db.update(containersTable).set(updates).where(eq(containersTable.id, id)).returning();
+    if (deliveredAt && !updated.deliveredAt) {
+      return res.status(500).json({ error: "Delivery date could not be persisted. No completion status was changed." });
+    }
     const reasons: string[] = [];
     if (deliveredAt !== undefined) reasons.push(deliveredAt ? `Delivery date set to ${deliveredAt}` : "Delivery date cleared");
     if (truckNumber !== undefined && (existing.truckNumber ?? null) !== (truckNumber || null)) reasons.push(`Truck: ${truckNumber || "cleared"}`);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useBranchScope } from "@/components/layout/branch-provider";
 import {
@@ -485,6 +485,8 @@ export default function OverheadExpensesPage() {
     to: filterTo || undefined,
     status: statusTab !== "all" ? statusTab : undefined,
   });
+  const lastLoadedData = useRef<typeof data>(undefined);
+  if (data) lastLoadedData.current = data;
   const { data: categories = [] } = useGetExpenseCategories();
 
   const createMutation = useCreateOverheadExpense();
@@ -498,7 +500,10 @@ export default function OverheadExpensesPage() {
   const updateCatMutation = useUpdateExpenseCategory();
   const deleteCatMutation = useDeleteExpenseCategory();
 
-  const expenses = data?.expenses ?? [];
+  // Keep the previous verified result visible while filter changes are loading.
+  // A temporary empty array is not evidence that there are no expenses.
+  const displayedData = data ?? lastLoadedData.current;
+  const expenses = displayedData?.expenses ?? [];
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const visibleExpenses = normalizedSearch
     ? expenses.filter(e => [
@@ -512,10 +517,10 @@ export default function OverheadExpensesPage() {
         ...e.paymentSchedules.flatMap(s => [s.status, s.latestComment ?? ""]),
       ].some(value => value.toLowerCase().includes(normalizedSearch)))
     : expenses;
-  const totalOutstanding = data?.totalOutstanding ?? 0;
-  const totalPaidThisMonth = data?.totalPaidThisMonth ?? 0;
-  const byCategory = data?.byCategory ?? {};
-  const summaryReady = Boolean(data);
+  const totalOutstanding = displayedData?.totalOutstanding ?? 0;
+  const totalPaidThisMonth = displayedData?.totalPaidThisMonth ?? 0;
+  const byCategory = displayedData?.byCategory ?? {};
+  const summaryReady = Boolean(displayedData);
 
   const handleCreate = (v: ExpenseFormValues) => {
     createMutation.mutate({ category: v.category, description: v.description, amount: v.amount, reference: v.reference || undefined }, {

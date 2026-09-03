@@ -529,6 +529,7 @@ export default function PaymentSchedulesPage() {
 
   const schedules = data?.schedules ?? [];
   const summary = data?.summary;
+  const bucketCounts = (summary as (typeof summary & { bucketCounts?: Partial<Record<PaymentScheduleBucket, number>> }) | undefined)?.bucketCounts ?? {};
   const pendingAction = approve.isPending || partialApprove.isPending || reject.isPending || pay.isPending || complete.isPending || reschedule.isPending || cancel.isPending || comment.isPending;
   const hasActiveFilters = requestedById != null || status !== "all" || search.trim() !== "" || vendor.trim() !== "" || client.trim() !== "" || amountMin !== "" || amountMax !== "" || dateFrom !== "" || dateTo !== "";
 
@@ -673,7 +674,7 @@ export default function PaymentSchedulesPage() {
           <div className="flex flex-wrap items-center gap-2">
               {BUCKETS.map((item) => (
                 <button key={item.value} onClick={() => setBucket(item.value)} className={`h-8 whitespace-nowrap rounded-md border px-3 text-xs font-medium transition-colors ${bucket === item.value ? "border-primary/30 bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:border-border hover:bg-accent/40 hover:text-foreground"}`}>
-                  {item.label}
+                  {item.label} ({bucketCounts[item.value] ?? 0})
                 </button>
               ))}
           </div>

@@ -50,17 +50,18 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
           ...(profile.jobFunction === "operations" || hasWorkspace(profile, "terminal_manager") ? ["operations"] : []),
         ];
 
-    // Get containers assigned to this user (scoped by branch — Task #74)
+    // My Tasks is an assigned-work queue. A user's general container ownership
+    // belongs in the operational workspaces, not in this task list.
     const branchScope = getBranchScope(req);
-    const conds: any[] = [];
-    if (!isElevated) conds.push(eq(containersTable.assignedStaffId, user.id));
-    if (branchScope !== null) conds.push(eq(containersTable.branchId, branchScope));
-    const whereExpr = conds.length === 0 ? undefined : (conds.length === 1 ? conds[0] : and(...conds));
-    const baseSel = db.select().from(containersTable).$dynamic();
-    const filtered = whereExpr ? baseSel.where(whereExpr) : baseSel;
-    const assignedContainerRows = isElevated ? await filtered.limit(50) : await filtered;
-
-    const containerIds = assignedContainerRows.map(c => c.id);
+    const taskConditions = [eq(containerTasksTable.assignedStaffId, user.id)];
+    if (branchScope !== null) taskConditions.push(eq(containerTasksTable.branchId, branchScope));
+    const myContainerTasks = await db.select().from(containerTasksTable)
+      .where(taskConditions.length === 1 ? taskConditions[0] : and(...taskConditions));
+    const openTasks = myContainerTasks.filter(t => t.status !== "completed");
+    const containerIds = [...new Set(openTasks.map(t => t.containerId))];
+    const assignedContainerRows = containerIds.length > 0
+      ? await db.select().from(containersTable).where(inArray(containersTable.id, containerIds))
+      : [];
     const staffMap: Record<number, string> = {};
     const staffIds = [...new Set(assignedContainerRows.map(r => r.assignedStaffId).filter(Boolean))] as number[];
     if (staffIds.length > 0) {
@@ -112,11 +113,7 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
         }));
     }
 
-    // Get container tasks assigned to this user (pending, high-priority rejection follow-ups)
-    const myContainerTasks = await db.select().from(containerTasksTable)
-      .where(eq(containerTasksTable.assignedStaffId, user.id));
-    const correctionTasks = myContainerTasks
-      .filter(t => t.status !== "completed")
+    const correctionTasks = openTasks
       .map(t => ({
         id: t.id,
         containerId: t.containerId,
