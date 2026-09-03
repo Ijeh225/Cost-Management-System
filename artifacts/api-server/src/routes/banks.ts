@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable, dutyPaymentTransactionsTable } from "@workspace/db";
+import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable, dutyPaymentTransactionsTable, paymentSchedulePaymentsTable, paymentSchedulesTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
@@ -15,7 +15,7 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
     const filtered = activeOnly ? scoped.filter(b => b.isActive) : scoped;
 
     // Compute current balance for each bank from all transaction sources
-    const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows, fundAddRows, containerExpRows, dutyPaymentRows] = await Promise.all([
+    const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows, fundAddRows, containerExpRows, dutyPaymentRows, schedulePaymentRows] = await Promise.all([
       db.select({ bankId: invoicePaymentsTable.bankId, total: sum(invoicePaymentsTable.amount) })
         .from(invoicePaymentsTable).where(isNotNull(invoicePaymentsTable.bankId)).groupBy(invoicePaymentsTable.bankId),
       db.select({ bankId: clientDepositsTable.bankId, total: sum(clientDepositsTable.amount) })
@@ -32,6 +32,8 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
         .from(containerExpensePaymentsTable).where(isNotNull(containerExpensePaymentsTable.bankId)).groupBy(containerExpensePaymentsTable.bankId),
       db.select({ bankId: dutyPaymentTransactionsTable.bankId, total: sum(dutyPaymentTransactionsTable.amount) })
         .from(dutyPaymentTransactionsTable).where(isNotNull(dutyPaymentTransactionsTable.bankId)).groupBy(dutyPaymentTransactionsTable.bankId),
+      db.select({ bankId: paymentSchedulePaymentsTable.bankId, total: sum(paymentSchedulePaymentsTable.amount) })
+        .from(paymentSchedulePaymentsTable).where(isNotNull(paymentSchedulePaymentsTable.bankId)).groupBy(paymentSchedulePaymentsTable.bankId),
     ]);
 
     const toMap = (arr: { bankId: number | null; total: string | null }[]) =>
@@ -45,6 +47,7 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
     const fadMap       = toMap(fundAddRows);
     const cExpMap      = toMap(containerExpRows);
     const dutyMap      = toMap(dutyPaymentRows);
+    const scheduleMap  = toMap(schedulePaymentRows);
 
     const result = filtered.map(b => ({
       ...b,
@@ -56,7 +59,8 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
         (toutMap[b.id] ?? 0) -
         (expMap[b.id] ?? 0) -
         (cExpMap[b.id] ?? 0) -
-        (dutyMap[b.id] ?? 0),
+        (dutyMap[b.id] ?? 0) -
+        (scheduleMap[b.id] ?? 0),
     }));
 
     return res.json(result);
@@ -203,7 +207,7 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
     type RawTx = {
       id: string;
       date: Date;
-      type: "payment" | "deposit" | "transfer_in" | "transfer_out" | "fund_addition" | "expense_payment" | "container_expense_payment" | "duty_payment";
+      type: "payment" | "deposit" | "transfer_in" | "transfer_out" | "fund_addition" | "expense_payment" | "container_expense_payment" | "payment_schedule" | "duty_payment";
       description: string;
       reference: string | null;
       clientName: string | null;
@@ -472,7 +476,42 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
       }
     }
 
-    // 8. Customs duty payments debited from this bank
+    // 8. Standalone payment schedules debited from this bank
+    if (!typeFilter || typeFilter === "payment_schedule") {
+      const scheduleConditions: SQL<unknown>[] = [eq(paymentSchedulePaymentsTable.bankId, id)];
+      if (fromDate) scheduleConditions.push(gte(paymentSchedulePaymentsTable.paidAt, fromDate));
+      if (toDate)   scheduleConditions.push(lte(paymentSchedulePaymentsTable.paidAt, toDate));
+
+      const schedulePayments = await db
+        .select({
+          id: paymentSchedulePaymentsTable.id,
+          amount: paymentSchedulePaymentsTable.amount,
+          paidAt: paymentSchedulePaymentsTable.paidAt,
+          reference: paymentSchedulePaymentsTable.reference,
+          notes: paymentSchedulePaymentsTable.notes,
+          vendorBeneficiary: paymentSchedulesTable.vendorBeneficiary,
+          description: paymentSchedulesTable.description,
+        })
+        .from(paymentSchedulePaymentsTable)
+        .leftJoin(paymentSchedulesTable, eq(paymentSchedulePaymentsTable.scheduleId, paymentSchedulesTable.id))
+        .where(and(...scheduleConditions));
+
+      for (const schedulePayment of schedulePayments) {
+        txs.push({
+          id: `payment_schedule_${schedulePayment.id}`,
+          date: schedulePayment.paidAt,
+          type: "payment_schedule",
+          description: `Payment schedule - ${schedulePayment.vendorBeneficiary ?? "Vendor"}${schedulePayment.description ? ` (${schedulePayment.description})` : ""}${schedulePayment.notes ? ` (${schedulePayment.notes})` : ""}`,
+          reference: schedulePayment.reference ?? null,
+          clientName: null,
+          invoiceNumber: null,
+          debit: parseFloat(schedulePayment.amount),
+          credit: 0,
+        });
+      }
+    }
+
+    // 9. Customs duty payments debited from this bank
     if (!typeFilter || typeFilter === "duty_payment") {
       const dutyConditions: SQL<unknown>[] = [eq(dutyPaymentTransactionsTable.bankId, id)];
       if (fromDate) dutyConditions.push(gte(dutyPaymentTransactionsTable.paidAt, fromDate));

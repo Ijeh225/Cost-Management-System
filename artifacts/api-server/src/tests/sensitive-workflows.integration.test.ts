@@ -11,6 +11,7 @@ import {
   invoicePaymentsTable,
   invoicesTable,
   overheadExpensesTable,
+  paymentSchedulePaymentsTable,
   paymentSchedulesTable,
   shippingChargesTable,
   usersTable,
@@ -35,6 +36,7 @@ let otherBranchUser: Session;
 let protectedContainerId = 0;
 let paymentExpenseId = 0;
 let paymentScheduleId = 0;
+let standaloneScheduleId = 0;
 let collectionBankId = 0;
 let collectionInvoiceId = 0;
 let createdStaffUserId = 0;
@@ -171,6 +173,18 @@ beforeAll(async () => {
     status: "partially_approved",
   }).returning({ id: paymentSchedulesTable.id });
   paymentScheduleId = schedule.id;
+  const [standaloneSchedule] = await db.insert(paymentSchedulesTable).values({
+    branchId: branchAId,
+    scheduleDate: new Date(),
+    requestedById: adminId,
+    vendorBeneficiary: "Integration standalone vendor",
+    description: `Standalone schedule ${suffix}`,
+    amountRequested: "500",
+    amountApproved: "500",
+    amountPaid: "0",
+    status: "approved",
+  }).returning({ id: paymentSchedulesTable.id });
+  standaloneScheduleId = standaloneSchedule.id;
 });
 
 afterAll(async () => {
@@ -178,6 +192,8 @@ afterAll(async () => {
   if (collectionInvoiceId) await db.delete(invoicesTable).where(eq(invoicesTable.id, collectionInvoiceId));
   if (collectionBankId) await db.delete(banksTable).where(eq(banksTable.id, collectionBankId));
   if (paymentExpenseId) await db.delete(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, paymentExpenseId));
+  if (standaloneScheduleId) await db.delete(paymentSchedulePaymentsTable).where(eq(paymentSchedulePaymentsTable.scheduleId, standaloneScheduleId));
+  if (standaloneScheduleId) await db.delete(paymentSchedulesTable).where(eq(paymentSchedulesTable.id, standaloneScheduleId));
   if (paymentScheduleId) await db.delete(paymentSchedulesTable).where(eq(paymentSchedulesTable.id, paymentScheduleId));
   if (paymentExpenseId) await db.delete(overheadExpensesTable).where(eq(overheadExpensesTable.id, paymentExpenseId));
   if (protectedContainerId) await db.delete(containersTable).where(eq(containersTable.id, protectedContainerId));
@@ -361,5 +377,38 @@ describe("sensitive workflow integration", () => {
     const banks = await admin.agent.get("/api/banks");
     expect(banks.status).toBe(200);
     expect(banks.body.find((bank: { id: number }) => bank.id === collectionBankId)?.currentBalance).toBe(250);
+  });
+
+  it("records a standalone schedule payment in the bank, financial ledger, and cash flow", async () => {
+    const paid = await admin.agent
+      .patch(`/api/payment-schedules/${standaloneScheduleId}/pay`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ amount: 500, paymentMethod: "bank", bankId: collectionBankId, reference: "integration-standalone-schedule" });
+    expect(paid.status).toBe(200);
+    expect(paid.body.status).toBe("paid");
+    expect(paid.body.amountPaid).toBe(500);
+
+    const [payment] = await db.select().from(paymentSchedulePaymentsTable)
+      .where(eq(paymentSchedulePaymentsTable.scheduleId, standaloneScheduleId));
+    expect(payment).toBeDefined();
+    expect(Number(payment.amount)).toBe(500);
+    expect(payment.bankId).toBe(collectionBankId);
+
+    const statement = await admin.agent.get(`/api/banks/${collectionBankId}/transactions?type=payment_schedule`);
+    expect(statement.status).toBe(200);
+    expect(statement.body.transactions).toHaveLength(1);
+    expect(statement.body.transactions[0]).toMatchObject({ type: "payment_schedule", debit: 500, reference: "integration-standalone-schedule" });
+
+    const ledger = await admin.agent.get("/api/reports/financial-ledger");
+    expect(ledger.status).toBe(200);
+    expect(ledger.body.entries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ source: "Payment schedule", amount: 500, reference: "integration-standalone-schedule" }),
+    ]));
+
+    const cashFlow = await admin.agent.get("/api/reports/cashflow");
+    expect(cashFlow.status).toBe(200);
+    expect(cashFlow.body.outflows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "payment_schedule", amount: 500, reference: "integration-standalone-schedule" }),
+    ]));
   });
 });

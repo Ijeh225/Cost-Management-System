@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, dutyPaymentTransactionsTable, reportSubscriptionsTable, reportDeliveryLogsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
+import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, dutyPaymentTransactionsTable, paymentSchedulePaymentsTable, paymentSchedulesTable, reportSubscriptionsTable, reportDeliveryLogsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, isNull, sql, desc, type SQL, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, requireSuperAdmin, getBranchScope, AuthRequest } from "../lib/auth.js";
@@ -206,7 +206,7 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
 
     const fromBank = alias(banksTable, "financial_ledger_from_bank");
     const toBank = alias(banksTable, "financial_ledger_to_bank");
-    const [invoiceRows, dutyRows, overheadRows, containerRows, fundingRows, transferRows] = await Promise.all([
+    const [invoiceRows, dutyRows, overheadRows, containerRows, scheduleRows, fundingRows, transferRows] = await Promise.all([
       db.select({ id: invoicePaymentsTable.id, date: invoicePaymentsTable.paidAt, amount: invoicePaymentsTable.amount, method: invoicePaymentsTable.paymentMethod, reference: invoicePaymentsTable.reference, notes: invoicePaymentsTable.notes, invoiceNumber: invoicesTable.invoiceNumber, bankName: banksTable.name })
         .from(invoicePaymentsTable).leftJoin(invoicesTable, eq(invoicePaymentsTable.invoiceId, invoicesTable.id)).leftJoin(banksTable, eq(invoicePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(invoicePaymentsTable.paidAt, invoicePaymentsTable.branchId))),
       db.select({ id: dutyPaymentTransactionsTable.id, date: dutyPaymentTransactionsTable.paidAt, amount: dutyPaymentTransactionsTable.amount, method: dutyPaymentTransactionsTable.paymentMethod, reference: dutyPaymentTransactionsTable.reference, notes: dutyPaymentTransactionsTable.notes, containerId: containersTable.id, containerNumber: containersTable.containerNumber, bankName: banksTable.name })
@@ -215,6 +215,8 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
         .from(expensePaymentsTable).leftJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id)).leftJoin(banksTable, eq(expensePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(expensePaymentsTable.paidAt, expensePaymentsTable.branchId))),
       db.select({ id: containerExpensePaymentsTable.id, date: containerExpensePaymentsTable.paidAt, amount: containerExpensePaymentsTable.amount, method: containerExpensePaymentsTable.paymentMethod, reference: containerExpensePaymentsTable.reference, narration: containerExpensePaymentsTable.narration, section: containerExpensePaymentsTable.section, containerId: containersTable.id, containerNumber: containersTable.containerNumber, bankName: banksTable.name })
         .from(containerExpensePaymentsTable).leftJoin(containersTable, eq(containerExpensePaymentsTable.containerId, containersTable.id)).leftJoin(banksTable, eq(containerExpensePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(containerExpensePaymentsTable.paidAt, containerExpensePaymentsTable.branchId))),
+      db.select({ id: paymentSchedulePaymentsTable.id, date: paymentSchedulePaymentsTable.paidAt, amount: paymentSchedulePaymentsTable.amount, method: paymentSchedulePaymentsTable.paymentMethod, reference: paymentSchedulePaymentsTable.reference, notes: paymentSchedulePaymentsTable.notes, vendor: paymentSchedulesTable.vendorBeneficiary, description: paymentSchedulesTable.description, bankName: banksTable.name })
+        .from(paymentSchedulePaymentsTable).leftJoin(paymentSchedulesTable, eq(paymentSchedulePaymentsTable.scheduleId, paymentSchedulesTable.id)).leftJoin(banksTable, eq(paymentSchedulePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(paymentSchedulePaymentsTable.paidAt, paymentSchedulePaymentsTable.branchId))),
       db.select({ id: bankFundAdditionsTable.id, date: bankFundAdditionsTable.createdAt, amount: bankFundAdditionsTable.amount, reference: bankFundAdditionsTable.reference, narration: bankFundAdditionsTable.narration, bankName: banksTable.name })
         .from(bankFundAdditionsTable).leftJoin(banksTable, eq(bankFundAdditionsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(bankFundAdditionsTable.createdAt, bankFundAdditionsTable.branchId))),
       db.select({ id: bankTransfersTable.id, date: bankTransfersTable.createdAt, amount: bankTransfersTable.amount, reference: bankTransfersTable.reference, narration: bankTransfersTable.narration, fromBank: fromBank.name, toBank: toBank.name })
@@ -229,6 +231,7 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
       ...dutyRows.map(row => ({ id: `duty-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Customs duty payment", description: row.containerNumber ? `Duty payment for ${row.containerNumber}` : "Customs duty payment", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
       ...overheadRows.map(row => ({ id: `overhead-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Overhead payment", description: row.description ? `${row.category ?? "Overhead"}: ${row.description}` : "Overhead payment", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.notes || null, sourceLink: "/overhead-expenses" })),
       ...containerRows.map(row => ({ id: `container-expense-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Container disbursement", description: row.containerNumber ? `${row.section ?? "Operations"} for ${row.containerNumber}` : "Container disbursement", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.narration || null, sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
+      ...scheduleRows.map(row => ({ id: `payment-schedule-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Payment schedule", description: row.vendor ? `${row.vendor}${row.description ? `: ${row.description}` : ""}` : "Payment schedule", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: "/payment-schedules" })),
       ...fundingRows.map(row => ({ id: `funding-${row.id}`, date: row.date.toISOString(), direction: "in" as const, source: "Bank funding", description: row.narration || "Bank fund addition", amount: Number(row.amount ?? 0), method: "bank", bankName: row.bankName, reference: row.reference || null, sourceLink: "/bank-management" })),
       ...transferRows.flatMap(row => [
         { id: `transfer-out-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Bank transfer", description: `Transfer to ${row.toBank ?? "unassigned bank"}${row.narration ? `: ${row.narration}` : ""}`, amount: Number(row.amount ?? 0), method: "bank transfer", bankName: row.fromBank ?? null, reference: row.reference || null, sourceLink: "/bank-management" },
@@ -257,17 +260,19 @@ reportsRouter.get("/reports/financial-control-exceptions", requireAuth, requireB
       if (branchScope.id !== null) conditions.push(eq(branch, branchScope.id));
       return conditions;
     };
-    const [invoiceRows, dutyRows, overheadRows, containerRows] = await Promise.all([
+    const [invoiceRows, dutyRows, overheadRows, containerRows, scheduleRows] = await Promise.all([
       db.select({ id: invoicePaymentsTable.id, amount: invoicePaymentsTable.amount, paidAt: invoicePaymentsTable.paidAt, invoiceNumber: invoicesTable.invoiceNumber }).from(invoicePaymentsTable).leftJoin(invoicesTable, eq(invoicePaymentsTable.invoiceId, invoicesTable.id)).where(and(...bankMethodWithoutBank(invoicePaymentsTable.paidAt, invoicePaymentsTable.branchId, invoicePaymentsTable.paymentMethod, invoicePaymentsTable.bankId))),
       db.select({ id: dutyPaymentTransactionsTable.id, amount: dutyPaymentTransactionsTable.amount, paidAt: dutyPaymentTransactionsTable.paidAt, containerId: containersTable.id, containerNumber: containersTable.containerNumber }).from(dutyPaymentTransactionsTable).leftJoin(containersTable, eq(dutyPaymentTransactionsTable.containerId, containersTable.id)).where(and(...bankMethodWithoutBank(dutyPaymentTransactionsTable.paidAt, dutyPaymentTransactionsTable.branchId, dutyPaymentTransactionsTable.paymentMethod, dutyPaymentTransactionsTable.bankId))),
       db.select({ id: expensePaymentsTable.id, amount: expensePaymentsTable.amount, paidAt: expensePaymentsTable.paidAt, description: overheadExpensesTable.description }).from(expensePaymentsTable).leftJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id)).where(and(...bankMethodWithoutBank(expensePaymentsTable.paidAt, expensePaymentsTable.branchId, expensePaymentsTable.paymentMethod, expensePaymentsTable.bankId))),
       db.select({ id: containerExpensePaymentsTable.id, amount: containerExpensePaymentsTable.amount, paidAt: containerExpensePaymentsTable.paidAt, containerId: containersTable.id, containerNumber: containersTable.containerNumber }).from(containerExpensePaymentsTable).leftJoin(containersTable, eq(containerExpensePaymentsTable.containerId, containersTable.id)).where(and(...bankMethodWithoutBank(containerExpensePaymentsTable.paidAt, containerExpensePaymentsTable.branchId, containerExpensePaymentsTable.paymentMethod, containerExpensePaymentsTable.bankId))),
+      db.select({ id: paymentSchedulePaymentsTable.id, amount: paymentSchedulePaymentsTable.amount, paidAt: paymentSchedulePaymentsTable.paidAt, vendor: paymentSchedulesTable.vendorBeneficiary }).from(paymentSchedulePaymentsTable).leftJoin(paymentSchedulesTable, eq(paymentSchedulePaymentsTable.scheduleId, paymentSchedulesTable.id)).where(and(...bankMethodWithoutBank(paymentSchedulePaymentsTable.paidAt, paymentSchedulePaymentsTable.branchId, paymentSchedulePaymentsTable.paymentMethod, paymentSchedulePaymentsTable.bankId))),
     ]);
     const exceptions = [
       ...invoiceRows.map(row => ({ id: `invoice-${row.id}`, date: row.paidAt.toISOString(), source: "Invoice collection", description: row.invoiceNumber ? `Bank collection for ${row.invoiceNumber} has no bank account.` : "Bank collection has no bank account.", amount: Number(row.amount ?? 0), sourceLink: "/invoices" })),
       ...dutyRows.map(row => ({ id: `duty-${row.id}`, date: row.paidAt.toISOString(), source: "Customs duty payment", description: `Bank duty payment for ${row.containerNumber ?? "a container"} has no bank account.`, amount: Number(row.amount ?? 0), sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
       ...overheadRows.map(row => ({ id: `overhead-${row.id}`, date: row.paidAt.toISOString(), source: "Overhead payment", description: `Bank overhead payment${row.description ? ` for ${row.description}` : ""} has no bank account.`, amount: Number(row.amount ?? 0), sourceLink: "/overhead-expenses" })),
       ...containerRows.map(row => ({ id: `container-${row.id}`, date: row.paidAt.toISOString(), source: "Container disbursement", description: `Bank disbursement for ${row.containerNumber ?? "a container"} has no bank account.`, amount: Number(row.amount ?? 0), sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
+      ...scheduleRows.map(row => ({ id: `payment-schedule-${row.id}`, date: row.paidAt.toISOString(), source: "Payment schedule", description: `Bank payment schedule for ${row.vendor ?? "a vendor"} has no bank account.`, amount: Number(row.amount ?? 0), sourceLink: "/payment-schedules" })),
     ].sort((a, b) => b.date.localeCompare(a.date));
     return res.json({ branchScope, period: { from: range.from?.toISOString() ?? null, to: range.to?.toISOString() ?? null }, summary: { needsReview: exceptions.length, missingBankAccount: exceptions.length }, exceptions, evidenceNote: "These are data-quality exceptions: a payment was marked as bank but has no bank account recorded. They are not assumed fraud, debt, or a duplicated payment." });
   } catch (err) {
@@ -1124,32 +1129,42 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
 
     if (allCostIds.length > 0) {
       if (normalizedCostBasis === "actual_paid") {
-        // Use actual disbursements (container_expense_payments) instead of charge-table budgets
-        const disbPayments = await db
-          .select({
+        // Actual paid COGS is the union of container disbursements and the
+        // immutable customs-duty payment ledger. Duty belongs in Customs.
+        const [disbPayments, dutyPayments] = await Promise.all([
+          db.select({
             containerId: containerExpensePaymentsTable.containerId,
             section: containerExpensePaymentsTable.section,
             total: sql<string>`sum(${containerExpensePaymentsTable.amount})`,
           })
-          .from(containerExpensePaymentsTable)
-          .where(inArray(containerExpensePaymentsTable.containerId, allCostIds))
-          .groupBy(containerExpensePaymentsTable.containerId, containerExpensePaymentsTable.section);
+            .from(containerExpensePaymentsTable)
+            .where(inArray(containerExpensePaymentsTable.containerId, allCostIds))
+            .groupBy(containerExpensePaymentsTable.containerId, containerExpensePaymentsTable.section),
+          db.select({
+            containerId: dutyPaymentTransactionsTable.containerId,
+            total: sql<string>`sum(${dutyPaymentTransactionsTable.amount})`,
+          })
+            .from(dutyPaymentTransactionsTable)
+            .where(inArray(dutyPaymentTransactionsTable.containerId, allCostIds))
+            .groupBy(dutyPaymentTransactionsTable.containerId),
+        ]);
 
         const disbMap = new Map<number, Map<string, number>>();
         for (const r of disbPayments) {
           if (!disbMap.has(r.containerId)) disbMap.set(r.containerId, new Map());
           disbMap.get(r.containerId)!.set(r.section ?? "other", parseFloat(r.total ?? "0"));
         }
+        const dutyMap = new Map(dutyPayments.map(row => [row.containerId, parseFloat(row.total ?? "0")]));
 
         for (const id of allCostIds) {
           const secMap = disbMap.get(id) ?? new Map<string, number>();
           const s = secMap.get("shipping")   ?? 0;
-          const c = secMap.get("customs")    ?? 0;
+          const c = (secMap.get("customs") ?? 0) + (dutyMap.get(id) ?? 0);
           const t = secMap.get("terminal")   ?? 0;
           const d = secMap.get("delivery")   ?? 0;
           const o = secMap.get("operations") ?? 0;
           // Sum ALL section entries (including null-section → "other") so no payment is dropped
-          const total = [...secMap.values()].reduce((sum, v) => sum + v, 0);
+          const total = [...secMap.values()].reduce((sum, v) => sum + v, 0) + (dutyMap.get(id) ?? 0);
           const unallocated = total - (s + c + t + d + o);
           if (invoicedIdSet.has(id)) {
             costShipping   += s;
@@ -1423,6 +1438,32 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
       .where(ohConds.length > 0 ? and(...ohConds) : undefined)
       .orderBy(expensePaymentsTable.paidAt);
 
+    // OUTFLOWS - standalone payment schedules. Overhead-linked schedules are
+    // already represented by expense_payments and are intentionally excluded.
+    const schedulePayConds: SQL[] = [];
+    if (fromDate) schedulePayConds.push(gte(paymentSchedulePaymentsTable.paidAt, fromDate));
+    if (toDate)   schedulePayConds.push(lte(paymentSchedulePaymentsTable.paidAt, toDate));
+    if (bankIdNum !== null) schedulePayConds.push(eq(paymentSchedulePaymentsTable.bankId, bankIdNum));
+    if (branchScope.id !== null) schedulePayConds.push(eq(paymentSchedulePaymentsTable.branchId, branchScope.id));
+
+    const schedulePaymentRows = await db
+      .select({
+        id: paymentSchedulePaymentsTable.id,
+        amount: paymentSchedulePaymentsTable.amount,
+        paidAt: paymentSchedulePaymentsTable.paidAt,
+        reference: paymentSchedulePaymentsTable.reference,
+        notes: paymentSchedulePaymentsTable.notes,
+        bankId: paymentSchedulePaymentsTable.bankId,
+        bankName: banksTable.name,
+        vendorBeneficiary: paymentSchedulesTable.vendorBeneficiary,
+        description: paymentSchedulesTable.description,
+      })
+      .from(paymentSchedulePaymentsTable)
+      .leftJoin(paymentSchedulesTable, eq(paymentSchedulePaymentsTable.scheduleId, paymentSchedulesTable.id))
+      .leftJoin(banksTable, eq(paymentSchedulePaymentsTable.bankId, banksTable.id))
+      .where(schedulePayConds.length > 0 ? and(...schedulePayConds) : undefined)
+      .orderBy(paymentSchedulePaymentsTable.paidAt);
+
     // INFLOWS — bank fund additions
     const fundAddConds: SQL[] = [];
     if (fromDate) fundAddConds.push(gte(bankFundAdditionsTable.createdAt, fromDate));
@@ -1503,7 +1544,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
     type Txn = {
       id: string;
       date: string;
-      type: "invoice_payment" | "client_deposit" | "overhead_expense" | "fund_addition" | "container_expense" | "duty_payment" | "bank_transfer";
+      type: "invoice_payment" | "client_deposit" | "overhead_expense" | "payment_schedule" | "fund_addition" | "container_expense" | "duty_payment" | "bank_transfer";
       direction: "in" | "out";
       description: string;
       category: string | null;
@@ -1590,6 +1631,21 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
         bankId: r.bankId ?? null,
         bankName: r.bankName ?? null,
         reference: r.reference ?? null,
+        amount: parseFloat(r.amount as string ?? "0"),
+      });
+    }
+
+    for (const r of schedulePaymentRows) {
+      outflows.push({
+        id: `schedule-${r.id}`,
+        date: r.paidAt instanceof Date ? r.paidAt.toISOString() : String(r.paidAt),
+        type: "payment_schedule",
+        direction: "out",
+        description: `Payment schedule${r.vendorBeneficiary ? ` - ${r.vendorBeneficiary}` : ""}${r.description ? ` (${r.description})` : ""}`,
+        category: "Payment Schedule",
+        bankId: r.bankId ?? null,
+        bankName: r.bankName ?? null,
+        reference: r.reference ?? r.notes ?? null,
         amount: parseFloat(r.amount as string ?? "0"),
       });
     }
@@ -1700,6 +1756,12 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
       const prevCepConds: SQL[] = [lt(containerExpensePaymentsTable.paidAt, fromDate)];
       if (bankIdNum !== null) prevCepConds.push(eq(containerExpensePaymentsTable.bankId, bankIdNum));
       if (branchScope.id !== null) prevCepConds.push(eq(containerExpensePaymentsTable.branchId, branchScope.id));
+      const prevScheduleConds: SQL[] = [lt(paymentSchedulePaymentsTable.paidAt, fromDate)];
+      if (bankIdNum !== null) prevScheduleConds.push(eq(paymentSchedulePaymentsTable.bankId, bankIdNum));
+      if (branchScope.id !== null) prevScheduleConds.push(eq(paymentSchedulePaymentsTable.branchId, branchScope.id));
+      const prevDutyConds: SQL[] = [lt(dutyPaymentTransactionsTable.paidAt, fromDate)];
+      if (bankIdNum !== null) prevDutyConds.push(eq(dutyPaymentTransactionsTable.bankId, bankIdNum));
+      if (branchScope.id !== null) prevDutyConds.push(eq(dutyPaymentTransactionsTable.branchId, branchScope.id));
 
       const promises: Promise<Array<{ s: string }>>[] = [
         db.select({ s: sql<string>`coalesce(sum(${invoicePaymentsTable.amount}), 0)` })
@@ -1712,13 +1774,19 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
           .from(bankFundAdditionsTable).where(and(...prevFundAddConds)),
         db.select({ s: sql<string>`coalesce(sum(${containerExpensePaymentsTable.amount}), 0)` })
           .from(containerExpensePaymentsTable).where(and(...prevCepConds)),
+        db.select({ s: sql<string>`coalesce(sum(${paymentSchedulePaymentsTable.amount}), 0)` })
+          .from(paymentSchedulePaymentsTable).where(and(...prevScheduleConds)),
+        db.select({ s: sql<string>`coalesce(sum(${dutyPaymentTransactionsTable.amount}), 0)` })
+          .from(dutyPaymentTransactionsTable).where(and(...prevDutyConds)),
       ];
-      const [prevInvPay, prevDep, prevOh, prevFundAdd, prevCep] = await Promise.all(promises);
+      const [prevInvPay, prevDep, prevOh, prevFundAdd, prevCep, prevSchedule, prevDuty] = await Promise.all(promises);
       openingBalance += parseFloat(prevInvPay[0]?.s ?? "0");
       openingBalance += parseFloat(prevDep[0]?.s ?? "0");
       openingBalance -= parseFloat(prevOh[0]?.s ?? "0");
       openingBalance += parseFloat(prevFundAdd[0]?.s ?? "0");
       openingBalance -= parseFloat(prevCep[0]?.s ?? "0");
+      openingBalance -= parseFloat(prevSchedule[0]?.s ?? "0");
+      openingBalance -= parseFloat(prevDuty[0]?.s ?? "0");
 
       // Bank transfers (specific-bank view only)
       if (bankIdNum !== null) {
@@ -1812,7 +1880,7 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
       financialBasis: {
         budgeted: FINANCIAL_BASIS.budgeted,
         actualPaid: FINANCIAL_BASIS.actual_paid,
-        summary: "Budgeted charge amounts are compared with actual dated disbursement payments.",
+        summary: "Budgeted charge amounts are compared with actual dated container disbursements and customs-duty payments.",
       },
       rows: [] as ReturnType<typeof buildRow>[],
       aggregate: {
@@ -1858,16 +1926,29 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
     if (fromDate) payConds.push(gte(containerExpensePaymentsTable.paidAt, fromDate));
     if (toDate)   payConds.push(lte(containerExpensePaymentsTable.paidAt, toDate));
 
-    // Fetch disbursements grouped by container + section
-    const disbPayments = await db
-      .select({
+    const dutyConds: SQL[] = [inArray(dutyPaymentTransactionsTable.containerId, allIds)];
+    if (fromDate) dutyConds.push(gte(dutyPaymentTransactionsTable.paidAt, fromDate));
+    if (toDate)   dutyConds.push(lte(dutyPaymentTransactionsTable.paidAt, toDate));
+
+    // Fetch actual cash movements. Customs duty is separate from container
+    // disbursements, but it is still a Customs cost for the same container.
+    const [disbPayments, dutyPayments] = await Promise.all([
+      db.select({
         containerId: containerExpensePaymentsTable.containerId,
         section: containerExpensePaymentsTable.section,
         total: sql<string>`sum(${containerExpensePaymentsTable.amount})`,
       })
-      .from(containerExpensePaymentsTable)
-      .where(and(...payConds))
-      .groupBy(containerExpensePaymentsTable.containerId, containerExpensePaymentsTable.section);
+        .from(containerExpensePaymentsTable)
+        .where(and(...payConds))
+        .groupBy(containerExpensePaymentsTable.containerId, containerExpensePaymentsTable.section),
+      db.select({
+        containerId: dutyPaymentTransactionsTable.containerId,
+        total: sql<string>`sum(${dutyPaymentTransactionsTable.amount})`,
+      })
+        .from(dutyPaymentTransactionsTable)
+        .where(and(...dutyConds))
+        .groupBy(dutyPaymentTransactionsTable.containerId),
+    ]);
 
     // Build disbursements map: containerId -> section -> amount (only for payments within the date range)
     const disbMap = new Map<number, Map<string, number>>();
@@ -1875,6 +1956,7 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
       if (!disbMap.has(r.containerId)) disbMap.set(r.containerId, new Map());
       disbMap.get(r.containerId)!.set(r.section ?? "other", parseFloat(r.total ?? "0"));
     }
+    const dutyMap = new Map(dutyPayments.map(row => [row.containerId, parseFloat(row.total ?? "0")]));
 
     // Always include ALL containers matching the status filter.
     // Date filters only affect which disbursements are counted — not which containers appear.
@@ -1911,7 +1993,7 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
       const secDisb = disbMap.get(id) ?? new Map<string, number>();
       const disbursed: Record<string, number> = {
         shipping:   secDisb.get("shipping")   ?? 0,
-        customs:    secDisb.get("customs")    ?? 0,
+        customs:    (secDisb.get("customs") ?? 0) + (dutyMap.get(id) ?? 0),
         terminal:   secDisb.get("terminal")   ?? 0,
         delivery:   secDisb.get("delivery")   ?? 0,
         operations: secDisb.get("operations") ?? 0,
@@ -1924,7 +2006,7 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
       }
       const totalBudgeted = SECTIONS.reduce((s, sec) => s + budgeted[sec], 0);
       // Sum ALL entries in secDisb (including null-section → "other") so no payment is dropped
-      const totalDisbursed = [...secDisb.values()].reduce((s, v) => s + v, 0);
+      const totalDisbursed = [...secDisb.values()].reduce((s, v) => s + v, 0) + (dutyMap.get(id) ?? 0);
       return {
         containerId: id,
         containerNumber: c?.containerNumber ?? "",
@@ -1975,7 +2057,7 @@ reportsRouter.get("/reports/disbursement-reconciliation", requireAuth, requireBr
       financialBasis: {
         budgeted: FINANCIAL_BASIS.budgeted,
         actualPaid: FINANCIAL_BASIS.actual_paid,
-        summary: "Budgeted charge amounts are compared with actual dated disbursement payments.",
+        summary: "Budgeted charge amounts are compared with actual dated container disbursements and customs-duty payments.",
       },
       rows,
       aggregate: {
@@ -2209,12 +2291,17 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
     const overheadPaymentConds: SQL[] = [];
     if (fromDate) overheadPaymentConds.push(gte(expensePaymentsTable.paidAt, fromDate));
     if (toDate) overheadPaymentConds.push(lte(expensePaymentsTable.paidAt, toDate));
+    const dutyPaymentConds: SQL[] = [];
+    if (fromDate) dutyPaymentConds.push(gte(dutyPaymentTransactionsTable.paidAt, fromDate));
+    if (toDate) dutyPaymentConds.push(lte(dutyPaymentTransactionsTable.paidAt, toDate));
 
-    const [issuedInvoices, containerPayments, overheadPayments] = await Promise.all([
+    const [issuedInvoices, containerPayments, dutyPayments, overheadPayments] = await Promise.all([
       db.select({ branchId: invoicesTable.branchId, subtotal: invoicesTable.subtotal })
         .from(invoicesTable).where(and(...issuedInvoiceConds)),
       db.select({ branchId: containerExpensePaymentsTable.branchId, amount: containerExpensePaymentsTable.amount })
         .from(containerExpensePaymentsTable).where(containerPaymentConds.length ? and(...containerPaymentConds) : undefined),
+      db.select({ branchId: dutyPaymentTransactionsTable.branchId, amount: dutyPaymentTransactionsTable.amount })
+        .from(dutyPaymentTransactionsTable).where(dutyPaymentConds.length ? and(...dutyPaymentConds) : undefined),
       db.select({ branchId: expensePaymentsTable.branchId, amount: expensePaymentsTable.amount })
         .from(expensePaymentsTable).where(overheadPaymentConds.length ? and(...overheadPaymentConds) : undefined),
     ]);
@@ -2226,6 +2313,9 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
     };
     const revenueByBranch = sumByBranch(issuedInvoices.map(row => ({ branchId: row.branchId, amount: row.subtotal })));
     const costsByBranch = sumByBranch(containerPayments);
+    for (const payment of dutyPayments) {
+      costsByBranch.set(payment.branchId, (costsByBranch.get(payment.branchId) ?? 0) + parseFloat(payment.amount ?? "0"));
+    }
     const overheadsByBranch = sumByBranch(overheadPayments);
 
     // Outstanding receivables per branch (sum of unpaid invoice balances).
@@ -2310,7 +2400,7 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
         revenue: FINANCIAL_BASIS.accrual,
         containerCosts: FINANCIAL_BASIS.actual_paid,
         overheads: FINANCIAL_BASIS.actual_paid,
-        summary: "Issued invoice revenue less actual paid container costs and actual paid overhead.",
+        summary: "Issued invoice revenue less actual paid container costs, including customs duty, and actual paid overhead.",
       },
       generatedAt: new Date().toISOString(),
     });

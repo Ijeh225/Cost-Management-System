@@ -122,6 +122,20 @@ branch scopes have been reconciled.
 | CONT-RPT-001 | High | Container Print Summary | Printable reports for controlled containers `E2EA260901` (ID 25) and `E2EL260901` (ID 26) omit Container No., B/L, customer name, workflow stage, vessel, declaration, and size; show `Invalid Date`; and print the branch ID as a money row in every charge section (for example `Branch Id ₦3.00` for Abuja and `Branch Id ₦2.00` for Lagos), even when the container has no charges. | `containers/print/[id].tsx` reads camelCase API fields such as `containerNumber`, `blNumber`, `customerName`, `createdAt`, and `containerId`, but the live data uses a different field shape. Its charge-entry filter excludes `containerId` but not `branchId`, so the branch identifier is converted to currency and repeated in every section. | Define and use the typed API response shape or normalise it once before rendering. Read the actual field names for identity/date values and exclude all non-charge metadata, including branch ID, from charge tables. Add print-route tests for empty-charge and charged containers. | Produces unreliable operational and financial documents, exposes false cost lines, and prevents staff or clients from using container printouts as evidence. | Open |
 | DEL-001 | High | Container delivery completion and Dashboard | The Date Delivered editor on closed controlled container `E2EA260901` visibly accepts `2026-09-03` and returns `Delivery date saved.`, but the record shows `Not yet recorded` immediately after save and after a full reload. The scoped Abuja Dashboard consequently shows the container Closed but Completed 0. | The cause is not yet traced. The save action appears to report success without persisting or returning the delivery date. | Trace the delivery-date mutation from UI through the API and database. Return a validation error if no value is stored, refresh the detail query after success, and add an integration test that checks persistence plus Dashboard Completed and Delivery Tracking. | Blocks reliable completion reporting and delivery tracking, leaving staff with a misleading success confirmation. | Open |
 
+## Remediation Follow-up: Steps 1 and 3 (2026-09-03)
+
+| Item | Status | Implementation and re-test requirement |
+| --- | --- | --- |
+| INV-002 | Implemented locally; deployment re-check required | The API now locks the invoice and rejects both zero-outstanding and over-outstanding collections before an immutable payment row is written. The paid-invoice UI hides Record Payment. The historic N1 collection on `INV-202609-001` is preserved for an authorised accounting correction and is not auto-reversed. |
+| FIN-002 | Implemented locally; deployment re-check required | Actual-paid P&L, Branch Comparison, and Disbursement Reconciliation now include immutable customs-duty payment rows in Customs actual cost. Cash Flow also includes duty in both period activity and opening balance. |
+| SCHED-001 | Implemented locally for new payments; historic correction pending | A paid standalone schedule now writes an immutable `payment_schedule_payments` record and appears in Financial Ledger, Cash Flow, and the selected bank statement/balance. Overhead-linked schedules retain their existing expense-payment path to avoid double counting. The earlier controlled N500 schedule is not backfilled because its original bank/date/reference evidence must be confirmed first. |
+
+The API startup migration `payment_schedule_payments_v1` must run on the
+target environment. After deployment, create or use one newly approved,
+standalone controlled schedule with real recorded payment details and reconcile
+it across Payment Schedules, Bank Management, Financial Ledger, Cash Flow,
+P&L, Branch Comparison, and Disbursement Reconciliation.
+
 ## Live Test Cycle Closeout (2026-09-03)
 
 The live end-to-end test cycle is **complete with defects and documented

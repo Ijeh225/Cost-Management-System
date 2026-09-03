@@ -728,6 +728,26 @@ async function runStartupMigrations() {
       await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedules_overhead_expense_id_idx ON payment_schedules(overhead_expense_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS expense_payments_payment_schedule_id_idx ON expense_payments(payment_schedule_id)`);
     });
+    await runMigration("payment_schedule_payments_v1", async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS payment_schedule_payments (
+          id SERIAL PRIMARY KEY,
+          branch_id INTEGER NOT NULL REFERENCES branches(id),
+          schedule_id INTEGER NOT NULL REFERENCES payment_schedules(id) ON DELETE CASCADE,
+          amount NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+          payment_method TEXT NOT NULL DEFAULT 'cash',
+          bank_id INTEGER REFERENCES banks(id) ON DELETE RESTRICT,
+          reference TEXT,
+          notes TEXT,
+          paid_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          recorded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedule_payments_schedule_id_idx ON payment_schedule_payments(schedule_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedule_payments_branch_paid_idx ON payment_schedule_payments(branch_id, paid_at DESC)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS payment_schedule_payments_bank_idx ON payment_schedule_payments(bank_id) WHERE bank_id IS NOT NULL`);
+    });
     await runMigration("duty_payment_transactions_v1", async () => {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS duty_payment_transactions (

@@ -54,6 +54,25 @@ export const paymentScheduleEventsTable = pgTable("payment_schedule_events", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+/**
+ * Immutable payment facts for a standalone payment schedule. Schedules linked
+ * to an overhead expense continue to use expense_payments so one cash movement
+ * is never recorded twice.
+ */
+export const paymentSchedulePaymentsTable = pgTable("payment_schedule_payments", {
+  id: serial("id").primaryKey(),
+  branchId: integer("branch_id").notNull().references(() => branchesTable.id),
+  scheduleId: integer("schedule_id").notNull().references(() => paymentSchedulesTable.id, { onDelete: "cascade" }),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method").notNull().default("cash"),
+  bankId: integer("bank_id"),
+  reference: text("reference"),
+  notes: text("notes"),
+  paidAt: timestamp("paid_at").notNull().defaultNow(),
+  recordedBy: integer("recorded_by").references(() => usersTable.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const paymentScheduleDocumentsTable = pgTable("payment_schedule_documents", {
   id: serial("id").primaryKey(),
   branchId: integer("branch_id").notNull().references(() => branchesTable.id),
@@ -69,4 +88,5 @@ export const paymentScheduleDocumentsTable = pgTable("payment_schedule_documents
 export type PaymentSchedule = typeof paymentSchedulesTable.$inferSelect;
 export type InsertPaymentSchedule = typeof paymentSchedulesTable.$inferInsert;
 export type PaymentScheduleEvent = typeof paymentScheduleEventsTable.$inferSelect;
+export type PaymentSchedulePayment = typeof paymentSchedulePaymentsTable.$inferSelect;
 export type PaymentScheduleDocument = typeof paymentScheduleDocumentsTable.$inferSelect;

@@ -39,6 +39,7 @@ function TxTypeBadge({ type }: { type: BankTransaction["type"] }) {
     fund_addition:    { label: "Fund Addition",    cls: "bg-teal-500/10 text-teal-400 border-teal-500/30",   icon: ArrowDownLeft },
     expense_payment:           { label: "Expense Payment",    cls: "bg-red-500/10 text-red-400 border-red-500/30",       icon: ArrowUpRight },
     container_expense_payment: { label: "Container Expense",  cls: "bg-orange-500/10 text-orange-400 border-orange-500/30", icon: ArrowUpRight },
+    payment_schedule:          { label: "Payment Schedule",  cls: "bg-violet-500/10 text-violet-400 border-violet-500/30", icon: ArrowUpRight },
     duty_payment:              { label: "Duty Payment",       cls: "bg-rose-500/10 text-rose-400 border-rose-500/30",       icon: ArrowUpRight },
   }[type] ?? { label: type, cls: "bg-muted/60 text-muted-foreground border-border/40", icon: Receipt };
   const Icon = config.icon;
@@ -351,6 +352,8 @@ export default function BankDetailPage() {
                   <SelectItem value="fund_addition">Fund Additions</SelectItem>
                   <SelectItem value="expense_payment">Expense Payments</SelectItem>
                   <SelectItem value="container_expense_payment">Container Expenses</SelectItem>
+                  <SelectItem value="payment_schedule">Payment Schedules</SelectItem>
+                  <SelectItem value="duty_payment">Duty Payments</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -743,6 +743,36 @@ test before beginning any new large product feature.
 - Production testing must use read-only checks unless a reversible controlled
   test record is explicitly required and recorded.
 
+### Financial Integrity Remediation: Steps 1 and 3 (2026-09-03)
+
+- Step 1 was re-verified. The invoice-payment API locks the invoice and
+  recalculates its outstanding amount before a payment row can be inserted.
+  It rejects both a payment against a fully paid invoice and an amount greater
+  than the live outstanding balance. The paid-invoice UI also hides Record
+  Payment when no amount remains. The existing API regression coverage passed.
+- The historic `INV-202609-001` extra N1 collection remains intentionally
+  untouched. It is an already-posted production accounting fact, not a new
+  application behaviour. Reversing or reallocating it requires the real
+  customer/bank evidence and an explicitly authorised credit-note or correction
+  workflow; this release does not silently mutate live financial history.
+- Step 3 is implemented for future financial activity. The new immutable
+  `payment_schedule_payments` table records each paid standalone schedule with
+  its amount, payment date, method, bank, reference, notes, and recorder.
+  Overhead-linked schedules continue to use the existing expense-payment
+  ledger, preventing double counting.
+- Actual-paid P&L, Branch Comparison, Disbursement Reconciliation, Cash Flow,
+  Financial Ledger, and Bank Management now use the aligned sources: container
+  expense payments, customs-duty payments, overhead payments, and standalone
+  schedule payments. Duty now contributes to Customs actual cost.
+- Startup migration `payment_schedule_payments_v1` creates the new table and
+  indexes once when the deployed API starts. A production deployment and a
+  controlled new standalone-schedule payment re-test are still required before
+  marking `FIN-002` and `SCHED-001` fully live-verified.
+- The historic paid N500 controlled schedule remains without a reconstructed
+  immutable payment row because its actual payment evidence was not supplied to
+  this change. Its correction must use the actual bank, date, reference, and
+  approval evidence; no financial details are invented.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

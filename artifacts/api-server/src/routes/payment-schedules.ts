@@ -11,6 +11,7 @@ import {
   overheadExpensesTable,
   paymentScheduleDocumentsTable,
   paymentScheduleEventsTable,
+  paymentSchedulePaymentsTable,
   paymentSchedulesTable,
   usersTable,
   workflowNotificationsTable,
@@ -583,6 +584,20 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/pay", requireAuth, async (r
         });
         await tx.update(overheadExpensesTable).set({ paidAt, updatedAt: new Date() })
           .where(and(eq(overheadExpensesTable.id, updatedSchedule.overheadExpenseId), sql`${overheadExpensesTable.paidAt} IS NULL`));
+      } else {
+        // Standalone schedules are still real cash movements. Keep them in a
+        // dedicated immutable ledger instead of inventing an overhead expense.
+        await tx.insert(paymentSchedulePaymentsTable).values({
+          branchId: updatedSchedule.branchId,
+          scheduleId: updatedSchedule.id,
+          amount: String(amount),
+          paymentMethod,
+          bankId: paymentMethod === "bank" ? bankId : null,
+          reference: req.body.reference?.trim() || null,
+          notes: req.body.notes || req.body.comment || `Paid via payment schedule #${updatedSchedule.id}`,
+          paidAt,
+          recordedBy: req.user?.id ?? null,
+        });
       }
       await tx.insert(paymentScheduleEventsTable).values({
         branchId: updatedSchedule.branchId, scheduleId: updatedSchedule.id, type: "paid",
