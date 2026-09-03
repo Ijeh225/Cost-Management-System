@@ -634,6 +634,15 @@ test before beginning any new large product feature.
   `Missing required fields (CON or B/Lading)`, reported 0 records ready, and
   disabled the import action. No container was created.
 
+### Delivery Persistence Blocker
+
+- 2026-09-03: the Date Delivered field on closed controlled container
+  `E2EA260901` visibly accepted `2026-09-03` and returned `Delivery date
+  saved.`, but the record reverted to `Not yet recorded` after each reload.
+- The scoped Abuja Dashboard still lists the record as Closed while reporting
+  Completed 0. This is documented as high-priority `DEL-001` and blocks the
+  final delivered-stage acceptance check until the save path is corrected.
+
 ### Department Workspaces
 
 - Architecture stores separate owner fields for Documentation, Transire,
