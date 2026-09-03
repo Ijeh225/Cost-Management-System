@@ -8,6 +8,7 @@ import {
 import { eq, desc, sum, inArray, gte, and, isNull, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, verifyPassword, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
+import { isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 
 export const clientsRouter = Router();
 
@@ -36,7 +37,7 @@ clientsRouter.get("/clients", requireAuth, async (req: AuthRequest, res) => {
     }
     const outstandingByClient = new Map<number, number>();
     for (const inv of allInvoices) {
-      if (!inv.clientId) continue;
+      if (!inv.clientId || !isInvoiceFinanciallyActive(inv.status)) continue;
       const total = parseFloat(inv.total ?? "0");
       const paid = (paymentsByInvoice.get(inv.id) ?? []).reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
       const outstanding = Math.max(0, total - paid);
@@ -69,7 +70,7 @@ clientsRouter.post("/clients", requireAuth, async (req: AuthRequest, res) => {
       if (isNaN(parsed) || parsed < 0) return res.status(400).json({ error: "Agreed clearing rate must be a non-negative number" });
       rate = String(parsed);
     }
-    const createBranchId = resolveCreateBranch(req, res);
+    const createBranchId = resolveCreateBranch(req, res, req.body.branchId);
     if (createBranchId == null) return;
     const [client] = await db.insert(clientsTable).values({
       name: name.trim(), contactName, contactEmail, contactPhone, address, notes,
@@ -287,8 +288,10 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
       const payments = paymentsByInvoice.get(inv.id) ?? [];
       const paid = payments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
       const outstanding = Math.max(0, total - paid);
-      totalInvoiced += total;
-      totalCollected += paid;
+      if (isInvoiceFinanciallyActive(inv.status)) {
+        totalInvoiced += total;
+        totalCollected += paid;
+      }
       const items = (itemsByInvoice.get(inv.id) ?? []).map(it => ({
         id: it.id,
         containerId: it.containerId ?? null,
@@ -377,7 +380,7 @@ clientsRouter.get("/clients/:id/receivables", requireAuth, async (req: AuthReque
 
 clientsRouter.post("/clients/bulk", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const targetBranchId = resolveCreateBranch(req, res);
+    const targetBranchId = resolveCreateBranch(req, res, req.body.branchId);
     if (targetBranchId === null) return;
     const { rows } = req.body as { rows: Array<{ name: string; contactName?: string; contactEmail?: string; contactPhone?: string; address?: string; notes?: string }> };
     if (!Array.isArray(rows)) return res.status(400).json({ error: "rows must be an array" });
@@ -605,7 +608,9 @@ clientsRouter.post("/client-deposits/:id/allocate", requireBranchAdminOrAbove, a
     if (!userCanAccessBranch(req, inv.branchId)) {
       return res.status(403).json({ error: "Invoice belongs to another branch." });
     }
-    if (inv.status === "draft") return res.status(400).json({ error: "Cannot allocate a deposit against a draft invoice" });
+    if (!isInvoiceFinanciallyActive(inv.status)) {
+      return res.status(400).json({ error: "Cannot allocate a deposit against a draft, cancelled, or written-off invoice" });
+    }
 
     const existingPayments = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
     const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
@@ -690,15 +695,14 @@ clientsRouter.get("/clients/:id/wallet-summary", requireAuth, async (req: AuthRe
       .where(depositFilter);
     const totalDeposited = parseFloat(depositSumRow?.total ?? "0");
 
-    const invoiceFilter = resetAt
-      ? and(eq(invoicesTable.clientId, clientId), gte(invoicesTable.createdAt, resetAt))
-      : eq(invoicesTable.clientId, clientId);
-
-    const [invoiceSumRow] = await db
-      .select({ total: sum(invoicesTable.total) })
+    const walletInvoices = await db.select({ total: invoicesTable.total, status: invoicesTable.status })
       .from(invoicesTable)
-      .where(invoiceFilter);
-    const totalExpenses = parseFloat(invoiceSumRow?.total ?? "0");
+      .where(resetAt
+        ? and(eq(invoicesTable.clientId, clientId), gte(invoicesTable.createdAt, resetAt))
+        : eq(invoicesTable.clientId, clientId));
+    const totalExpenses = walletInvoices
+      .filter((invoice) => isInvoiceFinanciallyActive(invoice.status))
+      .reduce((total, invoice) => total + parseFloat(invoice.total ?? "0"), 0);
 
     // Unallocated deposits: amount - allocatedAmount > 0 (ignore wallet reset for unallocated — show true picture)
     const allDeposits = await db

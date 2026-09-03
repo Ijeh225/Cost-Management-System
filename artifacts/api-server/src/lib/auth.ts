@@ -297,17 +297,33 @@ export function getBranchScope(req: AuthRequest): number | null {
 }
 
 /**
- * Used by POST/create endpoints. If the resolved scope is null (super admin
- * in All-Branches mode), responds with 400 and returns false. Otherwise
- * returns the resolved branch id.
+ * Used by POST/create endpoints. A normal user must create in their resolved
+ * branch. A Super Admin in All-Branches mode must explicitly choose a branch
+ * supplied by the form; the value is still checked against their authority.
  */
-export function resolveCreateBranch(req: AuthRequest, res: Response): number | null {
+export function resolveCreateBranch(req: AuthRequest, res: Response, requestedBranchId?: unknown): number | null {
   const scope = getBranchScope(req);
-  if (scope == null) {
+  const requested = requestedBranchId == null || requestedBranchId === "" ? null : Number(requestedBranchId);
+  if (requested != null && (!Number.isInteger(requested) || requested <= 0)) {
+    res.status(400).json({ error: "Select a valid branch to create this record." });
+    return null;
+  }
+  if (scope != null) {
+    if (requested != null && requested !== scope) {
+      res.status(403).json({ error: "The selected branch does not match your active authorised branch." });
+      return null;
+    }
+    return scope;
+  }
+  if (requested == null) {
     res.status(400).json({ error: "Select a specific branch to create records." });
     return null;
   }
-  return scope;
+  if (!userCanAccessBranch(req, requested)) {
+    res.status(403).json({ error: "You are not authorised to create records in the selected branch." });
+    return null;
+  }
+  return requested;
 }
 
 export async function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {

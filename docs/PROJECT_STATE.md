@@ -832,6 +832,26 @@ before planning any further changes.
   the current browser limitation, and cross-role restrictions with separate
   non-production accounts.
 
+### Remediation Follow-up: Steps 6-8 (2026-09-03)
+
+- **Step 6 completion - implemented locally; deployment reconciliation
+  required.** The shared eligible-invoice rule now excludes draft, cancelled,
+  and written-off invoices from Dashboard invoice totals, Client list/detail
+  totals, and wallet liability while retaining their audit records. Reconcile
+  Dashboard, AR, Client Statement, Wallet, and P&L under one branch scope.
+- **Step 7 - implemented locally; branch creation re-test required.** Create
+  endpoints honour an explicitly selected authorised branch for a Super Admin
+  in All Branches mode, reject invalid or unauthorised selections, and Client,
+  Container, and Invoice forms initialise to the effective active branch.
+- **Step 8 - implemented locally; AI evidence re-test required.** AI reads
+  stage-specific owners, uses eligible finance invoices, identifies its
+  notification view as Workflow History, performs exact schedule lookup,
+  blocks false All Branches briefing refreshes, and searches indexed filenames
+  as well as document text. Re-test `AI-002` through `AI-007` after deploy.
+- **Verification before commit:** API typecheck passed, frontend typecheck
+  passed, the API test suite passed (70 tests), and `git diff --check` passed.
+  No live deployment verification has been recorded for these changes yet.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/layout/auth-provider";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import { useBranches } from "@/pages/branches";
 import { Loader2, PlusCircle, Package, AlertCircle, ChevronRight } from "lucide-react";
 
@@ -44,6 +45,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
   const { data: allInvoices } = useListInvoices();
   const createMutation = useCreateInvoice();
   const { isSuperAdmin, user } = useAuth();
+  const { activeBranchId } = useBranchScope();
   const { data: branches } = useBranches({ enabled: isSuperAdmin });
   const [branchId, setBranchId] = useState<number | null>(user?.branchId ?? null);
 
@@ -55,8 +57,9 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
       setVatRate("");
       setDueDate("");
       setNotes("");
+      setBranchId(isSuperAdmin ? (activeBranchId === "all" ? null : activeBranchId) : (user?.branchId ?? null));
     }
-  }, [open, preselectedClientId, preselectedContainerId]);
+  }, [open, preselectedClientId, preselectedContainerId, isSuperAdmin, activeBranchId, user?.branchId]);
 
   const containers = clientDetails?.containers ?? [];
 
@@ -106,8 +109,12 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
       toast({ title: "Invoice created", description: inv.invoiceNumber });
       onClose();
       setLocation(`/invoices/${inv.id}`);
-    } catch {
-      toast({ variant: "destructive", title: "Failed to create invoice" });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to create invoice",
+        description: error instanceof Error ? error.message : "Check the selected branch and linked records, then try again.",
+      });
     }
   };
 

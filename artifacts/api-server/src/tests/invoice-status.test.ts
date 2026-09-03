@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getEffectiveInvoiceStatus, isInvoiceCollectable, isInvoiceEditable } from "../lib/invoice-status.js";
+import { getEffectiveInvoiceStatus, isInvoiceCollectable, isInvoiceEditable, isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 
 const now = new Date("2026-09-01T12:00:00Z");
 
@@ -32,5 +32,13 @@ describe("invoice status rules", () => {
     expect(isInvoiceCollectable("draft")).toBe(false);
     expect(isInvoiceCollectable("cancelled")).toBe(false);
     expect(isInvoiceCollectable("written_off")).toBe(false);
+  });
+
+  it("keeps audit-only invoices out of financial totals", () => {
+    expect(isInvoiceFinanciallyActive("sent")).toBe(true);
+    expect(isInvoiceFinanciallyActive("paid")).toBe(true);
+    expect(isInvoiceFinanciallyActive("draft")).toBe(false);
+    expect(isInvoiceFinanciallyActive("cancelled")).toBe(false);
+    expect(isInvoiceFinanciallyActive("written_off")).toBe(false);
   });
 });

@@ -49,10 +49,10 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
       setBranchId(
         isSuperAdmin && activeBranchId === "all"
           ? null
-          : (user?.branchId ?? null),
+          : (isSuperAdmin ? Number(activeBranchId) : (user?.branchId ?? null)),
       );
     }
-  }, [open]);
+  }, [open, activeBranchId, isSuperAdmin, user?.branchId]);
 
   const [form, setForm] = useState({
     customerName: "",

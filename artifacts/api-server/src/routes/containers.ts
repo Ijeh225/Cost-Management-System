@@ -3,6 +3,7 @@ import { db, containersTable, usersTable, clientsTable, shippingChargesTable, cu
 import { eq, ilike, or, sql, desc, and, inArray, ne, isNotNull } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
+import { isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 import { getFinalWorkflowMissingStages } from "../lib/workflow-readiness.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
 import { isContainerPhysicallyInTerminal } from "../lib/operational-definitions.js";
@@ -573,7 +574,7 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
     if (!resolvedCustomerName) {
       return res.status(400).json({ error: "customerName is required (or pick a client to auto-fill)" });
     }
-    const createBranchId = resolveCreateBranch(req, res);
+    const createBranchId = resolveCreateBranch(req, res, req.body.branchId);
     if (createBranchId == null) return;
     if (parsedClientId) {
       const [linkedClient] = await db.select({ branchId: clientsTable.branchId })
@@ -2762,6 +2763,7 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     let totalInvoiced = 0;
     let totalCollected = 0;
     for (const inv of allInvoices) {
+      if (!isInvoiceFinanciallyActive(inv.status)) continue;
       const total = parseFloat(inv.total ?? "0");
       const paid = (paymentsByInvoice.get(inv.id) ?? []).reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
       totalInvoiced += total;

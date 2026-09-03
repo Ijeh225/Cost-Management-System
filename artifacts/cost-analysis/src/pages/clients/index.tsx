@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBranches } from "@/pages/branches";
 import { BranchChip } from "@/components/layout/branch-chip";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import {
   Users, Plus, Search, Loader2, Trash2, ChevronRight, ChevronDown,
   Phone, Mail, MapPin, Building2, Upload, Download, AlertTriangle,
@@ -127,6 +128,7 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
   const { toast } = useToast();
   const createMutation = useCreateClient();
   const { isSuperAdmin, user } = useAuth();
+  const { activeBranchId } = useBranchScope();
   const { data: branches } = useBranches({ enabled: isSuperAdmin });
   const [branchId, setBranchId] = useState<number | null>(user?.branchId ?? null);
   const [form, setForm] = useState({
@@ -134,6 +136,11 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
   });
 
   const set = (patch: Partial<typeof form>) => setForm(f => ({ ...f, ...patch }));
+
+  useEffect(() => {
+    if (!open) return;
+    setBranchId(isSuperAdmin ? (activeBranchId === "all" ? null : activeBranchId) : (user?.branchId ?? null));
+  }, [open, isSuperAdmin, activeBranchId, user?.branchId]);
 
   const handleSubmit = async () => {
     if (!form.name.trim()) return;
@@ -147,8 +154,12 @@ function CreateClientDialog({ open, onClose }: { open: boolean; onClose: () => v
       toast({ title: "Client created" });
       setForm({ name: "", contactName: "", contactEmail: "", contactPhone: "", address: "", notes: "", agreedClearingRate: "" });
       onClose();
-    } catch {
-      toast({ variant: "destructive", title: "Failed to create client" });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to create client",
+        description: error instanceof Error ? error.message : "Check the selected branch and try again.",
+      });
     }
   };
 

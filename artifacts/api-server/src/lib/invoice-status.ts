@@ -56,3 +56,8 @@ export function isInvoiceEditable(status: string) {
 export function isInvoiceCollectable(status: string) {
   return !["draft", "cancelled", "written_off"].includes(status);
 }
+
+/** Financial summaries exclude audit-only invoice lifecycle states. */
+export function isInvoiceFinanciallyActive(status: string) {
+  return isInvoiceCollectable(status);
+}

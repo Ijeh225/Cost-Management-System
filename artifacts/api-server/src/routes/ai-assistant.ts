@@ -31,7 +31,7 @@ import {
   usersTable,
   workflowNotificationsTable,
 } from "@workspace/db";
-import { and, desc, eq, gte, ilike, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, ne, or } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
 import { formatProactiveBriefing, generateProactiveBriefing } from "../lib/ai-proactive-intelligence.js";
 import { AiProviderUsage, generateEvidenceBasedAnswer, isNaturalLanguageRoutingConfigured, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
@@ -44,6 +44,9 @@ import { analyseAccountantControls } from "../lib/ai-accountant-intelligence.js"
 import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 import { hasAuthority, resolveAccessProfile } from "../lib/authorization.js";
+import { stageOwnerFor } from "../lib/department-stage-owners.js";
+import { isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
+import { isWorkflowNotificationVisibleToUser } from "./notifications.js";
 
 export const aiAssistantRouter = Router();
 
@@ -279,6 +282,20 @@ function documentSearchQuery(question: string): string {
     .slice(0, 160);
 }
 
+function documentJobIdentifier(question: string): string | null {
+  const candidates = question.toUpperCase().match(/\b[A-Z0-9-]{6,32}\b/g) ?? [];
+  return candidates.find((candidate) => /[A-Z]/.test(candidate) && /\d/.test(candidate)) ?? null;
+}
+
+function paymentScheduleLookupQuery(question: string): string | null {
+  const quoted = question.match(/["']([^"']{2,160})["']/);
+  if (quoted?.[1]) return quoted[1].trim();
+  const match = question.match(/\b(?:payment\s+schedule|schedule)\s+(?:for|named|called)\s+(.{2,160})$/i);
+  if (match?.[1]) return match[1].trim();
+  const identifier = question.match(/\b(?:payment\s+schedule|schedule)\s+(.{2,160})$/i)?.[1]?.trim() ?? "";
+  return /\d/.test(identifier) ? identifier : null;
+}
+
 function interpretQuestionFallback(question: string): CopilotIntent {
   const understanding = understandAiQuestion(question);
   const normalised = question.trim().toLowerCase();
@@ -288,8 +305,9 @@ function interpretQuestionFallback(question: string): CopilotIntent {
   if (investigationPlan) {
     return { toolId: "container_delay_investigation", args: { containerNumber: investigationPlan.containerNumber }, label: investigationPlan.title.toLowerCase() };
   }
-  if (containerMatch && /\b(documents?|docs?|files?|attachments?)\b/.test(normalised)) {
-    return { toolId: "container_documents", args: { containerNumber: containerMatch }, label: "container documents" };
+  if (/\b(documents?|docs?|files?|attachments?)\b/.test(normalised)) {
+    const jobIdentifier = containerMatch ?? documentJobIdentifier(question);
+    if (jobIdentifier) return { toolId: "container_documents", args: { containerNumber: jobIdentifier }, label: "container documents" };
   }
   if (/(document|file|attachment)/.test(normalised) && /(search|find|contain|mention|show|list)/.test(normalised)) {
     const query = documentSearchQuery(question);
@@ -327,7 +345,10 @@ function interpretQuestionFallback(question: string): CopilotIntent {
   if (/(duty|customs).*(payment|paid|outstanding|unpaid|assessment)|(payment|paid|outstanding|unpaid|assessment).*(duty|customs)/.test(normalised)) return { toolId: "duty_payments_overview", args: {}, label: "duty payments overview" };
   if (/(wallet|deposit|deposits).*(client|unallocated|allocation|credit)|(client|unallocated|allocation|credit).*(wallet|deposit|deposits)/.test(normalised)) return { toolId: "client_wallet_overview", args: {}, label: "client wallet activity" };
   if (/(outstanding|overdue|receivable|invoice|collected).*(invoice|balance|payment|receivable)|(invoice|balance|payment|receivable).*(outstanding|overdue|receivable|collected)/.test(normalised)) return { toolId: "receivables_overview", args: {}, label: "receivables overview" };
-  if (/(approved|pending).*(schedule|payment)|(schedule|payment).*(approved|awaiting)/.test(normalised)) return { toolId: "approved_payment_schedules", args: {}, label: "approved payment schedules" };
+  if (/\b(payment\s+schedule|schedule)\b/.test(normalised)) {
+    const query = paymentScheduleLookupQuery(question);
+    return { toolId: "approved_payment_schedules", args: query ? { query } : {}, label: query ? "payment schedule lookup" : "approved payment schedules" };
+  }
   if (/(overhead|expense).*(outstanding|paid|payment|balance)|(outstanding|paid|payment|balance).*(overhead|expense)/.test(normalised)) return { toolId: "overhead_overview", args: {}, label: "overhead overview" };
   if (/(financial|profit|loss|revenue|cashflow|cash flow).*(report|month|summary)|(report|month|summary).*(financial|profit|loss|revenue|cashflow|cash flow)/.test(normalised)) return { toolId: "monthly_financial_report", args: {}, label: "monthly financial report" };
   if (/(bank|ledger).*(reconciliation|reconcile|balance)|(reconciliation|reconcile).*(bank|ledger)/.test(normalised)) return { toolId: "bank_ledger_reconciliation", args: {}, label: "bank ledger reconciliation" };
@@ -373,7 +394,8 @@ async function interpretNaturalLanguageQuestion(question: string, req: AuthReque
     });
     if (selection.kind === "tool" && TOOL_IDS.has(selection.toolId)) {
       const tool = TOOL_CATALOG.find((candidate) => candidate.id === selection.toolId)!;
-      return { toolId: tool.id, args: selection.args, label: tool.title.toLowerCase() };
+      const query = tool.id === "approved_payment_schedules" ? paymentScheduleLookupQuery(question) : null;
+      return { toolId: tool.id, args: query ? { ...selection.args, query } : selection.args, label: tool.title.toLowerCase() };
     }
     if (selection.kind === "tool") {
       return { toolId: null, args: {}, label: "unsupported question", clarification: "I could not safely match that request to an approved read-only tool." };
@@ -759,6 +781,8 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     const rows = scoped(await db.select({
       id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber,
       customerName: containersTable.customerName, status: containersTable.status,
+      transireStageOwner: containersTable.transireStageOwner, shippingStageOwner: containersTable.shippingStageOwner,
+      terminalStageOwner: containersTable.terminalStageOwner, pulloutStageOwner: containersTable.pulloutStageOwner,
       expectedTransireDate: containersTable.expectedTransireDate, transireReleasedAt: containersTable.transireReleasedAt,
       expectedDoDate: containersTable.expectedDoDate, doReleasedAt: containersTable.doReleasedAt,
       expectedTdoDate: containersTable.expectedTdoDate, tdoReleasedAt: containersTable.tdoReleasedAt,
@@ -803,7 +827,11 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       result.records = stageRows.slice(0, limit).map((row) => {
         const data = row as unknown as Record<string, unknown>;
         const state = stageState(data, stage);
-        return { title: row.containerNumber, detail: `${row.customerName} - ${state === "released" ? `released ${dateOnly(data[STAGE_TOOL_FIELDS[stage].released] as Date)}` : `expected ${dateOnly(data[STAGE_TOOL_FIELDS[stage].expected] as Date)}`}.`, href: `${route}?container=${row.id}`, badges: [state] };
+        const owner = stageOwnerFor(stage, row);
+        const timing = state === "released"
+          ? `released ${dateOnly(data[STAGE_TOOL_FIELDS[stage].released] as Date)}`
+          : `expected ${dateOnly(data[STAGE_TOOL_FIELDS[stage].expected] as Date)}`;
+        return { title: row.containerNumber, detail: `${row.customerName} - ${timing}; owner ${owner ?? "Unassigned"}.`, href: `${route}?container=${row.id}`, badges: [state] };
       });
       result.sources = stageRows.slice(0, limit).map((row) => ({ type: "container", id: row.id, label: row.containerNumber, href: `/containers/${row.id}` }));
     }
@@ -814,7 +842,9 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     const now = new Date();
     const rows = scoped(await db.select({
       id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber,
-      customerName: containersTable.customerName, stageOwner: containersTable.stageOwner,
+      customerName: containersTable.customerName,
+      transireStageOwner: containersTable.transireStageOwner, shippingStageOwner: containersTable.shippingStageOwner,
+      terminalStageOwner: containersTable.terminalStageOwner, pulloutStageOwner: containersTable.pulloutStageOwner,
       expectedTransireDate: containersTable.expectedTransireDate, transireReleasedAt: containersTable.transireReleasedAt,
       expectedDoDate: containersTable.expectedDoDate, doReleasedAt: containersTable.doReleasedAt,
       expectedTdoDate: containersTable.expectedTdoDate, tdoReleasedAt: containersTable.tdoReleasedAt,
@@ -822,15 +852,15 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     }).from(containersTable), branchId);
     const result = createResult(toolId, tool.title, branchId);
     const delayed = rows.flatMap((row) => [
-      { stage: "Transire", expected: row.expectedTransireDate, actual: row.transireReleasedAt },
-      { stage: "Shipping / DO", expected: row.expectedDoDate, actual: row.doReleasedAt },
-      { stage: "Terminal / TDO", expected: row.expectedTdoDate, actual: row.tdoReleasedAt },
-      { stage: "Pullout", expected: row.expectedPulloutDate, actual: row.pulloutReleasedAt },
+      { stage: "Transire", stageId: "transire_processing", expected: row.expectedTransireDate, actual: row.transireReleasedAt },
+      { stage: "Shipping / DO", stageId: "shipping", expected: row.expectedDoDate, actual: row.doReleasedAt },
+      { stage: "Terminal / TDO", stageId: "terminal", expected: row.expectedTdoDate, actual: row.tdoReleasedAt },
+      { stage: "Pullout", stageId: "pull_out", expected: row.expectedPulloutDate, actual: row.pulloutReleasedAt },
     ].filter((stage) => stage.expected && !stage.actual && new Date(stage.expected).getTime() < now.getTime()).map((stage) => ({ ...stage, row })));
     result.facts = [{ label: "Delayed stage actions", value: delayed.length }, { label: "Affected containers", value: new Set(delayed.map((item) => item.row.id)).size }];
     result.records = delayed.slice(0, limit).map((item) => ({
       title: `${item.row.containerNumber} - ${item.stage}`,
-      detail: `Expected ${dateOnly(item.expected)}. Owner: ${item.row.stageOwner ?? "Unassigned"}.`,
+      detail: `Expected ${dateOnly(item.expected)}. Owner: ${stageOwnerFor(item.stageId, item.row) ?? "Unassigned"}.`,
       href: `/containers/${item.row.id}`,
       badges: ["Overdue", item.stage],
     }));
@@ -920,6 +950,8 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber,
       customerName: containersTable.customerName, blNumber: containersTable.blNumber, vessel: containersTable.vessel,
       status: containersTable.status, eta: containersTable.eta, berthed: containersTable.berthed, stageOwner: containersTable.stageOwner,
+      transireStageOwner: containersTable.transireStageOwner, shippingStageOwner: containersTable.shippingStageOwner,
+      terminalStageOwner: containersTable.terminalStageOwner, pulloutStageOwner: containersTable.pulloutStageOwner,
       delayReason: containersTable.delayReason, paarNumber: containersTable.paarNumber, paarDelayReason: containersTable.paarDelayReason,
       expectedTransireDate: containersTable.expectedTransireDate, transireDelayReason: containersTable.transireDelayReason,
       transireReleasedAt: containersTable.transireReleasedAt, expectedDoDate: containersTable.expectedDoDate,
@@ -937,7 +969,11 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     result.facts = [
       { label: "Customer", value: row.customerName }, { label: "Workflow status", value: row.status.replace(/_/g, " ") },
       { label: "ETA", value: dateOnly(row.eta) }, { label: "Berthing", value: row.berthed ? "Confirmed" : "Not confirmed" },
-      { label: "Stage owner", value: row.stageOwner ?? "Unassigned" }, { label: "PAAR", value: row.paarNumber ?? "Not recorded" },
+      { label: "Berthing owner", value: row.stageOwner ?? "Unassigned" }, { label: "PAAR", value: row.paarNumber ?? "Not recorded" },
+      { label: "Transire owner", value: stageOwnerFor("transire_processing", row) ?? "Unassigned" },
+      { label: "Shipping owner", value: stageOwnerFor("shipping", row) ?? "Unassigned" },
+      { label: "Terminal owner", value: stageOwnerFor("terminal", row) ?? "Unassigned" },
+      { label: "Pullout owner", value: stageOwnerFor("pull_out", row) ?? "Unassigned" },
       ...(row.delayReason ? [{ label: "General delay reason", value: row.delayReason }] : []),
       ...(row.paarDelayReason ? [{ label: "PAAR delay reason", value: row.paarDelayReason }] : []),
       ...(row.transireDelayReason ? [{ label: "Transire delay reason", value: row.transireDelayReason }] : []),
@@ -1126,11 +1162,12 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       message: workflowNotificationsTable.message, actionUrl: workflowNotificationsTable.actionUrl,
       containerId: workflowNotificationsTable.containerId, containerNumber: workflowNotificationsTable.containerNumber,
       targetUserId: workflowNotificationsTable.targetUserId, isRead: workflowNotificationsTable.isRead, createdAt: workflowNotificationsTable.createdAt,
-    }).from(workflowNotificationsTable).orderBy(desc(workflowNotificationsTable.createdAt)).limit(250), branchId)
-      .filter((row) => row.targetUserId == null || row.targetUserId === req.user!.id);
+    }).from(workflowNotificationsTable).orderBy(desc(workflowNotificationsTable.createdAt)).limit(500), branchId)
+      .filter((row) => hasAuthority(req.user!.accessProfile, "admin") || isWorkflowNotificationVisibleToUser(row, req.user!.accessProfile, req.user!.id));
     const result = createResult(toolId, tool.title, branchId);
     const typeCounts = notifications.reduce<Record<string, number>>((counts, notification) => { counts[notification.type] = (counts[notification.type] ?? 0) + 1; return counts; }, {});
     result.facts = [
+      { label: "Notification view", value: "Workflow History" },
       { label: "Visible notifications", value: notifications.length },
       { label: "Unread notifications", value: notifications.filter((notification) => !notification.isRead).length },
       { label: "Notification types", value: Object.keys(typeCounts).length },
@@ -1144,6 +1181,10 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       type: "workflow_notification", id: notification.id, label: notification.containerNumber || notification.type,
       href: notification.actionUrl || (notification.containerId ? `/containers/${notification.containerId}` : "/notifications"),
     }));
+    result.notes = [
+      "This summary uses the same branch-scoped Workflow History records and visibility rules as Notifications.",
+      "System Alerts are calculated separately by the Notifications page and are not included in these workflow-history totals.",
+    ];
     return result;
   }
 
@@ -1151,7 +1192,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     const invoices = scoped(await db.select({
       id: invoicesTable.id, branchId: invoicesTable.branchId, invoiceNumber: invoicesTable.invoiceNumber,
       total: invoicesTable.total, dueDate: invoicesTable.dueDate, status: invoicesTable.status,
-    }).from(invoicesTable).where(ne(invoicesTable.status, "written_off")), branchId);
+    }).from(invoicesTable), branchId).filter((invoice) => isInvoiceFinanciallyActive(invoice.status));
     const payments = invoices.length ? await db.select({ invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount })
       .from(invoicePaymentsTable).where(inArray(invoicePaymentsTable.invoiceId, invoices.map((invoice) => invoice.id))) : [];
     const paidByInvoice = new Map<number, number>();
@@ -1180,13 +1221,37 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
   }
 
   if (toolId === "approved_payment_schedules") {
+    const requestedQuery = typeof body.query === "string" ? body.query.trim().toLocaleLowerCase() : "";
     const schedules = scoped(await db.select({
       id: paymentSchedulesTable.id, branchId: paymentSchedulesTable.branchId, vendorBeneficiary: paymentSchedulesTable.vendorBeneficiary,
       description: paymentSchedulesTable.description, amountRequested: paymentSchedulesTable.amountRequested,
       amountApproved: paymentSchedulesTable.amountApproved, amountPaid: paymentSchedulesTable.amountPaid,
       status: paymentSchedulesTable.status, scheduleDate: paymentSchedulesTable.scheduleDate,
-    }).from(paymentSchedulesTable), branchId).filter((schedule) => ["approved", "partially_approved", "paid"].includes(schedule.status) && toAmount(schedule.amountApproved) > toAmount(schedule.amountPaid));
+    }).from(paymentSchedulesTable), branchId).filter((schedule) => {
+      if (requestedQuery) {
+        return schedule.vendorBeneficiary.toLocaleLowerCase() === requestedQuery || schedule.description.toLocaleLowerCase() === requestedQuery;
+      }
+      return ["approved", "partially_approved", "paid"].includes(schedule.status) && toAmount(schedule.amountApproved) > toAmount(schedule.amountPaid);
+    });
     const result = createResult(toolId, tool.title, branchId);
+    if (requestedQuery) {
+      result.title = "Payment Schedule Lookup";
+      result.facts = [
+        { label: "Exact schedule matches", value: schedules.length },
+        { label: "Search term", value: requestedQuery },
+      ];
+      result.records = schedules.slice(0, limit).map((schedule) => ({
+        title: schedule.vendorBeneficiary,
+        detail: `${schedule.description} - ${schedule.status.replace(/_/g, " ")}; requested ${money(toAmount(schedule.amountRequested))}; approved ${money(toAmount(schedule.amountApproved))}; paid ${money(toAmount(schedule.amountPaid))}.`,
+        href: `/payment-schedules?selected=${schedule.id}`,
+        badges: [schedule.status.replace(/_/g, " ")],
+      }));
+      result.sources = schedules.slice(0, limit).map((schedule) => ({ type: "payment_schedule", id: schedule.id, label: schedule.vendorBeneficiary, href: `/payment-schedules?selected=${schedule.id}` }));
+      result.notes = [
+        schedules.length ? "Only exact vendor or description matches are returned; no unrelated schedule was substituted." : "No exact payment schedule was found in your authorised branch scope.",
+      ];
+      return result;
+    }
     result.facts = [
       { label: "Schedules awaiting payment", value: schedules.length },
       { label: "Approved payment balance", value: money(schedules.reduce((sum, schedule) => sum + Math.max(0, toAmount(schedule.amountApproved) - toAmount(schedule.amountPaid)), 0)) },
@@ -1270,13 +1335,15 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
 
   if (toolId === "payment_summary") {
     const period = getReportPeriod(body);
-    const [allInvoicePayments, allDeposits, allOverheadPayments, allContainerPayments] = await Promise.all([
+    const [allInvoices, allInvoicePayments, allDeposits, allOverheadPayments, allContainerPayments] = await Promise.all([
+      db.select({ id: invoicesTable.id, branchId: invoicesTable.branchId, status: invoicesTable.status }).from(invoicesTable),
       db.select({ id: invoicePaymentsTable.id, branchId: invoicePaymentsTable.branchId, invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount, paidAt: invoicePaymentsTable.paidAt }).from(invoicePaymentsTable),
       db.select({ id: clientDepositsTable.id, branchId: clientDepositsTable.branchId, clientId: clientDepositsTable.clientId, amount: clientDepositsTable.amount, createdAt: clientDepositsTable.createdAt }).from(clientDepositsTable),
       db.select({ id: expensePaymentsTable.id, branchId: expensePaymentsTable.branchId, expenseId: expensePaymentsTable.expenseId, amount: expensePaymentsTable.amount, paidAt: expensePaymentsTable.paidAt }).from(expensePaymentsTable),
       db.select({ id: containerExpensePaymentsTable.id, branchId: containerExpensePaymentsTable.branchId, containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount, paidAt: containerExpensePaymentsTable.paidAt }).from(containerExpensePaymentsTable),
     ]);
-    const invoicePayments = scoped(allInvoicePayments, branchId).filter((payment) => occursWithin(payment.paidAt, period));
+    const eligibleInvoiceIds = new Set(scoped(allInvoices, branchId).filter((invoice) => isInvoiceFinanciallyActive(invoice.status)).map((invoice) => invoice.id));
+    const invoicePayments = scoped(allInvoicePayments, branchId).filter((payment) => eligibleInvoiceIds.has(payment.invoiceId) && occursWithin(payment.paidAt, period));
     const deposits = scoped(allDeposits, branchId).filter((deposit) => occursWithin(deposit.createdAt, period));
     const overheadPayments = scoped(allOverheadPayments, branchId).filter((payment) => occursWithin(payment.paidAt, period));
     const containerPayments = scoped(allContainerPayments, branchId).filter((payment) => occursWithin(payment.paidAt, period));
@@ -1318,7 +1385,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     const paidByInvoice = new Map<number, number>();
     payments.forEach((payment) => paidByInvoice.set(payment.invoiceId, (paidByInvoice.get(payment.invoiceId) ?? 0) + toAmount(payment.amount)));
     const rows = clients.map((client) => {
-      const clientInvoices = invoices.filter((invoice) => invoice.clientId === client.id && invoice.status !== "written_off");
+      const clientInvoices = invoices.filter((invoice) => invoice.clientId === client.id && isInvoiceFinanciallyActive(invoice.status));
       const invoiced = clientInvoices.reduce((sum, invoice) => sum + toAmount(invoice.total), 0);
       const collected = clientInvoices.reduce((sum, invoice) => sum + (paidByInvoice.get(invoice.id) ?? 0), 0);
       const depositsForClient = deposits.filter((deposit) => deposit.clientId === client.id);
@@ -1354,8 +1421,9 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       db.select({ id: expensePaymentsTable.id, branchId: expensePaymentsTable.branchId, expenseId: expensePaymentsTable.expenseId, amount: expensePaymentsTable.amount, paidAt: expensePaymentsTable.paidAt }).from(expensePaymentsTable),
       db.select({ id: containerExpensePaymentsTable.id, branchId: containerExpensePaymentsTable.branchId, containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount, paidAt: containerExpensePaymentsTable.paidAt }).from(containerExpensePaymentsTable),
     ]);
-    const invoices = scoped(allInvoices, branchId).filter((row) => occursWithin(row.createdAt, period) && row.status !== "written_off");
-    const collections = scoped(allInvoicePayments, branchId).filter((row) => occursWithin(row.paidAt, period));
+    const invoices = scoped(allInvoices, branchId).filter((row) => occursWithin(row.createdAt, period) && isInvoiceFinanciallyActive(row.status));
+    const eligibleInvoiceIds = new Set(scoped(allInvoices, branchId).filter((row) => isInvoiceFinanciallyActive(row.status)).map((row) => row.id));
+    const collections = scoped(allInvoicePayments, branchId).filter((row) => eligibleInvoiceIds.has(row.invoiceId) && occursWithin(row.paidAt, period));
     const deposits = scoped(allDeposits, branchId).filter((row) => occursWithin(row.createdAt, period));
     const overheadPayments = scoped(allOverheadPayments, branchId).filter((row) => occursWithin(row.paidAt, period));
     const containerPayments = scoped(allContainerPayments, branchId).filter((row) => occursWithin(row.paidAt, period));
@@ -1394,7 +1462,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       db.select({ id: invoicesTable.id, branchId: invoicesTable.branchId, invoiceNumber: invoicesTable.invoiceNumber, total: invoicesTable.total, dueDate: invoicesTable.dueDate, status: invoicesTable.status, createdAt: invoicesTable.createdAt }).from(invoicesTable),
       db.select({ invoiceId: invoicePaymentsTable.invoiceId, branchId: invoicePaymentsTable.branchId, amount: invoicePaymentsTable.amount }).from(invoicePaymentsTable),
     ]);
-    const invoices = scoped(allInvoices, branchId).filter((invoice) => invoice.status !== "written_off");
+    const invoices = scoped(allInvoices, branchId).filter((invoice) => isInvoiceFinanciallyActive(invoice.status));
     const paymentMap = new Map<number, number>();
     scoped(allPayments, branchId).forEach((payment) => paymentMap.set(payment.invoiceId, (paymentMap.get(payment.invoiceId) ?? 0) + toAmount(payment.amount)));
     const now = new Date();
@@ -1685,7 +1753,10 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     if (escapedQuery.length < 2) throw new Error("Provide a more specific document search term.");
     const conditions = [
       eq(documentIntelligenceIndexTable.status, "indexed"),
-      ilike(documentIntelligenceIndexTable.contentText, `%${escapedQuery}%`),
+      or(
+        ilike(documentIntelligenceIndexTable.contentText, `%${escapedQuery}%`),
+        ilike(containerDocumentsTable.originalName, `%${escapedQuery}%`),
+      ),
       ...(branchId == null ? [] : [eq(documentIntelligenceIndexTable.branchId, branchId)]),
       ...(requestedContainerId == null ? [] : [eq(documentIntelligenceIndexTable.containerId, requestedContainerId)]),
     ];

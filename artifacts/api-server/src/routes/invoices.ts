@@ -279,7 +279,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
     const singleContainerId = containers.length === 1 ? containers[0].id : null;
     const containerMap = Object.fromEntries(containers.map(c => [c.id, c]));
 
-    const createBranchId = resolveCreateBranch(req, res);
+    const createBranchId = resolveCreateBranch(req, res, req.body.branchId);
     if (createBranchId == null) return;
 
     // Cross-branch link guard: containers must belong to the active branch.

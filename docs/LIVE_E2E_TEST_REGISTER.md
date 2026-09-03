@@ -163,6 +163,18 @@ This is the approved order for remaining work. Every future implementation,
 test result, issue, commit, and deployment outcome must update this roadmap
 and `docs/PROJECT_STATE.md` in the same commit.
 
+## Remediation Follow-up: Steps 6-8 (2026-09-03)
+
+| Step | Status | Implementation and re-test requirement |
+| --- | --- | --- |
+| Step 6 completion | Implemented locally; deployment reconciliation required | The canonical eligible-invoice rule now removes draft, cancelled, and written-off invoices from Dashboard, Client, Statement, and Wallet financial totals while retaining audit history. |
+| Step 7 | Implemented locally; branch creation re-test required | Selected authorised branch IDs are now honoured for Client, Container, and Invoice creation under All Branches, while forms default to the effective selected branch and reject unauthorised branch use. |
+| Step 8 | Implemented locally; AI evidence re-test required | AI now reads per-stage ownership, excludes non-financial invoices, labels Workflow History notifications, performs exact payment-schedule lookup, blocks false All Branches briefing refreshes, and searches indexed filenames as well as document text. |
+
+Local verification: API type check, web type check, API test suite (70 tests),
+and whitespace validation. Live re-test is required after a successful
+deployment.
+
 ## Live Test Cycle Closeout (2026-09-03)
 
 The live end-to-end test cycle is **complete with defects and documented
