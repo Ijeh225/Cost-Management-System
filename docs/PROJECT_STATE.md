@@ -613,7 +613,8 @@ test before beginning any new large product feature.
 - The mobile Create User dialog retained all labelled controls and its Close,
   Cancel, and Create User actions within the viewport. `No users found` under
   the selected Lagos branch was expected; All Branches correctly showed the
-  one active owner and seven disabled historical accounts.
+  one active owner and seven disabled historical accounts. The same dialog
+  closes correctly with Escape on desktop.
 
 ### Controlled Document Upload
 
