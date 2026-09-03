@@ -615,6 +615,18 @@ test before beginning any new large product feature.
   the selected Lagos branch was expected; All Branches correctly showed the
   one active owner and seven disabled historical accounts.
 
+### Controlled Document Upload
+
+- 2026-09-03: a non-sensitive 107 B CSV named
+  `E2E-20260903-document-upload.csv` was uploaded in the General section of
+  controlled container `E2ED260901`. The record shows Searchable, the correct
+  uploader, and the upload date, which confirms live file upload and document
+  linking.
+- Its row opens the stored-document dialog and exposes Open document. This
+  browser session did not produce a new tab or download after that final
+  action, so only file retrieval remains environment-limited; no app defect is
+  recorded from that limitation.
+
 ### Department Workspaces
 
 - Architecture stores separate owner fields for Documentation, Transire,
