@@ -122,6 +122,30 @@ branch scopes have been reconciled.
 | CONT-RPT-001 | High | Container Print Summary | Printable reports for controlled containers `E2EA260901` (ID 25) and `E2EL260901` (ID 26) omit Container No., B/L, customer name, workflow stage, vessel, declaration, and size; show `Invalid Date`; and print the branch ID as a money row in every charge section (for example `Branch Id ₦3.00` for Abuja and `Branch Id ₦2.00` for Lagos), even when the container has no charges. | `containers/print/[id].tsx` reads camelCase API fields such as `containerNumber`, `blNumber`, `customerName`, `createdAt`, and `containerId`, but the live data uses a different field shape. Its charge-entry filter excludes `containerId` but not `branchId`, so the branch identifier is converted to currency and repeated in every section. | Define and use the typed API response shape or normalise it once before rendering. Read the actual field names for identity/date values and exclude all non-charge metadata, including branch ID, from charge tables. Add print-route tests for empty-charge and charged containers. | Produces unreliable operational and financial documents, exposes false cost lines, and prevents staff or clients from using container printouts as evidence. | Open |
 | DEL-001 | High | Container delivery completion and Dashboard | The Date Delivered editor on closed controlled container `E2EA260901` visibly accepts `2026-09-03` and returns `Delivery date saved.`, but the record shows `Not yet recorded` immediately after save and after a full reload. The scoped Abuja Dashboard consequently shows the container Closed but Completed 0. | The cause is not yet traced. The save action appears to report success without persisting or returning the delivery date. | Trace the delivery-date mutation from UI through the API and database. Return a validation error if no value is stored, refresh the detail query after success, and add an integration test that checks persistence plus Dashboard Completed and Delivery Tracking. | Blocks reliable completion reporting and delivery tracking, leaving staff with a misleading success confirmation. | Open |
 
+## Live Test Cycle Closeout (2026-09-03)
+
+The live end-to-end test cycle is **complete with defects and documented
+blockers**. All safe controlled operational, financial, reporting, document,
+responsive UI, role-inventory, and AI read/action-preview paths have been
+exercised. No further production write is justified merely to turn a blocked
+test into a passing result.
+
+| Remaining case | Terminal result | Reason the live test stops here |
+| --- | --- | --- |
+| TD-01 / SEC-01 | Blocked | Cross-role allow/deny testing requires isolated, non-production authenticated sessions. The only intended active production user is the owner Super Admin. |
+| TD-02 / DEL-01 | Failed | The controlled closed container accepts a delivery date and reports success, but does not persist it after reload (`DEL-001`). |
+| TD-03 | Blocked | Draft, sent, partial, paid, cancelled, and zero-value states were tested. Native/manual due-date entry is still required to create an overdue case reliably. |
+| TD-04 / BANK-01 | Blocked | Exact duplicate-reference prevention and duplicate transfer testing would risk creating an irreversible duplicate bank movement. |
+| DUTY-01 | Blocked | Payment lifecycle and reconciliation passed; a reversal needs a separately approved reversible duty record and should not be run against the completed controlled duty. |
+| DOC-01 | Blocked / Failed | Upload, linking, and visible document metadata pass. Direct file retrieval is limited by the browser surface; AI retrieval fails despite the visible Searchable state (`AI-007`). |
+| OPS-01 / OPS-02 / OPS-03 | Failed | Pull-Out released records are absent from the released view (`OPS-002`), and generic stage controls do not reliably persist (`OPS-001`). |
+| OH-01 / REP-01 | Failed | Scheduled payments do not reach the financial ledger/cash flow (`SCHED-001`) and reports have documented calculation/print defects. |
+| AI-10 / UI-01 | Failed / Blocked | The AI consolidated briefing fails despite its enabled control (`AI-006`). Valid user-creation double-submit is not run because it would create a production account. |
+
+All failed and blocked items have a priority, impact, and required correction in
+the defect register below. The next work should be remediation and targeted
+re-tests, not additional uncontrolled production writes.
+
 ## Completion Criteria
 
 The test is complete only when every execution item is marked Passed, Failed,

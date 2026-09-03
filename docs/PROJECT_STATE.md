@@ -448,6 +448,18 @@ test before beginning any new large product feature.
   schedule. Cancelling the draft left zero matching schedules in the live
   Payment Schedule module; no payment or financial record was created.
 
+### Live Test Cycle Closeout (2026-09-03)
+
+- The complete live acceptance-test cycle is closed as **complete with defects
+  and documented blockers**. All safe controlled paths were exercised and
+  reconciled. The project must now move to fixing the logged defects and then
+  targeted re-testing, rather than creating more production records merely to
+  force coverage of unsafe duplicate or reversal scenarios.
+- The remaining terminal blockers are isolated cross-role sessions, native
+  manual due-date behavior, the delivery-date persistence failure `DEL-001`,
+  duplicate bank-reference safety, a dedicated approved duty-reversal case,
+  browser-surface file retrieval, and valid user-creation double-submit.
+
 ### AI Stage-Owner Reconciliation
 
 - 2026-09-02: The AI correctly found delayed Transire job `HLCU8765432` and
