@@ -442,6 +442,11 @@ test before beginning any new large product feature.
   Documents tab, but the AI exact filename query returns zero indexed
   documents. Trace the searchable-document index and AI branch scope before
   relying on the assistant for document retrieval.
+- AI controlled-action safety check passed for a deliberately labelled ₦1
+  Lagos payment-schedule preview. It displayed Preview only and required
+  `Confirm and execute` before it could create a normal pending-approval
+  schedule. Cancelling the draft left zero matching schedules in the live
+  Payment Schedule module; no payment or financial record was created.
 
 ### AI Stage-Owner Reconciliation
 
