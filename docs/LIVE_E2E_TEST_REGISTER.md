@@ -148,6 +148,21 @@ P&L, Branch Comparison, and Disbursement Reconciliation.
 | VAT-001 | Implemented locally; deployment re-check required | The VAT printable page now calls its memoised calculation before any loading or error return. Re-open the VAT print route for loading, populated, and no-data cases. |
 | CONT-RPT-001 | Implemented locally; deployment re-check required | Container print now reads the detail response's record, calculated charges, extra charges, and approvals from their proper locations and excludes branch metadata from money tables. Re-print both an empty-charge and a charged controlled container. |
 
+## Approved Remaining Remediation Roadmap: Steps 6-11 (2026-09-03)
+
+| Step | Scope | Defects and required outcome |
+| --- | --- | --- |
+| Step 6 completion | Consistent cancelled-invoice financial population | `DASH-001`, `AR-002`, `STMT-001`, `CLT-001`: cancelled invoices remain audit history only and contribute no revenue, collections, receivables, wallet liability, credit allocation, or client balance. Reconcile Dashboard, AR, Aging, Statement, Client, and P&L against the same eligible-invoice rule. |
+| Step 7 | Correct branch scope | `BRN-001`: create forms must respect the selected authorised branch, initialise to the effective branch, show actionable errors, and preserve branch isolation. |
+| Step 8 | Make AI answers trustworthy | `AI-002`, `AI-003`, `AI-004`, `AI-005`, `AI-006`, `AI-007`: use authoritative stage ownership, eligible finance invoices, notification sources/counts, exact payment-schedule evidence, truthful All Branches briefing state, and the same searchable-document source as Documentation. |
+| Step 9 | Fix workflow visibility and persistence | `NOTIF-001`, `NOTIF-002`, `TASK-001`, `APR-001`, `PIPE-001`, `DEL-001`: correct alert labels, prevent duplicate events, create a meaningful assigned-work queue, refresh rejected approvals, make released Terminal cards non-misleading, and persist delivery dates. |
+| Step 10 | Fix smaller finance and UI problems | `BANK-002`, `SCHED-002`, `CP-002`, `OH-002`: correct statement filtering/reset, selected-tab schedule counts, container-payment loading/empty copy, and overhead refresh presentation. |
+| Step 11 | Complete controlled verification | Verify native overdue-invoice date entry, a new approved reversible duty record, duplicate bank-reference protection, document retrieval with an upload-capable surface, and isolated non-production cross-role accounts. |
+
+This is the approved order for remaining work. Every future implementation,
+test result, issue, commit, and deployment outcome must update this roadmap
+and `docs/PROJECT_STATE.md` in the same commit.
+
 ## Live Test Cycle Closeout (2026-09-03)
 
 The live end-to-end test cycle is **complete with defects and documented

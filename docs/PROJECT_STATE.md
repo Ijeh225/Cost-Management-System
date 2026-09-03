@@ -29,6 +29,11 @@ important completed milestones so previous work remains traceable.
 Carry out and document a controlled, comprehensive live end-to-end acceptance
 test before beginning any new large product feature.
 
+The approved remediation sequence is the source of truth for all work after
+the deployed re-tests of Steps 1-6. Do not reorder, rename, or replace these
+steps from memory. Read this section and `docs/LIVE_E2E_TEST_REGISTER.md`
+before planning any further changes.
+
 ## Current Session Record
 
 - On 2026-09-01, the user made automatic project-state recording a standing
@@ -797,6 +802,35 @@ test before beginning any new large product feature.
   are still required for `INV-001`, `OPS-001`, `OPS-002`, `RPT-001`, `RPT-002`,
   `RPT-003`, `VAT-001`, and `CONT-RPT-001` before their live-test entries are
   marked resolved.
+
+### Approved Remaining Remediation Roadmap: Steps 6-11 (2026-09-03)
+
+- **Step 6 completion: Consistent cancelled-invoice financial population.**
+  Centralise the eligible invoice rule so cancelled invoices remain visible as
+  audit history but have zero financial effect in Dashboard (`DASH-001`),
+  Invoice Aging (`AR-002`), Client Statement (`STMT-001`), and Client/Wallet
+  totals (`CLT-001`). This is remaining finance-consistency work, not a new
+  standalone roadmap step.
+- **Step 7: Correct branch scope.** Fix `BRN-001`: forms must create in the
+  selected authorised branch, use the effective branch as their displayed
+  default, surface actionable validation errors, and preserve branch isolation
+  in all figures.
+- **Step 8: Make AI answers trustworthy.** Fix `AI-002` stage-owner sourcing,
+  `AI-003` invoice eligibility in finance drafts, `AI-004` notification
+  counts, `AI-005` exact schedule lookup, `AI-006` All Branches briefing
+  behaviour, and `AI-007` searchable-document retrieval.
+- **Step 9: Fix workflow visibility and persistence.** Fix `NOTIF-001` alert
+  taxonomy, `NOTIF-002` duplicate history events, `TASK-001` assigned-work
+  queue, `APR-001` stale rejection view, `PIPE-001` released Terminal action
+  display, and `DEL-001` delivery-date persistence and Dashboard completion.
+- **Step 10: Fix smaller finance and UI problems.** Fix `BANK-002` statement
+  filters/reset, `SCHED-002` selected-tab counts, `CP-002` loading/empty copy,
+  and `OH-002` refresh loading presentation.
+- **Step 11: Complete controlled verification.** Use approved controlled test
+  records to verify overdue invoice behaviour with native date entry, duty
+  reversal, duplicate bank-reference prevention, document retrieval outside
+  the current browser limitation, and cross-role restrictions with separate
+  non-production accounts.
 
 ## Update Format
 
