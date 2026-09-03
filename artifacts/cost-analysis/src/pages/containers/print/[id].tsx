@@ -16,11 +16,15 @@ export default function ContainerPrintPage() {
 
   if (!container) return <div className="text-center p-10 text-gray-500">Container not found.</div>;
 
-  const c = container as any;
-  const charges = c.charges ?? {};
+  // The detail endpoint returns the record and its calculated charges as
+  // siblings. Keep the print view aligned with that API contract.
+  const detail = container as any;
+  const c = detail.container ?? detail;
+  const charges = detail.charges ?? c.charges ?? {};
+  const sectionApprovals = detail.sectionApprovals ?? c.sectionApprovals ?? [];
 
   const extraCharges: Array<{ id: number; section: string; label: string; amount: number; sortOrder: number }> =
-    (c.extraCharges ?? []).slice().sort((a: any, b: any) =>
+    (charges.extraCharges ?? c.extraCharges ?? []).slice().sort((a: any, b: any) =>
       a.sortOrder !== b.sortOrder ? a.sortOrder - b.sortOrder : a.id - b.id
     );
 
@@ -39,6 +43,11 @@ export default function ContainerPrintPage() {
 
   const formatKey = (k: string) =>
     k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+
+  const formatDate = (value: string | null | undefined) => {
+    if (!value || Number.isNaN(new Date(value).getTime())) return "—";
+    return new Date(value).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" });
+  };
 
   return (
     <>
@@ -106,7 +115,7 @@ export default function ContainerPrintPage() {
             <h3>Customer Information</h3>
             <div className="info-row"><span className="info-label">Customer Name</span><span className="info-value">{c.customerName}</span></div>
             <div className="info-row"><span className="info-label">Workflow Stage</span><span className="info-value capitalize">{c.status?.replace(/_/g, " ")}</span></div>
-            <div className="info-row"><span className="info-label">Date Created</span><span className="info-value">{new Date(c.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })}</span></div>
+            <div className="info-row"><span className="info-label">Date Created</span><span className="info-value">{formatDate(c.createdAt)}</span></div>
           </div>
         </div>
 
@@ -118,11 +127,11 @@ export default function ContainerPrintPage() {
               <div className="amount">{formatCurrency(clearingCharges)}</div>
             </div>
             <div className="summary-item">
-              <label>Total Actual Cost</label>
+              <label>Budgeted Total Cost</label>
               <div className="amount">{formatCurrency(totalCost)}</div>
             </div>
             <div className="summary-item">
-              <label>Gross Profit / Loss</label>
+              <label>Budgeted Gross Profit / Loss</label>
               <div className="amount" style={{ color: grossProfit >= 0 ? "#6ee7b7" : "#fca5a5" }}>{formatCurrency(grossProfit)}</div>
             </div>
           </div>
@@ -131,7 +140,7 @@ export default function ContainerPrintPage() {
         {/* Detailed Charges */}
         {sectionData.map(({ title, key, data }) => {
           const entries = Object.entries(data).filter(([k, v]) =>
-            !["id","containerId","updatedAt","createdAt"].includes(k) && v !== null && Number(v) !== 0
+            !["id","containerId","branchId","updatedAt","createdAt"].includes(k) && v !== null && Number(v) !== 0
           );
           const sectionExtras = extraCharges.filter(e => e.section === key);
           if (entries.length === 0 && sectionExtras.length === 0) return null;
@@ -207,12 +216,12 @@ export default function ContainerPrintPage() {
         )}
 
         {/* Approval Status */}
-        {c.sectionApprovals?.length > 0 && (
+        {sectionApprovals.length > 0 && (
           <div>
             <div className="section-title">Section Approval Status</div>
             <table className="charge-table">
               <tbody>
-                {c.sectionApprovals.map((a: any) => (
+                {sectionApprovals.map((a: any) => (
                   <tr key={a.section}>
                     <td style={{ textTransform: "capitalize" }}>{a.section}</td>
                     <td><span className="badge" style={{ background: a.status === "approved" ? "#d1fae5" : a.status === "rejected" ? "#fee2e2" : "#fef3c7", color: a.status === "approved" ? "#065f46" : a.status === "rejected" ? "#7f1d1d" : "#78350f" }}>{a.status}</span></td>

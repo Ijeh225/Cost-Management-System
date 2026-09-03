@@ -229,6 +229,15 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
       notes?: string;
     };
 
+    let parsedDueDate: string | null;
+    if (dueDate == null || dueDate === "") {
+      parsedDueDate = null;
+    } else if (typeof dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dueDate) && !Number.isNaN(new Date(`${dueDate}T00:00:00.000Z`).getTime()) && new Date(`${dueDate}T00:00:00.000Z`).toISOString().slice(0, 10) === dueDate) {
+      parsedDueDate = dueDate;
+    } else {
+      return res.status(400).json({ error: "Due date must be a valid calendar date in YYYY-MM-DD format." });
+    }
+
     if (!containerIds || !Array.isArray(containerIds) || containerIds.length === 0) {
       return res.status(400).json({ error: "containerIds array is required and must not be empty" });
     }
@@ -288,7 +297,7 @@ router.post("/invoices", requireAuth, async (req: AuthRequest, res) => {
         subtotal: String(subtotal),
         vatAmount: String(vat),
         total: String(total),
-        dueDate: dueDate ?? null,
+        dueDate: parsedDueDate,
         notes: notes ?? "",
         branchId: createBranchId,
       }).returning();
@@ -686,9 +695,24 @@ router.patch("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Invoice amounts can only be edited while the invoice is a draft" });
     }
 
+    if (dueDate !== undefined && !isInvoiceEditable(_inv.status)) {
+      return res.status(400).json({ error: "Due date can only be changed while the invoice is a draft." });
+    }
+
+    let parsedDueDate: string | null | undefined;
+    if (dueDate !== undefined) {
+      if (dueDate == null || dueDate === "") {
+        parsedDueDate = null;
+      } else if (typeof dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dueDate) && !Number.isNaN(new Date(`${dueDate}T00:00:00.000Z`).getTime()) && new Date(`${dueDate}T00:00:00.000Z`).toISOString().slice(0, 10) === dueDate) {
+        parsedDueDate = dueDate;
+      } else {
+        return res.status(400).json({ error: "Due date must be a valid calendar date in YYYY-MM-DD format." });
+      }
+    }
+
     const updates: Record<string, any> = { updatedAt: new Date() };
     if (status !== undefined) updates.status = "sent";
-    if (dueDate !== undefined) updates.dueDate = dueDate;
+    if (parsedDueDate !== undefined) updates.dueDate = parsedDueDate;
     if (notes !== undefined) updates.notes = notes;
     if (subtotal !== undefined) updates.subtotal = String(subtotal);
     if (vatAmount !== undefined) updates.vatAmount = String(vatAmount);

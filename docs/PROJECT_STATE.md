@@ -773,6 +773,31 @@ test before beginning any new large product feature.
   this change. Its correction must use the actual bank, date, reference, and
   approval evidence; no financial details are invented.
 
+### Workflow and Reporting Remediation: Steps 4-6 (2026-09-03)
+
+- Step 4: Invoice issuing now prevents the invalid zero-value action in the
+  interface and explains why it is unavailable. The API validates a supplied
+  due date as a real `YYYY-MM-DD` calendar date and locks it, like invoice
+  amounts, once an invoice has been issued. Draft, sent, partial, paid,
+  cancelled, and written-off status rules remain server-controlled.
+- Step 5: The generic Operations detail page now saves Transire, Shipping,
+  Terminal, and Pull-Out owners through the existing stage-action endpoint.
+  Each save therefore reaches the stage-specific owner field instead of the
+  legacy shared `stageOwner` field. The pipeline also retains a released
+  Pull-Out work item so the Pull-Out workspace can put it in its Released tab.
+- Step 6: P&L now calculates average recognised profit using invoiced
+  containers only and includes immutable overhead-payment rows even if their
+  parent expense record is unavailable. Operational reports explicitly label
+  their costs and profit as budgeted. The VAT printable route now obeys React
+  hook ordering. Container printouts now normalise the detail API response,
+  exclude metadata such as branch ID from money rows, and label their figures
+  as budgeted rather than actual-paid.
+- Verification before commit: API typecheck passed, frontend typecheck passed,
+  and all 69 API tests passed. A production deployment and targeted re-tests
+  are still required for `INV-001`, `OPS-001`, `OPS-002`, `RPT-001`, `RPT-002`,
+  `RPT-003`, `VAT-001`, and `CONT-RPT-001` before their live-test entries are
+  marked resolved.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

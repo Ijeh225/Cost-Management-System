@@ -136,6 +136,18 @@ standalone controlled schedule with real recorded payment details and reconcile
 it across Payment Schedules, Bank Management, Financial Ledger, Cash Flow,
 P&L, Branch Comparison, and Disbursement Reconciliation.
 
+## Remediation Follow-up: Steps 4-6 (2026-09-03)
+
+| Item | Status | Implementation and re-test requirement |
+| --- | --- | --- |
+| INV-001 | Implemented locally; deployment re-check required | A zero-value draft can no longer present a usable Mark as Sent action. The API now rejects impossible calendar dates and permits due-date changes only while the invoice remains a draft. Re-test draft, sent, partial, paid, overdue, cancelled, and zero-value cases after deployment. |
+| OPS-001 | Implemented locally; deployment re-check required | The generic Operations form now uses the existing stage-action API for Transire, Shipping, Terminal, and Pull-Out ownership, so it writes the same independent stage-specific owner fields as the department workspaces. Re-test independent owners, expected dates, actual release dates, and navigation persistence with a controlled job. |
+| OPS-002 | Implemented locally; deployment re-check required | The pipeline retains released Pull-Out records rather than filtering them out, allowing the Pull-Out workspace to classify them in its Released tab. Re-test an already released Pull-Out job without changing historic operational data. |
+| RPT-001 / RPT-003 | Implemented locally; deployment re-check required | P&L average recognised profit now divides by invoiced containers only, and its overhead source retains immutable payment rows even where a parent overhead record is unavailable. Reconcile P&L, Financial Dashboard, and Branch Comparison under the same branch, period, and actual-paid basis. |
+| RPT-002 | Implemented locally; deployment re-check required | The operational Report Centre and its exports now call out budgeted cost and budgeted gross profit. Recheck that finance users use P&L for accrual or actual-paid results. |
+| VAT-001 | Implemented locally; deployment re-check required | The VAT printable page now calls its memoised calculation before any loading or error return. Re-open the VAT print route for loading, populated, and no-data cases. |
+| CONT-RPT-001 | Implemented locally; deployment re-check required | Container print now reads the detail response's record, calculated charges, extra charges, and approvals from their proper locations and excludes branch metadata from money tables. Re-print both an empty-charge and a charged controlled container. |
+
 ## Live Test Cycle Closeout (2026-09-03)
 
 The live end-to-end test cycle is **complete with defects and documented

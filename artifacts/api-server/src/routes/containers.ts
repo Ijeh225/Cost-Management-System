@@ -348,7 +348,7 @@ async function getOrCreateCharges(containerId: number) {
   return { shipping, customs, terminal, delivery, operations };
 }
 
-function numericToObj(row: any, exclude = ["id", "containerId", "updatedAt"]) {
+function numericToObj(row: any, exclude = ["id", "containerId", "branchId", "createdAt", "updatedAt"]) {
   const obj: any = {};
   for (const key of Object.keys(row)) {
     if (exclude.includes(key)) continue;
@@ -1027,7 +1027,8 @@ router.get("/containers/pipeline", requireAuth, async (req: AuthRequest, res) =>
         }
       }
 
-      if (c.tdoReleasedAt && !c.pulloutReleasedAt) {
+      // Pull-Out needs its own submitted history even after the job has moved on.
+      if (c.tdoReleasedAt) {
         if (!stages.pull_out) stages.pull_out = [];
         stages.pull_out.push({
           ...entry,

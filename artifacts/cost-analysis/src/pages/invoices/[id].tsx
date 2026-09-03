@@ -735,8 +735,12 @@ export default function InvoiceDetailPage() {
     try {
       await updateMutation.mutateAsync({ id: invoiceId, data: { status } });
       toast({ title: "Status updated" });
-    } catch {
-      toast({ variant: "destructive", title: "Failed to update status" });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Invoice was not issued",
+        description: err instanceof Error ? err.message : "Failed to update status",
+      });
     }
   };
 
@@ -1211,15 +1215,24 @@ export default function InvoiceDetailPage() {
           )}
 
           {isAdmin && invoice.status === "draft" && (
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => handleStatusChange("sent")}
-              disabled={updateMutation.isPending}
-            >
-              <Send className="w-4 h-4" />
-              Mark as Sent
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => handleStatusChange("sent")}
+                    disabled={updateMutation.isPending || invoice.total <= 0}
+                  >
+                    <Send className="w-4 h-4" />
+                    Mark as Sent
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {invoice.total <= 0 && (
+                <TooltipContent>Add a positive charge before issuing this invoice.</TooltipContent>
+              )}
+            </Tooltip>
           )}
 
           {canWriteOff && (

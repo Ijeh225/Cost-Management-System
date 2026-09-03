@@ -216,32 +216,30 @@ const OPS_RELEASE_LABELS: Record<string, string> = {
 
 const OPS_STAGE_CONFIG: Record<string, {
   expectedLabel: string;
+  ownerField: keyof Container;
   expectedField: keyof Container;
   releasedField: keyof Container;
   delayReasonField: keyof Container;
   finalDateField: keyof Container;
 }> = {
-  transire_processing: { expectedLabel: "Expected Transire Release Date", expectedField: "expectedTransireDate", releasedField: "transireReleasedAt", delayReasonField: "transireDelayReason", finalDateField: "transireFinalDate" },
-  shipping:            { expectedLabel: "Expected DO Date",               expectedField: "expectedDoDate",       releasedField: "doReleasedAt",       delayReasonField: "doDelayReason",       finalDateField: "doFinalDate"       },
-  terminal:            { expectedLabel: "Expected TDO Date",              expectedField: "expectedTdoDate",      releasedField: "tdoReleasedAt",      delayReasonField: "tdoDelayReason",      finalDateField: "tdoFinalDate"      },
-  pull_out:            { expectedLabel: "Expected Pullout Date",          expectedField: "expectedPulloutDate",  releasedField: "pulloutReleasedAt",  delayReasonField: "pulloutDelayReason",  finalDateField: "pulloutFinalDate"  },
+  transire_processing: { expectedLabel: "Expected Transire Release Date", ownerField: "transireStageOwner", expectedField: "expectedTransireDate", releasedField: "transireReleasedAt", delayReasonField: "transireDelayReason", finalDateField: "transireFinalDate" },
+  shipping:            { expectedLabel: "Expected DO Date",               ownerField: "shippingStageOwner", expectedField: "expectedDoDate",       releasedField: "doReleasedAt",       delayReasonField: "doDelayReason",       finalDateField: "doFinalDate"       },
+  terminal:            { expectedLabel: "Expected TDO Date",              ownerField: "terminalStageOwner", expectedField: "expectedTdoDate",      releasedField: "tdoReleasedAt",      delayReasonField: "tdoDelayReason",      finalDateField: "tdoFinalDate"      },
+  pull_out:            { expectedLabel: "Expected Pullout Date",          ownerField: "pulloutStageOwner", expectedField: "expectedPulloutDate",  releasedField: "pulloutReleasedAt",  delayReasonField: "pulloutDelayReason",  finalDateField: "pulloutFinalDate"  },
 };
 
 function OpsStageTracker({
-  container, isEditable, daysInStage, stageOwner, setStageOwner,
-  stageActionMut, advanceMutation, updateMutation, toast,
+  container, isEditable, daysInStage, stageActionMut, advanceMutation, toast,
 }: {
   container: Container;
   isEditable: boolean;
   daysInStage: number;
-  stageOwner: string;
-  setStageOwner: (v: string) => void;
   stageActionMut: ReturnType<typeof useStageAction>;
   advanceMutation: ReturnType<typeof useAdvanceContainerStatus>;
-  updateMutation: ReturnType<typeof useUpdateContainer>;
   toast: ReturnType<typeof import("@/hooks/use-toast").useToast>["toast"];
 }) {
   const cfg = OPS_STAGE_CONFIG[container.status];
+  const [stageOwner, setStageOwner] = useState((container[cfg.ownerField] as string | null) ?? "");
   const [localExpectedDate, setLocalExpectedDate] = useState(
     (container[cfg.expectedField] as string | null) ? (container[cfg.expectedField] as string).slice(0, 10) : ""
   );
@@ -253,6 +251,7 @@ function OpsStageTracker({
   const [ownerDirty, setOwnerDirty] = useState(false);
 
   useEffect(() => {
+    setStageOwner((container[cfg.ownerField] as string | null) ?? "");
     setLocalExpectedDate((container[cfg.expectedField] as string | null) ? (container[cfg.expectedField] as string).slice(0, 10) : "");
     setDelayReasonInput((container[cfg.delayReasonField] as string | null) ?? "");
     setFinalDateInput((container[cfg.finalDateField] as string | null) ? (container[cfg.finalDateField] as string).slice(0, 10) : "");
@@ -312,7 +311,7 @@ function OpsStageTracker({
 
   const handleSaveOwner = async () => {
     try {
-      await updateMutation.mutateAsync({ id: container.id, data: { stageOwner: stageOwner || null } });
+      await stageActionMut.mutateAsync({ id: container.id, action: "update_stage_owner", stageOwner: stageOwner || null });
       setOwnerDirty(false);
       toast({ title: "Stage owner saved" });
     } catch (err) {
@@ -341,8 +340,8 @@ function OpsStageTracker({
               />
             </div>
             {isEditable && ownerDirty && (
-              <Button size="sm" className="h-8 gap-1.5 text-xs shrink-0" onClick={handleSaveOwner} disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+              <Button size="sm" className="h-8 gap-1.5 text-xs shrink-0" onClick={handleSaveOwner} disabled={stageActionMut.isPending}>
+                {stageActionMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                 Save
               </Button>
             )}
@@ -1063,11 +1062,8 @@ function OperationalForm({
       container={container}
       isEditable={isEditable}
       daysInStage={daysInStage}
-      stageOwner={stageOwner}
-      setStageOwner={setStageOwner}
       stageActionMut={stageActionMut}
       advanceMutation={advanceMutation}
-      updateMutation={updateMutation}
       toast={toast}
     />;
   }

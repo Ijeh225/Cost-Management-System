@@ -1117,7 +1117,9 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
 
     // All container IDs we need charges for (invoiced + uninvoiced)
     const allCostIds = [...new Set([...invoicedIds, ...uninvoicedIds])];
-    const containerCount = allCostIds.length;
+    // Revenue and recognised COGS only cover invoiced containers. Uninvoiced
+    // cost is reported separately, so it must not dilute recognised profit.
+    const containerCount = invoicedIds.length;
     const invoicedIdSet = new Set(invoicedIds);
 
     // Section cost accumulators — only for INVOICED containers (recognized COGS matching revenue)
@@ -1234,7 +1236,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
         category: overheadExpensesTable.category,
       })
       .from(expensePaymentsTable)
-      .innerJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id))
+      .leftJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id))
       .where(ohConds.length > 0 ? and(...ohConds) : undefined);
 
     let totalOverheads = 0;

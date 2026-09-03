@@ -16,6 +16,21 @@ function useQueryParams() {
 export default function VatSummaryPrint() {
   const { from, to } = useQueryParams();
   const { data, isLoading, isError } = useGetVatSummary({ from, to });
+  const invoices = data?.invoices ?? [];
+
+  const quarterlyBreakdown = useMemo(() => {
+    const map: Record<string, { label: string; vatCollected: number; taxableAmount: number; count: number }> = {};
+    for (const inv of invoices) {
+      const d = new Date(inv.createdAt);
+      const q = Math.floor(d.getMonth() / 3) + 1;
+      const key = `Q${q} ${d.getFullYear()}`;
+      if (!map[key]) map[key] = { label: key, vatCollected: 0, taxableAmount: 0, count: 0 };
+      map[key].vatCollected += inv.vatAmount;
+      map[key].taxableAmount += inv.subtotal;
+      map[key].count++;
+    }
+    return Object.values(map).sort((a, b) => a.label.localeCompare(b.label));
+  }, [invoices]);
 
   if (isLoading) {
     return (
@@ -33,7 +48,7 @@ export default function VatSummaryPrint() {
     );
   }
 
-  const { period, invoices, totals } = data;
+  const { period, totals } = data;
 
   const periodLabel = (() => {
     if (period.from && period.to) return `${fmtDate(period.from)} \u2013 ${fmtDate(period.to)}`;
@@ -45,20 +60,6 @@ export default function VatSummaryPrint() {
   const vatRate = totals.totalSubtotal > 0 && totals.totalVat > 0
     ? ((totals.totalVat / totals.totalSubtotal) * 100).toFixed(1)
     : null;
-
-  const quarterlyBreakdown = useMemo(() => {
-    const map: Record<string, { label: string; vatCollected: number; taxableAmount: number; count: number }> = {};
-    for (const inv of invoices) {
-      const d = new Date(inv.createdAt);
-      const q = Math.floor(d.getMonth() / 3) + 1;
-      const key = `Q${q} ${d.getFullYear()}`;
-      if (!map[key]) map[key] = { label: key, vatCollected: 0, taxableAmount: 0, count: 0 };
-      map[key].vatCollected += inv.vatAmount;
-      map[key].taxableAmount += inv.subtotal;
-      map[key].count++;
-    }
-    return Object.values(map).sort((a, b) => a.label.localeCompare(b.label));
-  }, [invoices]);
 
   return (
     <>

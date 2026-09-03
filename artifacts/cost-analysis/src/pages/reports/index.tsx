@@ -76,8 +76,8 @@ function ContainersTable({ rows, showBranch }: { rows: ReportRow[]; showBranch?:
             <th className="px-5 py-3 text-left font-medium">Vessel / Size</th>
             <th className="px-5 py-3 text-left font-medium">Status</th>
             <th className="px-5 py-3 text-right font-medium">Revenue (₦)</th>
-            <th className="px-5 py-3 text-right font-medium">Total Cost (₦)</th>
-            <th className="px-5 py-3 text-right font-medium">Gross Profit (₦)</th>
+            <th className="px-5 py-3 text-right font-medium">Budgeted Cost (₦)</th>
+            <th className="px-5 py-3 text-right font-medium">Budgeted Gross Profit (₦)</th>
             <th className="px-5 py-3 text-right font-medium">Unpaid Duty (₦)</th>
             <th className="px-5 py-3 text-left font-medium">Date</th>
           </tr>
@@ -144,8 +144,8 @@ function ClientReportsTable({ rows }: { rows: ReportRow[] }) {
             <th className="px-5 py-3 text-left font-medium">Client / Customer</th>
             <th className="px-5 py-3 text-right font-medium">Containers</th>
             <th className="px-5 py-3 text-right font-medium">Total Revenue (₦)</th>
-            <th className="px-5 py-3 text-right font-medium">Total Cost (₦)</th>
-            <th className="px-5 py-3 text-right font-medium">Gross Profit (₦)</th>
+            <th className="px-5 py-3 text-right font-medium">Budgeted Cost (₦)</th>
+            <th className="px-5 py-3 text-right font-medium">Budgeted Gross Profit (₦)</th>
             <th className="px-5 py-3 text-right font-medium">Avg Profit / Container</th>
           </tr>
         </thead>
@@ -287,8 +287,8 @@ function FinancialReport({ rows }: { rows: ReportRow[] }) {
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <SumCard label="Total Clearing Revenue" value={formatCurrency(totalRev)} color="text-primary" />
-        <SumCard label="Total Operational Expenses" value={formatCurrency(totalCost)} color="text-orange-400" />
-        <SumCard label="Net Gross Profit" value={formatCurrency(totalProfit)} color={totalProfit >= 0 ? "text-emerald-400" : "text-destructive"} sub={`${rows.length} containers`} />
+        <SumCard label="Budgeted Operational Expenses" value={formatCurrency(totalCost)} color="text-orange-400" />
+        <SumCard label="Budgeted Gross Profit" value={formatCurrency(totalProfit)} color={totalProfit >= 0 ? "text-emerald-400" : "text-destructive"} sub={`${rows.length} containers`} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -335,7 +335,7 @@ function FinancialReport({ rows }: { rows: ReportRow[] }) {
               <span className="font-mono font-semibold text-primary">{formatCurrency(totalRev)}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border/30">
-              <span className="text-sm text-muted-foreground">Total Clearing Cost</span>
+              <span className="text-sm text-muted-foreground">Budgeted Clearing Cost</span>
               <span className="font-mono font-semibold text-orange-400">{formatCurrency(totalCost)}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border/30">
@@ -1516,7 +1516,7 @@ export default function ReportsPage() {
               <BarChart3 className="w-6 h-6 text-primary" /> Reports
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Comprehensive financial reports — export as CSV, Excel, or PDF.
+              Operational reports use budgeted container charges and costs. Use the P&L for actual-paid or accrual financial results.
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -1587,8 +1587,8 @@ export default function ReportsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <SumCard label="Total Containers" value={String(allRows.length)} />
             <SumCard label="Total Revenue" value={formatCurrency(totalRevenue)} color="text-primary" />
-            <SumCard label="Total Expenses" value={formatCurrency(totalCost)} color="text-orange-400" />
-            <SumCard label="Net Profit" value={formatCurrency(totalProfit)} color={totalProfit >= 0 ? "text-emerald-400" : "text-destructive"} sub={lossMakers > 0 ? `${lossMakers} loss-making` : undefined} />
+            <SumCard label="Budgeted Expenses" value={formatCurrency(totalCost)} color="text-orange-400" />
+            <SumCard label="Budgeted Gross Profit" value={formatCurrency(totalProfit)} color={totalProfit >= 0 ? "text-emerald-400" : "text-destructive"} sub={lossMakers > 0 ? `${lossMakers} loss-making` : undefined} />
           </div>
         )}
 
