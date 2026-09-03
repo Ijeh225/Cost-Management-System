@@ -582,6 +582,18 @@ test before beginning any new large product feature.
   non-authoritative legacy presentation covered by `OPS-001`; department
   workspaces are the authoritative source for stage ownership.
 
+### Controlled Bank Transfer
+
+- 2026-09-03: created the zero-balance, Lagos-scoped E2E-only account
+  `E2E-20260903 Lagos Transfer Destination` for the remaining internal
+  transfer acceptance check. It is separate from operational and customer
+  money.
+- A controlled ₦1 transfer from `E2E-20260901 Lagos Test Bank` used reference
+  `E2E-20260903-BANK-TRANSFER-001`. The transfer list, source statement, and
+  destination statement agree: source is ₦1,100 after its ₦1 Transfer Out and
+  destination is ₦1 after its ₦1 Transfer In. The reference is retained as
+  auditable test evidence.
+
 ### Department Workspaces
 
 - Architecture stores separate owner fields for Documentation, Transire,
