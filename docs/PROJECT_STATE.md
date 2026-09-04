@@ -1137,6 +1137,18 @@ before planning any further changes.
   duplicate-reference rejection check, then capture the remaining authenticated
   finance API `403` response before starting DUTY-002.
 
+### BANK-003 Controlled Record Reservation (2026-09-04)
+
+- The first planned reference `E2E-20260904-BANK-003-001` was rejected with
+  HTTP `409` because a movement with that reference already exists somewhere in
+  the Lagos branch. No new movement was created; neither active E2E bank
+  statement contains that reference.
+- To avoid conflating that historic record with this verification, the one new
+  controlled record is reserved before posting: `E2E-20260904-BANK-003-LIVE-001-7A9C`,
+  a N1.00 fund addition to `E2E-20260901 Lagos Test Bank` (bank ID 3,
+  E2E Lagos). It will be posted once, then the identical reference will be
+  retried once and must return `409` without a second movement.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

@@ -412,3 +412,10 @@ repeat speculative login attempts.
 `AI-008` is closed. **Next controlled check:** post one fresh labelled
 BANK-003 fund addition, retry the exact reference, and verify HTTP `409` with
 no second movement before progressing to the finance API and DUTY-002 checks.
+
+### BANK-003 Controlled Record Reservation (2026-09-04)
+
+| Record / check | Status | Evidence |
+| --- | --- | --- |
+| `E2E-20260904-BANK-003-001` | Not used | The first proposed N1.00 fund addition was rejected with HTTP `409` because that reference already exists elsewhere in E2E Lagos. Neither active E2E bank statement contains it, and no new movement was created. |
+| `E2E-20260904-BANK-003-LIVE-001-7A9C` | Reserved before write | One N1.00 fund addition to `E2E-20260901 Lagos Test Bank` (ID 3, E2E Lagos), narration `E2E verification only BANK-003 initial fund addition`. It will be posted once and retried once with the identical reference. |
