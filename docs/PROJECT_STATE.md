@@ -1272,6 +1272,28 @@ pending. Do not repeat those production writes.
 **Next exact action:** begin item 1 with the cancelled-invoice financial
 population re-test, then update both project records with the observed result.
 
+### Step 6 Live Re-Test - Partial Failure (2026-09-04)
+
+- Invoices, Dashboard, Accounts Receivable, and the controlled Lagos Client
+  now agree on the active financial population: the two cancelled invoices are
+  presented separately, while the genuine overdue `INV-202609-004` drives the
+  N1,000 gross / N999 net receivable after the existing N1 credit. This is
+  consistent with the live Dashboard N3,001 invoiced, N2,002 collected, and
+  N999 outstanding figures.
+- The printable Invoice Aging report still fails `AR-002`. It labels cancelled
+  `INV-202609-002` and `INV-202609-003` as two Current unpaid invoices for
+  N2,000, then adds the genuine N1,000 overdue invoice for a false N3,000
+  outstanding total. The report must apply the same eligible-invoice rule as
+  AR before Step 6 can close.
+- The current live data also demonstrates a native overdue case: invoice
+  `INV-202609-004` has a persisted 2026-08-01 due date and is correctly shown
+  as 34 days overdue in Invoices, AR, and Aging. This observation does not
+  remove the remaining manual-browser verification requirement for a newly
+  entered due date on a controlled record.
+- **Next exact action:** continue with the Step 7 branch-scope re-test, then
+  proceed through the remaining current work order without repeating this
+  ageing query.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

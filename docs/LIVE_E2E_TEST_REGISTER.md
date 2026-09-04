@@ -502,3 +502,14 @@ duty checks as pending. Do not repeat them.
 
 **Next exact action:** start Order 1, the cancelled-invoice financial-population
 re-test. It is the highest remaining cross-module finance risk.
+
+### Step 6 Live Re-Test - Partial Failure (2026-09-04)
+
+| Surface | Result | Evidence |
+| --- | --- | --- |
+| Invoices, Dashboard, AR, Client | Passed for cancelled-invoice exclusion | The two cancelled invoices remain separate in Invoices. Dashboard and AR show N3,001 invoiced, N2,002 collected, and N999 outstanding; the Lagos client shows N3,000 issued for its two eligible invoices, N2,001 collected, and N999 outstanding after the existing N1 credit. |
+| Printable Invoice Aging | Failed - `AR-002` remains open | `/reports/invoice-aging/print` lists cancelled `INV-202609-002` and `INV-202609-003` as two Current unpaid N1,000 invoices, then adds actual overdue `INV-202609-004` for a false N3,000 total outstanding. |
+| Native overdue observation | Present | `INV-202609-004` has persisted due date 2026-08-01 and is shown as 34 days overdue in Invoices, AR, and Aging. A newly entered native-date test remains a separate controlled verification case. |
+
+**Next exact action:** run the Step 7 branch-scope re-test. Step 6 cannot close
+until the printable aging query uses the canonical eligible-invoice rule.
