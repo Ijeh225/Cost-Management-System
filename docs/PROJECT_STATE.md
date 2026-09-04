@@ -1036,6 +1036,20 @@ before planning any further changes.
   Duty Payments, the original bank statement, Duty Payment Ledger, Financial
   Ledger, Cash Flow, P&L, and the audit history before closing `DUTY-002`.
 
+### DUTY-002 Deployment Status (2026-09-04)
+
+- Implementation commit `53a74e5` (`Add immutable duty payment reversals`) was
+  pushed to `origin/master`. Railway completed the build and returned the
+  production service to **Online**.
+- The available browser session is the controlled Terminal E2E user for
+  `E2E-20260901-Lagos`. It correctly exposes only Terminal Workspace and cannot
+  perform the finance-only Duty Payments reversal test. No production payment
+  or reversal was created from that restricted session.
+- **Next exact action:** sign in as the owner Super Admin or a controlled
+  Accounts user, make one fresh labelled duty payment, reverse it once through
+  Duty Payment History, and record the Duty, Bank, Ledger, Cash Flow, P&L, and
+  audit reconciliation results before closing `DUTY-002`.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

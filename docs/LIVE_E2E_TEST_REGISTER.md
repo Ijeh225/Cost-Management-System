@@ -353,3 +353,6 @@ payment, reverse it once through the new Duty Payments History action, and
 reconcile the resulting duty balance and all listed financial views. Do not
 reverse the pre-existing `E2E-20260904-DUTY-REVERSAL-001` entry unless it is
 explicitly selected for the controlled test.
+
+| Railway deployment `53a74e5` | Passed | Railway completed the build for `Add immutable duty payment reversals` and returned the production service to Online. |
+| DUTY-002 live reversal re-test | Blocked by correct role scope | The available browser session is the controlled Terminal user for `E2E-20260901-Lagos`; it correctly exposes only Terminal Workspace, not the finance-only Duty Payments screen. No existing payment was changed. An owner Super Admin or Accounts session is required for the controlled reversal. |
