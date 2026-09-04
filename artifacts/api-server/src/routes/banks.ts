@@ -7,6 +7,19 @@ export const banksRouter = Router();
 
 banksRouter.use(requireFinanceAccess);
 
+class DuplicateBankReferenceError extends Error {
+  constructor(reference: string) {
+    super(`A bank movement with reference "${reference}" already exists in this branch.`);
+    this.name = "DuplicateBankReferenceError";
+  }
+}
+
+function normaliseBankReference(reference: unknown): string | null {
+  if (typeof reference !== "string") return null;
+  const value = reference.trim();
+  return value || null;
+}
+
 banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
   try {
     const activeOnly = req.query.active === "true";
@@ -630,17 +643,36 @@ banksRouter.post("/banks/:id/fund-additions", requireBranchAdminOrAbove, async (
     }
 
     const userId = req.user?.id ?? null;
-    const [addition] = await db.insert(bankFundAdditionsTable).values({
-      bankId,
-      amount: String(amount),
-      narration: narration ?? "",
-      reference: reference ?? null,
-      addedBy: userId,
-      branchId: bank.branchId,
-    }).returning();
+    const normalisedReference = normaliseBankReference(reference);
+    const addition = await db.transaction(async (tx) => {
+      if (normalisedReference) {
+        const referenceKey = normalisedReference.toLowerCase();
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`bank-movement:${bank.branchId}:${referenceKey}`}))`);
+        const [existingTransfer, existingAddition] = await Promise.all([
+          tx.select({ id: bankTransfersTable.id }).from(bankTransfersTable)
+            .where(and(eq(bankTransfersTable.branchId, bank.branchId), sql`lower(btrim(${bankTransfersTable.reference})) = ${referenceKey}`)).limit(1),
+          tx.select({ id: bankFundAdditionsTable.id }).from(bankFundAdditionsTable)
+            .where(and(eq(bankFundAdditionsTable.branchId, bank.branchId), sql`lower(btrim(${bankFundAdditionsTable.reference})) = ${referenceKey}`)).limit(1),
+        ]);
+        if (existingTransfer || existingAddition) throw new DuplicateBankReferenceError(normalisedReference);
+      }
+
+      const [created] = await tx.insert(bankFundAdditionsTable).values({
+        bankId,
+        amount: String(amount),
+        narration: narration ?? "",
+        reference: normalisedReference,
+        addedBy: userId,
+        branchId: bank.branchId,
+      }).returning();
+      return created;
+    });
 
     return res.status(201).json(addition);
   } catch (err) {
+    if (err instanceof DuplicateBankReferenceError) {
+      return res.status(409).json({ error: err.message });
+    }
     console.error("POST /banks/:id/fund-additions error:", err);
     return res.status(500).json({ error: "Server error" });
   }
@@ -686,16 +718,32 @@ banksRouter.post("/banks/transfers", requireBranchAdminOrAbove, async (req: Auth
     }
 
     const userId = req.user?.id ?? null;
+    const normalisedReference = normaliseBankReference(reference);
 
-    const [transfer] = await db.insert(bankTransfersTable).values({
-      fromBankId,
-      toBankId,
-      amount: String(amount),
-      narration: narration ?? "",
-      reference: reference ?? null,
-      createdBy: userId,
-      branchId: fromBank.branchId,
-    }).returning();
+    const transfer = await db.transaction(async (tx) => {
+      if (normalisedReference) {
+        const referenceKey = normalisedReference.toLowerCase();
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`bank-movement:${fromBank.branchId}:${referenceKey}`}))`);
+        const [existingTransfer, existingAddition] = await Promise.all([
+          tx.select({ id: bankTransfersTable.id }).from(bankTransfersTable)
+            .where(and(eq(bankTransfersTable.branchId, fromBank.branchId), sql`lower(btrim(${bankTransfersTable.reference})) = ${referenceKey}`)).limit(1),
+          tx.select({ id: bankFundAdditionsTable.id }).from(bankFundAdditionsTable)
+            .where(and(eq(bankFundAdditionsTable.branchId, fromBank.branchId), sql`lower(btrim(${bankFundAdditionsTable.reference})) = ${referenceKey}`)).limit(1),
+        ]);
+        if (existingTransfer || existingAddition) throw new DuplicateBankReferenceError(normalisedReference);
+      }
+
+      const [created] = await tx.insert(bankTransfersTable).values({
+        fromBankId,
+        toBankId,
+        amount: String(amount),
+        narration: narration ?? "",
+        reference: normalisedReference,
+        createdBy: userId,
+        branchId: fromBank.branchId,
+      }).returning();
+      return created;
+    });
 
     let createdByName: string | null = null;
     if (userId) {
@@ -717,6 +765,9 @@ banksRouter.post("/banks/transfers", requireBranchAdminOrAbove, async (req: Auth
       createdAt: transfer.createdAt instanceof Date ? transfer.createdAt.toISOString() : transfer.createdAt,
     });
   } catch (err) {
+    if (err instanceof DuplicateBankReferenceError) {
+      return res.status(409).json({ error: err.message });
+    }
     console.error("POST /banks/transfers error:", err);
     return res.status(500).json({ error: "Server error" });
   }

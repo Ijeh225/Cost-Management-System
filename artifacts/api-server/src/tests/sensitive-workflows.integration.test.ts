@@ -5,6 +5,8 @@ import app from "../app";
 import {
   db,
   banksTable,
+  bankFundAdditionsTable,
+  bankTransfersTable,
   branchesTable,
   containersTable,
   expensePaymentsTable,
@@ -17,7 +19,7 @@ import {
   usersTable,
   workflowNotificationsTable,
 } from "@workspace/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 
 type Session = { agent: ReturnType<typeof request.agent>; csrf: string };
 
@@ -38,6 +40,7 @@ let paymentExpenseId = 0;
 let paymentScheduleId = 0;
 let standaloneScheduleId = 0;
 let collectionBankId = 0;
+let transferBankId = 0;
 let collectionInvoiceId = 0;
 let createdStaffUserId = 0;
 
@@ -142,6 +145,11 @@ beforeAll(async () => {
     branchId: branchAId,
   }).returning({ id: banksTable.id });
   collectionBankId = bank.id;
+  const [transferBank] = await db.insert(banksTable).values({
+    name: `Integration Transfer Bank ${suffix}`,
+    branchId: branchAId,
+  }).returning({ id: banksTable.id });
+  transferBankId = transferBank.id;
   const [invoice] = await db.insert(invoicesTable).values({
     branchId: branchAId,
     containerId: protectedContainerId,
@@ -188,8 +196,18 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (collectionBankId || transferBankId) {
+    await db.delete(bankTransfersTable).where(or(
+      eq(bankTransfersTable.fromBankId, collectionBankId),
+      eq(bankTransfersTable.toBankId, collectionBankId),
+      eq(bankTransfersTable.fromBankId, transferBankId),
+      eq(bankTransfersTable.toBankId, transferBankId),
+    ));
+  }
+  if (collectionBankId) await db.delete(bankFundAdditionsTable).where(eq(bankFundAdditionsTable.bankId, collectionBankId));
   if (collectionInvoiceId) await db.delete(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, collectionInvoiceId));
   if (collectionInvoiceId) await db.delete(invoicesTable).where(eq(invoicesTable.id, collectionInvoiceId));
+  if (transferBankId) await db.delete(banksTable).where(eq(banksTable.id, transferBankId));
   if (collectionBankId) await db.delete(banksTable).where(eq(banksTable.id, collectionBankId));
   if (paymentExpenseId) await db.delete(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, paymentExpenseId));
   if (standaloneScheduleId) await db.delete(paymentSchedulePaymentsTable).where(eq(paymentSchedulePaymentsTable.scheduleId, standaloneScheduleId));
@@ -377,6 +395,34 @@ describe("sensitive workflow integration", () => {
     const banks = await admin.agent.get("/api/banks");
     expect(banks.status).toBe(200);
     expect(banks.body.find((bank: { id: number }) => bank.id === collectionBankId)?.currentBalance).toBe(250);
+  });
+
+  it("prevents duplicate references across bank fund additions and transfers", async () => {
+    const reference = `integration-bank-reference-${suffix}`;
+    const addition = await admin.agent
+      .post(`/api/banks/${collectionBankId}/fund-additions`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ amount: 100, narration: "Integration bank reference guard", reference });
+    expect(addition.status).toBe(201);
+
+    const repeatedAddition = await admin.agent
+      .post(`/api/banks/${collectionBankId}/fund-additions`)
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ amount: 100, narration: "Duplicate reference", reference: ` ${reference.toUpperCase()} ` });
+    expect(repeatedAddition.status).toBe(409);
+
+    const crossTypeDuplicate = await admin.agent
+      .post("/api/banks/transfers")
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ fromBankId: collectionBankId, toBankId: transferBankId, amount: 20, reference });
+    expect(crossTypeDuplicate.status).toBe(409);
+
+    const transfers = await db.select().from(bankTransfersTable)
+      .where(or(eq(bankTransfersTable.fromBankId, collectionBankId), eq(bankTransfersTable.toBankId, transferBankId)));
+    const additions = await db.select().from(bankFundAdditionsTable)
+      .where(eq(bankFundAdditionsTable.bankId, collectionBankId));
+    expect(transfers).toHaveLength(0);
+    expect(additions).toHaveLength(1);
   });
 
   it("records a standalone schedule payment in the bank, financial ledger, and cash flow", async () => {

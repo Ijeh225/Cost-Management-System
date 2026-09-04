@@ -356,3 +356,21 @@ explicitly selected for the controlled test.
 
 | Railway deployment `53a74e5` | Passed | Railway completed the build for `Add immutable duty payment reversals` and returned the production service to Online. |
 | DUTY-002 live reversal re-test | Blocked by correct role scope | The available browser session is the controlled Terminal user for `E2E-20260901-Lagos`; it correctly exposes only Terminal Workspace, not the finance-only Duty Payments screen. No existing payment was changed. An owner Super Admin or Accounts session is required for the controlled reversal. |
+
+### Pre-Duty Verification Fixes (2026-09-04)
+
+| Test / issue | Result | Evidence |
+| --- | --- | --- |
+| `BANK-003` duplicate bank reference | Implemented locally; live re-test pending deployment | Bank transfers and fund additions now normalize a non-empty reference, lock its branch-level movement key within a transaction, and check both tables before insertion. Duplicate values, including casing/whitespace variations and cross-type reuse, return `409` without a second bank movement. The database-backed integration case is present but cannot run without the required isolated `TEST_DATABASE_URL`. |
+| `AI-008` document citation label | Implemented locally; live re-test pending deployment | A filename-only match now says `Filename match`; text-only and unpaged legacy matches say `Text match` or `Indexed match`; a known extracted page says `Page N`. The cited button continues to open the existing container Documents tab. Focused unit tests passed. |
+| Residual finance API access check | Passed at middleware level; direct browser capture remains environment-blocked | The new authenticated HTTP regression test produced `403` for Delivery and `200` for Accounts through `requireFinanceAccess`. A direct production request to `/api/banks` from the controlled Terminal session was stopped by `net::ERR_BLOCKED_BY_CLIENT` before it reached the app, so no production status code is claimed. |
+
+Local verification before deployment: focused tests passed (12), API unit suite
+passed (19 files, 75 tests), workspace typecheck passed, and the local Railway
+build command passed. The integration suite correctly refused to run without
+`TEST_DATABASE_URL`; no production database was used for it.
+
+Next controlled checks after deployment: repeat the exact AI document query;
+post one fresh labelled bank fund addition and retry the same reference to
+confirm `409` with no second movement; and capture an authenticated finance API
+denial from a browser or client that allows the request to reach the server.

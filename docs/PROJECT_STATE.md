@@ -1050,6 +1050,38 @@ before planning any further changes.
   Duty Payment History, and record the Duty, Bank, Ledger, Cash Flow, P&L, and
   audit reconciliation results before closing `DUTY-002`.
 
+### BANK-003, AI-008, and API Access Verification (2026-09-04)
+
+- **BANK-003 implemented locally.** Non-empty bank references are now trimmed
+  and treated as a branch-level bank-movement identifier across both bank
+  transfers and fund additions. Each write takes a PostgreSQL transaction
+  advisory lock before checking both movement tables, so concurrent requests
+  cannot create duplicate references. A duplicate now returns HTTP `409`; a
+  blank optional reference remains valid. The integration test creates a fund
+  addition, retries it with casing/whitespace changes, then tries the same
+  reference as a transfer and expects both duplicate attempts to be rejected.
+- **AI-008 implemented locally.** AI document search no longer displays
+  `Page unavailable` merely because a filename match has no page-text match.
+  Search results now label the actual evidence as `Filename match`, `Text
+  match`, `Indexed match`, or a verified `Page N`. The existing document link
+  remains the container Documents tab.
+- **Residual finance API check completed at the middleware level.** A new HTTP
+  regression test signs an authenticated Delivery session and observes a real
+  `403` from `requireFinanceAccess`; the same test observes `200` for Accounts.
+  A direct production navigation attempt to `/api/banks` from the controlled
+  Terminal browser session was blocked by the browser client with
+  `net::ERR_BLOCKED_BY_CLIENT` before it reached the deployed application, so
+  it cannot be claimed as a live API response.
+- **Verification:** focused tests passed (12 tests), the API unit suite passed
+  (19 files, 75 tests), workspace typecheck passed, the local Railway build
+  command passed, and `git diff --check` passed. The database integration suite remains
+  intentionally blocked because `TEST_DATABASE_URL` is not configured; it was
+  not pointed at production.
+- **Next exact action:** commit and deploy these three changes. Then, from an
+  environment that permits same-origin API requests, repeat the live
+  authenticated non-finance `403` check and run the controlled BANK-003 and
+  AI-008 re-tests before resuming the DUTY-002 financial write test.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

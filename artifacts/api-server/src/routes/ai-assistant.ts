@@ -40,6 +40,7 @@ import { isPhysicalTerminalPresenceQuestion, resolveAiOperationalStage } from ".
 import { understandAiQuestion } from "../lib/ai-question-understanding.js";
 import { buildAiInvestigationPlan } from "../lib/ai-investigation-plan.js";
 import { buildAiAnswerPresentation } from "../lib/ai-answer-presentation.js";
+import { describeDocumentSearchMatch } from "../lib/ai-document-search-match.js";
 import { analyseAccountantControls } from "../lib/ai-accountant-intelligence.js";
 import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
@@ -1785,24 +1786,20 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       ...(requestedContainerId == null ? [] : [{ label: "Container filter", value: requestedContainerId }]),
     ];
     result.records = rows.map((row) => {
-      let page = "Page unavailable";
-      let sourceText = row.contentText ?? "";
-      try {
-        const pages = JSON.parse(row.pageText) as Array<{ page?: number; text?: string }>;
-        const matchedPage = pages.find((item) => item.text?.toLowerCase().includes(lowerQuery));
-        if (matchedPage?.page) page = `Page ${matchedPage.page}`;
-        sourceText = matchedPage?.text ?? sourceText;
-      } catch {
-        // Older or failed metadata is still safe to show without a page number.
-      }
-      const matchIndex = sourceText.toLowerCase().indexOf(lowerQuery);
+      const match = describeDocumentSearchMatch({
+        pageText: row.pageText,
+        contentText: row.contentText,
+        originalName: row.originalName,
+        query: lowerQuery,
+      });
+      const matchIndex = match.sourceText.toLowerCase().indexOf(lowerQuery);
       const start = Math.max(0, matchIndex - 110);
-      const snippet = sourceText.slice(start, start + 280).replace(/\s+/g, " ").trim();
+      const snippet = match.sourceText.slice(start, start + 280).replace(/\s+/g, " ").trim();
       return {
         title: row.originalName,
-        detail: `${row.containerNumber} - ${page}${row.section ? ` - ${row.section}` : ""}${snippet ? `: ${snippet}` : ""}`,
+        detail: `${row.containerNumber} - ${match.label}${row.section ? ` - ${row.section}` : ""}${snippet ? `: ${snippet}` : ""}`,
         href: `/containers/${row.containerId}?tab=documents`,
-        badges: ["Document", page],
+        badges: ["Document", match.label],
       };
     });
     result.sources = rows.map((row) => ({
