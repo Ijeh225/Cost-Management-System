@@ -457,3 +457,16 @@ the fresh labelled DUTY-002 reversal test.
 The residual API-verification item is closed. **Next exact action:** register
 the fresh labelled DUTY-002 payment before the write, then reverse it once and
 reconcile all affected financial views.
+
+### DUTY-002 Controlled Record Reservation (2026-09-04)
+
+| Record / check | Status | Evidence |
+| --- | --- | --- |
+| Assessment adjustment | Reserved | Controlled `E2EL260901` assessment will change from N100.00 to N101.00 only long enough to create N1.00 outstanding, then return to N100.00 after the reversal verification. |
+| Payment | Reserved before financial write | N1.00 from `E2E-20260901 Lagos Test Bank`, reference `E2E-20260904-DUTY-REVERSAL-LIVE-002-PAY`, narration `E2E verification only DUTY-002 payment`. |
+| Reversal | Reserved before financial write | Reverse only the new payment once, reference `E2E-20260904-DUTY-REVERSAL-LIVE-002-REV`, reason `E2E verification only DUTY-002 reversal test`. |
+| Historic payment | Excluded | `E2E-20260904-DUTY-REVERSAL-001` is not part of this test and must not be changed. |
+
+**Next exact action:** create the reserved N1.00 outstanding balance, post the
+single payment, reverse that same transaction once, reconcile the stated views,
+and restore the original N100.00 assessment.

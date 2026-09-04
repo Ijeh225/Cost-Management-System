@@ -1199,6 +1199,23 @@ before planning any further changes.
   reverse it exactly once and reconcile Duty Payments, Bank, Financial Ledger,
   Cash Flow, and actual-paid P&L.
 
+### DUTY-002 Controlled Record Reservation (2026-09-04)
+
+- No unused Lagos duty assessment is available. The smallest reversible path
+  uses the existing controlled container `E2EL260901`: temporarily change its
+  already paid N100.00 assessment to N101.00, creating N1.00 outstanding.
+  This is an assessment-only adjustment and will be restored to N100.00 after
+  the reversal check.
+- The only new payment is N1.00 from `E2E-20260901 Lagos Test Bank`, reference
+  `E2E-20260904-DUTY-REVERSAL-LIVE-002-PAY`, narration `E2E verification only
+  DUTY-002 payment`. It will be reversed once with reference
+  `E2E-20260904-DUTY-REVERSAL-LIVE-002-REV` and the matching E2E reason.
+- The historic `E2E-20260904-DUTY-REVERSAL-001` payment is not part of this
+  test and must not be changed.
+- **Next exact action:** save the N101.00 assessment, record the reserved
+  N1.00 payment once, reverse only that new transaction once, reconcile all
+  affected views, then restore the N100.00 assessment.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
