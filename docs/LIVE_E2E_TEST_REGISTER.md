@@ -537,3 +537,29 @@ until the printable aging query uses the canonical eligible-invoice rule.
 **Next exact action:** finish the remaining Step 9 visibility/persistence checks:
 Approval Queue immediate refresh, Pipeline Terminal visibility, and delivery-date
 persistence. Do not repeat the passed My Tasks test.
+
+### Step 9 and Step 10 Continued Live Re-Test (2026-09-04)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `PIPE-001` released Terminal visibility | Passed | Terminal Workspace Submitted lists closed `E2EA260901`; Pipeline independently lists the same E2E Abuja job in Closed. |
+| `APR-001` immediate approval refresh | Blocked | Approval Queue rendered no pending sections and one recently approved E2E item. A controlled submit-and-reject cycle is required; no unrelated record was changed. |
+| `DEL-001` delivery date persistence | Unverified | The closed E2E job was inspected, but its Details view did not expose the delivery actual-date field. Verify through Delivery & Empty Return with a controlled record. |
+| `BANK-002` duty filter and clear | Passed | Bank statement type choices include Duty Payments. Selecting it returned exactly four duty rows, and Clear filters appeared. |
+| `SCHED-002` tab count/date scope | Failed - remains open | Today's Schedule (1) contains a record dated 2026-08-27 and labelled 8 days overdue. It is not a today record. |
+| `CP-002`, `OH-002` loading states | Unverified | A cold-load and refresh visual check is still required to rule out the transient empty/zero state. |
+
+**Next exact action:** cold-load and refresh Container Payments and Overhead
+Expenses, then determine whether the visual loading-state defects remain.
+
+### Step 10 Loading-State Live Re-Test Passed (2026-09-04)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `CP-002` Container Payments loading state | Passed - observed visual check | Cold load and browser refresh retained populated Recent Payments; no false `no payments` state was displayed. |
+| `OH-002` Overhead Expenses loading state | Passed - observed visual check | Cold load and browser refresh retained non-zero balances and populated expense cards; no empty or zero state was displayed. |
+
+No financial or operational record was created or changed for these visual
+checks. **Next exact action:** prioritize fixes for `AR-002`, `AI-005`,
+`AI-006`, `NOTIF-001`, `NOTIF-002`, and `SCHED-002`; reserve `BRN-001`,
+`APR-001`, and `DEL-001` for controlled workflow verification.

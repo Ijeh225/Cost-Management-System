@@ -1341,6 +1341,47 @@ population re-test, then update both project records with the observed result.
   Pipeline Terminal visibility, and delivery-date persistence; do not repeat
   the passed My Tasks check.
 
+### Step 9 and Step 10 Continued Live Re-Test (2026-09-04)
+
+- `PIPE-001` passed. Terminal Workspace shows the released E2E Abuja job
+  `E2EA260901` in **Submitted** as Closed, and Pipeline independently shows
+  it in the Closed lane. Released terminal work is no longer hidden.
+- `APR-001` is blocked, not failed. Approval Queue correctly rendered its
+  current empty Pending Review state and a recently approved E2E record, but
+  there was no safe pending submission available to reject and observe an
+  immediate in-page removal. This requires one explicitly controlled
+  submit-and-reject cycle.
+- `DEL-001` is still unverified. The closed job shows stage history but the
+  Delivery actual-date field was not exposed in the inspected details; verify
+  it through the Delivery & Empty Return workflow with a controlled record.
+- `BANK-002` passed. The bank statement offers a **Duty Payments** filter,
+  returned exactly the four duty transactions when selected, and exposed
+  **Clear filters** after filtering.
+- `SCHED-002` remains open. The **Today's Schedule (1)** tab displayed the
+  only record as `8 days overdue` with a 2026-08-27 schedule date. A past-due
+  record must not be counted or presented as today's schedule.
+- `CP-002` and `OH-002` need a visual cold-load/refresh observation; the
+  current static pages cannot prove the prior transient empty-state defect is
+  gone.
+- **Next exact action:** record this re-test result, then test Container
+  Payments and Overhead Expenses with a cold load and refresh before deciding
+  whether their loading-state issues can close.
+
+### Step 10 Loading-State Live Re-Test Passed (2026-09-04)
+
+- `CP-002` passed the observed cold-load and browser-refresh check. Container
+  Payments retained its populated Recent Payments view and did not present a
+  false "no payments" state while loading.
+- `OH-002` passed the observed cold-load and browser-refresh check. Overhead
+  Expenses retained its non-zero balances and populated expense list without a
+  transient empty or zero state.
+- This is visual runtime evidence only; no expense, payment, or bank record was
+  created or changed.
+- **Next exact action:** address the still-open functional defects in priority
+  order: `AR-002`, `AI-005`, `AI-006`, `NOTIF-001`, `NOTIF-002`, and
+  `SCHED-002`; retain `BRN-001`, `APR-001`, and `DEL-001` as controlled-write
+  or workflow verification work.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
