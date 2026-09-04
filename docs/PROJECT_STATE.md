@@ -1294,6 +1294,53 @@ population re-test, then update both project records with the observed result.
   proceed through the remaining current work order without repeating this
   ageing query.
 
+### Step 7 and Step 8 Live Re-Test - Partial Pass (2026-09-04)
+
+- `BRN-001` passed its non-destructive UI scope check. With **All branches**
+  selected, the Add Client form requires an explicit branch. After selecting
+  **E2E-20260901-Lagos**, the same form defaults to that branch and explains
+  that it follows the active branch. No extra client was created merely to
+  exercise a backend rejection, so submission-time enforcement remains to be
+  confirmed during an appropriate controlled write.
+- `AI-002` passed. The all-branches delayed-stage answer cited
+  `HLCU8765432 - Transire` with **Owner: Unassigned**, rather than reusing a
+  generic or another-stage owner. `MSCU1234567` independently showed owner
+  `john`.
+- `AI-003` passed. A fresh all-branches monthly finance draft for
+  2026-08-31 to 2026-09-04 reported three eligible invoices totaling
+  N3,001.00 and cited the actual eligible records, including
+  `INV-202609-004`; it excluded both cancelled invoices.
+- `AI-004` passed. The assistant reported 88 visible workflow-history events
+  and 72 unread. Notifications independently showed 88 of 88 workflow events
+  and an Unread badge of 72; the separate System Alerts count was not mixed
+  into the answer.
+- `AI-005` failed. The exact question for `E2E-20260901 Scheduled Test
+  Vendor` did not execute a search and demanded a schedule ID, invoice number,
+  or client ID. Exact vendor-name lookup remains open.
+- `AI-006` is partial. All-branches briefing generation is correctly disabled
+  with an explanation, but the dated snapshot is still headed "Current Finance
+  & Control Briefing". It should be labelled as a historical snapshot whenever
+  no new all-branches briefing can be generated.
+- `AI-007` passed. The assistant found and cited
+  `E2E-20260903-document-upload.csv` for `E2ED260901` with one indexed match.
+- **Next exact action:** complete the Step 9 workflow visibility re-test,
+  beginning with notification taxonomy/idempotency and approval refresh.
+
+### Step 9 Live Re-Test - Partial Result (2026-09-04)
+
+- `TASK-001` passed. My Tasks now presents only the signed-in user's assigned
+  follow-ups and clearly directs submitted section reviews to Approval Queue;
+  it did not show the former broad container list.
+- `NOTIF-001` remains open. System Alerts still labels a PAAR deadline alert as
+  "Low Profit Margin" even though its text says "PAAR overdue".
+- `NOTIF-002` remains open. Workflow History contains repeated identical
+  Payment Scheduled and Payment Approved events for the same schedule and
+  timestamp, including three identical E2E vendor events. This is evidence of
+  duplicate history generation rather than a display-only count issue.
+- **Next exact action:** continue Step 9 with Approval Queue immediate-refresh,
+  Pipeline Terminal visibility, and delivery-date persistence; do not repeat
+  the passed My Tasks check.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

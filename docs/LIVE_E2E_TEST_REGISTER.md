@@ -513,3 +513,27 @@ re-test. It is the highest remaining cross-module finance risk.
 
 **Next exact action:** run the Step 7 branch-scope re-test. Step 6 cannot close
 until the printable aging query uses the canonical eligible-invoice rule.
+
+### Step 7 and Step 8 Live Re-Test - Partial Pass (2026-09-04)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `BRN-001` branch default | Passed - UI scope | In All Branches, Add Client required a branch selection. In E2E Lagos, it defaulted to `E2E-20260901-Lagos` and stated it follows the active branch. No unnecessary client was created, so backend submission enforcement remains a controlled-write check. |
+| `AI-002` true stage owner | Passed | The all-branches delayed-stage answer cited `HLCU8765432 - Transire` with `Owner: Unassigned`, while `MSCU1234567 - Transire` independently showed `Owner: john`. |
+| `AI-003` invoice eligibility | Passed | A new 2026-08-31 to 2026-09-04 Monthly Finance draft reported 3 eligible invoices totaling N3,001.00 and cited `INV-202608-002`, `INV-202609-001`, and `INV-202609-004`; both cancelled invoices were excluded. |
+| `AI-004` notification scope/counts | Passed | AI returned 88 visible Workflow History events and 72 unread. Notifications independently showed 88 of 88 workflow events and 72 unread; System Alerts remain separate. |
+| `AI-005` exact schedule vendor lookup | Failed - remains open | The exact vendor-name query requested a schedule ID, invoice number, or client ID and ran no data tool. |
+| `AI-006` all-branches briefing | Partial | Generation is correctly disabled and explains that a branch must be selected. The existing dated snapshot remains titled `Current Finance & Control Briefing`, which can misrepresent a historical result as current. |
+| `AI-007` indexed document lookup | Passed | Exact query for `E2E-20260903-document-upload.csv` found one indexed document and cited `E2ED260901` with `Filename match`. |
+
+### Step 9 Live Re-Test - Partial Result (2026-09-04)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `TASK-001` assigned work queue | Passed | My Tasks shows `Your assigned follow-ups` and no broad container list; with no owner tasks, it reports zero open tasks and directs submitted reviews to Approval Queue. |
+| `NOTIF-001` taxonomy | Failed - remains open | System Alerts still names a PAAR deadline alert `Low Profit Margin` despite its message being `PAAR overdue`. |
+| `NOTIF-002` duplicate events | Failed - remains open | Workflow History visibly contains repeated same-time Payment Scheduled and Payment Approved events, including three identical E2E vendor events. |
+
+**Next exact action:** finish the remaining Step 9 visibility/persistence checks:
+Approval Queue immediate refresh, Pipeline Terminal visibility, and delivery-date
+persistence. Do not repeat the passed My Tasks test.
