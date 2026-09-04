@@ -1183,6 +1183,22 @@ before planning any further changes.
   already-passing middleware regression evidence and record the environmental
   limitation. Then begin the documented fresh-record DUTY-002 reversal test.
 
+### SEC-02 Authenticated API Capture Passed (2026-09-04)
+
+- The existing controlled `E2E Delivery QA` profile (ID 12) was reused rather
+  than creating another account. Its test-only password was rotated for the
+  check and is not stored in the repository.
+- An authenticated live HTTP request to `/api/banks` using that Delivery
+  profile returned HTTP `403`. This proves the request reached production and
+  `requireFinanceAccess` denied the non-finance profile as designed.
+- The Owner Super Admin browser session was restored after the isolated check.
+  The former direct-browser API limitation is no longer an open verification
+  item. `SEC-02` is fully closed for both route and API access.
+- **Next exact action:** register one fresh labelled duty payment in the live
+  test register before creating it, then use the DUTY-002 History action to
+  reverse it exactly once and reconcile Duty Payments, Bank, Financial Ledger,
+  Cash Flow, and actual-paid P&L.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

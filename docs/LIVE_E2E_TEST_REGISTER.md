@@ -445,3 +445,15 @@ and one HTTP `409` rejection.
 non-finance API `403` only from a client that can reach `/api/*`; the current
 browser environment blocks direct API navigation before the app. Then begin
 the fresh labelled DUTY-002 reversal test.
+
+### SEC-02 Authenticated API Re-Test (2026-09-04)
+
+| Test | Result | Evidence |
+| --- | --- | --- |
+| Controlled profile setup | Passed | The existing `E2E Delivery QA` profile (ID 12) was reused; its test-only password was rotated and is intentionally not recorded. No duplicate user was created. |
+| Delivery `GET /api/banks` | Passed | An authenticated live HTTP client received HTTP `403`. The request reached production and finance access was denied for the Delivery profile. |
+| Owner session restoration | Passed | The Owner Super Admin browser session was restored after the isolated API check. |
+
+The residual API-verification item is closed. **Next exact action:** register
+the fresh labelled DUTY-002 payment before the write, then reverse it once and
+reconcile all affected financial views.
