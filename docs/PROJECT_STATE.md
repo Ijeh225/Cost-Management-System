@@ -1149,6 +1149,21 @@ before planning any further changes.
   E2E Lagos). It will be posted once, then the identical reference will be
   retried once and must return `409` without a second movement.
 
+### BANK-003 Guard Correction (2026-09-04)
+
+- The attempted reserved N1.00 fund addition was rejected with HTTP `409` even
+  though its reference was newly reserved. Source tracing found the fault: both
+  duplicate queries return arrays, and the route treated empty arrays as truthy
+  rather than checking their lengths. This made every non-empty reference look
+  duplicated.
+- The fund-addition and transfer paths now use one tested helper that normalises
+  optional references and returns true only when either query has at least one
+  match. The focused API suite passed 20 files / 78 tests, API typecheck passed,
+  and `git diff --check` passed. No live financial movement was created.
+- **Next exact action:** commit and deploy this guard correction. Once Railway
+  is active, use the already reserved reference once, retry it once, and verify
+  the first movement exists exactly once while the retry returns `409`.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

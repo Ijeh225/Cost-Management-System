@@ -419,3 +419,16 @@ no second movement before progressing to the finance API and DUTY-002 checks.
 | --- | --- | --- |
 | `E2E-20260904-BANK-003-001` | Not used | The first proposed N1.00 fund addition was rejected with HTTP `409` because that reference already exists elsewhere in E2E Lagos. Neither active E2E bank statement contains it, and no new movement was created. |
 | `E2E-20260904-BANK-003-LIVE-001-7A9C` | Reserved before write | One N1.00 fund addition to `E2E-20260901 Lagos Test Bank` (ID 3, E2E Lagos), narration `E2E verification only BANK-003 initial fund addition`. It will be posted once and retried once with the identical reference. |
+
+### BANK-003 Guard Correction (2026-09-04)
+
+| Test / issue | Result | Evidence |
+| --- | --- | --- |
+| Reserved first-write attempt | Failed safely | `E2E-20260904-BANK-003-LIVE-001-7A9C` was rejected with HTTP `409` before any movement was created, despite being newly reserved. |
+| Root cause | Confirmed | The duplicate queries return arrays. The deployed guard used `existingTransfer || existingAddition`, so even two empty arrays evaluated as a duplicate. |
+| Local correction | Passed; deployment required | Both bank-write paths now check whether either result array has a positive length through a shared helper. The API suite passed 20 files / 78 tests, API typecheck passed, and whitespace validation passed. |
+
+No BANK-003 fund addition has been created in this resumed test. **Next exact
+action:** deploy the correction, then post the reserved N1.00 fund addition once
+and retry it once with the same reference. The expected result is one movement
+and one HTTP `409` rejection.

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable, dutyPaymentTransactionsTable, paymentSchedulePaymentsTable, paymentSchedulesTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { hasExistingBankReference, normaliseBankReference } from "../lib/bank-reference-guard.js";
 
 export const banksRouter = Router();
 
@@ -12,12 +13,6 @@ class DuplicateBankReferenceError extends Error {
     super(`A bank movement with reference "${reference}" already exists in this branch.`);
     this.name = "DuplicateBankReferenceError";
   }
-}
-
-function normaliseBankReference(reference: unknown): string | null {
-  if (typeof reference !== "string") return null;
-  const value = reference.trim();
-  return value || null;
 }
 
 banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
@@ -654,7 +649,9 @@ banksRouter.post("/banks/:id/fund-additions", requireBranchAdminOrAbove, async (
           tx.select({ id: bankFundAdditionsTable.id }).from(bankFundAdditionsTable)
             .where(and(eq(bankFundAdditionsTable.branchId, bank.branchId), sql`lower(btrim(${bankFundAdditionsTable.reference})) = ${referenceKey}`)).limit(1),
         ]);
-        if (existingTransfer || existingAddition) throw new DuplicateBankReferenceError(normalisedReference);
+        if (hasExistingBankReference(existingTransfer, existingAddition)) {
+          throw new DuplicateBankReferenceError(normalisedReference);
+        }
       }
 
       const [created] = await tx.insert(bankFundAdditionsTable).values({
@@ -730,7 +727,9 @@ banksRouter.post("/banks/transfers", requireBranchAdminOrAbove, async (req: Auth
           tx.select({ id: bankFundAdditionsTable.id }).from(bankFundAdditionsTable)
             .where(and(eq(bankFundAdditionsTable.branchId, fromBank.branchId), sql`lower(btrim(${bankFundAdditionsTable.reference})) = ${referenceKey}`)).limit(1),
         ]);
-        if (existingTransfer || existingAddition) throw new DuplicateBankReferenceError(normalisedReference);
+        if (hasExistingBankReference(existingTransfer, existingAddition)) {
+          throw new DuplicateBankReferenceError(normalisedReference);
+        }
       }
 
       const [created] = await tx.insert(bankTransfersTable).values({
