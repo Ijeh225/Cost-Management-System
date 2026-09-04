@@ -402,3 +402,13 @@ one fresh labelled payment and one reversal.
 **Next exact action:** wait for a confirmed Owner Super Admin sign-in or an
 authenticated E2E Accounts session before resuming the pending checks. Do not
 repeat speculative login attempts.
+
+### AI-008 Live Re-Test (2026-09-04)
+
+| Test | Result | Evidence |
+| --- | --- | --- |
+| AI-008 exact document citation | Passed | Under `E2E-20260901-Lagos`, one exact query for `E2E-DOCUMENT-RETRIEVAL-20260904.txt` returned one indexed document for `E2EL260901`. The cited record label is `Filename match`, not `Page unavailable`, and directs the user to the container Documents tab. No record was changed. |
+
+`AI-008` is closed. **Next controlled check:** post one fresh labelled
+BANK-003 fund addition, retry the exact reference, and verify HTTP `409` with
+no second movement before progressing to the finance API and DUTY-002 checks.

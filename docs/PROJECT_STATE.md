@@ -1124,6 +1124,19 @@ before planning any further changes.
 - **Next exact action:** obtain a valid Owner Super Admin or E2E Accounts
   session, then resume the documented checks in their existing order.
 
+### AI-008 Live Re-Test (2026-09-04)
+
+- Owner Super Admin access was restored and the exact Lagos query
+  `Find E2E-DOCUMENT-RETRIEVAL-20260904.txt.` was run once.
+- The assistant found one indexed document for `E2EL260901`, cited the correct
+  container Documents tab, and labelled the evidence `Filename match`. The
+  former `Page unavailable` label did not appear. `AI-008` is live-verified
+  and closed.
+- No operational or financial record was changed.
+- **Next exact action:** run the one controlled BANK-003 fund-addition and
+  duplicate-reference rejection check, then capture the remaining authenticated
+  finance API `403` response before starting DUTY-002.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
