@@ -1216,6 +1216,33 @@ before planning any further changes.
   N1.00 payment once, reverse only that new transaction once, reconcile all
   affected views, then restore the N100.00 assessment.
 
+### DUTY-002 Live Re-Test Passed (2026-09-04)
+
+- The reserved controlled payment
+  `E2E-20260904-DUTY-REVERSAL-LIVE-002-PAY` was recorded once for N1.00 on
+  `E2EL260901`, then reversed once through Duty Payment History with reference
+  `E2E-20260904-DUTY-REVERSAL-LIVE-002-REV` and the required E2E reason. The
+  historic `E2E-20260904-DUTY-REVERSAL-001` payment was not changed.
+- History retains the original N1.00 payment as already reversed and shows one
+  linked N1.00 reversal. The product did not offer a second reversal for that
+  payment. This confirms the immutable, one-time reversal workflow.
+- Reconciliation passed: Duty Payments and the Duty Ledger show the N1.00
+  payment and -N1.00 reversal as a net-zero pair; Financial Ledger records a
+  N1.00 Customs duty payment outflow and N1.00 Customs duty reversal inflow;
+  the E2E Lagos bank statement returned to its N1,101.00 closing balance; and
+  Cash Flow shows the matching duty outflow and reversal inflow.
+- The actual-paid P&L also reconciles. It shows N500.00 Customs cost and
+  N701.00 total cost of sales, with the new N1.00 payment-and-reversal pair
+  contributing no net cost. September actual cost of sales remains N700.00.
+- The temporary assessment adjustment was restored successfully: `E2EL260901`
+  is again assessed at N100.00, paid N100.00, has N0.00 outstanding, and is
+  marked Paid. The reversal audit trail remains intentionally retained.
+- `DUTY-002` is live-verified and closed. No source code changed during this
+  final live test.
+- **Next exact action:** review the remaining open or environment-blocked cases
+  in `docs/LIVE_E2E_TEST_REGISTER.md` before scheduling another live write
+  test. Do not repeat completed BANK-003, AI-008, SEC-02, or DUTY-002 cases.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

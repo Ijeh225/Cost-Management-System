@@ -470,3 +470,21 @@ reconcile all affected financial views.
 **Next exact action:** create the reserved N1.00 outstanding balance, post the
 single payment, reverse that same transaction once, reconcile the stated views,
 and restore the original N100.00 assessment.
+
+### DUTY-002 Live Re-Test Passed (2026-09-04)
+
+| Test | Result | Evidence |
+| --- | --- | --- |
+| Temporary assessment | Passed and restored | `E2EL260901` was temporarily changed from N100.00 to N101.00 to create exactly N1.00 outstanding. After the test it was saved back to N100.00; Duty Payments then showed N100.00 assessed, N100.00 paid, N0.00 outstanding, and Paid. |
+| One controlled payment | Passed | One N1.00 payment was recorded from `E2E-20260901 Lagos Test Bank` with `E2E-20260904-DUTY-REVERSAL-LIVE-002-PAY`. |
+| One immutable reversal | Passed | Duty Payment History reversed only that new payment once using `E2E-20260904-DUTY-REVERSAL-LIVE-002-REV` and the reserved E2E reason. History labels the payment Already reversed and shows one linked reversal; no second reversal was available. |
+| Duty and bank reconciliation | Passed | Duty Ledger shows the N1.00 payment and -N1.00 reversal as a net-zero pair. The bank statement shows the N1.00 duty-payment debit and N1.00 duty-reversal credit, returning the E2E Lagos test bank to N1,101.00. |
+| Financial Ledger and Cash Flow | Passed | Financial Ledger records the payment as a N1.00 Customs duty outflow and the reversal as a N1.00 inflow. Cash Flow includes the matching duty outflow and reversal inflow. |
+| Actual-paid P&L | Passed | The all-branch actual-paid P&L shows N500.00 Customs and N701.00 total cost of sales; the N1.00 payment-and-reversal pair has no net effect. September cost of sales remains N700.00. |
+
+`DUTY-002` is closed. The historic `E2E-20260904-DUTY-REVERSAL-001` was not
+modified. No source code changed during this final live verification.
+
+**Next exact action:** review the remaining open and environment-blocked cases
+in this register before starting another controlled test. Do not repeat the
+completed BANK-003, AI-008, SEC-02, or DUTY-002 tests.
