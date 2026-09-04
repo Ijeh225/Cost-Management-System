@@ -239,3 +239,46 @@ Next controlled checks: repair `USER-001`, then create and test separately
 scoped role accounts. `BANK-003` needs duplicate-reference validation before
 runtime re-testing; `DUTY-002` must be implemented before the duty reversal
 test can resume.
+
+## Cross-Role Continuation (2026-09-04)
+
+The owner restored an authorised Super Admin session. The following clearly
+named E2E accounts were created in the Lagos test branch. Passwords are
+intentionally not recorded in repository files.
+
+| Account | Access profile | Result |
+| --- | --- | --- |
+| `E2E Accounts QA` | Staff / Accounts | Created; sign-in opens Accounts Workspace. Direct `/users` and `/banks` redirect to Accounts Workspace. |
+| `E2E Terminal QA` | Staff / Terminal Manager | Created; sign-in opens Terminal Workspace. Direct `/users` redirects to Terminal Workspace. |
+| `E2E Delivery QA` | Staff / Delivery / Transport | Created; sign-in opens Delivery Workspace. Direct `/users` redirects to Delivery Workspace. |
+| `E2E Branch Admin QA` | Branch Admin / General Staff | Created; sign-in shows only the Lagos branch, its scoped data, and its branch members. Direct global `/settings` redirects to the scoped Dashboard. |
+| `E2E Operations QA` | Staff / Operations / Transire + Shipping | Created; sign-in exposes exactly the selected Transire and Shipping workspaces. |
+
+| Test | Result | Evidence |
+| --- | --- | --- |
+| `USER-001` User Management inventory | Passed on re-test | A fresh owner session reports 9 modern profiles, 0 legacy access paths, and lists the owner plus the active E2E users. The earlier empty table was not reproduced. |
+| Operations-profile creation | Passed with required selection | Operations profiles must select at least one workspace. A first intentionally unassigned attempt returned `Invalid access profile`; selecting Transire and Shipping created the profile successfully. This is expected validation, not a defect. |
+| `SEC-02` direct financial route bypass | **Failed - High** | Delivery, Terminal, and Operations Staff accounts have finance modules hidden in the sidebar, yet direct navigation to `/invoices` renders invoice totals, client names, amounts, collections, and overdue balances for their scoped branch. |
+
+### New Defect: SEC-02 - Department roles can bypass hidden financial navigation
+
+- **Priority:** High
+- **Module:** Frontend route authorisation / Invoices
+- **Observed behaviour:** Department accounts that do not have `finance.access`
+  can open `/invoices` directly even though the navigation and quick-start text
+  say financial data is unavailable.
+- **Affected profiles confirmed:** Delivery / Transport, Terminal Manager, and
+  Operations. The branch restriction still applies, but the sensitive finance
+  surface is exposed within that branch.
+- **Root cause identified:** [App.tsx](../artifacts/cost-analysis/src/App.tsx)
+  renders `/invoices` and other ordinary module routes without a capability or
+  department-workspace guard. Sidebar filtering is only a navigation control,
+  not route authorisation.
+- **Required correction:** Add a reusable route guard based on the existing
+  modern access profile and apply it consistently to finance, client, report,
+  operations, and workspace routes. Verify both direct URLs and APIs return a
+  safe redirect or 403 for every denied capability.
+
+**Next priority:** Fix `SEC-02` before performing further financial write
+tests with departmental accounts. Continue the controlled verification only
+after the deployment is retested with the same E2E accounts.

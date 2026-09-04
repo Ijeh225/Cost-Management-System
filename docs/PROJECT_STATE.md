@@ -918,6 +918,29 @@ before planning any further changes.
   tests using clearly labelled E2E accounts. Implement `AI-008`, `BANK-003`,
   and `DUTY-002` before attempting their blocked or failed cases again.
 
+### Cross-Role Continuation (2026-09-04)
+
+- **`USER-001` re-test passed.** A fresh Super Admin session showed the owner
+  and test accounts, 9 modern profiles, and 0 legacy access paths. The earlier
+  empty User Management table was not reproduced.
+- **Created controlled E2E role accounts** in E2E Lagos for Accounts, Terminal
+  Manager, Delivery / Transport, Branch Admin, and Operations. Credentials are
+  deliberately excluded from repository files. The Accounts, Terminal, and
+  Delivery accounts landed in their intended workspace; Branch Admin stayed
+  branch-scoped; Operations required explicit workspace choices and, with
+  Transire plus Shipping selected, correctly exposed only those workspaces.
+- **New High finding `SEC-02`: route authorisation is incomplete.** The UI
+  hides financial modules from Delivery, Terminal, and Operations Staff, but
+  direct `/invoices` navigation still renders invoice totals, customer names,
+  payment collection values, and overdue balances for their authorised branch.
+  `artifacts/cost-analysis/src/App.tsx` applies admin guards to a few routes
+  but renders `/invoices` and many other module routes without a capability
+  guard. Navigation hiding is therefore not access enforcement.
+- **Next exact action:** implement a reusable modern-profile route guard,
+  apply it to every sensitive route, add allow/deny route tests, deploy, then
+  repeat `SEC-02` with the current E2E role accounts. Do not run more
+  departmental financial writes until this High issue is closed.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
