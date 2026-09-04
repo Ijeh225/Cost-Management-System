@@ -1,0 +1,5 @@
+E2E verification only
+
+Unique document-retrieval test fixture for container E2EL260901.
+Reference: E2E-DOC-RETRIEVAL-20260904
+This file contains no client or production information.

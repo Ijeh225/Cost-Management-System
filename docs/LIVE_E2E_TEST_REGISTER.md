@@ -218,3 +218,23 @@ The test is complete only when every execution item is marked Passed, Failed,
 Blocked, or Not Applicable; every created record is identified; financial
 figures are reconciled to their source records; and every defect is prioritised
 with an owner and required correction.
+
+## Authorised Live Test Continuation (2026-09-04)
+
+The owner explicitly confirmed that all records in the live application are
+test data and authorised controlled creation of additional dummy records where
+needed. New test records must remain clearly labelled `E2E verification only`
+and must be logged here before the next financial write.
+
+| Test | Record | Result | Evidence |
+| --- | --- | --- | --- |
+| TD-03 overdue invoice | `INV-202609-004` (ID 11), client `E2E-20260901 Lagos Client`, container `E2ED260901`, total N1,000.00, due 2026-08-01 | Passed | Native date input accepted the past date. After Mark as Sent, the invoice became Overdue and remained Overdue after a full reload. AR showed N1,000.00 gross overdue, the existing N1.00 credit, and N999.00 net receivable. Dashboard showed N3,000.00 invoiced, N2,001.00 collected, and N999.00 outstanding for the same branch. Invoice Aging Report placed it in 31-60 days with 34 days overdue and N1,000.00 outstanding. |
+| DUTY-01 reversal | `E2EL260901`, assessment N100.00, payment reference `E2E-20260904-DUTY-REVERSAL-001` | Blocked - new defect `DUTY-002` | Assessment and payment persisted: Duty Payments shows N500.00 assessed, N500.00 paid, and N0.00 outstanding. A source and route search found no reversal endpoint or UI action for duty payments, so an immutable reversal entry cannot be tested or created. |
+| BANK-003 duplicate reference | Bank transfer and fund-addition routes | Failed - source verified | `POST /banks/transfers` and `POST /banks/:id/fund-additions` accept and insert an optional reference without checking for an existing one. Runtime duplication is not attempted yet, because it would create a second bank movement. |
+| DOC-01 / AI-007 retrieval | `E2E-DOCUMENT-RETRIEVAL-20260904.txt`, document ID 8 | Passed with new defect `AI-008` | The document uploaded to `E2EL260901`, is marked Searchable, opens at `/api/documents/8`, and AI exact search found one indexed match containing its filename and contents. The AI cited-record button opens the correct Documents tab, but the citation label wrongly says `Page unavailable`. |
+| SEC-01 cross-role setup | User Management | Failed - new defect `USER-001` | The active Super Admin session opens User Management, which reports `1 / 1 active profiles migrated` but renders `No users found.` The current owner account is missing from the table, blocking trustworthy account inventory before cross-role testing. |
+
+Next controlled checks: repair `USER-001`, then create and test separately
+scoped role accounts. `BANK-003` needs duplicate-reference validation before
+runtime re-testing; `DUTY-002` must be implemented before the duty reversal
+test can resume.

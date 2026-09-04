@@ -878,6 +878,41 @@ before planning any further changes.
   `git diff --check` passed. Deployment and the controlled re-tests described
   above remain required.
 
+### Authorised Live Test Continuation (2026-09-04)
+
+- The owner confirmed that the deployed data is test-only and authorised
+  controlled dummy records for end-to-end verification. Every new record must
+  remain clearly labelled `E2E verification only` and be captured in
+  `docs/LIVE_E2E_TEST_REGISTER.md`.
+- **TD-03 passed:** created `INV-202609-004` (ID 11) for `E2ED260901` with a
+  native past due date of 2026-08-01. Sending it produced Overdue status, which
+  persisted after reload. Accounts Receivable reported N1,000.00 gross overdue
+  and N999.00 net receivable after the existing N1.00 credit. The Dashboard
+  reconciled to N3,000.00 invoiced, N2,001.00 collected, and N999.00
+  outstanding under the same E2E branch. Invoice Aging Report also listed the
+  record in 31-60 days, 34 days overdue, with N1,000.00 outstanding.
+- **DUTY-002 discovered:** controlled assessment and payment for `E2EL260901`
+  persisted at N100.00 under reference `E2E-20260904-DUTY-REVERSAL-001`, but
+  the application has no duty-payment reversal route or user action. A reversal
+  test cannot continue until the system supports a traceable immutable reversal
+  entry that reconciles the Duty, Bank, Ledger, Cash Flow, and P&L views.
+- **BANK-003 discovered:** the transfer and fund-addition API routes insert
+  optional references without checking for an existing reference. A duplicate
+  runtime write was not attempted because the source confirms the missing
+  protection; add validation before re-testing it.
+- **DOC-01 / AI-007 passed; AI-008 discovered:** uploaded
+  `E2E-DOCUMENT-RETRIEVAL-20260904.txt` to `E2EL260901`, verified its direct
+  stored link, and confirmed AI exact search retrieves its indexed filename and
+  contents. The AI citation opens the correct Documents tab but incorrectly
+  labels the available target as `Page unavailable`.
+- **USER-001 discovered:** User Management reports one active modern access
+  profile but lists no users, including the signed-in owner Super Admin. Repair
+  the user listing and account inventory before depending on it for cross-role
+  verification.
+- **Next exact action:** repair `USER-001`, then create and execute cross-role
+  tests using clearly labelled E2E accounts. Implement `AI-008`, `BANK-003`,
+  and `DUTY-002` before attempting their blocked or failed cases again.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
