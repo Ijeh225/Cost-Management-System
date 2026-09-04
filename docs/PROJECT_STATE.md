@@ -909,6 +909,11 @@ before planning any further changes.
   profile but lists no users, including the signed-in owner Super Admin. Repair
   the user listing and account inventory before depending on it for cross-role
   verification.
+- **SEC-01 partial pass:** created and signed into the dedicated Documentation
+  test account for E2E Lagos. It reaches Documentation but is redirected from
+  both `/users` and `/banks`, which confirms those restricted surfaces are
+  denied. The remaining role accounts require the owner Super Admin session to
+  be restored; the owner password is intentionally not stored in project files.
 - **Next exact action:** repair `USER-001`, then create and execute cross-role
   tests using clearly labelled E2E accounts. Implement `AI-008`, `BANK-003`,
   and `DUTY-002` before attempting their blocked or failed cases again.
