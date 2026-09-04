@@ -977,6 +977,19 @@ before planning any further changes.
   Railway marks it active; then repeat the denied Operations `/invoices` URL
   and API checks plus the allowed Accounts and Branch Admin finance checks.
 
+### SEC-02 Scope Completion: Client Data (2026-09-04)
+
+- During the live Delivery re-test, the corrected `/invoices` route redirected
+  to Delivery Workspace as intended, but direct `/clients` still displayed an
+  owed client balance and an `Add Client` control. This contradicted the
+  Delivery quick-start promise that client records are unavailable.
+- The same `finance.access` policy now protects the Clients router and both
+  client web routes. This is an extension of the existing finance capability,
+  not a new role or parallel permission model.
+- **Local verification:** cost-analysis type check passed and API suite passed
+  (17 files, 71 tests). Deploy and re-test Delivery `/clients` before closing
+  the full route-authorisation finding.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

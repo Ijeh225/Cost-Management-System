@@ -6,11 +6,13 @@ import {
   usersTable, banksTable,
 } from "@workspace/db";
 import { eq, desc, sum, inArray, gte, and, isNull, isNotNull, sql } from "drizzle-orm";
-import { requireAuth, requireBranchAdminOrAbove, AuthRequest, verifyPassword, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, verifyPassword, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 import { isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 
 export const clientsRouter = Router();
+
+clientsRouter.use(requireFinanceAccess);
 
 clientsRouter.get("/clients", requireAuth, async (req: AuthRequest, res) => {
   try {

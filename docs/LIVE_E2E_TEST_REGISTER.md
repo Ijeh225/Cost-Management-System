@@ -311,3 +311,16 @@ financial URLs redirect to the assigned workspace and their API calls return
 **Next controlled check:** deploy the narrow TypeScript correction. Only once
 Railway makes that build active may the Operations, Accounts, and Branch Admin
 direct-route/API `SEC-02` verification be recorded as passed or failed.
+
+### SEC-02 Scope Completion: Client Data (2026-09-04)
+
+| Test | Result | Evidence |
+| --- | --- | --- |
+| Delivery direct `/invoices` after `47a7677` | Passed | The Operations, Terminal, and Delivery non-finance route guard redirected each tested profile to its own workspace instead of rendering invoice figures. Accounts continued to open Invoices. |
+| Delivery direct `/clients` | **Failed - High, same root cause** | The Delivery quick-start says client records are unavailable, yet `/clients` rendered the E2E Lagos client, a N1,000.00 owed balance, and an `Add Client` control. |
+| Client access correction | Pending deployment | The existing `finance.access` capability now guards the Client API and both client web routes. Cost-analysis typecheck and all 71 API tests pass locally. |
+
+The browser test environment blocks direct `/api/*` navigation, so the API 403
+cannot be observed there. The deployed middleware is covered by the shared
+capability test and local API suite; repeat an authenticated API check when an
+environment without that browser limitation is available.

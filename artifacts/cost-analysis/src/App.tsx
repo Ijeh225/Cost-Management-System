@@ -330,8 +330,8 @@ function Router() {
               <Route path="/reports/disbursement-reconciliation">
                 <FinanceGuard><DisbursementReconciliationPage /></FinanceGuard>
               </Route>
-              <Route path="/clients" component={ClientsPage} />
-              <Route path="/clients/:id" component={ClientDetailPage} />
+              <Route path="/clients"><FinanceGuard><ClientsPage /></FinanceGuard></Route>
+              <Route path="/clients/:id"><FinanceGuard><ClientDetailPage /></FinanceGuard></Route>
               <Route path="/notifications" component={NotificationsPage} />
               <Route path="/operations"><BranchAdminOrAboveGuard><OperationsPage /></BranchAdminOrAboveGuard></Route>
               <Route path="/operations/:id" component={OperationDetailPage} />
