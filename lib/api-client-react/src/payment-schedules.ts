@@ -11,7 +11,7 @@ export type PaymentScheduleStatus =
   | "cancelled";
 
 export type PaymentSchedulePriority = "low" | "normal" | "urgent";
-export type PaymentScheduleBucket = "today" | "tomorrow" | "upcoming" | "completed" | "cancelled";
+export type PaymentScheduleBucket = "overdue" | "today" | "tomorrow" | "upcoming" | "completed" | "cancelled";
 
 export type PaymentSchedule = {
   id: number;

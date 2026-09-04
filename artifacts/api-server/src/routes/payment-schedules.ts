@@ -24,9 +24,10 @@ import {
   requireFinanceAccess,
   userCanAccessBranch,
 } from "../lib/auth.js";
-import { hasAuthority, resolveAccessProfile } from "../lib/authorization.js";
+import { hasAuthority } from "../lib/authorization.js";
 import { deleteDocument, documentExists, getDocument, saveDocument } from "../lib/document-storage.js";
 import { exceedsApprovedPaymentBalance, exceedsOverheadPaymentBalance, isScheduleReadyToComplete } from "../lib/payment-rules.js";
+import { getPaymentScheduleBucket, startOfLocalDay } from "../lib/payment-schedule-buckets.js";
 
 export const paymentSchedulesRouter = Router();
 
@@ -38,9 +39,7 @@ const OPEN_STATUSES = new Set(["pending_approval", "partially_approved", "approv
 const PRIORITIES = new Set(["low", "normal", "urgent"]);
 
 function startOfDay(date: Date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return startOfLocalDay(date);
 }
 
 function addDays(date: Date, days: number) {
@@ -71,17 +70,6 @@ function isApprover(req: AuthRequest) {
 
 function canMarkPaid(req: AuthRequest) {
   return isApprover(req) || req.user?.accessProfile.jobFunction === "accounts";
-}
-
-function bucketForSchedule(scheduleDate: Date, status: string, today = startOfDay(new Date())) {
-  const day = startOfDay(scheduleDate);
-  const tomorrow = addDays(today, 1);
-  const dayAfterTomorrow = addDays(today, 2);
-  if (status === "completed" || status === "paid") return "completed";
-  if (status === "cancelled" || status === "rejected") return "cancelled";
-  if (day < tomorrow) return "today";
-  if (day < dayAfterTomorrow) return "tomorrow";
-  return "upcoming";
 }
 
 function overdueDays(scheduleDate: Date, status: string, today = startOfDay(new Date())) {
@@ -134,7 +122,7 @@ function formatSchedule(row: PaymentSchedule & {
     balance,
     priority: row.priority,
     status: row.status,
-    bucket: bucketForSchedule(row.scheduleDate, row.status),
+    bucket: getPaymentScheduleBucket(row.scheduleDate, row.status),
     overdueDays: days,
     overdueLevel: overdueLevel(days),
     eventCount: row.eventCount ?? 0,
@@ -181,27 +169,20 @@ async function notifyUsers(params: {
   actionUrl?: string | null;
 }) {
   try {
+    if (params.target !== "creator") {
+      // One role-group event, with visibility resolved when history is read.
+      await db.insert(workflowNotificationsTable).values({
+        branchId: params.branchId,
+        type: params.type,
+        message: params.message,
+        actionUrl: params.actionUrl ?? null,
+      });
+      return;
+    }
+
     let targets: number[] = [];
     if (params.target === "creator") {
       targets = params.creatorId ? [params.creatorId] : [];
-    } else {
-      const users = await db.select({
-        id: usersTable.id,
-        authorityLevel: usersTable.authorityLevel,
-        jobFunction: usersTable.jobFunction,
-        workspaceAccess: usersTable.workspaceAccess,
-        accessProfileMigratedAt: usersTable.accessProfileMigratedAt,
-        branchId: usersTable.branchId,
-      }).from(usersTable).where(eq(usersTable.isActive, true));
-      targets = users
-        .filter((u) => {
-          const profile = resolveAccessProfile(u);
-          const sameBranchOrGlobal = hasAuthority(profile, "super_admin") || u.branchId === params.branchId;
-          if (!sameBranchOrGlobal) return false;
-          if (params.target === "approvers") return hasAuthority(profile, "admin");
-          return profile.jobFunction === "accounts" || hasAuthority(profile, "admin");
-        })
-        .map((u) => u.id);
     }
     const uniqueTargets = [...new Set(targets)].filter(Boolean);
     if (uniqueTargets.length === 0) return;
@@ -318,6 +299,7 @@ paymentSchedulesRouter.get("/payment-schedules", requireAuth, async (req: AuthRe
       ? scopedSchedules.filter((schedule) => schedule.bucket === bucket)
       : scopedSchedules;
     const bucketCounts = {
+      overdue: scopedSchedules.filter((s) => s.bucket === "overdue").length,
       today: scopedSchedules.filter((s) => s.bucket === "today").length,
       tomorrow: scopedSchedules.filter((s) => s.bucket === "tomorrow").length,
       upcoming: scopedSchedules.filter((s) => s.bucket === "upcoming").length,

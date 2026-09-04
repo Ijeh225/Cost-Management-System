@@ -42,6 +42,7 @@ import { buildAiInvestigationPlan } from "../lib/ai-investigation-plan.js";
 import { buildAiAnswerPresentation } from "../lib/ai-answer-presentation.js";
 import { describeDocumentSearchMatch } from "../lib/ai-document-search-match.js";
 import { analyseAccountantControls } from "../lib/ai-accountant-intelligence.js";
+import { paymentScheduleLookupQuery } from "../lib/ai-payment-schedule-lookup.js";
 import { canUseAiAssistantRollout } from "../lib/ai-rollout-policy.js";
 import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 import { hasAuthority, resolveAccessProfile } from "../lib/authorization.js";
@@ -288,15 +289,6 @@ function documentJobIdentifier(question: string): string | null {
   return candidates.find((candidate) => /[A-Z]/.test(candidate) && /\d/.test(candidate)) ?? null;
 }
 
-function paymentScheduleLookupQuery(question: string): string | null {
-  const quoted = question.match(/["']([^"']{2,160})["']/);
-  if (quoted?.[1]) return quoted[1].trim();
-  const match = question.match(/\b(?:payment\s+schedule|schedule)\s+(?:for|named|called)\s+(.{2,160})$/i);
-  if (match?.[1]) return match[1].trim();
-  const identifier = question.match(/\b(?:payment\s+schedule|schedule)\s+(.{2,160})$/i)?.[1]?.trim() ?? "";
-  return /\d/.test(identifier) ? identifier : null;
-}
-
 function interpretQuestionFallback(question: string): CopilotIntent {
   const understanding = understandAiQuestion(question);
   const normalised = question.trim().toLowerCase();
@@ -370,6 +362,11 @@ async function interpretNaturalLanguageQuestion(question: string, req: AuthReque
   }
   const understanding = understandAiQuestion(question);
   const deterministicIntent = interpretQuestionFallback(question);
+  // A named schedule has an exact-match reader. Do not let the model reduce it
+  // to the generic approved-schedules question.
+  if (deterministicIntent.toolId === "approved_payment_schedules" && paymentScheduleLookupQuery(question)) {
+    return deterministicIntent;
+  }
   if (deterministicIntent.toolId && (understanding.containerNumber || understanding.invoiceNumber || understanding.stage || understanding.asksForDelays)) {
     return deterministicIntent;
   }

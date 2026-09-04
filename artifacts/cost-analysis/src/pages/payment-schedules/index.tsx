@@ -80,6 +80,7 @@ const OVERDUE_COLORS = {
 };
 
 const BUCKETS: Array<{ value: PaymentScheduleBucket; label: string }> = [
+  { value: "overdue", label: "Overdue Schedules" },
   { value: "today", label: "Today's Schedule" },
   { value: "tomorrow", label: "Tomorrow's Schedule" },
   { value: "upcoming", label: "Upcoming Schedules" },

@@ -1105,10 +1105,9 @@ notificationsRouter.get("/workflow-notifications", requireAuth, async (req: Auth
           .orderBy(desc(workflowNotificationsTable.createdAt))
           .limit(limit);
 
-    let notifications = allWorkflow;
-    if (!isAdminProfile(profile)) {
-      notifications = notifications.filter(n => isWorkflowNotificationVisibleToUser(n, profile, userId));
-    }
+    // Targeted rows are personal. This also hides historic recipient fan-out
+    // copies from admins, while untargeted role events stay visible by policy.
+    let notifications = allWorkflow.filter(n => isWorkflowNotificationVisibleToUser(n, profile, userId));
     if (typeFilter !== "all") notifications = notifications.filter(n => n.type === typeFilter);
     if (readFilter === "read") notifications = notifications.filter(n => n.isRead);
     if (readFilter === "unread") notifications = notifications.filter(n => !n.isRead);
@@ -1140,8 +1139,7 @@ notificationsRouter.post("/workflow-notifications/:id/read", requireAuth, async 
     if (!existing || !userCanAccessBranch(req, existing.branchId)) {
       return res.status(404).json({ error: "Notification not found" });
     }
-    const isAdmin = isAdminProfile(req.user!.accessProfile);
-    if (!isAdmin && !isWorkflowNotificationVisibleToUser(existing, req.user!.accessProfile, req.user!.id)) {
+    if (!isWorkflowNotificationVisibleToUser(existing, req.user!.accessProfile, req.user!.id)) {
       return res.status(403).json({ error: "Cannot mark another user's notification as read" });
     }
     await db.update(workflowNotificationsTable)
@@ -1157,29 +1155,22 @@ notificationsRouter.post("/workflow-notifications/:id/read", requireAuth, async 
 notificationsRouter.post("/workflow-notifications/read-all", requireAuth, async (req: AuthRequest, res) => {
   try {
     const branchScope = getBranchScope(req);
-    const isAdmin = isAdminProfile(req.user!.accessProfile);
     const userId = req.user!.id;
     const unreadClause = eq(workflowNotificationsTable.isRead, false);
     const branchClause = branchScope !== null ? eq(workflowNotificationsTable.branchId, branchScope) : undefined;
     const baseWhere = and(unreadClause, branchClause);
 
-    if (isAdmin) {
+    const rows = await db.select()
+      .from(workflowNotificationsTable)
+      .where(baseWhere)
+      .limit(1000);
+    const visibleIds = rows
+      .filter(n => isWorkflowNotificationVisibleToUser(n, req.user!.accessProfile, userId))
+      .map(n => n.id);
+    if (visibleIds.length > 0) {
       await db.update(workflowNotificationsTable)
         .set({ isRead: true, readAt: new Date() })
-        .where(baseWhere);
-    } else {
-      const rows = await db.select()
-        .from(workflowNotificationsTable)
-        .where(baseWhere)
-        .limit(1000);
-      const visibleIds = rows
-        .filter(n => isWorkflowNotificationVisibleToUser(n, req.user!.accessProfile, userId))
-        .map(n => n.id);
-      if (visibleIds.length > 0) {
-        await db.update(workflowNotificationsTable)
-          .set({ isRead: true, readAt: new Date() })
-          .where(inArray(workflowNotificationsTable.id, visibleIds));
-      }
+        .where(inArray(workflowNotificationsTable.id, visibleIds));
     }
     return res.json({ success: true });
   } catch (err) {

@@ -461,21 +461,13 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payment-schedules", requireB
     });
 
     try {
-      const adminUsers = await db.select({ id: usersTable.id, role: usersTable.role, branchId: usersTable.branchId })
-        .from(usersTable)
-        .where(eq(usersTable.isActive, true));
-      const targets = adminUsers
-        .filter(u => u.role === "super_admin" || (u.role === "admin" && u.branchId === expense.branchId))
-        .map(u => u.id);
-      if (targets.length > 0) {
-        await db.insert(workflowNotificationsTable).values([...new Set(targets)].map(targetUserId => ({
-          branchId: expense.branchId,
-          type: "payment_schedule_created",
-          message: `${req.user?.name ?? "A user"} scheduled overhead payment ${amount.toLocaleString("en-NG")} for ${vendorBeneficiary}`,
-          targetUserId,
-          actionUrl: `/payment-schedules?focus=${schedule.id}`,
-        })));
-      }
+      // One schedule creates one shared event; reader policy decides who sees it.
+      await db.insert(workflowNotificationsTable).values({
+        branchId: expense.branchId,
+        type: "payment_schedule_created",
+        message: `${req.user?.name ?? "A user"} scheduled overhead payment ${amount.toLocaleString("en-NG")} for ${vendorBeneficiary}`,
+        actionUrl: `/payment-schedules?focus=${schedule.id}`,
+      });
     } catch (notifyErr) {
       console.warn("[overhead-expenses] payment schedule notification warning:", notifyErr);
     }

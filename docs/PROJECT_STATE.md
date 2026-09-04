@@ -1390,3 +1390,27 @@ When updating this file, change only what is needed and always record:
 2. Tests/builds actually run and their result.
 3. Deployment or live-test evidence actually observed.
 4. The next exact action, in priority order.
+
+## Remaining Confirmed Defects - Source Fixes Implemented (2026-09-04)
+
+The following fixes are implemented locally and verified by unit tests,
+typechecks, and production builds. They are **not marked live-passed** until
+the deployed application is re-tested.
+
+| Defect | Source correction | Live re-test required |
+| --- | --- | --- |
+| `AR-002` | Invoice Aging now applies `isInvoiceFinanciallyActive`, the same eligible-invoice rule used by Accounts Receivable. Draft, cancelled, and written-off invoices cannot enter aging totals or printable aging. | Confirm both the Aging page and its print route exclude `INV-202609-002` and `INV-202609-003`. |
+| `NOTIF-002` | Payment-schedule group notices are now one untargeted business event instead of one row per recipient. Historical recipient rows are filtered by the signed-in recipient, preserving audit rows without showing an admin every copy. | Create and approve one controlled schedule; each signed-in recipient must see one Scheduled event and one Approved event. |
+| `AI-005` | Exact singular payment-schedule questions now take a deterministic, punctuation-normalised vendor/description lookup path before model routing. The existing exact-match reader returns the named record or no match, never a substitute. | Query the full `E2E-20260901 Scheduled Test Vendor` name and confirm the paid N500 record is cited. |
+| `AI-006` | In All Branches, saved briefings are rendered as **Historical finance & control briefing** with a Historical snapshot badge. No saved data is changed. | Confirm All Branches cannot generate a new briefing and no displayed saved briefing calls itself Current. |
+| `NOTIF-001` | `paar_overdue` now has its own PAAR Overdue notification configuration instead of falling through to Low Profit Margin. | Confirm an existing PAAR deadline alert is labelled PAAR Overdue. |
+| `SCHED-002` | Open schedules before today now enter a separate Overdue bucket. Today, Tomorrow, Upcoming, Completed, and Cancelled retain their exact date/status meanings. | Confirm the 2026-08-27 schedule is in Overdue and Today's Schedule contains only records due today. |
+
+**Validation completed locally:** API unit suite (22 files, 83 tests), root
+workspace typecheck, web typecheck, web production build, and API production
+build all passed. The web build reported only pre-existing source-map and
+chunk-size warnings.
+
+**Next exact action:** push and deploy this correction, then perform the six
+listed live re-tests in the table order. Do not repeat the already closed
+`BANK-003`, `AI-008`, `SEC-02`, or `DUTY-002` controls.

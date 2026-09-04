@@ -563,3 +563,24 @@ No financial or operational record was created or changed for these visual
 checks. **Next exact action:** prioritize fixes for `AR-002`, `AI-005`,
 `AI-006`, `NOTIF-001`, `NOTIF-002`, and `SCHED-002`; reserve `BRN-001`,
 `APR-001`, and `DEL-001` for controlled workflow verification.
+
+### Remaining Confirmed Defects - Source Fixes Implemented (2026-09-04)
+
+These changes have passed local verification but still require deployment and
+the live evidence below before their register status can move to Passed.
+
+| Defect | Implemented correction | Required live evidence |
+| --- | --- | --- |
+| `AR-002` | Aging uses the canonical financially-active invoice rule, excluding draft, cancelled, and written-off invoices. | Aging page and print route exclude both cancelled E2E invoices. |
+| `NOTIF-002` | Payment-schedule group events are written once, not once per recipient; historical targeted copies are shown only to their intended recipient. | One new controlled schedule produces one Payment Scheduled and one Payment Approved event per recipient. |
+| `AI-005` | Named vendor lookups are deterministic and punctuation-safe before model selection. | Exact controlled vendor query cites the N500 paid schedule, with no unrelated schedule. |
+| `AI-006` | All Branches displays saved briefing data as a Historical snapshot. | Saved all-branches briefing is not labelled Current. |
+| `NOTIF-001` | `paar_overdue` has a dedicated PAAR Overdue label. | Existing PAAR deadline alert displays that label. |
+| `SCHED-002` | Past-due open schedules have a dedicated Overdue tab; Today is date-exact. | 2026-08-27 record is Overdue and not in Today's Schedule. |
+
+**Local validation:** API unit suite passed (22 files / 83 tests); root and
+web typechecks passed; API and web production builds passed. No live data was
+created or changed while implementing these corrections.
+
+**Next exact action:** deploy, then execute the six live re-tests above in
+the listed order. Existing completed control checks remain closed.

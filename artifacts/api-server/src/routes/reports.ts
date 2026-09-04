@@ -7,6 +7,7 @@ import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOp
 import { deliverReportSubscription } from "../lib/report-delivery.js";
 import { normalizeReportRecipients, normalizeReportSendAt, normalizeReportSendDayOfWeek, SCHEDULED_REPORT_FREQUENCIES, SCHEDULED_REPORT_KINDS } from "../lib/report-delivery-rules.js";
 import { FINANCIAL_BASIS, normalizeContainerCostBasis, profitLossBasis } from "../lib/financial-reporting.js";
+import { isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 
 export const reportsRouter = Router();
 
@@ -2127,7 +2128,10 @@ reportsRouter.get("/reports/invoice-aging", requireAuth, requireBranchMemberOrAb
       .where(branchScope.id !== null ? eq(invoicesTable.branchId, branchScope.id) : undefined)
       .orderBy(invoicesTable.dueDate);
 
-    const invoiceIds = invoices.map(i => i.id);
+    // Aging is an accounts-receivable report. Keep draft, cancelled, and
+    // written-off invoices in their audit views but out of outstanding debt.
+    const eligibleInvoices = invoices.filter((invoice) => isInvoiceFinanciallyActive(invoice.status));
+    const invoiceIds = eligibleInvoices.map(i => i.id);
     const payments = invoiceIds.length > 0
       ? await db.select({ invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount }).from(invoicePaymentsTable).where(inArray(invoicePaymentsTable.invoiceId, invoiceIds))
       : [];
@@ -2143,7 +2147,7 @@ reportsRouter.get("/reports/invoice-aging", requireAuth, requireBranchMemberOrAb
     };
     const bucketTotals: Record<string, number> = { current: 0, days1to30: 0, days31to60: 0, days61to90: 0, days90plus: 0 };
 
-    for (const inv of invoices) {
+    for (const inv of eligibleInvoices) {
       const total = parseFloat(inv.total ?? "0");
       const paid = paidMap.get(inv.id) ?? 0;
       const outstanding = Math.max(0, total - paid);
