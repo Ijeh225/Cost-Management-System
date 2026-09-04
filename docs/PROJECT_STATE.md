@@ -1113,6 +1113,17 @@ before planning any further changes.
   authenticated finance API `403` capture, and the single controlled DUTY-002
   reversal reconciliation.
 
+### Owner Authentication Attempt (2026-09-04)
+
+- The supplied Owner Super Admin sign-in was attempted once and the application
+  returned HTTP `401 Invalid credentials`. No credential is stored in this
+  repository, and no live record or user access was changed.
+- This is an authentication blocker, not an application defect: do not retry
+  until the owner supplies a confirmed current sign-in or an authenticated E2E
+  Accounts session is restored.
+- **Next exact action:** obtain a valid Owner Super Admin or E2E Accounts
+  session, then resume the documented checks in their existing order.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

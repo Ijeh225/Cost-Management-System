@@ -392,3 +392,13 @@ to run the pending live checks once, in this order: AI-008 exact document query,
 BANK-003 duplicate-reference `409` with no second movement, an authenticated
 finance API `403` through a client that reaches `/api/*`, then DUTY-002 using
 one fresh labelled payment and one reversal.
+
+### Owner Authentication Attempt (2026-09-04)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Supplied Owner Super Admin sign-in | Blocked | One attempt returned HTTP `401 Invalid credentials`. No test data, financial record, or user access was changed. Credentials are not recorded here. |
+
+**Next exact action:** wait for a confirmed Owner Super Admin sign-in or an
+authenticated E2E Accounts session before resuming the pending checks. Do not
+repeat speculative login attempts.
