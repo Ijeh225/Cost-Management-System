@@ -1397,6 +1397,10 @@ The following fixes are implemented locally and verified by unit tests,
 typechecks, and production builds. They are **not marked live-passed** until
 the deployed application is re-tested.
 
+**Implementation commit:** `c7db5bc` (`Fix remaining reporting, AI,
+notification, and schedule defects`) was pushed to `origin/master` on
+2026-09-04.
+
 | Defect | Source correction | Live re-test required |
 | --- | --- | --- |
 | `AR-002` | Invoice Aging now applies `isInvoiceFinanciallyActive`, the same eligible-invoice rule used by Accounts Receivable. Draft, cancelled, and written-off invoices cannot enter aging totals or printable aging. | Confirm both the Aging page and its print route exclude `INV-202609-002` and `INV-202609-003`. |

@@ -569,6 +569,9 @@ checks. **Next exact action:** prioritize fixes for `AR-002`, `AI-005`,
 These changes have passed local verification but still require deployment and
 the live evidence below before their register status can move to Passed.
 
+**Implementation commit:** `c7db5bc` was pushed to `origin/master` on
+2026-09-04.
+
 | Defect | Implemented correction | Required live evidence |
 | --- | --- | --- |
 | `AR-002` | Aging uses the canonical financially-active invoice rule, excluding draft, cancelled, and written-off invoices. | Aging page and print route exclude both cancelled E2E invoices. |
