@@ -14,6 +14,7 @@ export type AuthContextType = {
   isBranchAdmin: boolean;
   isAdminOrAbove: boolean;
   isBranchMember: boolean;
+  canAccessFinance: boolean;
   userRole: string | null;
   userRoles: string[];
   isDepartmentUser: boolean;
@@ -33,7 +34,7 @@ export type AuthContextType = {
   workspaceHome: string | null;
 };
 
-type WorkspaceKey = "documentation" | "accounts" | "transire" | "shipping" | "terminal" | "pullout" | "terminal_manager" | "delivery" | "security";
+export type WorkspaceKey = "documentation" | "accounts" | "transire" | "shipping" | "terminal" | "pullout" | "terminal_manager" | "delivery" | "security";
 
 export type ClientAccessProfile = {
   source: "modern" | "invalid";
@@ -69,6 +70,7 @@ const AuthContext = createContext<AuthContextType>({
   isBranchAdmin: false,
   isAdminOrAbove: false,
   isBranchMember: false,
+  canAccessFinance: false,
 });
 
 async function checkSetupRequired(): Promise<{ required: boolean }> {
@@ -185,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isBranchAdmin = authorityLevel === "branch_admin";
   const isAdminOrAbove = authorityLevel === "super_admin" || authorityLevel === "admin" || authorityLevel === "branch_admin";
   const isBranchMember = authorityLevel !== null;
+  const canAccessFinance = isBranchAdmin || isAdmin || hasModernWorkspace("accounts");
 
   return (
     <AuthContext.Provider
@@ -197,6 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isBranchAdmin,
         isAdminOrAbove,
         isBranchMember,
+        canAccessFinance,
         userRole: authorityLevel,
         userRoles: authorityLevel ? [authorityLevel] : [],
         isDocumentationUser: hasModernWorkspace("documentation"),

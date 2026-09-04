@@ -263,7 +263,7 @@ export function hasCapability(profile: ResolvedAccessProfile, capability: Capabi
     case "records.read_branch":
       return true;
     case "finance.access":
-      return profile.authorityLevel === "admin" || profile.jobFunction === "accounts";
+      return hasAuthority(profile, "branch_admin") || profile.jobFunction === "accounts";
     case "documentation.access":
       return profile.authorityLevel === "admin" || profile.jobFunction === "documentation";
     case "terminal_manager.supervise":

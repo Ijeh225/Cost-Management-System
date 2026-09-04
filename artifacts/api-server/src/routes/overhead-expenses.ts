@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { db, overheadExpensesTable, overheadExpenseTopupsTable, expenseCategoriesTable, expensePaymentsTable, banksTable, usersTable, branchesTable, paymentSchedulesTable, paymentScheduleEventsTable, workflowNotificationsTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, inArray, sql } from "drizzle-orm";
-import { requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
 export const overheadExpensesRouter = Router();
+
+overheadExpensesRouter.use(requireFinanceAccess);
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 

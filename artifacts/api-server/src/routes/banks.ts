@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, invoicesTable, clientDepositsTable, clientsTable, overheadExpensesTable, bankFundAdditionsTable, expensePaymentsTable, containerExpensePaymentsTable, containerExpenseCategoriesTable, containersTable, dutyPaymentTransactionsTable, paymentSchedulePaymentsTable, paymentSchedulesTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull, sql } from "drizzle-orm";
-import { requireAuth, requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
 export const banksRouter = Router();
+
+banksRouter.use(requireFinanceAccess);
 
 banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
   try {

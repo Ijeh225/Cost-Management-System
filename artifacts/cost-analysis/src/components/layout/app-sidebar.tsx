@@ -55,7 +55,7 @@ function isNavItemActive(location: string, item: NavItem) {
 export function AppSidebar() {
   const [location] = useLocation();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const { isAdmin, isSuperAdmin, isBranchAdmin, isAdminOrAbove, isBranchMember, isAuthenticated, user, isDocumentationUser, isAccountsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser } = useAuth();
+  const { isAdmin, isSuperAdmin, isBranchAdmin, isAdminOrAbove, isAuthenticated, user, isDocumentationUser, isAccountsUser, isTransireUser, isShippingUser, isTerminalUser, isPullOutUser, isShippingTerminalUser, isTerminalManager, isDeliveryUser, isDepartmentUser, isSecurityUser, canAccessFinance } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { activeBranchId, setActiveBranch, branches } = useBranchScope();
   const userBranchName = user?.branchName
@@ -79,10 +79,10 @@ export function AppSidebar() {
     { title: "Documentation",   url: "/documentation",  icon: FileCheck2       },
     { title: "Containers",      url: "/containers",     icon: Box              },
     { title: "Clients",         url: "/clients",        icon: Building2        },
-    { title: "Invoices",        url: "/invoices",       icon: FileText         },
+    ...(canAccessFinance ? [{ title: "Invoices", url: "/invoices", icon: FileText }] : []),
     ...(canSeeDutyPayments ? [{ title: "Duty Payments", url: "/duty-payments", icon: Banknote }] : []),
-    { title: "Accounts Receivable", url: "/accounts-receivable", icon: BookOpen },
-    { title: "Payment Schedule", url: "/payment-schedules", icon: CalendarClock },
+    ...(canAccessFinance ? [{ title: "Accounts Receivable", url: "/accounts-receivable", icon: BookOpen }] : []),
+    ...(canAccessFinance ? [{ title: "Payment Schedule", url: "/payment-schedules", icon: CalendarClock }] : []),
     { title: "My Tasks",        url: "/my-tasks",       icon: ListTodo         },
     { title: "Notifications",   url: "/notifications",  icon: Bell, badge: unreadCount },
     ...(staffCanUpload ? [{ title: "Upload Data", url: "/containers/upload", icon: UploadCloud }] : []),
@@ -92,7 +92,7 @@ export function AppSidebar() {
     { title: "Approval Queue",   url: "/approvals",              icon: ClipboardCheck },
     { title: "Pipeline Board",   url: "/pipeline",               icon: Kanban          },
     { title: "Analytics",        url: "/analytics",              icon: BarChart2       },
-    ...(isBranchMember ? [{ title: "Reports", url: "/reports", icon: FileDown }] : []),
+    ...(canAccessFinance ? [{ title: "Reports", url: "/reports", icon: FileDown }] : []),
     ...(isSuperAdmin ? [{ title: "Branch Comparison", url: "/reports/branch-comparison", icon: BarChart2 }] : []),
     { title: "Bank Management",  url: "/banks",                  icon: Landmark        },
     { title: "Container Payments", url: "/container-payments",  icon: CreditCard      },

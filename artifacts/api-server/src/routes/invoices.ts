@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable, workflowNotificationsTable, userClientAssignmentsTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
-import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
+import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { toE164Nigerian, sendWhatsAppTemplate, assertBranchWhatsAppSenderSupported } from "../lib/whatsapp.js";
 import { getEffectiveInvoiceStatus, isInvoiceCollectable, isInvoiceEditable } from "../lib/invoice-status.js";
 
 const router = Router();
+
+router.use(requireFinanceAccess);
 
 function pad(n: number, len = 3) {
   return String(n).padStart(len, "0");

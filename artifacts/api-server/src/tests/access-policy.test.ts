@@ -45,6 +45,24 @@ describe("profile-only access policy", () => {
     expect(hasWorkspace(profile, "shipping")).toBe(false);
   });
 
+  it("allows finance access only to accounts staff and branch authority or above", () => {
+    const branchAdmin = resolveAccessProfile({
+      authorityLevel: "branch_admin",
+      jobFunction: "general_staff",
+      workspaceAccess: "[]",
+      accessProfileMigratedAt: new Date(),
+    });
+    const delivery = resolveAccessProfile({
+      authorityLevel: "staff",
+      jobFunction: "delivery",
+      workspaceAccess: JSON.stringify(["delivery"]),
+      accessProfileMigratedAt: new Date(),
+    });
+
+    expect(hasCapability(branchAdmin, "finance.access")).toBe(true);
+    expect(hasCapability(delivery, "finance.access")).toBe(false);
+  });
+
   it("requires an Operations workspace and preserves explicit multi-workspace access", () => {
     const invalid = resolveAccessProfile({ authorityLevel: "staff", jobFunction: "operations", workspaceAccess: "[]", accessProfileMigratedAt: new Date() });
     const valid = resolveAccessProfile({ authorityLevel: "staff", jobFunction: "operations", workspaceAccess: JSON.stringify(["shipping", "terminal"]), accessProfileMigratedAt: new Date() });

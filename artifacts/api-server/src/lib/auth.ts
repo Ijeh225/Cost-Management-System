@@ -4,7 +4,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { Request, Response, NextFunction } from "express";
 import { db, usersTable, branchesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { hasAuthority, resolveAccessProfile, type ResolvedAccessProfile } from "./authorization.js";
+import { hasAuthority, hasCapability, resolveAccessProfile, type Capability, type ResolvedAccessProfile } from "./authorization.js";
 import type { AuthorityLevel } from "./access-policy.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -325,6 +325,25 @@ export function resolveCreateBranch(req: AuthRequest, res: Response, requestedBr
   }
   return requested;
 }
+
+/**
+ * Enforces a modern access-profile capability at the API boundary. UI route
+ * guards improve navigation, but this middleware keeps direct API calls from
+ * bypassing the same permission policy.
+ */
+export function requireCapability(capability: Capability) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    await requireAuth(req, res, () => {
+      if (!req.user || !hasCapability(req.user.accessProfile, capability)) {
+        res.status(403).json({ error: "You do not have permission to access this resource." });
+        return;
+      }
+      next();
+    });
+  };
+}
+
+export const requireFinanceAccess = requireCapability("finance.access");
 
 export async function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {

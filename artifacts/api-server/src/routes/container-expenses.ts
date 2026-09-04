@@ -6,9 +6,11 @@ import {
   deliveryChargesTable, operationsChargesTable, containerExtraChargesTable,
 } from "@workspace/db";
 import { eq, desc, inArray, sql } from "drizzle-orm";
-import { requireBranchAdminOrAbove, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
+import { requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 
 export const containerExpensesRouter = Router();
+
+containerExpensesRouter.use(requireFinanceAccess);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

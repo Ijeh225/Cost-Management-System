@@ -21,6 +21,7 @@ import {
   AuthRequest,
   getBranchScope,
   requireAuth,
+  requireFinanceAccess,
   userCanAccessBranch,
 } from "../lib/auth.js";
 import { hasAuthority, resolveAccessProfile } from "../lib/authorization.js";
@@ -28,6 +29,8 @@ import { deleteDocument, documentExists, getDocument, saveDocument } from "../li
 import { exceedsApprovedPaymentBalance, exceedsOverheadPaymentBalance, isScheduleReadyToComplete } from "../lib/payment-rules.js";
 
 export const paymentSchedulesRouter = Router();
+
+paymentSchedulesRouter.use(requireFinanceAccess);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 const FINAL_STATUSES = new Set(["completed", "rejected", "cancelled"]);

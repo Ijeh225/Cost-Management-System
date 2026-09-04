@@ -941,6 +941,27 @@ before planning any further changes.
   repeat `SEC-02` with the current E2E role accounts. Do not run more
   departmental financial writes until this High issue is closed.
 
+### SEC-02 Remediation (2026-09-04)
+
+- **Implemented locally; deployment re-test required.** `finance.access` now
+  permits the existing Branch Admin authority and the Accounts job function.
+  `requireCapability` and `requireFinanceAccess` enforce that policy at the
+  backend API boundary for invoices, payment schedules, reports, banks,
+  overhead expenses, and container payments. Direct API calls can no longer
+  rely on a hidden sidebar link as their only restriction.
+- The frontend now derives `canAccessFinance` from the same modern profile.
+  Finance pages and printable finance routes use a shared guard that redirects
+  denied users to their assigned workspace. Workspace routes themselves now
+  verify the exact assigned workspace, while User Management, Approvals,
+  Pipeline, and generic Operations require administrative authority.
+- **Verification before commit:** workspace type check passed; API suite
+  passed (71 tests); web production build passed; server build passed; and
+  `git diff --check` passed.
+- **Next exact action:** push and deploy, then re-test `SEC-02` using the
+  existing Delivery, Terminal, Operations, Accounts, and Branch Admin E2E
+  accounts. Mark the issue closed only after both denied URL/API access and
+  permitted finance access are observed live.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

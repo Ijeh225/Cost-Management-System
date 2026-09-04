@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import { AuthProvider } from "@/components/layout/auth-provider";
+import { AuthProvider, type WorkspaceKey } from "@/components/layout/auth-provider";
 import { BranchProvider } from "@/components/layout/branch-provider";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -176,27 +176,6 @@ function BranchAdminOrAboveGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function BranchMemberOrAboveGuard({ children }: { children: ReactNode }) {
-  const { isLoading, isAuthenticated, isBranchMember } = useAuth();
-  const [, setLocation] = useLocation();
-  const confirmed = useRef(false);
-  if (isBranchMember && !confirmed.current) confirmed.current = true;
-  useEffect(() => {
-    if (isLoading) return;
-    if (confirmed.current) return;
-    if (!isAuthenticated) setLocation("/login");
-    else if (!isBranchMember) setLocation("/");
-  }, [isBranchMember, isLoading, isAuthenticated, setLocation]);
-  if (!confirmed.current) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-7 h-7 animate-spin text-primary" />
-      </div>
-    );
-  }
-  return <>{children}</>;
-}
-
 function SuperAdminGuard({ children }: { children: ReactNode }) {
   const { user, isLoading, isAuthenticated, isSuperAdmin } = useAuth();
   const [, setLocation] = useLocation();
@@ -226,6 +205,59 @@ function SuperAdminGuard({ children }: { children: ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+function AccessGuard({ allowed, children }: { allowed: boolean; children: ReactNode }) {
+  const { isAuthenticated, isLoading, workspaceHome } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated) {
+      setLocation("/login");
+    } else if (!allowed) {
+      setLocation(workspaceHome ?? "/", { replace: true });
+    }
+  }, [allowed, isAuthenticated, isLoading, setLocation, workspaceHome]);
+
+  if (isLoading || !isAuthenticated || !allowed) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+function FinanceGuard({ children }: { children: ReactNode }) {
+  const { canAccessFinance } = useAuth();
+  return <AccessGuard allowed={canAccessFinance}>{children}</AccessGuard>;
+}
+
+function WorkspaceGuard({ workspace, children }: { workspace: WorkspaceKey; children: ReactNode }) {
+  const { accessProfile, isAdminOrAbove } = useAuth();
+  const allowed = isAdminOrAbove || accessProfile?.workspaces.includes(workspace) === true;
+  return <AccessGuard allowed={allowed}>{children}</AccessGuard>;
+}
+
+function WorkspaceDocumentationRedirect() {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate("/documentation", { replace: true }); }, [navigate]);
+  return null;
+}
+
+function WorkspaceShippingRedirect() {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate("/workspace/shipping", { replace: true }); }, [navigate]);
+  return null;
+}
+
+function WorkspaceOperationsRedirect() {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate("/workspace/transire", { replace: true }); }, [navigate]);
+  return null;
 }
 
 function HomeRoute() {
@@ -261,17 +293,17 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/setup" component={Setup} />
-      <Route path="/containers/:id/print" component={ContainerPrintPage} />
-      <Route path="/invoices/:id/print" component={InvoicePrintPage} />
-      <Route path="/overhead-expenses/:id/print" component={OverheadExpensePrintPage} />
-      <Route path="/credit-notes/:id/print" component={CreditNotePrintPage} />
-      <Route path="/reports/client-statement/print" component={ClientStatementPrint} />
-      <Route path="/reports/vat-summary/print" component={VatSummaryPrint} />
-      <Route path="/reports/invoice-aging/print" component={InvoiceAgingPrint} />
-      <Route path="/reports/cashflow/print" component={CashFlowPrint} />
-      <Route path="/reports/pl/print" component={ProfitLossPrint} />
-      <Route path="/reports/delivery-report/print" component={DeliveryReportPrint} />
-      <Route path="/reports/branch-comparison/print" component={BranchComparisonPrint} />
+      <Route path="/containers/:id/print"><FinanceGuard><ContainerPrintPage /></FinanceGuard></Route>
+      <Route path="/invoices/:id/print"><FinanceGuard><InvoicePrintPage /></FinanceGuard></Route>
+      <Route path="/overhead-expenses/:id/print"><FinanceGuard><OverheadExpensePrintPage /></FinanceGuard></Route>
+      <Route path="/credit-notes/:id/print"><FinanceGuard><CreditNotePrintPage /></FinanceGuard></Route>
+      <Route path="/reports/client-statement/print"><FinanceGuard><ClientStatementPrint /></FinanceGuard></Route>
+      <Route path="/reports/vat-summary/print"><FinanceGuard><VatSummaryPrint /></FinanceGuard></Route>
+      <Route path="/reports/invoice-aging/print"><FinanceGuard><InvoiceAgingPrint /></FinanceGuard></Route>
+      <Route path="/reports/cashflow/print"><FinanceGuard><CashFlowPrint /></FinanceGuard></Route>
+      <Route path="/reports/pl/print"><FinanceGuard><ProfitLossPrint /></FinanceGuard></Route>
+      <Route path="/reports/delivery-report/print"><FinanceGuard><DeliveryReportPrint /></FinanceGuard></Route>
+      <Route path="/reports/branch-comparison/print"><SuperAdminGuard><BranchComparisonPrint /></SuperAdminGuard></Route>
       <Route>
         <AppLayout>
           <PageErrorBoundary>
@@ -280,8 +312,8 @@ function Router() {
               <Route path="/containers" component={Containers} />
               <Route path="/containers/upload" component={UploadPage} />
               <Route path="/containers/:id" component={ContainerDetail} />
-              <Route path="/users" component={Users} />
-              <Route path="/approvals" component={ApprovalsPage} />
+              <Route path="/users"><BranchAdminOrAboveGuard><Users /></BranchAdminOrAboveGuard></Route>
+              <Route path="/approvals"><BranchAdminOrAboveGuard><ApprovalsPage /></BranchAdminOrAboveGuard></Route>
               <Route path="/my-tasks" component={MyTasksPage} />
               <Route path="/analytics">
                 <BranchAdminOrAboveGuard><AnalyticsPage /></BranchAdminOrAboveGuard>
@@ -290,51 +322,51 @@ function Router() {
                 <SuperAdminGuard><BranchComparisonPage /></SuperAdminGuard>
               </Route>
               <Route path="/reports">
-                <BranchMemberOrAboveGuard><ReportsPage /></BranchMemberOrAboveGuard>
+                <FinanceGuard><ReportsPage /></FinanceGuard>
               </Route>
               <Route path="/reports/cashflow">
-                <BranchMemberOrAboveGuard><CashFlowPage /></BranchMemberOrAboveGuard>
+                <FinanceGuard><CashFlowPage /></FinanceGuard>
               </Route>
               <Route path="/reports/disbursement-reconciliation">
-                <BranchMemberOrAboveGuard><DisbursementReconciliationPage /></BranchMemberOrAboveGuard>
+                <FinanceGuard><DisbursementReconciliationPage /></FinanceGuard>
               </Route>
               <Route path="/clients" component={ClientsPage} />
               <Route path="/clients/:id" component={ClientDetailPage} />
               <Route path="/notifications" component={NotificationsPage} />
-              <Route path="/operations" component={OperationsPage} />
+              <Route path="/operations"><BranchAdminOrAboveGuard><OperationsPage /></BranchAdminOrAboveGuard></Route>
               <Route path="/operations/:id" component={OperationDetailPage} />
-              <Route path="/documentation" component={DocumentationWorkspace} />
-              <Route path="/pipeline" component={PipelinePage} />
-              <Route path="/accounts-receivable" component={ArPage} />
-              <Route path="/duty-payments" component={DutyPaymentsPage} />
+              <Route path="/documentation"><WorkspaceGuard workspace="documentation"><DocumentationWorkspace /></WorkspaceGuard></Route>
+              <Route path="/pipeline"><BranchAdminOrAboveGuard><PipelinePage /></BranchAdminOrAboveGuard></Route>
+              <Route path="/accounts-receivable"><FinanceGuard><ArPage /></FinanceGuard></Route>
+              <Route path="/duty-payments"><FinanceGuard><DutyPaymentsPage /></FinanceGuard></Route>
               <Route path="/banks">
-                <BranchAdminOrAboveGuard><BanksPage /></BranchAdminOrAboveGuard>
+                <FinanceGuard><BanksPage /></FinanceGuard>
               </Route>
               <Route path="/banks/:id">
-                <BranchAdminOrAboveGuard><BankDetailPage /></BranchAdminOrAboveGuard>
+                <FinanceGuard><BankDetailPage /></FinanceGuard>
               </Route>
               <Route path="/overhead-expenses">
-                <BranchAdminOrAboveGuard><OverheadExpensesPage /></BranchAdminOrAboveGuard>
+                <FinanceGuard><OverheadExpensesPage /></FinanceGuard>
               </Route>
               <Route path="/payment-schedules">
-                <PaymentSchedulesPage />
+                <FinanceGuard><PaymentSchedulesPage /></FinanceGuard>
               </Route>
               <Route path="/container-payments">
-                <BranchAdminOrAboveGuard><ContainerPaymentsPage /></BranchAdminOrAboveGuard>
+                <FinanceGuard><ContainerPaymentsPage /></FinanceGuard>
               </Route>
-              <Route path="/workspace/documentation" component={() => { const [, nav] = useLocation(); nav("/documentation", { replace: true }); return null; }} />
-              <Route path="/workspace/accounts" component={AccountsWorkspace} />
-              <Route path="/workspace/transire" component={TransireWorkspace} />
-              <Route path="/workspace/shipping" component={ShippingWorkspace} />
-              <Route path="/workspace/terminal-ops" component={TerminalOpsWorkspace} />
-              <Route path="/workspace/pull-out" component={PullOutWorkspace} />
-              <Route path="/workspace/shipping-terminal" component={() => { const [, nav] = useLocation(); nav("/workspace/shipping", { replace: true }); return null; }} />
-              <Route path="/workspace/operations" component={() => { const [, nav] = useLocation(); nav("/workspace/transire", { replace: true }); return null; }} />
-              <Route path="/workspace/terminal" component={TerminalWorkspace} />
-              <Route path="/workspace/delivery" component={DeliveryWorkspace} />
-              <Route path="/gate" component={GatePage} />
-              <Route path="/invoices" component={InvoicesPage} />
-              <Route path="/invoices/:id" component={InvoiceDetailPage} />
+              <Route path="/workspace/documentation"><WorkspaceGuard workspace="documentation"><WorkspaceDocumentationRedirect /></WorkspaceGuard></Route>
+              <Route path="/workspace/accounts"><WorkspaceGuard workspace="accounts"><AccountsWorkspace /></WorkspaceGuard></Route>
+              <Route path="/workspace/transire"><WorkspaceGuard workspace="transire"><TransireWorkspace /></WorkspaceGuard></Route>
+              <Route path="/workspace/shipping"><WorkspaceGuard workspace="shipping"><ShippingWorkspace /></WorkspaceGuard></Route>
+              <Route path="/workspace/terminal-ops"><WorkspaceGuard workspace="terminal"><TerminalOpsWorkspace /></WorkspaceGuard></Route>
+              <Route path="/workspace/pull-out"><WorkspaceGuard workspace="pullout"><PullOutWorkspace /></WorkspaceGuard></Route>
+              <Route path="/workspace/shipping-terminal"><WorkspaceGuard workspace="shipping"><WorkspaceShippingRedirect /></WorkspaceGuard></Route>
+              <Route path="/workspace/operations"><WorkspaceGuard workspace="transire"><WorkspaceOperationsRedirect /></WorkspaceGuard></Route>
+              <Route path="/workspace/terminal"><WorkspaceGuard workspace="terminal_manager"><TerminalWorkspace /></WorkspaceGuard></Route>
+              <Route path="/workspace/delivery"><WorkspaceGuard workspace="delivery"><DeliveryWorkspace /></WorkspaceGuard></Route>
+              <Route path="/gate"><WorkspaceGuard workspace="security"><GatePage /></WorkspaceGuard></Route>
+              <Route path="/invoices"><FinanceGuard><InvoicesPage /></FinanceGuard></Route>
+              <Route path="/invoices/:id"><FinanceGuard><InvoiceDetailPage /></FinanceGuard></Route>
               <Route path="/settings">
                 <AdminGuard><SettingsPage /></AdminGuard>
               </Route>

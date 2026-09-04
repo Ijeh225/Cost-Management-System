@@ -282,3 +282,21 @@ intentionally not recorded in repository files.
 **Next priority:** Fix `SEC-02` before performing further financial write
 tests with departmental accounts. Continue the controlled verification only
 after the deployment is retested with the same E2E accounts.
+
+### SEC-02 Remediation (2026-09-04)
+
+`SEC-02` is implemented locally and awaiting deployment re-test. The existing
+modern-profile `finance.access` rule now includes Branch Admin authority and
+the Accounts job function, matching the finance access already intended by
+the application. A reusable backend capability middleware now protects the
+Invoices, Payment Schedules, Reports, Banks, Overhead Expenses, and Container
+Payments APIs. The web router also protects finance screens, printable finance
+documents, user management, approvals, the generic Operations page, Pipeline,
+and every department workspace with the same modern profile data.
+
+Verification before commit: workspace type check passed, API test suite passed
+(71 tests), web production build passed, server build passed, and `git diff
+--check` passed. After deployment, sign in again as the existing Delivery,
+Terminal, Operations, Accounts, and Branch Admin E2E users. Confirm denied
+financial URLs redirect to the assigned workspace and their API calls return
+403, while Accounts and Branch Admin finance access continues to work.
