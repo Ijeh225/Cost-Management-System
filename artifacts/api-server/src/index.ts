@@ -768,6 +768,19 @@ async function runStartupMigrations() {
       await pool.query(`CREATE INDEX IF NOT EXISTS duty_payment_transactions_branch_paid_idx ON duty_payment_transactions(branch_id, paid_at DESC)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS duty_payment_transactions_bank_idx ON duty_payment_transactions(bank_id) WHERE bank_id IS NOT NULL`);
     });
+    await runMigration("duty_payment_reversals_v1", async () => {
+      await pool.query(`ALTER TABLE duty_payment_transactions ADD COLUMN IF NOT EXISTS entry_type TEXT NOT NULL DEFAULT 'payment'`);
+      await pool.query(`ALTER TABLE duty_payment_transactions ADD COLUMN IF NOT EXISTS reversal_of_transaction_id INTEGER REFERENCES duty_payment_transactions(id) ON DELETE RESTRICT`);
+      await pool.query(`ALTER TABLE duty_payment_transactions ADD COLUMN IF NOT EXISTS reversal_reason TEXT`);
+      await pool.query(`ALTER TABLE duty_payment_transactions DROP CONSTRAINT IF EXISTS duty_payment_transactions_amount_check`);
+      await pool.query(`ALTER TABLE duty_payment_transactions DROP CONSTRAINT IF EXISTS duty_payment_transactions_amount_nonzero_check`);
+      await pool.query(`ALTER TABLE duty_payment_transactions ADD CONSTRAINT duty_payment_transactions_amount_nonzero_check CHECK (amount <> 0)`);
+      await pool.query(`ALTER TABLE duty_payment_transactions DROP CONSTRAINT IF EXISTS duty_payment_transactions_entry_type_check`);
+      await pool.query(`ALTER TABLE duty_payment_transactions ADD CONSTRAINT duty_payment_transactions_entry_type_check CHECK (entry_type IN ('payment', 'reversal'))`);
+      await pool.query(`ALTER TABLE duty_payment_transactions DROP CONSTRAINT IF EXISTS duty_payment_transactions_reversal_link_check`);
+      await pool.query(`ALTER TABLE duty_payment_transactions ADD CONSTRAINT duty_payment_transactions_reversal_link_check CHECK ((entry_type = 'payment' AND reversal_of_transaction_id IS NULL) OR (entry_type = 'reversal' AND reversal_of_transaction_id IS NOT NULL))`);
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS duty_payment_transactions_one_reversal_idx ON duty_payment_transactions(reversal_of_transaction_id) WHERE entry_type = 'reversal'`);
+    });
     await runMigration("ai_assistant_foundation_v1", async () => {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS ai_assistant_sessions (

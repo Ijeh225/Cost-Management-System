@@ -3,16 +3,19 @@ import { useLocation } from "wouter";
 import {
   useListDutyPayments,
   useRecordDutyPayment,
+  useListDutyPaymentTransactions,
+  useReverseDutyPaymentTransaction,
   useAdvanceContainerStatus,
   listDutyPayments,
   useListActiveBanks,
   type DutyPaymentRow,
+  type DutyPaymentTransaction,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Banknote, Search, Filter, X, Download, FileSpreadsheet, FileText,
-  Loader2, AlertCircle, ChevronLeft, ChevronRight, ShieldAlert,
+  Loader2, AlertCircle, ChevronLeft, ChevronRight, ShieldAlert, History, RotateCcw,
 } from "lucide-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { BranchChip } from "@/components/layout/branch-chip";
@@ -134,6 +137,8 @@ export default function DutyPaymentsPage() {
   const [showFilters,  setShowFilters]  = useState(false);
   const [page,         setPage]         = useState(1);
   const [recordFor,    setRecordFor]    = useState<DutyPaymentRow | null>(null);
+  const [historyFor,   setHistoryFor]   = useState<DutyPaymentRow | null>(null);
+  const [reverseFor,   setReverseFor]   = useState<DutyPaymentTransaction | null>(null);
   const pendingRecordRef = useRef<DutyPaymentRow | null>(null);
   const limit = 25;
 
@@ -204,6 +209,22 @@ export default function DutyPaymentsPage() {
         pendingRecordRef.current = null;
         const msg = e instanceof Error ? e.message : "Unknown error";
         toast({ variant: "destructive", title: "Could not record payment", description: msg });
+      },
+    },
+  });
+
+  const reverseMut = useReverseDutyPaymentTransaction({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Duty payment reversed", description: "The duty balance, bank ledger, cash flow, and reports now reflect the reversal." });
+        setReverseFor(null);
+        qc.invalidateQueries({ queryKey: ["/api/duty-payments"] });
+        qc.invalidateQueries({ queryKey: ["/api/reports"] });
+        qc.invalidateQueries({ queryKey: ["/api/banks"] });
+        qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      },
+      onError: (e: unknown) => {
+        toast({ variant: "destructive", title: "Could not reverse duty payment", description: e instanceof Error ? e.message : "Unknown error" });
       },
     },
   });
@@ -519,16 +540,28 @@ export default function DutyPaymentsPage() {
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(r.updatedAt ?? null)}</td>
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs gap-1"
-                          disabled={status === "paid" || status === "not_assessed"}
-                          onClick={() => setRecordFor(r)}
-                          data-testid={`button-record-${r.containerNumber}`}
-                        >
-                          <Banknote className="w-3 h-3" /> Record
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-xs gap-1"
+                            disabled={r.dutyPaid <= 0}
+                            onClick={() => setHistoryFor(r)}
+                            data-testid={`button-history-${r.containerNumber}`}
+                          >
+                            <History className="w-3 h-3" /> History
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs gap-1"
+                            disabled={status === "paid" || status === "not_assessed"}
+                            onClick={() => setRecordFor(r)}
+                            data-testid={`button-record-${r.containerNumber}`}
+                          >
+                            <Banknote className="w-3 h-3" /> Record
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -566,7 +599,160 @@ export default function DutyPaymentsPage() {
         }}
         isPending={recordMut.isPending}
       />
+      <DutyPaymentHistoryDialog
+        row={historyFor}
+        onClose={() => { setHistoryFor(null); setReverseFor(null); }}
+        onReverse={(transaction) => setReverseFor(transaction)}
+      />
+      <ReverseDutyPaymentDialog
+        transaction={reverseFor}
+        onClose={() => setReverseFor(null)}
+        onSubmit={(reference, reason, reversalDate) => {
+          if (!reverseFor) return;
+          reverseMut.mutate({
+            transactionId: reverseFor.id,
+            data: { reference, reason, reversalDate: reversalDate || null },
+          });
+        }}
+        isPending={reverseMut.isPending}
+      />
     </motion.div>
+  );
+}
+
+function DutyPaymentHistoryDialog({
+  row, onClose, onReverse,
+}: {
+  row: DutyPaymentRow | null;
+  onClose: () => void;
+  onReverse: (transaction: DutyPaymentTransaction) => void;
+}) {
+  const { data, isLoading, isError } = useListDutyPaymentTransactions(
+    row?.containerId ?? 0,
+    { query: { queryKey: ["/api/duty-payments", row?.containerId ?? 0, "transactions"] as const, enabled: !!row } },
+  );
+  const transactions = data?.transactions ?? [];
+
+  return (
+    <Dialog open={!!row} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><History className="w-5 h-5 text-orange-400" /> Duty Payment History</DialogTitle>
+          <DialogDescription>
+            {row ? `${row.containerNumber} - ${row.customerName}` : ""}. Reversals are permanent linked accounting entries; the original payment is never deleted.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="py-10 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        ) : isError ? (
+          <p className="py-8 text-center text-sm text-destructive">Could not load duty-payment history.</p>
+        ) : transactions.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">No dated duty-payment entries were found for this container.</p>
+        ) : (
+          <div className="space-y-2">
+            {transactions.map(transaction => {
+              const isReversal = transaction.entryType === "reversal" || transaction.amount < 0;
+              return (
+                <Card key={transaction.id} className={`p-3 ${isReversal ? "border-amber-500/30 bg-amber-500/5" : ""}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className={isReversal ? "border-amber-500/50 text-amber-500" : "border-emerald-500/50 text-emerald-500"}>
+                          {isReversal ? "Reversal" : "Payment"}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{fmtDate(transaction.paidAt)}</span>
+                        <span className="text-xs text-muted-foreground">{transaction.paymentMethod === "bank" ? transaction.bankName ?? "Bank" : "Cash"}</span>
+                      </div>
+                      <p className={`font-mono font-semibold ${isReversal ? "text-amber-500" : "text-emerald-500"}`}>
+                        {isReversal ? "+" : "-"}{formatCurrency(Math.abs(transaction.amount))}
+                      </p>
+                      <p className="text-xs text-muted-foreground break-words">Reference: {transaction.reference ?? "Not recorded"}</p>
+                      {isReversal && <p className="text-xs text-muted-foreground break-words">Reason: {transaction.reversalReason ?? "Not recorded"}</p>}
+                    </div>
+                    {!isReversal && transaction.canReverse && (
+                      <Button size="sm" variant="outline" className="gap-1 border-amber-500/40 text-amber-500 hover:text-amber-400" onClick={() => onReverse(transaction)}>
+                        <RotateCcw className="w-3.5 h-3.5" /> Reverse
+                      </Button>
+                    )}
+                    {!isReversal && !transaction.canReverse && <span className="text-xs text-muted-foreground">Already reversed</span>}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+        <DialogFooter><Button variant="outline" onClick={onClose}>Close</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReverseDutyPaymentDialog({
+  transaction, onClose, onSubmit, isPending,
+}: {
+  transaction: DutyPaymentTransaction | null;
+  onClose: () => void;
+  onSubmit: (reference: string, reason: string, reversalDate: string) => void;
+  isPending: boolean;
+}) {
+  const [reference, setReference] = useState("");
+  const [reason, setReason] = useState("");
+  const [reversalDate, setReversalDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  useEffect(() => {
+    if (transaction) {
+      setReference("");
+      setReason("");
+      setReversalDate(new Date().toISOString().slice(0, 10));
+    }
+  }, [transaction]);
+
+  const error = reference.trim() === ""
+    ? "Enter the refund or reversal reference."
+    : reason.trim().length < 3
+      ? "Explain the reversal in at least 3 characters."
+      : "";
+
+  return (
+    <Dialog open={!!transaction} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><RotateCcw className="w-5 h-5 text-amber-500" /> Reverse Duty Payment</DialogTitle>
+          <DialogDescription>
+            This creates a permanent negative entry linked to the original payment. It restores the duty outstanding balance and credits the original payment source.
+          </DialogDescription>
+        </DialogHeader>
+        {transaction && (
+          <div className="space-y-4">
+            <Card className="p-3 bg-amber-500/5 border-amber-500/30">
+              <p className="text-xs text-muted-foreground">Amount being reversed</p>
+              <p className="font-mono text-lg font-bold text-amber-500">{formatCurrency(Math.abs(transaction.amount))}</p>
+              <p className="text-xs text-muted-foreground mt-1">Original source: {transaction.paymentMethod === "bank" ? transaction.bankName ?? "Bank" : "Cash"}</p>
+            </Card>
+            <div className="space-y-1">
+              <Label htmlFor="reversalDate">Reversal Date</Label>
+              <Input id="reversalDate" type="date" value={reversalDate} onChange={e => setReversalDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="reversalReference">Reversal Reference</Label>
+              <Input id="reversalReference" value={reference} onChange={e => setReference(e.target.value)} maxLength={200} placeholder="Refund, correction, or bank reference" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="reversalReason">Reason</Label>
+              <Textarea id="reversalReason" rows={3} value={reason} onChange={e => setReason(e.target.value)} maxLength={2000} placeholder="Why this payment is being reversed" />
+            </div>
+            {error && <p className="text-xs text-destructive">{error}</p>}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
+          <Button variant="destructive" className="gap-1" disabled={!transaction || !!error || isPending} onClick={() => transaction && onSubmit(reference.trim(), reason.trim(), reversalDate)}>
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />} Create Reversal
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

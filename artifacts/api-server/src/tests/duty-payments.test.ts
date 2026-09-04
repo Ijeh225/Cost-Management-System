@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import app from "../app";
-import { db, containersTable, customsChargesTable, auditLogTable } from "@workspace/db";
+import { db, containersTable, customsChargesTable, auditLogTable, dutyPaymentTransactionsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 
 let ADMIN_COOKIE = "";
@@ -49,6 +49,7 @@ async function seedContainerWithDuty(opts: {
 
 async function cleanup(containerId: number) {
   await db.delete(auditLogTable).where(eq(auditLogTable.containerId, containerId));
+  await db.delete(dutyPaymentTransactionsTable).where(eq(dutyPaymentTransactionsTable.containerId, containerId));
   await db.delete(customsChargesTable).where(eq(customsChargesTable.containerId, containerId));
   await db.delete(containersTable).where(eq(containersTable.id, containerId));
 }
@@ -254,5 +255,76 @@ describe("PATCH /api/duty-payments/:containerId — concurrency / no lost update
     // crucially, paid never exceeds duty.
     expect(Number(row.dutyPaid)).toBeLessThanOrEqual(DUTY);
     expect(Number(row.dutyNotPaid)).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("POST /api/duty-payments/transactions/:transactionId/reverse — immutable reversal", () => {
+  let containerId = 0;
+  let transactionId = 0;
+
+  beforeAll(async () => {
+    containerId = await seedContainerWithDuty({
+      containerNumber: "TEST-DUTY-REV-001",
+      blNumber: "BL-TEST-DUTY-REV-001",
+      duty: 100_000,
+    });
+    const payment = await request(app)
+      .patch(`/api/duty-payments/${containerId}`)
+      .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
+      .send({ amount: 40_000, paymentDate: "2026-05-01", reference: "PAY-REV-001" });
+    expect(payment.status).toBe(200);
+
+    const [transaction] = await db.select({ id: dutyPaymentTransactionsTable.id })
+      .from(dutyPaymentTransactionsTable)
+      .where(eq(dutyPaymentTransactionsTable.containerId, containerId));
+    transactionId = transaction.id;
+  });
+
+  afterAll(async () => {
+    await cleanup(containerId);
+  });
+
+  it("creates a linked negative ledger entry, restores duty, and prevents a second reversal", async () => {
+    const historyBefore = await request(app)
+      .get(`/api/duty-payments/${containerId}/transactions`)
+      .set("Cookie", ADMIN_COOKIE);
+    expect(historyBefore.status).toBe(200);
+    expect(historyBefore.body.transactions).toHaveLength(1);
+    expect(historyBefore.body.transactions[0]).toMatchObject({ id: transactionId, entryType: "payment", amount: 40_000, canReverse: true });
+
+    const reversal = await request(app)
+      .post(`/api/duty-payments/transactions/${transactionId}/reverse`)
+      .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
+      .send({ reversalDate: "2026-05-02", reference: "REV-001", reason: "Payment was recorded against the wrong duty assessment" });
+    expect(reversal.status).toBe(200);
+    expect(reversal.body.dutyPaid).toBe(0);
+    expect(reversal.body.dutyNotPaid).toBe(100_000);
+    expect(reversal.body.dutyStatus).toBe("unpaid");
+
+    const historyAfter = await request(app)
+      .get(`/api/duty-payments/${containerId}/transactions`)
+      .set("Cookie", ADMIN_COOKIE);
+    expect(historyAfter.status).toBe(200);
+    expect(historyAfter.body.transactions).toHaveLength(2);
+    const original = historyAfter.body.transactions.find((row: { id: number }) => row.id === transactionId);
+    const reversalEntry = historyAfter.body.transactions.find((row: { entryType: string }) => row.entryType === "reversal");
+    expect(original.canReverse).toBe(false);
+    expect(reversalEntry).toMatchObject({ amount: -40_000, reversalOfTransactionId: transactionId, reference: "REV-001" });
+
+    const secondAttempt = await request(app)
+      .post(`/api/duty-payments/transactions/${transactionId}/reverse`)
+      .set("Cookie", ADMIN_COOKIE)
+      .set("X-CSRF-Token", ADMIN_CSRF)
+      .send({ reference: "REV-002", reason: "Duplicate attempt should fail" });
+    expect(secondAttempt.status).toBe(409);
+
+    const audits = await db.select().from(auditLogTable).where(and(
+      eq(auditLogTable.containerId, containerId),
+      eq(auditLogTable.action, "duty_payment_reversed"),
+    ));
+    expect(audits).toHaveLength(1);
+    expect(audits[0].reason ?? "").toContain(`reversalOf=${transactionId}`);
   });
 });

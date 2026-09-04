@@ -339,3 +339,17 @@ environment without that browser limitation is available.
 `SEC-02` is closed for the confirmed web-route exposure. The API guard is
 deployed and locally verified, but the direct live API-403 observation remains
 a browser-environment limitation rather than a failed access-control test.
+
+### DUTY-002 Implementation Awaiting Controlled Live Re-Test (2026-09-04)
+
+| Test | Result | Evidence |
+| --- | --- | --- |
+| DUTY-002 immutable reversal implementation | Implemented locally | A reversal now creates one linked negative duty transaction with mandatory reference and reason, restores the `customs_charges` running balance atomically, and writes `duty_payment_reversed` to audit history. Database constraints allow only a non-zero payment or a linked reversal and a partial unique index prevents a second reversal of the same original payment. |
+| Duty, bank, ledger, cash flow, and P&L propagation | Implemented locally | The same signed duty ledger drives duty totals, reconciliation, actual-paid P&L/analytics sums, bank balance totals, Financial Ledger, Cash Flow, and bank statement presentation. Reversals are displayed as credits/inflows rather than negative debits. |
+| Local verification | Passed with integration environment gap | API and web type checks passed; web production build and server production build passed. The standard API unit suite passed (17 files, 71 tests). The new database integration test covers reversal linkage, balance restoration, audit logging, history visibility, and duplicate blocking, but could not run because no isolated `TEST_DATABASE_URL` is configured. |
+
+**Next controlled check:** deploy the feature, create one fresh labelled duty
+payment, reverse it once through the new Duty Payments History action, and
+reconcile the resulting duty balance and all listed financial views. Do not
+reverse the pre-existing `E2E-20260904-DUTY-REVERSAL-001` entry unless it is
+explicitly selected for the controlled test.

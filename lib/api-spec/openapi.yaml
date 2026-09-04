@@ -1098,6 +1098,62 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /duty-payments/{containerId}/transactions:
+    get:
+      operationId: listDutyPaymentTransactions
+      tags: [DutyPayments]
+      summary: List the immutable duty-payment history for one container
+      security: [{cookieAuth: []}]
+      parameters:
+        - name: containerId
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Duty-payment transaction history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DutyPaymentTransactionListResponse"
+
+  /duty-payments/transactions/{transactionId}/reverse:
+    post:
+      operationId: reverseDutyPaymentTransaction
+      tags: [DutyPayments]
+      summary: Create an immutable reversal for an original duty payment
+      security: [{cookieAuth: []}]
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReverseDutyPaymentRequest"
+      responses:
+        "200":
+          description: Duty payment balance after reversal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DutyPaymentRow"
+        "400":
+          description: Invalid reversal request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Payment is already reversed or cannot be reconciled safely
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -2526,3 +2582,38 @@ components:
         bankId: {type: integer, nullable: true}
         reference: {type: string, nullable: true}
       required: [amount]
+
+    DutyPaymentTransaction:
+      type: object
+      properties:
+        id: {type: integer}
+        amount: {type: number, description: "Positive for a payment; negative for a reversal."}
+        entryType: {type: string, enum: [payment, reversal]}
+        reversalOfTransactionId: {type: integer, nullable: true}
+        reversalReason: {type: string, nullable: true}
+        paymentMethod: {type: string, enum: [cash, bank]}
+        bankId: {type: integer, nullable: true}
+        bankName: {type: string, nullable: true}
+        reference: {type: string, nullable: true}
+        notes: {type: string, nullable: true}
+        paidAt: {type: string, format: date-time}
+        recordedByName: {type: string, nullable: true}
+        canReverse: {type: boolean}
+      required: [id, amount, entryType, paymentMethod, paidAt, canReverse]
+
+    DutyPaymentTransactionListResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DutyPaymentTransaction"
+      required: [transactions]
+
+    ReverseDutyPaymentRequest:
+      type: object
+      properties:
+        reversalDate: {type: string, format: date, nullable: true}
+        reference: {type: string, minLength: 1, maxLength: 200}
+        reason: {type: string, minLength: 3, maxLength: 2000}
+      required: [reference, reason]

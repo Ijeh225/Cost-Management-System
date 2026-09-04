@@ -53,6 +53,9 @@ reportsRouter.get("/reports/duty-payment-ledger", requireAuth, requireBranchMemb
     const rows = await db.select({
       id: dutyPaymentTransactionsTable.id,
       amount: dutyPaymentTransactionsTable.amount,
+      entryType: dutyPaymentTransactionsTable.entryType,
+      reversalOfTransactionId: dutyPaymentTransactionsTable.reversalOfTransactionId,
+      reversalReason: dutyPaymentTransactionsTable.reversalReason,
       paymentMethod: dutyPaymentTransactionsTable.paymentMethod,
       paidAt: dutyPaymentTransactionsTable.paidAt,
       reference: dutyPaymentTransactionsTable.reference,
@@ -86,6 +89,9 @@ reportsRouter.get("/reports/duty-payment-ledger", requireAuth, requireBranchMemb
         ...row,
         amount: Number(row.amount ?? 0),
         paidAt: row.paidAt?.toISOString() ?? null,
+        entryType: row.entryType,
+        reversalOfTransactionId: row.reversalOfTransactionId,
+        reversalReason: row.reversalReason,
         sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : null,
       })),
       evidenceNote: "Only dated duty-payment ledger entries are included. Older snapshot balances without a ledger entry remain visible in reconciliation as historical/unledgered amounts.",
@@ -211,7 +217,7 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
     const [invoiceRows, dutyRows, overheadRows, containerRows, scheduleRows, fundingRows, transferRows] = await Promise.all([
       db.select({ id: invoicePaymentsTable.id, date: invoicePaymentsTable.paidAt, amount: invoicePaymentsTable.amount, method: invoicePaymentsTable.paymentMethod, reference: invoicePaymentsTable.reference, notes: invoicePaymentsTable.notes, invoiceNumber: invoicesTable.invoiceNumber, bankName: banksTable.name })
         .from(invoicePaymentsTable).leftJoin(invoicesTable, eq(invoicePaymentsTable.invoiceId, invoicesTable.id)).leftJoin(banksTable, eq(invoicePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(invoicePaymentsTable.paidAt, invoicePaymentsTable.branchId))),
-      db.select({ id: dutyPaymentTransactionsTable.id, date: dutyPaymentTransactionsTable.paidAt, amount: dutyPaymentTransactionsTable.amount, method: dutyPaymentTransactionsTable.paymentMethod, reference: dutyPaymentTransactionsTable.reference, notes: dutyPaymentTransactionsTable.notes, containerId: containersTable.id, containerNumber: containersTable.containerNumber, bankName: banksTable.name })
+      db.select({ id: dutyPaymentTransactionsTable.id, date: dutyPaymentTransactionsTable.paidAt, amount: dutyPaymentTransactionsTable.amount, entryType: dutyPaymentTransactionsTable.entryType, reversalReason: dutyPaymentTransactionsTable.reversalReason, method: dutyPaymentTransactionsTable.paymentMethod, reference: dutyPaymentTransactionsTable.reference, notes: dutyPaymentTransactionsTable.notes, containerId: containersTable.id, containerNumber: containersTable.containerNumber, bankName: banksTable.name })
         .from(dutyPaymentTransactionsTable).leftJoin(containersTable, eq(dutyPaymentTransactionsTable.containerId, containersTable.id)).leftJoin(banksTable, eq(dutyPaymentTransactionsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(dutyPaymentTransactionsTable.paidAt, dutyPaymentTransactionsTable.branchId))),
       db.select({ id: expensePaymentsTable.id, date: expensePaymentsTable.paidAt, amount: expensePaymentsTable.amount, method: expensePaymentsTable.paymentMethod, notes: expensePaymentsTable.notes, expenseId: overheadExpensesTable.id, description: overheadExpensesTable.description, category: overheadExpensesTable.category, bankName: banksTable.name })
         .from(expensePaymentsTable).leftJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id)).leftJoin(banksTable, eq(expensePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(expensePaymentsTable.paidAt, expensePaymentsTable.branchId))),
@@ -230,7 +236,24 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
 
     const entries: FinancialLedgerEntry[] = [
       ...invoiceRows.map(row => ({ id: `invoice-${row.id}`, date: row.date.toISOString(), direction: "in" as const, source: "Invoice collection", description: row.invoiceNumber ? `Collection for ${row.invoiceNumber}` : "Invoice collection", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: "/invoices" })),
-      ...dutyRows.map(row => ({ id: `duty-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Customs duty payment", description: row.containerNumber ? `Duty payment for ${row.containerNumber}` : "Customs duty payment", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
+      ...dutyRows.map(row => {
+        const amount = Number(row.amount ?? 0);
+        const isReversal = row.entryType === "reversal" || amount < 0;
+        return {
+          id: `duty-${row.id}`,
+          date: row.date.toISOString(),
+          direction: isReversal ? "in" as const : "out" as const,
+          source: isReversal ? "Customs duty reversal" : "Customs duty payment",
+          description: isReversal
+            ? `Duty reversal${row.containerNumber ? ` for ${row.containerNumber}` : ""}${row.reversalReason ? `: ${row.reversalReason}` : ""}`
+            : (row.containerNumber ? `Duty payment for ${row.containerNumber}` : "Customs duty payment"),
+          amount: Math.abs(amount),
+          method: row.method,
+          bankName: row.bankName,
+          reference: row.reference || row.notes || null,
+          sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers",
+        };
+      }),
       ...overheadRows.map(row => ({ id: `overhead-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Overhead payment", description: row.description ? `${row.category ?? "Overhead"}: ${row.description}` : "Overhead payment", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.notes || null, sourceLink: "/overhead-expenses" })),
       ...containerRows.map(row => ({ id: `container-expense-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Container disbursement", description: row.containerNumber ? `${row.section ?? "Operations"} for ${row.containerNumber}` : "Container disbursement", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.narration || null, sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
       ...scheduleRows.map(row => ({ id: `payment-schedule-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Payment schedule", description: row.vendor ? `${row.vendor}${row.description ? `: ${row.description}` : ""}` : "Payment schedule", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: "/payment-schedules" })),
@@ -1515,8 +1538,8 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
       .where(cepConds.length > 0 ? and(...cepConds) : undefined)
       .orderBy(containerExpensePaymentsTable.paidAt);
 
-    // OUTFLOWS - actual Customs duty payments. Snapshot balances are deliberately
-    // excluded; only dated ledger rows represent a cash movement.
+    // Actual Customs duty ledger entries. Payments are outflows; linked
+    // reversals are inflows to the original payment source.
     const dutyConds: SQL[] = [];
     if (fromDate) dutyConds.push(gte(dutyPaymentTransactionsTable.paidAt, fromDate));
     if (toDate) dutyConds.push(lte(dutyPaymentTransactionsTable.paidAt, toDate));
@@ -1527,6 +1550,8 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
       .select({
         id: dutyPaymentTransactionsTable.id,
         amount: dutyPaymentTransactionsTable.amount,
+        entryType: dutyPaymentTransactionsTable.entryType,
+        reversalReason: dutyPaymentTransactionsTable.reversalReason,
         paidAt: dutyPaymentTransactionsTable.paidAt,
         paymentMethod: dutyPaymentTransactionsTable.paymentMethod,
         notes: dutyPaymentTransactionsTable.notes,
@@ -1655,17 +1680,22 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
     }
 
     for (const r of dutyRows) {
-      outflows.push({
+      const amount = parseFloat(r.amount as string ?? "0");
+      const isReversal = r.entryType === "reversal" || amount < 0;
+      const target = isReversal ? inflows : outflows;
+      target.push({
         id: `duty-${r.id}`,
         date: r.paidAt instanceof Date ? r.paidAt.toISOString() : String(r.paidAt),
         type: "duty_payment",
-        direction: "out",
-        description: `Customs duty payment${r.containerNumber ? ` - ${r.containerNumber}` : ""}${r.notes ? ` (${r.notes})` : ""}`,
+        direction: isReversal ? "in" : "out",
+        description: isReversal
+          ? `Customs duty reversal${r.containerNumber ? ` - ${r.containerNumber}` : ""}${r.reversalReason ? ` (${r.reversalReason})` : ""}`
+          : `Customs duty payment${r.containerNumber ? ` - ${r.containerNumber}` : ""}${r.notes ? ` (${r.notes})` : ""}`,
         category: "Customs Duty",
         bankId: r.bankId ?? null,
         bankName: r.bankName ?? null,
         reference: r.reference ?? null,
-        amount: parseFloat(r.amount as string ?? "0"),
+        amount: Math.abs(amount),
       });
     }
 

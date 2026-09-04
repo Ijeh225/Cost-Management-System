@@ -1010,6 +1010,32 @@ before planning any further changes.
   register. Do not treat the browser API limitation as evidence of an access
   bypass.
 
+### DUTY-002 Implementation: Immutable Duty Payment Reversal (2026-09-04)
+
+- Implemented a true duty-payment reversal. The original payment remains
+  immutable; a single linked negative transaction is created with a mandatory
+  reference, reason, reversal date, user, and audit-log record. A database
+  constraint prevents zero entries, invalid entry types, orphan reversals, and
+  a second reversal of the same payment.
+- The reversal atomically restores the Customs duty balance and uses the
+  original cash or bank source. Duty history now exposes a History action and
+  an explicit Reverse action only for unreversed original payments. It does
+  not offer deletion or editing of historical payment facts.
+- Bank statements show a reversal as a credit, while Financial Ledger and Cash
+  Flow show it as an inflow. Duty ledger, duty reconciliation, P&L, analytics,
+  and bank balances use the same signed transaction ledger, so their aggregate
+  totals net the original payment and its reversal correctly.
+- **Local verification:** API and web TypeScript checks passed; web production
+  build and server production build passed. The normal unit suite passed (17
+  files, 71 tests). A dedicated duty-reversal integration
+  test now covers payment, linked reversal, restored balance, history, audit
+  trail, and duplicate-reversal rejection; it could not execute here because
+  `TEST_DATABASE_URL` is not configured. No production reversal has been made.
+- **Next exact action:** commit and deploy this implementation, then conduct
+  one controlled live reversal using a fresh labelled duty payment and verify
+  Duty Payments, the original bank statement, Duty Payment Ledger, Financial
+  Ledger, Cash Flow, P&L, and the audit history before closing `DUTY-002`.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:

@@ -139,25 +139,17 @@ export const CreateUserBody = zod.object({
   email: zod.string(),
   name: zod.string(),
   password: zod.string(),
-  role: zod.enum([
-    "admin",
-    "super_admin",
-    "branch_admin",
-    "staff",
-    "documentation_user",
-    "accounts_user",
-    "operations_user",
-    "transire_user",
-    "shipping_user",
-    "terminal_user",
-    "pull_out_user",
-    "shipping_terminal_user",
+  authorityLevel: zod.enum(["super_admin", "admin", "branch_admin", "staff"]),
+  jobFunction: zod.enum([
+    "general_staff",
+    "documentation",
+    "accounts",
+    "operations",
     "terminal_manager",
-    "delivery_user",
-    "security_user",
+    "delivery",
+    "security",
   ]),
-  sectionPermission: zod.string().nullish(),
-  sectionPermissions: zod.string().nullish(),
+  workspaceAccess: zod.array(zod.string()).optional(),
   branchId: zod.number().nullish(),
   canUpload: zod.boolean().optional(),
 });
@@ -209,31 +201,11 @@ export const UpdateUserParams = zod.object({
 
 export const UpdateUserBody = zod.object({
   name: zod.string().optional(),
-  role: zod
-    .enum([
-      "admin",
-      "super_admin",
-      "branch_admin",
-      "staff",
-      "documentation_user",
-      "accounts_user",
-      "operations_user",
-      "transire_user",
-      "shipping_user",
-      "terminal_user",
-      "pull_out_user",
-      "shipping_terminal_user",
-      "terminal_manager",
-      "delivery_user",
-      "security_user",
-    ])
-    .optional(),
-  sectionPermission: zod.string().nullish(),
-  sectionPermissions: zod.string().nullish(),
   isActive: zod.boolean().optional(),
   password: zod.string().optional(),
   status: zod.string().optional(),
   canUpload: zod.boolean().optional(),
+  branchId: zod.number().nullish(),
 });
 
 export const UpdateUserResponse = zod.object({
@@ -2331,6 +2303,73 @@ export const RecordDutyPaymentBody = zod.object({
 });
 
 export const RecordDutyPaymentResponse = zod.object({
+  containerId: zod.number(),
+  containerNumber: zod.string(),
+  blNumber: zod.string(),
+  customerName: zod.string(),
+  status: zod.string(),
+  duty: zod.number(),
+  dutyPaid: zod.number(),
+  dutyNotPaid: zod.number(),
+  dutyStatus: zod.enum(["paid", "partial", "unpaid", "not_assessed"]),
+  updatedAt: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary List the immutable duty-payment history for one container
+ */
+export const ListDutyPaymentTransactionsParams = zod.object({
+  containerId: zod.coerce.number(),
+});
+
+export const ListDutyPaymentTransactionsResponse = zod.object({
+  transactions: zod.array(
+    zod.object({
+      id: zod.number(),
+      amount: zod
+        .number()
+        .describe("Positive for a payment; negative for a reversal."),
+      entryType: zod.enum(["payment", "reversal"]),
+      reversalOfTransactionId: zod.number().nullish(),
+      reversalReason: zod.string().nullish(),
+      paymentMethod: zod.enum(["cash", "bank"]),
+      bankId: zod.number().nullish(),
+      bankName: zod.string().nullish(),
+      reference: zod.string().nullish(),
+      notes: zod.string().nullish(),
+      paidAt: zod.date(),
+      recordedByName: zod.string().nullish(),
+      canReverse: zod.boolean(),
+    }),
+  ),
+});
+
+/**
+ * @summary Create an immutable reversal for an original duty payment
+ */
+export const ReverseDutyPaymentTransactionParams = zod.object({
+  transactionId: zod.coerce.number(),
+});
+
+export const reverseDutyPaymentTransactionBodyReferenceMax = 200;
+
+export const reverseDutyPaymentTransactionBodyReasonMin = 3;
+export const reverseDutyPaymentTransactionBodyReasonMax = 2000;
+
+export const ReverseDutyPaymentTransactionBody = zod.object({
+  reversalDate: zod.date().nullish(),
+  reference: zod
+    .string()
+    .min(1)
+    .max(reverseDutyPaymentTransactionBodyReferenceMax),
+  reason: zod
+    .string()
+    .min(reverseDutyPaymentTransactionBodyReasonMin)
+    .max(reverseDutyPaymentTransactionBodyReasonMax),
+});
+
+export const ReverseDutyPaymentTransactionResponse = zod.object({
   containerId: zod.number(),
   containerNumber: zod.string(),
   blNumber: zod.string(),

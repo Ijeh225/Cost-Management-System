@@ -5,15 +5,12 @@
  * Cost Analysis Per Container API
  * OpenAPI spec version: 0.1.0
  */
-import type { UpdateUserRequestRole } from "./updateUserRequestRole";
 
 export interface UpdateUserRequest {
   name?: string;
-  role?: UpdateUserRequestRole;
-  sectionPermission?: string | null;
-  sectionPermissions?: string | null;
   isActive?: boolean;
   password?: string;
   status?: string;
   canUpload?: boolean;
+  branchId?: number | null;
 }

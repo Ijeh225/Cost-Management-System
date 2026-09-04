@@ -9,6 +9,11 @@ export const dutyPaymentTransactionsTable = pgTable("duty_payment_transactions",
   branchId: integer("branch_id").notNull().default(1),
   containerId: integer("container_id").notNull(),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  // Payments are positive. A reversal is a linked negative entry so every
+  // financial report can calculate the net cash movement from this ledger.
+  entryType: text("entry_type").notNull().default("payment"),
+  reversalOfTransactionId: integer("reversal_of_transaction_id"),
+  reversalReason: text("reversal_reason"),
   paymentMethod: text("payment_method").notNull().default("cash"),
   bankId: integer("bank_id"),
   reference: text("reference"),

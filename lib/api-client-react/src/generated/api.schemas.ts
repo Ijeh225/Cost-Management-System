@@ -62,23 +62,35 @@ export interface LoginResponse {
   message: string;
 }
 
-export type UserAuthorityLevel = "super_admin" | "admin" | "branch_admin" | "staff";
+export type CreateUserRequestAuthorityLevel =
+  (typeof CreateUserRequestAuthorityLevel)[keyof typeof CreateUserRequestAuthorityLevel];
 
-export type UserJobFunction =
-  | "general_staff"
-  | "documentation"
-  | "accounts"
-  | "operations"
-  | "terminal_manager"
-  | "delivery"
-  | "security";
+export const CreateUserRequestAuthorityLevel = {
+  super_admin: "super_admin",
+  admin: "admin",
+  branch_admin: "branch_admin",
+  staff: "staff",
+} as const;
+
+export type CreateUserRequestJobFunction =
+  (typeof CreateUserRequestJobFunction)[keyof typeof CreateUserRequestJobFunction];
+
+export const CreateUserRequestJobFunction = {
+  general_staff: "general_staff",
+  documentation: "documentation",
+  accounts: "accounts",
+  operations: "operations",
+  terminal_manager: "terminal_manager",
+  delivery: "delivery",
+  security: "security",
+} as const;
 
 export interface CreateUserRequest {
   email: string;
   name: string;
   password: string;
-  authorityLevel: UserAuthorityLevel;
-  jobFunction: UserJobFunction;
+  authorityLevel: CreateUserRequestAuthorityLevel;
+  jobFunction: CreateUserRequestJobFunction;
   workspaceAccess?: string[];
   branchId?: number | null;
   canUpload?: boolean;
@@ -893,6 +905,57 @@ export interface RecordDutyPaymentRequest {
   paymentMethod?: RecordDutyPaymentRequestPaymentMethod;
   bankId?: number | null;
   reference?: string | null;
+}
+
+export type DutyPaymentTransactionEntryType =
+  (typeof DutyPaymentTransactionEntryType)[keyof typeof DutyPaymentTransactionEntryType];
+
+export const DutyPaymentTransactionEntryType = {
+  payment: "payment",
+  reversal: "reversal",
+} as const;
+
+export type DutyPaymentTransactionPaymentMethod =
+  (typeof DutyPaymentTransactionPaymentMethod)[keyof typeof DutyPaymentTransactionPaymentMethod];
+
+export const DutyPaymentTransactionPaymentMethod = {
+  cash: "cash",
+  bank: "bank",
+} as const;
+
+export interface DutyPaymentTransaction {
+  id: number;
+  /** Positive for a payment; negative for a reversal. */
+  amount: number;
+  entryType: DutyPaymentTransactionEntryType;
+  reversalOfTransactionId?: number | null;
+  reversalReason?: string | null;
+  paymentMethod: DutyPaymentTransactionPaymentMethod;
+  bankId?: number | null;
+  bankName?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+  paidAt: string;
+  recordedByName?: string | null;
+  canReverse: boolean;
+}
+
+export interface DutyPaymentTransactionListResponse {
+  transactions: DutyPaymentTransaction[];
+}
+
+export interface ReverseDutyPaymentRequest {
+  reversalDate?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  reference: string;
+  /**
+   * @minLength 3
+   * @maxLength 2000
+   */
+  reason: string;
 }
 
 export type ListContainersParams = {

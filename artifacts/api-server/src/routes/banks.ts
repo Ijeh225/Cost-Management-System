@@ -523,6 +523,8 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
         .select({
           id: dutyPaymentTransactionsTable.id,
           amount: dutyPaymentTransactionsTable.amount,
+          entryType: dutyPaymentTransactionsTable.entryType,
+          reversalReason: dutyPaymentTransactionsTable.reversalReason,
           paidAt: dutyPaymentTransactionsTable.paidAt,
           reference: dutyPaymentTransactionsTable.reference,
           notes: dutyPaymentTransactionsTable.notes,
@@ -533,16 +535,20 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
         .where(and(...dutyConditions));
 
       for (const duty of dutyRows) {
+        const amount = parseFloat(duty.amount);
+        const isReversal = duty.entryType === "reversal" || amount < 0;
         txs.push({
           id: `duty_payment_${duty.id}`,
           date: duty.paidAt,
           type: "duty_payment",
-          description: `Customs duty - ${duty.containerNumber ?? "Container"}${duty.notes ? ` (${duty.notes})` : ""}`,
+          description: isReversal
+            ? `Customs duty reversal - ${duty.containerNumber ?? "Container"}${duty.reversalReason ? ` (${duty.reversalReason})` : ""}`
+            : `Customs duty - ${duty.containerNumber ?? "Container"}${duty.notes ? ` (${duty.notes})` : ""}`,
           reference: duty.reference ?? null,
           clientName: null,
           invoiceNumber: null,
-          debit: parseFloat(duty.amount),
-          credit: 0,
+          debit: isReversal ? 0 : Math.abs(amount),
+          credit: isReversal ? Math.abs(amount) : 0,
         });
       }
     }

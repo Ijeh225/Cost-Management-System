@@ -5,15 +5,16 @@
  * Cost Analysis Per Container API
  * OpenAPI spec version: 0.1.0
  */
-import type { CreateUserRequestRole } from "./createUserRequestRole";
+import type { CreateUserRequestAuthorityLevel } from "./createUserRequestAuthorityLevel";
+import type { CreateUserRequestJobFunction } from "./createUserRequestJobFunction";
 
 export interface CreateUserRequest {
   email: string;
   name: string;
   password: string;
-  role: CreateUserRequestRole;
-  sectionPermission?: string | null;
-  sectionPermissions?: string | null;
+  authorityLevel: CreateUserRequestAuthorityLevel;
+  jobFunction: CreateUserRequestJobFunction;
+  workspaceAccess?: string[];
   branchId?: number | null;
   canUpload?: boolean;
 }

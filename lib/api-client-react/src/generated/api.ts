@@ -40,6 +40,7 @@ import type {
   DeliveryReportResponse,
   DutyPaymentListResponse,
   DutyPaymentRow,
+  DutyPaymentTransactionListResponse,
   ErrorResponse,
   ExportContainersCSVParams,
   GetContainerReportParams,
@@ -56,6 +57,7 @@ import type {
   MyTasksResponse,
   RecordDutyPaymentRequest,
   RejectSectionRequest,
+  ReverseDutyPaymentRequest,
   SaveCustomFieldValuesRequest,
   SectionApproval,
   TimelineEvent,
@@ -4455,4 +4457,192 @@ export const useRecordDutyPayment = <
   TContext
 > => {
   return useMutation(getRecordDutyPaymentMutationOptions(options));
+};
+
+/**
+ * @summary List the immutable duty-payment history for one container
+ */
+export const getListDutyPaymentTransactionsUrl = (containerId: number) => {
+  return `/api/duty-payments/${containerId}/transactions`;
+};
+
+export const listDutyPaymentTransactions = async (
+  containerId: number,
+  options?: RequestInit,
+): Promise<DutyPaymentTransactionListResponse> => {
+  return customFetch<DutyPaymentTransactionListResponse>(
+    getListDutyPaymentTransactionsUrl(containerId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListDutyPaymentTransactionsQueryKey = (containerId: number) => {
+  return [`/api/duty-payments/${containerId}/transactions`] as const;
+};
+
+export const getListDutyPaymentTransactionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDutyPaymentTransactions>>,
+  TError = ErrorType<unknown>,
+>(
+  containerId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDutyPaymentTransactions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListDutyPaymentTransactionsQueryKey(containerId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDutyPaymentTransactions>>
+  > = ({ signal }) =>
+    listDutyPaymentTransactions(containerId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!containerId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDutyPaymentTransactions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDutyPaymentTransactionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDutyPaymentTransactions>>
+>;
+export type ListDutyPaymentTransactionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List the immutable duty-payment history for one container
+ */
+
+export function useListDutyPaymentTransactions<
+  TData = Awaited<ReturnType<typeof listDutyPaymentTransactions>>,
+  TError = ErrorType<unknown>,
+>(
+  containerId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDutyPaymentTransactions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDutyPaymentTransactionsQueryOptions(
+    containerId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create an immutable reversal for an original duty payment
+ */
+export const getReverseDutyPaymentTransactionUrl = (transactionId: number) => {
+  return `/api/duty-payments/transactions/${transactionId}/reverse`;
+};
+
+export const reverseDutyPaymentTransaction = async (
+  transactionId: number,
+  reverseDutyPaymentRequest: ReverseDutyPaymentRequest,
+  options?: RequestInit,
+): Promise<DutyPaymentRow> => {
+  return customFetch<DutyPaymentRow>(
+    getReverseDutyPaymentTransactionUrl(transactionId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(reverseDutyPaymentRequest),
+    },
+  );
+};
+
+export const getReverseDutyPaymentTransactionMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reverseDutyPaymentTransaction>>,
+    TError,
+    { transactionId: number; data: BodyType<ReverseDutyPaymentRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reverseDutyPaymentTransaction>>,
+  TError,
+  { transactionId: number; data: BodyType<ReverseDutyPaymentRequest> },
+  TContext
+> => {
+  const mutationKey = ["reverseDutyPaymentTransaction"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reverseDutyPaymentTransaction>>,
+    { transactionId: number; data: BodyType<ReverseDutyPaymentRequest> }
+  > = (props) => {
+    const { transactionId, data } = props ?? {};
+
+    return reverseDutyPaymentTransaction(transactionId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReverseDutyPaymentTransactionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reverseDutyPaymentTransaction>>
+>;
+export type ReverseDutyPaymentTransactionMutationBody =
+  BodyType<ReverseDutyPaymentRequest>;
+export type ReverseDutyPaymentTransactionMutationError =
+  ErrorType<ErrorResponse>;
+
+/**
+ * @summary Create an immutable reversal for an original duty payment
+ */
+export const useReverseDutyPaymentTransaction = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reverseDutyPaymentTransaction>>,
+    TError,
+    { transactionId: number; data: BodyType<ReverseDutyPaymentRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reverseDutyPaymentTransaction>>,
+  TError,
+  { transactionId: number; data: BodyType<ReverseDutyPaymentRequest> },
+  TContext
+> => {
+  return useMutation(getReverseDutyPaymentTransactionMutationOptions(options));
 };
