@@ -485,6 +485,20 @@ and restore the original N100.00 assessment.
 `DUTY-002` is closed. The historic `E2E-20260904-DUTY-REVERSAL-001` was not
 modified. No source code changed during this final live verification.
 
-**Next exact action:** review the remaining open and environment-blocked cases
-in this register before starting another controlled test. Do not repeat the
-completed BANK-003, AI-008, SEC-02, or DUTY-002 tests.
+### Current Remaining Work Order (2026-09-04)
+
+The completed BANK-003, AI-008, SEC-02, and DUTY-002 evidence supersedes the
+older Step 11 entries that described duplicate bank-reference and reversible
+duty checks as pending. Do not repeat them.
+
+| Order | Work | Current scope |
+| --- | --- | --- |
+| 1 | Step 6 re-test | Reconcile the deployed cancelled-invoice eligibility rule in Dashboard, Accounts Receivable, Aging, Client Statement, and Client/Wallet (`DASH-001`, `AR-002`, `STMT-001`, `CLT-001`). |
+| 2 | Step 7 re-test | Verify selected-branch creation defaults, actionable errors, and branch isolation (`BRN-001`). |
+| 3 | Step 8 AI re-test | Re-test authoritative stage owner, finance invoice eligibility, notification counts, exact schedule lookup, All Branches briefing state, and indexed document lookup (`AI-002` to `AI-007`). `AI-008` is closed. |
+| 4 | Step 9 re-test | Verify notification labels/idempotency, My Tasks, approval refresh, Pipeline Terminal display, and delivery-date persistence (`NOTIF-001`, `NOTIF-002`, `TASK-001`, `APR-001`, `PIPE-001`, `DEL-001`). |
+| 5 | Step 10 re-test | Verify bank filter/reset, schedule tab counts, Container Payments loading state, and Overhead refresh state (`BANK-002`, `SCHED-002`, `CP-002`, `OH-002`). |
+| 6 | Remaining Step 11 controls | Use an appropriate non-production/manual surface only for overdue native date entry, actual uploaded-file retrieval, and isolated cross-role sessions. |
+
+**Next exact action:** start Order 1, the cancelled-invoice financial-population
+re-test. It is the highest remaining cross-module finance risk.

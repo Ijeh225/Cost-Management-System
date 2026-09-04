@@ -1243,6 +1243,35 @@ before planning any further changes.
   in `docs/LIVE_E2E_TEST_REGISTER.md` before scheduling another live write
   test. Do not repeat completed BANK-003, AI-008, SEC-02, or DUTY-002 cases.
 
+### Current Remaining Work Order (2026-09-04)
+
+The completed BANK-003, AI-008, SEC-02, and DUTY-002 evidence supersedes the
+older Step 11 notes that listed bank-reference and duty-reversal verification as
+pending. Do not repeat those production writes.
+
+1. Re-test the deployed Step 6 cancelled-invoice rule across Dashboard,
+   Accounts Receivable, Aging, Client Statement, and Client/Wallet (`DASH-001`,
+   `AR-002`, `STMT-001`, `CLT-001`).
+2. Re-test selected-branch creation and isolation for the Step 7 correction
+   (`BRN-001`).
+3. Re-test the Step 8 AI corrections: authoritative stage ownership, eligible
+   invoice finance totals, notification scope/counts, exact schedule lookup,
+   consolidated briefing state, and uploaded-document retrieval
+   (`AI-002` through `AI-007`). `AI-008` is already closed.
+4. Re-test Step 9 workflow and persistence fixes: notification taxonomy and
+   duplicate history, My Tasks, approval refresh, Pipeline Terminal display,
+   and delivery-date persistence (`NOTIF-001`, `NOTIF-002`, `TASK-001`,
+   `APR-001`, `PIPE-001`, `DEL-001`).
+5. Re-test Step 10 bank and loading-state fixes (`BANK-002`, `SCHED-002`,
+   `CP-002`, `OH-002`).
+6. Leave only the true Step 11 environmental cases for an appropriate test
+   surface: native overdue-date entry, actual uploaded-file retrieval, and
+   isolated non-production cross-role sessions. These do not justify further
+   uncontrolled production writes.
+
+**Next exact action:** begin item 1 with the cancelled-invoice financial
+population re-test, then update both project records with the observed result.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
