@@ -432,3 +432,16 @@ No BANK-003 fund addition has been created in this resumed test. **Next exact
 action:** deploy the correction, then post the reserved N1.00 fund addition once
 and retry it once with the same reference. The expected result is one movement
 and one HTTP `409` rejection.
+
+### BANK-003 Live Re-Test (2026-09-04)
+
+| Test | Result | Evidence |
+| --- | --- | --- |
+| Railway deployment `d34706d` | Passed | Railway showed `Correct bank reference duplicate guard` as Active and the production service Online before the write test. |
+| Reserved initial fund addition | Passed | `E2E-20260904-BANK-003-LIVE-001-7A9C` created exactly one N1.00 Fund Addition in `E2E-20260901 Lagos Test Bank`. The statement showed nine transactions, N2,002.00 total credits, and N1,101.00 closing balance. |
+| Identical-reference retry | Passed | A second submission with the same reference returned HTTP `409 A bank movement with reference ... already exists in this branch.` The statement contains only the single matching credit. |
+
+`BANK-003` is closed. **Next exact action:** capture the remaining authenticated
+non-finance API `403` only from a client that can reach `/api/*`; the current
+browser environment blocks direct API navigation before the app. Then begin
+the fresh labelled DUTY-002 reversal test.

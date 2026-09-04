@@ -1164,6 +1164,25 @@ before planning any further changes.
   is active, use the already reserved reference once, retry it once, and verify
   the first movement exists exactly once while the retry returns `409`.
 
+### BANK-003 Live Re-Test Passed (2026-09-04)
+
+- Railway deployed commit `d34706d` (`Correct bank reference duplicate guard`)
+  successfully; the production service was shown as Active and Online before
+  the live verification resumed.
+- The reserved N1.00 fund addition
+  `E2E-20260904-BANK-003-LIVE-001-7A9C` was accepted once by
+  `E2E-20260901 Lagos Test Bank`. Its statement now has nine transactions,
+  N2,002.00 total credits, and a N1,101.00 closing balance. The one matching
+  row is a Fund Addition credit of N1.00 with the recorded E2E narration.
+- Retrying the exact same reference was correctly rejected with HTTP `409`.
+  The bank statement has no second matching movement. `BANK-003` is
+  live-verified and closed.
+- **Next exact action:** attempt the remaining authenticated non-finance API
+  `403` capture only through a client that can reach `/api/*`. If the browser
+  continues blocking that request before it reaches the app, retain the
+  already-passing middleware regression evidence and record the environmental
+  limitation. Then begin the documented fresh-record DUTY-002 reversal test.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
