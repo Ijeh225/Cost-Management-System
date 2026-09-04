@@ -377,3 +377,5 @@ Next controlled checks after deployment: repeat the exact AI document query;
 post one fresh labelled bank fund addition and retry the same reference to
 confirm `409` with no second movement; and capture an authenticated finance API
 denial from a browser or client that allows the request to reach the server.
+
+| Railway deployment after `199d96d` and `8b9da6c` | Observed Online | Railway displayed the `Cost-Management-System` production service as Online. The available Terminal-only E2E session was not used for financial writes or an API request. |

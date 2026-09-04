@@ -1085,6 +1085,17 @@ before planning any further changes.
   authenticated non-finance `403` check and run the controlled BANK-003 and
   AI-008 re-tests before resuming the DUTY-002 financial write test.
 
+### Pre-Duty Fix Deployment Status (2026-09-04)
+
+- After the `199d96d` implementation and `8b9da6c` state-record commits were
+  pushed, Railway was observed showing the `Cost-Management-System` production
+  service as **Online**. No live BANK-003 movement, AI query, or finance API
+  request was made from the available Terminal-only session.
+- **Next exact action:** use the owner Super Admin or Accounts session to run
+  the documented BANK-003 and AI-008 re-tests. Use a browser/client that lets
+  a same-origin `/api/banks` request reach the server for the remaining live
+  `403` capture, then resume the controlled DUTY-002 reversal test.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
