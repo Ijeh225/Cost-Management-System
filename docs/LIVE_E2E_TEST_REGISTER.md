@@ -379,3 +379,16 @@ confirm `409` with no second movement; and capture an authenticated finance API
 denial from a browser or client that allows the request to reach the server.
 
 | Railway deployment after `199d96d` and `8b9da6c` | Observed Online | Railway displayed the `Cost-Management-System` production service as Online. The available Terminal-only E2E session was not used for financial writes or an API request. |
+
+### Live-Test Resumption Checkpoint (2026-09-04)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Handover and working tree | Passed | `PROJECT_STATE.md` and this register were reviewed completely before resuming. `master` is clean; no existing test record was repeated or changed. |
+| Available browser role | Blocked for finance verification | The active application session is `E2E-20260901-Lagos` Documentation. It correctly exposes Documentation only and does not provide AI Assistant, Bank Management, or Duty Payments access. No live write was made. |
+
+**Next exact action:** an Owner Super Admin or E2E Accounts session is required
+to run the pending live checks once, in this order: AI-008 exact document query,
+BANK-003 duplicate-reference `409` with no second movement, an authenticated
+finance API `403` through a client that reaches `/api/*`, then DUTY-002 using
+one fresh labelled payment and one reversal.

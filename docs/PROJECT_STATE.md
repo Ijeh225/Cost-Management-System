@@ -1096,6 +1096,23 @@ before planning any further changes.
   a same-origin `/api/banks` request reach the server for the remaining live
   `403` capture, then resume the controlled DUTY-002 reversal test.
 
+### Live-Test Resumption Checkpoint (2026-09-04)
+
+- The project handover was reviewed in full before resuming work. Git is clean
+  on `master`; no completed test record, code change, or deployment has been
+  overwritten.
+- The available application browser session is now the controlled Documentation
+  E2E user in `E2E-20260901-Lagos`. It correctly exposes Documentation only.
+  It cannot access the AI Assistant, Bank Management, or Duty Payments.
+- No live write or duplicate test was attempted. The remaining BANK-003,
+  AI-008, and authenticated finance-API checks still require an Owner Super
+  Admin or Accounts session. DUTY-002 remains after those checks.
+- **Next exact action:** restore an authorised Owner Super Admin or E2E Accounts
+  browser session, then perform the already documented targeted checks in this
+  order: AI-008 exact document query, BANK-003 duplicate-reference rejection,
+  authenticated finance API `403` capture, and the single controlled DUTY-002
+  reversal reconciliation.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
