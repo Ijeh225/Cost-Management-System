@@ -324,3 +324,18 @@ The browser test environment blocks direct `/api/*` navigation, so the API 403
 cannot be observed there. The deployed middleware is covered by the shared
 capability test and local API suite; repeat an authenticated API check when an
 environment without that browser limitation is available.
+
+### SEC-02 Final Live Verification (2026-09-04)
+
+| Test | Result | Evidence |
+| --- | --- | --- |
+| Railway deployment `b9942b9` | Passed | Railway marked **Protect client data with finance access** active and the production service online. |
+| Operations direct `/invoices` | Passed | Redirected to Transire Workspace; no invoice values were rendered. |
+| Terminal direct `/invoices` | Passed | Redirected to Terminal Workspace; no invoice values were rendered. |
+| Delivery direct `/invoices` | Passed | Redirected to Delivery Workspace; no invoice values were rendered. |
+| Delivery direct `/clients` | Passed | Redirected to Delivery Workspace; no client balance, client list, or Add Client control was rendered. |
+| Accounts direct `/invoices` | Passed | The Accounts user opened the invoice list and its scoped figures as intended. |
+
+`SEC-02` is closed for the confirmed web-route exposure. The API guard is
+deployed and locally verified, but the direct live API-403 observation remains
+a browser-environment limitation rather than a failed access-control test.

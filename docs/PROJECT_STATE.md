@@ -990,6 +990,26 @@ before planning any further changes.
   (17 files, 71 tests). Deploy and re-test Delivery `/clients` before closing
   the full route-authorisation finding.
 
+### SEC-02 Live Verification Complete (2026-09-04)
+
+- Railway deployed `b9942b9` successfully. The exact previously exposed
+  direct URLs were re-tested with the existing E2E accounts: Operations,
+  Terminal, and Delivery now redirect from `/invoices` to their assigned
+  workspaces; Delivery also redirects from `/clients` to Delivery Workspace.
+  No invoice totals, client balances, or create controls are shown.
+- The Accounts E2E user still opens `/invoices` successfully, confirming the
+  finance rule preserves intended Accounts access. The Branch Admin allowance
+  is covered by the shared policy test and deployed capability rule.
+- **Residual verification gap:** this browser environment blocks direct
+  `/api/*` navigation, so an authenticated live API 403 response was not
+  captured here. The deployed API middleware, successful production build,
+  type check, and 71-test API suite provide code-level coverage; repeat the
+  direct API request from a browser without that limitation when practical.
+- **Next exact action:** continue the remaining documented controlled
+  verification items (`DUTY-002`, `BANK-003`, and `AI-008`) from the live E2E
+  register. Do not treat the browser API limitation as evidence of an access
+  bypass.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
