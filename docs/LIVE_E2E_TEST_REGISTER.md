@@ -359,6 +359,9 @@ explicitly selected for the controlled test.
 
 ### Pre-Duty Verification Fixes (2026-09-04)
 
+Implementation commit `199d96d` (`Protect bank references and AI document
+evidence`) is pushed to `origin/master`.
+
 | Test / issue | Result | Evidence |
 | --- | --- | --- |
 | `BANK-003` duplicate bank reference | Implemented locally; live re-test pending deployment | Bank transfers and fund additions now normalize a non-empty reference, lock its branch-level movement key within a transaction, and check both tables before insertion. Duplicate values, including casing/whitespace variations and cross-type reuse, return `409` without a second bank movement. The database-backed integration case is present but cannot run without the required isolated `TEST_DATABASE_URL`. |

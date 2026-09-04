@@ -1052,6 +1052,9 @@ before planning any further changes.
 
 ### BANK-003, AI-008, and API Access Verification (2026-09-04)
 
+- **Implementation commit:** `199d96d` (`Protect bank references and AI
+  document evidence`) is pushed to `origin/master`.
+
 - **BANK-003 implemented locally.** Non-empty bank references are now trimmed
   and treated as a branch-level bank-movement identifier across both bank
   transfers and fund additions. Each write takes a PostgreSQL transaction
