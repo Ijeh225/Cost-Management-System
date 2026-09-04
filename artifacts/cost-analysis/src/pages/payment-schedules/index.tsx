@@ -529,7 +529,8 @@ export default function PaymentSchedulesPage() {
 
   const schedules = data?.schedules ?? [];
   const summary = data?.summary;
-  const bucketCounts = (summary as (typeof summary & { bucketCounts?: Partial<Record<PaymentScheduleBucket, number>> }) | undefined)?.bucketCounts ?? {};
+  const bucketCounts: Partial<Record<PaymentScheduleBucket, number>> =
+    (summary as (typeof summary & { bucketCounts?: Partial<Record<PaymentScheduleBucket, number>> }) | undefined)?.bucketCounts ?? {};
   const pendingAction = approve.isPending || partialApprove.isPending || reject.isPending || pay.isPending || complete.isPending || reschedule.isPending || cancel.isPending || comment.isPending;
   const hasActiveFilters = requestedById != null || status !== "all" || search.trim() !== "" || vendor.trim() !== "" || client.trim() !== "" || amountMin !== "" || amountMax !== "" || dateFrom !== "" || dateTo !== "";
 

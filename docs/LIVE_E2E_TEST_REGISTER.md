@@ -300,3 +300,14 @@ Verification before commit: workspace type check passed, API test suite passed
 Terminal, Operations, Accounts, and Branch Admin E2E users. Confirm denied
 financial URLs redirect to the assigned workspace and their API calls return
 403, while Accounts and Branch Admin finance access continues to work.
+
+### Deployment Build Correction (2026-09-04)
+
+| Test | Result | Evidence |
+| --- | --- | --- |
+| Railway deployment for `b772158` | Failed before release | Railway typecheck reported that `bucketCounts` in Payment Schedules fell back to untyped `{}`, so a `PaymentScheduleBucket` key could not index it. The active production release therefore remains unchanged and still exhibits `SEC-02`. |
+| Local correction | Passed | The fallback is explicitly `Partial<Record<PaymentScheduleBucket, number>>`; the cost-analysis typecheck and Vite production build pass locally. |
+
+**Next controlled check:** deploy the narrow TypeScript correction. Only once
+Railway makes that build active may the Operations, Accounts, and Branch Admin
+direct-route/API `SEC-02` verification be recorded as passed or failed.

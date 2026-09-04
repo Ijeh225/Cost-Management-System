@@ -962,6 +962,21 @@ before planning any further changes.
   accounts. Mark the issue closed only after both denied URL/API access and
   permitted finance access are observed live.
 
+### Deployment Build Correction (2026-09-04)
+
+- Railway rejected commit `b772158` before deployment because
+  `payment-schedules/index.tsx` used an untyped `{}` fallback for
+  `bucketCounts`; TypeScript therefore could not index it with a
+  `PaymentScheduleBucket`. Production remains on the prior successful build,
+  so `SEC-02` is not yet closed.
+- The fallback now has the explicit type
+  `Partial<Record<PaymentScheduleBucket, number>>`. The precise local Railway
+  checks now pass: cost-analysis type check and production build. The existing
+  server build had also passed before this frontend-only correction.
+- **Next exact action:** commit and push the narrow build correction; confirm
+  Railway marks it active; then repeat the denied Operations `/invoices` URL
+  and API checks plus the allowed Accounts and Branch Admin finance checks.
+
 ## Update Format
 
 When updating this file, change only what is needed and always record:
