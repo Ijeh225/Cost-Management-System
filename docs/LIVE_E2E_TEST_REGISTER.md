@@ -16,6 +16,7 @@ action` label below does not override this current register.
 | Workflow and views | `NOTIF-001`, `NOTIF-002`, `TASK-001`, `PIPE-001`, `APR-001`, `DEL-001` | Queue rejection refreshes immediately; saved delivery date, Dashboard, and Delivery Tracking reconcile. |
 | Finance and loading UI | `BANK-002`, `SCHED-002`, `CP-002`, `OH-002`, `BANK-003`, `DUTY-002` | Filters/date buckets, load states, bank-reference guard, and controlled duty reversal have recorded live evidence. |
 | Finance and report re-test | `RPT-001`, `RPT-002`, `RPT-003`, `SCHED-001`, `FIN-002`, `FIN-003` | 2026-09-05 controlled N1 standalone schedule moved through payment, bank, ledger, cash flow, P&L, dashboard, and duty/disbursement reconciliation successfully. Branch Comparison and Cash Flow presentation were also re-tested after their deployed corrections. |
+| Operations and document re-test | `OPS-001`, `OPS-002`, `VAT-001`, `CLT-001`, `CONT-RPT-001`, `INV-001` | Stage ownership is authoritative in Operations, Pull-Out Released is visible, VAT print renders, Client/AR figures agree, container prints are accurate, and zero-value drafts cannot be sent. |
 | Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
 
 ### Current Follow-Up
@@ -24,15 +25,29 @@ The records below already have source changes in the current branch. They are
 not a request to implement the same feature again. A live re-test either closes
 the record or produces new evidence for a targeted follow-up fix.
 
-1. Operational persistence and visibility: `OPS-001` and `OPS-002`. The
-   stage-specific generic-control and Pull-Out Released-view changes are
-   recorded as implemented; use existing controlled jobs to verify them.
-2. Printable and client-finance surfaces: `VAT-001`, `STMT-001`, `CLT-001`,
-   and `CONT-RPT-001`. The current branch has the eligibility and print-route
-   corrections; reopen only if their live output remains wrong.
-3. Invoice UI: `INV-001` is implemented and needs a zero-value draft re-test.
-   `INV-002` remains live-mitigated; its historic N1 correction and isolated
+1. `STMT-001` and newly logged `VAT-002`: apply the canonical active-financial
+   invoice rule to the Client Statement and VAT Summary API routes. Cancelled
+   invoices may remain as audit-only history but must not affect totals,
+   receivables, taxable turnover, or VAT liability.
+2. Re-test the existing Lagos client after that correction: Client Statement
+   must match Accounts Receivable at N3,000 invoiced, N2,001 collected, and
+   N999 net outstanding. The 1-5 September VAT Summary must exclude both
+   cancelled invoices from its financial totals.
+3. `INV-002` remains live-mitigated; its historic N1 correction and isolated
    database regression test require separately approved work.
+
+### Operations and Document Live Re-Test - 2026-09-05
+
+| Record | Result | Live evidence |
+| --- | --- | --- |
+| `OPS-001` | Passed / closed | Generic Operations `/operations/20` now shows `HLCU8765432` Transire owner as Unassigned, matching the Transire workspace rather than legacy generic owner `Jdjdh`. The Operations Board presents independent owners by stage for `E2EL260901`: Documentation, Transire, Shipping, Terminal, and Pull-Out are distinct. |
+| `OPS-002` | Passed / closed | Pull-Out Released contains `E2EL260901`, submitted 1 September, with `E2E Pull-Out Owner`. Terminal Released independently contains the same job with `E2E Terminal Owner`. |
+| `VAT-001` | Passed / closed | VAT print rendered with content for 1-5 September and rendered a zero-total no-data report for 1-5 October; the prior blank-page hook failure is gone. |
+| `CLT-001` | Passed / closed | Lagos Client detail matches AR: N3,000 invoiced, N2,001 collected, N999 outstanding, and N1 credit balance. Cancelled invoices do not affect its live client/wallet totals. |
+| `CONT-RPT-001` | Passed / closed | Empty-charge container 25 and charged container 26 prints show correct identity, customer, stage, date, and charge values. No Invalid Date or Branch Id currency rows appeared. |
+| `INV-001` | Passed / closed | Existing zero-value draft `INV-202608-001` shows N0 total/outstanding and a disabled Mark as Sent action. |
+| `STMT-001` | Failed / reopened | Lagos Client Statement still includes cancelled `INV-202609-002` and `INV-202609-003`, reporting N5,000 invoiced, N3,000 gross outstanding, and N2,999 net owed instead of the AR-aligned active population. |
+| `VAT-002` | New / open | The now-rendering VAT Summary includes the same two cancelled invoices and totals N5,000 for 1-5 September. It must exclude cancelled invoices from taxable turnover and VAT totals. |
 
 ### RPT-003 and FIN-003 Live Re-Test Passed - 2026-09-05
 

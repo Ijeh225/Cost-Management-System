@@ -15,6 +15,10 @@ remain auditable.
 - Finance re-test evidence now closes `RPT-001`, `RPT-002`, `RPT-003`,
   `SCHED-001`, `FIN-002`, and `FIN-003`. Branch Comparison, P&L, and the
   Financial Dashboard now use the same recognised actual-cost population.
+- Operations and document re-tests now close `OPS-001`, `OPS-002`, `VAT-001`,
+  `CLT-001`, `CONT-RPT-001`, and `INV-001`. The Client Statement (`STMT-001`)
+  remains open, and VAT cancelled-invoice eligibility is newly recorded as
+  `VAT-002`.
 - Earlier controlled work also closed `BANK-003`, `AI-008`, `SEC-02`, and
   `DUTY-002`. Do not repeat their financial or workflow writes.
 - The latest deployment is verified live: Abuja dashboard completion now
@@ -28,9 +32,7 @@ the live application and only reopen it if that proof fails.
 
 | Priority | Work group | Records | Evidence of implementation |
 | --- | --- | --- | --- |
-| High | Operational record authority and visibility | `OPS-001`, `OPS-002` | Stage-specific generic-control and Pull-Out Released-view corrections are recorded as implemented. |
-| High | Printable and client financial documents | `VAT-001`, `STMT-001`, `CLT-001`, `CONT-RPT-001` | Invoice eligibility and print-route corrections are present in the current branch. |
-| Medium | Invoice experience | `INV-001` | Zero-value draft issue control is recorded as implemented. |
+| High | Cancelled-invoice financial eligibility | `STMT-001`, `VAT-002` | The deployed Client Statement and VAT Summary routes still total cancelled invoices. Both API routes select all client/period invoices without the canonical active-financial-invoice status filter. |
 
 `INV-002` is already protected live: further overpayments are blocked. Its
 remaining work is an isolated database regression test and a separately
@@ -38,11 +40,37 @@ approved correction for the historic labelled N1 overpayment.
 
 ### Next Live Re-Test Order
 
-1. Operations re-test: `OPS-001` and `OPS-002` using existing controlled jobs.
-2. Document and client-finance re-test: `VAT-001`, `STMT-001`, `CLT-001`, and
-   `CONT-RPT-001`.
-3. Invoice UI re-test: `INV-001`. Do not alter the historic `INV-002` N1 entry
-   unless a separate correction is expressly approved.
+1. Fix `STMT-001` and `VAT-002`: apply the canonical active-financial-invoice
+   rule to Client Statement and VAT Summary totals. Cancelled invoices may stay
+   visible as audit history only, with zero financial effect.
+2. Live re-test both report routes with the existing Lagos client. They must
+   reconcile to Accounts Receivable at N3,000 invoiced, N2,001 collected, and
+   N999 net outstanding; VAT for 1-5 September must exclude cancelled invoices.
+3. Keep the historic `INV-002` N1 entry unchanged unless a separate correction
+   is expressly approved. The isolated `TEST_DATABASE_URL` work remains a test
+   environment follow-up, not a live-data task.
+
+### Operations and Document Live Re-Test - 2026-09-05
+
+- `OPS-001` passed: `/operations/20` now displays the Transire-specific owner
+  for `HLCU8765432` as Unassigned, matching the Transire workspace rather than
+  the stale generic `Jdjdh` value retained in its history. The Operations Board
+  likewise shows distinct owner values for the same job in each department.
+- `OPS-002` passed: Pull-Out Released now contains `E2EL260901` with its own
+  `E2E Pull-Out Owner`, alongside its 1 September submission. Terminal Released
+  independently shows `E2E Terminal Owner`; Documentation, Transire, and
+  Shipping continue to show their separate owners.
+- `VAT-001` passed: the VAT print route renders for both populated and no-data
+  periods. `CLT-001` passed: the Lagos Client page matches AR at N3,000
+  invoiced, N2,001 collected, and N999 outstanding. `CONT-RPT-001` passed for
+  both empty-charge container 25 and charged container 26. `INV-001` passed:
+  zero-value draft `INV-202608-001` keeps Mark as Sent disabled.
+- `STMT-001` failed/reopened: its print route includes cancelled invoices
+  `INV-202609-002` and `INV-202609-003` in N5,000 invoiced, N3,000 gross
+  outstanding, and N2,999 net owed totals. `VAT-002` was recorded because the
+  populated VAT print route repeats the same cancelled invoices and reports
+  N5,000 taxable turnover for 1-5 September instead of the N3,000 active
+  invoice population.
 
 ### RPT-003 and FIN-003 Live Re-Test Passed - 2026-09-05
 
