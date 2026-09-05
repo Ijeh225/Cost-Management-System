@@ -20,30 +20,23 @@ remain auditable.
   Statement and VAT Summary now apply the same active-financial-invoice rule
   as Accounts Receivable.
 - Earlier controlled work also closed `BANK-003`, `AI-008`, `SEC-02`, and
-  `DUTY-002`. Do not repeat their financial or workflow writes.
+  `DUTY-002`, and `INV-002`. Do not repeat their financial or workflow writes.
 - The latest deployment is verified live: Abuja dashboard completion now
   matches the persisted delivery date and Delivery Tracking.
 
-### Implemented Correction Awaiting Controlled Live Re-Test
+### Current Follow-Up
 
-`INV-002` is protected live against new overpayments. A traceable reversal for
-the approved historic N1 overpayment is implemented locally and must be
-deployed before it is used on the controlled test record.
+No deployed application correction is awaiting a live re-test. The only
+remaining `INV-002` follow-up is an isolated database integration test using
+`TEST_DATABASE_URL` for concurrent/repeated-reversal safety.
 
 ### Next Action
 
-1. Deploy the invoice-payment reversal migration and use the Invoice detail
-   reversal action on `INV-202609-001` payment
-   `E2E-20260901-INV-001-OVERPAY-REJECT`. Record a new reversal reference and
-   the reason that this was the approved controlled post-paid N1 correction.
-2. Verify that the original collection and its linked N1 reversal remain in
-   invoice history and audit log; the invoice stays Paid at N2,000, client
-   credit becomes N0, and the bank, Financial Ledger, Cash Flow, Analytics,
-   AR, and Client Statement no longer include a net extra N1 collection.
-3. The isolated `TEST_DATABASE_URL` integration test remains an environment
-   follow-up after the controlled live correction.
+1. Provision `TEST_DATABASE_URL` and add the isolated database-backed
+   regression test for concurrent/repeated invoice-payment reversals. This is
+   test-environment work only; it does not require another live financial write.
 
-### INV-002 Traceable Payment Reversal Implemented Locally - 2026-09-05
+### INV-002 Traceable Payment Reversal Live Re-Test Passed - 2026-09-05
 
 - Invoice payments now support immutable `payment` and `reversal` entries,
   linked one-to-one. Reversal requires a reference, reason, and a date no
@@ -54,6 +47,15 @@ deployed before it is used on the controlled test record.
   totals in the same transaction.
 - The reversal source is presented as a money-out in Bank Management, Financial
   Ledger, and Cash Flow, rather than as a misleading negative collection.
+- Railway deployed commit `a13d096`. In the explicit Lagos branch scope, the
+  controlled N1 `E2E-20260901-INV-001-OVERPAY-REJECT` payment on
+  `INV-202609-001` was reversed as
+  `E2E-20260905-INV-001-OVERPAY-REVERSAL`. The original N1 payment and the
+  linked negative N1 reversal remain in Payment History and the audit log.
+- Live reconciliation passed: the invoice remains Paid at N2,000; client
+  credit is N0; AR, Analytics, and Client Statement show N2,000 collected and
+  N1,000 outstanding only from `INV-202609-004`; Bank Management shows the
+  reversal as a N1 debit; Financial Ledger and Cash Flow show it as money-out.
 - Local verification passed: API/frontend typechecks, API/frontend production
   builds, and all 85 API tests. The new unit test covers the calculation of
   credit created by an overpayment.

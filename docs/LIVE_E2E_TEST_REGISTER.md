@@ -16,26 +16,25 @@ action` label below does not override this current register.
 | Workflow and views | `NOTIF-001`, `NOTIF-002`, `TASK-001`, `PIPE-001`, `APR-001`, `DEL-001` | Queue rejection refreshes immediately; saved delivery date, Dashboard, and Delivery Tracking reconcile. |
 | Finance and loading UI | `BANK-002`, `SCHED-002`, `CP-002`, `OH-002`, `BANK-003`, `DUTY-002` | Filters/date buckets, load states, bank-reference guard, and controlled duty reversal have recorded live evidence. |
 | Finance and report re-test | `RPT-001`, `RPT-002`, `RPT-003`, `SCHED-001`, `FIN-002`, `FIN-003` | 2026-09-05 controlled N1 standalone schedule moved through payment, bank, ledger, cash flow, P&L, dashboard, and duty/disbursement reconciliation successfully. Branch Comparison and Cash Flow presentation were also re-tested after their deployed corrections. |
+| Invoice payment reversal | `INV-002` | The N1 controlled post-paid overpayment was reversed without deleting its original history; invoice, AR, client wallet, analytics, bank, Financial Ledger, Cash Flow, and Client Statement reconcile to N2,000 collected and N0 credit. |
 | Operations and document re-test | `OPS-001`, `OPS-002`, `VAT-001`, `VAT-002`, `CLT-001`, `CONT-RPT-001`, `INV-001`, `STMT-001` | Stage ownership is authoritative in Operations, Pull-Out Released is visible, VAT and statement figures use only active financial invoices, Client/AR figures agree, container prints are accurate, and zero-value drafts cannot be sent. |
 | Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
 
 ### Current Follow-Up
 
-`INV-002` remains protected against new overpayments. Its approved historic N1
-correction is implemented locally as a traceable reversal and awaits deployment
-and one controlled live re-test. The isolated database regression test still
-requires `TEST_DATABASE_URL`.
+No deployed correction awaits a live re-test. The only remaining `INV-002`
+follow-up is an isolated database regression test using `TEST_DATABASE_URL`
+for concurrent/repeated-reversal safety.
 
-### INV-002 Traceable Payment Reversal Implemented Locally - 2026-09-05
+### INV-002 Traceable Payment Reversal Live Re-Test Passed - 2026-09-05
 
-| Scope | Implemented correction | Controlled live re-test required |
+| Scope | Implemented correction | Live evidence |
 | --- | --- | --- |
-| Invoice payment history | Replaced hard deletion with a required-reference, required-reason reversal. The original row stays in history and a single linked negative entry is created; a second reversal is rejected. | Reverse the historic N1 `E2E-20260901-INV-001-OVERPAY-REJECT` payment on `INV-202609-001` after deployment. |
-| Financial reconciliation | The same reversal is shown as money-out in Bank Management, Financial Ledger, and Cash Flow. AR, analytics, reports, and invoice totals net the original and reversal together. Client credit is reduced only by the original payment's proven overpayment portion. | Confirm N2,000 paid, N0 credit, no net N1 extra cash collection, and retained original/reversal/audit evidence. |
+| Invoice payment history | Replaced hard deletion with a required-reference, required-reason reversal. The original row stays in history and a single linked negative entry is created; a second reversal is rejected. | Railway deployed `a13d096`. In Lagos scope, `E2E-20260901-INV-001-OVERPAY-REJECT` on `INV-202609-001` was reversed with `E2E-20260905-INV-001-OVERPAY-REVERSAL`. Payment History shows four rows and the invoice remains Paid at N2,000. |
+| Financial reconciliation | The same reversal is shown as money-out in Bank Management, Financial Ledger, and Cash Flow. AR, analytics, reports, and invoice totals net the original and reversal together. Client credit is reduced only by the original payment's proven overpayment portion. | Client Wallet and AR show N0 credit and N2,000 collected. Analytics and Client Statement show N2,000 collected, with N1,000 outstanding only for `INV-202609-004`. Bank Management shows the N1 reversal debit; Financial Ledger and Cash Flow show a separate N1 money-out reversal entry. |
 
 Local verification: API/frontend typechecks and production builds passed; all
-85 API tests passed. The current historic N1 row remains unchanged until the
-deployed reversal action is deliberately completed.
+85 API tests passed. The live controlled reversal above also passed.
 
 ### STMT-001 and VAT-002 Live Re-Test Passed - 2026-09-05
 
