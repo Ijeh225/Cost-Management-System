@@ -2667,7 +2667,8 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       : await db.select().from(containersTable).where(eq(containersTable.branchId, _scope));
     const totalContainers = allContainers.length;
     const inProgress = allContainers.filter(c => c.status !== "closed").length;
-    const completed = 0;
+    // Match Delivery Tracking: completion requires a recorded delivery date.
+    const completed = allContainers.filter(c => c.deliveredAt != null).length;
     const closed = allContainers.filter(c => c.status === "closed").length;
     const containersInTerminalList = allContainers
       .filter(isContainerPhysicallyInTerminal)

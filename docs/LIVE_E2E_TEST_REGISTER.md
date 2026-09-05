@@ -627,3 +627,26 @@ specified, then verify backend creation and branch isolation.
 `APR-001` (submit and reject one controlled item, then verify immediate queue
 refresh) and `DEL-001` (persist a real delivery date and reconcile Dashboard
 Completed plus Delivery Tracking).
+
+### APR-001 Controlled Live Re-Test (2026-09-05)
+
+DEL-001 live evidence: job 25 E2EA260901 saved 2026-09-05 and retained the
+date after full reload. Abuja Delivery Tracking returned exactly one delivery
+on 5 Sept 2026, four days, N1,000 revenue. Dashboard Completed remained 0.
+Root cause confirmed in dashboard API: hard-coded zero, not failed persistence.
+Corrected to count branch-scoped non-null deliveredAt, with an integration
+reconciliation assertion added (not locally executed; seeded database required).
+Full railway:build passed. Await deployment and final Dashboard re-test before
+closing DEL-001. No financial transactions were changed.
+
+Passed: existing Lagos E2EL260901 (ID 26) was submitted for full container
+review and rejected once in Approval Queue with reason
+`E2E-20260905 APR-001 controlled rejection: verify immediate queue refresh.`
+Without navigating or reloading after the rejection, Pending Review became
+empty and Recently Reviewed showed Rejected with the exact reason. This closes
+APR-001 for the exercised owner/branch workflow. Existing deployed correction
+was sufficient; no code fix or financial change was required.
+
+Next: DEL-001 on existing closed Abuja E2EA260901 (ID 25), whose delivery date
+is still Not yet recorded. Verify native date save, reload persistence,
+Dashboard Completed and Delivery Tracking against the same date and job.

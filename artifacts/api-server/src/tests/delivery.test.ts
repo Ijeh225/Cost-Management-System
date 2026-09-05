@@ -23,6 +23,18 @@ beforeAll(async () => {
 });
 
 describe("GET /api/analytics/deliveries", () => {
+  it("dashboard completed reconciles with unfiltered delivery tracking", async () => {
+    const dashboard = await request(app)
+      .get("/api/dashboard/stats")
+      .set("Cookie", ADMIN_COOKIE);
+    const deliveries = await request(app)
+      .get("/api/analytics/deliveries")
+      .set("Cookie", ADMIN_COOKIE);
+    expect(dashboard.status).toBe(200);
+    expect(deliveries.status).toBe(200);
+    expect(dashboard.body.completed).toBe(deliveries.body.count);
+  });
+
   it("returns 401 when unauthenticated", async () => {
     const res = await request(app).get("/api/analytics/deliveries");
     expect(res.status).toBe(401);

@@ -1467,3 +1467,27 @@ branch, then verify creation and data isolation in the target branch only.
 **Next exact action:** finish the remaining controlled workflow verification:
 `APR-001` immediate Approval Queue rejection refresh, then `DEL-001` delivery
 date persistence and its Dashboard/Delivery Tracking reconciliation.
+
+### APR-001 Controlled Live Re-Test (2026-09-05)
+
+DEL-001 follow-up: the existing Abuja job 25 now retains delivery date
+2026-09-05 after save and full reload. Delivery Tracking returns that one job,
+the same date, four days, and N1,000 budgeted revenue. Dashboard still returned
+Completed 0: its API hard-coded `const completed = 0`. Replaced this with the
+branch-scoped count of non-null deliveredAt records, matching Delivery Tracking.
+Full railway:build passed. Added an integration reconciliation assertion;
+it has not been run locally because it requires the seeded test database.
+Next exact action: deploy this correction, then verify Abuja Dashboard Completed
+1 against the already verified Delivery Tracking row. Do not create another job.
+
+- Current work: finish APR-001 and DEL-001 using existing controlled jobs.
+- APR-001 passed: submitted full container review for Lagos E2EL260901 (ID 26)
+  once, then rejected it through Approval Queue with reason
+  `E2E-20260905 APR-001 controlled rejection: verify immediate queue refresh.`
+- Without navigation or reload after rejection, Pending Review became empty
+  and Recently Reviewed displayed the same job as Rejected with that reason.
+- Existing deployed correction passed; no source-code change was needed.
+- Git was clean at start, HEAD follows pushed test checkpoint 251caed.
+- Next: DEL-001 on existing Abuja E2EA260901 (ID 25), currently Closed with
+  delivery date Not yet recorded. Save a controlled date, reload, and reconcile
+  Dashboard Completed and Delivery Tracking. Retain rejection audit evidence.
