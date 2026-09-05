@@ -12,6 +12,9 @@ remain auditable.
 - Live re-tests closed `DASH-001`, `AR-002`, `BRN-001`, `AI-002` through
   `AI-007`, `NOTIF-001`, `NOTIF-002`, `TASK-001`, `PIPE-001`, `BANK-002`,
   `SCHED-002`, `CP-002`, `OH-002`, `APR-001`, and `DEL-001`.
+- Finance re-test evidence now closes `RPT-001`, `RPT-002`, `SCHED-001`, and
+  `FIN-002`. `RPT-003` remains open because Branch Comparison still applies a
+  broader actual-cost population than the matching P&L and Financial Dashboard.
 - Earlier controlled work also closed `BANK-003`, `AI-008`, `SEC-02`, and
   `DUTY-002`. Do not repeat their financial or workflow writes.
 - The latest deployment is verified live: Abuja dashboard completion now
@@ -25,7 +28,8 @@ the live application and only reopen it if that proof fails.
 
 | Priority | Work group | Records | Evidence of implementation |
 | --- | --- | --- | --- |
-| High | Finance source consistency | `RPT-001`, `RPT-002`, `RPT-003`, `SCHED-001`, `FIN-002` | Pushed finance/report corrections include `4cc800f` and `c7db5bc`. |
+| High | Branch-comparison financial scope | `RPT-003` | Re-opened by the 2026-09-05 live re-test: all-branch Branch Comparison uses a broader actual-cost population than P&L and Financial Dashboard. |
+| Medium | Cash Flow per-bank reconciliation | `FIN-003` | Newly observed on 2026-09-05: the E2E Lagos bank statement closes at N1,100 while Cash Flow reports N1,101 net for that bank over the same 1-5 September period. Trace before treating it as a posting defect. |
 | High | Operational record authority and visibility | `OPS-001`, `OPS-002` | Stage-specific generic-control and Pull-Out Released-view corrections are recorded as implemented. |
 | High | Printable and client financial documents | `VAT-001`, `STMT-001`, `CLT-001`, `CONT-RPT-001` | Invoice eligibility and print-route corrections are present in the current branch. |
 | Medium | Invoice experience | `INV-001` | Zero-value draft issue control is recorded as implemented. |
@@ -36,15 +40,41 @@ approved correction for the historic labelled N1 overpayment.
 
 ### Next Live Re-Test Order
 
-1. Finance/report reconciliation: `RPT-001`, `RPT-002`, `RPT-003`,
-   `SCHED-001`, and `FIN-002`. The schedule case needs one new controlled paid
-   standalone schedule because the old N500 record is intentionally not
-   backfilled.
+1. Trace and correct `RPT-003` and `FIN-003`; define one declared actual-cost
+   population for Branch Comparison, P&L, Financial Dashboard, Cash Flow, and
+   their supporting bank/disbursement reports.
 2. Operations re-test: `OPS-001` and `OPS-002` using existing controlled jobs.
 3. Document and client-finance re-test: `VAT-001`, `STMT-001`, `CLT-001`, and
    `CONT-RPT-001`.
 4. Invoice UI re-test: `INV-001`. Do not alter the historic `INV-002` N1 entry
    unless a separate correction is expressly approved.
+
+### Finance Re-Test Completed - 2026-09-05
+
+- Reserved controlled record: `E2E-20260905 FIN-RETEST Standalone Schedule`.
+- The new N1 schedule was approved and paid through `E2E-20260901 Lagos Test
+  Bank` with reference `E2E-20260905-FIN-RETEST-SCHED-001`. It moved to Paid
+  with a zero balance and appeared as the exact N1 debit in the bank statement,
+  Financial Ledger, and Cash Flow Payment Schedule outflow. The historic N500
+  schedule remains unchanged and is not backfilled.
+- `RPT-001` passed: Actual-Paid P&L uses 2 invoiced containers in Lagos and 3
+  under All Branches, with the corresponding recognised-cost average.
+- `RPT-002` passed: Reports explicitly state the operational cards use budgeted
+  clearing charges/costs, and label Budgeted Expenses and Budgeted Gross Profit.
+- `SCHED-001` passed for new payments: the new immutable schedule-payment row
+  reaches Payment Schedules, Bank Management, Financial Ledger, and Cash Flow.
+- `FIN-002` passed: Lagos P&L and Financial Dashboard agree on N3,000 accrual
+  revenue, N700 actual paid container costs, N300 actual paid overhead, and
+  N2,000 true net profit; Disbursement Reconciliation includes the controlled
+  duty payments in the actual spend population.
+- `RPT-003` failed/reopened: under All Branches, P&L and Financial Dashboard
+  show N701 actual costs and N-10,708,002 net profit, while Branch Comparison
+  shows N2,000,702 actual costs and N-12,708,003 net profit. The difference is
+  the broader non-invoiced-container population shown by Branch Comparison.
+- `FIN-003` observed: the E2E Lagos statement closes at N1,100 after the new
+  schedule debit; Cash Flow's 1-5 September per-bank breakdown reports N1,101.
+  This is recorded for source tracing and is not yet attributed to the new
+  schedule-payment path.
 
 ### Verification Notes, Not Active Product Defects
 

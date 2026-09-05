@@ -15,27 +15,48 @@ action` label below does not override this current register.
 | AI correctness | `AI-002` to `AI-007`, `AI-008` | Stage owner, eligible invoices, notification counts, exact schedule and document lookup, briefing state, and citation link were live re-tested. |
 | Workflow and views | `NOTIF-001`, `NOTIF-002`, `TASK-001`, `PIPE-001`, `APR-001`, `DEL-001` | Queue rejection refreshes immediately; saved delivery date, Dashboard, and Delivery Tracking reconcile. |
 | Finance and loading UI | `BANK-002`, `SCHED-002`, `CP-002`, `OH-002`, `BANK-003`, `DUTY-002` | Filters/date buckets, load states, bank-reference guard, and controlled duty reversal have recorded live evidence. |
+| Finance and report re-test | `RPT-001`, `RPT-002`, `SCHED-001`, `FIN-002` | 2026-09-05 controlled N1 standalone schedule moved through payment, bank, ledger, cash flow, P&L, dashboard, and duty/disbursement reconciliation successfully. |
 | Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
 
-### Implemented Corrections Awaiting Live Re-Test
+### Current Finance Follow-Up
 
 The records below already have source changes in the current branch. They are
 not a request to implement the same feature again. A live re-test either closes
 the record or produces new evidence for a targeted follow-up fix.
 
-1. Finance/report reconciliation: `RPT-001`, `RPT-002`, `RPT-003`,
-   `SCHED-001`, and `FIN-002`. Pushed commits `4cc800f` and `c7db5bc` contain
-   the relevant finance/report work. Test one new controlled paid standalone
-   schedule because the historic N500 schedule was intentionally not backfilled.
-2. Operational persistence and visibility: `OPS-001` and `OPS-002`. The
+1. `RPT-003` remains open: under All Branches, P&L and Financial Dashboard show
+   N701 actual costs and N-10,708,002 net profit, but Branch Comparison shows
+   N2,000,702 and N-12,708,003 because it includes a broader non-invoiced
+   actual-cost population. Define and implement one declared comparison basis.
+2. `FIN-003` is newly observed: the E2E Lagos bank statement closes at N1,100,
+   while Cash Flow's 1-5 September per-bank result is N1,101. Trace the source
+   difference before classifying it as a schedule, reversal, or reporting bug.
+3. Operational persistence and visibility: `OPS-001` and `OPS-002`. The
    stage-specific generic-control and Pull-Out Released-view changes are
    recorded as implemented; use existing controlled jobs to verify them.
-3. Printable and client-finance surfaces: `VAT-001`, `STMT-001`, `CLT-001`,
+4. Printable and client-finance surfaces: `VAT-001`, `STMT-001`, `CLT-001`,
    and `CONT-RPT-001`. The current branch has the eligibility and print-route
    corrections; reopen only if their live output remains wrong.
-4. Invoice UI: `INV-001` is implemented and needs a zero-value draft re-test.
+5. Invoice UI: `INV-001` is implemented and needs a zero-value draft re-test.
    `INV-002` remains live-mitigated; its historic N1 correction and isolated
    database regression test require separately approved work.
+
+### Finance Re-Test Completed - 2026-09-05
+
+Reserved controlled record: `E2E-20260905 FIN-RETEST Standalone Schedule`.
+It was approved and paid as N1 from `E2E-20260901 Lagos Test Bank`, reference
+`E2E-20260905-FIN-RETEST-SCHED-001`. Payment Schedules shows Paid/N1/N0
+balance; the bank statement, Financial Ledger, and Cash Flow contain the same
+N1 debit.
+
+| Record | Result | Live evidence |
+| --- | --- | --- |
+| `RPT-001` | Passed / closed | Actual-Paid P&L reports 2 invoiced containers in Lagos and 3 under All Branches; recognised-cost averages use those same counts. |
+| `RPT-002` | Passed / closed | Reports declares budgeted operational basis and labels Budgeted Expenses and Budgeted Gross Profit. |
+| `SCHED-001` | Passed / closed for new payments | The new immutable schedule-payment path reconciles through schedule, bank, ledger, and Cash Flow. Historic N500 remains untouched. |
+| `FIN-002` | Passed / closed | Lagos P&L and Financial Dashboard agree at N3,000 revenue, N700 actual costs, N300 overhead, N2,000 net profit; disbursement includes controlled duty spend. |
+| `RPT-003` | Failed / reopened | All-Branches P&L/Dashboard: N701 actual costs and N-10,708,002 net; Branch Comparison: N2,000,702 and N-12,708,003. |
+| `FIN-003` | New follow-up | Bank statement closing N1,100 differs by N1 from Cash Flow per-bank net N1,101 for 1-5 September. |
 
 ### Test-Environment Follow-Up Only
 
