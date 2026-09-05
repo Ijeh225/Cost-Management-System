@@ -61,3 +61,21 @@ export function isInvoiceCollectable(status: string) {
 export function isInvoiceFinanciallyActive(status: string) {
   return isInvoiceCollectable(status);
 }
+
+/**
+ * Gives audit-only invoices zero effect in financial summaries while allowing
+ * callers to retain their original records for history displays.
+ */
+export function getInvoiceFinancialEffect(status: string, total: number, totalPaid: number) {
+  if (!isInvoiceFinanciallyActive(status)) {
+    return { total: 0, paid: 0, outstanding: 0 };
+  }
+
+  const safeTotal = Number.isFinite(total) ? Math.max(0, total) : 0;
+  const safePaid = Number.isFinite(totalPaid) ? Math.max(0, totalPaid) : 0;
+  return {
+    total: safeTotal,
+    paid: safePaid,
+    outstanding: Math.max(0, safeTotal - safePaid),
+  };
+}

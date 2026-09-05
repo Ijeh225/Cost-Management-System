@@ -25,16 +25,24 @@ The records below already have source changes in the current branch. They are
 not a request to implement the same feature again. A live re-test either closes
 the record or produces new evidence for a targeted follow-up fix.
 
-1. `STMT-001` and newly logged `VAT-002`: apply the canonical active-financial
-   invoice rule to the Client Statement and VAT Summary API routes. Cancelled
-   invoices may remain as audit-only history but must not affect totals,
-   receivables, taxable turnover, or VAT liability.
-2. Re-test the existing Lagos client after that correction: Client Statement
-   must match Accounts Receivable at N3,000 invoiced, N2,001 collected, and
-   N999 net outstanding. The 1-5 September VAT Summary must exclude both
-   cancelled invoices from its financial totals.
+1. `STMT-001` and `VAT-002` are implemented locally. Deploy and re-test the
+   existing Lagos client: Client Statement retains cancelled invoices as audit
+   history with zero financial effect, while VAT Summary omits them from
+   taxable turnover and invoice totals.
+2. The two report routes must then reconcile to Accounts Receivable at N3,000
+   invoiced, N2,001 collected, and N999 net outstanding. The 1-5 September VAT
+   Summary must use the N3,000 active-invoice population.
 3. `INV-002` remains live-mitigated; its historic N1 correction and isolated
    database regression test require separately approved work.
+
+### STMT-001 and VAT-002 Correction Implemented Locally - 2026-09-05
+
+| Record | Implemented correction | Local verification still required live |
+| --- | --- | --- |
+| `STMT-001` | Client Statement now applies `getInvoiceFinancialEffect` to its total, paid, outstanding, and credit-note calculations. Draft, cancelled, and written-off invoices remain history rows but carry zero financial effect. | Deploy, then confirm cancelled invoices have N0 paid/outstanding effect and the statement totals match AR. |
+| `VAT-002` | VAT Summary now filters rows and totals with `isInvoiceFinanciallyActive`, excluding audit-only invoices from taxable turnover, VAT, count, and grand total. | Deploy, then confirm the 1-5 September report excludes `INV-202609-002` and `INV-202609-003`. |
+
+Local verification: API typecheck and server production build pass; all 84 API tests pass. The regression test covers active versus draft, cancelled, and written-off financial effect.
 
 ### Operations and Document Live Re-Test - 2026-09-05
 

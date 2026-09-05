@@ -32,7 +32,7 @@ the live application and only reopen it if that proof fails.
 
 | Priority | Work group | Records | Evidence of implementation |
 | --- | --- | --- | --- |
-| High | Cancelled-invoice financial eligibility | `STMT-001`, `VAT-002` | The deployed Client Statement and VAT Summary routes still total cancelled invoices. Both API routes select all client/period invoices without the canonical active-financial-invoice status filter. |
+| High | Cancelled-invoice financial eligibility | `STMT-001`, `VAT-002` | Correction implemented locally on 2026-09-05. Client Statement retains audit history but gives inactive invoices zero financial effect; VAT Summary lists and totals only active financial invoices. Deploy and live re-test are required. |
 
 `INV-002` is already protected live: further overpayments are blocked. Its
 remaining work is an isolated database regression test and a separately
@@ -40,15 +40,31 @@ approved correction for the historic labelled N1 overpayment.
 
 ### Next Live Re-Test Order
 
-1. Fix `STMT-001` and `VAT-002`: apply the canonical active-financial-invoice
-   rule to Client Statement and VAT Summary totals. Cancelled invoices may stay
-   visible as audit history only, with zero financial effect.
-2. Live re-test both report routes with the existing Lagos client. They must
-   reconcile to Accounts Receivable at N3,000 invoiced, N2,001 collected, and
-   N999 net outstanding; VAT for 1-5 September must exclude cancelled invoices.
+1. Deploy and live re-test `STMT-001` and `VAT-002` with the existing Lagos
+   client. Client Statement must retain cancelled invoices as audit history
+   with zero paid/outstanding effect; VAT Summary must omit them from its
+   invoice and financial totals.
+2. Confirm both report routes reconcile to Accounts Receivable at N3,000
+   invoiced, N2,001 collected, and N999 net outstanding; VAT for 1-5 September
+   must use the N3,000 active invoice population.
 3. Keep the historic `INV-002` N1 entry unchanged unless a separate correction
    is expressly approved. The isolated `TEST_DATABASE_URL` work remains a test
    environment follow-up, not a live-data task.
+
+### STMT-001 and VAT-002 Correction Implemented Locally - 2026-09-05
+
+- The Client Statement now uses `getInvoiceFinancialEffect`, which applies the
+  existing `isInvoiceFinanciallyActive` rule to totals, paid amounts, and
+  outstanding balance. Draft, cancelled, and written-off invoices remain in
+  the statement history but have zero financial effect, including credit-note
+  adjustments.
+- VAT Summary now filters its report rows through the same canonical rule.
+  Therefore audit-only invoice statuses are not included in taxable turnover,
+  VAT, invoice count, or grand totals.
+- Verification passed: API typecheck, server production build, and all 84 API
+  tests. The new regression test proves inactive invoice statuses always have
+  zero financial effect. Deployment and targeted live evidence remain required
+  before closure.
 
 ### Operations and Document Live Re-Test - 2026-09-05
 

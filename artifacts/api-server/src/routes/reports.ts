@@ -7,7 +7,7 @@ import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOp
 import { deliverReportSubscription } from "../lib/report-delivery.js";
 import { normalizeReportRecipients, normalizeReportSendAt, normalizeReportSendDayOfWeek, SCHEDULED_REPORT_FREQUENCIES, SCHEDULED_REPORT_KINDS } from "../lib/report-delivery-rules.js";
 import { FINANCIAL_BASIS, normalizeContainerCostBasis, profitLossBasis } from "../lib/financial-reporting.js";
-import { isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
+import { getInvoiceFinancialEffect, isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 
 export const reportsRouter = Router();
 
@@ -697,10 +697,9 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireBranchMemberO
       const invPayments = paymentsByInvoice.get(inv.id) ?? [];
       const paid = invPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
       const total = parseFloat(inv.total ?? "0");
-      // Written-off invoices have zero effective outstanding — their balance was absorbed as bad debt
-      const outstanding = inv.status === "written_off" ? 0 : Math.max(0, total - paid);
-      totalInvoiced += total;
-      totalPaid += paid;
+      const financialEffect = getInvoiceFinancialEffect(inv.status, total, paid);
+      totalInvoiced += financialEffect.total;
+      totalPaid += financialEffect.paid;
 
       const items = (statementItemsByInvoice.get(inv.id) ?? []).map(it => ({
         id: it.id,
@@ -719,8 +718,8 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireBranchMemberO
         subtotal: parseFloat(inv.subtotal ?? "0"),
         vatAmount: parseFloat(inv.vatAmount ?? "0"),
         total,
-        totalPaid: paid,
-        outstanding,
+        totalPaid: financialEffect.paid,
+        outstanding: financialEffect.outstanding,
         dueDate: inv.dueDate ?? null,
         notes: inv.notes,
         createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : String(inv.createdAt),
@@ -748,13 +747,14 @@ reportsRouter.get("/reports/client-statement", requireAuth, requireBranchMemberO
       return s + Math.max(0, parseFloat(d.amount ?? "0") - parseFloat(d.allocatedAmount ?? "0"));
     }, 0);
 
-    // Sum per-invoice outstanding; written_off invoices already have outstanding=0 above,
-    // so they are correctly excluded from the receivable balance.
+    // Audit-only invoices remain in the history, but their formatted outstanding
+    // is zero so they cannot affect the receivable balance.
     const grossOutstanding = formattedInvoices.reduce((s, inv) => s + inv.outstanding, 0);
     const effectiveClosingBalance = Math.max(0, grossOutstanding - creditBalance - unallocatedDeposits);
 
     // Split totalPaid into cash collections vs credit-note adjustments for transparent reporting
     const totalCreditNoteAdjustments = formattedInvoices.reduce((s, inv) => {
+      if (!isInvoiceFinanciallyActive(inv.status)) return s;
       return s + inv.payments
         .filter(p => p.paymentMethod === "credit_note")
         .reduce((ps, p) => ps + p.amount, 0);
@@ -816,7 +816,7 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireBranchMemberOrAbov
     let totalVat = 0;
     let totalInvoiced = 0;
 
-    const rows = invoices.map(inv => {
+    const rows = invoices.filter((inv) => isInvoiceFinanciallyActive(inv.status)).map(inv => {
       const subtotal = parseFloat(inv.subtotal ?? "0");
       const vat = parseFloat(inv.vatAmount ?? "0");
       const total = parseFloat(inv.total ?? "0");

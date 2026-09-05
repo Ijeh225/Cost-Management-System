@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getEffectiveInvoiceStatus, isInvoiceCollectable, isInvoiceEditable, isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
+import { getEffectiveInvoiceStatus, getInvoiceFinancialEffect, isInvoiceCollectable, isInvoiceEditable, isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 
 const now = new Date("2026-09-01T12:00:00Z");
 
@@ -40,5 +40,12 @@ describe("invoice status rules", () => {
     expect(isInvoiceFinanciallyActive("draft")).toBe(false);
     expect(isInvoiceFinanciallyActive("cancelled")).toBe(false);
     expect(isInvoiceFinanciallyActive("written_off")).toBe(false);
+  });
+
+  it("gives audit-only invoices zero financial effect while retaining active invoice amounts", () => {
+    expect(getInvoiceFinancialEffect("sent", 1_000, 250)).toEqual({ total: 1_000, paid: 250, outstanding: 750 });
+    expect(getInvoiceFinancialEffect("cancelled", 1_000, 250)).toEqual({ total: 0, paid: 0, outstanding: 0 });
+    expect(getInvoiceFinancialEffect("draft", 1_000, 0)).toEqual({ total: 0, paid: 0, outstanding: 0 });
+    expect(getInvoiceFinancialEffect("written_off", 1_000, 0)).toEqual({ total: 0, paid: 0, outstanding: 0 });
   });
 });
