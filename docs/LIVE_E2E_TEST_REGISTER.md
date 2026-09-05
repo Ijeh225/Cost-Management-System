@@ -15,30 +15,31 @@ action` label below does not override this current register.
 | AI correctness | `AI-002` to `AI-007`, `AI-008` | Stage owner, eligible invoices, notification counts, exact schedule and document lookup, briefing state, and citation link were live re-tested. |
 | Workflow and views | `NOTIF-001`, `NOTIF-002`, `TASK-001`, `PIPE-001`, `APR-001`, `DEL-001` | Queue rejection refreshes immediately; saved delivery date, Dashboard, and Delivery Tracking reconcile. |
 | Finance and loading UI | `BANK-002`, `SCHED-002`, `CP-002`, `OH-002`, `BANK-003`, `DUTY-002` | Filters/date buckets, load states, bank-reference guard, and controlled duty reversal have recorded live evidence. |
-| Finance and report re-test | `RPT-001`, `RPT-002`, `SCHED-001`, `FIN-002` | 2026-09-05 controlled N1 standalone schedule moved through payment, bank, ledger, cash flow, P&L, dashboard, and duty/disbursement reconciliation successfully. |
+| Finance and report re-test | `RPT-001`, `RPT-002`, `RPT-003`, `SCHED-001`, `FIN-002`, `FIN-003` | 2026-09-05 controlled N1 standalone schedule moved through payment, bank, ledger, cash flow, P&L, dashboard, and duty/disbursement reconciliation successfully. Branch Comparison and Cash Flow presentation were also re-tested after their deployed corrections. |
 | Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
 
-### Current Finance Follow-Up
+### Current Follow-Up
 
 The records below already have source changes in the current branch. They are
 not a request to implement the same feature again. A live re-test either closes
 the record or produces new evidence for a targeted follow-up fix.
 
-1. `RPT-003` correction is implemented locally: Branch Comparison now follows
-   P&L's first-active-invoice container-cost recognition. Deploy and re-test
-   that its All-Branches actual costs and net profit match P&L/Dashboard.
-2. `FIN-003` correction is implemented locally: All-Banks Cash Flow now
-   identifies per-bank net as transfer-excluded period movement, not a bank
-   statement balance. Deploy and re-check screen and print output.
-3. Operational persistence and visibility: `OPS-001` and `OPS-002`. The
+1. Operational persistence and visibility: `OPS-001` and `OPS-002`. The
    stage-specific generic-control and Pull-Out Released-view changes are
    recorded as implemented; use existing controlled jobs to verify them.
-4. Printable and client-finance surfaces: `VAT-001`, `STMT-001`, `CLT-001`,
+2. Printable and client-finance surfaces: `VAT-001`, `STMT-001`, `CLT-001`,
    and `CONT-RPT-001`. The current branch has the eligibility and print-route
    corrections; reopen only if their live output remains wrong.
-5. Invoice UI: `INV-001` is implemented and needs a zero-value draft re-test.
+3. Invoice UI: `INV-001` is implemented and needs a zero-value draft re-test.
    `INV-002` remains live-mitigated; its historic N1 correction and isolated
    database regression test require separately approved work.
+
+### RPT-003 and FIN-003 Live Re-Test Passed - 2026-09-05
+
+| Record | Result | Live evidence |
+| --- | --- | --- |
+| `RPT-003` | Passed / closed | Deployed All-Branches Branch Comparison reports N3,001 revenue, N701 actual paid costs, N2,300 gross profit, N10,710,302 actual paid overhead, and N-10,708,002 net profit. The All-Branches Actual-Paid P&L and Financial Dashboard report the same values. The 9 operational containers remain separate from the 3 invoiced containers used for recognised cost of sales. |
+| `FIN-003` | Passed / closed | Deployed Lagos Cash Flow screen and print route for 1-5 September label the table `Per-Bank Period Activity` and the column `Net Movement (N)`. Both explain that All-Banks excludes internal transfers, so N1,101 period movement is not the individual statement closing balance of N1,100. |
 
 ### Finance Re-Test Completed - 2026-09-05
 
@@ -64,7 +65,7 @@ N1 debit.
 | `RPT-003` | Branch Comparison counted all container payments, while P&L recognises costs once for containers with a first active invoice in the selected period. | Branch Comparison now derives container costs from the same first-active-invoice set as P&L and assigns each cost to that container's branch. Container disbursements and duty transactions are both included. | Deploy, then confirm All-Branches actual costs and net profit equal matching P&L and Financial Dashboard totals. |
 | `FIN-003` | All-Banks Cash Flow removes internal transfer pairs by design, while an individual bank statement includes its transfer debit/credit in closing balance. The UI called the period activity simply Net. | Screen and printable Cash Flow output now say Net Movement and warn that All-Banks per-bank activity excludes internal transfers and is not a statement closing balance. | Deploy, then confirm the wording in both Cash Flow screen and print view. |
 
-Local verification: API and frontend typechecks pass; 83 API tests pass; API and frontend production builds pass.
+Local verification: API and frontend typechecks pass; 83 API tests pass; API and frontend production builds pass. Railway deployed commit `6893ea1` before the two targeted live re-tests above.
 
 ### Test-Environment Follow-Up Only
 

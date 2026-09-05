@@ -12,9 +12,9 @@ remain auditable.
 - Live re-tests closed `DASH-001`, `AR-002`, `BRN-001`, `AI-002` through
   `AI-007`, `NOTIF-001`, `NOTIF-002`, `TASK-001`, `PIPE-001`, `BANK-002`,
   `SCHED-002`, `CP-002`, `OH-002`, `APR-001`, and `DEL-001`.
-- Finance re-test evidence now closes `RPT-001`, `RPT-002`, `SCHED-001`, and
-  `FIN-002`. `RPT-003` remains open because Branch Comparison still applies a
-  broader actual-cost population than the matching P&L and Financial Dashboard.
+- Finance re-test evidence now closes `RPT-001`, `RPT-002`, `RPT-003`,
+  `SCHED-001`, `FIN-002`, and `FIN-003`. Branch Comparison, P&L, and the
+  Financial Dashboard now use the same recognised actual-cost population.
 - Earlier controlled work also closed `BANK-003`, `AI-008`, `SEC-02`, and
   `DUTY-002`. Do not repeat their financial or workflow writes.
 - The latest deployment is verified live: Abuja dashboard completion now
@@ -28,8 +28,6 @@ the live application and only reopen it if that proof fails.
 
 | Priority | Work group | Records | Evidence of implementation |
 | --- | --- | --- | --- |
-| High | Branch-comparison financial scope | `RPT-003` | Correction implemented locally on 2026-09-05. Branch Comparison now follows P&L's first-active-invoice cost-recognition policy; deployment and live re-test are required. |
-| Medium | Cash Flow per-bank reconciliation | `FIN-003` | Correction implemented locally on 2026-09-05. The source difference is internal-transfer elimination in All-Banks Cash Flow, not an N1 posting loss; screen and print output now say the per-bank figure is period movement, not statement closing balance. |
 | High | Operational record authority and visibility | `OPS-001`, `OPS-002` | Stage-specific generic-control and Pull-Out Released-view corrections are recorded as implemented. |
 | High | Printable and client financial documents | `VAT-001`, `STMT-001`, `CLT-001`, `CONT-RPT-001` | Invoice eligibility and print-route corrections are present in the current branch. |
 | Medium | Invoice experience | `INV-001` | Zero-value draft issue control is recorded as implemented. |
@@ -40,15 +38,24 @@ approved correction for the historic labelled N1 overpayment.
 
 ### Next Live Re-Test Order
 
-1. Deploy and live re-test `RPT-003` and `FIN-003`: Branch Comparison must
-   match P&L/Financial Dashboard under the same All-Branches actual-paid basis;
-   Cash Flow must clearly distinguish transfer-excluded period movement from a
-   bank statement's closing balance.
-2. Operations re-test: `OPS-001` and `OPS-002` using existing controlled jobs.
-3. Document and client-finance re-test: `VAT-001`, `STMT-001`, `CLT-001`, and
+1. Operations re-test: `OPS-001` and `OPS-002` using existing controlled jobs.
+2. Document and client-finance re-test: `VAT-001`, `STMT-001`, `CLT-001`, and
    `CONT-RPT-001`.
-4. Invoice UI re-test: `INV-001`. Do not alter the historic `INV-002` N1 entry
+3. Invoice UI re-test: `INV-001`. Do not alter the historic `INV-002` N1 entry
    unless a separate correction is expressly approved.
+
+### RPT-003 and FIN-003 Live Re-Test Passed - 2026-09-05
+
+- `RPT-003` passed on the deployed All-Branches view. Branch Comparison shows
+  N3,001 accrual revenue, N701 actual paid costs, N2,300 gross profit before
+  overhead, N10,710,302 actual paid overhead, and N-10,708,002 net profit.
+  Those figures match the All-Branches Actual-Paid P&L and Financial Dashboard.
+  Its operational container count remains 9, intentionally separate from the
+  three invoiced containers recognised for actual cost of sales.
+- `FIN-003` passed on the deployed Lagos Cash Flow screen and print route for
+  1-5 September. Both now say `Net Movement` and explain that All-Banks mode
+  excludes internal transfers, so the N1,101 per-bank period movement is not
+  the individual bank statement's N1,100 closing balance.
 
 ### Finance Re-Test Completed - 2026-09-05
 
@@ -92,8 +99,8 @@ approved correction for the historic labelled N1 overpayment.
   and explicitly state that All-Banks internal-transfer elimination means it
   must not be compared to an individual bank statement closing balance.
 - Verification: API typecheck and frontend typecheck pass; all 83 API tests
-  pass. The API and frontend production builds also pass. Deployment and the
-  targeted live re-test remain required before closure.
+  pass. The API and frontend production builds passed, Railway deployed commit
+  `6893ea1`, and the targeted live re-test passed.
 
 ### Verification Notes, Not Active Product Defects
 
