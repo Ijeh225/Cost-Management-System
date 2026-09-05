@@ -31,7 +31,7 @@ import { getPaymentScheduleBucket, startOfLocalDay } from "../lib/payment-schedu
 
 export const paymentSchedulesRouter = Router();
 
-paymentSchedulesRouter.use(requireFinanceAccess);
+paymentSchedulesRouter.use("/payment-schedules", requireFinanceAccess);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 const FINAL_STATUSES = new Set(["completed", "rejected", "cancelled"]);

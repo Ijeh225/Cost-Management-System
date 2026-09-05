@@ -10,7 +10,10 @@ import { requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, userCanAc
 
 export const containerExpensesRouter = Router();
 
-containerExpensesRouter.use(requireFinanceAccess);
+containerExpensesRouter.use("/container-expense-categories", requireFinanceAccess);
+containerExpensesRouter.use("/container-expense-payments", requireFinanceAccess);
+containerExpensesRouter.use("/containers/:id/expense-payments", requireFinanceAccess);
+containerExpensesRouter.use("/containers/:id/reconciliation", requireFinanceAccess);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -6,7 +6,7 @@ import { hasExistingBankReference, normaliseBankReference } from "../lib/bank-re
 
 export const banksRouter = Router();
 
-banksRouter.use(requireFinanceAccess);
+banksRouter.use("/banks", requireFinanceAccess);
 
 class DuplicateBankReferenceError extends Error {
   constructor(reference: string) {

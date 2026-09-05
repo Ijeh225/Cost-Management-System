@@ -5,7 +5,7 @@ import { requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, userCanAc
 
 export const overheadExpensesRouter = Router();
 
-overheadExpensesRouter.use(requireFinanceAccess);
+overheadExpensesRouter.use("/overhead-expenses", requireFinanceAccess);
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 

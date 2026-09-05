@@ -8,7 +8,8 @@ import { getReversibleOverpaymentCredit } from "../lib/invoice-payment-reversal.
 
 const router = Router();
 
-router.use(requireFinanceAccess);
+router.use("/invoices", requireFinanceAccess);
+router.use("/credit-notes", requireFinanceAccess);
 
 function pad(n: number, len = 3) {
   return String(n).padStart(len, "0");

@@ -22,12 +22,28 @@ action` label below does not override this current register.
 
 ### Current Follow-Up
 
-No deployed correction awaits a live re-test. The isolated `TEST_DATABASE_URL`
-runner and concurrent/repeated-reversal regression case are implemented. The
-user selected a separate Railway test database, but Railway blocks creation of
-the empty `integration-test` environment because its subscription is unpaid
-and the trial is maxed out. No environment, service, database, Railway
-production configuration, or live data was changed.
+Railway capacity is resolved. `integration-test` / `Postgres-2Wsy` now hosts
+the isolated `cost_management_integration_test` database. Test schema and
+dummy records were created there; no production financial writes occurred.
+
+New High defect `API-ROUTE-001`: root-mounted finance-router middleware
+blocks unrelated staff operations. The assigned officer received HTTP 403
+before reaching the verification handler. Seven finance routers now scope
+their guards to their own URL families. All 11 isolated regression tests passed;
+deployment and live staff-session acceptance are not yet claimed.
+
+### Railway Integration Run - 2026-09-05
+
+| Item | Result | Evidence |
+| --- | --- | --- |
+| Test infrastructure | Provisioned | Empty environment, fresh PostgreSQL service, named integration database; public TCP enabled temporarily for local runner. |
+| Initial runner failures | Test-harness issues corrected | Windows schema path, legacy seeded-suite selection, and remote hook/test timeouts corrected. Reset now requires explicit opt-in and the exact disposable database name. |
+| INV-002 simultaneous reversal | Passed in isolated database | One 200, one 409, one linked reversal, N250 paid, N0 credit, one audit event in the 9/10 run. |
+| API-ROUTE-001 | Corrected; isolated regression passed | All 11 tests passed in 137.41 seconds, including positive staff-task access, explicit cross-branch 404s, assigned officer verification/berthing, finance URL denial, concurrent reversal reconciliation, and cleanup. |
+| Local build and unit checks | Passed | Full railway:build; 23 API unit-test files / 85 tests. |
+
+**Next exact action:** verify deployment after commit/push, then check a
+controlled non-finance staff session. Do not repeat completed financial writes.
 
 ### Railway Test-Environment Provisioning Attempt - 2026-09-05
 

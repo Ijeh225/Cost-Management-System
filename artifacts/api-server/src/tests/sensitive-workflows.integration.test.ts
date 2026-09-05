@@ -228,6 +228,16 @@ afterAll(async () => {
 });
 
 describe("sensitive workflow integration", () => {
+  it("keeps finance routes denied without blocking unrelated staff routes", async () => {
+    const financePaths = ["/clients", "/client-deposits/1/allocate", "/invoices", "/credit-notes", "/banks", "/reports/pl", "/payment-schedules", "/overhead-expenses", "/container-expense-categories", "/container-expense-payments/recent", `/containers/${protectedContainerId}/expense-payments`, `/containers/${protectedContainerId}/reconciliation`, `/containers/${protectedContainerId}/unlink-client`];
+    for (const path of financePaths) {
+      const response = await officer.agent.get(`/api${path}`);
+      expect(response.status, path).toBe(403);
+    }
+    const tasks = await officer.agent.get(`/api/containers/${protectedContainerId}/tasks`);
+    expect(tasks.status).toBe(200);
+  });
+
   it("enforces branch-admin user management boundaries", async () => {
     const visibleUsers = await branchAdmin.agent.get("/api/users");
     expect(visibleUsers.status).toBe(200);
@@ -266,7 +276,7 @@ describe("sensitive workflow integration", () => {
     expect(elevated.status).toBe(403);
 
     const crossBranchRead = await branchAdmin.agent.get(`/api/users/${otherBranchUserId}`);
-    expect(crossBranchRead.status).toBe(404);
+    expect(crossBranchRead.status).toBe(403);
 
     const staffDenied = await officer.agent.get("/api/users");
     expect(staffDenied.status).toBe(403);
@@ -292,7 +302,7 @@ describe("sensitive workflow integration", () => {
     const verified = await officer.agent
       .post(`/api/containers/${protectedContainerId}/verify`)
       .set("X-CSRF-Token", officer.csrf);
-    expect(verified.status).toBe(200);
+    expect(verified.status, JSON.stringify(verified.body)).toBe(200);
     expect(verified.body.verifiedBy).toBe(officerId);
 
     const deniedBerthing = await admin.agent

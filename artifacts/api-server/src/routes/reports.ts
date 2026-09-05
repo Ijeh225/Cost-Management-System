@@ -11,7 +11,7 @@ import { getInvoiceFinancialEffect, isInvoiceFinanciallyActive } from "../lib/in
 
 export const reportsRouter = Router();
 
-reportsRouter.use(requireFinanceAccess);
+reportsRouter.use("/reports", requireFinanceAccess);
 
 // ─── Branch scope helper ────────────────────────────────────────────────────
 // Resolves the active branch scope for a report request. Returns:

@@ -26,21 +26,38 @@ remain auditable.
 
 ### Current Follow-Up
 
-No deployed application correction is awaiting a live re-test. The isolated
-`TEST_DATABASE_URL` runner and concurrent/repeated-reversal regression case
-are implemented. The user selected a separate Railway test PostgreSQL service,
-but Railway currently prevents creation of the empty `integration-test`
-environment because the workspace subscription is unpaid and the trial is
-maxed out. No environment, service, or database was created; no live or
-Railway production database was contacted.
+Railway capacity is resolved. The empty `integration-test` environment and
+fresh `Postgres-2Wsy` service now host `cost_management_integration_test`.
+Only this isolated database has received test schema and dummy records.
+Temporary public TCP access was enabled for the local integration runner.
+
+The isolated run passed the INV-002 concurrent reversal case but discovered
+`API-ROUTE-001`: finance routers mounted at the API root apply unscoped
+permission middleware to unrelated operational requests. The correction
+scopes all seven finance guards to their own URL families. All 11 isolated
+integration tests passed after the correction. Deployment verification is pending.
 
 ### Next Action
 
-1. Restore Railway environment-creation capacity by resolving the workspace
-   billing/trial restriction. Then create the empty `integration-test`
-   environment and a fresh PostgreSQL service, set only `TEST_DATABASE_URL`,
-   and run the guarded integration suite. This must never use production
-   `DATABASE_URL`.
+1. Verify the deployed API-ROUTE-001 correction after commit/push, using a
+   controlled non-finance staff session. Do not repeat completed financial writes.
+
+### Railway Integration Progress - 2026-09-05
+
+- Capacity resolution allowed a genuinely empty environment and fresh test
+  PostgreSQL service; production was not copied or used for database testing.
+- Fixed Windows schema discovery using a relative forward-slash Drizzle path.
+- Integration config now selects self-seeding `.integration.test.ts` files.
+  The two older seeded delivery/duty suites are not claimed as passed.
+- Remote test/hook timeouts are 120 seconds. Schema reset is opt-in via
+  `RESET_TEST_DATABASE=1`, restricted to `cost_management_integration_test`.
+- Before the routing correction, 9/10 integration cases passed; the assigned
+  officer was incorrectly denied by the Clients finance middleware.
+- Full `railway:build` and API unit tests (23 files, 85 tests) passed after
+  the routing correction. The final database-backed run passed 11/11 tests
+  in 137.41 seconds, including cleanup, assigned officer verification/berthing,
+  cross-branch 404s, finance denial, and concurrent reversal reconciliation.
+- No production record was created, changed, or deleted for these tests.
 
 ### Railway Isolated Test Database Attempt - 2026-09-05
 

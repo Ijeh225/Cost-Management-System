@@ -52,9 +52,26 @@ create more than one reversal entry.
 
 ## Exact Next Action
 
-Resolve Railway workspace capacity, then create a separate empty
-`integration-test` environment and fresh PostgreSQL service. Set only
-`TEST_DATABASE_URL` and run the guarded integration suite with explicit
-remote-test approval.
+The earlier capacity blocker is resolved. Verify deployment of API-ROUTE-001
+after commit/push and check a controlled non-finance staff session.
 
 Do not run this suite against Railway production.
+
+## Railway Resolution and Regression Result
+
+- Created the empty `integration-test` environment, fresh `Postgres-2Wsy`
+  service, and `cost_management_integration_test` database. Production was
+  not copied or used. Public TCP access was temporarily enabled for testing.
+- Fixed Windows Drizzle schema discovery, selected only self-seeding
+  integration files, and allowed 120 seconds for remote hooks/test cases.
+  Schema reset is opt-in and restricted to the exact disposable database name.
+- Initial runs exposed API-ROUTE-001: root-mounted finance middleware ran on
+  unrelated staff requests. Scoped the guards in seven finance routers to
+  their own URL families; role policy and assigned-officer checks stay intact.
+- Final isolated run passed all 11 cases in 137.41 seconds. This includes
+  simultaneous invoice reversal, finance denial, cross-branch restrictions,
+  officer verification/berthing, bank/schedule reconciliation, and cleanup.
+- Full production build and all 85 API unit tests passed. Older seeded
+  delivery/duty test files are excluded and are not claimed as passed.
+- User asked whether the live app had changed; explained that edits were local
+  and uncommitted at that point. User then explicitly said to proceed.

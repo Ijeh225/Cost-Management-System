@@ -12,7 +12,9 @@ import { isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 
 export const clientsRouter = Router();
 
-clientsRouter.use(requireFinanceAccess);
+clientsRouter.use("/clients", requireFinanceAccess);
+clientsRouter.use("/client-deposits", requireFinanceAccess);
+clientsRouter.use("/containers/:id/unlink-client", requireFinanceAccess);
 
 clientsRouter.get("/clients", requireAuth, async (req: AuthRequest, res) => {
   try {

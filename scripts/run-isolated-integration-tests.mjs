@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -21,6 +22,8 @@ if (process.env.DATABASE_URL === databaseUrl) {
 
 const env = { ...process.env, TEST_DATABASE_URL: databaseUrl, DATABASE_URL: databaseUrl, NODE_ENV: "test" };
 const shell = process.platform === "win32";
+const requireDbPackage = createRequire(path.join(root, "lib", "db", "package.json"));
+const { Client } = requireDbPackage("pg");
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, env, shell, stdio: "inherit" });
@@ -29,6 +32,20 @@ function run(command, args) {
 
 if (databaseUrl === defaultDatabaseUrl) {
   run("docker", ["compose", "-f", "docker-compose.integration.yml", "up", "-d", "--wait"]);
+}
+
+// Reset is opt-in and restricted to the disposable database created for this suite.
+if (process.env.RESET_TEST_DATABASE === "1") {
+  if (databaseName !== "cost_management_integration_test") {
+    throw new Error("Reset requires the disposable cost_management_integration_test database.");
+  }
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query("DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
+  } finally {
+    await client.end();
+  }
 }
 
 run("pnpm", ["--filter", "@workspace/db", "run", "push-force"]);
