@@ -17,18 +17,25 @@ action` label below does not override this current register.
 | Finance and loading UI | `BANK-002`, `SCHED-002`, `CP-002`, `OH-002`, `BANK-003`, `DUTY-002` | Filters/date buckets, load states, bank-reference guard, and controlled duty reversal have recorded live evidence. |
 | Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
 
-### Active Defect Backlog
+### Implemented Corrections Awaiting Live Re-Test
 
-1. `RPT-001`, `RPT-002`, `RPT-003`, `SCHED-001`, `FIN-002`: establish one
-   declared financial population and basis across P&L, Dashboard, Branch
-   Comparison, Cash Flow, Financial Ledger, schedules, and exports.
-2. `OPS-001`, `OPS-002`: retire or repair the legacy generic Operations
-   control and make released Pull-Out work visible in its Released view.
-3. `VAT-001`, `STMT-001`, `CLT-001`, `CONT-RPT-001`: correct the remaining
-   printable-report and client-financial presentation defects.
-4. `INV-001`: prevent zero-value draft issuance from offering a misleading
-   action. `INV-002` is live-mitigated; keep its historic N1 correction and
-   isolated database regression test as separately approved work.
+The records below already have source changes in the current branch. They are
+not a request to implement the same feature again. A live re-test either closes
+the record or produces new evidence for a targeted follow-up fix.
+
+1. Finance/report reconciliation: `RPT-001`, `RPT-002`, `RPT-003`,
+   `SCHED-001`, and `FIN-002`. Pushed commits `4cc800f` and `c7db5bc` contain
+   the relevant finance/report work. Test one new controlled paid standalone
+   schedule because the historic N500 schedule was intentionally not backfilled.
+2. Operational persistence and visibility: `OPS-001` and `OPS-002`. The
+   stage-specific generic-control and Pull-Out Released-view changes are
+   recorded as implemented; use existing controlled jobs to verify them.
+3. Printable and client-finance surfaces: `VAT-001`, `STMT-001`, `CLT-001`,
+   and `CONT-RPT-001`. The current branch has the eligibility and print-route
+   corrections; reopen only if their live output remains wrong.
+4. Invoice UI: `INV-001` is implemented and needs a zero-value draft re-test.
+   `INV-002` remains live-mitigated; its historic N1 correction and isolated
+   database regression test require separately approved work.
 
 ### Test-Environment Follow-Up Only
 

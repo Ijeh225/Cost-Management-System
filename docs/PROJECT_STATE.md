@@ -17,18 +17,34 @@ remain auditable.
 - The latest deployment is verified live: Abuja dashboard completion now
   matches the persisted delivery date and Delivery Tracking.
 
-### Active Defects Requiring a Product Decision or Source Fix
+### Implemented Corrections Awaiting Final Live Re-Test
 
-| Priority | Work group | Active records |
-| --- | --- | --- |
-| High | Finance source consistency | `RPT-001`, `RPT-002`, `RPT-003`, `SCHED-001`, `FIN-002` |
-| High | Operational record authority and visibility | `OPS-001`, `OPS-002` |
-| High | Printable and client financial documents | `VAT-001`, `STMT-001`, `CLT-001`, `CONT-RPT-001` |
-| Medium | Invoice experience and historic test correction | `INV-001`, `INV-002` |
+These records are not waiting for duplicate implementation. The relevant code
+is already in the current branch; the next work is to prove each correction in
+the live application and only reopen it if that proof fails.
 
-`INV-002` is protected in the live application: further overpayments are
-blocked. Its remaining work is an isolated database regression test and a
-separately approved correction for the historic labelled N1 overpayment.
+| Priority | Work group | Records | Evidence of implementation |
+| --- | --- | --- | --- |
+| High | Finance source consistency | `RPT-001`, `RPT-002`, `RPT-003`, `SCHED-001`, `FIN-002` | Pushed finance/report corrections include `4cc800f` and `c7db5bc`. |
+| High | Operational record authority and visibility | `OPS-001`, `OPS-002` | Stage-specific generic-control and Pull-Out Released-view corrections are recorded as implemented. |
+| High | Printable and client financial documents | `VAT-001`, `STMT-001`, `CLT-001`, `CONT-RPT-001` | Invoice eligibility and print-route corrections are present in the current branch. |
+| Medium | Invoice experience | `INV-001` | Zero-value draft issue control is recorded as implemented. |
+
+`INV-002` is already protected live: further overpayments are blocked. Its
+remaining work is an isolated database regression test and a separately
+approved correction for the historic labelled N1 overpayment.
+
+### Next Live Re-Test Order
+
+1. Finance/report reconciliation: `RPT-001`, `RPT-002`, `RPT-003`,
+   `SCHED-001`, and `FIN-002`. The schedule case needs one new controlled paid
+   standalone schedule because the old N500 record is intentionally not
+   backfilled.
+2. Operations re-test: `OPS-001` and `OPS-002` using existing controlled jobs.
+3. Document and client-finance re-test: `VAT-001`, `STMT-001`, `CLT-001`, and
+   `CONT-RPT-001`.
+4. Invoice UI re-test: `INV-001`. Do not alter the historic `INV-002` N1 entry
+   unless a separate correction is expressly approved.
 
 ### Verification Notes, Not Active Product Defects
 
