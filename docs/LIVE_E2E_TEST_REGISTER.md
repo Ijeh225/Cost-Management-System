@@ -19,6 +19,7 @@ action` label below does not override this current register.
 | Invoice payment reversal | `INV-002` | The N1 controlled post-paid overpayment was reversed without deleting its original history; invoice, AR, client wallet, analytics, bank, Financial Ledger, Cash Flow, and Client Statement reconcile to N2,000 collected and N0 credit. |
 | Operations and document re-test | `OPS-001`, `OPS-002`, `VAT-001`, `VAT-002`, `CLT-001`, `CONT-RPT-001`, `INV-001`, `STMT-001` | Stage ownership is authoritative in Operations, Pull-Out Released is visible, VAT and statement figures use only active financial invoices, Client/AR figures agree, container prints are accurate, and zero-value drafts cannot be sent. |
 | Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
+| Scoped finance middleware | `API-ROUTE-001` | Release `6a327a5` active in Railway; 12 authenticated live API checks passed for existing Operations QA staff, including allowed operational reads and denied finance / cross-branch access. |
 
 ### Current Follow-Up
 
@@ -29,8 +30,9 @@ dummy records were created there; no production financial writes occurred.
 New High defect `API-ROUTE-001`: root-mounted finance-router middleware
 blocks unrelated staff operations. The assigned officer received HTTP 403
 before reaching the verification handler. Seven finance routers now scope
-their guards to their own URL families. All 11 isolated regression tests passed;
-deployment and live staff-session acceptance are not yet claimed.
+their guards to their own URL families. All 11 isolated regression tests passed.
+Deployment and fresh live staff-session acceptance are now verified; this
+defect is closed with the evidence below.
 
 ### Railway Integration Run - 2026-09-05
 
@@ -42,10 +44,41 @@ deployment and live staff-session acceptance are not yet claimed.
 | API-ROUTE-001 | Corrected; isolated regression passed | All 11 tests passed in 137.41 seconds, including positive staff-task access, explicit cross-branch 404s, assigned officer verification/berthing, finance URL denial, concurrent reversal reconciliation, and cleanup. |
 | Local build and unit checks | Passed | Full railway:build; 23 API unit-test files / 85 tests. |
 | Test network cleanup | Passed | Removed temporary public TCP proxy; Railway confirms Online / Unexposed service with private networking retained. |
-| Release | Pushed; deployment pending | `05ba101` pushed to origin/master. Railway started deployment `265a65ca-254b-4649-8e4d-d79e2475eec8`. |
+| Release | Deployed; live acceptance passed | Railway confirms descendant `6a327a5` Active / Deployment successful, deployment `644c3d66-5bea-4b2c-8c6e-8c91b39a4786`, including fix `05ba101`. |
 
-**Next exact action:** verify deployment after commit/push, then check a
-controlled non-finance staff session. Do not repeat completed financial writes.
+**Next exact action:** this remediation round is closed. Await the next
+user-selected task; do not repeat completed financial writes or restart the audit.
+
+### API-ROUTE-001 Live Staff Acceptance - 2026-09-05
+
+Reused `E2E Operations QA` (user 14, E2E Lagos / branch 2): Staff authority,
+Operations function, Transire and Shipping workspaces only. Reset only this
+dummy account's password for fresh authentication; credentials were not saved
+to project records. The checks used a separate authenticated HTTP cookie
+session against the deployed application's API, not the owner's session.
+
+| Live request (GET, under `/api`) | Expected | Observed |
+| --- | --- | --- |
+| `/containers/26/tasks` (same branch) | 200 | 200 |
+| `/containers/25/tasks` (other branch) | 404 | 404, Container not found |
+| `/users/14` (own profile) | 200 | 200 |
+| `/containers` | 200 | 200 |
+| `/clients` | 403 | 403 |
+| `/banks` | 403 | 403 |
+| `/invoices` | 403 | 403 |
+| `/reports/invoice-aging` | 403 | 403 |
+| `/overhead-expenses` | 403 | 403 |
+| `/payment-schedules` | 403 | 403 |
+| `/container-expense-categories` | 403 | 403 |
+| `/users` | 403 | 403, Admin access required |
+
+All 12 checks passed. Re-read the QA profile as owner and confirmed authority,
+function, workspace access, branch and active status stayed unchanged. Logged
+out the QA session after testing. No new account or business record was created;
+no financial or operational workflow write was performed. Password rotation and
+login/logout session changes are the only live mutations in this acceptance.
+No new visual browser or assigned-officer write test is claimed; the latter
+remains covered by the completed isolated integration suite.
 
 ### Railway Test-Environment Provisioning Attempt - 2026-09-05
 

@@ -52,8 +52,9 @@ create more than one reversal entry.
 
 ## Exact Next Action
 
-The earlier capacity blocker is resolved. Verify deployment of API-ROUTE-001
-after commit/push and check a controlled non-finance staff session.
+The capacity blocker is resolved and API-ROUTE-001 deployment / live staff
+acceptance are complete. This remediation round is closed; await the next
+user-selected task without repeating completed financial writes.
 
 Do not run this suite against Railway production.
 
@@ -80,3 +81,18 @@ Do not run this suite against Railway production.
 - Removed temporary test public TCP access and applied the change. Railway
   shows the isolated PostgreSQL service Online and Unexposed. Future local
   runs need an explicitly selected test-environment tunnel or temporary proxy.
+
+## Final Deployment and Live Acceptance
+
+- Railway confirms `6a327a5` (including fix `05ba101`) Active / Deployment
+  successful, deployment `644c3d66-5bea-4b2c-8c6e-8c91b39a4786`.
+- Reused existing E2E Operations QA, user 14 in branch 2, with Staff authority
+  and only Transire / Shipping access. Rotated only its dummy password for a
+  fresh login; did not change its authority, workspaces, branch, or active state.
+- All 12 live authenticated API checks passed: permitted same-branch task,
+  own-profile and container reads; 404 for other-branch tasks; 403 for all seven
+  finance route groups and User Management. Staff session logged out afterwards.
+- These were direct API checks, not new browser workflow or officer-write tests.
+  No new test account or business/financial record was created or changed.
+  Only the QA password and authentication-session state changed.
+- API-ROUTE-001 is closed. The user's requested final acceptance is complete.

@@ -21,6 +21,8 @@ remain auditable.
   as Accounts Receivable.
 - Earlier controlled work also closed `BANK-003`, `AI-008`, `SEC-02`, and
   `DUTY-002`, and `INV-002`. Do not repeat their financial or workflow writes.
+- `API-ROUTE-001` is now closed: the corrected release is active in Railway,
+  and a fresh controlled non-finance staff session passed all 12 live API checks.
 - The latest deployment is verified live: Abuja dashboard completion now
   matches the persisted delivery date and Delivery Tracking.
 
@@ -37,13 +39,34 @@ The isolated run passed the INV-002 concurrent reversal case but discovered
 permission middleware to unrelated operational requests. The correction
 scopes all seven finance guards to their own URL families. All 11 isolated
 integration tests passed after the correction. Code and records were committed
-and pushed as `05ba101`; Railway picked up deployment
-`265a65ca-254b-4649-8e4d-d79e2475eec8`. Deployment verification is pending.
+and pushed as `05ba101`. Railway now confirms the subsequent documentation
+release `6a327a5`, which includes that fix, is Active / Deployment successful:
+`644c3d66-5bea-4b2c-8c6e-8c91b39a4786`. Fresh live staff acceptance passed.
 
 ### Next Action
 
-1. Verify the deployed API-ROUTE-001 correction after commit/push, using a
-   controlled non-finance staff session. Do not repeat completed financial writes.
+1. This remediation round is closed. Wait for the next user-selected task;
+   do not restart the completed audit or repeat completed financial writes.
+
+### API-ROUTE-001 Deployment and Live Acceptance - 2026-09-05
+
+- Railway production shows release `6a327a5` Active / Deployment successful;
+  deployment logs show the server listening on port 8080. It includes `05ba101`.
+- Reused existing `E2E Operations QA` (user 14, branch 2), with Staff authority,
+  Operations function, and only Transire / Shipping workspaces. Rotated only
+  this dummy account's password for a fresh login; no credentials are recorded.
+- Authenticated directly against the live API with an independent staff cookie
+  session. All 12 status checks passed: same-branch container 26 tasks, own user
+  profile, and container list returned 200; other-branch container 25 tasks
+  returned 404; Clients, Banks, Invoices, Reports, Overhead, Payment Schedules,
+  and Container Expenses returned 403; User Management also returned 403.
+- Confirmed the account's authority, job function, workspace access, branch,
+  and active status were unchanged. Logged out the staff session afterwards.
+- This acceptance was at the live authenticated API boundary, not a new visual
+  browser workflow test. Officer verification writes remain covered by the
+  already-passed isolated suite; no financial/workflow write was repeated.
+- No new test account, container, invoice, payment, or schedule was created.
+  Only test-password and authentication-session state changed.
 
 ### Railway Integration Progress - 2026-09-05
 
