@@ -1,5 +1,23 @@
 # Live End-to-End Test Register
 
+## Latest Control Closure - 2026-09-05
+
+| Control | Current result | Evidence |
+| --- | --- | --- |
+| APR-001 | Passed / closed for owner-Lagos workflow | Submitted and rejected existing job 26 E2EL260901 once. Pending Review immediately became empty; Recently Reviewed showed Rejected and the exact test reason without reload. |
+| DEL-001 | Passed / closed for controlled Abuja workflow | Existing job 25 E2EA260901 saved 2026-09-05 and retained it after reload. Delivery Tracking: one delivery, 5 Sept 2026, four days, N1,000 budgeted revenue. After deployed fix b6638cb, Abuja Dashboard: Total 1, In Progress 0, Completed 1. |
+
+Dashboard root cause was the literal `const completed = 0`; changed to count
+branch-scoped non-null deliveredAt. Railway deployment
+0d3cf23a-37d9-4349-965c-9badbf8baa6a was ACTIVE/successful before the final live
+Dashboard check. Full railway:build and 22 API unit files / 83 tests passed.
+New seeded-database integration assertion was added but not executed locally.
+No financial data changed. Keep job 26's rejection history and job 25's saved
+delivery date as evidence. Stop point: Abuja Dashboard, Completed 1. These
+results supersede historical Open/Failed/Blocked rows below; do not repeat
+these controlled writes. Review remaining register exceptions before selecting
+another task; this closure does not certify every workflow in the application.
+
 ## Purpose
 
 This is the execution record for the pre-delivery live acceptance test. It

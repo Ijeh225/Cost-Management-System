@@ -1,5 +1,29 @@
 # Project State
 
+## Latest Verified Checkpoint - 2026-09-05
+
+- APR-001: CLOSED for the tested owner/Lagos workflow. Job 26 was submitted
+  and rejected once; Pending Review immediately cleared and Recently Reviewed
+  showed Rejected with the recorded reason, without reload.
+- DEL-001: CLOSED for the controlled Abuja job 25. Delivery date 2026-09-05
+  persists after reload. Delivery Tracking reports one delivery on that date,
+  four days and N1,000 budgeted revenue. Dashboard now shows Total 1,
+  In Progress 0, Completed 1 after deployment.
+- Root cause fixed: Dashboard completed was hard-coded to zero. It now counts
+  non-null deliveredAt in the selected branch, matching Delivery Tracking.
+- Code commit b6638cb pushed to origin/master and verified ACTIVE/successful
+  on Railway deployment 0d3cf23a-37d9-4349-965c-9badbf8baa6a before final live check.
+- Validation: full railway:build passed; API unit suite 22 files / 83 tests
+  passed. Added database integration reconciliation assertion was not run
+  locally; it needs the seeded integration database. Live reconciliation passed.
+- Retained evidence: Lagos job 26 rejection and Abuja job 25 delivery date.
+  No financial postings, new jobs, deletions, or migrations in this task.
+- Exact stopping point: Abuja Dashboard after deployment, Completed 1.
+  Both requested controls are complete; do not repeat their writes. Older
+  Open/Blocked entries below are historical and superseded by this checkpoint.
+  Next action is a register closeout review for any other unverified controls,
+  not another APR-001/DEL-001 test or a claim that every app workflow has passed.
+
 ## Purpose
 
 This is the authoritative handoff record for the Cost Management System. Every
