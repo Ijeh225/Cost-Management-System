@@ -23,6 +23,34 @@ action` label below does not override this current register.
 
 ### Current Follow-Up
 
+The manual documentation task completed on 2026-09-05. The earlier remediation
+round remains closed on its recorded scope. Source inspection for the manual
+identified the two follow-ups below. They are not results of repeated live
+writes and must not be described as already fixed or live-reproduced.
+
+| New record | Evidence / status | Next bounded verification |
+| --- | --- | --- |
+| `MANUAL-GATE-001` | Source-observed gate control gap, pending assessment. In `artifacts/api-server/src/routes/containers.ts`, Gate-In accepts Shipping/Pull-Out status or existing Pull-Out release without calling the full readiness helper, and updates an existing Gate-In timestamp without a duplicate guard. Gate-Out and Empty Gate-In handlers lack explicit prior-event prerequisites. Main workflow transitions enforce stronger readiness. No gate write was performed for this review. | In isolated tests, verify missing-readiness and repeat Gate-In requests plus out-of-order loaded/empty events. Decide the shared invariant before changing handlers; preserve authentic existing timestamps. |
+| `MANUAL-INV-001` | Source-observed invoice preview discrepancy, pending targeted test. `CreateInvoiceDialog.tsx` sums container clearing charges, while invoice creation in `routes/invoices.ts` prioritizes `client.agreedClearingRate` when present. Different values can yield a preview/saved-draft mismatch. No invoice was created for this review. | Use an isolated client with a different agreed/container rate, compare preview and persisted draft, then align the preview to the authoritative amount rule without altering issued invoices. |
+
+### Manual Production Evidence - 2026-09-05
+
+- Created `output/pdf/Cost_Management_Blueprint_and_User_Manual.pdf`, edition
+  1.0, with maintained source/builder and assets under `docs/manual/`.
+- 57 pages, 54 chapters, 7 screenshots, 4 diagrams. All pages rendered for
+  visual QA; chapter/bookmark presence, text boundaries, missing-glyph and
+  example-arithmetic checks passed. Screenshots are dated test-data views.
+- Captured Dashboard, Operations, Reports, Payment Schedules, invoice 8,
+  Terminal/TDO workspace and Gate Security through a separate authenticated
+  read-only browser context. No new account, job, invoice, payment, schedule,
+  gate event, permission or configuration was created/changed.
+- Only authentication-session activity accompanied capture. No new deployment,
+  full regression run, external message or financial reconciliation is claimed.
+- The manual uses the latest authoritative closures rather than reopening old
+  failed rows; historical unledgered N500 schedule and test limitations remain.
+
+### Previous Follow-Up - Resolved Integration Work
+
 Railway capacity is resolved. `integration-test` / `Postgres-2Wsy` now hosts
 the isolated `cost_management_integration_test` database. Test schema and
 dummy records were created there; no production financial writes occurred.

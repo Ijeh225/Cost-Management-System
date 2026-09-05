@@ -45,8 +45,38 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
-1. This remediation round is closed. Wait for the next user-selected task;
-   do not restart the completed audit or repeat completed financial writes.
+1. The user-requested application blueprint/training PDF is complete; review the
+   manual in `output/pdf/Cost_Management_Blueprint_and_User_Manual.pdf`.
+2. Do not restart closed remediation writes. Two newly recorded source-review
+   follow-ups, `MANUAL-GATE-001` and `MANUAL-INV-001`, need separately scoped
+   assessment/verification before a new correction is claimed. No fix was
+   authorized or performed as part of manual production.
+
+### Application Blueprint and Training Manual - Completed 2026-09-05
+
+- Baseline: `8d62f2c`, with the API-ROUTE-001 live acceptance recorded.
+- Reconcile historical entries against the latest authoritative closure before
+  describing current behavior. Clearly distinguish code-supported procedures,
+  live-verified cases, recommendations, and remaining coverage limitations.
+- Delivered edition 1.0: 57 pages, 54 chapters, seven read-only live screenshots,
+  four vector diagrams, role/report tables, operating procedures, worked job
+  arithmetic, troubleshooting, latest test closures and explicit coverage limits.
+- Maintainable source/builder/assets are in `docs/manual/`; final PDF is in
+  `output/pdf/Cost_Management_Blueprint_and_User_Manual.pdf`.
+- Rendered all pages, reviewed contact sheets and dense full-size pages, and
+  checked chapter/bookmark coverage, text boundaries, glyph extraction and
+  worked-example arithmetic. No page-boundary violations or missing chapters.
+- Documentation-only work: application logic, database/schema, permissions and
+  business records were unchanged. A separate owner authentication session was
+  used for read-only screenshots. No repeated financial/workflow writes.
+- Source review found two additional follow-ups, not live reproductions:
+  `MANUAL-GATE-001` (gate-event prerequisite/duplicate checks weaker than main
+  workflow readiness) and `MANUAL-INV-001` (invoice preview sums container rates
+  while the server prioritizes a client agreed rate). Details are in the current
+  live-test register and manual chapter 49. The closed audit scope stays closed.
+- Historic N500 paid schedule remains unledgered, without fabricated backfill.
+  Browser/download, broad device/keyboard and excluded seeded-suite limits remain
+  documented. No deployment or fresh full regression is claimed for this task.
 
 ### API-ROUTE-001 Deployment and Live Acceptance - 2026-09-05
 

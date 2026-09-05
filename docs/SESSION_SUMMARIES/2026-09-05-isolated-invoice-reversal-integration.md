@@ -53,8 +53,9 @@ create more than one reversal entry.
 ## Exact Next Action
 
 The capacity blocker is resolved and API-ROUTE-001 deployment / live staff
-acceptance are complete. This remediation round is closed; await the next
-user-selected task without repeating completed financial writes.
+acceptance are complete. This remediation round is closed. The subsequent
+user-selected task, comprehensive blueprint/user-manual PDF, is now complete;
+see the documentation handoff below. Do not repeat completed financial writes.
 
 Do not run this suite against Railway production.
 
@@ -96,3 +97,28 @@ Do not run this suite against Railway production.
   No new test account or business/financial record was created or changed.
   Only the QA password and authentication-session state changed.
 - API-ROUTE-001 is closed. The user's requested final acceptance is complete.
+
+## Subsequent Documentation Handoff - 2026-09-05
+
+- User requested a detailed A-to-Z application blueprint and training PDF,
+  combining all three records with current source and live application review.
+- Reviewed the continuity records, source rules, module/report/navigation
+  implementation, and seven authenticated read-only live screens.
+- Delivered edition 1.0 at
+  `output/pdf/Cost_Management_Blueprint_and_User_Manual.pdf`: 57 pages,
+  54 chapters, seven screenshots and four vector diagrams. Maintained Markdown,
+  ReportLab builder, README and original screenshots are under `docs/manual/`.
+- Covered setup, authority/function/workspace/branch rules, intake and all
+  operational stages, every major finance/report module, controls, examples,
+  troubleshooting, confirmed closures and retained evidence limitations.
+- Rendered every page, visually checked contact sheets and dense pages, and
+  validated chapters/bookmarks, page boundaries, glyph extraction and arithmetic.
+- Source review identified `MANUAL-GATE-001` (weaker individual gate-handler
+  checks) and `MANUAL-INV-001` (client agreed-rate versus dialog-preview totals).
+  They are documented follow-ups, not live-reproduced or fixed defects.
+- No application code/schema/business data/access configuration was changed.
+  Separate owner authentication was used for screenshots. No external sends,
+  financial/workflow writes or repeated full live tests were performed.
+- Next: review the manual, then scope the two source-review follow-ups only when
+  requested. Historical N500 ledger gap still needs authentic evidence and
+  separate correction authority; it was not silently reconstructed.
