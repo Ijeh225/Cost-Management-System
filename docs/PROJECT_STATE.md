@@ -1418,3 +1418,34 @@ chunk-size warnings.
 **Next exact action:** push and deploy this correction, then perform the six
 listed live re-tests in the table order. Do not repeat the already closed
 `BANK-003`, `AI-008`, `SEC-02`, or `DUTY-002` controls.
+
+### Six Confirmed Defects Live Re-Test Passed (2026-09-05)
+
+**Implementation already pushed:** `c7db5bc`; the preceding documentation
+checkpoint was `dc84f36`. The earlier local validation remains valid: API unit
+suite (22 files / 83 tests), root and web typechecks, API production build,
+and web production build all passed.
+
+- `AR-002` passed in both views. Invoice Aging Analysis and printable Invoice
+  Aging show only `INV-202609-004` at ₦1,000 outstanding; cancelled
+  `INV-202609-002` and `INV-202609-003` are excluded.
+- `NOTIF-002` passed. A single controlled ₦1 schedule,
+  `E2E-20260905 Notification Idempotency Vendor`, was created and approved in
+  E2E Lagos. Owner Workflow History shows one Payment Scheduled and one Payment
+  Approved event for it, not duplicate rows.
+- `AI-005` passed. The exact named-vendor question found one record and cited
+  the paid ₦500 schedule with matching requested, approved, and paid amounts.
+- `AI-006` passed. With All Branches selected, generation is disabled; the
+  saved briefing is headed `Historical finance & control briefing` and marked
+  `Historical snapshot`.
+- `NOTIF-001` passed. The active PAAR deadline alert for `MSCU1234567` displays
+  `PAAR Overdue`.
+- `SCHED-002` passed. The 2026-08-27 `tuykguh` record is in Overdue and Today's
+  Schedule contains only the 2026-09-05 controlled schedule.
+
+The new ₦1 approved payment schedule remains in the E2E Lagos branch as a
+clearly labelled, auditable test record. No payment was recorded against it.
+
+**Next exact action:** perform `BRN-001` backend branch creation verification:
+from All Branches, submit one controlled record for an explicitly selected
+branch, then verify creation and data isolation in the target branch only.
