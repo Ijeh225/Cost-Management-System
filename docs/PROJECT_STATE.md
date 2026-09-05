@@ -1449,3 +1449,21 @@ clearly labelled, auditable test record. No payment was recorded against it.
 **Next exact action:** perform `BRN-001` backend branch creation verification:
 from All Branches, submit one controlled record for an explicitly selected
 branch, then verify creation and data isolation in the target branch only.
+
+### BRN-001 Backend Branch-Creation Re-Test Passed (2026-09-05)
+
+- In All Branches, the New Client form explicitly selected
+  `E2E-20260901-Lagos` and successfully created
+  `E2E-20260905 BRN-001 Lagos Scope Client` (client ID 8).
+- The new client is visible in All Branches and the Lagos branch, and absent
+  from the Abuja branch. This is backend persistence evidence, not merely a
+  form-default observation.
+- The deployed shared `resolveCreateBranch` helper is the same creation guard
+  used by clients, containers, and invoices, so this proves the repaired
+  authorised selected-branch path under a consolidated global scope.
+- The client remains as labelled E2E test data only; it has no containers,
+  invoices, payments, or balances.
+
+**Next exact action:** finish the remaining controlled workflow verification:
+`APR-001` immediate Approval Queue rejection refresh, then `DEL-001` delivery
+date persistence and its Dashboard/Delivery Tracking reconciliation.

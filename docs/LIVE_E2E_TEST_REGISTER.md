@@ -607,3 +607,23 @@ The controlled ₦1 schedule remains in the E2E Lagos branch as an auditable
 test record. The next controlled verification is `BRN-001`: submit a new
 branch-scoped record while All Branches is selected but a target branch is
 specified, then verify backend creation and branch isolation.
+
+### BRN-001 Backend Branch-Creation Re-Test Passed (2026-09-05)
+
+- With **All Branches** active, a controlled client named
+  `E2E-20260905 BRN-001 Lagos Scope Client` was created while its form
+  explicitly selected `E2E-20260901-Lagos`.
+- The creation succeeded and returned client ID 8. The client appears in the
+  All Branches list and the Lagos-scoped list, but does not appear in the
+  Abuja-scoped list.
+- This exercises the deployed `resolveCreateBranch` path used by client,
+  container, and invoice create routes. It confirms that an authorised form
+  branch is accepted under All Branches and that the backend persists the
+  selected branch rather than the global consolidated scope.
+- The controlled client remains as an auditable E2E data record. No container,
+  invoice, payment, or financial balance was created from it.
+
+**Next exact action:** complete the remaining controlled workflow checks:
+`APR-001` (submit and reject one controlled item, then verify immediate queue
+refresh) and `DEL-001` (persist a real delivery date and reconcile Dashboard
+Completed plus Delivery Tracking).
