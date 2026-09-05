@@ -4,6 +4,7 @@ import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "dr
 import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
 import { toE164Nigerian, sendWhatsAppTemplate, assertBranchWhatsAppSenderSupported } from "../lib/whatsapp.js";
 import { getEffectiveInvoiceStatus, isInvoiceCollectable, isInvoiceEditable } from "../lib/invoice-status.js";
+import { getReversibleOverpaymentCredit } from "../lib/invoice-payment-reversal.js";
 
 const router = Router();
 
@@ -78,6 +79,9 @@ async function fetchPaymentsWithBank(invoiceId: number) {
       reference: invoicePaymentsTable.reference,
       notes: invoicePaymentsTable.notes,
       bankId: invoicePaymentsTable.bankId,
+      entryType: invoicePaymentsTable.entryType,
+      reversalOfPaymentId: invoicePaymentsTable.reversalOfPaymentId,
+      reversalReason: invoicePaymentsTable.reversalReason,
       bankName: banksTable.name,
       createdAt: invoicePaymentsTable.createdAt,
     })
@@ -106,6 +110,9 @@ async function generateCreditNoteNumber(): Promise<string> {
 
 async function formatInvoice(inv: any, payments: any[], items?: any[], creditNotes?: any[]) {
   const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
+  const reversedPaymentIds = new Set(payments
+    .filter(payment => payment.entryType === "reversal" && payment.reversalOfPaymentId != null)
+    .map(payment => payment.reversalOfPaymentId));
   const total = parseFloat(inv.total ?? "0");
   const outstanding = Math.max(0, total - totalPaid);
   const status = getEffectiveInvoiceStatus({ status: inv.status, total, totalPaid, dueDate: inv.dueDate });
@@ -148,6 +155,10 @@ async function formatInvoice(inv: any, payments: any[], items?: any[], creditNot
       reference: p.reference,
       notes: p.notes,
       bankId: p.bankId ?? null,
+      entryType: p.entryType,
+      reversalOfPaymentId: p.reversalOfPaymentId ?? null,
+      reversalReason: p.reversalReason ?? null,
+      canReverse: p.entryType === "payment" && !reversedPaymentIds.has(p.id),
       bankName: p.bankName ?? null,
       createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
     })),
@@ -1230,75 +1241,113 @@ router.post("/invoices/:id/apply-credit", requireBranchAdminOrAbove, async (req:
   }
 });
 
-router.delete("/invoices/:id/payments/:paymentId", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
+router.post("/invoices/:id/payments/:paymentId/reverse", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const invoiceId = parseInt(String(req.params.id), 10);
     const paymentId = parseInt(String(req.params.paymentId), 10);
     if (isNaN(invoiceId) || isNaN(paymentId)) return res.status(400).json({ error: "Invalid id" });
 
-    const [_inv] = await db.select({ branchId: invoicesTable.branchId }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!_inv || !userCanAccessBranch(req, _inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
-    const [payment] = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.id, paymentId));
-    if (!payment) return res.status(404).json({ error: "Payment not found" });
-    if (payment.invoiceId !== invoiceId) return res.status(400).json({ error: "Payment does not belong to this invoice" });
+    const { reversalDate, reference: referenceRaw, reason: reasonRaw } = req.body ?? {};
+    const reference = String(referenceRaw ?? "").trim();
+    const reason = String(reasonRaw ?? "").trim();
+    if (!reference) return res.status(400).json({ error: "A reversal reference is required" });
+    if (reference.length > 200) return res.status(400).json({ error: "Reference must be 200 characters or fewer" });
+    if (reason.length < 3 || reason.length > 2_000) return res.status(400).json({ error: "Reason must be between 3 and 2,000 characters" });
 
-    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    const paymentAmount = parseFloat(payment.amount ?? "0");
+    let reversalDateClean: string | null = null;
+    if (reversalDate != null && String(reversalDate).trim() !== "") {
+      const date = new Date(String(reversalDate).trim());
+      if (Number.isNaN(date.getTime())) return res.status(400).json({ error: "Invalid reversalDate (expected ISO date)" });
+      reversalDateClean = date.toISOString().slice(0, 10);
+    }
 
-    await db.transaction(async (tx) => {
-      await tx.delete(invoicePaymentsTable).where(eq(invoicePaymentsTable.id, paymentId));
+    const result = await db.transaction(async (tx) => {
+      type PaymentRow = { id: number; invoice_id: number; branch_id: number; amount: string; payment_method: string; bank_id: number | null; entry_type: string; paid_at: Date | string };
+      const locked = await tx.execute(sql`
+        SELECT id, invoice_id, branch_id, amount, payment_method, bank_id, entry_type, paid_at
+        FROM invoice_payments WHERE id = ${paymentId} FOR UPDATE
+      `);
+      const payment = ((Array.isArray(locked) ? locked : (locked as { rows?: unknown[] }).rows ?? []) as PaymentRow[])[0];
+      if (!payment || payment.invoice_id !== invoiceId) return { error: { code: 404, message: "Invoice payment not found" } } as const;
+      if (payment.entry_type !== "payment" || Number(payment.amount) <= 0) {
+        return { error: { code: 400, message: "Only an original invoice payment can be reversed" } } as const;
+      }
+      if (reversalDateClean && reversalDateClean < new Date(payment.paid_at).toISOString().slice(0, 10)) {
+        return { error: { code: 400, message: "A reversal date cannot be before the original payment date" } } as const;
+      }
 
-      // Reverse credit balance if this was a credit-method payment
-      if (payment.paymentMethod === "credit" && inv?.clientId) {
+      const [inv] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+      if (!inv || !userCanAccessBranch(req, inv.branchId)) return { error: { code: 404, message: "Invoice not found" } } as const;
+      const scope = getBranchScope(req);
+      if (scope === null && req.user?.role === "super_admin") {
+        return { error: { code: 400, message: "Select the invoice branch before reversing a payment." } } as const;
+      }
+      if (scope !== null && scope !== inv.branchId) return { error: { code: 404, message: "Invoice not found" } } as const;
+
+      const existing = await tx.execute(sql`
+        SELECT id FROM invoice_payments
+        WHERE reversal_of_payment_id = ${paymentId} AND entry_type = 'reversal' FOR UPDATE
+      `);
+      const existingRows = (Array.isArray(existing) ? existing : (existing as { rows?: unknown[] }).rows ?? []) as Array<{ id: number }>;
+      if (existingRows.length > 0) return { error: { code: 409, message: "This invoice payment has already been reversed" } } as const;
+
+      const payments = await tx.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+      const originalAmount = Number(payment.amount);
+      const otherPaymentTotal = payments.filter(row => row.id !== paymentId).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+      const creditToReverse = getReversibleOverpaymentCredit(inv.total, otherPaymentTotal, originalAmount);
+
+      if (creditToReverse > 0.005) {
+        if (!inv.clientId) {
+          return { error: { code: 409, message: "This payment created client credit, but the invoice no longer has a linked client to correct safely" } } as const;
+        }
+        const [client] = await tx.select({ creditBalance: clientsTable.creditBalance }).from(clientsTable).where(eq(clientsTable.id, inv.clientId));
+        if (!client || Number(client.creditBalance ?? 0) + 0.005 < creditToReverse) {
+          return { error: { code: 409, message: "The linked client credit has been used or changed, so this payment cannot be reversed safely" } } as const;
+        }
         await tx.update(clientsTable)
-          .set({ creditBalance: sql`GREATEST(0, ${clientsTable.creditBalance}::numeric + ${String(paymentAmount)})` })
+          .set({ creditBalance: sql`GREATEST(0, ${clientsTable.creditBalance}::numeric - ${String(creditToReverse)})` })
           .where(eq(clientsTable.id, inv.clientId));
       }
 
-      // Reverse deposit allocation if this payment originated from a deposit
-      const depositMatch = payment.notes?.match(/Applied from deposit #(\d+)/);
-      if (depositMatch) {
-        const sourceDepositId = parseInt(depositMatch[1]);
-        await tx.update(clientDepositsTable)
-          .set({ allocatedAmount: sql`GREATEST(0, ${clientDepositsTable.allocatedAmount}::numeric - ${String(paymentAmount)})` })
-          .where(eq(clientDepositsTable.id, sourceDepositId));
-      }
+      const paidAt = reversalDateClean ? new Date(`${reversalDateClean}T12:00:00.000Z`) : new Date();
+      await tx.insert(invoicePaymentsTable).values({
+        invoiceId,
+        branchId: inv.branchId,
+        amount: String(-originalAmount),
+        paymentMethod: payment.payment_method,
+        bankId: payment.bank_id,
+        reference,
+        notes: `Reversal of invoice payment #${payment.id}`,
+        entryType: "reversal",
+        reversalOfPaymentId: payment.id,
+        reversalReason: reason,
+        paidAt,
+      });
 
-      // Reverse overpayment credit that was stored when this payment was recorded
-      if (inv?.clientId && payment.paymentMethod !== "credit") {
-        const remainingPayments = await tx.select().from(invoicePaymentsTable)
-          .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
-        const prevTotalPaid = remainingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
-        const invoiceTotal = parseFloat(inv.total ?? "0");
-        const prevOverpaidBeforeDelete = Math.max(0, prevTotalPaid + paymentAmount - invoiceTotal);
-        const nowOverpaid = Math.max(0, prevTotalPaid - invoiceTotal);
-        const creditToReverse = prevOverpaidBeforeDelete - nowOverpaid;
-        if (creditToReverse > 0) {
-          await tx.update(clientsTable)
-            .set({ creditBalance: sql`GREATEST(0, ${clientsTable.creditBalance}::numeric - ${String(creditToReverse)})` })
-            .where(eq(clientsTable.id, inv.clientId));
-        }
-      }
-
-      if (inv) {
-        const payments = await tx.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
-        const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
-        const total = parseFloat(inv.total);
-        const newStatus = getEffectiveInvoiceStatus({
-          status: inv.status,
-          total,
-          totalPaid,
-          dueDate: inv.dueDate,
-        });
-        await tx.update(invoicesTable).set({ status: newStatus, updatedAt: new Date() }).where(eq(invoicesTable.id, invoiceId));
-      }
+      const totalPaid = payments.reduce((sum, row) => sum + Number(row.amount ?? 0), 0) - originalAmount;
+      const total = Number(inv.total ?? 0);
+      const status = getEffectiveInvoiceStatus({ status: inv.status, total, totalPaid, dueDate: inv.dueDate });
+      await tx.update(invoicesTable).set({ status, updatedAt: new Date() }).where(eq(invoicesTable.id, invoiceId));
+      await tx.insert(invoiceAuditLogTable).values({
+        invoiceId,
+        branchId: inv.branchId,
+        action: "payment_reversed",
+        details: `Reversed payment #${payment.id} (₦${originalAmount.toLocaleString()}) | reference=${reference} | ${reason}`,
+        performedBy: req.user?.id ?? null,
+      });
+      return { ok: { totalPaid, status, creditReversed: creditToReverse } } as const;
     });
 
-    return res.json({ success: true });
+    if ("error" in result && result.error) return res.status(result.error.code).json({ error: result.error.message });
+    return res.json({ success: true, ...result.ok });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: "Failed to delete payment" });
+    return res.status(500).json({ error: "Failed to reverse invoice payment" });
   }
+});
+
+router.delete("/invoices/:id/payments/:paymentId", requireBranchAdminOrAbove, (_req: AuthRequest, res) => {
+  return res.status(405).json({ error: "Invoice payment records are immutable. Use the reversal action instead." });
 });
 
 function containerListLine(items: { containerNumber: string | null }[]): string {

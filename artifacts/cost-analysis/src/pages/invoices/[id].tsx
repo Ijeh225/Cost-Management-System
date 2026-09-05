@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
 import {
-  useGetInvoice, useUpdateInvoice, useRecordPayment, useDeletePayment,
+  useGetInvoice, useUpdateInvoice, useRecordPayment, useReverseInvoicePayment,
   useGetInvoiceWhatsAppLog, useSendInvoiceWhatsApp, useSendInvoiceReminder, useSendInvoiceReceipt,
   useAddInvoiceItem, useEditInvoiceItem, useRemoveInvoiceItem,
   useListActiveBanks, useApplyClientCredit, useGetClientWalletSummary,
   useGetClientDeposits, useAllocateDeposit,
   useRaiseCreditNote, useWriteOffInvoice, useGetInvoiceAuditLog, useCancelInvoice,
-  type RecordPaymentBody, type InvoiceItem, type CreditNote, type InvoiceAuditLogEntry,
+  type RecordPaymentBody, type InvoiceItem, type CreditNote, type InvoiceAuditLogEntry, type InvoicePayment, type ReverseInvoicePaymentBody,
 } from "@workspace/api-client-react";
 import { useListContainers, getListContainersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -28,10 +28,10 @@ import {
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  FileText, ArrowLeft, Phone, Loader2, Trash2, CheckCircle2,
+  FileText, ArrowLeft, Phone, Loader2, Undo2, CheckCircle2,
   Clock, AlertTriangle, CreditCard, Send, PlusCircle, Building2,
   Box, Calendar, StickyNote, MessageCircle, Bell, ChevronDown, ChevronUp, Printer, Receipt,
-  Pencil, ChevronsUpDown, Check, Banknote, FileX, ReceiptText,
+  Pencil, ChevronsUpDown, Check, Banknote, FileX, ReceiptText, Trash2,
 } from "lucide-react";
 
 function ApplyDepositDialog({
@@ -459,6 +459,58 @@ function RecordPaymentDialog({
   );
 }
 
+function ReversePaymentDialog({
+  open, onClose, invoiceId, payment,
+}: {
+  open: boolean;
+  onClose: () => void;
+  invoiceId: number;
+  payment: InvoicePayment | null;
+}) {
+  const { toast } = useToast();
+  const reverseMutation = useReverseInvoicePayment();
+  const [form, setForm] = useState<ReverseInvoicePaymentBody>({ reference: "", reason: "", reversalDate: new Date().toISOString().slice(0, 10) });
+
+  useEffect(() => {
+    if (open) setForm({ reference: "", reason: "", reversalDate: new Date().toISOString().slice(0, 10) });
+  }, [open, payment?.id]);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!payment) return;
+    if (!form.reference.trim()) {
+      toast({ variant: "destructive", title: "Enter a reversal reference" });
+      return;
+    }
+    if (form.reason.trim().length < 3) {
+      toast({ variant: "destructive", title: "Enter a clear reversal reason" });
+      return;
+    }
+    try {
+      await reverseMutation.mutateAsync({ invoiceId, paymentId: payment.id, data: form });
+      toast({ title: "Payment reversed", description: "The original payment remains in the audit trail." });
+      onClose();
+    } catch (err) {
+      toast({ variant: "destructive", title: err instanceof Error ? err.message : "Failed to reverse payment" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={value => { if (!value) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><Undo2 className="w-4 h-4 text-amber-500" />Reverse Payment</DialogTitle></DialogHeader>
+        <form onSubmit={submit} className="space-y-4 mt-2">
+          <p className="text-sm text-muted-foreground">This creates a linked negative entry for {payment ? formatCurrency(payment.amount) : "this payment"}. It does not delete the original bank and invoice history.</p>
+          <div><Label htmlFor="reversal-date">Reversal Date</Label><Input id="reversal-date" type="date" value={form.reversalDate ?? ""} onChange={event => setForm(value => ({ ...value, reversalDate: event.target.value }))} className="mt-1" /></div>
+          <div><Label htmlFor="reversal-reference">Reversal Reference *</Label><Input id="reversal-reference" value={form.reference} onChange={event => setForm(value => ({ ...value, reference: event.target.value }))} placeholder="e.g. REV-20260905-001" className="mt-1" /></div>
+          <div><Label htmlFor="reversal-reason">Reason *</Label><Textarea id="reversal-reason" rows={3} value={form.reason} onChange={event => setForm(value => ({ ...value, reason: event.target.value }))} placeholder="Explain why this payment must be reversed..." className="mt-1" /></div>
+          <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" variant="destructive" disabled={reverseMutation.isPending}>{reverseMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}Reverse Payment</Button></div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AddItemDialog({
   open, onClose, invoiceId, existingContainerIds,
 }: {
@@ -702,7 +754,7 @@ export default function InvoiceDetailPage() {
   const { toast } = useToast();
   const { data: invoice, isLoading } = useGetInvoice(isNaN(invoiceId) ? null : invoiceId);
   const updateMutation = useUpdateInvoice();
-  const deletePaymentMutation = useDeletePayment();
+  const reversePaymentMutation = useReverseInvoicePayment();
   const sendWhatsAppMutation = useSendInvoiceWhatsApp();
   const sendReminderMutation = useSendInvoiceReminder();
   const sendReceiptMutation = useSendInvoiceReceipt();
@@ -713,6 +765,7 @@ export default function InvoiceDetailPage() {
   const { data: auditLog } = useGetInvoiceAuditLog(isNaN(invoiceId) ? null : invoiceId);
   const [auditLogOpen, setAuditLogOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [reversalPayment, setReversalPayment] = useState<InvoicePayment | null>(null);
   const [creditOpen, setCreditOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [creditNoteOpen, setCreditNoteOpen] = useState(false);
@@ -741,16 +794,6 @@ export default function InvoiceDetailPage() {
         title: "Invoice was not issued",
         description: err instanceof Error ? err.message : "Failed to update status",
       });
-    }
-  };
-
-  const handleDeletePayment = async (paymentId: number) => {
-    if (!confirm("Remove this payment record?")) return;
-    try {
-      await deletePaymentMutation.mutateAsync({ invoiceId, paymentId });
-      toast({ title: "Payment removed" });
-    } catch {
-      toast({ variant: "destructive", title: "Failed to remove payment" });
     }
   };
 
@@ -1279,18 +1322,19 @@ export default function InvoiceDetailPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {regularPayments.map(payment => (
-                <div
+              {regularPayments.map(payment => {
+                const isReversal = payment.entryType === "reversal" || payment.amount < 0;
+                return <div
                   key={payment.id}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/30 border border-border/30"
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border ${isReversal ? "bg-amber-500/10 border-amber-500/30" : "bg-muted/30 border-border/30"}`}
                 >
-                  <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isReversal ? "bg-amber-500/20" : "bg-emerald-500/20"}`}>
+                    {isReversal ? <Undo2 className="w-3.5 h-3.5 text-amber-500" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-emerald-400">{formatCurrency(payment.amount)}</span>
-                      <Badge variant="secondary" className="text-xs capitalize">{payment.paymentMethod}</Badge>
+                      <span className={`text-sm font-semibold ${isReversal ? "text-amber-500" : "text-emerald-400"}`}>{formatCurrency(payment.amount)}</span>
+                      <Badge variant="secondary" className="text-xs capitalize">{isReversal ? "reversal" : payment.paymentMethod}</Badge>
                       {payment.reference && (
                         <span className="text-xs text-muted-foreground font-mono">Ref: {payment.reference}</span>
                       )}
@@ -1300,23 +1344,24 @@ export default function InvoiceDetailPage() {
                         {new Date(payment.paidAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                       {payment.notes && (
-                        <span className="text-xs text-muted-foreground">· {payment.notes}</span>
+                        <span className="text-xs text-muted-foreground">· {isReversal ? payment.reversalReason ?? payment.notes : payment.notes}</span>
                       )}
                     </div>
                   </div>
-                  {isAdmin && (
+                  {isAdmin && !isReversal && payment.canReverse !== false && (
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDeletePayment(payment.id)}
-                      disabled={deletePaymentMutation.isPending}
+                      className="h-7 w-7 text-muted-foreground hover:text-amber-500"
+                      onClick={() => setReversalPayment(payment)}
+                      disabled={reversePaymentMutation.isPending}
+                      aria-label={`Reverse payment ${payment.reference || payment.id}`}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Undo2 className="w-3.5 h-3.5" />
                     </Button>
                   )}
                 </div>
-              ))}
+              })}
             </div>
           )}
         </CardContent>
@@ -1486,6 +1531,12 @@ export default function InvoiceDetailPage() {
         open={paymentOpen}
         onClose={() => setPaymentOpen(false)}
         invoiceId={invoiceId}
+      />
+      <ReversePaymentDialog
+        open={reversalPayment !== null}
+        onClose={() => setReversalPayment(null)}
+        invoiceId={invoiceId}
+        payment={reversalPayment}
       />
 
       {invoice.clientId != null && (

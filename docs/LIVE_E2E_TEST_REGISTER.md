@@ -21,9 +21,21 @@ action` label below does not override this current register.
 
 ### Current Follow-Up
 
-No deployed source correction is waiting for re-test. `INV-002` remains
-live-mitigated; its historic N1 correction and isolated database regression
-test require separately approved work.
+`INV-002` remains protected against new overpayments. Its approved historic N1
+correction is implemented locally as a traceable reversal and awaits deployment
+and one controlled live re-test. The isolated database regression test still
+requires `TEST_DATABASE_URL`.
+
+### INV-002 Traceable Payment Reversal Implemented Locally - 2026-09-05
+
+| Scope | Implemented correction | Controlled live re-test required |
+| --- | --- | --- |
+| Invoice payment history | Replaced hard deletion with a required-reference, required-reason reversal. The original row stays in history and a single linked negative entry is created; a second reversal is rejected. | Reverse the historic N1 `E2E-20260901-INV-001-OVERPAY-REJECT` payment on `INV-202609-001` after deployment. |
+| Financial reconciliation | The same reversal is shown as money-out in Bank Management, Financial Ledger, and Cash Flow. AR, analytics, reports, and invoice totals net the original and reversal together. Client credit is reduced only by the original payment's proven overpayment portion. | Confirm N2,000 paid, N0 credit, no net N1 extra cash collection, and retained original/reversal/audit evidence. |
+
+Local verification: API/frontend typechecks and production builds passed; all
+85 API tests passed. The current historic N1 row remains unchanged until the
+deployed reversal action is deliberately completed.
 
 ### STMT-001 and VAT-002 Live Re-Test Passed - 2026-09-05
 
@@ -38,8 +50,8 @@ effect regression coverage.
 
 ### Remaining Follow-Up
 
-`INV-002` remains live-mitigated; its historic N1 correction and isolated
-database regression test require separately approved work.
+After the deployed controlled reversal is verified, add the isolated
+`TEST_DATABASE_URL` integration test for concurrent/repeated reversal safety.
 
 ### Operations and Document Live Re-Test - 2026-09-05
 

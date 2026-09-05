@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, numeric, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, numeric, timestamp, date, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { containersTable } from "./containers";
 import { clientsTable } from "./clients";
 import { banksTable } from "./banks";
@@ -41,6 +41,9 @@ export const invoicePaymentsTable = pgTable("invoice_payments", {
   reference: text("reference").notNull().default(""),
   notes: text("notes").notNull().default(""),
   bankId: integer("bank_id").references(() => banksTable.id, { onDelete: "set null" }),
+  entryType: text("entry_type").notNull().default("payment"),
+  reversalOfPaymentId: integer("reversal_of_payment_id").references((): AnyPgColumn => invoicePaymentsTable.id, { onDelete: "restrict" }),
+  reversalReason: text("reversal_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -238,6 +238,8 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
         .select({
           id: invoicePaymentsTable.id,
           amount: invoicePaymentsTable.amount,
+          entryType: invoicePaymentsTable.entryType,
+          reversalReason: invoicePaymentsTable.reversalReason,
           paidAt: invoicePaymentsTable.paidAt,
           reference: invoicePaymentsTable.reference,
           notes: invoicePaymentsTable.notes,
@@ -253,16 +255,20 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
         .where(and(...paymentConditions));
 
       for (const p of payments) {
+        const amount = parseFloat(p.amount);
+        const isReversal = p.entryType === "reversal" || amount < 0;
         txs.push({
           id: `payment_${p.id}`,
           date: p.paidAt,
           type: "payment",
-          description: `Invoice payment — ${p.invoiceNumber ?? `INV-${p.invoiceId}`}${p.notes ? ` (${p.notes})` : ""}`,
+          description: isReversal
+            ? `Invoice payment reversal — ${p.invoiceNumber ?? `INV-${p.invoiceId}`}${p.reversalReason ? ` (${p.reversalReason})` : ""}`
+            : `Invoice payment — ${p.invoiceNumber ?? `INV-${p.invoiceId}`}${p.notes ? ` (${p.notes})` : ""}`,
           reference: p.reference || null,
           clientName: p.clientName ?? null,
           invoiceNumber: p.invoiceNumber ?? null,
-          debit: 0,
-          credit: parseFloat(p.amount),
+          debit: isReversal ? Math.abs(amount) : 0,
+          credit: isReversal ? 0 : Math.abs(amount),
         });
       }
     }

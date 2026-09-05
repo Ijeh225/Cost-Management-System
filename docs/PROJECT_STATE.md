@@ -24,20 +24,39 @@ remain auditable.
 - The latest deployment is verified live: Abuja dashboard completion now
   matches the persisted delivery date and Delivery Tracking.
 
-### Remaining Follow-Up
+### Implemented Correction Awaiting Controlled Live Re-Test
 
-No deployed source correction is awaiting a live re-test. The only remaining
-item below requires separately approved historic-data or test-environment work.
-
-`INV-002` is already protected live: further overpayments are blocked. Its
-remaining work is an isolated database regression test and a separately
-approved correction for the historic labelled N1 overpayment.
+`INV-002` is protected live against new overpayments. A traceable reversal for
+the approved historic N1 overpayment is implemented locally and must be
+deployed before it is used on the controlled test record.
 
 ### Next Action
 
-1. Keep the historic `INV-002` N1 entry unchanged unless a separate correction
-   is expressly approved. The isolated `TEST_DATABASE_URL` work remains a test
-   environment follow-up, not a live-data task.
+1. Deploy the invoice-payment reversal migration and use the Invoice detail
+   reversal action on `INV-202609-001` payment
+   `E2E-20260901-INV-001-OVERPAY-REJECT`. Record a new reversal reference and
+   the reason that this was the approved controlled post-paid N1 correction.
+2. Verify that the original collection and its linked N1 reversal remain in
+   invoice history and audit log; the invoice stays Paid at N2,000, client
+   credit becomes N0, and the bank, Financial Ledger, Cash Flow, Analytics,
+   AR, and Client Statement no longer include a net extra N1 collection.
+3. The isolated `TEST_DATABASE_URL` integration test remains an environment
+   follow-up after the controlled live correction.
+
+### INV-002 Traceable Payment Reversal Implemented Locally - 2026-09-05
+
+- Invoice payments now support immutable `payment` and `reversal` entries,
+  linked one-to-one. Reversal requires a reference, reason, and a date no
+  earlier than the original payment. A payment cannot be reversed twice.
+- The legacy hard-delete endpoint and trash action are replaced by a reversal
+  dialog. The original collection remains audit-visible; the new negative row
+  restores invoice, bank, ledger, Cash Flow, analytics, and client-credit
+  totals in the same transaction.
+- The reversal source is presented as a money-out in Bank Management, Financial
+  Ledger, and Cash Flow, rather than as a misleading negative collection.
+- Local verification passed: API/frontend typechecks, API/frontend production
+  builds, and all 85 API tests. The new unit test covers the calculation of
+  credit created by an overpayment.
 
 ### STMT-001 and VAT-002 Live Re-Test Passed - 2026-09-05
 

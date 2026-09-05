@@ -43,6 +43,10 @@ export type InvoicePayment = {
   reference: string;
   notes: string;
   bankId: number | null;
+  entryType: "payment" | "reversal";
+  reversalOfPaymentId: number | null;
+  reversalReason: string | null;
+  canReverse: boolean;
   bankName: string | null;
   createdAt: string;
 };
@@ -207,16 +211,24 @@ export function useRecordPayment() {
   });
 }
 
-export function useDeletePayment() {
+export type ReverseInvoicePaymentBody = {
+  reversalDate?: string;
+  reference: string;
+  reason: string;
+};
+
+export function useReverseInvoicePayment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ invoiceId, paymentId }: { invoiceId: number; paymentId: number }) =>
-      customFetch<{ success: boolean }>(`/api/invoices/${invoiceId}/payments/${paymentId}`, {
-        method: "DELETE",
-      }),
+    mutationFn: ({ invoiceId, paymentId, data }: { invoiceId: number; paymentId: number; data: ReverseInvoicePaymentBody }) =>
+      customFetch<{ success: boolean; totalPaid: number; status: string; creditReversed: number }>(
+        `/api/invoices/${invoiceId}/payments/${paymentId}/reverse`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }
+      ),
     onSuccess: (_, { invoiceId }) => {
       qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
       qc.invalidateQueries({ queryKey: ["/api/banks"] });
     },
   });

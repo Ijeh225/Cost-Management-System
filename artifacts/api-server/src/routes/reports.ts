@@ -216,7 +216,7 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
     const fromBank = alias(banksTable, "financial_ledger_from_bank");
     const toBank = alias(banksTable, "financial_ledger_to_bank");
     const [invoiceRows, dutyRows, overheadRows, containerRows, scheduleRows, fundingRows, transferRows] = await Promise.all([
-      db.select({ id: invoicePaymentsTable.id, date: invoicePaymentsTable.paidAt, amount: invoicePaymentsTable.amount, method: invoicePaymentsTable.paymentMethod, reference: invoicePaymentsTable.reference, notes: invoicePaymentsTable.notes, invoiceNumber: invoicesTable.invoiceNumber, bankName: banksTable.name })
+      db.select({ id: invoicePaymentsTable.id, date: invoicePaymentsTable.paidAt, amount: invoicePaymentsTable.amount, entryType: invoicePaymentsTable.entryType, reversalReason: invoicePaymentsTable.reversalReason, method: invoicePaymentsTable.paymentMethod, reference: invoicePaymentsTable.reference, notes: invoicePaymentsTable.notes, invoiceNumber: invoicesTable.invoiceNumber, bankName: banksTable.name })
         .from(invoicePaymentsTable).leftJoin(invoicesTable, eq(invoicePaymentsTable.invoiceId, invoicesTable.id)).leftJoin(banksTable, eq(invoicePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(invoicePaymentsTable.paidAt, invoicePaymentsTable.branchId))),
       db.select({ id: dutyPaymentTransactionsTable.id, date: dutyPaymentTransactionsTable.paidAt, amount: dutyPaymentTransactionsTable.amount, entryType: dutyPaymentTransactionsTable.entryType, reversalReason: dutyPaymentTransactionsTable.reversalReason, method: dutyPaymentTransactionsTable.paymentMethod, reference: dutyPaymentTransactionsTable.reference, notes: dutyPaymentTransactionsTable.notes, containerId: containersTable.id, containerNumber: containersTable.containerNumber, bankName: banksTable.name })
         .from(dutyPaymentTransactionsTable).leftJoin(containersTable, eq(dutyPaymentTransactionsTable.containerId, containersTable.id)).leftJoin(banksTable, eq(dutyPaymentTransactionsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(dutyPaymentTransactionsTable.paidAt, dutyPaymentTransactionsTable.branchId))),
@@ -236,7 +236,11 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
     ]);
 
     const entries: FinancialLedgerEntry[] = [
-      ...invoiceRows.map(row => ({ id: `invoice-${row.id}`, date: row.date.toISOString(), direction: "in" as const, source: "Invoice collection", description: row.invoiceNumber ? `Collection for ${row.invoiceNumber}` : "Invoice collection", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: "/invoices" })),
+      ...invoiceRows.map(row => {
+        const amount = Number(row.amount ?? 0);
+        const isReversal = row.entryType === "reversal" || amount < 0;
+        return { id: `invoice-${row.id}`, date: row.date.toISOString(), direction: isReversal ? "out" as const : "in" as const, source: isReversal ? "Invoice payment reversal" : "Invoice collection", description: isReversal ? `Reversal for ${row.invoiceNumber ?? "invoice"}${row.reversalReason ? `: ${row.reversalReason}` : ""}` : (row.invoiceNumber ? `Collection for ${row.invoiceNumber}` : "Invoice collection"), amount: Math.abs(amount), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: "/invoices" };
+      }),
       ...dutyRows.map(row => {
         const amount = Number(row.amount ?? 0);
         const isReversal = row.entryType === "reversal" || amount < 0;
@@ -1401,6 +1405,8 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
       .select({
         id: invoicePaymentsTable.id,
         amount: invoicePaymentsTable.amount,
+        entryType: invoicePaymentsTable.entryType,
+        reversalReason: invoicePaymentsTable.reversalReason,
         paidAt: invoicePaymentsTable.paidAt,
         paymentMethod: invoicePaymentsTable.paymentMethod,
         reference: invoicePaymentsTable.reference,
@@ -1588,17 +1594,21 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
     const outflows: Txn[] = [];
 
     for (const r of invoicePaymentRows) {
-      inflows.push({
+      const amount = parseFloat(r.amount as string ?? "0");
+      const isReversal = r.entryType === "reversal" || amount < 0;
+      (isReversal ? outflows : inflows).push({
         id: `ip-${r.id}`,
         date: r.paidAt instanceof Date ? r.paidAt.toISOString() : String(r.paidAt),
         type: "invoice_payment",
-        direction: "in",
-        description: `Invoice ${r.invoiceNumber ?? ""} payment${r.clientName ? ` — ${r.clientName}` : ""}`,
+        direction: isReversal ? "out" : "in",
+        description: isReversal
+          ? `Invoice ${r.invoiceNumber ?? ""} payment reversal${r.reversalReason ? ` — ${r.reversalReason}` : ""}`
+          : `Invoice ${r.invoiceNumber ?? ""} payment${r.clientName ? ` — ${r.clientName}` : ""}`,
         category: r.paymentMethod ?? null,
         bankId: r.bankId,
         bankName: r.bankName,
         reference: r.reference ?? null,
-        amount: parseFloat(r.amount as string ?? "0"),
+        amount: Math.abs(amount),
       });
     }
 
