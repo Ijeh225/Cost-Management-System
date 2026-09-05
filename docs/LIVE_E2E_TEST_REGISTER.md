@@ -35,6 +35,8 @@ writes and must not be described as already fixed or live-reproduced.
 
 ### Manual Production Evidence - 2026-09-05
 
+- Manual/source/assets and all three record updates committed and pushed as
+  `38f767e`. Git whitespace checks passed with PDF binary attributes applied.
 - Created `output/pdf/Cost_Management_Blueprint_and_User_Manual.pdf`, edition
   1.0, with maintained source/builder and assets under `docs/manual/`.
 - 57 pages, 54 chapters, 7 screenshots, 4 diagrams. All pages rendered for

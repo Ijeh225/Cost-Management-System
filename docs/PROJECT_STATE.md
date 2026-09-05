@@ -54,6 +54,8 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Application Blueprint and Training Manual - Completed 2026-09-05
 
+- Delivery commit `38f767e` was pushed successfully to `origin/master`.
+  PDF assets are marked binary to preserve byte-for-byte repository storage.
 - Baseline: `8d62f2c`, with the API-ROUTE-001 live acceptance recorded.
 - Reconcile historical entries against the latest authoritative closure before
   describing current behavior. Clearly distinguish code-supported procedures,
