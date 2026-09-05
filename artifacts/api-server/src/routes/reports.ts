@@ -2323,23 +2323,57 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
     const issuedInvoiceConds: SQL[] = [ne(invoicesTable.status, "draft"), ne(invoicesTable.status, "cancelled")];
     if (fromDate) issuedInvoiceConds.push(gte(invoicesTable.createdAt, fromDate));
     if (toDate) issuedInvoiceConds.push(lte(invoicesTable.createdAt, toDate));
-    const containerPaymentConds: SQL[] = [];
-    if (fromDate) containerPaymentConds.push(gte(containerExpensePaymentsTable.paidAt, fromDate));
-    if (toDate) containerPaymentConds.push(lte(containerExpensePaymentsTable.paidAt, toDate));
     const overheadPaymentConds: SQL[] = [];
     if (fromDate) overheadPaymentConds.push(gte(expensePaymentsTable.paidAt, fromDate));
     if (toDate) overheadPaymentConds.push(lte(expensePaymentsTable.paidAt, toDate));
-    const dutyPaymentConds: SQL[] = [];
-    if (fromDate) dutyPaymentConds.push(gte(dutyPaymentTransactionsTable.paidAt, fromDate));
-    if (toDate) dutyPaymentConds.push(lte(dutyPaymentTransactionsTable.paidAt, toDate));
+
+    // Revenue is recognised on issuance. Match P&L by recognising a container's
+    // actual cost only once: in the period of its first active invoice.
+    const invoiceCostItemRows = await db
+      .select({
+        containerId: invoiceItemsTable.containerId,
+        invoiceCreatedAt: invoicesTable.createdAt,
+        containerBranchId: containersTable.branchId,
+      })
+      .from(invoiceItemsTable)
+      .innerJoin(invoicesTable, eq(invoiceItemsTable.invoiceId, invoicesTable.id))
+      .innerJoin(containersTable, eq(invoiceItemsTable.containerId, containersTable.id))
+      .where(and(
+        isNotNull(invoiceItemsTable.containerId),
+        ne(invoicesTable.status, "draft"),
+        ne(invoicesTable.status, "cancelled"),
+      ));
+
+    const firstInvoiceByContainer = new Map<number, Date>();
+    const recognizedContainerBranch = new Map<number, number>();
+    for (const item of invoiceCostItemRows) {
+      if (item.containerId === null) continue;
+      const invoiceDate = item.invoiceCreatedAt instanceof Date
+        ? item.invoiceCreatedAt
+        : new Date(item.invoiceCreatedAt);
+      const firstInvoiceDate = firstInvoiceByContainer.get(item.containerId);
+      if (!firstInvoiceDate || invoiceDate < firstInvoiceDate) {
+        firstInvoiceByContainer.set(item.containerId, invoiceDate);
+        recognizedContainerBranch.set(item.containerId, item.containerBranchId);
+      }
+    }
+    const recognizedContainerIds = [...firstInvoiceByContainer.entries()]
+      .filter(([, invoiceDate]) => (!fromDate || invoiceDate >= fromDate) && (!toDate || invoiceDate <= toDate))
+      .map(([containerId]) => containerId);
 
     const [issuedInvoices, containerPayments, dutyPayments, overheadPayments] = await Promise.all([
       db.select({ branchId: invoicesTable.branchId, subtotal: invoicesTable.subtotal })
         .from(invoicesTable).where(and(...issuedInvoiceConds)),
-      db.select({ branchId: containerExpensePaymentsTable.branchId, amount: containerExpensePaymentsTable.amount })
-        .from(containerExpensePaymentsTable).where(containerPaymentConds.length ? and(...containerPaymentConds) : undefined),
-      db.select({ branchId: dutyPaymentTransactionsTable.branchId, amount: dutyPaymentTransactionsTable.amount })
-        .from(dutyPaymentTransactionsTable).where(dutyPaymentConds.length ? and(...dutyPaymentConds) : undefined),
+      recognizedContainerIds.length > 0
+        ? db.select({ containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount })
+            .from(containerExpensePaymentsTable)
+            .where(inArray(containerExpensePaymentsTable.containerId, recognizedContainerIds))
+        : Promise.resolve([]),
+      recognizedContainerIds.length > 0
+        ? db.select({ containerId: dutyPaymentTransactionsTable.containerId, amount: dutyPaymentTransactionsTable.amount })
+            .from(dutyPaymentTransactionsTable)
+            .where(inArray(dutyPaymentTransactionsTable.containerId, recognizedContainerIds))
+        : Promise.resolve([]),
       db.select({ branchId: expensePaymentsTable.branchId, amount: expensePaymentsTable.amount })
         .from(expensePaymentsTable).where(overheadPaymentConds.length ? and(...overheadPaymentConds) : undefined),
     ]);
@@ -2350,9 +2384,15 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       return result;
     };
     const revenueByBranch = sumByBranch(issuedInvoices.map(row => ({ branchId: row.branchId, amount: row.subtotal })));
-    const costsByBranch = sumByBranch(containerPayments);
+    const costsByBranch = new Map<number, number>();
+    const addRecognizedCost = (containerId: number, amount: string | null) => {
+      const branchId = recognizedContainerBranch.get(containerId);
+      if (branchId === undefined) return;
+      costsByBranch.set(branchId, (costsByBranch.get(branchId) ?? 0) + parseFloat(amount ?? "0"));
+    };
+    for (const payment of containerPayments) addRecognizedCost(payment.containerId, payment.amount);
     for (const payment of dutyPayments) {
-      costsByBranch.set(payment.branchId, (costsByBranch.get(payment.branchId) ?? 0) + parseFloat(payment.amount ?? "0"));
+      addRecognizedCost(payment.containerId, payment.amount);
     }
     const overheadsByBranch = sumByBranch(overheadPayments);
 
@@ -2438,7 +2478,7 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
         revenue: FINANCIAL_BASIS.accrual,
         containerCosts: FINANCIAL_BASIS.actual_paid,
         overheads: FINANCIAL_BASIS.actual_paid,
-        summary: "Issued invoice revenue less actual paid container costs, including customs duty, and actual paid overhead.",
+        summary: "Issued invoice revenue less actual paid costs for containers recognised by their first active invoice, including customs duty, and actual paid overhead.",
       },
       generatedAt: new Date().toISOString(),
     });

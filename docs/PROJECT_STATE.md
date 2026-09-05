@@ -28,8 +28,8 @@ the live application and only reopen it if that proof fails.
 
 | Priority | Work group | Records | Evidence of implementation |
 | --- | --- | --- | --- |
-| High | Branch-comparison financial scope | `RPT-003` | Re-opened by the 2026-09-05 live re-test: all-branch Branch Comparison uses a broader actual-cost population than P&L and Financial Dashboard. |
-| Medium | Cash Flow per-bank reconciliation | `FIN-003` | Newly observed on 2026-09-05: the E2E Lagos bank statement closes at N1,100 while Cash Flow reports N1,101 net for that bank over the same 1-5 September period. Trace before treating it as a posting defect. |
+| High | Branch-comparison financial scope | `RPT-003` | Correction implemented locally on 2026-09-05. Branch Comparison now follows P&L's first-active-invoice cost-recognition policy; deployment and live re-test are required. |
+| Medium | Cash Flow per-bank reconciliation | `FIN-003` | Correction implemented locally on 2026-09-05. The source difference is internal-transfer elimination in All-Banks Cash Flow, not an N1 posting loss; screen and print output now say the per-bank figure is period movement, not statement closing balance. |
 | High | Operational record authority and visibility | `OPS-001`, `OPS-002` | Stage-specific generic-control and Pull-Out Released-view corrections are recorded as implemented. |
 | High | Printable and client financial documents | `VAT-001`, `STMT-001`, `CLT-001`, `CONT-RPT-001` | Invoice eligibility and print-route corrections are present in the current branch. |
 | Medium | Invoice experience | `INV-001` | Zero-value draft issue control is recorded as implemented. |
@@ -40,9 +40,10 @@ approved correction for the historic labelled N1 overpayment.
 
 ### Next Live Re-Test Order
 
-1. Trace and correct `RPT-003` and `FIN-003`; define one declared actual-cost
-   population for Branch Comparison, P&L, Financial Dashboard, Cash Flow, and
-   their supporting bank/disbursement reports.
+1. Deploy and live re-test `RPT-003` and `FIN-003`: Branch Comparison must
+   match P&L/Financial Dashboard under the same All-Branches actual-paid basis;
+   Cash Flow must clearly distinguish transfer-excluded period movement from a
+   bank statement's closing balance.
 2. Operations re-test: `OPS-001` and `OPS-002` using existing controlled jobs.
 3. Document and client-finance re-test: `VAT-001`, `STMT-001`, `CLT-001`, and
    `CONT-RPT-001`.
@@ -75,6 +76,24 @@ approved correction for the historic labelled N1 overpayment.
   schedule debit; Cash Flow's 1-5 September per-bank breakdown reports N1,101.
   This is recorded for source tracing and is not yet attributed to the new
   schedule-payment path.
+
+### RPT-003 and FIN-003 Correction Implemented Locally - 2026-09-05
+
+- `RPT-003`: Branch Comparison now derives actual container costs from the
+  exact set of containers recognised by P&L: each container enters once, in the
+  period of its first active (non-draft, non-cancelled) invoice. It includes
+  both immutable container-disbursement and customs-duty rows for that set.
+  Operational container counts remain all containers, intentionally separate
+  from the financial recognition basis.
+- `FIN-003`: Source tracing confirmed the N1 difference is the internal bank
+  transfer that All-Banks Cash Flow deliberately removes from consolidated
+  movement. The displayed per-bank value was already a period net, not a bank
+  balance. The Cash Flow screen and print report now label it `Net Movement`
+  and explicitly state that All-Banks internal-transfer elimination means it
+  must not be compared to an individual bank statement closing balance.
+- Verification: API typecheck and frontend typecheck pass; all 83 API tests
+  pass. The API and frontend production builds also pass. Deployment and the
+  targeted live re-test remain required before closure.
 
 ### Verification Notes, Not Active Product Defects
 

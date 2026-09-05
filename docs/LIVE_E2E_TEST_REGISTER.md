@@ -24,13 +24,12 @@ The records below already have source changes in the current branch. They are
 not a request to implement the same feature again. A live re-test either closes
 the record or produces new evidence for a targeted follow-up fix.
 
-1. `RPT-003` remains open: under All Branches, P&L and Financial Dashboard show
-   N701 actual costs and N-10,708,002 net profit, but Branch Comparison shows
-   N2,000,702 and N-12,708,003 because it includes a broader non-invoiced
-   actual-cost population. Define and implement one declared comparison basis.
-2. `FIN-003` is newly observed: the E2E Lagos bank statement closes at N1,100,
-   while Cash Flow's 1-5 September per-bank result is N1,101. Trace the source
-   difference before classifying it as a schedule, reversal, or reporting bug.
+1. `RPT-003` correction is implemented locally: Branch Comparison now follows
+   P&L's first-active-invoice container-cost recognition. Deploy and re-test
+   that its All-Branches actual costs and net profit match P&L/Dashboard.
+2. `FIN-003` correction is implemented locally: All-Banks Cash Flow now
+   identifies per-bank net as transfer-excluded period movement, not a bank
+   statement balance. Deploy and re-check screen and print output.
 3. Operational persistence and visibility: `OPS-001` and `OPS-002`. The
    stage-specific generic-control and Pull-Out Released-view changes are
    recorded as implemented; use existing controlled jobs to verify them.
@@ -57,6 +56,15 @@ N1 debit.
 | `FIN-002` | Passed / closed | Lagos P&L and Financial Dashboard agree at N3,000 revenue, N700 actual costs, N300 overhead, N2,000 net profit; disbursement includes controlled duty spend. |
 | `RPT-003` | Failed / reopened | All-Branches P&L/Dashboard: N701 actual costs and N-10,708,002 net; Branch Comparison: N2,000,702 and N-12,708,003. |
 | `FIN-003` | New follow-up | Bank statement closing N1,100 differs by N1 from Cash Flow per-bank net N1,101 for 1-5 September. |
+
+### RPT-003 and FIN-003 Implementation - 2026-09-05
+
+| Record | Root cause | Implemented correction | Verification still required |
+| --- | --- | --- | --- |
+| `RPT-003` | Branch Comparison counted all container payments, while P&L recognises costs once for containers with a first active invoice in the selected period. | Branch Comparison now derives container costs from the same first-active-invoice set as P&L and assigns each cost to that container's branch. Container disbursements and duty transactions are both included. | Deploy, then confirm All-Branches actual costs and net profit equal matching P&L and Financial Dashboard totals. |
+| `FIN-003` | All-Banks Cash Flow removes internal transfer pairs by design, while an individual bank statement includes its transfer debit/credit in closing balance. The UI called the period activity simply Net. | Screen and printable Cash Flow output now say Net Movement and warn that All-Banks per-bank activity excludes internal transfers and is not a statement closing balance. | Deploy, then confirm the wording in both Cash Flow screen and print view. |
+
+Local verification: API and frontend typechecks pass; 83 API tests pass; API and frontend production builds pass.
 
 ### Test-Environment Follow-Up Only
 

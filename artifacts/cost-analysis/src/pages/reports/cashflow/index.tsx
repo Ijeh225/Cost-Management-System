@@ -184,18 +184,24 @@ function TxnTable({ rows, direction }: { rows: CashFlowTxn[]; direction: "in" | 
   );
 }
 
-function BankBreakdownCard({ byBank, totalIn, totalOut }: {
+function BankBreakdownCard({ byBank, totalIn, totalOut, transfersEliminated }: {
   byBank: Array<{ bankId: number | null; bankName: string; totalIn: number; totalOut: number }>;
   totalIn: number;
   totalOut: number;
+  transfersEliminated: boolean;
 }) {
   if (byBank.length === 0) return null;
   return (
     <Card className="border-border/50 bg-card/40">
       <CardHeader className="border-b border-border/40 pb-3">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-blue-400" /> Per-Bank Breakdown
+          <Wallet className="w-4 h-4 text-blue-400" /> Per-Bank Period Activity
         </CardTitle>
+        {transfersEliminated && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Internal transfers are excluded in All Banks mode, so this net movement is not a bank-statement closing balance.
+          </p>
+        )}
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full text-sm">
@@ -204,7 +210,7 @@ function BankBreakdownCard({ byBank, totalIn, totalOut }: {
               <th className="px-5 py-2.5 text-left font-medium">Bank Account</th>
               <th className="px-5 py-2.5 text-right font-medium">Inflow (₦)</th>
               <th className="px-5 py-2.5 text-right font-medium">Outflow (₦)</th>
-              <th className="px-5 py-2.5 text-right font-medium">Net (₦)</th>
+              <th className="px-5 py-2.5 text-right font-medium">Net Movement (₦)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/30">
@@ -412,7 +418,12 @@ export default function CashFlowPage() {
             />
 
             {/* Per-bank breakdown */}
-            <BankBreakdownCard byBank={data.breakdown.byBank} totalIn={data.totals.totalIn} totalOut={data.totals.totalOut} />
+            <BankBreakdownCard
+              byBank={data.breakdown.byBank}
+              totalIn={data.totals.totalIn}
+              totalOut={data.totals.totalOut}
+              transfersEliminated={applied.bankId === "all"}
+            />
 
             {/* Transaction detail */}
             <TxnTable rows={data.inflows} direction="in" />

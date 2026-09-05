@@ -295,13 +295,16 @@ export default function CashFlowPrint() {
         {breakdown.byBank.length > 0 && (
           <div className="section">
             <div className="section-heading">Per-Bank Breakdown</div>
+            {data.filters?.bankId == null && (
+              <p className="note">All-Banks mode excludes internal transfers. Per-bank net movement is period activity, not the closing balance shown on an individual bank statement.</p>
+            )}
             <table>
               <thead>
                 <tr>
                   <th>Bank</th>
                   <th className="right">Inflow (₦)</th>
                   <th className="right">Outflow (₦)</th>
-                  <th className="right">Net (₦)</th>
+                  <th className="right">Net Movement (₦)</th>
                 </tr>
               </thead>
               <tbody>
