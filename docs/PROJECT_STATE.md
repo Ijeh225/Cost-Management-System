@@ -28,18 +28,30 @@ remain auditable.
 
 No deployed application correction is awaiting a live re-test. The isolated
 `TEST_DATABASE_URL` runner and concurrent/repeated-reversal regression case
-are implemented. Its first local execution is blocked by the local Docker
-Desktop Linux engine returning HTTP 500 before PostgreSQL can start; no live
-or Railway database was contacted.
+are implemented. The user selected a separate Railway test PostgreSQL service,
+but Railway currently prevents creation of the empty `integration-test`
+environment because the workspace subscription is unpaid and the trial is
+maxed out. No environment, service, or database was created; no live or
+Railway production database was contacted.
 
 ### Next Action
 
-1. Choose the isolated test-database host, then run `pnpm test:integration`:
-   either restore the local Docker Desktop Linux engine for the guarded local
-   `cost_management_integration_test` service, or provision a separately
-   isolated Railway test environment and PostgreSQL service. This is
-   test-environment work only; it does not require another live financial
-   write and must never use production `DATABASE_URL`.
+1. Restore Railway environment-creation capacity by resolving the workspace
+   billing/trial restriction. Then create the empty `integration-test`
+   environment and a fresh PostgreSQL service, set only `TEST_DATABASE_URL`,
+   and run the guarded integration suite. This must never use production
+   `DATABASE_URL`.
+
+### Railway Isolated Test Database Attempt - 2026-09-05
+
+- The user chose Railway rather than Docker Desktop for the isolated
+  integration database.
+- An empty environment named `integration-test` was prepared in the Railway
+  project, deliberately avoiding a duplicate of production and its variables.
+- Railway did not create it. The project UI reports an unpaid subscription and
+  a maxed-out trial, which blocks additional environment/service creation.
+- Confirmation after the attempt: the environment selector still lists only
+  `production`. No Railway production configuration or data changed.
 
 ### Session-Summary Memory Added - 2026-09-05
 

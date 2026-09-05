@@ -23,10 +23,22 @@ action` label below does not override this current register.
 ### Current Follow-Up
 
 No deployed correction awaits a live re-test. The isolated `TEST_DATABASE_URL`
-runner and concurrent/repeated-reversal regression case are implemented. Its
-first execution is blocked locally because Docker Desktop's Linux engine
-returns HTTP 500 before PostgreSQL starts. The guard did not connect to
-Railway or any live database.
+runner and concurrent/repeated-reversal regression case are implemented. The
+user selected a separate Railway test database, but Railway blocks creation of
+the empty `integration-test` environment because its subscription is unpaid
+and the trial is maxed out. No environment, service, database, Railway
+production configuration, or live data was changed.
+
+### Railway Test-Environment Provisioning Attempt - 2026-09-05
+
+| Item | Result | Evidence |
+| --- | --- | --- |
+| Empty `integration-test` environment | Blocked before creation | Railway displayed `Your subscription is unpaid` and `Trial maxed out`. The creation dialog was dismissed and the environment selector still listed only `production`. |
+| Production isolation | Preserved | The attempt selected Empty Environment rather than duplicating production. No production variables, service, database, or records were read or changed. |
+
+**Next exact action:** resolve Railway workspace capacity, then create the
+empty test environment and a new PostgreSQL service before setting
+`TEST_DATABASE_URL`. Do not reuse the production PostgreSQL service.
 
 ### Isolated INV-002 Regression Test Implementation - 2026-09-05
 

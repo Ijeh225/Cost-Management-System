@@ -38,8 +38,12 @@ create more than one reversal entry.
 - A separately provisioned Railway PostgreSQL database is also a valid
   alternative. It must live in a dedicated test environment, use
   `TEST_DATABASE_URL`, and never point at the production database.
-- The user has asked about the Railway option but has not selected local Docker
-  or separate Railway test infrastructure yet.
+- The user selected separate Railway test infrastructure rather than Docker
+  Desktop.
+- An empty `integration-test` Railway environment was requested, explicitly
+  avoiding a copy of production. Railway blocked creation because the workspace
+  subscription is unpaid and the trial is maxed out. The selector still shows
+  only `production`; no Railway service or database was created.
 
 ## Commit
 
@@ -48,11 +52,9 @@ create more than one reversal entry.
 
 ## Exact Next Action
 
-Choose the isolated database host:
-
-1. Restore Docker Desktop's Linux engine and run `pnpm test:integration`; or
-2. Provision a separate Railway test environment and PostgreSQL service, set
-   `TEST_DATABASE_URL`, and run the guarded integration suite with explicit
-   remote-test approval.
+Resolve Railway workspace capacity, then create a separate empty
+`integration-test` environment and fresh PostgreSQL service. Set only
+`TEST_DATABASE_URL` and run the guarded integration suite with explicit
+remote-test approval.
 
 Do not run this suite against Railway production.
