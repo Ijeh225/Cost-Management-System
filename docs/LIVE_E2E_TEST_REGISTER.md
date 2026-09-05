@@ -16,33 +16,30 @@ action` label below does not override this current register.
 | Workflow and views | `NOTIF-001`, `NOTIF-002`, `TASK-001`, `PIPE-001`, `APR-001`, `DEL-001` | Queue rejection refreshes immediately; saved delivery date, Dashboard, and Delivery Tracking reconcile. |
 | Finance and loading UI | `BANK-002`, `SCHED-002`, `CP-002`, `OH-002`, `BANK-003`, `DUTY-002` | Filters/date buckets, load states, bank-reference guard, and controlled duty reversal have recorded live evidence. |
 | Finance and report re-test | `RPT-001`, `RPT-002`, `RPT-003`, `SCHED-001`, `FIN-002`, `FIN-003` | 2026-09-05 controlled N1 standalone schedule moved through payment, bank, ledger, cash flow, P&L, dashboard, and duty/disbursement reconciliation successfully. Branch Comparison and Cash Flow presentation were also re-tested after their deployed corrections. |
-| Operations and document re-test | `OPS-001`, `OPS-002`, `VAT-001`, `CLT-001`, `CONT-RPT-001`, `INV-001` | Stage ownership is authoritative in Operations, Pull-Out Released is visible, VAT print renders, Client/AR figures agree, container prints are accurate, and zero-value drafts cannot be sent. |
+| Operations and document re-test | `OPS-001`, `OPS-002`, `VAT-001`, `VAT-002`, `CLT-001`, `CONT-RPT-001`, `INV-001`, `STMT-001` | Stage ownership is authoritative in Operations, Pull-Out Released is visible, VAT and statement figures use only active financial invoices, Client/AR figures agree, container prints are accurate, and zero-value drafts cannot be sent. |
 | Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
 
 ### Current Follow-Up
 
-The records below already have source changes in the current branch. They are
-not a request to implement the same feature again. A live re-test either closes
-the record or produces new evidence for a targeted follow-up fix.
+No deployed source correction is waiting for re-test. `INV-002` remains
+live-mitigated; its historic N1 correction and isolated database regression
+test require separately approved work.
 
-1. `STMT-001` and `VAT-002` are implemented locally. Deploy and re-test the
-   existing Lagos client: Client Statement retains cancelled invoices as audit
-   history with zero financial effect, while VAT Summary omits them from
-   taxable turnover and invoice totals.
-2. The two report routes must then reconcile to Accounts Receivable at N3,000
-   invoiced, N2,001 collected, and N999 net outstanding. The 1-5 September VAT
-   Summary must use the N3,000 active-invoice population.
-3. `INV-002` remains live-mitigated; its historic N1 correction and isolated
-   database regression test require separately approved work.
+### STMT-001 and VAT-002 Live Re-Test Passed - 2026-09-05
 
-### STMT-001 and VAT-002 Correction Implemented Locally - 2026-09-05
-
-| Record | Implemented correction | Local verification still required live |
+| Record | Result | Live evidence |
 | --- | --- | --- |
-| `STMT-001` | Client Statement now applies `getInvoiceFinancialEffect` to its total, paid, outstanding, and credit-note calculations. Draft, cancelled, and written-off invoices remain history rows but carry zero financial effect. | Deploy, then confirm cancelled invoices have N0 paid/outstanding effect and the statement totals match AR. |
-| `VAT-002` | VAT Summary now filters rows and totals with `isInvoiceFinanciallyActive`, excluding audit-only invoices from taxable turnover, VAT, count, and grand total. | Deploy, then confirm the 1-5 September report excludes `INV-202609-002` and `INV-202609-003`. |
+| `STMT-001` | Passed / closed | `/reports/client-statement/print?clientId=6` keeps cancelled `INV-202609-002` and `INV-202609-003` as N1,000 history rows with N0 paid and N0 balance. Totals reconcile to AR: N3,000 invoiced, N2,001 paid, N1,000 gross outstanding, N1 credit, and N999 net owed. |
+| `VAT-002` | Passed / closed | `/reports/vat-summary/print?from=2026-09-01&to=2026-09-05` lists only paid `INV-202609-001` and sent `INV-202609-004`. It reports two invoices, N3,000 taxable turnover, N0 VAT, and N3,000 grand total; both cancelled invoices are absent. |
 
-Local verification: API typecheck and server production build pass; all 84 API tests pass. The regression test covers active versus draft, cancelled, and written-off financial effect.
+Local verification before deployment: API typecheck and server production build
+passed; all 84 API tests passed, including active versus audit-only financial
+effect regression coverage.
+
+### Remaining Follow-Up
+
+`INV-002` remains live-mitigated; its historic N1 correction and isolated
+database regression test require separately approved work.
 
 ### Operations and Document Live Re-Test - 2026-09-05
 

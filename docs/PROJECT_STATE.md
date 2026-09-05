@@ -16,42 +16,30 @@ remain auditable.
   `SCHED-001`, `FIN-002`, and `FIN-003`. Branch Comparison, P&L, and the
   Financial Dashboard now use the same recognised actual-cost population.
 - Operations and document re-tests now close `OPS-001`, `OPS-002`, `VAT-001`,
-  `CLT-001`, `CONT-RPT-001`, and `INV-001`. The Client Statement (`STMT-001`)
-  remains open, and VAT cancelled-invoice eligibility is newly recorded as
-  `VAT-002`.
+  `VAT-002`, `CLT-001`, `CONT-RPT-001`, `INV-001`, and `STMT-001`. Client
+  Statement and VAT Summary now apply the same active-financial-invoice rule
+  as Accounts Receivable.
 - Earlier controlled work also closed `BANK-003`, `AI-008`, `SEC-02`, and
   `DUTY-002`. Do not repeat their financial or workflow writes.
 - The latest deployment is verified live: Abuja dashboard completion now
   matches the persisted delivery date and Delivery Tracking.
 
-### Implemented Corrections Awaiting Final Live Re-Test
+### Remaining Follow-Up
 
-These records are not waiting for duplicate implementation. The relevant code
-is already in the current branch; the next work is to prove each correction in
-the live application and only reopen it if that proof fails.
-
-| Priority | Work group | Records | Evidence of implementation |
-| --- | --- | --- | --- |
-| High | Cancelled-invoice financial eligibility | `STMT-001`, `VAT-002` | Correction implemented locally on 2026-09-05. Client Statement retains audit history but gives inactive invoices zero financial effect; VAT Summary lists and totals only active financial invoices. Deploy and live re-test are required. |
+No deployed source correction is awaiting a live re-test. The only remaining
+item below requires separately approved historic-data or test-environment work.
 
 `INV-002` is already protected live: further overpayments are blocked. Its
 remaining work is an isolated database regression test and a separately
 approved correction for the historic labelled N1 overpayment.
 
-### Next Live Re-Test Order
+### Next Action
 
-1. Deploy and live re-test `STMT-001` and `VAT-002` with the existing Lagos
-   client. Client Statement must retain cancelled invoices as audit history
-   with zero paid/outstanding effect; VAT Summary must omit them from its
-   invoice and financial totals.
-2. Confirm both report routes reconcile to Accounts Receivable at N3,000
-   invoiced, N2,001 collected, and N999 net outstanding; VAT for 1-5 September
-   must use the N3,000 active invoice population.
-3. Keep the historic `INV-002` N1 entry unchanged unless a separate correction
+1. Keep the historic `INV-002` N1 entry unchanged unless a separate correction
    is expressly approved. The isolated `TEST_DATABASE_URL` work remains a test
    environment follow-up, not a live-data task.
 
-### STMT-001 and VAT-002 Correction Implemented Locally - 2026-09-05
+### STMT-001 and VAT-002 Live Re-Test Passed - 2026-09-05
 
 - The Client Statement now uses `getInvoiceFinancialEffect`, which applies the
   existing `isInvoiceFinanciallyActive` rule to totals, paid amounts, and
@@ -61,10 +49,14 @@ approved correction for the historic labelled N1 overpayment.
 - VAT Summary now filters its report rows through the same canonical rule.
   Therefore audit-only invoice statuses are not included in taxable turnover,
   VAT, invoice count, or grand totals.
-- Verification passed: API typecheck, server production build, and all 84 API
-  tests. The new regression test proves inactive invoice statuses always have
-  zero financial effect. Deployment and targeted live evidence remain required
-  before closure.
+- Live Client Statement at `/reports/client-statement/print?clientId=6` retains
+  cancelled `INV-202609-002` and `INV-202609-003` as N1,000 audit-history rows
+  with N0 paid and N0 balance. Its totals reconcile to AR: N3,000 invoiced,
+  N2,001 paid, N1,000 gross outstanding, N1 credit, and N999 net balance owed.
+- Live VAT Summary at `/reports/vat-summary/print?from=2026-09-01&to=2026-09-05`
+  lists only paid `INV-202609-001` and sent `INV-202609-004`: two invoices,
+  N3,000 excluding VAT, N0 VAT, and N3,000 grand total. The cancelled invoices
+  are absent from the breakdown and financial totals.
 
 ### Operations and Document Live Re-Test - 2026-09-05
 
