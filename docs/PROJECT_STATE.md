@@ -29,13 +29,16 @@ remain auditable.
 Railway capacity is resolved. The empty `integration-test` environment and
 fresh `Postgres-2Wsy` service now host `cost_management_integration_test`.
 Only this isolated database has received test schema and dummy records.
-Temporary public TCP access was enabled for the local integration runner.
+Temporary public TCP access was removed after testing. Railway confirms the
+test service is Online and Unexposed; its private database and volume remain.
 
 The isolated run passed the INV-002 concurrent reversal case but discovered
 `API-ROUTE-001`: finance routers mounted at the API root apply unscoped
 permission middleware to unrelated operational requests. The correction
 scopes all seven finance guards to their own URL families. All 11 isolated
-integration tests passed after the correction. Deployment verification is pending.
+integration tests passed after the correction. Code and records were committed
+and pushed as `05ba101`; Railway picked up deployment
+`265a65ca-254b-4649-8e4d-d79e2475eec8`. Deployment verification is pending.
 
 ### Next Action
 

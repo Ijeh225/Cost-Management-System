@@ -41,6 +41,8 @@ deployment and live staff-session acceptance are not yet claimed.
 | INV-002 simultaneous reversal | Passed in isolated database | One 200, one 409, one linked reversal, N250 paid, N0 credit, one audit event in the 9/10 run. |
 | API-ROUTE-001 | Corrected; isolated regression passed | All 11 tests passed in 137.41 seconds, including positive staff-task access, explicit cross-branch 404s, assigned officer verification/berthing, finance URL denial, concurrent reversal reconciliation, and cleanup. |
 | Local build and unit checks | Passed | Full railway:build; 23 API unit-test files / 85 tests. |
+| Test network cleanup | Passed | Removed temporary public TCP proxy; Railway confirms Online / Unexposed service with private networking retained. |
+| Release | Pushed; deployment pending | `05ba101` pushed to origin/master. Railway started deployment `265a65ca-254b-4649-8e4d-d79e2475eec8`. |
 
 **Next exact action:** verify deployment after commit/push, then check a
 controlled non-finance staff session. Do not repeat completed financial writes.

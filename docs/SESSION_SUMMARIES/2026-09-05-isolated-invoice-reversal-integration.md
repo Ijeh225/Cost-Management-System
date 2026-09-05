@@ -75,3 +75,8 @@ Do not run this suite against Railway production.
   delivery/duty test files are excluded and are not claimed as passed.
 - User asked whether the live app had changed; explained that edits were local
   and uncommitted at that point. User then explicitly said to proceed.
+- Code and records committed/pushed as `05ba101`. Railway started deployment
+  `265a65ca-254b-4649-8e4d-d79e2475eec8`; live acceptance is pending.
+- Removed temporary test public TCP access and applied the change. Railway
+  shows the isolated PostgreSQL service Online and Unexposed. Future local
+  runs need an explicitly selected test-environment tunnel or temporary proxy.
