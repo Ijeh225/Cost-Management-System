@@ -36,9 +36,15 @@ Railway or any live database.
 | Concurrent reversal regression | Implemented | The API integration suite now creates a fully paid N250 invoice plus a historic N1 overpayment credit and sends two concurrent reversals. The expected assertions are one success, one 409 rejection, one linked negative row, N250 net paid, N0 client credit, and one invoice audit event. |
 | First isolated execution | Blocked before database access | `pnpm test:integration` reached Docker Compose, then Docker Desktop Linux engine returned HTTP 500 while inspecting `postgres:16-alpine`. API typecheck passed. No schema was applied and no test record was created. |
 
-**Next exact action:** restore the local Docker Desktop Linux engine and run
-`pnpm test:integration`; do not substitute Railway or production for this
-isolated regression test.
+**Next exact action:** choose the isolated database host, then run
+`pnpm test:integration`: restore Docker Desktop's Linux engine for the local
+service, or provision a separate Railway test environment and PostgreSQL
+service. Do not use Railway production for this isolated regression test.
+
+**Session handoff:** the related implementation, blocker, and safe Railway
+test-database option are summarised in
+`docs/SESSION_SUMMARIES/2026-09-05-isolated-invoice-reversal-integration.md`.
+It records no credentials or raw chat content.
 
 ### INV-002 Traceable Payment Reversal Live Re-Test Passed - 2026-09-05
 

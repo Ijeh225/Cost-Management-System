@@ -34,11 +34,22 @@ or Railway database was contacted.
 
 ### Next Action
 
-1. Restore the local Docker Desktop Linux engine, then run
-   `pnpm test:integration`. The command starts only the guarded local
-   `cost_management_integration_test` PostgreSQL service, applies the schema,
-   and runs the isolated regression suite. This is test-environment work only;
-   it does not require another live financial write.
+1. Choose the isolated test-database host, then run `pnpm test:integration`:
+   either restore the local Docker Desktop Linux engine for the guarded local
+   `cost_management_integration_test` service, or provision a separately
+   isolated Railway test environment and PostgreSQL service. This is
+   test-environment work only; it does not require another live financial
+   write and must never use production `DATABASE_URL`.
+
+### Session-Summary Memory Added - 2026-09-05
+
+- `docs/SESSION_SUMMARIES/` now stores concise dated handoff summaries of
+  significant project conversations and work sessions.
+- The authoritative current state remains this file; live-test evidence remains
+  in `docs/LIVE_E2E_TEST_REGISTER.md`. Session summaries capture decisions,
+  work completed, blockers, commits, and exact next actions without storing
+  passwords, API keys, connection strings, or raw chat transcripts.
+- Current handoff: `docs/SESSION_SUMMARIES/2026-09-05-isolated-invoice-reversal-integration.md`.
 
 ### Isolated Invoice-Reversal Integration Test Implemented - 2026-09-05
 
