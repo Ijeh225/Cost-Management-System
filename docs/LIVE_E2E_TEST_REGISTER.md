@@ -22,9 +22,23 @@ action` label below does not override this current register.
 
 ### Current Follow-Up
 
-No deployed correction awaits a live re-test. The only remaining `INV-002`
-follow-up is an isolated database regression test using `TEST_DATABASE_URL`
-for concurrent/repeated-reversal safety.
+No deployed correction awaits a live re-test. The isolated `TEST_DATABASE_URL`
+runner and concurrent/repeated-reversal regression case are implemented. Its
+first execution is blocked locally because Docker Desktop's Linux engine
+returns HTTP 500 before PostgreSQL starts. The guard did not connect to
+Railway or any live database.
+
+### Isolated INV-002 Regression Test Implementation - 2026-09-05
+
+| Item | Result | Evidence |
+| --- | --- | --- |
+| Isolated database runner | Implemented | `pnpm test:integration` starts a localhost-only PostgreSQL 16 Compose service named `cost_management_integration_test`, applies the schema, then runs API integration tests. It rejects a non-test database name, a non-local host without an explicit override, and a value matching `DATABASE_URL`. |
+| Concurrent reversal regression | Implemented | The API integration suite now creates a fully paid N250 invoice plus a historic N1 overpayment credit and sends two concurrent reversals. The expected assertions are one success, one 409 rejection, one linked negative row, N250 net paid, N0 client credit, and one invoice audit event. |
+| First isolated execution | Blocked before database access | `pnpm test:integration` reached Docker Compose, then Docker Desktop Linux engine returned HTTP 500 while inspecting `postgres:16-alpine`. API typecheck passed. No schema was applied and no test record was created. |
+
+**Next exact action:** restore the local Docker Desktop Linux engine and run
+`pnpm test:integration`; do not substitute Railway or production for this
+isolated regression test.
 
 ### INV-002 Traceable Payment Reversal Live Re-Test Passed - 2026-09-05
 

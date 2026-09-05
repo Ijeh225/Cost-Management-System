@@ -26,15 +26,39 @@ remain auditable.
 
 ### Current Follow-Up
 
-No deployed application correction is awaiting a live re-test. The only
-remaining `INV-002` follow-up is an isolated database integration test using
-`TEST_DATABASE_URL` for concurrent/repeated-reversal safety.
+No deployed application correction is awaiting a live re-test. The isolated
+`TEST_DATABASE_URL` runner and concurrent/repeated-reversal regression case
+are implemented. Its first local execution is blocked by the local Docker
+Desktop Linux engine returning HTTP 500 before PostgreSQL can start; no live
+or Railway database was contacted.
 
 ### Next Action
 
-1. Provision `TEST_DATABASE_URL` and add the isolated database-backed
-   regression test for concurrent/repeated invoice-payment reversals. This is
-   test-environment work only; it does not require another live financial write.
+1. Restore the local Docker Desktop Linux engine, then run
+   `pnpm test:integration`. The command starts only the guarded local
+   `cost_management_integration_test` PostgreSQL service, applies the schema,
+   and runs the isolated regression suite. This is test-environment work only;
+   it does not require another live financial write.
+
+### Isolated Invoice-Reversal Integration Test Implemented - 2026-09-05
+
+- Added `docker-compose.integration.yml` with a localhost-only PostgreSQL 16
+  service named `cost_management_integration_test` on port 54329. It is fully
+  separate from Railway and production.
+- Added guarded `pnpm test:integration`. It refuses a test URL whose database
+  name lacks `test` or `integration`, rejects a non-local host unless
+  explicitly overridden, and refuses to reuse `DATABASE_URL`.
+- Added `ensureInvoicePaymentReversalSchema` to keep the local test schema in
+  sync with the invoice reversal constraints, including the one-reversal-only
+  unique index. Startup and integration setup use the same helper.
+- Added a database-backed concurrent regression case: a fully paid N250
+  invoice with a historic N1 overpayment receives two simultaneous reversal
+  requests. It asserts exactly one HTTP 200, one HTTP 409, one reversal row,
+  a paid N250 net invoice, zero client credit, and one audit event.
+- Verification: API typecheck passed. The initial `pnpm test:integration`
+  attempt stopped while Docker tried to inspect `postgres:16-alpine`: Docker
+  Desktop Linux engine returned HTTP 500 on its local named pipe. No database
+  schema was applied and no test data was created anywhere.
 
 ### INV-002 Traceable Payment Reversal Live Re-Test Passed - 2026-09-05
 

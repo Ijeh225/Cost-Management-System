@@ -9,7 +9,9 @@ import {
   bankTransfersTable,
   branchesTable,
   containersTable,
+  clientsTable,
   expensePaymentsTable,
+  invoiceAuditLogTable,
   invoicePaymentsTable,
   invoicesTable,
   overheadExpensesTable,
@@ -42,6 +44,7 @@ let standaloneScheduleId = 0;
 let collectionBankId = 0;
 let transferBankId = 0;
 let collectionInvoiceId = 0;
+let collectionClientId = 0;
 let createdStaffUserId = 0;
 
 async function login(email: string): Promise<Session> {
@@ -207,6 +210,7 @@ afterAll(async () => {
   if (collectionBankId) await db.delete(bankFundAdditionsTable).where(eq(bankFundAdditionsTable.bankId, collectionBankId));
   if (collectionInvoiceId) await db.delete(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, collectionInvoiceId));
   if (collectionInvoiceId) await db.delete(invoicesTable).where(eq(invoicesTable.id, collectionInvoiceId));
+  if (collectionClientId) await db.delete(clientsTable).where(eq(clientsTable.id, collectionClientId));
   if (transferBankId) await db.delete(banksTable).where(eq(banksTable.id, transferBankId));
   if (collectionBankId) await db.delete(banksTable).where(eq(banksTable.id, collectionBankId));
   if (paymentExpenseId) await db.delete(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, paymentExpenseId));
@@ -395,6 +399,76 @@ describe("sensitive workflow integration", () => {
     const banks = await admin.agent.get("/api/banks");
     expect(banks.status).toBe(200);
     expect(banks.body.find((bank: { id: number }) => bank.id === collectionBankId)?.currentBalance).toBe(250);
+  });
+
+  it("allows exactly one concurrent reversal for a historic invoice overpayment", async () => {
+    const [reversalClient] = await db.insert(clientsTable).values({
+      branchId: branchAId,
+      name: `Integration reversal client ${suffix}`,
+      creditBalance: "1",
+    }).returning({ id: clientsTable.id });
+    collectionClientId = reversalClient.id;
+
+    await db.update(invoicesTable)
+      .set({ clientId: collectionClientId })
+      .where(eq(invoicesTable.id, collectionInvoiceId));
+
+    const [historicOverpayment] = await db.insert(invoicePaymentsTable).values({
+      branchId: branchAId,
+      invoiceId: collectionInvoiceId,
+      amount: "1",
+      paymentMethod: "transfer",
+      bankId: collectionBankId,
+      reference: `integration-historic-overpayment-${suffix}`,
+      notes: "Historic overpayment state for concurrent reversal regression coverage",
+    }).returning({ id: invoicePaymentsTable.id });
+
+    const reversalDate = new Date().toISOString().slice(0, 10);
+    const responses = await Promise.all([
+      admin.agent
+        .post(`/api/invoices/${collectionInvoiceId}/payments/${historicOverpayment.id}/reverse`)
+        .set("X-CSRF-Token", admin.csrf)
+        .send({
+          reversalDate,
+          reference: `integration-reversal-a-${suffix}`,
+          reason: "Concurrent reversal regression test A",
+        }),
+      branchAdmin.agent
+        .post(`/api/invoices/${collectionInvoiceId}/payments/${historicOverpayment.id}/reverse`)
+        .set("X-CSRF-Token", branchAdmin.csrf)
+        .send({
+          reversalDate,
+          reference: `integration-reversal-b-${suffix}`,
+          reason: "Concurrent reversal regression test B",
+        }),
+    ]);
+
+    expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
+    expect(responses.find(response => response.status === 409)?.body.error).toMatch(/already been reversed/i);
+
+    const payments = await db.select().from(invoicePaymentsTable)
+      .where(eq(invoicePaymentsTable.invoiceId, collectionInvoiceId));
+    const reversals = payments.filter(payment => payment.entryType === "reversal" && payment.reversalOfPaymentId === historicOverpayment.id);
+    expect(reversals).toHaveLength(1);
+    expect(Number(reversals[0].amount)).toBe(-1);
+    expect(payments.reduce((total, payment) => total + Number(payment.amount), 0)).toBe(250);
+
+    const [invoice] = await db.select({ status: invoicesTable.status })
+      .from(invoicesTable)
+      .where(eq(invoicesTable.id, collectionInvoiceId));
+    expect(invoice.status).toBe("paid");
+
+    const [storedClient] = await db.select({ creditBalance: clientsTable.creditBalance })
+      .from(clientsTable)
+      .where(eq(clientsTable.id, collectionClientId));
+    expect(Number(storedClient.creditBalance)).toBe(0);
+
+    const auditRows = await db.select().from(invoiceAuditLogTable)
+      .where(and(
+        eq(invoiceAuditLogTable.invoiceId, collectionInvoiceId),
+        eq(invoiceAuditLogTable.action, "payment_reversed"),
+      ));
+    expect(auditRows).toHaveLength(1);
   });
 
   it("prevents duplicate references across bank fund additions and transfers", async () => {

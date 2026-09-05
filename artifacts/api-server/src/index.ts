@@ -5,6 +5,7 @@ import { runScheduledDigest } from "./routes/notifications";
 import { runScheduledReportDelivery } from "./lib/report-delivery";
 import { runScheduledAiProactiveBriefings } from "./lib/ai-proactive-intelligence";
 import { getDocumentStorageConfigurationError } from "./lib/document-storage";
+import { ensureInvoicePaymentReversalSchema } from "./lib/invoice-payment-reversal-schema";
 
 async function ensureMigrationsTable() {
   await pool.query(`
@@ -782,16 +783,7 @@ async function runStartupMigrations() {
       await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS duty_payment_transactions_one_reversal_idx ON duty_payment_transactions(reversal_of_transaction_id) WHERE entry_type = 'reversal'`);
     });
     await runMigration("invoice_payment_reversals_v1", async () => {
-      await pool.query(`ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS entry_type TEXT NOT NULL DEFAULT 'payment'`);
-      await pool.query(`ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS reversal_of_payment_id INTEGER REFERENCES invoice_payments(id) ON DELETE RESTRICT`);
-      await pool.query(`ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS reversal_reason TEXT`);
-      await pool.query(`ALTER TABLE invoice_payments DROP CONSTRAINT IF EXISTS invoice_payments_amount_nonzero_check`);
-      await pool.query(`ALTER TABLE invoice_payments ADD CONSTRAINT invoice_payments_amount_nonzero_check CHECK (amount <> 0)`);
-      await pool.query(`ALTER TABLE invoice_payments DROP CONSTRAINT IF EXISTS invoice_payments_entry_type_check`);
-      await pool.query(`ALTER TABLE invoice_payments ADD CONSTRAINT invoice_payments_entry_type_check CHECK (entry_type IN ('payment', 'reversal'))`);
-      await pool.query(`ALTER TABLE invoice_payments DROP CONSTRAINT IF EXISTS invoice_payments_reversal_link_check`);
-      await pool.query(`ALTER TABLE invoice_payments ADD CONSTRAINT invoice_payments_reversal_link_check CHECK ((entry_type = 'payment' AND reversal_of_payment_id IS NULL) OR (entry_type = 'reversal' AND reversal_of_payment_id IS NOT NULL))`);
-      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS invoice_payments_one_reversal_idx ON invoice_payments(reversal_of_payment_id) WHERE entry_type = 'reversal'`);
+      await ensureInvoicePaymentReversalSchema(pool);
     });
     await runMigration("ai_assistant_foundation_v1", async () => {
       await pool.query(`
