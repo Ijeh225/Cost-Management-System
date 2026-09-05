@@ -1,5 +1,46 @@
 # Project State
 
+## Current Work Register - Authoritative as of 2026-09-05
+
+Use this section to choose the next task. Earlier plans, next-action lines,
+and issue statuses in this document are historical evidence, not the current
+backlog. They are retained so that previous decisions and live-test results
+remain auditable.
+
+### Closed Since the Original Audit
+
+- Live re-tests closed `DASH-001`, `AR-002`, `BRN-001`, `AI-002` through
+  `AI-007`, `NOTIF-001`, `NOTIF-002`, `TASK-001`, `PIPE-001`, `BANK-002`,
+  `SCHED-002`, `CP-002`, `OH-002`, `APR-001`, and `DEL-001`.
+- Earlier controlled work also closed `BANK-003`, `AI-008`, `SEC-02`, and
+  `DUTY-002`. Do not repeat their financial or workflow writes.
+- The latest deployment is verified live: Abuja dashboard completion now
+  matches the persisted delivery date and Delivery Tracking.
+
+### Active Defects Requiring a Product Decision or Source Fix
+
+| Priority | Work group | Active records |
+| --- | --- | --- |
+| High | Finance source consistency | `RPT-001`, `RPT-002`, `RPT-003`, `SCHED-001`, `FIN-002` |
+| High | Operational record authority and visibility | `OPS-001`, `OPS-002` |
+| High | Printable and client financial documents | `VAT-001`, `STMT-001`, `CLT-001`, `CONT-RPT-001` |
+| Medium | Invoice experience and historic test correction | `INV-001`, `INV-002` |
+
+`INV-002` is protected in the live application: further overpayments are
+blocked. Its remaining work is an isolated database regression test and a
+separately approved correction for the historic labelled N1 overpayment.
+
+### Verification Notes, Not Active Product Defects
+
+- The document upload, linking, searchable index, and AI lookup have passed.
+  Download behaviour was limited by the previous browser surface, not proven
+  to be an application defect.
+- Database-backed integration cases require an isolated `TEST_DATABASE_URL`.
+  This is test-environment work, not permission to create more production data.
+- All newly added entries must update this register and the live test register
+  in the same commit. Do not use an older “Next action” paragraph to choose
+  work without checking this section first.
+
 ## Latest Verified Checkpoint - 2026-09-05
 
 - APR-001: CLOSED for the tested owner/Lagos workflow. Job 26 was submitted
@@ -21,8 +62,9 @@
 - Exact stopping point: Abuja Dashboard after deployment, Completed 1.
   Both requested controls are complete; do not repeat their writes. Older
   Open/Blocked entries below are historical and superseded by this checkpoint.
-  Next action is a register closeout review for any other unverified controls,
-  not another APR-001/DEL-001 test or a claim that every app workflow has passed.
+  The register closeout review is recorded in the Current Work Register above.
+  Do not repeat APR-001/DEL-001 writes or claim that every app workflow has
+  passed.
 
 ## Purpose
 
@@ -42,13 +84,13 @@ important completed milestones so previous work remains traceable.
 
 - Canonical working repository: `Cost-Management-System-restored`
 - Main branch: `master`
-- Last confirmed project-state commit: `ac8c9b4 Add project continuity state`
+- Last project-state checkpoint before this register cleanup: `1ad7ff1`
 - Preserved rollback tags:
   - `checkpoint-before-rbac-user-migration-2026-08-28`
   - `checkpoint-before-user-role-restructuring-2026-08-28`
 - Never reset, delete, or overwrite these checkpoints.
 
-## Current Objective
+## Historical Objective - 2026-09-01 (Superseded)
 
 Carry out and document a controlled, comprehensive live end-to-end acceptance
 test before beginning any new large product feature.
@@ -265,7 +307,7 @@ before planning any further changes.
   (₦1 revenue, ₦1 actual container cost, ₦500,002 actual paid overhead, and
   -₦500,002 net profit). Branch Comparison is not reconciled; see `RPT-003`.
 
-## Next Actions, In Order
+## Historical Next Actions - 2026-09-01 (Superseded)
 
 1. Complete `ENV-02` and catalogue the current test data without changing it.
 2. Complete branch/date-range coverage for `FIN-01`; retain `RPT-001` for the
@@ -1267,7 +1309,7 @@ before planning any further changes.
   in `docs/LIVE_E2E_TEST_REGISTER.md` before scheduling another live write
   test. Do not repeat completed BANK-003, AI-008, SEC-02, or DUTY-002 cases.
 
-### Current Remaining Work Order (2026-09-04)
+### Historical Remaining Work Order (2026-09-04; Superseded)
 
 The completed BANK-003, AI-008, SEC-02, and DUTY-002 evidence supersedes the
 older Step 11 notes that listed bank-reference and duty-reversal verification as

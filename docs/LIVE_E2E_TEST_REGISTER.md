@@ -1,5 +1,44 @@
 # Live End-to-End Test Register
 
+## Current Test and Defect Register - Authoritative as of 2026-09-05
+
+Use this register before selecting the next test or fix. The detailed test rows
+and defect log below preserve their original observation date and are therefore
+historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
+action` label below does not override this current register.
+
+### Closed by Deployed Fix and Live Re-Test
+
+| Area | Closed records | Latest evidence |
+| --- | --- | --- |
+| Cancelled-invoice population and branch scope | `DASH-001`, `AR-002`, `BRN-001` | Aging print excludes cancelled invoices; selected Lagos branch creation worked from All Branches and remained isolated. |
+| AI correctness | `AI-002` to `AI-007`, `AI-008` | Stage owner, eligible invoices, notification counts, exact schedule and document lookup, briefing state, and citation link were live re-tested. |
+| Workflow and views | `NOTIF-001`, `NOTIF-002`, `TASK-001`, `PIPE-001`, `APR-001`, `DEL-001` | Queue rejection refreshes immediately; saved delivery date, Dashboard, and Delivery Tracking reconcile. |
+| Finance and loading UI | `BANK-002`, `SCHED-002`, `CP-002`, `OH-002`, `BANK-003`, `DUTY-002` | Filters/date buckets, load states, bank-reference guard, and controlled duty reversal have recorded live evidence. |
+| Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
+
+### Active Defect Backlog
+
+1. `RPT-001`, `RPT-002`, `RPT-003`, `SCHED-001`, `FIN-002`: establish one
+   declared financial population and basis across P&L, Dashboard, Branch
+   Comparison, Cash Flow, Financial Ledger, schedules, and exports.
+2. `OPS-001`, `OPS-002`: retire or repair the legacy generic Operations
+   control and make released Pull-Out work visible in its Released view.
+3. `VAT-001`, `STMT-001`, `CLT-001`, `CONT-RPT-001`: correct the remaining
+   printable-report and client-financial presentation defects.
+4. `INV-001`: prevent zero-value draft issuance from offering a misleading
+   action. `INV-002` is live-mitigated; keep its historic N1 correction and
+   isolated database regression test as separately approved work.
+
+### Test-Environment Follow-Up Only
+
+- An isolated `TEST_DATABASE_URL` is still needed for database-backed
+  integration checks.
+- Previous direct-file download behaviour was browser-surface limited. Upload,
+  open-route, linked-document, searchable-index, and AI retrieval checks pass.
+- Do not re-run a closed controlled write solely because an older table below
+  still says Open or Blocked.
+
 ## Latest Control Closure - 2026-09-05
 
 | Control | Current result | Evidence |
@@ -103,6 +142,10 @@ branch scopes have been reconciled.
   does not replace the separate fresh sign-out/sign-in verification.
 
 ## Defect Log
+
+The following defect rows are the original findings. Their `Status` cells are
+historical at the time of recording; the authoritative status is the current
+register at the top of this file.
 
 | ID | Priority | Module | Finding | Cause | Required correction | Cross-module impact | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -503,7 +546,7 @@ and restore the original N100.00 assessment.
 `DUTY-002` is closed. The historic `E2E-20260904-DUTY-REVERSAL-001` was not
 modified. No source code changed during this final live verification.
 
-### Current Remaining Work Order (2026-09-04)
+### Historical Remaining Work Order (2026-09-04; Superseded)
 
 The completed BANK-003, AI-008, SEC-02, and DUTY-002 evidence supersedes the
 older Step 11 entries that described duplicate bank-reference and reversible
