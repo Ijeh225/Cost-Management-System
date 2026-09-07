@@ -1,6 +1,6 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-09-05
+## Current Work Register - Authoritative as of 2026-09-07
 
 Use this section to choose the next task. Earlier plans, next-action lines,
 and issue statuses in this document are historical evidence, not the current
@@ -51,6 +51,23 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
    follow-ups, `MANUAL-GATE-001` and `MANUAL-INV-001`, need separately scoped
    assessment/verification before a new correction is claimed. No fix was
    authorized or performed as part of manual production.
+
+### Nigerian Market and Pricing Research - 2026-09-07
+
+- User asked what the blueprint's app might cost in Nigeria, whether comparable
+  bonded-terminal software exists, and monthly/yearly pricing or worth.
+- Reviewed relevant PDF chapters and official vendor pages. Logic Version's
+  SmartTi/SmartTie explicitly advertises bonded-terminal software in Lagos;
+  Kaleris, Logistaas and Magaya provide related international comparisons.
+- Saved sources, vendor-price caveats and provisional development/subscription/
+  running-cost ranges in `docs/NIGERIA_MARKET_AND_PRICING_RESEARCH.md`.
+- Estimates are not a buyer valuation, verified market average or approved price.
+  Proposed starting offer for validation: NGN 1m setup plus NGN 200k/month or
+  NGN 2m prepaid/year. No pricing plan, billing or tenancy feature implemented.
+- Existing source-review follow-ups remain; do not market full industrial TOS,
+  external customs integration or proven multi-company SaaS without verification.
+- No application/PDF/business-data change, provider purchase or live write test.
+- Current discussion handoff: `docs/SESSION_SUMMARIES/2026-09-07-market-pricing.md`.
 
 ### Application Blueprint and Training Manual - Completed 2026-09-05
 

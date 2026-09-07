@@ -23,6 +23,12 @@ action` label below does not override this current register.
 
 ### Current Follow-Up
 
+2026-09-07 market-pricing discussion: no new live test or defect closure.
+Official vendor research and provisional estimates are recorded separately in
+`docs/NIGERIA_MARKET_AND_PRICING_RESEARCH.md`. Existing source-review follow-ups
+and historical evidence limits remain unchanged; commercial advice is not an
+acceptance test or proof of multi-company tenancy.
+
 The manual documentation task completed on 2026-09-05. The earlier remediation
 round remains closed on its recorded scope. Source inspection for the manual
 identified the two follow-ups below. They are not results of repeated live

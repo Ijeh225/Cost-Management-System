@@ -18,4 +18,5 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-09-07 Nigerian market and pricing discussion](2026-09-07-market-pricing.md)
 - [2026-09-05 isolated invoice-reversal integration and test database decision](2026-09-05-isolated-invoice-reversal-integration.md)
