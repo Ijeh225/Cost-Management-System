@@ -58,6 +58,9 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Manual Follow-Up Live Reproduction - 2026-09-07
 
+- Evidence, guarded probe and continuity records committed as `e9d871d` and
+  pushed to `origin/master`. This commit is not an application fix.
+
 - User required live WRITE reproduction before fixes. Invoice case used the
   browser; gate negative cases used an authenticated live owner API session,
   followed by browser verification of persisted Gate Log rows.
