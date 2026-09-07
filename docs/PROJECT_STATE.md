@@ -45,20 +45,39 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
-- Availability clarification, checked live 2026-09-07: existing Railway
-  `integration-test` / `Postgres-2Wsy` is Online. Settings show private networking
-  and Add Public Access (no public endpoint); current runner environment has no
-  TEST_DATABASE_URL. This is a runner-connection gap, not a missing database or
-  confirmed outage. Railway UI offers `railway connect Postgres-2Wsy --tunnel-only`;
-  verify CLI support/auth and actual test database before running the suite.
-  No tunnel, exposure, schema or data change was made during this read-only check.
+- The six pending isolated regressions are now complete: 6 passed, 11 unrelated
+  cases deliberately skipped. Connection gap resolved through a temporary SSH
+  tunnel to the existing test service; tunnel closed after cleanup verification.
 - `MANUAL-GATE-001` and `MANUAL-INV-001` are closed on the deployed live
-  acceptance scope below. Do not repeat fixture creation or financial writes.
-- Remaining verification limit: run the six new isolated database regression
-  cases when TEST_DATABASE_URL is available. The live acceptance is not proof
-  that the entire isolated suite passed. No new confirmed defect was found.
+  acceptance and six isolated regression checks. No outstanding test remains
+  in this two-fix scope; await the next user-selected task. Do not repeat tests
+  or describe the previously unavailable connection as a current blocker.
 - Preserve fixtures 28-31, client 9, invoices 12-13 and historical NGN500 evidence.
   The completed PDF remains its historical edition; no PDF rewrite this session.
+
+### Isolated Manual Regressions - 2026-09-07
+
+- User authorized connecting the existing isolated DB and running the six tests.
+  Railway CLI 5.49.3 used authenticated SSH tunneling to `Postgres-2Wsy`, explicitly
+  selecting integration-test (51a4f5a2-e7ae-443e-836f-095b2015f3cc) and service
+  ed1e8b3d-c2e2-4654-a11d-bc16fa858bd6. Local port 54339, no public access added.
+- SQL verified current_database() = cost_management_integration_test, 57 public
+  tables, zero starting containers. Test URL/credentials existed only in process
+  memory; no production connection or schema reset/push was used.
+- Ran only six named gate/pricing cases from sensitive-workflows.integration.test.ts.
+  First run: 6 passed / 11 skipped, 58.36s. Found test-only cleanup omission:
+  three branch-wide invoice_created notifications survived fixture removal.
+- Adjusted afterAll to remove notifications only for the suite's newly created
+  branches. Removed exactly the three identified orphan test notifications from
+  the isolated first run. No deployed application/business behavior changed.
+- Final repeat: 6 passed / 11 skipped, exit 0, 66.07s. Confirmed zero remaining
+  containers, clients, invoices, users, branches, banks, schedules, overheads,
+  workflow notifications and audit rows. Closed SSH and verified port 54339 has
+  no listener. Existing private Railway DB/volume retained.
+- API TypeScript check and git diff whitespace check passed after cleanup edit.
+- Corepack stalled before tests started; used the installed Vitest entrypoint
+  directly. Final run used an ephemeral test JWT secret; no deployment secret
+  changed. Session details: docs/SESSION_SUMMARIES/2026-09-07-isolated-manual-regressions.md.
 
 ### Deployed Manual Acceptance - 2026-09-07
 
@@ -78,8 +97,8 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
   instead of container NGN100. VAT 7.5% preview was NGN6.75 / total NGN96.75.
   Reset VAT to 0 and saved invoice 13 `INV-202609-006`: subtotal/total NGN90,
   Draft, paid NGN0, no payment history. No issuance or money posting.
-- Live owner acceptance does not replace isolated rollback/access-boundary
-  regression coverage. Six new isolated cases remain NOT RUN; test DB not exposed.
+- At live acceptance, six isolated cases remained unrun. The subsequent isolated
+  run above now passes all six; no public test DB exposure was needed.
 - Session: `docs/SESSION_SUMMARIES/2026-09-07-manual-live-acceptance.md`.
 
 ### Gate and Invoice Preview Corrections - 2026-09-07

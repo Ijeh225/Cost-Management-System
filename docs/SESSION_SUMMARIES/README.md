@@ -18,6 +18,8 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-09-07 isolated manual regression completion](2026-09-07-isolated-manual-regressions.md)
+
 - [2026-09-07 deployed manual live acceptance](2026-09-07-manual-live-acceptance.md)
 
 - [2026-09-07 gate and invoice preview corrections](2026-09-07-gate-invoice-fixes.md)

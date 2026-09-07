@@ -20,9 +20,56 @@ action` label below does not override this current register.
 | Operations and document re-test | `OPS-001`, `OPS-002`, `VAT-001`, `VAT-002`, `CLT-001`, `CONT-RPT-001`, `INV-001`, `STMT-001` | Stage ownership is authoritative in Operations, Pull-Out Released is visible, VAT and statement figures use only active financial invoices, Client/AR figures agree, container prints are accurate, and zero-value drafts cannot be sent. |
 | Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
 | Scoped finance middleware | `API-ROUTE-001` | Release `6a327a5` active in Railway; 12 authenticated live API checks passed for existing Operations QA staff, including allowed operational reads and denied finance / cross-branch access. |
-| Manual follow-up acceptance | `MANUAL-GATE-001`, `MANUAL-INV-001` | 2026-09-07 deployed gate readiness/order/duplicate controls and preview-to-saved NGN90 draft passed. Container 31 and invoice 13 retained; isolated six-case suite remains unrun. |
+| Manual follow-up acceptance | `MANUAL-GATE-001`, `MANUAL-INV-001` | 2026-09-07 live checks passed; all six subsequent isolated DB regressions passed. Container 31 and invoice 13 retained. No pending test in this bounded scope. |
 
 ### Current Follow-Up
+
+Current status supersedes the earlier availability/unrun notes below: the six
+isolated manual regressions passed on 2026-09-07. Connection was established via
+private SSH tunnel, database identity verified, and tunnel closed after cleanup.
+No new confirmed application defect. A test-fixture notification cleanup omission
+was corrected and the six tests rerun successfully. No production data affected.
+
+### Isolated Six-Case Acceptance - 2026-09-07
+
+Target: existing Postgres-2Wsy in integration-test, not production. SQL confirmed
+cost_management_integration_test / 57 public tables / zero initial containers.
+Used Railway CLI 5.49.3 SSH tunnel bound to 127.0.0.1:54339, no public endpoint.
+No reset or schema push. Only temporary test fixtures were created.
+
+| Case | Result |
+| --- | --- |
+| Missing gate readiness/prior events | PASS: 409, no dates, audit or notification side effects |
+| Concurrent gate actions and valid sequence | PASS: each of four simultaneous pairs returned 200/409; original entry timestamp and prior notification preserved; four audit entries, five workflow notifications, final empty-return equality |
+| Gate permissions / branch isolation | PASS: unauthorized staff 403, other-branch admin access 404 |
+| Client agreed rate 90, two containers | PASS: items 90/90, subtotal 180, VAT 13.50, total 193.50 |
+| Client agreed rate zero | PASS: items 0/0, subtotal/VAT/total 0 |
+| No agreed client rate | PASS: container fallback items 100/200, subtotal 300, VAT 22.50, total 322.50 |
+
+- First run: six passed, eleven unrelated cases intentionally skipped, 58.36s.
+  Cleanup inspection found three invoice_created broadcast notifications left
+  in the isolated DB (IDs 16-18, test branch 5, Pricing QA run 1788793979701-2647).
+  These lacked a target-user/container cascade. Fixed test afterAll cleanup to
+  remove notifications for its own new branch IDs, not global history.
+- Removed only those three verified isolated fixtures. First date-limited cleanup
+  guard aborted/rolled back without deletion because timestamp serialization
+  differed; rechecked IDs, type, branch, fixture messages and missing parent branch
+  before the exact three-row cleanup. No broader reset/deletion.
+- Final repeat after cleanup correction: 6 passed / 11 skipped, exit 0, 66.07s.
+  SQL verified zero rows in containers, clients, invoices, users, branches, banks,
+  payment_schedules, overhead_expenses, workflow_notifications and audit_log.
+- API TypeScript check and git diff whitespace check also passed.
+- Closed both the local Railway tunnel process and its SSH child; confirmed no
+  listener on port 54339. No credentials saved to repo or logs. No production
+  settings, app code, financial/workflow records, schema, or PDF changed.
+- Corepack launch stalled before test execution; installed Vitest ran directly.
+  First run printed the local test JWT fallback warning. Final run used a random
+  process-only JWT_SECRET; this was not a production configuration warning.
+- Not a claim that all 17 integration tests were rerun: eleven remain on their
+  earlier recorded evidence. No additional test remains for these six controls.
+- Session: docs/SESSION_SUMMARIES/2026-09-07-isolated-manual-regressions.md.
+
+### Earlier Availability Check (Superseded)
 
 2026-09-07 availability check: Railway `integration-test` / `Postgres-2Wsy`
 currently Online, private networking, no public endpoint configured. Local runner
@@ -42,14 +89,13 @@ The manual documentation task completed on 2026-09-05. The earlier remediation
 round remains closed on its recorded scope. Its two source-review follow-ups
 were subsequently reproduced with user-authorized live writes on 2026-09-07,
 as recorded below. Corrections passed local checks and subsequent deployed live
-acceptance on 2026-09-07. Six new isolated database regressions remain unrun;
-that coverage limit is not an open reproduced defect. No original audit closure
-is reopened.
+acceptance on 2026-09-07. All six new isolated database regressions subsequently
+passed as recorded above. No original audit closure is reopened.
 
 | New record | Evidence / status | Next bounded verification |
 | --- | --- | --- |
-| `MANUAL-GATE-001` | Closed by deployed live acceptance 2026-09-07. Missing prerequisites/order violations/duplicates return 409; valid four-event sequence has one persisted audit each. Loaded gate concurrency pairs returned 200/409. | Preserve fixtures. Run isolated regression suite separately when reachable; do not repeat fixture creation. |
-| `MANUAL-INV-001` | Closed by deployed browser acceptance 2026-09-07. Container 31 NGN100 charge/client 9 NGN90 agreed rate: preview NGN90 and saved draft 13 NGN90, paid NGN0. VAT preview also correct. | Retain unpaid draft and original failure invoice 12. No issuance/payment required. |
+| `MANUAL-GATE-001` | Closed by live acceptance and three isolated gate regression cases, including all four concurrent event pairs. | Preserve live evidence; no pending gate acceptance test in this scope. |
+| `MANUAL-INV-001` | Closed by browser acceptance and three isolated agreed-rate/zero/fallback cases including VAT. | Retain unpaid drafts; no pending invoice acceptance test in this scope. |
 
 ### Deployed Live Acceptance - 2026-09-07
 

@@ -242,7 +242,12 @@ afterAll(async () => {
     await db.delete(workflowNotificationsTable).where(inArray(workflowNotificationsTable.targetUserId, testUserIds));
     await db.delete(usersTable).where(inArray(usersTable.id, testUserIds));
   }
-  if (branchAId || branchBId) await db.delete(branchesTable).where(inArray(branchesTable.id, [branchAId, branchBId].filter(Boolean)));
+  if (branchAId || branchBId) {
+    const testBranchIds = [branchAId, branchBId].filter(Boolean);
+    // Broadcast invoice notifications have no target user or container to cascade.
+    await db.delete(workflowNotificationsTable).where(inArray(workflowNotificationsTable.branchId, testBranchIds));
+    await db.delete(branchesTable).where(inArray(branchesTable.id, testBranchIds));
+  }
 });
 
 describe("sensitive workflow integration", () => {
