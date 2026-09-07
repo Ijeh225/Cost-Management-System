@@ -1,6 +1,6 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-09-05
+## Current Test and Defect Register - Authoritative as of 2026-09-07
 
 Use this register before selecting the next test or fix. The detailed test rows
 and defect log below preserve their original observation date and are therefore
@@ -30,14 +30,64 @@ and historical evidence limits remain unchanged; commercial advice is not an
 acceptance test or proof of multi-company tenancy.
 
 The manual documentation task completed on 2026-09-05. The earlier remediation
-round remains closed on its recorded scope. Source inspection for the manual
-identified the two follow-ups below. They are not results of repeated live
-writes and must not be described as already fixed or live-reproduced.
+round remains closed on its recorded scope. Its two source-review follow-ups
+were subsequently reproduced with user-authorized live writes on 2026-09-07,
+as recorded below. Neither has been fixed. No original audit closure is reopened.
 
 | New record | Evidence / status | Next bounded verification |
 | --- | --- | --- |
-| `MANUAL-GATE-001` | Source-observed gate control gap, pending assessment. In `artifacts/api-server/src/routes/containers.ts`, Gate-In accepts Shipping/Pull-Out status or existing Pull-Out release without calling the full readiness helper, and updates an existing Gate-In timestamp without a duplicate guard. Gate-Out and Empty Gate-In handlers lack explicit prior-event prerequisites. Main workflow transitions enforce stronger readiness. No gate write was performed for this review. | In isolated tests, verify missing-readiness and repeat Gate-In requests plus out-of-order loaded/empty events. Decide the shared invariant before changing handlers; preserve authentic existing timestamps. |
-| `MANUAL-INV-001` | Source-observed invoice preview discrepancy, pending targeted test. `CreateInvoiceDialog.tsx` sums container clearing charges, while invoice creation in `routes/invoices.ts` prioritizes `client.agreedClearingRate` when present. Different values can yield a preview/saved-draft mismatch. No invoice was created for this review. | Use an isolated client with a different agreed/container rate, compare preview and persisted draft, then align the preview to the authoritative amount rule without altering issued invoices. |
+| `MANUAL-GATE-001` | High; reproduced live 2026-09-07, open. Fixture 29: main transition rejected missing releases (409), Gate-In accepted (200), repeat overwrote timestamp (200). Fixture 30: Empty Gate-In and loaded Gate-Out accepted without prior loaded entry (200). Final GET and live Gate Log confirm persistence. UI guards exist but API rules are weaker. | On authorization, enforce agreed gate readiness/event-order/duplicate invariants at the API, add isolated regressions and retest; preserve authentic timestamps and retained test evidence. |
+| `MANUAL-INV-001` | Medium; reproduced live 2026-09-07, open. Client 9 agreed rate NGN90, container 28 charge NGN100: Create Invoice preview NGN100, persisted draft invoice 12 NGN90. Server prioritizes agreed rate; preview does not. | On authorization, align preview with server pricing; regression-test different/equal/unset agreed rates and multi-container totals. Do not change issued invoice amounts. |
+
+### Live Write Reproduction Evidence - 2026-09-07
+
+Scope: user explicitly requested live write tests before fixes. Only newly
+labelled dummy fixtures were mutated; no app correction or old audit re-test.
+Owner authenticated browser used for invoice creation; independent authenticated
+owner HTTP session with normal CSRF used for negative gate endpoint tests.
+
+| Case | Expected control | Observed |
+| --- | --- | --- |
+| Invoice preview/saved consistency | Same NGN90 effective agreed rate in preview and draft | Browser preview subtotal/total NGN100; saved invoice `INV-202609-005` (12) subtotal/total NGN90, Draft, paid NGN0. FAIL. |
+| Main gate readiness reference | Reject incomplete release prerequisites | `PATCH /api/containers/29/status` to gate_in: 409 listing Documentation/PAAR, Transire, Shipping/DO, Terminal/TDO, Pullout. PASS. |
+| Gate-In readiness | Same missing-readiness rejection | `POST /api/containers/29/gate-in`: 200, gate_in persisted with all releases null. FAIL. Shipping was an explicit admin fixture setup, not a naturally completed workflow. |
+| Repeated Gate-In | Reject or preserve original timestamp | Second POST: 200; `2026-09-07T12:27:54.163Z` changed to `2026-09-07T12:27:54.718Z`. Final GET confirms overwritten value. FAIL. |
+| Empty Gate-Out prerequisite | Reject when no Empty Gate-In exists | Container 30 POST empty-gate-out: 409, `Empty Gate-In must be recorded before Empty Gate-Out`. PASS. |
+| Empty Gate-In prerequisite | Reject before loaded exit/delivery | Container 30 POST empty-gate-in: 200 at `2026-09-07T12:27:55.873Z` while loaded entry/exit and delivery null, status pending_verification. FAIL. |
+| Loaded Gate-Out prerequisite | Reject without loaded Gate-In | Container 30 POST gate-out: 200 at `2026-09-07T12:27:56.468Z`, gateInDate remains null. Final GET confirms. FAIL. |
+| Browser UI guard comparison | Disable initial invalid loaded events | Container 28 pending verification displayed both Record Gate-In and Record Gate-Out disabled. PASS, but not a backend protection. |
+| Persisted browser Gate Log | Reflect API state | Reload showed two entries: A gate_in at 13:27:54 Lagos; B pending verification, no Gate-In, Gate-Out 13:27:56, Empty Gate-In 13:27:55. Confirms invalid sequence is stored and displayed. |
+
+Retained fixture inventory (all in existing E2E Lagos / branch 2):
+
+- Client 9: `E2E-20260907 Manual Rate QA`, agreed rate NGN90, no contact email/phone.
+- Container 28: `E2EI260907`, BL `E2E-INV-RATE-260907`, NGN100 charge,
+  pending verification, linked only to new client/draft.
+- Invoice 12: `INV-202609-005`, NGN90 draft, labelled do-not-issue/collect,
+  no payments. Retained for inspection, not cancelled or deleted.
+- Container 29: `E2EG260907A`, BL `E2E-GATE-E2EG260907A`, NGN0,
+  no client; admin-set Shipping then accepted Gate-In; original/repeat event
+  requests retained through normal application audit creation.
+- Container 30: `E2EG260907B`, BL `E2E-GATE-E2EG260907B`, NGN0,
+  no client; pending verification with intentionally invalid test movement dates.
+
+Observed dashboard impact: count 9 -> 12; In Progress 8 -> 11; Terminal 0 -> 1;
+budgeted clearing charges NGN72,004,001 -> NGN72,004,101. Financial summary
+Invoiced NGN3,001 / Collected NGN2,001 / AR NGN1,000 and displayed bank balances
+remained unchanged. New fixtures affect operational counts and notification/audit
+history; do not describe the live system as unchanged. No actual cash movement,
+invoice issue, external message, record deletion or historical NGN500 backfill.
+
+Runner notes: missing optional requests module stopped the first local launch
+before login; switched to Python standard library. Initial authenticated probe
+without CSRF received 403 before creating anything; logout also 403. The
+corrected run fetched normal CSRF, completed once, and logout returned 200.
+Subsequent owner browser session was at login; signed in normally and checked
+Gate Log. No credentials or session cookies stored in files. Do not rerun the
+probe: fixed fixture-name guard intentionally refuses already-existing records.
+
+Next exact action: present findings and await fix authorization, gate controls
+then invoice preview. This is not a full regression or a new cross-role test.
 
 ### Manual Production Evidence - 2026-09-05
 

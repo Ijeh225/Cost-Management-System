@@ -45,12 +45,47 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-07: authorized live write reproduction is complete. Both manual
+  follow-ups reproduced; no application correction was made. Details below
+  and in the current live-test register. Retain fixtures; do not rerun creation.
+
 1. The user-requested application blueprint/training PDF is complete; review the
    manual in `output/pdf/Cost_Management_Blueprint_and_User_Manual.pdf`.
-2. Do not restart closed remediation writes. Two newly recorded source-review
-   follow-ups, `MANUAL-GATE-001` and `MANUAL-INV-001`, need separately scoped
-   assessment/verification before a new correction is claimed. No fix was
-   authorized or performed as part of manual production.
+2. Await authorization to correct now-live-confirmed `MANUAL-GATE-001`
+   (gate readiness, duplicate timestamp and event-order controls), then
+   `MANUAL-INV-001` (preview uses container rate, saved draft uses agreed rate).
+   Do not restart closed remediation writes or repair historic data by invention.
+
+### Manual Follow-Up Live Reproduction - 2026-09-07
+
+- User required live WRITE reproduction before fixes. Invoice case used the
+  browser; gate negative cases used an authenticated live owner API session,
+  followed by browser verification of persisted Gate Log rows.
+- `MANUAL-INV-001`: new client 9 has NGN90 agreed rate; container 28
+  `E2EI260907` has NGN100 clearing charges. Preview NGN100 saved as NGN90
+  draft `INV-202609-005` / invoice 12. No issue, collection or bank posting.
+- `MANUAL-GATE-001`: zero-charge, unlinked test containers 29 `E2EG260907A`
+  and 30 `E2EG260907B` created in E2E Lagos (branch 2). Admin stage setup
+  placed A in Shipping without any releases; main status transition returned
+  409 for missing readiness, but Gate-In returned 200. A second Gate-In
+  returned 200 and overwrote the original timestamp. B accepted Empty Gate-In
+  before any loaded movement and Gate-Out without Gate-In (both 200).
+- Correct controls also observed: pending-verification UI gate buttons disabled;
+  Empty Gate-Out without Empty Gate-In rejected with 409. These do not cover
+  the weaker API paths. No new cross-role test or full regression is claimed.
+- Retained A at gate_in; B pending_verification with deliberately inconsistent
+  test gate timestamps; invoice draft unpaid. These are labelled test evidence,
+  not actual physical movements. Existing business records were not modified.
+- Dashboard after testing: containers 9 -> 12; terminal 0 -> 1; budgeted charges
+  increased NGN100. Invoiced NGN3,001, collected NGN2,001, AR NGN1,000 and
+  displayed bank balances stayed unchanged. No full report reconciliation run.
+- Added one-off guarded `scripts/live-gate-followup-probe.py`; no app logic,
+  schema, deployment settings or PDF changed. Credentials are prompted, not saved.
+  Initial runner lacked requests (corrected to standard library); first API
+  attempt was blocked by CSRF before fixture creation. Corrected run used the
+  normal CSRF endpoint and logged out successfully. Owner browser login restored.
+- Historical NGN500 exception remains untouched; no false backfill or fix claimed.
+- Handoff: `docs/SESSION_SUMMARIES/2026-09-07-manual-followup-live-tests.md`.
 
 ### Nigerian Market and Pricing Research - 2026-09-07
 
