@@ -45,6 +45,7 @@ is reopened.
 
 ### Deployed Live Acceptance - 2026-09-07
 
+- Acceptance evidence/script committed and pushed as `6c24e0f` to origin/master.
 - Deployment confirmed in Railway: 696ef75 includes 960b7ff; Active / Deployment
   successful, ID `c113654a-88a6-44f1-83a9-cf19509f1764`.
 - Controlled owner API test created only container 31 `E2ER260907`, BL

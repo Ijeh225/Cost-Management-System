@@ -55,6 +55,7 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Deployed Manual Acceptance - 2026-09-07
 
+- Acceptance evidence/script committed and pushed as `6c24e0f` to origin/master.
 - Railway release "Record gate and invoice correction push" (696ef75, includes
   fix 960b7ff) is Active / Deployment successful; deployment
   `c113654a-88a6-44f1-83a9-cf19509f1764` observed directly.

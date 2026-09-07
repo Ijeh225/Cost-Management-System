@@ -36,4 +36,5 @@ creation, modify old evidence, repair historical NGN500 records, or rewrite PDF.
 
 Updated PROJECT_STATE.md, LIVE_E2E_TEST_REGISTER.md, session index; added guarded
 live acceptance script. No application source changed in this acceptance turn.
-Commit/push recorded after commit creation.
+Evidence/script committed and pushed as `6c24e0f` to origin/master. Follow-up
+record-only commit captures this verified hash and push result.
