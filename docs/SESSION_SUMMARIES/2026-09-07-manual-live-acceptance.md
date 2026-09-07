@@ -34,6 +34,13 @@ creation, modify old evidence, repair historical NGN500 records, or rewrite PDF.
 
 ## Files and Commit
 
+Follow-up availability question: directly checked Railway; existing Postgres-2Wsy
+in integration-test is Online and private, no public endpoint. Runner has no
+TEST_DATABASE_URL. Railway suggests a CLI tunnel; it was not started or verified.
+Database browser showed no tables, not proof of the named integration database's
+contents. No changes to service, app, data or test status. Clarify connection gap
+instead of saying the database does not exist. Updated both registers.
+
 Updated PROJECT_STATE.md, LIVE_E2E_TEST_REGISTER.md, session index; added guarded
 live acceptance script. No application source changed in this acceptance turn.
 Evidence/script committed and pushed as `6c24e0f` to origin/master. Follow-up

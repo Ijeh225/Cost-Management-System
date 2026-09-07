@@ -24,6 +24,14 @@ action` label below does not override this current register.
 
 ### Current Follow-Up
 
+2026-09-07 availability check: Railway `integration-test` / `Postgres-2Wsy`
+currently Online, private networking, no public endpoint configured. Local runner
+has no TEST_DATABASE_URL. UI offers a private CLI tunnel, but connectivity and
+database identity were not tested. Database browser displayed no tables; this
+alone does not establish contents of the separately named integration database.
+No settings/data changed and no tests rerun. Six isolated cases remain NOT RUN;
+next is connect and verify the existing isolated database, not create a duplicate.
+
 2026-09-07 market-pricing discussion: no new live test or defect closure.
 Official vendor research and provisional estimates are recorded separately in
 `docs/NIGERIA_MARKET_AND_PRICING_RESEARCH.md`. Existing source-review follow-ups

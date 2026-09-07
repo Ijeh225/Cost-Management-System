@@ -45,6 +45,13 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- Availability clarification, checked live 2026-09-07: existing Railway
+  `integration-test` / `Postgres-2Wsy` is Online. Settings show private networking
+  and Add Public Access (no public endpoint); current runner environment has no
+  TEST_DATABASE_URL. This is a runner-connection gap, not a missing database or
+  confirmed outage. Railway UI offers `railway connect Postgres-2Wsy --tunnel-only`;
+  verify CLI support/auth and actual test database before running the suite.
+  No tunnel, exposure, schema or data change was made during this read-only check.
 - `MANUAL-GATE-001` and `MANUAL-INV-001` are closed on the deployed live
   acceptance scope below. Do not repeat fixture creation or financial writes.
 - Remaining verification limit: run the six new isolated database regression
