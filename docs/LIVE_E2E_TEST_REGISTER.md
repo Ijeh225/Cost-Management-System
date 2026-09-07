@@ -32,6 +32,8 @@ was corrected and the six tests rerun successfully. No production data affected.
 
 ### Isolated Six-Case Acceptance - 2026-09-07
 
+- Tests/cleanup and evidence committed and pushed as `f9f2a4b` to origin/master.
+
 Target: existing Postgres-2Wsy in integration-test, not production. SQL confirmed
 cost_management_integration_test / 57 public tables / zero initial containers.
 Used Railway CLI 5.49.3 SSH tunnel bound to 127.0.0.1:54339, no public endpoint.

@@ -58,5 +58,6 @@ Preserve live fixtures 28-31, client 9, invoices 12-13 and historic NGN500 evide
 ## Changes
 
 Test fixture cleanup only; no application runtime/source behavior or PDF changes.
-Updated Project State, Live Test Register and session index. Commit hash recorded
-after commit creation and verified push.
+Updated Project State, Live Test Register and session index. Tests/cleanup and
+evidence committed/pushed as `f9f2a4b` to origin/master. Record-only follow-up
+captures that verified commit and push result.

@@ -57,6 +57,7 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Isolated Manual Regressions - 2026-09-07
 
+- Tests/cleanup and evidence committed and pushed as `f9f2a4b` to origin/master.
 - User authorized connecting the existing isolated DB and running the six tests.
   Railway CLI 5.49.3 used authenticated SSH tunneling to `Postgres-2Wsy`, explicitly
   selecting integration-test (51a4f5a2-e7ae-443e-836f-095b2015f3cc) and service
