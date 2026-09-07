@@ -20,6 +20,7 @@ action` label below does not override this current register.
 | Operations and document re-test | `OPS-001`, `OPS-002`, `VAT-001`, `VAT-002`, `CLT-001`, `CONT-RPT-001`, `INV-001`, `STMT-001` | Stage ownership is authoritative in Operations, Pull-Out Released is visible, VAT and statement figures use only active financial invoices, Client/AR figures agree, container prints are accurate, and zero-value drafts cannot be sent. |
 | Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
 | Scoped finance middleware | `API-ROUTE-001` | Release `6a327a5` active in Railway; 12 authenticated live API checks passed for existing Operations QA staff, including allowed operational reads and denied finance / cross-branch access. |
+| Manual follow-up acceptance | `MANUAL-GATE-001`, `MANUAL-INV-001` | 2026-09-07 deployed gate readiness/order/duplicate controls and preview-to-saved NGN90 draft passed. Container 31 and invoice 13 retained; isolated six-case suite remains unrun. |
 
 ### Current Follow-Up
 
@@ -32,14 +33,55 @@ acceptance test or proof of multi-company tenancy.
 The manual documentation task completed on 2026-09-05. The earlier remediation
 round remains closed on its recorded scope. Its two source-review follow-ups
 were subsequently reproduced with user-authorized live writes on 2026-09-07,
-as recorded below. Corrections were then implemented on 2026-09-07 and passed
-local checks; deployment/live acceptance and new database regressions remain
-pending. No original audit closure is reopened.
+as recorded below. Corrections passed local checks and subsequent deployed live
+acceptance on 2026-09-07. Six new isolated database regressions remain unrun;
+that coverage limit is not an open reproduced defect. No original audit closure
+is reopened.
 
 | New record | Evidence / status | Next bounded verification |
 | --- | --- | --- |
-| `MANUAL-GATE-001` | High; reproduced live, corrected in code 2026-09-07; deployment/live acceptance pending. Shared readiness/order/duplicate validator plus row-locked transaction replaces weaker gate handlers. Unit checks pass; new concurrency cases written, not yet run. | Verify deployed invalid requests return 409 without writes; test valid sequence/concurrency in isolated DB. Preserve original timestamps, historic fixtures and prior audit evidence. |
-| `MANUAL-INV-001` | Medium; reproduced live, corrected in code 2026-09-07; deployment/live acceptance pending. Preview now uses agreed rate (including zero), fallback container charge, accurate line labels/totals and a client-data loading guard. Three preview tests pass. | Confirm deployed preview NGN90 for client 9/container 28 without issuing/changing invoice 12. If a new draft is needed for acceptance, use a separate labelled fixture; do not alter issued invoices. |
+| `MANUAL-GATE-001` | Closed by deployed live acceptance 2026-09-07. Missing prerequisites/order violations/duplicates return 409; valid four-event sequence has one persisted audit each. Loaded gate concurrency pairs returned 200/409. | Preserve fixtures. Run isolated regression suite separately when reachable; do not repeat fixture creation. |
+| `MANUAL-INV-001` | Closed by deployed browser acceptance 2026-09-07. Container 31 NGN100 charge/client 9 NGN90 agreed rate: preview NGN90 and saved draft 13 NGN90, paid NGN0. VAT preview also correct. | Retain unpaid draft and original failure invoice 12. No issuance/payment required. |
+
+### Deployed Live Acceptance - 2026-09-07
+
+- Deployment confirmed in Railway: 696ef75 includes 960b7ff; Active / Deployment
+  successful, ID `c113654a-88a6-44f1-83a9-cf19509f1764`.
+- Controlled owner API test created only container 31 `E2ER260907`, BL
+  `E2E-ACCEPTANCE-260907`, E2E Lagos/branch 2, client 9, charge NGN100.
+  Verification and explicit Shipping stage were fixture setup; required PAAR,
+  Transire, DO, TDO and Pullout releases were recorded before successful Gate-In.
+- Before releases, all four gate endpoints rejected invalid requests with 409
+  and timestamp/update fields remained unchanged. Existing invalid fixtures
+  29/30 also rejected duplicate or missing-entry requests. Empty entry before
+  loaded exit and empty exit before empty entry returned 409.
+- Loaded Gate-In/Gate-Out concurrent pairs each returned [200,409]; subsequent
+  retries returned 409 without changing timestamps. Browser and final read-only
+  API inspection confirmed the complete four-event sequence and one audit each:
+
+| Persisted event on container 31 | UTC timestamp |
+| --- | --- |
+| Gate-In | 2026-09-07T13:08:52.893Z |
+| Gate-Out | 2026-09-07T13:08:55.497Z |
+| Empty Gate-In | 2026-09-07T13:08:58.214Z |
+| Empty Gate-Out / emptyReturnDate | 2026-09-07T13:08:59.995Z |
+
+- The write runner finished before its final console tail could be recovered
+  after context compaction. No writes were repeated. Independent read-only
+  verification exited 0/PASS for all persisted timestamps, exactly one audit per
+  event, empty-return equality and preserved historical dates on 29/30. Do not
+  infer unobserved final runner assertions from that result.
+- Browser preview selected only container 31: line/subtotal/total NGN90,
+  explicitly labelled client agreed rate. 7.5% VAT preview NGN6.75, total NGN96.75.
+  Reset to 0%; created invoice 13 `INV-202609-006` once, NGN90 subtotal/total,
+  Draft, NGN0 paid, no payments. Existing invoice 12 remained unchanged.
+- No bank posting, payment, invoice issuance, external message, schema change,
+  or cleanup. New fixtures retained. Script has an existing-fixture guard:
+  `scripts/live-manual-acceptance.py`; do not rerun its creation flow.
+- Scope limit: owner live tests do not replace six isolated DB cases covering
+  transaction side effects, concurrency, access boundaries and 90/zero/unset
+  rates. Those remain NOT RUN. No test service exposure changed.
+- Session: `docs/SESSION_SUMMARIES/2026-09-07-manual-live-acceptance.md`.
 
 ### Correction Verification - 2026-09-07
 
@@ -61,8 +103,8 @@ pending. No original audit closure is reopened.
   protection/valid flow, branch/auth restrictions, and rate 90/0/unset invoice
   drafts). No TEST_DATABASE_URL supplied; local Docker engine pipe absent.
   Existing Railway integration DB was not re-exposed and production was not used.
-- No deployment success or corrected live behavior is claimed. Next is deployment
-  confirmation and bounded acceptance, plus isolated DB suite when reachable.
+- At implementation, deployment/live acceptance were pending. The subsequent
+  deployed acceptance above supersedes that status; isolated suite remains unrun.
 
 ### Live Write Reproduction Evidence - 2026-09-07
 

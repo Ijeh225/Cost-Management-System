@@ -45,25 +45,39 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
-- 2026-09-07: authorized fixes implemented and locally checked. Deployment and
-  controlled live acceptance remain pending; do not mark these two issues closed.
-  Preserve live fixtures 28-30, client 9 and invoice 12; no historic NGN500 repair.
+- `MANUAL-GATE-001` and `MANUAL-INV-001` are closed on the deployed live
+  acceptance scope below. Do not repeat fixture creation or financial writes.
+- Remaining verification limit: run the six new isolated database regression
+  cases when TEST_DATABASE_URL is available. The live acceptance is not proof
+  that the entire isolated suite passed. No new confirmed defect was found.
+- Preserve fixtures 28-31, client 9, invoices 12-13 and historical NGN500 evidence.
+  The completed PDF remains its historical edition; no PDF rewrite this session.
 
-- 2026-09-07: authorized live write reproduction is complete. Both manual
-  follow-ups reproduced; no application correction was made. Details below
-  and in the current live-test register. Retain fixtures; do not rerun creation.
+### Deployed Manual Acceptance - 2026-09-07
 
-1. The user-requested application blueprint/training PDF is complete; review the
-   manual in `output/pdf/Cost_Management_Blueprint_and_User_Manual.pdf`.
-2. Confirm deployment of the gate/invoice fixes, then run controlled acceptance
-   of `MANUAL-GATE-001` and `MANUAL-INV-001`. Run the new isolated concurrency
-   cases when the separate test database is reachable. Do not rerun the old
-   negative-write probe or silently rewrite its evidence.
+- Railway release "Record gate and invoice correction push" (696ef75, includes
+  fix 960b7ff) is Active / Deployment successful; deployment
+  `c113654a-88a6-44f1-83a9-cf19509f1764` observed directly.
+- Gate acceptance used one new labelled dummy container 31 `E2ER260907`, branch
+  2, client 9, clearing charge NGN100. Missing releases and out-of-order events
+  returned 409. After recording the required releases, all four gate events
+  persisted in order with one audit entry each. Loaded entry/exit simultaneous
+  request pairs returned 200/409, and retries preserved the accepted timestamps.
+- A separate read-only API verification exited 0/PASS: final gate timestamps
+  match browser audit, emptyReturnDate equals emptyGateOutDate, and historical
+  invalid timestamps on containers 29/30 remain unchanged. No old data repaired.
+- Browser invoice preview for container 31 correctly used client agreed NGN90
+  instead of container NGN100. VAT 7.5% preview was NGN6.75 / total NGN96.75.
+  Reset VAT to 0 and saved invoice 13 `INV-202609-006`: subtotal/total NGN90,
+  Draft, paid NGN0, no payment history. No issuance or money posting.
+- Live owner acceptance does not replace isolated rollback/access-boundary
+  regression coverage. Six new isolated cases remain NOT RUN; test DB not exposed.
+- Session: `docs/SESSION_SUMMARIES/2026-09-07-manual-live-acceptance.md`.
 
 ### Gate and Invoice Preview Corrections - 2026-09-07
 
 - Code, tests and records committed as `960b7ff` and pushed to `origin/master`.
-  Deployment and corrected live acceptance have not yet been verified.
+  Deployment/live acceptance were pending at implementation; now verified above.
 
 - `MANUAL-GATE-001`: four existing gate endpoints now share validation and a
   row-locked transaction covering the event timestamp, audit and notification.
@@ -87,8 +101,8 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
   invoice pricing scenarios. Not executed this session: TEST_DATABASE_URL absent;
   Docker Linux engine pipe unavailable; Railway test DB remains privately hosted
   per prior records. No production database substituted or network exposed.
-- No live record, schema or PDF changed during implementation. Source-review
-  concerns are corrected in code, not yet closed by deployed live acceptance.
+- No live record, schema or PDF changed during implementation. Subsequent live
+  acceptance is recorded above and closes these concerns on its tested scope.
 - Session: `docs/SESSION_SUMMARIES/2026-09-07-gate-invoice-fixes.md`.
 
 ### Manual Follow-Up Live Reproduction - 2026-09-07
