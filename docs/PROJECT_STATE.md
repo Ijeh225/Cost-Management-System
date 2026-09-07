@@ -62,6 +62,9 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Gate and Invoice Preview Corrections - 2026-09-07
 
+- Code, tests and records committed as `960b7ff` and pushed to `origin/master`.
+  Deployment and corrected live acceptance have not yet been verified.
+
 - `MANUAL-GATE-001`: four existing gate endpoints now share validation and a
   row-locked transaction covering the event timestamp, audit and notification.
   Gate-In uses the existing complete-release readiness rule. Duplicates return
