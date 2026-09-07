@@ -20,6 +20,7 @@ import {
   shippingChargesTable,
   usersTable,
   workflowNotificationsTable,
+  auditLogTable,
 } from "@workspace/db";
 import { and, eq, inArray, or } from "drizzle-orm";
 
@@ -46,6 +47,20 @@ let transferBankId = 0;
 let collectionInvoiceId = 0;
 let collectionClientId = 0;
 let createdStaffUserId = 0;
+const gateFixtureIds: number[] = [];
+const pricingInvoiceIds: number[] = [];
+const pricingClientIds: number[] = [];
+
+async function gateFixture(overrides: Partial<typeof containersTable.$inferInsert> = {}) {
+  const [row] = await db.insert(containersTable).values({
+    branchId: branchAId, customerName: "Isolated gate QA",
+    containerNumber: `GATE-${suffix}-${gateFixtureIds.length}`,
+    blNumber: `GATE-BL-${suffix}-${gateFixtureIds.length}`,
+    status: "shipping", ...overrides,
+  }).returning();
+  gateFixtureIds.push(row.id);
+  return row;
+}
 
 async function login(email: string): Promise<Session> {
   const agent = request.agent(app);
@@ -199,6 +214,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (pricingInvoiceIds.length) await db.delete(invoicesTable).where(inArray(invoicesTable.id, pricingInvoiceIds));
+  if (gateFixtureIds.length) await db.delete(containersTable).where(inArray(containersTable.id, gateFixtureIds));
+  if (pricingClientIds.length) await db.delete(clientsTable).where(inArray(clientsTable.id, pricingClientIds));
   if (collectionBankId || transferBankId) {
     await db.delete(bankTransfersTable).where(or(
       eq(bankTransfersTable.fromBankId, collectionBankId),
@@ -228,6 +246,77 @@ afterAll(async () => {
 });
 
 describe("sensitive workflow integration", () => {
+  it("rejects gate writes with missing readiness and missing prior events without side effects", async () => {
+    const row = await gateFixture();
+    for (const event of ["gate-in", "gate-out", "empty-gate-in", "empty-gate-out"]) {
+      const response = await admin.agent.post(`/api/containers/${row.id}/${event}`)
+        .set("X-CSRF-Token", admin.csrf).send({});
+      expect(response.status, event).toBe(409);
+    }
+    const [unchanged] = await db.select().from(containersTable).where(eq(containersTable.id, row.id));
+    expect(unchanged).toMatchObject({ status: "shipping", gateInDate: null, gateOutDate: null, emptyGateInDate: null, emptyGateOutDate: null });
+    expect(await db.select().from(auditLogTable).where(eq(auditLogTable.containerId, row.id))).toHaveLength(0);
+    expect(await db.select().from(workflowNotificationsTable).where(eq(workflowNotificationsTable.containerId, row.id))).toHaveLength(0);
+  });
+
+  it("records one gate entry under concurrent requests, keeps prior notifications, and completes the valid sequence", async () => {
+    const release = new Date("2026-09-01T00:00:00Z");
+    const row = await gateFixture({
+      paarNumber: "INT-PAAR", paarReleasedAt: release, transireReleasedAt: release,
+      doReleasedAt: release, tdoReleasedAt: release, pulloutReleasedAt: release,
+    });
+    await db.insert(workflowNotificationsTable).values({
+      type: "new_job", containerId: row.id, branchId: branchAId,
+      containerNumber: row.containerNumber, message: "Prior workflow event must survive Gate-In",
+    });
+    const post = (event: string) => admin.agent.post(`/api/containers/${row.id}/${event}`)
+      .set("X-CSRF-Token", admin.csrf).send({});
+    const entries = await Promise.all([post("gate-in"), post("gate-in")]);
+    expect(entries.map(r => r.status).sort()).toEqual([200, 409]);
+    const original = entries.find(r => r.status === 200)!.body.gateInDate;
+    expect((await post("gate-in")).status).toBe(409);
+    for (const event of ["gate-out", "empty-gate-in", "empty-gate-out"]) {
+      const results = await Promise.all([post(event), post(event)]);
+      expect(results.map(r => r.status).sort(), event).toEqual([200, 409]);
+    }
+    const [saved] = await db.select().from(containersTable).where(eq(containersTable.id, row.id));
+    expect(saved.gateInDate!.toISOString()).toBe(original);
+    expect(saved.emptyReturnDate).toEqual(saved.emptyGateOutDate);
+    expect(saved.emptyGateInDate!.getTime()).toBeGreaterThanOrEqual(saved.gateOutDate!.getTime());
+    expect(await db.select().from(auditLogTable).where(eq(auditLogTable.containerId, row.id))).toHaveLength(4);
+    expect(await db.select().from(workflowNotificationsTable).where(eq(workflowNotificationsTable.containerId, row.id))).toHaveLength(5);
+  });
+
+  it("keeps gate authorization and branch boundaries intact", async () => {
+    const local = await gateFixture();
+    const remote = await gateFixture({ branchId: branchBId });
+    expect((await officer.agent.post(`/api/containers/${local.id}/gate-in`)
+      .set("X-CSRF-Token", officer.csrf).send({})).status).toBe(403);
+    expect((await admin.agent.post(`/api/containers/${remote.id}/gate-in`)
+      .set("X-CSRF-Token", admin.csrf).send({})).status).toBe(404);
+  });
+
+  it.each([
+    { rate: "90", subtotal: 180, vat: 13.5, total: 193.5 },
+    { rate: "0", subtotal: 0, vat: 0, total: 0 },
+    { rate: null, subtotal: 300, vat: 22.5, total: 322.5 },
+  ])("persists the same per-container pricing rule used by the preview: $rate", async ({ rate, subtotal, vat, total }) => {
+    const [client] = await db.insert(clientsTable).values({
+      name: `Pricing QA ${suffix} ${rate}`, branchId: branchAId, agreedClearingRate: rate,
+    }).returning();
+    pricingClientIds.push(client.id);
+    const a = await gateFixture({ clientId: client.id, clearingCharges: "100" });
+    const b = await gateFixture({ clientId: client.id, clearingCharges: "200" });
+    const response = await admin.agent.post("/api/invoices")
+      .set("X-CSRF-Token", admin.csrf)
+      .send({ containerIds: [a.id, b.id], vatRate: 7.5 });
+    if (response.status === 201) pricingInvoiceIds.push(response.body.id);
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ status: "draft", subtotal, vatAmount: vat, total });
+    expect(response.body.items.map((item: { amount: number }) => item.amount).sort((x: number, y: number) => x - y))
+      .toEqual(rate == null ? [100, 200] : [Number(rate), Number(rate)]);
+  });
+
   it("keeps finance routes denied without blocking unrelated staff routes", async () => {
     const financePaths = ["/clients", "/client-deposits/1/allocate", "/invoices", "/credit-notes", "/banks", "/reports/pl", "/payment-schedules", "/overhead-expenses", "/container-expense-categories", "/container-expense-payments/recent", `/containers/${protectedContainerId}/expense-payments`, `/containers/${protectedContainerId}/reconciliation`, `/containers/${protectedContainerId}/unlink-client`];
     for (const path of financePaths) {

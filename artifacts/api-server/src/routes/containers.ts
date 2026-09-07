@@ -5,6 +5,7 @@ import { requireAuth, requireBranchAdminOrAbove, AuthRequest, getBranchScope, re
 import { calcTotalCost } from "../lib/calculations.js";
 import { isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 import { getFinalWorkflowMissingStages } from "../lib/workflow-readiness.js";
+import { GATE_EVENTS, gateEventError, type GateEvent } from "../lib/gate-events.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
 import { isContainerPhysicallyInTerminal } from "../lib/operational-definitions.js";
 import { stageOwnerFieldFor, stageOwnerFor } from "../lib/department-stage-owners.js";
@@ -1619,181 +1620,61 @@ router.get("/containers/gate-log", requireAuth, async (req: AuthRequest, res) =>
   }
 });
 
-// POST /containers/:id/gate-in — Security records container entry with exact timestamp
-router.post("/containers/:id/gate-in", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const id = parseInt(String(req.params.id));
-    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
-    const isSecurityUser = hasWorkspace(req.user!.accessProfile, "security");
-    if (!isAdmin && !isSecurityUser) {
-      return res.status(403).json({ error: "Only security personnel or administrators can record Gate-In" });
-    }
-    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
-
-    const now = new Date();
-    let nextStatus = existing.status;
-    if (["shipping", "pull_out"].includes(existing.status) || existing.pulloutReleasedAt) {
-      nextStatus = "gate_in";
-    } else if (!["gate_in", "examination", "final_release"].includes(existing.status)) {
-      return res.status(409).json({ error: `Container is at "${existing.status}" stage — Gate-In can only be recorded after Pull-Out release or once already in the terminal` });
-    }
-
-    const [updated] = await db.update(containersTable)
-      .set({ status: nextStatus, gateInDate: now, updatedAt: now })
-      .where(eq(containersTable.id, id))
-      .returning();
-    await db.insert(auditLogTable).values({
-      containerId: id,
-      branchId: existing.branchId,
-      userId: req.user!.id,
-      action: "gate_in_recorded",
-      section: "basic_info",
-      reason: `Gate-In recorded at ${now.toISOString()} by security`,
-    });
+// Lock validation, event write, audit and notification together so retries cannot overwrite history.
+for (const event of Object.keys(GATE_EVENTS) as GateEvent[]) {
+  router.post(`/containers/:id/${event}`, requireAuth, async (req: AuthRequest, res) => {
     try {
-      await db.delete(workflowNotificationsTable).where(eq(workflowNotificationsTable.containerId, id));
-      await db.insert(workflowNotificationsTable).values({
-        type: "gate_in",
-        message: `${existing.containerNumber} gated in — ready for terminal processing`,
-        containerId: id,
-        branchId: existing.branchId,
-        containerNumber: existing.containerNumber,
-      });
-    } catch {}
-    return res.json(formatContainer(updated));
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Server error" });
-  }
-});
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid container id" });
+      const config = GATE_EVENTS[event];
+      if (!hasAuthority(req.user!.accessProfile, "admin") && !hasWorkspace(req.user!.accessProfile, "security")) {
+        return res.status(403).json({ error: `Only security personnel or administrators can record ${config.label}` });
+      }
 
-// POST /containers/:id/gate-out — Security records container exit (timestamp only, no stage change)
-router.post("/containers/:id/gate-out", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const id = parseInt(String(req.params.id));
-    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
-    const isSecurityUser = hasWorkspace(req.user!.accessProfile, "security");
-    if (!isAdmin && !isSecurityUser) {
-      return res.status(403).json({ error: "Only security personnel or administrators can record Gate-Out" });
-    }
-    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
-    if (existing.gateOutDate) {
-      return res.status(409).json({ error: "Gate-Out has already been recorded for this container" });
-    }
-    const now = new Date();
-    const [updated] = await db.update(containersTable)
-      .set({ gateOutDate: now, updatedAt: now })
-      .where(eq(containersTable.id, id))
-      .returning();
-    await db.insert(auditLogTable).values({
-      containerId: id,
-      branchId: existing.branchId,
-      userId: req.user!.id,
-      action: "gate_out_recorded",
-      section: "basic_info",
-      reason: `Gate-Out recorded at ${now.toISOString()} by security`,
-    });
-    try {
-      await db.insert(workflowNotificationsTable).values({
-        type: "gate_out", branchId: existing.branchId,
-        message: `Gate-Out recorded — container left terminal: ${existing.containerNumber}`,
-        containerId: id, containerNumber: existing.containerNumber,
-      });
-    } catch {}
-    return res.json(formatContainer(updated));
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Server error" });
-  }
-});
+      const result = await db.transaction(async (tx) => {
+        const [existing] = await tx.select().from(containersTable)
+          .where(eq(containersTable.id, id)).for("update");
+        if (!existing || !userCanAccessBranch(req, existing.branchId)) {
+          return { status: 404, body: { error: "Container not found" } };
+        }
+        const error = gateEventError(existing, event);
+        if (error) return { status: 409, body: error };
 
-// POST /containers/:id/empty-gate-in — Security records empty container return to terminal (Scenario B step 1)
-router.post("/containers/:id/empty-gate-in", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const id = parseInt(String(req.params.id));
-    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
-    const isSecurityUser = hasWorkspace(req.user!.accessProfile, "security");
-    if (!isAdmin && !isSecurityUser) {
-      return res.status(403).json({ error: "Only security personnel or administrators can record Empty Gate-In" });
-    }
-    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
-    if (existing.emptyGateInDate) {
-      return res.status(409).json({ error: "Empty Gate-In has already been recorded for this container" });
-    }
-    const now = new Date();
-    const [updated] = await db.update(containersTable)
-      .set({ emptyGateInDate: now, updatedAt: now })
-      .where(eq(containersTable.id, id))
-      .returning();
-    await db.insert(auditLogTable).values({
-      containerId: id,
-      branchId: existing.branchId,
-      userId: req.user!.id,
-      action: "empty_gate_in_recorded",
-      section: "basic_info",
-      reason: `Empty Gate-In recorded at ${now.toISOString()} by security — empty container returned to terminal`,
-    });
-    try {
-      await db.insert(workflowNotificationsTable).values({
-        type: "empty_gate_in", branchId: existing.branchId,
-        message: `Empty container returned to terminal: ${existing.containerNumber}`,
-        containerId: id, containerNumber: existing.containerNumber,
+        const now = new Date();
+        const updates: Partial<typeof containersTable.$inferInsert> = {
+          [config.field]: now,
+          updatedAt: now,
+        };
+        if (event === "gate-in" && !["gate_in", "examination", "final_release"].includes(existing.status)) {
+          updates.status = "gate_in";
+        }
+        if (event === "empty-gate-out") updates.emptyReturnDate = now;
+        const [updated] = await tx.update(containersTable).set(updates)
+          .where(eq(containersTable.id, id)).returning();
+        await tx.insert(auditLogTable).values({
+          containerId: id,
+          branchId: existing.branchId,
+          userId: req.user!.id,
+          action: `${config.type}_recorded`,
+          section: "basic_info",
+          reason: `${config.label} recorded at ${now.toISOString()} by security`,
+        });
+        await tx.insert(workflowNotificationsTable).values({
+          type: config.type,
+          branchId: existing.branchId,
+          message: `${config.label} recorded: ${existing.containerNumber}`,
+          containerId: id,
+          containerNumber: existing.containerNumber,
+        });
+        return { status: 200, body: formatContainer(updated) };
       });
-    } catch {}
-    return res.json(formatContainer(updated));
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Server error" });
-  }
-});
-
-// POST /containers/:id/empty-gate-out — Security records empty container exit to port (Scenario B step 2 — auto-sets emptyReturnDate)
-router.post("/containers/:id/empty-gate-out", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const id = parseInt(String(req.params.id));
-    const isAdmin = hasAuthority(req.user!.accessProfile, "admin");
-    const isSecurityUser = hasWorkspace(req.user!.accessProfile, "security");
-    if (!isAdmin && !isSecurityUser) {
-      return res.status(403).json({ error: "Only security personnel or administrators can record Empty Gate-Out" });
+      return res.status(result.status).json(result.body);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Server error" });
     }
-    const [existing] = await db.select().from(containersTable).where(eq(containersTable.id, id));
-    if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Container not found" }); return; }
-    if (!existing.emptyGateInDate) {
-      return res.status(409).json({ error: "Empty Gate-In must be recorded before Empty Gate-Out" });
-    }
-    if (existing.emptyGateOutDate) {
-      return res.status(409).json({ error: "Empty Gate-Out has already been recorded for this container" });
-    }
-    const now = new Date();
-    // Auto-set emptyReturnDate: empty has left terminal, custody lifespan closes
-    const [updated] = await db.update(containersTable)
-      .set({ emptyGateOutDate: now, emptyReturnDate: now, updatedAt: now })
-      .where(eq(containersTable.id, id))
-      .returning();
-    await db.insert(auditLogTable).values({
-      containerId: id,
-      branchId: existing.branchId,
-      userId: req.user!.id,
-      action: "empty_gate_out_recorded",
-      section: "basic_info",
-      reason: `Empty Gate-Out recorded at ${now.toISOString()} by security — empty container returned to port, custody closed`,
-    });
-    try {
-      await db.insert(workflowNotificationsTable).values({
-        type: "empty_gate_out", branchId: existing.branchId,
-        message: `Empty container returned to port — custody closed: ${existing.containerNumber}`,
-        containerId: id, containerNumber: existing.containerNumber,
-      });
-    } catch {}
-    return res.json(formatContainer(updated));
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Server error" });
-  }
-});
+  });
+}
 
 router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
   try {

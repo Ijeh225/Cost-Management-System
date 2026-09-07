@@ -6,6 +6,7 @@ import {
   type Client,
 } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/format";
+import { invoiceItemAmount, invoicePreview } from "@/lib/invoice-preview";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -41,7 +42,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
   const [notes, setNotes] = useState("");
 
   const { data: clients, isLoading: clientsLoading } = useListClients();
-  const { data: clientDetails, isLoading: containersLoading } = useGetClient(selectedClientId);
+  const { data: clientDetails, isLoading: containersLoading, isError: clientLoadError } = useGetClient(selectedClientId);
   const { data: allInvoices } = useListInvoices();
   const createMutation = useCreateInvoice();
   const { isSuperAdmin, user } = useAuth();
@@ -71,13 +72,15 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
     )
   );
 
-  const subtotal = selectedContainerIds.reduce((sum, cid) => {
-    const container = containers.find(c => c.id === cid);
-    return sum + (container ? parseFloat(container.clearingCharges ?? "0") : 0);
-  }, 0);
-
-  const vatAmount = vatRate ? subtotal * (parseFloat(vatRate) / 100) : 0;
-  const total = subtotal + vatAmount;
+  const agreedRate = clientDetails?.agreedClearingRate;
+  const selectedContainers = containers.filter(c => selectedContainerIds.includes(c.id));
+  const pricingReady = !containersLoading && !clientLoadError
+    && clientDetails?.id === selectedClientId
+    && selectedContainers.length === selectedContainerIds.length;
+  const { subtotal, vatAmount, total } = invoicePreview(
+    selectedContainers.map(c => invoiceItemAmount(c.clearingCharges, agreedRate)),
+    vatRate ? Number(vatRate) : 0,
+  );
 
   const toggleContainer = (cid: number) => {
     setSelectedContainerIds(prev =>
@@ -94,6 +97,10 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
   };
 
   const handleCreate = async () => {
+    if (!pricingReady) {
+      toast({ variant: "destructive", title: "Wait for client pricing and containers to load" });
+      return;
+    }
     if (selectedContainerIds.length === 0) {
       toast({ variant: "destructive", title: "Select at least one container" });
       return;
@@ -174,7 +181,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
                 </button>
               )}
               <Badge variant="outline" className="text-xs border-primary/40 text-primary">
-                {selectedClient?.name ?? "Client"}
+                {clientDetails?.name ?? selectedClient?.name ?? "Client"}
               </Badge>
             </div>
 
@@ -182,7 +189,9 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
               <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
                 Containers
               </Label>
-              {containersLoading ? (
+              {clientLoadError ? (
+                <p role="alert" className="text-sm text-destructive">Unable to load client pricing. Reopen the dialog to try again.</p>
+              ) : containersLoading ? (
                 <div className="flex justify-center py-6">
                   <Loader2 className="w-5 h-5 animate-spin text-primary" />
                 </div>
@@ -196,6 +205,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
                   {containers.map(c => {
                     const alreadyInvoiced = invoicedContainerIds.has(c.id);
                     const checked = selectedContainerIds.includes(c.id);
+                    const effectiveAmount = invoiceItemAmount(c.clearingCharges, agreedRate);
                     return (
                       <label
                         key={c.id}
@@ -220,7 +230,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
                                 Invoiced
                               </Badge>
                             )}
-                            {(!c.clearingCharges || parseFloat(c.clearingCharges) === 0) && (
+                            {effectiveAmount === 0 && (
                               <Badge className="text-[10px] px-1.5 py-0 bg-destructive/15 text-destructive border border-destructive/30">
                                 No charge set
                               </Badge>
@@ -231,10 +241,10 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
                           )}
                         </div>
                         <div className="text-right shrink-0">
-                          <span className={`text-sm font-semibold font-mono ${(!c.clearingCharges || parseFloat(c.clearingCharges) === 0) ? "text-muted-foreground/50" : "text-foreground"}`}>
-                            {formatCurrency(parseFloat(c.clearingCharges ?? "0"))}
+                          <span className={`text-sm font-semibold font-mono ${effectiveAmount === 0 ? "text-muted-foreground/50" : "text-foreground"}`}>
+                            {formatCurrency(effectiveAmount)}
                           </span>
-                          <p className="text-[10px] text-muted-foreground">clearing charge</p>
+                          <p className="text-[10px] text-muted-foreground">{agreedRate != null ? "client agreed rate" : "container clearing charge"}</p>
                         </div>
                       </label>
                     );
@@ -242,7 +252,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
                 </div>
               )}
 
-              {selectedContainerIds.length > 0 && (
+              {pricingReady && selectedContainerIds.length > 0 && (
                 <div className="rounded-lg border border-border/50 bg-background/50 px-4 py-3 space-y-1.5">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">
@@ -322,7 +332,7 @@ export function CreateInvoiceDialog({ open, onClose, preselectedClientId, presel
               <Button variant="outline" onClick={onClose}>Cancel</Button>
               <Button
                 onClick={handleCreate}
-                disabled={createMutation.isPending || selectedContainerIds.length === 0}
+                disabled={createMutation.isPending || !pricingReady || selectedContainerIds.length === 0}
                 className="gap-2"
               >
                 {createMutation.isPending ? (

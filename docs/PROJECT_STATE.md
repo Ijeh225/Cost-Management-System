@@ -45,16 +45,48 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-07: authorized fixes implemented and locally checked. Deployment and
+  controlled live acceptance remain pending; do not mark these two issues closed.
+  Preserve live fixtures 28-30, client 9 and invoice 12; no historic NGN500 repair.
+
 - 2026-09-07: authorized live write reproduction is complete. Both manual
   follow-ups reproduced; no application correction was made. Details below
   and in the current live-test register. Retain fixtures; do not rerun creation.
 
 1. The user-requested application blueprint/training PDF is complete; review the
    manual in `output/pdf/Cost_Management_Blueprint_and_User_Manual.pdf`.
-2. Await authorization to correct now-live-confirmed `MANUAL-GATE-001`
-   (gate readiness, duplicate timestamp and event-order controls), then
-   `MANUAL-INV-001` (preview uses container rate, saved draft uses agreed rate).
-   Do not restart closed remediation writes or repair historic data by invention.
+2. Confirm deployment of the gate/invoice fixes, then run controlled acceptance
+   of `MANUAL-GATE-001` and `MANUAL-INV-001`. Run the new isolated concurrency
+   cases when the separate test database is reachable. Do not rerun the old
+   negative-write probe or silently rewrite its evidence.
+
+### Gate and Invoice Preview Corrections - 2026-09-07
+
+- `MANUAL-GATE-001`: four existing gate endpoints now share validation and a
+  row-locked transaction covering the event timestamp, audit and notification.
+  Gate-In uses the existing complete-release readiness rule. Duplicates return
+  409 without replacing timestamps; loaded exit requires entry, empty entry
+  requires loaded exit, and empty exit requires the complete preceding sequence.
+  Inconsistent historic event gaps require review, not fabricated timestamps.
+- Gate-In no longer deletes prior workflow notifications. Allowed existing
+  examination/final-release stage is preserved; delivered/completed jobs cannot
+  be sent back through a new gate entry. Existing auth/branch checks retained.
+  Final empty exit still records emptyReturnDate atomically.
+- `MANUAL-INV-001`: preview uses the selected client's agreed rate per item,
+  including zero, otherwise the container rate. Line labels/zero badges and
+  subtotal/VAT/total use the same amount. Creation waits for successful client
+  data and selected-container resolution. Server pricing/issued invoices unchanged.
+- Verification passed: 101 API unit tests (24 files), three standalone preview
+  tests, full railway:build (all typechecks and frontend/server production builds),
+  git whitespace checks. Vite reports non-fatal sourcemap/chunk-size warnings.
+- Added six isolated integration cases: failed-write no-side-effects, concurrent
+  valid gate sequence/duplicate preservation, access boundaries, and three
+  invoice pricing scenarios. Not executed this session: TEST_DATABASE_URL absent;
+  Docker Linux engine pipe unavailable; Railway test DB remains privately hosted
+  per prior records. No production database substituted or network exposed.
+- No live record, schema or PDF changed during implementation. Source-review
+  concerns are corrected in code, not yet closed by deployed live acceptance.
+- Session: `docs/SESSION_SUMMARIES/2026-09-07-gate-invoice-fixes.md`.
 
 ### Manual Follow-Up Live Reproduction - 2026-09-07
 

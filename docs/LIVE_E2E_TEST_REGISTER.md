@@ -32,12 +32,37 @@ acceptance test or proof of multi-company tenancy.
 The manual documentation task completed on 2026-09-05. The earlier remediation
 round remains closed on its recorded scope. Its two source-review follow-ups
 were subsequently reproduced with user-authorized live writes on 2026-09-07,
-as recorded below. Neither has been fixed. No original audit closure is reopened.
+as recorded below. Corrections were then implemented on 2026-09-07 and passed
+local checks; deployment/live acceptance and new database regressions remain
+pending. No original audit closure is reopened.
 
 | New record | Evidence / status | Next bounded verification |
 | --- | --- | --- |
-| `MANUAL-GATE-001` | High; reproduced live 2026-09-07, open. Fixture 29: main transition rejected missing releases (409), Gate-In accepted (200), repeat overwrote timestamp (200). Fixture 30: Empty Gate-In and loaded Gate-Out accepted without prior loaded entry (200). Final GET and live Gate Log confirm persistence. UI guards exist but API rules are weaker. | On authorization, enforce agreed gate readiness/event-order/duplicate invariants at the API, add isolated regressions and retest; preserve authentic timestamps and retained test evidence. |
-| `MANUAL-INV-001` | Medium; reproduced live 2026-09-07, open. Client 9 agreed rate NGN90, container 28 charge NGN100: Create Invoice preview NGN100, persisted draft invoice 12 NGN90. Server prioritizes agreed rate; preview does not. | On authorization, align preview with server pricing; regression-test different/equal/unset agreed rates and multi-container totals. Do not change issued invoice amounts. |
+| `MANUAL-GATE-001` | High; reproduced live, corrected in code 2026-09-07; deployment/live acceptance pending. Shared readiness/order/duplicate validator plus row-locked transaction replaces weaker gate handlers. Unit checks pass; new concurrency cases written, not yet run. | Verify deployed invalid requests return 409 without writes; test valid sequence/concurrency in isolated DB. Preserve original timestamps, historic fixtures and prior audit evidence. |
+| `MANUAL-INV-001` | Medium; reproduced live, corrected in code 2026-09-07; deployment/live acceptance pending. Preview now uses agreed rate (including zero), fallback container charge, accurate line labels/totals and a client-data loading guard. Three preview tests pass. | Confirm deployed preview NGN90 for client 9/container 28 without issuing/changing invoice 12. If a new draft is needed for acceptance, use a separate labelled fixture; do not alter issued invoices. |
+
+### Correction Verification - 2026-09-07
+
+- User authorized implementation after live reproduction. No live writes in
+  this implementation session; prior fixture evidence remains unchanged.
+- Gate validation now requires complete PAAR/department releases for entry;
+  all four timestamps reject repeats. Loaded exit requires loaded entry; empty
+  return requires loaded entry/exit; empty exit requires all previous events.
+  Inconsistent later events block filling earlier gaps automatically.
+- Event validation/write/audit/notification share a row-lock transaction, with
+  HTTP response after commit. Existing notification history is no longer deleted
+  by Gate-In. Permissions/branch checks and emptyReturnDate behavior retained.
+- Preview uses the server's agreed-rate precedence per container, including zero;
+  client data errors/loading prevent creation. No server price change or repricing
+  of saved invoices. Labels, zero badges, subtotal, VAT and total use effective rate.
+- PASS: 101 API unit tests; three preview arithmetic tests; full production build
+  and TypeScript checks. Non-fatal Vite sourcemap/large-chunk warnings remain.
+- NOT RUN: six new self-seeding DB cases (gate side effects, concurrent duplicate
+  protection/valid flow, branch/auth restrictions, and rate 90/0/unset invoice
+  drafts). No TEST_DATABASE_URL supplied; local Docker engine pipe absent.
+  Existing Railway integration DB was not re-exposed and production was not used.
+- No deployment success or corrected live behavior is claimed. Next is deployment
+  confirmation and bounded acceptance, plus isolated DB suite when reachable.
 
 ### Live Write Reproduction Evidence - 2026-09-07
 
