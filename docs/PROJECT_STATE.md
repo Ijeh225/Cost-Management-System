@@ -52,6 +52,7 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
   CAP-15 security/recovery and CAP-07 bank reconciliation are important before
   wider rollout/transaction volume. Discussion and remaining CAP priorities:
   docs/SESSION_SUMMARIES/2026-09-08-feature-priorities.md.
+  Discussion records committed and pushed as b76aab0; no application changes.
 - 2026-09-08 14:36 WAT: REVIEW-NOTES-001, REVIEW-A11Y-001 and REVIEW-LABEL-001
   are closed by successful deployment and scoped live acceptance. Fix a7766d2 is
   included in active release 56e26d8, Railway deployment

@@ -36,3 +36,6 @@
   user selects a feature and confirms relevant scope; then define acceptance,
   test in isolation, deploy and perform bounded live acceptance. Do not implement
   all proposals at once or describe them as already approved.
+
+- Publication: discussion records committed and pushed as b76aab0. This follow-up
+  records the confirmed Git result; product proposals remain unapproved.
