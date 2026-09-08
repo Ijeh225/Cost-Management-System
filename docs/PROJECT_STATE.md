@@ -45,6 +45,13 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-08 14:57 WAT: discussed next feature priorities after the REVIEW closures.
+  Proposals only, no implementation approved. Start with CAP-01 job overview,
+  CAP-02 document readiness and CAP-03 delay-cost forecasts, subject to CAP-04
+  shipment/B/L/visit scope; CAP-12 moves earlier if operating the physical yard.
+  CAP-15 security/recovery and CAP-07 bank reconciliation are important before
+  wider rollout/transaction volume. Discussion and remaining CAP priorities:
+  docs/SESSION_SUMMARIES/2026-09-08-feature-priorities.md.
 - 2026-09-08 14:36 WAT: REVIEW-NOTES-001, REVIEW-A11Y-001 and REVIEW-LABEL-001
   are closed by successful deployment and scoped live acceptance. Fix a7766d2 is
   included in active release 56e26d8, Railway deployment
