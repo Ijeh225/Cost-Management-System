@@ -44,3 +44,10 @@
 - Next: review/stage changes, commit and push. Then confirm Railway deployment
   and perform scoped live acceptance before closing REVIEW IDs in the register.
   No financial transaction, schema, deployment setting or historical fixture changed.
+
+## 2026-09-08 14:08 WAT (UTC+01:00) - Commit and Push
+
+- Fixes, regression scripts and continuity updates committed as a7766d2.
+  git push origin master succeeded (06c57ee -> a7766d2).
+- Whitespace check passed. This follow-up records the confirmed Git result;
+  deployment and live acceptance are still unverified, not failed or complete.

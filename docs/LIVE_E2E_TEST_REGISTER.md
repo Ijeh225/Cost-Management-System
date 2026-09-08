@@ -25,7 +25,7 @@ action` label below does not override this current register.
 ### Current Follow-Up
 
 2026-09-08 14:06 WAT: all three user-authorized REVIEW fixes are implemented and
-locally verified. Await commit/push and post-deployment live acceptance. No live
+locally verified, committed/pushed as a7766d2. Await deployment/live acceptance. No live
 data was changed. Session: docs/SESSION_SUMMARIES/2026-09-08-review-defect-fixes.md.
 
 2026-09-08 11:53 WAT (UTC+01:00), read-only capability review: three NEW findings,

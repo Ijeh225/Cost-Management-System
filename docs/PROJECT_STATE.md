@@ -46,7 +46,7 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 ### Next Action
 
 - 2026-09-08 14:06 WAT: the three user-authorized REVIEW fixes are implemented
-  and locally verified. Await commit/push, then deployment confirmation and live
+  and locally verified. Committed/pushed as a7766d2. Await deployment confirmation and live
   acceptance; do not mark them live-closed yet. No financial writes or migrations.
   Session:
   docs/SESSION_SUMMARIES/2026-09-08-review-defect-fixes.md.
