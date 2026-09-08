@@ -46,6 +46,7 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 ### Next Action
 
 - Completed user-selected capability/interface review (2026-09-08 11:53 WAT).
+  Committed and pushed as ed3e21c at 11:55 WAT; documentation-only change.
   Report: docs/APPLICATION_CAPABILITY_REVIEW_2026-09-08.md, covering current app,
   RaspibTech and primary competitor/reference sources, UX and 16 prioritized
   proposals. No feature implementation or new financial acceptance run.

@@ -38,6 +38,7 @@ research recommendations are proposals, not defects or new live test passes.
 Final review: docs/APPLICATION_CAPABILITY_REVIEW_2026-09-08.md. Six screens were
 sampled read-only; current narrow-view screenshots and AX plus source/manual
 review are not a new full desktop/mobile, financial-write or cross-role test.
+Review and continuity records committed and pushed as ed3e21c at 11:55 WAT.
 
 2026-09-08: historical SCHED-001 NGN500 data exception is now reconciled under
 explicit user authorization. This is a labelled reconstruction, not recovery of
