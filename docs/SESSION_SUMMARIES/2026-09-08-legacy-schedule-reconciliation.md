@@ -54,5 +54,6 @@ created_at remains current. These limits appear in payment notes and UI timeline
 
 Historical schedule7 discrepancy reconciled and verified. Preserve before/after
 evidence and script; do not pay it again. Current manual fixes/six isolated tests
-remain closed. Await next user-selected work. Three continuity records updated;
-commit/push hash recorded after creation.
+remain closed. Await next user-selected work. Three continuity records updated.
+Script/evidence/records committed and pushed as `aa43d7c`; script syntax and git
+whitespace checks passed. Record-only follow-up captures verified push result.

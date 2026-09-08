@@ -37,6 +37,9 @@ was corrected and the six tests rerun successfully. No production data affected.
 
 ### Historical NGN500 Schedule Reconciliation - 2026-09-08
 
+- Script/evidence/records committed and pushed as `aa43d7c`; syntax and git
+  whitespace checks passed. No further deployment is needed for the saved data.
+
 Scope: one existing dummy record in the live application, authorized by user.
 Schedule 7 / branch 2 / E2E-20260901 Scheduled Test Vendor had Paid NGN500 but
 zero immutable standalone payment rows. Original event IDs 20/21/22 retain its

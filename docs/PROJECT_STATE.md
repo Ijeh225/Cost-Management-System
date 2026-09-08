@@ -61,6 +61,8 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Historical Schedule Data Reconciliation - 2026-09-08
 
+- Script/evidence/records committed and pushed as `aa43d7c`; syntax and git
+  whitespace checks passed. Data correction was already verified in the live app.
 - User explicitly authorized correcting the retained NGN500 discrepancy, after
   earlier deferral. This supersedes historical "do not backfill" task boundaries
   only for schedule 7; no other legacy record was changed.
