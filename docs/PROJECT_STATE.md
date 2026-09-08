@@ -51,6 +51,7 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
   fb7c9010-9831-4bff-844f-144273c1b503 (Deployment successful).
   No remaining repair/test in this three-issue scope; await the next user-selected
   task. CAP proposals remain unapproved. No financial writes or migrations.
+  Live acceptance records committed and pushed as c796c56.
   Session and detailed evidence:
   docs/SESSION_SUMMARIES/2026-09-08-review-defect-fixes.md.
 - Completed user-selected capability/interface review (2026-09-08 11:53 WAT).

@@ -92,3 +92,11 @@
   Deployment successful in Railway. No redeploy was required.
 - Next: commit/push these acceptance records. No remaining test or fix in this
   three-item scope; await user selection before any CAP product implementation.
+
+## 2026-09-08 14:38 WAT (UTC+01:00) - Acceptance Records Pushed
+
+- Acceptance evidence and issue closures committed as c796c56 and pushed to
+  origin/master. This documentation-only follow-up records the Git result.
+- Current next action: await user-selected work; no pending item in the three
+  REVIEW fixes. Verified application release remains 56e26d8; subsequent commits
+  in this session only update documentation, not application code.
