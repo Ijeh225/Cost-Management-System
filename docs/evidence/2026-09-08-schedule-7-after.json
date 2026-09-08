@@ -1,0 +1,101 @@
+{
+  "schedule": [
+    {
+      "id": 7,
+      "branch_id": 2,
+      "schedule_date": "2026-08-31T23:00:00.000Z",
+      "original_request_date": "2026-09-01T15:44:40.275Z",
+      "requested_by_id": 1,
+      "vendor_beneficiary": "E2E-20260901 Scheduled Test Vendor",
+      "client_name": "E2E-20260901 Lagos Client",
+      "description": "E2E-20260901 controlled payment schedule test. Not a real vendor payment.",
+      "amount_requested": "500.00",
+      "amount_approved": "500.00",
+      "amount_paid": "500.00",
+      "priority": "normal",
+      "status": "paid",
+      "completed_at": null,
+      "cancelled_at": null,
+      "created_at": "2026-09-01T15:44:40.278Z",
+      "updated_at": "2026-09-01T15:49:12.882Z",
+      "overhead_expense_id": null
+    }
+  ],
+  "events": [
+    {
+      "id": 20,
+      "branch_id": 2,
+      "schedule_id": 7,
+      "type": "created",
+      "actor_user_id": 1,
+      "comment": "Payment schedule created.",
+      "amount": null,
+      "old_status": null,
+      "new_status": "pending_approval",
+      "old_schedule_date": null,
+      "new_schedule_date": null,
+      "created_at": "2026-09-01T15:44:40.283Z",
+      "original_created_at": "2026-09-01 16:44:40.283307"
+    },
+    {
+      "id": 21,
+      "branch_id": 2,
+      "schedule_id": 7,
+      "type": "approved",
+      "actor_user_id": 1,
+      "comment": "E2E-20260901 controlled approval for full workflow test.",
+      "amount": "500.00",
+      "old_status": "pending_approval",
+      "new_status": "approved",
+      "old_schedule_date": null,
+      "new_schedule_date": null,
+      "created_at": "2026-09-01T15:47:14.362Z",
+      "original_created_at": "2026-09-01 16:47:14.362769"
+    },
+    {
+      "id": 22,
+      "branch_id": 2,
+      "schedule_id": 7,
+      "type": "paid",
+      "actor_user_id": 1,
+      "comment": "E2E-20260901 controlled scheduled payment test. Not a real vendor payment.",
+      "amount": "500.00",
+      "old_status": "approved",
+      "new_status": "paid",
+      "old_schedule_date": null,
+      "new_schedule_date": null,
+      "created_at": "2026-09-01T15:49:12.876Z",
+      "original_created_at": "2026-09-01 16:49:12.876633"
+    },
+    {
+      "id": 28,
+      "branch_id": 2,
+      "schedule_id": 7,
+      "type": "comment",
+      "actor_user_id": 1,
+      "comment": "Historical reconstruction authorised by Owner on 2026-09-08, not a new payment. Source: schedule 7 Paid event 22 (NGN500, actor 1); paid_at copied from that event, not independently verified bank settlement time. Bank 3 is supported by the 2026-09-01 SCHED-01/BANK-01 live-test record. Original bank reference was not retained; LEGACY-RECON-SCHED-7-20260908 is a reconciliation identifier, not an original bank reference. Schedule amount_paid/status and original events are unchanged.",
+      "amount": null,
+      "old_status": "paid",
+      "new_status": "paid",
+      "old_schedule_date": null,
+      "new_schedule_date": null,
+      "created_at": "2026-09-08T09:18:48.634Z",
+      "original_created_at": "2026-09-08 10:18:48.634819"
+    }
+  ],
+  "payments": [
+    {
+      "id": 2,
+      "branch_id": 2,
+      "schedule_id": 7,
+      "amount": "500.00",
+      "payment_method": "bank",
+      "bank_id": 3,
+      "reference": "LEGACY-RECON-SCHED-7-20260908",
+      "notes": "Historical reconstruction authorised by Owner on 2026-09-08, not a new payment. Source: schedule 7 Paid event 22 (NGN500, actor 1); paid_at copied from that event, not independently verified bank settlement time. Bank 3 is supported by the 2026-09-01 SCHED-01/BANK-01 live-test record. Original bank reference was not retained; LEGACY-RECON-SCHED-7-20260908 is a reconciliation identifier, not an original bank reference. Schedule amount_paid/status and original events are unchanged.",
+      "paid_at": "2026-09-01T15:49:12.876Z",
+      "recorded_by": 1,
+      "created_at": "2026-09-08T09:18:48.634Z"
+    }
+  ]
+}

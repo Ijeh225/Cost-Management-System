@@ -1,6 +1,6 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-09-07
+## Current Test and Defect Register - Authoritative as of 2026-09-08
 
 Use this register before selecting the next test or fix. The detailed test rows
 and defect log below preserve their original observation date and are therefore
@@ -24,11 +24,55 @@ action` label below does not override this current register.
 
 ### Current Follow-Up
 
+2026-09-08: historical SCHED-001 NGN500 data exception is now reconciled under
+explicit user authorization. This is a labelled reconstruction, not recovery of
+an original bank reference. Prior unchanged/unledgered notes below are historical.
+No pending correction remains for schedule #7; preserve its before/after evidence.
+
 Current status supersedes the earlier availability/unrun notes below: the six
 isolated manual regressions passed on 2026-09-07. Connection was established via
 private SSH tunnel, database identity verified, and tunnel closed after cleanup.
 No new confirmed application defect. A test-fixture notification cleanup omission
 was corrected and the six tests rerun successfully. No production data affected.
+
+### Historical NGN500 Schedule Reconciliation - 2026-09-08
+
+Scope: one existing dummy record in the live application, authorized by user.
+Schedule 7 / branch 2 / E2E-20260901 Scheduled Test Vendor had Paid NGN500 but
+zero immutable standalone payment rows. Original event IDs 20/21/22 retain its
+creation/approval/payment history. Bank 3 identity comes from the original
+SCHED-01/BANK-01 test record and current matching bank/branch. Full current bank
+statement had 13 entries and no NGN500 vendor debit before correction.
+
+| Verification | Observed result |
+| --- | --- |
+| Isolated rehearsal | PASS: refuse changed amount; create one NGN500 bank fact; repeated invocation is no-op; unchanged schedule; one comment; transaction rolled back |
+| Rehearsal cleanup | PASS: zero branches/users/banks/schedules/events/payment facts remain |
+| Pre-correction snapshot | Saved complete schedule, original 3 events, empty payment list; no credentials |
+| Live correction | One row-locked transaction creates payment fact 2 and comment event 28; original schedule fields and events untouched |
+| Persisted consistency | PASS: exactly one fact NGN500/bank3; paid_at equals original event22.created_at at database precision; one trace comment |
+| Schedule browser | Paid NGN500, approved/requested NGN500, balance 0; old timeline plus visible reconstruction comment |
+| Bank browser | Credits NGN2,003 unchanged; debits 904 -> 1,404; closing 1,099 -> 599; entries 13 -> 14; exact reconstruction reference visible once |
+| Financial Ledger browser | One Payment schedule outflow NGN500 for correct vendor and Lagos bank with LEGACY-RECON-SCHED-7-20260908 |
+| Cash Flow browser | Bank 3, Sept 1-8: opening 0, inflows 2,003, outflows 1,404, closing 599; Payment Schedule category 501 includes original new-path NGN1 plus reconstructed NGN500 |
+| Connection cleanup | Both temporary SSH tunnels stopped; no listeners on 54339/54340; no public exposure added |
+
+Evidence limits are explicit in payment notes AND timeline comment: original bank
+reference was not retained. LEGACY-RECON-SCHED-7-20260908 is a correction identifier,
+not a claimed original transaction reference. paid_at is copied from the Paid
+action's stored timestamp, not independently verified bank settlement time. The
+current correction created_at stays current; historical payment event is not edited.
+No second payment, status reset, bank-funding adjustment, fabricated overhead or
+P&L reclassification. This task verifies schedule/bank/ledger/cash flow, not a new
+full financial audit or external bank settlement.
+
+Guarded script scripts/reconcile-legacy-schedule-7.mjs requires explicit modes,
+SSH loopback ports, expected database name, exact record identity/amount/bank/event,
+snapshot equality before first apply and explicit live confirmation string. It
+checks existing facts, locks source schedule/bank and writes fact/comment atomically.
+No app source/schema change or deployment required for this data correction.
+Before/after JSON: docs/evidence/2026-09-08-schedule-7-before.json and -after.json.
+Session: docs/SESSION_SUMMARIES/2026-09-08-legacy-schedule-reconciliation.md.
 
 ### Isolated Six-Case Acceptance - 2026-09-07
 

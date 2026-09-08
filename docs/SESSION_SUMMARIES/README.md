@@ -18,6 +18,8 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-09-08 historical schedule data reconciliation](2026-09-08-legacy-schedule-reconciliation.md)
+
 - [2026-09-07 isolated manual regression completion](2026-09-07-isolated-manual-regressions.md)
 
 - [2026-09-07 deployed manual live acceptance](2026-09-07-manual-live-acceptance.md)

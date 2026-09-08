@@ -1,6 +1,6 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-09-07
+## Current Work Register - Authoritative as of 2026-09-08
 
 Use this section to choose the next task. Earlier plans, next-action lines,
 and issue statuses in this document are historical evidence, not the current
@@ -45,6 +45,10 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- Historical NGN500 schedule #7 discrepancy is now reconciled with explicit user
+  authorization, an isolated rehearsal and live verification. Original schedule
+  and events preserved; one reconstructed payment fact and one trace comment
+  added. Do not list this old discrepancy as awaiting correction or pay it again.
 - The six pending isolated regressions are now complete: 6 passed, 11 unrelated
   cases deliberately skipped. Connection gap resolved through a temporary SSH
   tunnel to the existing test service; tunnel closed after cleanup verification.
@@ -52,8 +56,41 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
   acceptance and six isolated regression checks. No outstanding test remains
   in this two-fix scope; await the next user-selected task. Do not repeat tests
   or describe the previously unavailable connection as a current blocker.
-- Preserve fixtures 28-31, client 9, invoices 12-13 and historical NGN500 evidence.
+- Preserve fixtures 28-31, client 9, invoices 12-13 and NGN500 before/after evidence.
   The completed PDF remains its historical edition; no PDF rewrite this session.
+
+### Historical Schedule Data Reconciliation - 2026-09-08
+
+- User explicitly authorized correcting the retained NGN500 discrepancy, after
+  earlier deferral. This supersedes historical "do not backfill" task boundaries
+  only for schedule 7; no other legacy record was changed.
+- Read original schedule 7, branch 2, exact vendor E2E-20260901 Scheduled Test
+  Vendor: requested/approved/paid NGN500, status paid, no overhead linkage and
+  no payment_schedule_payments fact. Original Paid event 22 records NGN500 by
+  actor 1. Prior SCHED-01/BANK-01 live-test evidence identifies bank 3, Lagos Test
+  Bank; browser statement confirmed no matching debit before correction.
+- Rehearsed the guarded script on cost_management_integration_test through SSH:
+  invalid amount rejected, exactly one payment, retry no-op, original schedule
+  unchanged, one comment. Rehearsal rolled back; six checked fixture tables empty.
+- Applied one row-locked transaction on the application's existing Postgres / railway
+  DB through a separate SSH tunnel. Added payment_schedule_payments row 2, NGN500,
+  bank 3, and payment_schedule_events comment 28. Never called the pay endpoint,
+  changed paid totals, reset status, or removed prior events.
+- Reference LEGACY-RECON-SCHED-7-20260908 is explicitly a new reconciliation ID,
+  NOT an original bank reference. Original reference was not retained. paid_at
+  copies event 22's database timestamp exactly (2026-09-01 16:49:12.876633); it is
+  the recorded payment-action time, not independently verified bank settlement.
+- Direct post-check passed: exactly one payment, original schedule/events equal
+  saved snapshot, one correction comment, exact event/payment timestamp equality.
+- Live browser PASS: schedule Paid NGN500 / balance 0 plus visible trace comment;
+  bank 3 credits 2,003 unchanged, debits 904 -> 1,404, closing 1,099 -> 599,
+  transactions 13 -> 14; Financial Ledger shows one NGN500 reference; bank-specific
+  Cash Flow for Sept 1-8 shows opening 0, inflow 2,003, outflow 1,404, closing 599.
+- Both SSH tunnels closed, ports 54339/54340 no longer listening. No public
+  endpoint, app/schema change, new vendor payment, external message or PDF change.
+- Evidence: docs/evidence/2026-09-08-schedule-7-before.json and -after.json;
+  script: scripts/reconcile-legacy-schedule-7.mjs;
+  session: docs/SESSION_SUMMARIES/2026-09-08-legacy-schedule-reconciliation.md.
 
 ### Isolated Manual Regressions - 2026-09-07
 
