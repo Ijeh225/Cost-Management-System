@@ -45,6 +45,22 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- Completed user-selected capability/interface review (2026-09-08 11:53 WAT).
+  Report: docs/APPLICATION_CAPABILITY_REVIEW_2026-09-08.md, covering current app,
+  RaspibTech and primary competitor/reference sources, UX and 16 prioritized
+  proposals. No feature implementation or new financial acceptance run.
+- Next recommended action, pending user selection: repair REVIEW-NOTES-001
+  (live Stage Notes crash / source route mismatch), REVIEW-A11Y-001 (Documentation
+  keyboard/label gaps), and clarify REVIEW-LABEL-001 (draft-inclusive invoice
+  Outstanding versus issued receivables). These are new review records, not
+  reopened historical audit issues. No repair performed in this review.
+- CAP-01 through CAP-16 in the report are proposals, not approved implementation
+  steps. Highest-value product candidates: unified job view, document readiness,
+  free-time forecasting; clarify shipment/B/L/visit model before larger expansion.
+- Session: docs/SESSION_SUMMARIES/2026-09-08-capability-review.md. AGENTS.md now
+  requires timestamped discussion summaries at least every third substantive user
+  request and at important milestones, without waiting for a reminder.
+
 - Historical NGN500 schedule #7 discrepancy is now reconciled with explicit user
   authorization, an isolated rehearsal and live verification. Original schedule
   and events preserved; one reconstructed payment fact and one trace comment

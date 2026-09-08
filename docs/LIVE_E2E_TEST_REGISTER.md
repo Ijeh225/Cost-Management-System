@@ -24,6 +24,21 @@ action` label below does not override this current register.
 
 ### Current Follow-Up
 
+2026-09-08 11:53 WAT (UTC+01:00), read-only capability review: three NEW findings,
+not reopened historical audit IDs. No application fixes or financial writes made.
+
+| ID | Priority / evidence | Status and next action |
+| --- | --- | --- |
+| `REVIEW-NOTES-001` | High: container 31 Stage Notes shows 1348; click causes page error `f.map is not a function`. Hook requests /api/containers/:id/stage-notes, but backend root-mounted router declares /:id/stage-notes. UI assumes array. | Confirmed live crash + source route mismatch. Pending user-selected repair: align GET/POST paths, validate responses, show scoped errors; test read/add/branch isolation. No live add attempted; HTML response explanation inferred, not captured. |
+| `REVIEW-A11Y-001` | Medium: Documentation job expansion is a div with onClick and no button/keyboard semantics; several labels lack htmlFor/input IDs. Live accessibility tree shows unnamed fields/non-button card. | Source/AX confirmed. Pending repair and keyboard/screen-reader verification. This is not a full accessibility audit. |
+| `REVIEW-LABEL-001` | Medium presentation inconsistency: invoice Outstanding NGN1,180 versus dashboard receivables NGN1,000 in All Branches. Invoice page source excludes cancelled/written-off but includes drafts in the card. | Clarify/split Draft Value and Issued Outstanding using canonical eligibility. Not proof of changed/lost payments; individual invoices not re-audited today. |
+
+Session: docs/SESSION_SUMMARIES/2026-09-08-capability-review.md. Competitive
+research recommendations are proposals, not defects or new live test passes.
+Final review: docs/APPLICATION_CAPABILITY_REVIEW_2026-09-08.md. Six screens were
+sampled read-only; current narrow-view screenshots and AX plus source/manual
+review are not a new full desktop/mobile, financial-write or cross-role test.
+
 2026-09-08: historical SCHED-001 NGN500 data exception is now reconciled under
 explicit user authorization. This is a labelled reconstruction, not recovery of
 an original bank reference. Prior unchanged/unledgered notes below are historical.

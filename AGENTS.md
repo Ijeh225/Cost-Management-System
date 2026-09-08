@@ -1,5 +1,17 @@
 # Project Continuity Rules
 
+## Timestamped Conversation Summaries
+
+- Read the current session summary before continuing project work.
+- Keep a timestamped discussion log in `docs/SESSION_SUMMARIES/`, using Africa/Lagos
+  time (UTC+01:00). Summarize at least after every third substantive user request
+  in a continuing discussion, and sooner after an important decision, finding,
+  completed test/fix, or handoff. Do not wait for another reminder.
+- Record what was discussed, confirmed versus proposed work, decisions, evidence
+  limits, and the exact next action. Never store credentials or raw transcripts.
+- Update the session index and authoritative registers at meaningful milestones.
+  A proposal is not an implemented feature, and a review is not a passed live test.
+
 This repository uses [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) as the
 single source of truth for project continuity. Updating it is mandatory for
 every project change; do not wait for the user to ask or remind you.

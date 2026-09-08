@@ -6,6 +6,8 @@ the authoritative project register; it does not replace it.
 ## Rules
 
 - Create one dated summary for every meaningful work session.
+- Timestamp entries in Africa/Lagos time (UTC+01:00); summarize at least every
+  third substantive user request and after important milestones or decisions.
 - Record decisions, implementation work, test results, blockers, commits, and
   the exact next action.
 - Link the related entries in `docs/PROJECT_STATE.md` and, when testing is
@@ -17,6 +19,8 @@ the authoritative project register; it does not replace it.
   truth.
 
 ## Current Session
+
+- [2026-09-08 application capability and competitor review](2026-09-08-capability-review.md)
 
 - [2026-09-08 historical schedule data reconciliation](2026-09-08-legacy-schedule-reconciliation.md)
 
