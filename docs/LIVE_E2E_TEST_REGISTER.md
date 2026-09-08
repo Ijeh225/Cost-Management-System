@@ -24,14 +24,23 @@ action` label below does not override this current register.
 
 ### Current Follow-Up
 
+2026-09-08 14:06 WAT: all three user-authorized REVIEW fixes are implemented and
+locally verified. Await commit/push and post-deployment live acceptance. No live
+data was changed. Session: docs/SESSION_SUMMARIES/2026-09-08-review-defect-fixes.md.
+
 2026-09-08 11:53 WAT (UTC+01:00), read-only capability review: three NEW findings,
 not reopened historical audit IDs. No application fixes or financial writes made.
 
 | ID | Priority / evidence | Status and next action |
 | --- | --- | --- |
-| `REVIEW-NOTES-001` | High: container 31 Stage Notes shows 1348; click causes page error `f.map is not a function`. Hook requests /api/containers/:id/stage-notes, but backend root-mounted router declares /:id/stage-notes. UI assumes array. | Confirmed live crash + source route mismatch. Pending user-selected repair: align GET/POST paths, validate responses, show scoped errors; test read/add/branch isolation. No live add attempted; HTML response explanation inferred, not captured. |
-| `REVIEW-A11Y-001` | Medium: Documentation job expansion is a div with onClick and no button/keyboard semantics; several labels lack htmlFor/input IDs. Live accessibility tree shows unnamed fields/non-button card. | Source/AX confirmed. Pending repair and keyboard/screen-reader verification. This is not a full accessibility audit. |
-| `REVIEW-LABEL-001` | Medium presentation inconsistency: invoice Outstanding NGN1,180 versus dashboard receivables NGN1,000 in All Branches. Invoice page source excludes cancelled/written-off but includes drafts in the card. | Clarify/split Draft Value and Issued Outstanding using canonical eligibility. Not proof of changed/lost payments; individual invoices not re-audited today. |
+| `REVIEW-NOTES-001` | High: container 31 Stage Notes shows 1348; click causes page error `f.map is not a function`. Hook and API-root router paths differed; UI assumed array. | Fixed locally: canonical GET/POST paths, JSON/array validation, scoped error/retry display. Nine HTTP tests pass with real auth/CSRF/branch guards and mocked database, including read/add, empty/missing, cross-branch rejection and forged-header denial. Malformed response checks pass. Deployment/live read/add acceptance remains pending. |
+| `REVIEW-A11Y-001` | Medium: Documentation job expansion was a click-only div; sibling labels were unlinked. | Fixed locally: native buttons, aria-expanded/controls, seven unique linked fields, named search/filter controls. Production-build Chrome fixture test passed Enter/Space/Tab, label focus and unique IDs across cards. Deployment/live acceptance remains pending; not a full assistive-technology audit. |
+| `REVIEW-LABEL-001` | Medium: invoice Outstanding NGN1,180 versus dashboard receivables NGN1,000; invoice card included drafts. | Fixed locally: Issued Outstanding and Draft Value split, canonical eligibility parity checked for seven statuses; source figures retained, no financial writes. Browser fixture shows NGN1,000 issued / NGN180 draft, cancelled excluded, draft still in list; widths 390/768/1440 pass. Deployment/live reconciliation remains pending. |
+
+Local verification: 110 API tests, 18 response/summary checks and browser fixture
+smoke passed. Full railway:build passed; existing sourcemap/chunk-size warnings
+remain non-blocking. Initial test-fixture CSRF omission and cross-project test
+placement were corrected before the successful run; not live application defects.
 
 Session: docs/SESSION_SUMMARIES/2026-09-08-capability-review.md. Competitive
 research recommendations are proposals, not defects or new live test passes.

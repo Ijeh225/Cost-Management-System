@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
+import { useState, useRef, useEffect, useMemo, useId, type ReactNode } from "react";
 import * as XLSX from "xlsx";
 import {
   useGetPipeline,
@@ -9,7 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, getStatusColor, getStatusLabel, WORKFLOW_STAGES } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +56,7 @@ type DocContainer = PipelineContainer & { stage: string };
 
 function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () => void }) {
   const { toast } = useToast();
+  const fieldId = useId();
   const [expanded, setExpanded]         = useState(false);
   const [stageOwner,      setStageOwner]      = useState(c.stageOwnerName    ?? "");
   const [paarNumber,      setPaarNumber]      = useState(c.paarNumber         ?? "");
@@ -162,18 +163,21 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
   return (
     <Card className={`border transition-colors ${expanded ? "border-primary/30 bg-card" : "border-border/50 bg-card/60 hover:bg-accent/20"}`}>
       {/* Card header — always visible, click to toggle */}
-      <div
-        className="p-4 flex items-center gap-3 cursor-pointer select-none"
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={`${fieldId}-details`}
+        className="w-full rounded-lg p-4 flex items-center gap-3 text-left cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => setExpanded(v => !v)}
       >
-        <div className="shrink-0 text-muted-foreground">
+        <span className="shrink-0 text-muted-foreground" aria-hidden="true">
           {expanded
             ? <ChevronDown className="w-4 h-4 text-primary" />
             : <ChevronRight className="w-4 h-4" />}
-        </div>
+        </span>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+        <span className="flex-1 min-w-0">
+          <span className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm font-mono">{c.containerNumber}</span>
             <span className="text-muted-foreground text-xs font-mono">BL: {c.blNumber}</span>
             <DaysChip days={c.daysInStage} />
@@ -182,25 +186,26 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
                 <AlertTriangle className="w-2.5 h-2.5" /> PAAR overdue
               </span>
             )}
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">{c.customerName}</p>
-        </div>
+          </span>
+          <span className="block text-xs text-muted-foreground mt-0.5">{c.customerName}</span>
+        </span>
 
-        <Badge variant="outline" className={`shrink-0 text-[10px] ${getStatusColor(c.stage)}`}>
+        <span className={badgeVariants({ variant: "outline", className: `shrink-0 text-[10px] ${getStatusColor(c.stage)}` })}>
           {stageInfo?.short ?? c.stage}
-        </Badge>
-      </div>
+        </span>
+      </button>
 
       {/* Expanded body */}
       {expanded && (
-        <div className="px-4 pb-5 space-y-4">
+        <div id={`${fieldId}-details`} className="px-4 pb-5 space-y-4">
           <Separator />
 
           {/* Row 1: Stage Owner + PAAR Number */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Stage Owner</Label>
+              <Label htmlFor={`${fieldId}-owner`} className="text-xs text-muted-foreground">Stage Owner</Label>
               <Input
+                id={`${fieldId}-owner`}
                 value={stageOwner}
                 onChange={e => setStageOwner(e.target.value)}
                 placeholder="Person responsible"
@@ -208,7 +213,7 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">
+              <Label htmlFor={`${fieldId}-paar-number`} className="text-xs text-muted-foreground">
                 PAAR Number
                 {paarNumber.trim() && !paarReleaseDate && (
                   <span className="ml-1.5 text-amber-400">— click Set to confirm release date</span>
@@ -219,6 +224,7 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
               </Label>
               <div className="flex gap-2">
                 <Input
+                  id={`${fieldId}-paar-number`}
                   value={paarNumber}
                   onChange={e => setPaarNumber(e.target.value)}
                   placeholder="e.g. PAAR/2024/00123"
@@ -232,6 +238,7 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
                   disabled={!paarNumber.trim()}
                   className="h-8 px-3 text-xs shrink-0"
                   title="Set today as PAAR Release Date"
+                  aria-label="Set today as PAAR Release Date"
                 >
                   Set
                 </Button>
@@ -242,10 +249,11 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
           {/* Row 2: PAAR ETA + PAAR Release Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label className={`text-xs ${isPaarOverdue ? "text-red-400" : "text-muted-foreground"}`}>
+              <Label htmlFor={`${fieldId}-paar-eta`} className={`text-xs ${isPaarOverdue ? "text-red-400" : "text-muted-foreground"}`}>
                 PAAR ETA {isPaarOverdue && <span className="text-red-400">(overdue)</span>}
               </Label>
               <Input
+                id={`${fieldId}-paar-eta`}
                 type="date"
                 value={paarEta}
                 onChange={e => setPaarEta(e.target.value)}
@@ -253,8 +261,9 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">PAAR Release Date</Label>
+              <Label htmlFor={`${fieldId}-paar-release`} className="text-xs text-muted-foreground">PAAR Release Date</Label>
               <Input
+                id={`${fieldId}-paar-release`}
                 type="date"
                 value={paarReleaseDate}
                 onChange={e => setPaarReleaseDate(e.target.value)}
@@ -265,10 +274,12 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
 
           {/* Row 3: Assessment Amount (optional — can be filled at any time) */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-amber-400">
+            <Label htmlFor={`${fieldId}-assessment`} className="text-xs font-medium text-amber-400">
               Assessment Amount (₦) <span className="text-muted-foreground font-normal">(optional)</span>
             </Label>
             <Input
+              id={`${fieldId}-assessment`}
+              aria-describedby={`${fieldId}-assessment-help`}
               type="number"
               min="0"
               step="0.01"
@@ -277,7 +288,7 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
               placeholder="Enter NCS-assessed duty amount"
               className="h-8 text-sm bg-background font-mono border-amber-500/40"
             />
-            <p className="text-[10px] text-muted-foreground">
+            <p id={`${fieldId}-assessment-help`} className="text-[10px] text-muted-foreground">
               Optional — enter when known. Will appear on the Duty Payments page.
             </p>
           </div>
@@ -285,8 +296,9 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
           {/* Row 4: Delay reasons (optional, collapsible feel) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">PAAR Delay Reason <span className="opacity-50">(optional)</span></Label>
+              <Label htmlFor={`${fieldId}-paar-delay`} className="text-xs text-muted-foreground">PAAR Delay Reason <span className="opacity-50">(optional)</span></Label>
               <Textarea
+                id={`${fieldId}-paar-delay`}
                 value={paarDelayReason}
                 onChange={e => setPaarDelayReason(e.target.value)}
                 placeholder="Why is PAAR delayed?"
@@ -295,8 +307,9 @@ function DocCard({ c, onSubmitSuccess }: { c: DocContainer; onSubmitSuccess: () 
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">General Delay Reason <span className="opacity-50">(optional)</span></Label>
+              <Label htmlFor={`${fieldId}-delay`} className="text-xs text-muted-foreground">General Delay Reason <span className="opacity-50">(optional)</span></Label>
               <Textarea
+                id={`${fieldId}-delay`}
                 value={delayReason}
                 onChange={e => setDelayReason(e.target.value)}
                 placeholder="Any general blockers?"
@@ -363,6 +376,7 @@ function SubmittedDocumentationView({ containers }: { containers: DocContainer[]
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search submitted documentation by container #, BL #, customer, or PAAR..."
+            aria-label="Search submitted documentation"
             className="pl-11 h-11 text-sm"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -569,6 +583,7 @@ export default function DocumentationWorkspace() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 ref={searchRef}
+                aria-label="Search active documentation"
                 placeholder="Search by container #, BL #, or customer…"
                 className="pl-11 h-10 text-sm"
                 value={search}
@@ -579,6 +594,8 @@ export default function DocumentationWorkspace() {
               {STAGE_FILTER_OPTIONS.map(opt => (
                 <button
                   key={opt.value}
+                  type="button"
+                  aria-pressed={stageFilter === opt.value}
                   onClick={() => setStageFilter(opt.value)}
                   className={`text-[11px] px-3 py-1.5 rounded-full border transition-colors ${
                     stageFilter === opt.value

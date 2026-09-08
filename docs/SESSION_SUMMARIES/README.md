@@ -20,6 +20,8 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-09-08 three review defect fixes](2026-09-08-review-defect-fixes.md)
+
 - [2026-09-08 application capability and competitor review](2026-09-08-capability-review.md)
 
 - [2026-09-08 historical schedule data reconciliation](2026-09-08-legacy-schedule-reconciliation.md)

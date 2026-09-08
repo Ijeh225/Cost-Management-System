@@ -2814,7 +2814,7 @@ router.delete("/containers/bulk", requireAuth, requireBranchAdminOrAbove, async 
   }
 });
 
-router.get("/:id/stage-notes", requireAuth, async (req: AuthRequest, res) => {
+router.get("/containers/:id/stage-notes", requireAuth, async (req: AuthRequest, res) => {
   try {
     const containerId = parseInt(String(req.params.id), 10);
     if (isNaN(containerId)) return res.status(400).json({ error: "Invalid container id" });
@@ -2840,7 +2840,7 @@ router.get("/:id/stage-notes", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/:id/stage-notes", requireAuth, async (req: AuthRequest, res) => {
+router.post("/containers/:id/stage-notes", requireAuth, async (req: AuthRequest, res) => {
   try {
     const containerId = parseInt(String(req.params.id), 10);
     if (isNaN(containerId)) return res.status(400).json({ error: "Invalid container id" });

@@ -85,14 +85,14 @@ function StageOwnerSelect({ value, onChange }: { value: string; onChange: (v: st
 }
 
 function StageNotesPanel({ containerId, stage }: { containerId: number; stage: string }) {
-  const { data: notes, isLoading } = useGetStageNotes(containerId);
+  const { data: notes, isLoading, isError, isFetching, refetch } = useGetStageNotes(containerId);
   const addNote = useAddStageNote();
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
   const handleAdd = async () => {
-    if (!draft.trim()) return;
+    if (!draft.trim() || addNote.isPending) return;
     try {
       await addNote.mutateAsync({ containerId, stage, note: draft.trim() });
       setDraft("");
@@ -102,13 +102,15 @@ function StageNotesPanel({ containerId, stage }: { containerId: number; stage: s
     }
   };
 
-  const list = notes ?? [];
+  const list = Array.isArray(notes) ? notes : [];
 
   return (
     <div className="border-t border-border/30 pt-3 mt-3">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        aria-controls={`stage-notes-${containerId}`}
         className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
       >
         <span className="uppercase tracking-wider">Stage Notes</span>
@@ -120,14 +122,22 @@ function StageNotesPanel({ containerId, stage }: { containerId: number; stage: s
         <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="mt-2 space-y-2">
+        <div id={`stage-notes-${containerId}`} className="mt-2 space-y-2">
+          {isError && (
+            <div role="alert" className="text-xs text-destructive">
+              <p>Stage notes could not be refreshed. {list.length > 0 ? "Previously loaded notes are shown below." : "Please try again."}</p>
+              <Button type="button" size="sm" variant="outline" onClick={() => void refetch()} disabled={isFetching}>
+                Retry stage notes
+              </Button>
+            </div>
+          )}
           {isLoading ? (
             <p className="text-xs text-muted-foreground/50">Loading…</p>
           ) : list.length === 0 ? (
-            <p className="text-xs text-muted-foreground/40 italic">No notes for this container yet.</p>
+            !isError && <p className="text-xs text-muted-foreground/40 italic">No notes for this container yet.</p>
           ) : (
             <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-              {list.map((n: any) => (
+              {list.map(n => (
                 <div key={n.id} className="bg-muted/30 rounded-md px-2.5 py-1.5 text-xs">
                   <p className="text-foreground/90">{n.note}</p>
                   <p className="text-[10px] text-muted-foreground/50 mt-0.5">
@@ -140,6 +150,7 @@ function StageNotesPanel({ containerId, stage }: { containerId: number; stage: s
           <div className="flex gap-1.5">
             <Input
               value={draft}
+              aria-label="New stage note"
               onChange={e => setDraft(e.target.value)}
               placeholder="Add a note for this stage…"
               className="h-7 text-xs flex-1 border-border/50"
@@ -150,6 +161,7 @@ function StageNotesPanel({ containerId, stage }: { containerId: number; stage: s
               variant="outline"
               className="h-7 px-2 text-xs"
               onClick={handleAdd}
+              aria-label="Add stage note"
               disabled={addNote.isPending || !draft.trim()}
             >
               {addNote.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}

@@ -45,16 +45,31 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-08 14:06 WAT: the three user-authorized REVIEW fixes are implemented
+  and locally verified. Await commit/push, then deployment confirmation and live
+  acceptance; do not mark them live-closed yet. No financial writes or migrations.
+  Session:
+  docs/SESSION_SUMMARIES/2026-09-08-review-defect-fixes.md.
 - Completed user-selected capability/interface review (2026-09-08 11:53 WAT).
   Committed and pushed as ed3e21c at 11:55 WAT; documentation-only change.
   Report: docs/APPLICATION_CAPABILITY_REVIEW_2026-09-08.md, covering current app,
   RaspibTech and primary competitor/reference sources, UX and 16 prioritized
   proposals. No feature implementation or new financial acceptance run.
-- Next recommended action, pending user selection: repair REVIEW-NOTES-001
-  (live Stage Notes crash / source route mismatch), REVIEW-A11Y-001 (Documentation
-  keyboard/label gaps), and clarify REVIEW-LABEL-001 (draft-inclusive invoice
-  Outstanding versus issued receivables). These are new review records, not
-  reopened historical audit issues. No repair performed in this review.
+- REVIEW-NOTES-001: aligned GET/POST /containers/:id/stage-notes with the existing
+  API-root mount; validates GET JSON/array data and presents local retry errors
+  instead of crashing container detail. Real auth/CSRF/branch-guard HTTP tests
+  with mocked database reads/writes pass; no permissions broadened.
+- REVIEW-A11Y-001: Documentation job headers are native buttons with expansion
+  state; seven fields have unique IDs/linked labels. Search fields and filter
+  buttons expose accessible names/state. Local Chrome passed Enter, Space, Tab,
+  label-click focus and two-card ID uniqueness checks.
+- REVIEW-LABEL-001: invoice summary separates Issued Outstanding and Draft Value;
+  issued totals exclude draft/cancelled/written-off records, matching API financial
+  eligibility. Explains branch/list-filter scope and deposits. Draft list remains.
+- Verification: 110 API tests passed; 18 response/summary tests passed; production
+  UI fixture smoke passed, including invoice widths 390/768/1440. Full Railway
+  typecheck/frontend/API build passed with existing sourcemap/chunk-size warnings.
+  These are local tests, not a new live or database-backed acceptance run.
 - CAP-01 through CAP-16 in the report are proposals, not approved implementation
   steps. Highest-value product candidates: unified job view, document readiness,
   free-time forecasting; clarify shipment/B/L/visit model before larger expansion.

@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useListInvoices, useDeleteInvoice, type Invoice } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { formatCurrency } from "@/lib/format";
+import { summarizeInvoices } from "@/lib/invoice-summary";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -212,10 +213,7 @@ export default function InvoicesPage() {
     );
   });
 
-  const totalOutstanding = activeInvoices.reduce((s, i) => s + i.outstanding, 0);
-  const totalPaid = activeInvoices.reduce((s, i) => s + i.totalPaid, 0);
-  const paidCount = activeInvoices.filter(i => i.status === "paid").length;
-  const overdueCount = activeInvoices.filter(i => i.status === "overdue").length;
+  const { issuedOutstanding, draftValue, totalPaid, paidCount, overdueCount } = summarizeInvoices(allInvoices);
 
   const showWrittenOffSection = (statusFilter === "all" || statusFilter === "written_off") && filteredWrittenOff.length > 0;
   const showCancelledSection = (statusFilter === "all" || statusFilter === "cancelled") && filteredCancelled.length > 0;
@@ -240,9 +238,10 @@ export default function InvoicesPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-5">
         {[
-          { label: "Outstanding", value: formatCurrency(totalOutstanding), color: "text-amber-400" },
+          { label: "Issued Outstanding", value: formatCurrency(issuedOutstanding), color: "text-amber-400" },
+          { label: "Draft Value", value: formatCurrency(draftValue), color: "text-muted-foreground" },
           { label: "Total Collected", value: formatCurrency(totalPaid), color: "text-emerald-400" },
           { label: "Fully Paid", value: String(paidCount), color: "text-emerald-400" },
           { label: "Overdue", value: String(overdueCount), color: overdueCount > 0 ? "text-red-400" : "text-muted-foreground" },
@@ -255,6 +254,11 @@ export default function InvoicesPage() {
           </Card>
         ))}
       </div>
+      <p className="text-xs text-muted-foreground">
+        Summary covers all invoices in your current branch scope. Issued Outstanding excludes drafts,
+        cancelled and written-off invoices and is before client deposits. Draft Value is not a receivable.
+        Search and status filters below affect the list only.
+      </p>
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
