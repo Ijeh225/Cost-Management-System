@@ -51,3 +51,44 @@
   git push origin master succeeded (06c57ee -> a7766d2).
 - Whitespace check passed. This follow-up records the confirmed Git result;
   deployment and live acceptance are still unverified, not failed or complete.
+
+## 2026-09-08 14:33 WAT (UTC+01:00) - Live Acceptance in Progress
+
+- User authorized the live re-test. Clean master at 56e26d8 before testing.
+- Railway production shows Record review fixes push and verification handoff
+  ACTIVE / Deployment successful, deployment fb7c9010-9831-4bff-844f-144273c1b503,
+  including a7766d2. No redeploy or configuration change needed.
+- Container 31 E2ER260907: Stage Notes opened with an empty state, no false 1348
+  count or crash. Added exactly one labelled REVIEW-NOTES-001 acceptance note;
+  reloaded and confirmed count 1, text, author christian ifeanyi, gate_in stage,
+  and date 8 Sept 2026. Timeline has one corresponding note event at 14:28.
+  Retain this non-financial evidence; no job transition or payment performed.
+- Selected Abuja scope: container detail settled to Failed to load container
+  details and no note displayed. Restored All Branches. This is an owner-session
+  scope check, not a fresh non-admin role test or direct API status inspection.
+- Documentation E2EL260901 passed Enter expand, Space collapse and Tab navigation
+  from adjacent E2ED260901. All seven field labels link to existing inputs;
+  clicking Stage Owner label focuses its input. No Save/Submit clicked.
+- Next: reconcile live invoice split with Dashboard/AR; update final results.
+
+## 2026-09-08 14:36 WAT (UTC+01:00) - Three Live Acceptances Complete
+
+- REVIEW-LABEL-001 live All Branches: Issued Outstanding NGN1,000; Draft Value
+  NGN180; Total Collected NGN2,001; Fully Paid 2; Overdue 1. Draft invoice 13
+  INV-202609-006 and invoice 12 INV-202609-005 are NGN90 each; zero draft invoice 6
+  remains. Issued debt is invoice 11 INV-202609-004, NGN1,000 overdue. Paid invoices
+  8 and 7 contribute NGN2,000 and NGN1 collections; cancelled 9/10 stay in history.
+- Selecting Draft shows only three draft records without changing summary cards,
+  consistent with the explanatory text. No invoices created, sent or edited.
+- Dashboard independently shows NGN3,001 invoiced, NGN2,001 collected and NGN1,000
+  Outstanding Receivables. AR matches all three; gross/net outstanding NGN1,000,
+  one overdue invoice, zero credit balances. Deposits remain separately presented.
+- REVIEW-NOTES-001 and REVIEW-A11Y-001 pass on evidence above. All three REVIEW
+  issues now closed in authoritative records. No full-app re-audit is claimed.
+- One controlled note on container 31 and its matching timeline event are retained
+  for traceability. No deletions, payments, job advancement, new accounts or
+  credential changes. Current branch scope restored to All Branches.
+- Deployment verified before testing: 56e26d8, including a7766d2, ACTIVE and
+  Deployment successful in Railway. No redeploy was required.
+- Next: commit/push these acceptance records. No remaining test or fix in this
+  three-item scope; await user selection before any CAP product implementation.

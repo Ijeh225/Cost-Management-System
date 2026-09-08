@@ -45,10 +45,13 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
-- 2026-09-08 14:06 WAT: the three user-authorized REVIEW fixes are implemented
-  and locally verified. Committed/pushed as a7766d2. Await deployment confirmation and live
-  acceptance; do not mark them live-closed yet. No financial writes or migrations.
-  Session:
+- 2026-09-08 14:36 WAT: REVIEW-NOTES-001, REVIEW-A11Y-001 and REVIEW-LABEL-001
+  are closed by successful deployment and scoped live acceptance. Fix a7766d2 is
+  included in active release 56e26d8, Railway deployment
+  fb7c9010-9831-4bff-844f-144273c1b503 (Deployment successful).
+  No remaining repair/test in this three-issue scope; await the next user-selected
+  task. CAP proposals remain unapproved. No financial writes or migrations.
+  Session and detailed evidence:
   docs/SESSION_SUMMARIES/2026-09-08-review-defect-fixes.md.
 - Completed user-selected capability/interface review (2026-09-08 11:53 WAT).
   Committed and pushed as ed3e21c at 11:55 WAT; documentation-only change.
@@ -69,7 +72,18 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 - Verification: 110 API tests passed; 18 response/summary tests passed; production
   UI fixture smoke passed, including invoice widths 390/768/1440. Full Railway
   typecheck/frontend/API build passed with existing sourcemap/chunk-size warnings.
-  These are local tests, not a new live or database-backed acceptance run.
+  These local tests are supplemented by the live acceptance below; not a repeat
+  of the entire financial or cross-role audit.
+- Live acceptance: container 31 notes opens without a crash, one labelled note
+  saved, persisted after reload with author/stage/date and one timeline entry.
+  Abuja scope hid the out-of-branch job; All Branches restored. Keep this single
+  non-financial note and audit event; do not add a duplicate or delete history.
+- Documentation E2EL260901 passed Enter/Space/Tab, seven linked-label checks and
+  Stage Owner label focus. No saved fields changed or stage advanced.
+- All Branches invoices show NGN1,000 Issued Outstanding, NGN180 Draft Value
+  (two NGN90 drafts; zero draft also retained), NGN2,001 collected. Dashboard and
+  AR agree on NGN1,000 outstanding / NGN2,001 collected / NGN3,001 invoiced.
+  Draft filtering affects the list only as labelled. No payments were changed.
 - CAP-01 through CAP-16 in the report are proposals, not approved implementation
   steps. Highest-value product candidates: unified job view, document readiness,
   free-time forecasting; clarify shipment/B/L/visit model before larger expansion.

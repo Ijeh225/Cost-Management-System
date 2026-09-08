@@ -21,21 +21,24 @@ action` label below does not override this current register.
 | Access control | `SEC-02` | Direct denied finance access was re-tested at the application and API boundaries. |
 | Scoped finance middleware | `API-ROUTE-001` | Release `6a327a5` active in Railway; 12 authenticated live API checks passed for existing Operations QA staff, including allowed operational reads and denied finance / cross-branch access. |
 | Manual follow-up acceptance | `MANUAL-GATE-001`, `MANUAL-INV-001` | 2026-09-07 live checks passed; all six subsequent isolated DB regressions passed. Container 31 and invoice 13 retained. No pending test in this bounded scope. |
+| Capability-review repairs | `REVIEW-NOTES-001`, `REVIEW-A11Y-001`, `REVIEW-LABEL-001` | 2026-09-08: release 56e26d8 active; Stage Notes read/add/reload and timeline passed on container 31, Documentation keyboard/labels passed, invoice split reconciles with Dashboard/AR. One labelled non-financial note retained. |
 
 ### Current Follow-Up
 
-2026-09-08 14:06 WAT: all three user-authorized REVIEW fixes are implemented and
-locally verified, committed/pushed as a7766d2. Await deployment/live acceptance. No live
-data was changed. Session: docs/SESSION_SUMMARIES/2026-09-08-review-defect-fixes.md.
+2026-09-08 14:36 WAT: all three user-authorized REVIEW fixes are deployed and
+live-verified, now closed. Fix commit a7766d2 is included in active 56e26d8,
+Railway deployment fb7c9010-9831-4bff-844f-144273c1b503. One controlled Stage Note
+and corresponding audit event added; no financial or operational-field changes.
+Session: docs/SESSION_SUMMARIES/2026-09-08-review-defect-fixes.md.
 
 2026-09-08 11:53 WAT (UTC+01:00), read-only capability review: three NEW findings,
 not reopened historical audit IDs. No application fixes or financial writes made.
 
 | ID | Priority / evidence | Status and next action |
 | --- | --- | --- |
-| `REVIEW-NOTES-001` | High: container 31 Stage Notes shows 1348; click causes page error `f.map is not a function`. Hook and API-root router paths differed; UI assumed array. | Fixed locally: canonical GET/POST paths, JSON/array validation, scoped error/retry display. Nine HTTP tests pass with real auth/CSRF/branch guards and mocked database, including read/add, empty/missing, cross-branch rejection and forged-header denial. Malformed response checks pass. Deployment/live read/add acceptance remains pending. |
-| `REVIEW-A11Y-001` | Medium: Documentation job expansion was a click-only div; sibling labels were unlinked. | Fixed locally: native buttons, aria-expanded/controls, seven unique linked fields, named search/filter controls. Production-build Chrome fixture test passed Enter/Space/Tab, label focus and unique IDs across cards. Deployment/live acceptance remains pending; not a full assistive-technology audit. |
-| `REVIEW-LABEL-001` | Medium: invoice Outstanding NGN1,180 versus dashboard receivables NGN1,000; invoice card included drafts. | Fixed locally: Issued Outstanding and Draft Value split, canonical eligibility parity checked for seven statuses; source figures retained, no financial writes. Browser fixture shows NGN1,000 issued / NGN180 draft, cancelled excluded, draft still in list; widths 390/768/1440 pass. Deployment/live reconciliation remains pending. |
+| `REVIEW-NOTES-001` | High: container 31 Stage Notes showed 1348 and crashed on expansion. Hook and API-root router paths differed; UI assumed array. | Closed 2026-09-08 live: empty state opened normally; one labelled note saved, count 1 and text/author/gate_in/date survived reload, one timeline note event at 14:28. Abuja scope hid the job; All Branches restored. Auth/CSRF/cross-branch write rejection and malformed-response paths covered locally, not repeated under a new live staff login. |
+| `REVIEW-A11Y-001` | Medium: Documentation job expansion was a click-only div; sibling labels were unlinked. | Closed 2026-09-08 live: E2EL260901 expanded with Enter, collapsed with Space, reached by Tab from E2ED260901. Seven labels target existing inputs; Stage Owner label focuses its field. No Save/Submit clicked. Local two-card ID and all-label focus tests also passed. Not a full assistive-technology audit. |
+| `REVIEW-LABEL-001` | Medium: invoice Outstanding NGN1,180 versus dashboard receivables NGN1,000; invoice card included drafts. | Closed 2026-09-08 live: Issued Outstanding NGN1,000, Draft Value NGN180, collected NGN2,001. Two NGN90 drafts and one zero draft remain in list; Draft filter leaves summary unchanged as labelled. Dashboard/AR both show NGN1,000 outstanding, NGN2,001 collected and NGN3,001 invoiced. Cancelled invoices remain historical rows, excluded from summary. No financial writes. |
 
 Local verification: 110 API tests, 18 response/summary checks and browser fixture
 smoke passed. Full railway:build passed; existing sourcemap/chunk-size warnings
