@@ -9,6 +9,9 @@ action` label below does not override this current register.
 
 ### CAP-01 Live Staff Acceptance Passed - 2026-09-09 17:30 WAT
 
+- Acceptance evidence and read-only checker committed/pushed as `939e8ed`.
+  This closes the requested live staff follow-up. Await next authorized task;
+  completed fixtures #1/#2/#3 are retained and must not be repeated.
 - Fresh login: existing active Operations QA #14, branch #2, Transire/Shipping
   only. Rotated only its dummy password; no credentials/cookies saved to files.
 - Created exactly two reserved non-financial tasks on existing job #26:

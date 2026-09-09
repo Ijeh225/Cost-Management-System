@@ -2,6 +2,8 @@
 
 ## 2026-09-09 17:30 WAT - Live Staff Limitation Closed
 
+- Acceptance evidence/checker committed and pushed as 939e8ed. Publication
+  complete; next action is awaiting user-selected capability, not repeating tests.
 - Fresh browser login as existing Operations QA #14; active Staff/Operations,
   branch #2 and only Transire/Shipping. Rotated dummy password only, not roles.
 - New reserved tasks #2/#3 on existing #26, assigned #14/#13 respectively.

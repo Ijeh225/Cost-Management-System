@@ -45,6 +45,10 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- CAP-01 staff acceptance evidence/checker committed and pushed as `939e8ed`.
+  Requested owner and Operations-staff live acceptance are complete. No remaining
+  test/fix in this bounded scope; await next user-selected capability. Do not
+  recreate or reopen completed tasks #1/#2/#3. No new app deployment needed.
 - 2026-09-09 17:30 WAT: remaining CAP-01 live staff acceptance PASSED. Fresh
   E2E Operations QA #14 login showed only assigned task #2 in My Tasks, not
   same-job task #3 assigned #13. Overview finance absent visually and JSON
