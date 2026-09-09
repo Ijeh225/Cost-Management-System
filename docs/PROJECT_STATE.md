@@ -45,6 +45,14 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-09 12:18 WAT: CAP-04 implementation committed/pushed as `37adcd3`.
+  Railway deployment `032aa2c8-a7d7-4d28-8552-1de731ded52b` confirmed Active /
+  Deployment successful. Final release-order safeguard adds an atomic backfill
+  before schema synchronization and reasserts shipment integrity at startup.
+  Full build passes; all six real isolated PostgreSQL check groups pass, including
+  the bundled pre-deploy entrypoint. Scratch schema and SSH tunnel cleaned up.
+  Publishing the safeguard next; scoped live CAP-04 acceptance remains pending.
+  No manual production fixture writes, repeated financial tests or CAP-01 work.
 - 2026-09-09 12:07 WAT: CAP-04 implementation and local/isolated verification
   complete; publication/deployment confirmation and scoped live acceptance pending.
   Added shipment/B/L parents, physical equipment identity and preserved container

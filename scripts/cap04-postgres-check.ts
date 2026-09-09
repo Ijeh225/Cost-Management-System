@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { randomBytes } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { ensureShipmentSchema } from "../artifacts/api-server/src/lib/shipment-schema.js";
 
 const requireDb = createRequire(new URL("../lib/db/package.json", import.meta.url));
@@ -35,6 +37,14 @@ try {
     CREATE TABLE financial_facts(id SERIAL PRIMARY KEY,container_id INTEGER REFERENCES containers(id),amount NUMERIC);`);
   await insert("OLD-BOX", "OLD-BL");
   await query("INSERT INTO financial_facts(container_id,amount) VALUES(1,500)");
+  const scopedUrl = new URL(connectionString);
+  scopedUrl.searchParams.set("options", `-c search_path=${schema}`);
+  const preparation = spawnSync(process.execPath, [fileURLToPath(new URL("../artifacts/api-server/dist/migrate-shipments.cjs", import.meta.url))], {
+    env: { ...process.env, DATABASE_URL: scopedUrl.href }, encoding: "utf8", timeout: 60000, windowsHide: true,
+  });
+  assert.equal(preparation.status, 0, "Bundled pre-deploy migration must succeed in the isolated fixture namespace");
+  assert.match(preparation.stdout, /migration verified before schema synchronization/);
+  console.log("PASS: built pre-deploy migration entrypoint on isolated PostgreSQL");
   await ensureShipmentSchema(scoped);
   await ensureShipmentSchema(scoped);
   assert.deepEqual((await query("SELECT container_id,amount::int FROM financial_facts")).rows, [{ container_id: 1, amount: 500 }]);

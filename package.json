@@ -7,6 +7,7 @@
     "build": "corepack pnpm run typecheck && corepack pnpm --filter @workspace/cost-analysis run build && corepack pnpm --filter @workspace/api-server run build",
     "railway:build": "corepack pnpm run typecheck && corepack pnpm --filter @workspace/cost-analysis run build && corepack pnpm --filter @workspace/api-server run build",
     "railway:db:push": "corepack pnpm --filter @workspace/db run push",
+    "railway:db:prepare": "node artifacts/api-server/dist/migrate-shipments.cjs && corepack pnpm run railway:db:push",
     "railway:start": "node artifacts/api-server/dist/index.cjs",
     "test:integration": "node scripts/run-isolated-integration-tests.mjs",
     "typecheck:libs": "tsc --build",

@@ -3,7 +3,7 @@ builder = "RAILPACK"
 buildCommand = "pnpm run railway:build"
 
 [deploy]
-preDeployCommand = ["pnpm run railway:db:push"]
+preDeployCommand = ["pnpm run railway:db:prepare"]
 startCommand = "pnpm run railway:start"
 healthcheckPath = "/api/healthz"
 healthcheckTimeout = 120

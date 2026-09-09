@@ -1092,7 +1092,8 @@ async function runStartupMigrations() {
           OR access_profile_migrated_at IS NULL
       `);
     });
-    await runMigration("shipment_container_visits_v1", () => ensureShipmentSchema(pool));
+    await ensureShipmentSchema(pool);
+    await runMigration("shipment_container_visits_v1", async () => {});
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

@@ -70,3 +70,17 @@
   acceptance. No production data manually changed or live feature pass claimed.
 - CAP-01, shared document editor/readiness, new shared-fee allocation, physical
   yard inventory and master/house B/L hierarchy remain outside this implementation.
+
+## 2026-09-09 12:18 WAT (UTC+01:00) - Published Feature and Migration Guard
+
+- Implementation committed/pushed as `37adcd3`; deployment
+  `032aa2c8-a7d7-4d28-8552-1de731ded52b` confirmed Active / Deployment successful.
+- Found schema synchronization precedes startup. Added a bundled pre-deploy
+  migration so historical links are backfilled atomically before schema sync;
+  startup also reasserts integrity after synchronization. Fresh DB creation skips
+  the pre-backfill until tables exist. Migration failure stops the release.
+- Full build passed. All six real isolated PostgreSQL check groups passed,
+  including executing the bundled pre-deploy runner on the scratch fixture schema.
+  Scratch namespace removed and private SSH tunnel closure verified.
+- Publishing this safety follow-up next. Live CAP-04 write acceptance has not
+  been performed; no production fixture writes or financial retests were made.

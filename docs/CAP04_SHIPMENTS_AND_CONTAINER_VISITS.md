@@ -61,6 +61,10 @@ Physical equipment -> can have a different visit ID on a later B/L
 - Startup migration `shipment_container_visits_v1` runs in one transaction on one
   connection with an advisory lock and container table lock. Parent/equipment
   backfill happens before legacy unique constraints are removed.
+- Railway runs the same idempotent backfill before Drizzle schema synchronization
+  via `railway:db:prepare`; startup verifies it again before accepting requests.
+  Fresh databases are initialized by schema synchronization, then backfilled at
+  startup. There is no force/truncate option in this release path.
 - A conflicting historic normalized B/L/client or duplicate visit aborts and rolls
   back the migration. Investigate those records; never delete or merge history just
   to unblock deployment.

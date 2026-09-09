@@ -55,11 +55,12 @@ async function buildAll() {
   );
 
   await esbuild({
-    entryPoints: [path.resolve(__dirname, "src/index.ts")],
+    entryPoints: [path.resolve(__dirname, "src/index.ts"), path.resolve(__dirname, "src/migrate-shipments.ts")],
     platform: "node",
     bundle: true,
     format: "cjs",
-    outfile: path.resolve(distDir, "index.cjs"),
+    outdir: distDir,
+    outExtension: { ".js": ".cjs" },
     define: {
       "process.env.NODE_ENV": '"production"',
     },
