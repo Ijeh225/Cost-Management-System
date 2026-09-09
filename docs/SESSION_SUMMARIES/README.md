@@ -20,7 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-09-09 CAP-01 job overview and daily queue](2026-09-09-cap01-job-overview.md)
+- [2026-09-09 CAP-01 job overview, daily queue and live staff acceptance (17:30 WAT)](2026-09-09-cap01-job-overview.md)
 
 - [2026-09-09 CAP-04 implementation, live acceptance and display findings](2026-09-09-shipment-scope.md)
 

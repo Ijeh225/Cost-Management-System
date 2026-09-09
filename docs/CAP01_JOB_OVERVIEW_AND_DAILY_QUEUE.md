@@ -106,3 +106,19 @@ Dashboard and all three bank balances remained unchanged. Retain task #1; do not
 repeat creation. Local non-finance/branch/client tests supplement this live owner
 session; no fresh multi-account login, external messaging or productivity benchmark
 is claimed. Full evidence is in LIVE_E2E_TEST_REGISTER.md and the session summary.
+
+## Live Staff Follow-Up (2026-09-09 17:30 WAT)
+
+The earlier fresh-staff-login limitation is now closed for Operations QA #14,
+Lagos branch #2, with only Transire and Shipping access. My Tasks included only
+its task #2, not same-job #3 assigned to another user. Overview financial context
+was absent and the authenticated response returned finance=null. Cross-branch
+overview/tasks returned 404, finance/user APIs 403; forged branch headers did not
+broaden access. Staff completion refreshed its personal queue to empty.
+
+Both non-financial task controls #2/#3 on existing job #26 are retained completed;
+owner login restored and financial baseline unchanged. No role/source/schema
+changes. Shared job task editor remains collaborative under existing container
+access; My Tasks personal filtering is not an assignee-only mutation policy.
+This is scoped live Operations-staff acceptance, not a repeat of all roles or
+destructive actions. Details: CAP01_LIVE_STAFF_ACCEPTANCE_2026-09-09.md.

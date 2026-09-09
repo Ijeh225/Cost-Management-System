@@ -7,7 +7,47 @@ and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
+### CAP-01 Live Staff Acceptance Passed - 2026-09-09 17:30 WAT
+
+- Fresh login: existing active Operations QA #14, branch #2, Transire/Shipping
+  only. Rotated only its dummy password; no credentials/cookies saved to files.
+- Created exactly two reserved non-financial tasks on existing job #26:
+  #2 assigned #14, #3 assigned #13. Owner-created, medium, due 2026-09-09.
+  Personal staff queue contained #2 only (All=1/Today=1/Overdue=0); original
+  overview/task editor correctly retained both original IDs for the shared job.
+- Overview UI hid Financial context/invoice links; authenticated JSON finance
+  was null. Legacy My Tasks financial fields were zero. Only authorized
+  Transire/Shipping milestone links were available; other milestones read-only.
+- Live HTTP: normal overview/tasks/queue 200. Forged X-Branch-Id all/1/3 still
+  returned only staff's Lagos task #2; #24/#25 overviews 404 in every case.
+  #24/#25 tasks 404; banks, invoices, invoice #8, schedules and users APIs 403.
+  Test runner made 22 GET requests plus login/logout; no data mutation.
+- Direct invoice #8 browser route redirected to Transire; Head Office #24 task
+  link showed no job data. Browser blocks raw /api navigation, so actual API
+  status/body assertions used a separate live authenticated HTTP session.
+- Staff completed #2 at 17:26 WAT. Without reload, overview open 2->1 and
+  editor 1 active/1 done; staff queue then 0 while #3 stayed pending. Owner
+  restored and completed #3 at 17:29 WAT. Reload persisted 0 active/2 done.
+- Retain completed #2/#3 plus their ordinary internal assignment events.
+  Completed #1, CAP-04 fixtures, stage/physical fields and financial records
+  untouched. Dashboard 15/13/2; invoiced 3,301 / collected 2,001 / AR 1,300;
+  banks 47,499,997 / 599 / 1 unchanged. Staff HTTP/browser sessions logged out.
+- No new confirmed defect. This closes fresh non-finance CAP-01 acceptance for
+  the tested Operations profile, not every role or destructive task permission.
+  Shared job task editing is existing collaborative access, not assignee-only;
+  My Tasks is the personal selection layer. No role rules changed for this test.
+- Evidence: docs/CAP01_LIVE_STAFF_ACCEPTANCE_2026-09-09.md.
+  Next: publish records; await next user-authorized capability. Do not repeat
+  the task writes or reopen completed test fixtures.
+
 ### CAP-01 Bounded Acceptance Passed - 2026-09-09 16:17 WAT
+
+- 17:11 WAT follow-up authorized: fresh controlled user #14 acceptance now in
+  progress. Reserve CAP01-ACCESS-20260909 Staff queue verification and
+  CAP01-ACCESS-20260909 Other assignee control on existing job #26 only if
+  equivalent open fixtures are absent. Assign #14 / #13 respectively, due today;
+  complete and retain after verification. Task #1 and financial fixtures untouched.
+  Inspect UI and authenticated API scope; no pass claimed before observations.
 
 - Code `54f0ceb` committed/pushed. Railway deployment
   `61ffe1a3-322d-4fcf-b963-a4b8c1e85e24` SUCCESS, matching exact commit hash.

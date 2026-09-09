@@ -45,6 +45,32 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-09 17:30 WAT: remaining CAP-01 live staff acceptance PASSED. Fresh
+  E2E Operations QA #14 login showed only assigned task #2 in My Tasks, not
+  same-job task #3 assigned #13. Overview finance absent visually and JSON
+  finance=null; only Transire/Shipping milestone links available. Independent
+  authenticated HTTP checks returned 403 for finance/user-management APIs and
+  404 for Head Office/Abuja overview/tasks. Forged all/1/3 branch headers did
+  not widen Lagos scope. Direct invoice UI redirected; out-of-branch job hidden.
+  Staff completed #2 once; immediate overview 2->1 and personal queue 1->0.
+  Owner restored and completed control #3; reload confirms 0 active / 2 done.
+  Retain tasks #2/#3 on job #26 and their normal internal assignment events;
+  task #1 untouched. Only dummy #14 password/session state changed outside these
+  two tasks. Financial baseline unchanged; no application code/schema changed.
+  Fresh-live-staff limitation is closed for this Operations profile. Existing
+  shared job task editor remains collaborative; this is not assignee-only editing
+  authorization or a new all-role/deletion audit. No new confirmed defect.
+  Evidence: docs/CAP01_LIVE_STAFF_ACCEPTANCE_2026-09-09.md. Next: publish these
+  test records, then await user-selected capability; CAP-02 still only proposed.
+- 2026-09-09 17:11 WAT: user authorized the remaining CAP-01 live non-finance
+  acceptance. Reuse E2E Operations QA user #14 (Lagos, Transire/Shipping only),
+  rotating only its dummy password if required; never record credentials.
+  Verify personal queue, hidden overview finance, direct branch/finance denials
+  and permitted task completion. Preserve completed task #1 and CAP-04 fixtures.
+  If no suitable open tasks exist, reserve two labelled non-financial follow-ups
+  on existing Lagos job #26: one assigned #14 and one #13 as the exclusion control.
+  Retain them completed after checks. No financial, stage or physical-event writes.
+  Results pending; this is not a repeat of the entire application audit.
 - 2026-09-09 16:17 WAT: CAP-01 implemented, committed/pushed as `54f0ceb`, and
   deployed successfully: `61ffe1a3-322d-4fcf-b963-a4b8c1e85e24` (SUCCESS).
   Bounded live acceptance passed: #32/#33 show independent fields, correct physical

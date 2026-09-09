@@ -1,5 +1,42 @@
 # CAP-01 Job Overview and Daily Queue
 
+## 2026-09-09 17:30 WAT - Live Staff Limitation Closed
+
+- Fresh browser login as existing Operations QA #14; active Staff/Operations,
+  branch #2 and only Transire/Shipping. Rotated dummy password only, not roles.
+- New reserved tasks #2/#3 on existing #26, assigned #14/#13 respectively.
+  Staff queue showed #2 alone; overview/task editor showed both shared job tasks.
+  Finance hidden visually and finance=null in overview API; legacy queue amounts
+  zero. Only permitted department links appeared. No new financial records.
+- Raw API browser navigation hit ERR_BLOCKED_BY_CLIENT. Separate authenticated
+  HTTP checker passed 22 GET responses/assertions, including forged branch
+  selections, cross-branch 404s, finance/user-management 403s and unchanged tasks.
+  HTTP session logged out; browser needed a fresh staff login afterwards.
+- Direct invoice browser URL redirected to Transire; out-of-branch job withheld.
+  Staff completed #2 and queue became empty while #3 remained pending. Owner
+  restored, completed #3; reload confirmed both done and no open job tasks.
+- Keep #2/#3 and ordinary assignment events. #1 and historical test records
+  untouched. Same dashboard/bank baseline. No source/schema/deployment change.
+- No new confirmed defect. Scope is this non-finance profile and CAP-01 checks,
+  not a universal role/deletion audit. Existing same-job task editor is collaborative;
+  personal queue filtering is not an assignee-only edit policy.
+- Evidence: CAP01_LIVE_STAFF_ACCEPTANCE_2026-09-09.md. Checker is read-only
+  apart from authentication and deliberately requires original pending fixtures;
+  do not reopen/recreate now-completed fixtures just to rerun it.
+- Next: publish test records, then await user-selected capability. CAP-02 proposed.
+
+## 2026-09-09 17:11 WAT - Remaining Live Staff Check Authorized
+
+- User asked whether the live staff-login limitation needs testing, then explicitly
+  authorized it. Existing owner acceptance is not being repeated or overstated.
+- Clean master at 6b12ff8. Reuse active E2E Operations QA #14, Lagos branch #2,
+  Operations staff with only Transire/Shipping. Rotate dummy password if needed;
+  credentials/session cookies must never enter project files.
+- Check assigned queue, non-finance overview, branch/API denials and task actions.
+  Reserve two non-financial tasks on existing #26 only if suitable records absent,
+  assigned #14 and #13 to prove positive and negative queue selection. Retain done.
+  No new user/job/invoice/payment, no repeated completed task #1 or movement test.
+
 ## 2026-09-09 15:29 WAT - Implementation Authorized
 
 - User explicitly requested implementation after CAP-04 and both display fixes
