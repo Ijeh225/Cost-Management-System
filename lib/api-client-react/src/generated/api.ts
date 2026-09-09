@@ -60,6 +60,7 @@ import type {
   ReverseDutyPaymentRequest,
   SaveCustomFieldValuesRequest,
   SectionApproval,
+  ShipmentOverview,
   TimelineEvent,
   UpdateContainerChargesRequest,
   UpdateContainerRequest,
@@ -1236,6 +1237,94 @@ export const usePatchContainer = <
 > => {
   return useMutation(getPatchContainerMutationOptions(options));
 };
+
+/**
+ * @summary Read the branch-scoped B/L group for an authorized container visit
+ */
+export const getGetContainerShipmentUrl = (id: number) => {
+  return `/api/containers/${id}/shipment`;
+};
+
+export const getContainerShipment = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ShipmentOverview> => {
+  return customFetch<ShipmentOverview>(getGetContainerShipmentUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetContainerShipmentQueryKey = (id: number) => {
+  return [`/api/containers/${id}/shipment`] as const;
+};
+
+export const getGetContainerShipmentQueryOptions = <
+  TData = Awaited<ReturnType<typeof getContainerShipment>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getContainerShipment>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetContainerShipmentQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getContainerShipment>>
+  > = ({ signal }) => getContainerShipment(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getContainerShipment>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetContainerShipmentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getContainerShipment>>
+>;
+export type GetContainerShipmentQueryError = ErrorType<void>;
+
+/**
+ * @summary Read the branch-scoped B/L group for an authorized container visit
+ */
+
+export function useGetContainerShipment<
+  TData = Awaited<ReturnType<typeof getContainerShipment>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getContainerShipment>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetContainerShipmentQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Lock or unlock a container record

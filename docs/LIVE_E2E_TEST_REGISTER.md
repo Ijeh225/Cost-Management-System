@@ -1,15 +1,40 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-09-08
+## Current Test and Defect Register - Authoritative as of 2026-09-09
 
 Use this register before selecting the next test or fix. The detailed test rows
 and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
+### CAP-04 Feature Verification - 2026-09-09 12:07 WAT
+
+- User authorized CAP-04 implementation. Existing defect closures below remain;
+  this is new feature verification, not a repeated financial audit.
+- Local suite: 137 tests / 29 files pass, including migration/backfill/rollback,
+  owner/date/cost independence, client assignment transaction/audit, authorized
+  shipment API reads, ambiguous AI visit lookup and multi-container invoice labels.
+- Existing isolated Railway PostgreSQL: migration/rerun preserves visit and fact
+  links; concurrent siblings produce one parent; duplicate retries create one
+  visit; conflicting clients cannot share a parent; later equipment visits and
+  partial completion/costs remain separate. All five reported check groups passed.
+- No isolated public schema reset or production connection. Random scratch schema
+  removed and private SSH tunnel closure verified. Existing test fixtures retained.
+- Browser on local production build: sibling links and partial delivery; no page
+  overflow at 390/768/1440. Upload accepts two new boxes on an existing B/L and
+  skips the existing box/B/L pair. No external network or live API writes.
+- Full Railway typecheck/frontend/API build passes; existing Vite sourcemap and
+  large-chunk warnings remain non-blocking. One initial local smoke fixture had
+  the wrong CSRF response key; corrected to `token`, then passed. Not a live defect.
+- Pending: deployment/migration confirmation and bounded live acceptance of CAP-04.
+  Before creating any live fixtures, check for existing CAP-04 records to avoid
+  duplicate tests. Do not reopen previously closed issue IDs or repay old schedules.
+- Details: docs/CAP04_SHIPMENTS_AND_CONTAINER_VISITS.md and
+  docs/SESSION_SUMMARIES/2026-09-09-shipment-scope.md.
+
 ### Closed by Deployed Fix and Live Re-Test
 
-2026-09-09 10:53 WAT scope note: the user confirmed multi-container B/Ls.
+Historical 2026-09-09 10:53 WAT scope note: the user confirmed multi-container B/Ls.
 CAP-04 remains proposed, not implemented or tested. Future acceptance must cover
 one B/L with multiple containers, independent progress/partial delivery and no
 double counting of shared charges. Existing closures and fixtures are unchanged;

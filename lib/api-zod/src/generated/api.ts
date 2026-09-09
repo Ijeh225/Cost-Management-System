@@ -260,6 +260,18 @@ export const ListContainersResponse = zod.object({
   containers: zod.array(
     zod.object({
       id: zod.number(),
+      shipmentId: zod
+        .number()
+        .nullish()
+        .describe(
+          "Shared branch-scoped B\/L shipment; container id remains the individual visit.",
+        ),
+      equipmentId: zod
+        .number()
+        .nullish()
+        .describe(
+          "Physical equipment identity, which can appear on later shipment visits.",
+        ),
       customerName: zod.string(),
       containerNumber: zod.string(),
       blNumber: zod.string(),
@@ -442,6 +454,18 @@ export const GetContainerParams = zod.object({
 export const GetContainerResponse = zod.object({
   container: zod.object({
     id: zod.number(),
+    shipmentId: zod
+      .number()
+      .nullish()
+      .describe(
+        "Shared branch-scoped B\/L shipment; container id remains the individual visit.",
+      ),
+    equipmentId: zod
+      .number()
+      .nullish()
+      .describe(
+        "Physical equipment identity, which can appear on later shipment visits.",
+      ),
     customerName: zod.string(),
     containerNumber: zod.string(),
     blNumber: zod.string(),
@@ -698,6 +722,18 @@ export const UpdateContainerBody = zod.object({
 
 export const UpdateContainerResponse = zod.object({
   id: zod.number(),
+  shipmentId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Shared branch-scoped B\/L shipment; container id remains the individual visit.",
+    ),
+  equipmentId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Physical equipment identity, which can appear on later shipment visits.",
+    ),
   customerName: zod.string(),
   containerNumber: zod.string(),
   blNumber: zod.string(),
@@ -863,6 +899,18 @@ export const PatchContainerBody = zod.object({
 
 export const PatchContainerResponse = zod.object({
   id: zod.number(),
+  shipmentId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Shared branch-scoped B\/L shipment; container id remains the individual visit.",
+    ),
+  equipmentId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Physical equipment identity, which can appear on later shipment visits.",
+    ),
   customerName: zod.string(),
   containerNumber: zod.string(),
   blNumber: zod.string(),
@@ -986,6 +1034,36 @@ export const PatchContainerResponse = zod.object({
 });
 
 /**
+ * @summary Read the branch-scoped B/L group for an authorized container visit
+ */
+export const GetContainerShipmentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetContainerShipmentResponse = zod.object({
+  shipmentId: zod.number(),
+  blNumber: zod.string(),
+  branchId: zod.number(),
+  total: zod.number(),
+  delivered: zod.number(),
+  completed: zod.number(),
+  containers: zod.array(
+    zod.object({
+      id: zod.number(),
+      containerNumber: zod.string(),
+      blNumber: zod.string(),
+      status: zod.string(),
+      size: zod.string(),
+      deliveredAt: zod.date().nullable(),
+      transireStageOwner: zod.string().nullish(),
+      shippingStageOwner: zod.string().nullish(),
+      terminalStageOwner: zod.string().nullish(),
+      pulloutStageOwner: zod.string().nullish(),
+    }),
+  ),
+});
+
+/**
  * @summary Lock or unlock a container record
  */
 export const LockContainerParams = zod.object({
@@ -999,6 +1077,18 @@ export const LockContainerBody = zod.object({
 
 export const LockContainerResponse = zod.object({
   id: zod.number(),
+  shipmentId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Shared branch-scoped B\/L shipment; container id remains the individual visit.",
+    ),
+  equipmentId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Physical equipment identity, which can appear on later shipment visits.",
+    ),
   customerName: zod.string(),
   containerNumber: zod.string(),
   blNumber: zod.string(),
@@ -1520,6 +1610,18 @@ export const GetMyTasksResponse = zod.object({
   assignedContainers: zod.array(
     zod.object({
       id: zod.number(),
+      shipmentId: zod
+        .number()
+        .nullish()
+        .describe(
+          "Shared branch-scoped B\/L shipment; container id remains the individual visit.",
+        ),
+      equipmentId: zod
+        .number()
+        .nullish()
+        .describe(
+          "Physical equipment identity, which can appear on later shipment visits.",
+        ),
       customerName: zod.string(),
       containerNumber: zod.string(),
       blNumber: zod.string(),

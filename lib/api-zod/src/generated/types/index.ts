@@ -81,6 +81,8 @@ export * from "./saveCustomFieldValuesRequest";
 export * from "./saveCustomFieldValuesRequestValuesItem";
 export * from "./sectionApproval";
 export * from "./sectionApprovalStatus";
+export * from "./shipmentOverview";
+export * from "./shipmentOverviewContainersItem";
 export * from "./shippingCharges";
 export * from "./terminalCharges";
 export * from "./timelineEvent";

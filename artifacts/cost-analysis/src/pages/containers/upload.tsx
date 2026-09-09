@@ -1,4 +1,6 @@
 import { useState, useRef } from "react";
+import { containerVisitKey } from "@/lib/container-visit-key";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import {
@@ -82,7 +84,7 @@ function RowStatusBadge({ status }: { status: RowStatus }) {
 }
 
 function getConflictReason(status: RowStatus): string {
-  if (status === "db-both") return "Container number and B/L number already exist in system";
+  if (status === "db-both") return "This container already exists under this B/L";
   if (status === "db-con") return "Container number already exists in system";
   if (status === "db-bl") return "B/L number already exists in system";
   if (status === "file-dup") return "Duplicate within this file";
@@ -90,6 +92,7 @@ function getConflictReason(status: RowStatus): string {
 }
 
 export default function UploadPage() {
+  const { activeBranchId } = useBranchScope();
   const { isAdmin, user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -254,26 +257,19 @@ export default function UploadPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const seenCons = new Map<string, number[]>();
-  const seenBls  = new Map<string, number[]>();
+  const seenVisits = new Map<string, number[]>();
   parsedData.forEach((row, idx) => {
-    if (!seenCons.has(row.containerNumber)) seenCons.set(row.containerNumber, []);
-    seenCons.get(row.containerNumber)!.push(idx);
-    if (!seenBls.has(row.blNumber)) seenBls.set(row.blNumber, []);
-    seenBls.get(row.blNumber)!.push(idx);
+    const key = containerVisitKey(row);
+    if (!seenVisits.has(key)) seenVisits.set(key, []);
+    seenVisits.get(key)!.push(idx);
   });
 
   const getRowStatus = (row: UploadRow): RowStatus => {
-    const fileDup =
-      (seenCons.get(row.containerNumber)?.length ?? 0) > 1 ||
-      (seenBls.get(row.blNumber)?.length ?? 0) > 1;
+    const fileDup = (seenVisits.get(containerVisitKey(row))?.length ?? 0) > 1;
     if (fileDup) return "file-dup";
     if (!checkResult) return "new";
-    const existsCon = checkResult.existingContainerNumbers.includes(row.containerNumber);
-    const existsBl  = checkResult.existingBlNumbers.includes(row.blNumber);
-    if (existsCon && existsBl) return "db-both";
-    if (existsCon) return "db-con";
-    if (existsBl)  return "db-bl";
+    if (checkResult.existingVisits?.some(visit =>
+      (activeBranchId === "all" || visit.branchId === activeBranchId) && containerVisitKey(visit) === containerVisitKey(row))) return "db-both";
     return "new";
   };
 

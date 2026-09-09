@@ -226,6 +226,7 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
               {errors.blNumber && (
                 <p className="text-xs text-destructive">{errors.blNumber}</p>
               )}
+              <p className="text-xs text-muted-foreground">Use the same B/L and client to add another container to this shipment in the selected branch. Charges entered here apply only to this container.</p>
             </div>
 
             <div className="space-y-1.5">

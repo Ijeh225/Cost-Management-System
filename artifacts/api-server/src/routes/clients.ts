@@ -1,9 +1,10 @@
 import { Router } from "express";
+import { assignShipmentClient, ShipmentClientError } from "../lib/shipment-client.js";
 import {
   db, clientsTable, containersTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable,
   clientDepositsTable, shippingChargesTable, customsChargesTable,
   terminalChargesTable, deliveryChargesTable, operationsChargesTable,
-  usersTable, banksTable,
+  usersTable, banksTable, shipmentsTable,
 } from "@workspace/db";
 import { eq, desc, sum, inArray, gte, and, isNull, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, verifyPassword, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
@@ -179,8 +180,11 @@ clientsRouter.delete("/clients/:id", requireAuth, requireBranchAdminOrAbove, asy
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
     const [_existing] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, id));
     if (!_existing || !userCanAccessBranch(req, _existing.branchId)) return res.status(404).json({ error: "Client not found" });
-    await db.update(containersTable).set({ clientId: null }).where(eq(containersTable.clientId, id));
-    await db.delete(clientsTable).where(eq(clientsTable.id, id));
+    await db.transaction(async tx => {
+      await tx.update(shipmentsTable).set({ clientId: null }).where(eq(shipmentsTable.clientId, id));
+      await tx.update(containersTable).set({ clientId: null }).where(eq(containersTable.clientId, id));
+      await tx.delete(clientsTable).where(eq(clientsTable.id, id));
+    });
     return res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -198,11 +202,11 @@ clientsRouter.patch("/clients/:id/link-container", requireAuth, requireBranchAdm
     const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, containerId));
     if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
     if (container.branchId !== client.branchId) return res.status(400).json({ error: "Container and client must belong to the same branch" });
-    await db.update(containersTable)
-      .set({ clientId, customerName: client.name, updatedAt: new Date() })
-      .where(eq(containersTable.id, containerId));
-    return res.json({ success: true });
+    const updatedContainers = await assignShipmentClient(containerId, container.branchId, req.user!.id,
+      clientId, client.name, req.body.confirmShipment === true);
+    return res.json({ success: true, updatedContainers });
   } catch (err) {
+    if (err instanceof ShipmentClientError) return res.status(409).json({ error: err.message });
     console.error(err);
     return res.status(500).json({ error: "Server error" });
   }
@@ -214,9 +218,11 @@ clientsRouter.patch("/containers/:id/unlink-client", requireAuth, requireBranchA
     if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
     const [container] = await db.select({ branchId: containersTable.branchId }).from(containersTable).where(eq(containersTable.id, id));
     if (!container || !userCanAccessBranch(req, container.branchId)) return res.status(404).json({ error: "Container not found" });
-    await db.update(containersTable).set({ clientId: null, updatedAt: new Date() }).where(eq(containersTable.id, id));
-    return res.json({ success: true });
+    const updatedContainers = await assignShipmentClient(id, container.branchId, req.user!.id,
+      null, null, req.body?.confirmShipment === true);
+    return res.json({ success: true, updatedContainers });
   } catch (err) {
+    if (err instanceof ShipmentClientError) return res.status(409).json({ error: err.message });
     console.error(err);
     return res.status(500).json({ error: "Server error" });
   }

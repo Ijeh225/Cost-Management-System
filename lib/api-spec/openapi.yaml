@@ -303,6 +303,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Container"
 
+  /containers/{id}/shipment:
+    get:
+      operationId: getContainerShipment
+      tags: [containers]
+      summary: Read the branch-scoped B/L group for an authorized container visit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Independent container visits, delivery count and completion count; no financial fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipmentOverview"
+        "404":
+          description: Container missing or outside branch/client scope
+        "503":
+          description: Shipment migration is not ready
+
   /containers/{id}/lock:
     post:
       operationId: lockContainer
@@ -1279,6 +1302,14 @@ components:
       properties:
         id:
           type: integer
+        shipmentId:
+          type: integer
+          nullable: true
+          description: Shared branch-scoped B/L shipment; container id remains the individual visit.
+        equipmentId:
+          type: integer
+          nullable: true
+          description: Physical equipment identity, which can appear on later shipment visits.
         customerName:
           type: string
         containerNumber:
@@ -1923,6 +1954,33 @@ components:
         reason:
           type: string
       required: [section]
+
+    ShipmentOverview:
+      type: object
+      required: [shipmentId, blNumber, branchId, total, delivered, completed, containers]
+      properties:
+        shipmentId: {type: integer}
+        blNumber: {type: string}
+        branchId: {type: integer}
+        total: {type: integer}
+        delivered: {type: integer}
+        completed: {type: integer}
+        containers:
+          type: array
+          items:
+            type: object
+            required: [id, containerNumber, blNumber, status, size, deliveredAt]
+            properties:
+              id: {type: integer}
+              containerNumber: {type: string}
+              blNumber: {type: string}
+              status: {type: string}
+              size: {type: string}
+              deliveredAt: {type: string, format: date-time, nullable: true}
+              transireStageOwner: {type: string, nullable: true}
+              shippingStageOwner: {type: string, nullable: true}
+              terminalStageOwner: {type: string, nullable: true}
+              pulloutStageOwner: {type: string, nullable: true}
 
     ContainerDetail:
       type: object

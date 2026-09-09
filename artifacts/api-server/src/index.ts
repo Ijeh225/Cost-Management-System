@@ -6,6 +6,7 @@ import { runScheduledReportDelivery } from "./lib/report-delivery";
 import { runScheduledAiProactiveBriefings } from "./lib/ai-proactive-intelligence";
 import { getDocumentStorageConfigurationError } from "./lib/document-storage";
 import { ensureInvoicePaymentReversalSchema } from "./lib/invoice-payment-reversal-schema";
+import { ensureShipmentSchema } from "./lib/shipment-schema";
 
 async function ensureMigrationsTable() {
   await pool.query(`
@@ -1091,6 +1092,7 @@ async function runStartupMigrations() {
           OR access_profile_migrated_at IS NULL
       `);
     });
+    await runMigration("shipment_container_visits_v1", () => ensureShipmentSchema(pool));
   } catch (err) {
     console.error("[migration] startup migration failed:", err);
     process.exit(1);

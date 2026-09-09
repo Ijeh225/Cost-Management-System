@@ -45,6 +45,27 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-09 12:07 WAT: CAP-04 implementation and local/isolated verification
+  complete; publication/deployment confirmation and scoped live acceptance pending.
+  Added shipment/B/L parents, physical equipment identity and preserved container
+  IDs as visits. Create/import share an atomic database identity guard; different
+  containers can share a B/L but duplicate visits/client conflicts are rejected.
+  Group UI shows independent visits/partial delivery; shipment client changes are
+  explicit, transactional and audited. AI rejects ambiguous repeated equipment;
+  multi-container invoice headers derive the common B/L without changing totals.
+  Verified: 137 tests / 29 files; full Railway build; private Railway isolated DB
+  migration and concurrency checks; local browser sibling navigation, import pair
+  detection and widths 390/768/1440. Test namespace and SSH tunnel cleaned up.
+  No production records were manually changed. CAP-01 is not implemented here.
+  Procedure, migration/rollback boundaries and scope:
+  docs/CAP04_SHIPMENTS_AND_CONTAINER_VISITS.md.
+- 2026-09-09 11:35 WAT: user authorized CAP-04 implementation before CAP-01.
+  In progress: additive shipment/B/L and equipment/visit identities, migration
+  preserving container IDs, branch/client grouping controls, compatible create
+  and upload paths, shipment container visibility and regression verification.
+  Existing financial records stay container-linked; no copied shared charges.
+  Implementation and test evidence will be recorded before publication. CAP-01
+  is not part of this implementation. No live migration/test has yet run.
 - 2026-09-09 10:53 WAT: user confirmed that one B/L can cover multiple containers.
   CAP-04 is therefore a relevant foundation requirement, not merely hypothetical.
   Proposed design: one shipment/B/L parent with independently tracked containers;

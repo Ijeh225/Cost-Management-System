@@ -1,4 +1,5 @@
 import { NextFunction, Response, Router } from "express";
+import { findContainerVisit } from "../lib/container-visit-lookup.js";
 import {
   aiAssistantAuditLogsTable,
   aiAssistantEvaluationCasesTable,
@@ -31,7 +32,7 @@ import {
   usersTable,
   workflowNotificationsTable,
 } from "@workspace/db";
-import { and, desc, eq, gte, ilike, inArray, ne, or } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { AuthRequest, getBranchScope, requireAdmin } from "../lib/auth.js";
 import { formatProactiveBriefing, generateProactiveBriefing } from "../lib/ai-proactive-intelligence.js";
 import { AiProviderUsage, generateEvidenceBasedAnswer, isNaturalLanguageRoutingConfigured, selectToolWithNaturalLanguage } from "../lib/ai-tool-selection.js";
@@ -958,7 +959,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       tdoDelayReason: containersTable.tdoDelayReason, expectedPulloutDate: containersTable.expectedPulloutDate,
       pulloutReleasedAt: containersTable.pulloutReleasedAt, pulloutDelayReason: containersTable.pulloutDelayReason,
     }).from(containersTable), branchId);
-    const row = rows.find((candidate) => candidate.id === requestedId || candidate.containerNumber.toUpperCase() === requestedNumber);
+    const row = findContainerVisit(rows, requestedId, requestedNumber);
     const result = createResult(toolId, tool.title, branchId);
     if (!row) {
       result.notes = ["No authorised container matches that exact identifier."];
@@ -995,7 +996,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     const containers = scoped(await db.select({
       id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber, customerName: containersTable.customerName,
     }).from(containersTable), branchId);
-    const container = containers.find((row) => (Number.isInteger(requestedId) && row.id === requestedId) || (!!requestedNumber && row.containerNumber.toUpperCase() === requestedNumber));
+    const container = findContainerVisit(containers, requestedId, requestedNumber);
     if (!container) throw new Error("Container not found in your authorised branch scope.");
     const documents = await db.select({
       id: containerDocumentsTable.id,
@@ -1038,7 +1039,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     const requestedNumber = typeof body.containerNumber === "string" ? body.containerNumber.trim().toUpperCase() : "";
     if ((!Number.isInteger(requestedId) || requestedId <= 0) && !requestedNumber) throw new Error("Provide an exact container number or container ID.");
     const containers = scoped(await db.select({ id: containersTable.id, branchId: containersTable.branchId, containerNumber: containersTable.containerNumber, customerName: containersTable.customerName }).from(containersTable), branchId);
-    const container = containers.find((row) => row.id === requestedId || row.containerNumber.toUpperCase() === requestedNumber);
+    const container = findContainerVisit(containers, requestedId, requestedNumber);
     const result = createResult(toolId, tool.title, branchId);
     if (!container) { result.notes = ["No authorised container matches that ID."]; return result; }
     const containerId = container.id;
@@ -1930,8 +1931,12 @@ async function draftPreview(type: AssistantDraftType, body: Record<string, unkno
     if (!containerNumber || !title || (parsedDueDate && Number.isNaN(parsedDueDate.getTime())) || (assignedStaffId != null && (!Number.isInteger(assignedStaffId) || assignedStaffId <= 0))) {
       throw new Error("An exact container number and task title are required. Use a valid due date and branch staff member when provided.");
     }
-    const [container] = await db.select({ id: containersTable.id, containerNumber: containersTable.containerNumber })
-      .from(containersTable).where(and(eq(containersTable.branchId, branchId), eq(containersTable.containerNumber, containerNumber))).limit(1);
+    const matches = await db.select({ id: containersTable.id, containerNumber: containersTable.containerNumber })
+      .from(containersTable).where(and(eq(containersTable.branchId, branchId),
+        Number.isSafeInteger(Number(body.containerId)) && Number(body.containerId) > 0
+          ? eq(containersTable.id, Number(body.containerId))
+          : sql`upper(trim(${containersTable.containerNumber})) = ${containerNumber}`)).limit(2);
+    const container = findContainerVisit(matches, Number(body.containerId), containerNumber);
     if (!container) throw new Error("The container was not found in the selected branch.");
     let assigneeName: string | null = null;
     if (assignedStaffId != null) {
@@ -1972,8 +1977,12 @@ async function draftPreview(type: AssistantDraftType, body: Record<string, unkno
     if (!containerNumber || (parsedDueDate && Number.isNaN(parsedDueDate.getTime())) || (assignedStaffId != null && (!Number.isInteger(assignedStaffId) || assignedStaffId <= 0))) {
       throw new Error("An exact container number is required. Use a valid due date and active branch staff member when provided.");
     }
-    const [container] = await db.select().from(containersTable)
-      .where(and(eq(containersTable.branchId, branchId), eq(containersTable.containerNumber, containerNumber))).limit(1);
+    const matches = await db.select().from(containersTable)
+      .where(and(eq(containersTable.branchId, branchId),
+        Number.isSafeInteger(Number(body.containerId)) && Number(body.containerId) > 0
+          ? eq(containersTable.id, Number(body.containerId))
+          : sql`upper(trim(${containersTable.containerNumber})) = ${containerNumber}`)).limit(2);
+    const container = findContainerVisit(matches, Number(body.containerId), containerNumber);
     if (!container) throw new Error("The container was not found in the selected branch.");
     const containerData = container as unknown as Record<string, unknown>;
     const expectedDate = containerData[STAGE_TOOL_FIELDS[stage].expected] as Date | null;

@@ -1,15 +1,19 @@
-import { pgTable, serial, text, boolean, timestamp, integer, numeric } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, timestamp, integer, numeric, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { clientsTable } from "./clients";
+import { shipmentsTable, containerEquipmentTable } from "./shipments";
 
 export const containersTable = pgTable("containers", {
   id: serial("id").primaryKey(),
   branchId: integer("branch_id").notNull().default(1),
   customerName: text("customer_name").notNull(),
-  containerNumber: text("container_number").notNull().unique(),
-  blNumber: text("bl_number").notNull().unique(),
+  containerNumber: text("container_number").notNull(),
+  blNumber: text("bl_number").notNull(),
+  // Filled and checked atomically by the shipment identity trigger for all writers.
+  shipmentId: integer("shipment_id").references(() => shipmentsTable.id),
+  equipmentId: integer("equipment_id").references(() => containerEquipmentTable.id),
   declaration: text("declaration").notNull().default(""),
   size: text("size").notNull().default(""),
   vessel: text("vessel").notNull().default(""),
@@ -95,7 +99,7 @@ export const containersTable = pgTable("containers", {
   earlyStartReason: text("early_start_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [unique("containers_shipment_equipment_unique").on(table.shipmentId, table.equipmentId)]);
 
 export const insertContainerSchema = createInsertSchema(containersTable).omit({
   id: true,

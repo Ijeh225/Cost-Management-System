@@ -318,16 +318,17 @@ export function useAllocateDeposit(clientId: number) {
 export function useLinkContainerToClient() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ clientId, containerId }: { clientId: number; containerId: number }) => {
+    mutationFn: async ({ clientId, containerId, confirmShipment }: { clientId: number; containerId: number; confirmShipment?: boolean }) => {
       return customFetch<{ success: boolean }>(`/api/clients/${clientId}/link-container`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ containerId }),
+        body: JSON.stringify({ containerId, confirmShipment }),
       });
     },
     onSuccess: (_, { clientId }) => {
       qc.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId] });
+      qc.invalidateQueries({ predicate: query => query.queryKey.some(key => typeof key === "string" && (key.startsWith("/api/containers") || key === "containers")) });
     },
   });
 }

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { invoiceShipmentBl } from "../lib/invoice-shipment-label.js";
 import { db, invoicesTable, invoiceItemsTable, invoicePaymentsTable, containersTable, clientsTable, whatsappMessagesTable, banksTable, clientDepositsTable, creditNotesTable, overheadExpensesTable, invoiceAuditLogTable, workflowNotificationsTable, userClientAssignmentsTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, gte, lte, isNull, isNotNull, ne } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, getBranchScope, resolveCreateBranch, userCanAccessBranch } from "../lib/auth.js";
@@ -124,7 +125,7 @@ async function formatInvoice(inv: any, payments: any[], items?: any[], creditNot
     status,
     containerId: inv.containerId ?? null,
     containerNumber: inv.containerNumber ?? null,
-    blNumber: inv.blNumber ?? null,
+    blNumber: invoiceShipmentBl(items, inv.blNumber ?? null),
     clientId: inv.clientId ?? null,
     clientName: inv.clientName ?? null,
     clientPhone: inv.clientPhone ?? null,

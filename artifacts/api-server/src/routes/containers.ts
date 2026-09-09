@@ -11,6 +11,7 @@ import { isContainerPhysicallyInTerminal } from "../lib/operational-definitions.
 import { stageOwnerFieldFor, stageOwnerFor } from "../lib/department-stage-owners.js";
 import { hasAuthority, hasWorkspace } from "../lib/authorization.js";
 import { FINANCIAL_BASIS } from "../lib/financial-reporting.js";
+import { shipmentWriteError } from "../lib/shipment-schema.js";
 
 const router = Router();
 const VERIFICATION_OFFICER_SETTING_KEY = "verificationOfficerUserId";
@@ -185,6 +186,8 @@ function formatContainer(
     customerName: clientName ?? c.customerName,
     containerNumber: c.containerNumber,
     blNumber: c.blNumber,
+    shipmentId: c.shipmentId ?? null,
+    equipmentId: c.equipmentId ?? null,
     declaration: c.declaration ?? "",
     size: c.size ?? "",
     vessel: c.vessel ?? "",
@@ -633,9 +636,8 @@ router.post("/containers", requireAuth, async (req: AuthRequest, res) => {
     const berthingOfficerNames = await getUserNames(berthingOfficerIds);
     return res.status(201).json(formatContainer(container, null, null, null, verificationOfficerName, null, berthingOfficerName, verificationOfficerNames, berthingOfficerNames));
   } catch (err: any) {
-    if (err.code === "23505") {
-      return res.status(400).json({ error: "Container number or BL number already exists" });
-    }
+    const identityError = shipmentWriteError(err);
+    if (identityError) return res.status(409).json({ error: identityError });
     return res.status(500).json({ error: "Server error" });
   }
 });
@@ -648,15 +650,15 @@ router.post("/containers/check-duplicates", requireAuth, async (req: AuthRequest
   try {
     const _scope = getBranchScope(req);
     const _conFilter = _scope === null
-      ? inArray(containersTable.containerNumber, containerNumbers)
-      : and(inArray(containersTable.containerNumber, containerNumbers), eq(containersTable.branchId, _scope));
+      ? inArray(sql`upper(trim(${containersTable.containerNumber}))`, containerNumbers.map(String).map(v => v.trim().toUpperCase()))
+      : and(inArray(sql`upper(trim(${containersTable.containerNumber}))`, containerNumbers.map(String).map(v => v.trim().toUpperCase())), eq(containersTable.branchId, _scope));
     const _blFilter = _scope === null
       ? inArray(containersTable.blNumber, blNumbers)
       : and(inArray(containersTable.blNumber, blNumbers), eq(containersTable.branchId, _scope));
     const [existingCons, existingBls] = await Promise.all([
       containerNumbers.length > 0
         ? db
-            .select({ containerNumber: containersTable.containerNumber })
+            .select({ containerNumber: containersTable.containerNumber, blNumber: containersTable.blNumber, branchId: containersTable.branchId })
             .from(containersTable)
             .where(_conFilter)
         : Promise.resolve([]),
@@ -670,6 +672,7 @@ router.post("/containers/check-duplicates", requireAuth, async (req: AuthRequest
     return res.json({
       existingContainerNumbers: existingCons.map((r) => r.containerNumber),
       existingBlNumbers: existingBls.map((r) => r.blNumber),
+      existingVisits: existingCons,
     });
   } catch (err) {
     console.error(err);
@@ -766,10 +769,10 @@ router.post("/containers/upload", requireAuth, async (req: AuthRequest, res) => 
         }
         created++;
       } catch (err: any) {
-        if (err.code === "23505") {
+        if (err.code === "23505" || err.cause?.code === "23505") {
           duplicates.push(row.containerNumber || row.blNumber);
         } else {
-          errors.push(`Error for ${row.containerNumber}: ${err.message}`);
+          errors.push(`Error for ${row.containerNumber}: ${shipmentWriteError(err) ?? "Unable to import this row"}`);
         }
       }
     }
@@ -1781,6 +1784,39 @@ router.get("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/containers/:id/shipment", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid container ID" });
+    const [container] = await db.select().from(containersTable).where(eq(containersTable.id, id));
+    const scope = getBranchScope(req);
+    if (!container || !userCanAccessBranch(req, container.branchId) || (scope !== null && scope !== container.branchId)) {
+      return res.status(404).json({ error: "Container not found" });
+    }
+    if (!hasAuthority(req.user!.accessProfile, "admin")) {
+      const assignments = await db.select().from(userClientAssignmentsTable).where(eq(userClientAssignmentsTable.userId, req.user!.id));
+      if (assignments.length && !assignments.some(a => a.clientId === container.clientId)) {
+        return res.status(404).json({ error: "Container not found" });
+      }
+    }
+    if (!container.shipmentId) return res.status(503).json({ error: "Shipment migration is not ready" });
+    const rows = await db.select({
+      id: containersTable.id, containerNumber: containersTable.containerNumber, blNumber: containersTable.blNumber,
+      status: containersTable.status, size: containersTable.size, deliveredAt: containersTable.deliveredAt,
+      transireStageOwner: containersTable.transireStageOwner, shippingStageOwner: containersTable.shippingStageOwner,
+      terminalStageOwner: containersTable.terminalStageOwner, pulloutStageOwner: containersTable.pulloutStageOwner,
+    }).from(containersTable).where(and(eq(containersTable.shipmentId, container.shipmentId), eq(containersTable.branchId, container.branchId)))
+      .orderBy(containersTable.id);
+    // Operational metadata only: no financial totals or unrelated equipment visits.
+    return res.json({ shipmentId: container.shipmentId, blNumber: container.blNumber, branchId: container.branchId,
+      total: rows.length, delivered: rows.filter(row => row.deliveredAt !== null).length,
+      completed: rows.filter(row => row.status === "closed").length, containers: rows });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Unable to load shipment" });
+  }
+});
+
 router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(String(req.params.id));
@@ -1835,6 +1871,8 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
 
     return res.json(formatContainer(updated));
   } catch (err) {
+    const identityError = shipmentWriteError(err);
+    if (identityError) return res.status(409).json({ error: identityError });
     console.error(err);
     return res.status(500).json({ error: "Server error" });
   }

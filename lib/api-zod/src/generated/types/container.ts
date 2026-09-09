@@ -9,6 +9,10 @@ import type { ContainerStatus } from "./containerStatus";
 
 export interface Container {
   id: number;
+  /** Shared branch-scoped B/L shipment; container id remains the individual visit. */
+  shipmentId?: number | null;
+  /** Physical equipment identity, which can appear on later shipment visits. */
+  equipmentId?: number | null;
   customerName: string;
   containerNumber: string;
   blNumber: string;

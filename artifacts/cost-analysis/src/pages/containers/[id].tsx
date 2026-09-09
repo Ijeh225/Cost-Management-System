@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { ShipmentContainers } from "@/components/containers/shipment-containers";
 import type { ReactNode } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { getShippingLine, normalizeContainerNumber, formatTrackingDate, formatTrackingDateTime, isMaerskContainer, type TrackingResult } from "@/lib/tracking";
@@ -1276,6 +1277,8 @@ function OperationalContainerView({
         <Badge variant="outline" className="ml-auto shrink-0">Operational View</Badge>
       </div>
 
+      <ShipmentContainers containerId={container.id} />
+
       <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
         <CardContent className="p-6 space-y-6">
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -1541,13 +1544,13 @@ export default function ContainerDetail() {
     if (!selectedClientId) return;
     setLinkingClient(true);
     linkContainerMutation.mutate(
-      { clientId: Number(selectedClientId), containerId },
+      { clientId: Number(selectedClientId), containerId, confirmShipment: true },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
           setLinkClientDialog(false);
           setSelectedClientId("");
-          toast({ title: "Client linked", description: "Container is now linked to the selected client." });
+          toast({ title: "Shipment client linked", description: "All containers on this B/L are now linked to the selected client." });
           setLinkingClient(false);
         },
         onError: () => {
@@ -1559,17 +1562,20 @@ export default function ContainerDetail() {
   };
 
   const handleUnlinkClient = async () => {
+    if (!window.confirm("Unlink the client from every container on this B/L? Existing invoices and payments will not be changed.")) return;
     setLinkingClient(true);
     try {
       const res = await fetch(`/api/containers/${containerId}/unlink-client`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json", ...(await getCsrfHeaders()) },
+        body: JSON.stringify({ confirmShipment: true }),
       });
       if (!res.ok) throw new Error("Unlink failed");
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
       queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
-      toast({ title: "Client unlinked", description: "Container is no longer linked to a client." });
+      queryClient.invalidateQueries({ predicate: query => query.queryKey.some(key => typeof key === "string" && (key.startsWith("/api/containers") || key === "containers")) });
+      toast({ title: "Shipment client unlinked", description: "All containers on this B/L have been unlinked." });
     } catch {
       toast({ variant: "destructive", title: "Failed to unlink client" });
     } finally {
@@ -1655,6 +1661,7 @@ export default function ContainerDetail() {
             </span>
           </div>
         </div>
+        <ShipmentContainers containerId={container.id} />
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
           <CardContent className="pt-5 space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -2807,6 +2814,8 @@ export default function ContainerDetail() {
       )}
 
       {/* Tabs */}
+      <ShipmentContainers containerId={container.id} />
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <TabsList className="bg-card/40 border border-border/50 flex-wrap h-auto">
@@ -3245,7 +3254,8 @@ export default function ContainerDetail() {
       <Dialog open={linkClientDialog} onOpenChange={v => { if (!v) { setLinkClientDialog(false); setSelectedClientId(""); } }}>
         <DialogContent className="border-border/50 bg-card/95 backdrop-blur max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><LinkIcon className="w-4 h-4 text-primary" /> Link to Client</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><LinkIcon className="w-4 h-4 text-primary" /> Link Shipment to Client</DialogTitle>
+            <p className="text-sm text-muted-foreground">This changes the client for every container on this B/L in this branch. Existing invoices and payments are not changed.</p>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-2">

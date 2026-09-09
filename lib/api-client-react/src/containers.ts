@@ -358,6 +358,7 @@ export type CheckDuplicatesRequest = {
 export type CheckDuplicatesResult = {
   existingContainerNumbers: string[];
   existingBlNumbers: string[];
+  existingVisits?: { containerNumber: string; blNumber: string; branchId: number }[];
 };
 
 export function useCheckContainerDuplicates() {

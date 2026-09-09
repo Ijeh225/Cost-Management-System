@@ -137,6 +137,10 @@ export const ContainerStatus = {
 
 export interface Container {
   id: number;
+  /** Shared branch-scoped B/L shipment; container id remains the individual visit. */
+  shipmentId?: number | null;
+  /** Physical equipment identity, which can appear on later shipment visits. */
+  equipmentId?: number | null;
   customerName: string;
   containerNumber: string;
   blNumber: string;
@@ -424,6 +428,29 @@ export interface UpdateContainerChargesRequest {
   operations?: OperationsCharges;
   clearingCharges?: number;
   reason?: string;
+}
+
+export type ShipmentOverviewContainersItem = {
+  id: number;
+  containerNumber: string;
+  blNumber: string;
+  status: string;
+  size: string;
+  deliveredAt: string | null;
+  transireStageOwner?: string | null;
+  shippingStageOwner?: string | null;
+  terminalStageOwner?: string | null;
+  pulloutStageOwner?: string | null;
+};
+
+export interface ShipmentOverview {
+  shipmentId: number;
+  blNumber: string;
+  branchId: number;
+  total: number;
+  delivered: number;
+  completed: number;
+  containers: ShipmentOverviewContainersItem[];
 }
 
 export type SectionApprovalStatus =

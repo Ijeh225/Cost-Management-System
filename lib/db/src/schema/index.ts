@@ -5,6 +5,7 @@ export * from "./bank-transfers";
 export * from "./clients";
 export * from "./client-deposits";
 export * from "./containers";
+export * from "./shipments";
 export * from "./charges";
 export * from "./audit";
 export * from "./approvals";
