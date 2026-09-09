@@ -588,10 +588,147 @@ export interface ApprovalQueueItem {
   updatedAt: string;
 }
 
+export type DailyQueueEntryBucket =
+  (typeof DailyQueueEntryBucket)[keyof typeof DailyQueueEntryBucket];
+
+export const DailyQueueEntryBucket = {
+  overdue: "overdue",
+  today: "today",
+  undated: "undated",
+  upcoming: "upcoming",
+} as const;
+
+export interface DailyQueueEntry {
+  /** Existing container_tasks identity */
+  id: number;
+  containerId: number;
+  containerNumber: string;
+  blNumber: string;
+  customerName: string;
+  branchId: number;
+  title: string;
+  notes: string;
+  priority: string;
+  status: string;
+  dueDate: string | null;
+  bucket: DailyQueueEntryBucket;
+  workflowStage: string;
+  blockers: string[];
+  missingFinalPrerequisites: string[];
+  href: string;
+}
+
 export interface MyTasksResponse {
   assignedContainers: Container[];
   sectionApprovals: SectionApproval[];
   mySections: string[];
+  dailyQueue?: DailyQueueEntry[];
+  /** Calendar date in Africa/Lagos */
+  workDate?: string;
+  timeZone?: string;
+  asOf?: string;
+}
+
+export type JobOverviewResponsePhysical = {
+  inTerminal: boolean;
+  gateIn: string | null;
+  gateOut: string | null;
+  deliveredAt: string | null;
+  emptyReturnedAt: string | null;
+  closed: boolean;
+};
+
+export type JobOverviewResponseMilestonesItem = {
+  key: string;
+  label: string;
+  owner: string | null;
+  expected: string | null;
+  actual: string | null;
+  delay: string | null;
+  href: string;
+  state: string;
+};
+
+export type JobOverviewResponseNextAction = {
+  text: string | null;
+  owner: string | null;
+  dueAt: string | null;
+};
+
+export type JobOverviewResponseTasksItemBucket =
+  (typeof JobOverviewResponseTasksItemBucket)[keyof typeof JobOverviewResponseTasksItemBucket];
+
+export const JobOverviewResponseTasksItemBucket = {
+  overdue: "overdue",
+  today: "today",
+  undated: "undated",
+  upcoming: "upcoming",
+} as const;
+
+export type JobOverviewResponseTasksItem = {
+  id: number;
+  title: string;
+  status: string;
+  priority: string;
+  dueDate: string | null;
+  bucket: JobOverviewResponseTasksItemBucket;
+  assignedStaffId: number | null;
+  assignedStaffName: string | null;
+  href: string;
+};
+
+export type JobOverviewResponseDocumentsItem = {
+  id: number;
+  name: string;
+  section: string | null;
+};
+
+export type JobOverviewResponseApprovalsItem = {
+  id: number;
+  section: string;
+  status: string;
+  rejectionReason: string | null;
+};
+
+export type JobOverviewResponseFinanceInvoicesItem = {
+  id: number;
+  number: string;
+  status: string;
+  total: number;
+  paid: number;
+  outstanding: number;
+};
+
+/**
+ * Visit budgets and all-time paid costs; full linked invoices are not allocated or summed across visits
+ */
+export type JobOverviewResponseFinance = {
+  clearingBudget: number;
+  costBudget: number;
+  actualPaidCost: number;
+  note: string;
+  invoices: JobOverviewResponseFinanceInvoicesItem[];
+} | null;
+
+export interface JobOverviewResponse {
+  containerId: number;
+  containerNumber: string;
+  blNumber: string;
+  customerName: string;
+  branchId: number;
+  workflowStage: string;
+  asOf: string;
+  unassignedMilestones: number;
+  physical: JobOverviewResponsePhysical;
+  milestones: JobOverviewResponseMilestonesItem[];
+  blockers: string[];
+  missingFinalPrerequisites: string[];
+  nextAction: JobOverviewResponseNextAction;
+  tasks: JobOverviewResponseTasksItem[];
+  documents: JobOverviewResponseDocumentsItem[];
+  approvals: JobOverviewResponseApprovalsItem[];
+  /** Visit budgets and all-time paid costs; full linked invoices are not allocated or summed across visits */
+  finance: JobOverviewResponseFinance;
 }
 
 export interface RejectSectionRequest {

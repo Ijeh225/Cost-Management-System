@@ -6,10 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Container } from "./container";
+import type { DailyQueueEntry } from "./dailyQueueEntry";
 import type { SectionApproval } from "./sectionApproval";
 
 export interface MyTasksResponse {
   assignedContainers: Container[];
   sectionApprovals: SectionApproval[];
   mySections: string[];
+  dailyQueue?: DailyQueueEntry[];
+  /** Calendar date in Africa/Lagos */
+  workDate?: string;
+  timeZone?: string;
+  asOf?: Date;
 }

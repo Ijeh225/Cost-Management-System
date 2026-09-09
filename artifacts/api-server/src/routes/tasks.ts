@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { db, containerTasksTable, containersTable, usersTable, workflowNotificationsTable } from "@workspace/db";
+import { db, containerTasksTable, containersTable, usersTable, workflowNotificationsTable, userClientAssignmentsTable } from "@workspace/db";
 import { eq, asc, desc } from "drizzle-orm";
-import { requireAuth, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
+import { requireAuth, AuthRequest, userCanAccessBranch, getBranchScope } from "../lib/auth.js";
+import { hasAuthority } from "../lib/authorization.js";
 
 export const tasksRouter = Router();
 
@@ -11,8 +12,15 @@ async function getAccessibleContainer(req: AuthRequest, containerId: number) {
     id: containersTable.id,
     branchId: containersTable.branchId,
     containerNumber: containersTable.containerNumber,
+    clientId: containersTable.clientId,
   }).from(containersTable).where(eq(containersTable.id, containerId)).limit(1);
-  return container && userCanAccessBranch(req, container.branchId) ? container : null;
+  const scope = getBranchScope(req);
+  if (!container || !userCanAccessBranch(req, container.branchId) || (scope !== null && scope !== container.branchId)) return null;
+  if (!hasAuthority(req.user!.accessProfile, "admin")) {
+    const assignments = await db.select().from(userClientAssignmentsTable).where(eq(userClientAssignmentsTable.userId, req.user!.id));
+    if (assignments.length && !assignments.some(a => a.clientId === container.clientId)) return null;
+  }
+  return container;
 }
 
 tasksRouter.get("/containers/:id/tasks", requireAuth, async (req: AuthRequest, res) => {

@@ -40,6 +40,10 @@ try {
       role: owner ? "super_admin" : "shipping_user",
       accessProfile: { source: "modern", authorityLevel: owner ? "super_admin" : "staff", jobFunction: owner ? "general_staff" : "operations", workspaces: owner ? [] : ["shipping"], errors: [] } };
     else if (url.pathname === "/api/branches") data = [{ id: 1, name: "QA Branch", isActive: true }];
+    else if (/^\/api\/containers\/\d+\/overview$/.test(url.pathname)) {
+      // CAP-04 smoke isolates shipment behavior; the shared CAP-01 panel has its own fixture suite.
+      await route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"Overview outside CAP-04 fixture scope"}' }); return;
+    }
     else if (/^\/api\/containers\/\d+\/shipment$/.test(url.pathname)) data = { shipmentId: 5, branchId: 1, blNumber: "QA-SHARED-BL", total: 3, delivered: rows.filter(row => row.deliveredAt).length, completed: rows.filter(row => row.status === "closed").length, containers: rows };
     else if (/^\/api\/containers\/\d+\/verify$/.test(url.pathname)) {
       const row = rows.find(row => row.id === Number(url.pathname.split("/").at(-2)));

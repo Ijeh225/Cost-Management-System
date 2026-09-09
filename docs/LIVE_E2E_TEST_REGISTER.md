@@ -7,6 +7,20 @@ and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
+### CAP-01 Verification In Progress - 2026-09-09 15:54 WAT
+
+- 16:02 WAT: implementation/local checks complete. 153 tests/32 files and final
+  14 focused checks pass; full Railway build passes. Local production browser:
+  date filters, same task identity/deep links, completion invalidation, department
+  editor, finance/workspace restrictions, failure snapshot retention and responsive
+  layouts pass. CAP-04 fixture regression also passes. No live feature pass yet.
+- User authorized implementation. Shared job read model, existing task identities,
+  personal WAT queue, scoped finance, same-B/L invoice context and UI implemented.
+- Production build passed; unit/HTTP authorization tests and local browser fixture
+  checks in progress. No live CAP-01 acceptance yet; no production fixtures created.
+- Retain CAP-04 #32/#33 and invoice #14. Do not repeat issuance or cash postings.
+- Current session: docs/SESSION_SUMMARIES/2026-09-09-cap01-job-overview.md.
+
 ### CAP-04 Feature Verification - 2026-09-09 13:37 WAT
 
 - CAP04-UI-001 and DASH-002 CLOSED: fix `4e8095e` deployed successfully as

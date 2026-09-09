@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { ShipmentContainers } from "@/components/containers/shipment-containers";
+import { WorkspaceFollowups } from "@/components/containers/workspace-followups";
 import type { ReactNode } from "react";
-import { useParams, Link, useLocation } from "wouter";
+import { useParams, Link, useLocation, useSearch } from "wouter";
 import { getShippingLine, normalizeContainerNumber, formatTrackingDate, formatTrackingDateTime, isMaerskContainer, type TrackingResult } from "@/lib/tracking";
 import { trackRecentItem } from "@/lib/recent-items";
 import {
@@ -1454,7 +1455,15 @@ export default function ContainerDetail() {
   } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("charges");
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    return tab === "tasks" || tab === "documents" ? tab : "charges";
+  });
+  const overviewSearch = useSearch();
+  useEffect(() => {
+    const tab = new URLSearchParams(overviewSearch).get("tab");
+    if (tab === "tasks" || tab === "documents") setActiveTab(tab);
+  }, [overviewSearch]);
   const [openSection, setOpenSection] = useState<string | undefined>(undefined);
   const [rejectTargetSection, setRejectTargetSection] = useState<string | null>(null);
   const [editingClearing, setEditingClearing] = useState(false);
@@ -1638,7 +1647,7 @@ export default function ContainerDetail() {
         : isTerminalUser
           ? "/workspace/terminal-ops"
           : "/workspace/pull-out";
-    return <OperationalContainerView container={container} containerId={containerId} backHref={backHref} />;
+    return <div className="space-y-5"><OperationalContainerView container={container} containerId={containerId} backHref={backHref} /><WorkspaceFollowups containerId={containerId} branchId={container.branchId} /></div>;
   }
 
   if (isSecurityUser) {
@@ -1663,6 +1672,7 @@ export default function ContainerDetail() {
           </div>
         </div>
         <ShipmentContainers containerId={container.id} />
+        <WorkspaceFollowups containerId={containerId} branchId={container.branchId} />
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
           <CardContent className="pt-5 space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -2063,6 +2073,8 @@ export default function ContainerDetail() {
           )}
         </div>
       </div>
+
+      <ShipmentContainers containerId={container.id} />
 
       {isAdmin && (
         <EditContainerDetailsDialog
@@ -2819,7 +2831,6 @@ export default function ContainerDetail() {
       )}
 
       {/* Tabs */}
-      <ShipmentContainers containerId={container.id} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -3182,7 +3193,7 @@ export default function ContainerDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <TasksTab containerId={containerId} />
+              <TasksTab containerId={containerId} branchId={container.branchId ?? undefined} />
             </CardContent>
           </Card>
         </TabsContent>

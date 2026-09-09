@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { db, sectionApprovalsTable, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerTasksTable } from "@workspace/db";
+import { db, sectionApprovalsTable, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerTasksTable, userClientAssignmentsTable } from "@workspace/db";
 import { eq, inArray, and } from "drizzle-orm";
 import { requireAuth, AuthRequest, getBranchScope } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
-import { hasAuthority, hasWorkspace } from "../lib/authorization.js";
+import { hasAuthority, hasWorkspace, hasCapability } from "../lib/authorization.js";
+import { buildJobOverview, localWorkDate, prioritizeTasks } from "../lib/job-overview.js";
 
 const router = Router();
 
@@ -57,11 +58,17 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
     if (branchScope !== null) taskConditions.push(eq(containerTasksTable.branchId, branchScope));
     const myContainerTasks = await db.select().from(containerTasksTable)
       .where(taskConditions.length === 1 ? taskConditions[0] : and(...taskConditions));
-    const openTasks = myContainerTasks.filter(t => t.status !== "completed");
+    let openTasks = prioritizeTasks(myContainerTasks);
     const containerIds = [...new Set(openTasks.map(t => t.containerId))];
-    const assignedContainerRows = containerIds.length > 0
+    let assignedContainerRows = containerIds.length > 0
       ? await db.select().from(containersTable).where(inArray(containersTable.id, containerIds))
       : [];
+    const assignments = isElevated ? [] : await db.select().from(userClientAssignmentsTable).where(eq(userClientAssignmentsTable.userId, user.id));
+    assignedContainerRows = assignedContainerRows.filter(c => (branchScope === null || c.branchId === branchScope)
+      && (!assignments.length || assignments.some(a => a.clientId === c.clientId)));
+    const visible = new Map(assignedContainerRows.map(c => [c.id, c]));
+    openTasks = openTasks.filter(t => visible.get(t.containerId)?.branchId === t.branchId);
+    const canFinance = hasCapability(profile, "finance.access");
     const staffMap: Record<number, string> = {};
     const staffIds = [...new Set(assignedContainerRows.map(r => r.assignedStaffId).filter(Boolean))] as number[];
     if (staffIds.length > 0) {
@@ -71,7 +78,7 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
     }
 
     let totalsMap: Record<number, number> = {};
-    if (containerIds.length > 0) {
+    if (containerIds.length > 0 && canFinance) {
       const allShipping = await db.select().from(shippingChargesTable).where(inArray(shippingChargesTable.containerId, containerIds));
       const allCustoms = await db.select().from(customsChargesTable).where(inArray(customsChargesTable.containerId, containerIds));
       const allTerminal = await db.select().from(terminalChargesTable).where(inArray(terminalChargesTable.containerId, containerIds));
@@ -86,8 +93,9 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
 
     const assignedContainers = assignedContainerRows.map(c => ({
       ...formatContainer(c, c.assignedStaffId ? staffMap[c.assignedStaffId] ?? null : null),
+      clearingCharges: canFinance ? Number(c.clearingCharges) : 0,
       totalCost: totalsMap[c.id] ?? 0,
-      grossProfit: parseFloat(c.clearingCharges ?? "0") - (totalsMap[c.id] ?? 0),
+      grossProfit: canFinance ? parseFloat(c.clearingCharges ?? "0") - (totalsMap[c.id] ?? 0) : 0,
     }));
 
     // Get section approvals relevant to user
@@ -96,7 +104,7 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
       const rows = await db.select().from(sectionApprovalsTable)
         .where(inArray(sectionApprovalsTable.containerId, containerIds));
       sectionApprovals = rows
-        .filter(r => mySections.includes(r.section))
+        .filter(r => visible.has(r.containerId) && mySections.includes(r.section))
         .map(r => ({
           id: r.id,
           containerId: r.containerId,
@@ -126,7 +134,18 @@ router.get("/my-tasks", requireAuth, async (req: AuthRequest, res) => {
         isRejectionTask: t.title.startsWith("Resubmit "),
       }));
 
-    return res.json({ assignedContainers, sectionApprovals, mySections, correctionTasks });
+    const dailyQueue = openTasks.map(t => {
+      const c = visible.get(t.containerId)!;
+      const overview = buildJobOverview(c);
+      return { id: t.id, containerId: c.id, containerNumber: c.containerNumber, blNumber: c.blNumber,
+        branchId: c.branchId, customerName: c.customerName, title: t.title, notes: t.notes,
+        priority: t.priority, status: t.status, dueDate: t.dueDate, bucket: t.bucket,
+        workflowStage: overview.workflowStage, blockers: overview.blockers,
+        missingFinalPrerequisites: overview.missingFinalPrerequisites,
+        href: `/containers/${c.id}?tab=tasks&taskId=${t.id}` };
+    });
+    return res.json({ assignedContainers, sectionApprovals, mySections, correctionTasks, dailyQueue,
+      workDate: localWorkDate(new Date()), timeZone: "Africa/Lagos", asOf: new Date().toISOString() });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });

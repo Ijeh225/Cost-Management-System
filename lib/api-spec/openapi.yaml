@@ -303,6 +303,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/Container"
 
+  /containers/{id}/overview:
+    get:
+      operationId: getContainerJobOverview
+      tags: [containers]
+      summary: Read-only visit overview with independent milestones and scoped financial context
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Existing task and document IDs; finance is null without finance.access
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobOverviewResponse"
+        "401":
+          description: Authentication required
+        "404":
+          description: Visit missing or outside branch/client scope
+
   /containers/{id}/shipment:
     get:
       operationId: getContainerShipment
@@ -2231,7 +2253,137 @@ components:
           type: array
           items:
             type: string
+        dailyQueue:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyQueueEntry"
+        workDate: {type: string, description: Calendar date in Africa/Lagos}
+        timeZone: {type: string}
+        asOf: {type: string, format: date-time}
       required: [assignedContainers, sectionApprovals, mySections]
+
+    DailyQueueEntry:
+      type: object
+      required: [id, containerId, containerNumber, blNumber, customerName, branchId, title, notes, priority, status, dueDate, bucket, workflowStage, blockers, missingFinalPrerequisites, href]
+      properties:
+        id: {type: integer, description: Existing container_tasks identity, not a generated queue ID}
+        containerId: {type: integer}
+        containerNumber: {type: string}
+        blNumber: {type: string}
+        customerName: {type: string}
+        branchId: {type: integer}
+        title: {type: string}
+        notes: {type: string}
+        priority: {type: string}
+        status: {type: string}
+        dueDate: {type: string, nullable: true}
+        bucket: {type: string, enum: [overdue, today, undated, upcoming]}
+        workflowStage: {type: string}
+        blockers: {type: array, items: {type: string}}
+        missingFinalPrerequisites: {type: array, items: {type: string}}
+        href: {type: string}
+
+    JobOverviewResponse:
+      type: object
+      required: [containerId, containerNumber, blNumber, customerName, branchId, workflowStage, asOf, unassignedMilestones, physical, milestones, blockers, missingFinalPrerequisites, nextAction, tasks, documents, approvals, finance]
+      properties:
+        containerId: {type: integer}
+        containerNumber: {type: string}
+        blNumber: {type: string}
+        customerName: {type: string}
+        branchId: {type: integer}
+        workflowStage: {type: string}
+        asOf: {type: string, format: date-time}
+        unassignedMilestones: {type: integer}
+        physical:
+          type: object
+          required: [inTerminal, gateIn, gateOut, deliveredAt, emptyReturnedAt, closed]
+          properties:
+            inTerminal: {type: boolean}
+            gateIn: {type: string, nullable: true}
+            gateOut: {type: string, nullable: true}
+            deliveredAt: {type: string, nullable: true}
+            emptyReturnedAt: {type: string, nullable: true}
+            closed: {type: boolean}
+        milestones:
+          type: array
+          items:
+            type: object
+            required: [key, label, owner, expected, actual, delay, href, state]
+            properties:
+              key: {type: string}
+              label: {type: string}
+              owner: {type: string, nullable: true}
+              expected: {type: string, nullable: true}
+              actual: {type: string, nullable: true}
+              delay: {type: string, nullable: true}
+              href: {type: string}
+              state: {type: string}
+        blockers: {type: array, items: {type: string}}
+        missingFinalPrerequisites: {type: array, items: {type: string}}
+        nextAction:
+          type: object
+          required: [text, owner, dueAt]
+          properties:
+            text: {type: string, nullable: true}
+            owner: {type: string, nullable: true}
+            dueAt: {type: string, nullable: true}
+        tasks:
+          type: array
+          items:
+            type: object
+            required: [id, title, status, priority, dueDate, bucket, assignedStaffId, assignedStaffName, href]
+            properties:
+              id: {type: integer}
+              title: {type: string}
+              status: {type: string}
+              priority: {type: string}
+              dueDate: {type: string, nullable: true}
+              bucket: {type: string, enum: [overdue, today, undated, upcoming]}
+              assignedStaffId: {type: integer, nullable: true}
+              assignedStaffName: {type: string, nullable: true}
+              href: {type: string}
+        documents:
+          type: array
+          items:
+            type: object
+            required: [id, name, section]
+            properties:
+              id: {type: integer}
+              name: {type: string}
+              section: {type: string, nullable: true}
+        approvals:
+          type: array
+          items:
+            type: object
+            required: [id, section, status, rejectionReason]
+            properties:
+              id: {type: integer}
+              section: {type: string}
+              status: {type: string}
+              rejectionReason: {type: string, nullable: true}
+        finance:
+          type: object
+          nullable: true
+          description: Visit budgets and all-time paid costs; full linked invoices are not allocated or summed across visits
+          required: [clearingBudget, costBudget, actualPaidCost, note, invoices]
+          properties:
+            clearingBudget: {type: number}
+            costBudget: {type: number}
+            actualPaidCost: {type: number}
+            note: {type: string}
+            invoices:
+              type: array
+              items:
+                type: object
+                required: [id, number, status, total, paid, outstanding]
+                properties:
+                  id: {type: integer}
+                  number: {type: string}
+                  status: {type: string}
+                  total: {type: number}
+                  paid: {type: number}
+                  outstanding: {type: number}
 
     RejectSectionRequest:
       type: object

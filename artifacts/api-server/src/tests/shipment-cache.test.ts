@@ -17,6 +17,8 @@ describe("shipment summary invalidation", () => {
       client.setQueryData(queryKey, { delivered: 0, total: 2 });
     }
     client.setQueryData(["/api/invoices"], { total: 300 });
+    client.setQueryData(["/api/containers/32/overview"], { tasks: [] });
+    client.setQueryData(["/api/my-tasks"], { dailyQueue: [] });
     client.setQueryData(["/api/containers/32"], { status: "registered" });
     const observer = new QueryObserver(client, {
       queryKey: key,
@@ -28,6 +30,8 @@ describe("shipment summary invalidation", () => {
       expect(observer.getCurrentResult().data).toEqual({ delivered: 1, total: 2, status: "registered" });
       expect(client.getQueryState(sibling).isInvalidated).toBe(true);
       expect(client.getQueryState(previousShipment).isInvalidated).toBe(true);
+      expect(client.getQueryState(["/api/containers/32/overview"]).isInvalidated).toBe(true);
+      expect(client.getQueryState(["/api/my-tasks"]).isInvalidated).toBe(true);
       expect(client.getQueryState(["/api/invoices"]).isInvalidated).toBe(false);
       expect(client.getQueryState(["/api/containers/32"]).isInvalidated).toBe(false);
     } finally { unsubscribe(); client.clear(); }

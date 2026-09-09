@@ -3,10 +3,11 @@ import { Link } from "wouter";
 import { getStatusLabel } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { JobOverviewPanel } from "./job-overview";
 
 export function ShipmentContainers({ containerId }: { containerId: number }) {
   const { data, isPending, isError, refetch } = useGetContainerShipment(containerId);
-  return <Card>
+  return <div className="space-y-4"><JobOverviewPanel containerId={containerId} /><Card>
     <CardHeader><CardTitle className="text-base">Containers on this B/L</CardTitle></CardHeader>
     <CardContent className="space-y-3">
       {isPending && <p role="status">Loading shipment...</p>}
@@ -25,5 +26,5 @@ export function ShipmentContainers({ containerId }: { containerId: number }) {
         </ul>
       </>}
     </CardContent>
-  </Card>;
+  </Card></div>;
 }

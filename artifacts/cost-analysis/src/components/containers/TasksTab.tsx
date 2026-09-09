@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { useGetContainerTasks, useCreateContainerTask, useUpdateContainerTask, useDeleteContainerTask, useListUsers } from "@workspace/api-client-react";
+import { useEffect, useState } from "react";
+import { useSearch } from "wouter";
+import { useAuth } from "@/components/layout/auth-provider";
+import { useGetContainerTasks, useCreateContainerTask, useUpdateContainerTask, useDeleteContainerTask, useListUsers, getListUsersQueryKey, getGetContainerTasksQueryKey, invalidateShipmentSummaries } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -29,9 +31,13 @@ const STATUSES = [
 function priorityColor(p: string) { return PRIORITIES.find(x => x.value === p)?.color ?? ""; }
 function statusColor(s: string) { return STATUSES.find(x => x.value === s)?.color ?? ""; }
 function statusLabel(s: string) { return STATUSES.find(x => x.value === s)?.label ?? s; }
-function isOverdue(task: any) { return task.dueDate && new Date(task.dueDate) < new Date() && !["completed","cancelled"].includes(task.status); }
+function isOverdue(task: any) {
+  const day = (value: Date) => value.toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+  return task.dueDate && day(new Date(task.dueDate)) < day(new Date()) && !["completed", "cancelled"].includes(task.status);
+}
 
-export function TasksTab({ containerId }: { containerId: number }) {
+export function TasksTab({ containerId, branchId }: { containerId: number; branchId?: number }) {
+  const { user, isAdminOrAbove } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
@@ -40,14 +46,23 @@ export function TasksTab({ containerId }: { containerId: number }) {
   const [editStatus, setEditStatus] = useState("");
 
   const { data: tasks = [], isLoading } = useGetContainerTasks(containerId);
-  const { data: usersData } = useListUsers();
-  const staffUsers = (usersData as any)?.users?.filter((u: any) => u.role === "staff") ?? [];
+  const search = useSearch();
+  useEffect(() => {
+    const taskId = Number(new URLSearchParams(search).get("taskId"));
+    if (Number.isSafeInteger(taskId) && taskId > 0) document.getElementById(`task-${taskId}`)?.scrollIntoView({ block: "center" });
+  }, [search, tasks]);
+  const { data: usersData } = useListUsers({ query: { queryKey: getListUsersQueryKey(), enabled: isAdminOrAbove } });
+  const staffUsers = (isAdminOrAbove ? usersData ?? [] : user ? [user] : [])
+    .filter(u => u.isActive && (branchId === undefined || u.branchId === branchId));
 
   const createMutation = useCreateContainerTask();
   const updateMutation = useUpdateContainerTask();
   const deleteMutation = useDeleteContainerTask();
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["getContainerTasks", containerId] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: getGetContainerTasksQueryKey(containerId) });
+    invalidateShipmentSummaries(qc);
+  };
 
   const handleCreate = async () => {
     if (!form.title.trim()) return;
@@ -162,10 +177,11 @@ export function TasksTab({ containerId }: { containerId: number }) {
       ) : (
         <div className="space-y-2">
           {(tasks as any[]).map((task: any) => (
-            <div key={task.id} className={`rounded-lg border p-3.5 flex items-start gap-3 group transition-colors ${
+            <div key={task.id} id={`task-${task.id}`} className={`rounded-lg border p-3.5 flex items-start gap-3 group transition-colors ${
               isOverdue(task) ? "border-destructive/30 bg-destructive/5" : "border-border/40 bg-card/40 hover:bg-accent/20"
             }`}>
               <button
+                aria-label={`${task.status === "completed" ? "Reopen" : "Complete"} task ${task.id}`}
                 onClick={() => handleStatusChange(task.id, task.status === "completed" ? "pending" : "completed")}
                 className={`flex-shrink-0 w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center transition-colors ${task.status === "completed" ? "bg-emerald-500 border-emerald-500" : "border-muted-foreground hover:border-primary"}`}
               >
@@ -198,7 +214,7 @@ export function TasksTab({ containerId }: { containerId: number }) {
                 </div>
                 {task.notes && <p className="text-xs text-muted-foreground mt-1">{task.notes}</p>}
               </div>
-              <button onClick={() => handleDelete(task.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-destructive">
+              <button aria-label={`Delete task ${task.id}`} onClick={() => handleDelete(task.id)} className="opacity-100 sm:opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-destructive">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>

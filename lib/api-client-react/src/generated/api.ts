@@ -48,6 +48,7 @@ import type {
   GetDeliveryAnalyticsParams,
   HealthStatus,
   IntelligenceResponse,
+  JobOverviewResponse,
   ListContainersParams,
   ListDutyPaymentsParams,
   LockContainerRequest,
@@ -1237,6 +1238,95 @@ export const usePatchContainer = <
 > => {
   return useMutation(getPatchContainerMutationOptions(options));
 };
+
+/**
+ * @summary Read-only visit overview with independent milestones and scoped financial context
+ */
+export const getGetContainerJobOverviewUrl = (id: number) => {
+  return `/api/containers/${id}/overview`;
+};
+
+export const getContainerJobOverview = async (
+  id: number,
+  options?: RequestInit,
+): Promise<JobOverviewResponse> => {
+  return customFetch<JobOverviewResponse>(getGetContainerJobOverviewUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetContainerJobOverviewQueryKey = (id: number) => {
+  return [`/api/containers/${id}/overview`] as const;
+};
+
+export const getGetContainerJobOverviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof getContainerJobOverview>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getContainerJobOverview>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetContainerJobOverviewQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getContainerJobOverview>>
+  > = ({ signal }) =>
+    getContainerJobOverview(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getContainerJobOverview>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetContainerJobOverviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getContainerJobOverview>>
+>;
+export type GetContainerJobOverviewQueryError = ErrorType<void>;
+
+/**
+ * @summary Read-only visit overview with independent milestones and scoped financial context
+ */
+
+export function useGetContainerJobOverview<
+  TData = Awaited<ReturnType<typeof getContainerJobOverview>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getContainerJobOverview>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetContainerJobOverviewQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Read the branch-scoped B/L group for an authorized container visit

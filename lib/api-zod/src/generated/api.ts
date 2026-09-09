@@ -1034,6 +1034,100 @@ export const PatchContainerResponse = zod.object({
 });
 
 /**
+ * @summary Read-only visit overview with independent milestones and scoped financial context
+ */
+export const GetContainerJobOverviewParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetContainerJobOverviewResponse = zod.object({
+  containerId: zod.number(),
+  containerNumber: zod.string(),
+  blNumber: zod.string(),
+  customerName: zod.string(),
+  branchId: zod.number(),
+  workflowStage: zod.string(),
+  asOf: zod.date(),
+  unassignedMilestones: zod.number(),
+  physical: zod.object({
+    inTerminal: zod.boolean(),
+    gateIn: zod.string().nullable(),
+    gateOut: zod.string().nullable(),
+    deliveredAt: zod.string().nullable(),
+    emptyReturnedAt: zod.string().nullable(),
+    closed: zod.boolean(),
+  }),
+  milestones: zod.array(
+    zod.object({
+      key: zod.string(),
+      label: zod.string(),
+      owner: zod.string().nullable(),
+      expected: zod.string().nullable(),
+      actual: zod.string().nullable(),
+      delay: zod.string().nullable(),
+      href: zod.string(),
+      state: zod.string(),
+    }),
+  ),
+  blockers: zod.array(zod.string()),
+  missingFinalPrerequisites: zod.array(zod.string()),
+  nextAction: zod.object({
+    text: zod.string().nullable(),
+    owner: zod.string().nullable(),
+    dueAt: zod.string().nullable(),
+  }),
+  tasks: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      status: zod.string(),
+      priority: zod.string(),
+      dueDate: zod.string().nullable(),
+      bucket: zod.enum(["overdue", "today", "undated", "upcoming"]),
+      assignedStaffId: zod.number().nullable(),
+      assignedStaffName: zod.string().nullable(),
+      href: zod.string(),
+    }),
+  ),
+  documents: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      section: zod.string().nullable(),
+    }),
+  ),
+  approvals: zod.array(
+    zod.object({
+      id: zod.number(),
+      section: zod.string(),
+      status: zod.string(),
+      rejectionReason: zod.string().nullable(),
+    }),
+  ),
+  finance: zod
+    .object({
+      clearingBudget: zod.number(),
+      costBudget: zod.number(),
+      actualPaidCost: zod.number(),
+      note: zod.string(),
+      invoices: zod.array(
+        zod.object({
+          id: zod.number(),
+          number: zod.string(),
+          status: zod.string(),
+          total: zod.number(),
+          paid: zod.number(),
+          outstanding: zod.number(),
+        }),
+      ),
+    })
+    .nullable()
+    .describe(
+      "Visit budgets and all-time paid costs; full linked invoices are not allocated or summed across visits",
+    ),
+});
+
+/**
  * @summary Read the branch-scoped B/L group for an authorized container visit
  */
 export const GetContainerShipmentParams = zod.object({
@@ -1761,6 +1855,31 @@ export const GetMyTasksResponse = zod.object({
     }),
   ),
   mySections: zod.array(zod.string()),
+  dailyQueue: zod
+    .array(
+      zod.object({
+        id: zod.number().describe("Existing container_tasks identity"),
+        containerId: zod.number(),
+        containerNumber: zod.string(),
+        blNumber: zod.string(),
+        customerName: zod.string(),
+        branchId: zod.number(),
+        title: zod.string(),
+        notes: zod.string(),
+        priority: zod.string(),
+        status: zod.string(),
+        dueDate: zod.string().nullable(),
+        bucket: zod.enum(["overdue", "today", "undated", "upcoming"]),
+        workflowStage: zod.string(),
+        blockers: zod.array(zod.string()),
+        missingFinalPrerequisites: zod.array(zod.string()),
+        href: zod.string(),
+      }),
+    )
+    .optional(),
+  workDate: zod.string().optional().describe("Calendar date in Africa\/Lagos"),
+  timeZone: zod.string().optional(),
+  asOf: zod.date().optional(),
 });
 
 /**

@@ -45,6 +45,22 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-09 16:02 WAT: CAP-01 implementation and local verification complete.
+  Added read-only job overview near the top of visit detail and prioritized My Tasks
+  queue with WAT filters, stable task IDs, role/workspace links and branch/client
+  controls. No copied owners/financial facts. Fixed task assignee response shape,
+  task/document/overview cache refresh and department task deep links. 153 tests
+  pass; final 14 focused tests and full build pass. Local CAP-01 and CAP-04 browser
+  checks pass, including 390/768/1440 and refresh-error snapshot retention.
+  Next: commit/push, verify deployment, then bounded live acceptance using existing
+  visits #32/#33 and invoice #14. No live CAP-01 acceptance claimed yet. Procedure:
+  docs/CAP01_JOB_OVERVIEW_AND_DAILY_QUEUE.md. No schema change or financial write.
+- 2026-09-09 15:29 WAT: user authorized CAP-01 implementation. Active work is
+  the shared read-only job overview and prioritized personal daily queue, improving
+  existing container detail and My Tasks. Preserve task identities, department
+  owners, branch/client permissions and CAP-04 visit/finance relationships. No new
+  workflow editor, copied charge, migration or live fixture is authorized by this
+  implementation milestone. Verification/publication remain pending.
 - 2026-09-09 13:37 WAT: CAP04-UI-001 and DASH-002 CLOSED by deployed fix and
   focused live retest. Code `4e8095e` pushed; Railway deployment
   `6b10f5bb-ba9a-46f7-9b59-994b25ecc862` SUCCESS. On existing #32, clearing and
