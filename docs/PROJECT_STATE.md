@@ -45,6 +45,13 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-09 12:22 WAT: final CAP-04 code `fc88fb5` committed/pushed and deployed
+  successfully as `5acda3fb-fd1a-41cb-bcdf-ddc68cab879a`. Railway logs confirm
+  "CAP-04 shipment identity migration verified before schema synchronization".
+  Implementation, migration, build and isolated checks are complete. Next action
+  is bounded live feature acceptance, not another implementation or finance audit.
+  CAP-01 remains separate. Railway CLI also warns legacy config-as-code support
+  ends 2026-12-01; plan a reviewed infrastructure-config migration separately.
 - 2026-09-09 12:18 WAT: CAP-04 implementation committed/pushed as `37adcd3`.
   Railway deployment `032aa2c8-a7d7-4d28-8552-1de731ded52b` confirmed Active /
   Deployment successful. Final release-order safeguard adds an atomic backfill

@@ -7,7 +7,12 @@ and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
-### CAP-04 Feature Verification - 2026-09-09 12:18 WAT
+### CAP-04 Feature Verification - 2026-09-09 12:22 WAT
+
+- Final safeguard `fc88fb5` pushed and deployed successfully as
+  `5acda3fb-fd1a-41cb-bcdf-ddc68cab879a`. Railway deployment log confirms the
+  shipment identity migration verified before schema synchronization. Deployment
+  and migration confirmation are complete; bounded live feature acceptance remains.
 
 - Release `37adcd3` pushed; Railway deployment
   `032aa2c8-a7d7-4d28-8552-1de731ded52b` confirmed Active / Deployment successful.
@@ -15,7 +20,7 @@ action` label below does not override this current register.
   reasserts integrity at startup. Its full build passed; real isolated PostgreSQL
   verification passed all six groups, adding the bundled pre-deploy runner to the
   five groups below. Scratch schema removal and private tunnel closure verified.
-  Safeguard publication is in progress; live feature acceptance is still pending.
+  Safeguard publication/deployment completed at 12:22 WAT; live acceptance pending.
 
 - User authorized CAP-04 implementation. Existing defect closures below remain;
   this is new feature verification, not a repeated financial audit.
@@ -34,7 +39,7 @@ action` label below does not override this current register.
 - Full Railway typecheck/frontend/API build passes; existing Vite sourcemap and
   large-chunk warnings remain non-blocking. One initial local smoke fixture had
   the wrong CSRF response key; corrected to `token`, then passed. Not a live defect.
-- Pending: safeguard deployment confirmation and bounded live acceptance of CAP-04.
+- Pending: bounded live acceptance of CAP-04.
   Before creating any live fixtures, check for existing CAP-04 records to avoid
   duplicate tests. Do not reopen previously closed issue IDs or repay old schedules.
 - Details: docs/CAP04_SHIPMENTS_AND_CONTAINER_VISITS.md and

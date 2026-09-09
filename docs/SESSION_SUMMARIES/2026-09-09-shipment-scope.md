@@ -84,3 +84,16 @@
   Scratch namespace removed and private SSH tunnel closure verified.
 - Publishing this safety follow-up next. Live CAP-04 write acceptance has not
   been performed; no production fixture writes or financial retests were made.
+
+## 2026-09-09 12:22 WAT (UTC+01:00) - Deployment Confirmed
+
+- Final code `fc88fb5` committed/pushed; deployment
+  `5acda3fb-fd1a-41cb-bcdf-ddc68cab879a` reports SUCCESS.
+- Deployment logs confirm shipment identity migration verified before schema sync.
+- CAP-04 implementation and release verification complete: 137 automated tests,
+  full build, six real isolated PostgreSQL groups and local browser checks passed.
+- Next action is bounded live CAP-04 acceptance using existing fixtures first;
+  no live feature write acceptance claimed. CAP-01 is a separate future task.
+- Railway CLI warned config-as-code is deprecated with support ending 2026-12-01.
+  Existing deployment succeeded; infrastructure config migration is a separate
+  maintenance follow-up, not performed silently during CAP-04.
