@@ -20,7 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-09-09 CAP-04 requirement, implementation and verification](2026-09-09-shipment-scope.md)
+- [2026-09-09 CAP-04 implementation, live acceptance and display findings](2026-09-09-shipment-scope.md)
 
 - [2026-09-08 feature priorities discussion](2026-09-08-feature-priorities.md)
 

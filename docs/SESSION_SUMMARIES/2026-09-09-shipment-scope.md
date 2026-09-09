@@ -97,3 +97,21 @@
 - Railway CLI warned config-as-code is deprecated with support ending 2026-12-01.
   Existing deployment succeeded; infrastructure config migration is a separate
   maintenance follow-up, not performed silently during CAP-04.
+
+## 2026-09-09 13:15 WAT (UTC+01:00) - Live Acceptance and New Display Findings
+
+- User asked whether CAP-01 can start; records showed CAP-04 live acceptance was
+  pending. User then explicitly requested the multi-container live confirmation.
+- Existing directory had no CAP-04 fixture. Created visits #32 and #33 under
+  CAP04-LIVE-20260909, Lagos/client #6, with separate 100/200 clearing charges.
+- Only #32 verified, assigned and due/delivery-dated; sibling fields stayed empty.
+  Persisted shipment shows 1 of 2 delivered, 0 closed. No physical movement.
+- Created and internally issued invoice #14 INV-202609-007, total 300 for both
+  visits once. No external sending, payment, bank posting or old record changes.
+- Dashboard, P&L and AR showed exactly +300; paid costs, overhead, collections and
+  banks unchanged. Retained new records for inspection and future retest.
+- Found CAP04-UI-001 (shipment query not refreshed on mutation) and DASH-002
+  (open-job versus delivered-job counts overlap under misleading category labels).
+  Both Medium, source traced and documented; no fixes silently implemented.
+- Full bounded evidence: CAP04_LIVE_ACCEPTANCE_2026-09-09.md. Core live behavior
+  passed; next correct display controls and retest same records before CAP-01.

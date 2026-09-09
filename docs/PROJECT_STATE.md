@@ -45,6 +45,16 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-09 13:15 WAT: bounded CAP-04 live acceptance completed. Same-B/L visits
+  #32/#33, independent registration/owner/due/delivery fields and one NGN 300
+  invoice #14 passed. Dashboard/P&L/AR recognized exactly +300; paid costs,
+  overhead, collections and bank balances unchanged. Core behavior confirmed.
+  New Medium findings: `CAP04-UI-001` stale sibling summary until reload, and
+  `DASH-002` overlapping In Progress/Completed labels (15 total, 14 open, 2
+  delivered). Neither is financial duplication. Next: correct these display
+  controls and retest existing fixtures before CAP-01; do not recreate/reinvoice.
+  No fixes made in this test session. Evidence and retained fixture inventory:
+  docs/CAP04_LIVE_ACCEPTANCE_2026-09-09.md.
 - 2026-09-09 12:22 WAT: final CAP-04 code `fc88fb5` committed/pushed and deployed
   successfully as `5acda3fb-fd1a-41cb-bcdf-ddc68cab879a`. Railway logs confirm
   "CAP-04 shipment identity migration verified before schema synchronization".
