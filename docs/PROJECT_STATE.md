@@ -1,6 +1,6 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-09-08
+## Current Work Register - Authoritative as of 2026-09-09
 
 Use this section to choose the next task. Earlier plans, next-action lines,
 and issue statuses in this document are historical evidence, not the current
@@ -45,6 +45,16 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-09 10:53 WAT: user confirmed that one B/L can cover multiple containers.
+  CAP-04 is therefore a relevant foundation requirement, not merely hypothetical.
+  Proposed design: one shipment/B/L parent with independently tracked containers;
+  preserve per-container stages, owners, dates, costs and existing financial/audit
+  links. Shared charges must not be counted once for every container.
+  Next: inspect current grouping/constraints and define the additive CAP-04 scope
+  before implementation. Repeat equipment visits and physical-yard operations are
+  still unconfirmed. This is a business clarification, not authorization to build.
+  No source, schema or live data changed; no test repeated. Session:
+  docs/SESSION_SUMMARIES/2026-09-09-shipment-scope.md.
 - 2026-09-08 14:57 WAT: discussed next feature priorities after the REVIEW closures.
   Proposals only, no implementation approved. Start with CAP-01 job overview,
   CAP-02 document readiness and CAP-03 delay-cost forecasts, subject to CAP-04

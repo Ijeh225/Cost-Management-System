@@ -9,6 +9,12 @@ action` label below does not override this current register.
 
 ### Closed by Deployed Fix and Live Re-Test
 
+2026-09-09 10:53 WAT scope note: the user confirmed multi-container B/Ls.
+CAP-04 remains proposed, not implemented or tested. Future acceptance must cover
+one B/L with multiple containers, independent progress/partial delivery and no
+double counting of shared charges. Existing closures and fixtures are unchanged;
+no live test was performed for this clarification.
+
 | Area | Closed records | Latest evidence |
 | --- | --- | --- |
 | Cancelled-invoice population and branch scope | `DASH-001`, `AR-002`, `BRN-001` | Aging print excludes cancelled invoices; selected Lagos branch creation worked from All Branches and remained isolated. |

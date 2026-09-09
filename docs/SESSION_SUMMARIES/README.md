@@ -20,6 +20,8 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-09-09 multi-container B/L requirement](2026-09-09-shipment-scope.md)
+
 - [2026-09-08 feature priorities discussion](2026-09-08-feature-priorities.md)
 
 - [2026-09-08 three review defect fixes](2026-09-08-review-defect-fixes.md)
