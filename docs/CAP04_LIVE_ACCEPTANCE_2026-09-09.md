@@ -4,8 +4,9 @@
 
 User requested live confirmation of multi-container B/L grouping, independent
 progress and no duplicated financial totals. Core checks passed on the deployed
-application through the owner browser session. Two display issues remain open;
-this is not an unconditional feature sign-off or a repeated full finance audit.
+application through the owner browser session. Two display issues were found
+and subsequently closed at 13:37 WAT by the fix and live retest below. This is
+bounded CAP-04 acceptance, not a repeated full finance audit.
 
 All test data was explicitly authorized by the user. No passwords, tokens or raw
 session data are recorded here. Existing historical fixtures were not changed.
@@ -102,6 +103,24 @@ visit, cross-role session or full departmental release sequence was tested here.
 Prior isolated checks remain separate evidence. No general claim that every
 possible financial aggregation is verified follows from this bounded scenario.
 
-Core requested live behavior is confirmed. Address CAP04-UI-001 and DASH-002,
-then retest the existing fixture rather than creating or invoicing it again.
-CAP-01 has not started. Preserve invoice #14 and visits #32/#33 for that follow-up.
+Core requested live behavior is confirmed. CAP04-UI-001 and DASH-002 are now
+closed by the following retest. CAP-01 has not started. Preserve invoice #14 and
+visits #32/#33; do not recreate or reinvoice this test shipment.
+
+## 13:37 WAT - Display Fix and Live Closure
+
+- Code `4e8095e` committed/pushed; Railway deployment
+  `6b10f5bb-ba9a-46f7-9b59-994b25ecc862` SUCCESS.
+- CAP04-UI-001: explicitly invalidates shipment queries after visit mutations,
+  including cached sibling/old-shipment views. Local browser verified status
+  change and delivery set/clear without reload. Live #32 cleared delivery date:
+  card immediately showed 0 of 2; restoring 2026-09-09 immediately showed 1 of 2.
+  No intervening page reload. Original date restored, #33 remains pending.
+- DASH-002: API retains compatible field names but both delivery-card counts now
+  use delivery-date presence. UI labels Undelivered and Delivered distinguish
+  these from job closure. Live 15 = 13 + 2; no overlapping category counts.
+- Automated suite: 141 tests / 30 files; focused 7 tests after test-import fix;
+  full production build and browser smoke passed. Existing Vite warnings remain.
+- No financial write or new fixture. Dashboard invoice 3,301, collection 2,001,
+  AR 1,300, budget figures and banks match the earlier baseline after date restore.
+- Both findings closed. Prior source observations remain above as audit evidence.

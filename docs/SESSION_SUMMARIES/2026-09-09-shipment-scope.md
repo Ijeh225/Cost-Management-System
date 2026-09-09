@@ -128,3 +128,15 @@
   validates verification and delivery set/clear immediate refresh without reload,
   unchanged sibling, import and responsive widths. No live data changed yet.
 - Next publish, confirm deployment, retest #32/#33 without a new invoice or payment.
+
+## 2026-09-09 13:37 WAT (UTC+01:00) - Both Display Issues Closed Live
+
+- Fix `4e8095e` pushed; Railway deployment
+  `6b10f5bb-ba9a-46f7-9b59-994b25ecc862` SUCCESS.
+- Retested existing #32: delivery clear and restore updated sibling summary
+  1 -> 0 -> 1 of 2 without reload. Restored original 2026-09-09, preserving
+  pending sibling #33 and all owners/statuses. No new financial writes/fixtures.
+- Dashboard shows Total 15 = Undelivered 13 + Delivered 2. Invoice/collection/AR
+  and bank figures stayed unchanged. CAP04-UI-001 and DASH-002 now closed.
+- All build/test/deployment/live evidence recorded. CAP-04 is ready as the
+  foundation for proposed CAP-01; CAP-01 implementation has not started.

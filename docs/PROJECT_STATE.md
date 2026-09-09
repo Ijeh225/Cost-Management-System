@@ -45,6 +45,16 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-09 13:37 WAT: CAP04-UI-001 and DASH-002 CLOSED by deployed fix and
+  focused live retest. Code `4e8095e` pushed; Railway deployment
+  `6b10f5bb-ba9a-46f7-9b59-994b25ecc862` SUCCESS. On existing #32, clearing and
+  restoring 2026-09-09 immediately changed the shipment count 1 -> 0 -> 1 of 2
+  without reload. Original delivery date restored; #33 remains pending. Dashboard
+  now shows 15 total = 13 Undelivered + 2 Delivered. Invoice 3,301, collected 2,001,
+  AR 1,300 and bank balances unchanged. No new fixtures/invoices/payments created.
+  CAP-04 requested core acceptance and these display corrections are complete.
+  Next proposed feature is CAP-01 (unified overview/role-based daily queue);
+  implementation has not started. Retain #32/#33/#14; do not repeat their writes.
 - 2026-09-09 13:29 WAT: user authorized fixes for CAP04-UI-001 and DASH-002.
   Added targeted shipment-cache invalidation across visit delivery, verification,
   status/gate/stage actions, detail edits, create/import and approval callbacks.

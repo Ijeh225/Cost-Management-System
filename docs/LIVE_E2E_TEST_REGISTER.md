@@ -7,7 +7,17 @@ and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
-### CAP-04 Feature Verification - 2026-09-09 13:15 WAT
+### CAP-04 Feature Verification - 2026-09-09 13:37 WAT
+
+- CAP04-UI-001 and DASH-002 CLOSED: fix `4e8095e` deployed successfully as
+  `6b10f5bb-ba9a-46f7-9b59-994b25ecc862`. Fresh frontend loaded once before test;
+  then #32 delivery clear/save showed 0 of 2 and restore/save showed 1 of 2,
+  without reload between mutations. Original 2026-09-09 restored. Sibling status
+  remains Pending Verification and #32 Registered; no job automatically closed.
+- Live Dashboard: Total 15, Undelivered 13, Delivered 2. Displayed invoice 3,301,
+  collected 2,001, outstanding 1,300 and banks unchanged from acceptance baseline.
+  No new invoice, payment, container, branch or client. Only two auditable delivery
+  updates on the existing fixture; no audit history removed.
 
 - 2026-09-09 13:29 WAT fix milestone: CAP04-UI-001/DASH-002 implemented, pending
   deployment and live closure. Shipment queries now invalidate explicitly across
@@ -62,7 +72,8 @@ action` label below does not override this current register.
 - Full Railway typecheck/frontend/API build passes; existing Vite sourcemap and
   large-chunk warnings remain non-blocking. One initial local smoke fixture had
   the wrong CSRF response key; corrected to `token`, then passed. Not a live defect.
-- Pending: fixes and focused re-test for CAP04-UI-001 and DASH-002.
+- No remaining open CAP04-UI-001/DASH-002 work. Historical pending lines above
+  describe earlier milestones; the 13:37 deployed/live closure supersedes them.
   Before creating any live fixtures, check for existing CAP-04 records to avoid
   duplicate tests. Do not reopen previously closed issue IDs or repay old schedules.
 - Details: docs/CAP04_SHIPMENTS_AND_CONTAINER_VISITS.md and
