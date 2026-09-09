@@ -91,3 +91,18 @@ the restricted user-management endpoint.
 - Publication, deployed live checks and task write acceptance are still pending at
   this milestone. No measured human time-to-next-action improvement is claimed;
   collect a real user baseline before claiming productivity gains.
+
+## Deployed Acceptance (2026-09-09 16:17 WAT)
+
+This supersedes the earlier pending milestone. Code 54f0ceb is deployed successfully
+as Railway 61ffe1a3-322d-4fcf-b963-a4b8c1e85e24. Existing #32/#33 show independent
+state and budgets; shared invoice #14 is explicitly full-value 300, not an allocated
+per-visit amount. Created one task #1 on existing Head Office QA visit #24, assigned
+to owner user #1 and due today. Overview, personal Today queue and original task
+editor agreed on ID #1. Today=1/Overdue=0. Completion refreshed the overview and
+queue to zero open, retaining the completed task. No financial/stage writes.
+
+Dashboard and all three bank balances remained unchanged. Retain task #1; do not
+repeat creation. Local non-finance/branch/client tests supplement this live owner
+session; no fresh multi-account login, external messaging or productivity benchmark
+is claimed. Full evidence is in LIVE_E2E_TEST_REGISTER.md and the session summary.

@@ -45,6 +45,22 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-09 16:17 WAT: CAP-01 implemented, committed/pushed as `54f0ceb`, and
+  deployed successfully: `61ffe1a3-322d-4fcf-b963-a4b8c1e85e24` (SUCCESS).
+  Bounded live acceptance passed: #32/#33 show independent fields, correct physical
+  versus workflow state, 100/200 budgets and the SAME invoice #14 at full value 300
+  without an allocated/summed shipment invoice total. Existing owner queue was empty.
+  Created exactly one labelled non-financial task #1 on existing Head Office QA
+  visit #24 (not a new container), assigned to owner user #1, due 2026-09-09.
+  Overview and My Tasks both showed task #1; Today=1, Overdue=0. Original task link
+  selected Tasks; completion immediately changed overview to 0 open / task history
+  to 1 done, and queue returned to 0. Retain completed task #1 and normal assignment
+  notification; do not recreate it. No stage/owner/date, invoice or payment changed.
+  Dashboard still 15 = 13 undelivered + 2 delivered; invoices 3,301, collections
+  2,001, AR 1,300; banks 47,499,997 / 599 / 1 unchanged. Non-finance/branch/client
+  denial checks passed locally, not a new live multi-account session. CAP-01's
+  initial read-model/queue scope is complete. Await next user-selected capability;
+  CAP-02 remains proposed. Do not repeat closed financial tests or CAP-04 writes.
 - 2026-09-09 16:02 WAT: CAP-01 implementation and local verification complete.
   Added read-only job overview near the top of visit detail and prioritized My Tasks
   queue with WAT filters, stable task IDs, role/workspace links and branch/client

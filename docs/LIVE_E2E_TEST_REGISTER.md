@@ -7,7 +7,32 @@ and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
-### CAP-01 Verification In Progress - 2026-09-09 15:54 WAT
+### CAP-01 Bounded Acceptance Passed - 2026-09-09 16:17 WAT
+
+- Code `54f0ceb` committed/pushed. Railway deployment
+  `61ffe1a3-322d-4fcf-b963-a4b8c1e85e24` SUCCESS, matching exact commit hash.
+- Live owner session: #32 Registered/delivered 2026-09-09 with its saved action and
+  owner; #33 Pending Verification with no owner/action/delivery. Independent
+  department fields remain empty. Budgets 100 and 200; each links to invoice #14
+  once, explicitly labelled full invoice 300 / collections 0 / outstanding 300.
+- My Tasks was empty. For bounded write acceptance created ONE task #1 on existing
+  Head Office visit #24 QATU20260831, title CAP01-20260909 Verify daily queue and
+  overview, assigned owner user #1, medium priority, due 2026-09-09. Notes prohibit
+  physical/financial/external action. Existing task form correctly offered the owner.
+- Without reload after create, overview showed 1 open and original task #1. Personal
+  queue showed All=1, Today=1, Overdue=0. Today displayed task; Overdue did not.
+  Task link selected the original Tasks tab and task ID. Completed once; immediately
+  overview 0 open and task manager 0 active / 1 done; queue returned to all zeros.
+  Completed task #1 retained. No deletion, new job/invoice/payment or stage changes.
+- Final Dashboard/banks unchanged: containers 15, undelivered 13, delivered 2;
+  budget 72,004,501 / cost 2,000,501; invoices 3,301; collected 2,001; AR 1,300;
+  bank #2 47,499,997, #3 599, #4 1. Normal internal task notification retained.
+- Scope limits: no fresh live non-finance login, isolated DB run, document upload,
+  external messaging or human productivity benchmark in this feature acceptance.
+  Local auth/branch/client tests and department browser fixtures cover those access
+  boundaries. No new confirmed defect in this bounded CAP-01 scope.
+
+Historical implementation milestones follow; pending labels below are superseded.
 
 - 16:02 WAT: implementation/local checks complete. 153 tests/32 files and final
   14 focused checks pass; full Railway build passes. Local production browser:

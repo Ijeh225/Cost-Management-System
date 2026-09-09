@@ -38,3 +38,22 @@
 - Complete behavior/limits documented in CAP01_JOB_OVERVIEW_AND_DAILY_QUEUE.md.
   No human productivity improvement or live acceptance claimed. Next publish,
   confirm deployment and perform bounded acceptance without new financial records.
+
+## 2026-09-09 16:17 WAT - Deployed and Live-Accepted
+
+- Feature code 54f0ceb pushed. Railway 61ffe1a3-322d-4fcf-b963-a4b8c1e85e24
+  SUCCESS for exact commit. No migration or infrastructure configuration change.
+- Existing CAP-04 visits #32/#33 and invoice #14 passed read-only overview checks:
+  independent fields/100-and-200 budgets; one shared full-value 300 invoice link;
+  delivery does not close sibling or imply gate presence.
+- Empty owner queue required one controlled task fixture, not another container.
+  Created task #1 on existing Head Office QA visit #24, assigned owner user #1,
+  due today. Same ID in overview/queue/editor; Today=1 and Overdue=0. Completed
+  once; immediate overview/queue refresh to 0 open, original task retained as done.
+- Kept completed task and normal internal assignment notification. No external
+  message, financial transaction, changed stage/owner/date, or new invoice/job.
+- Dashboard/banks unchanged: 15 containers / 13 undelivered / 2 delivered;
+  invoice 3,301 / collection 2,001 / AR 1,300; banks 47,499,997 / 599 / 1.
+- Initial CAP-01 read-model/queue scope complete. Non-finance and branch/client
+  restrictions tested locally; no claim of a fresh live cross-role or financial
+  audit. Await next user-selected capability; CAP-02 is still only proposed.
