@@ -55,6 +55,7 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
   still unconfirmed. This is a business clarification, not authorization to build.
   No source, schema or live data changed; no test repeated. Session:
   docs/SESSION_SUMMARIES/2026-09-09-shipment-scope.md.
+  Requirement records committed as 0fc60df (documentation only).
 - 2026-09-08 14:57 WAT: discussed next feature priorities after the REVIEW closures.
   Proposals only, no implementation approved. Start with CAP-01 job overview,
   CAP-02 document readiness and CAP-03 delay-cost forecasts, subject to CAP-04

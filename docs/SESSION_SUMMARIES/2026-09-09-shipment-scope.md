@@ -17,3 +17,4 @@
 - Next action: inspect the existing model/grouping and define CAP-04 acceptance
   and migration scope before implementation. Repeat equipment visits and whether
   the business operates a physical yard are still unconfirmed.
+- Requirement records committed as 0fc60df; no feature implementation included.
