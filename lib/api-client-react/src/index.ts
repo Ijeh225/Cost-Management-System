@@ -13,6 +13,7 @@ export * from "./clients";
 export * from "./settings";
 export * from "./invoices";
 export * from "./containers";
+export * from "./shipment-cache";
 export * from "./reports";
 export * from "./notifications";
 export * from "./search";

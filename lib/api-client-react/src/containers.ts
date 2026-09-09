@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
+import { invalidateShipmentSummaries } from "./shipment-cache";
 
 export type PipelineContainer = {
   id: number;
@@ -103,6 +104,7 @@ export function useAdvanceContainerStatus() {
       qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
     },
     onSettled: (_data, _err, { id }) => {
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
     },
   });
@@ -167,6 +169,8 @@ export function useUpdateDeliveredAt() {
         headers: { "Content-Type": "application/json" },
       }),
     onSuccess: (_data, { id }) => {
+      invalidateShipmentSummaries(qc);
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
       qc.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
@@ -200,6 +204,7 @@ export function useUpdateDeliveryExecution() {
         headers: { "Content-Type": "application/json" },
       }),
     onSuccess: (_data, { id }) => {
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["analytics", "deliveries"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
@@ -216,6 +221,7 @@ export function useVerifyContainer() {
         headers: { "Content-Type": "application/json" },
       }),
     onSuccess: (_data, { id }) => {
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["/api/containers"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
@@ -478,6 +484,7 @@ export function useStageAction() {
         headers: { "Content-Type": "application/json" },
       }),
     onSuccess: (_data, { id }) => {
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
       qc.invalidateQueries({ queryKey: ["workflow-notifications"] });
@@ -495,6 +502,7 @@ export function useAuthorizeEarlyStart() {
         headers: { "Content-Type": "application/json" },
       }),
     onSuccess: (_data, { id }) => {
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
     },
@@ -507,6 +515,7 @@ export function useRevokeEarlyStart() {
     mutationFn: ({ id }) =>
       customFetch(`/api/containers/${id}/early-start`, { method: "DELETE" }),
     onSuccess: (_data, { id }) => {
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["containers", "pipeline"] });
     },
@@ -522,6 +531,7 @@ export function useGateIn() {
         headers: { "Content-Type": "application/json" },
       }),
     onSuccess: (_data, { id }) => {
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["/api/containers"] });
       qc.invalidateQueries({ queryKey: ["dashboard", "stats"] });
@@ -539,6 +549,7 @@ export function useGateOut() {
         headers: { "Content-Type": "application/json" },
       }),
     onSuccess: (_data, { id }) => {
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["/api/containers"] });
       qc.invalidateQueries({ queryKey: ["dashboard", "stats"] });
@@ -553,6 +564,7 @@ export function useEmptyGateIn() {
     mutationFn: ({ id }) =>
       customFetch(`/api/containers/${id}/empty-gate-in`, { method: "POST" }),
     onSuccess: (_data, { id }) => {
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["containers", "gate-log"] });
     },
@@ -565,6 +577,7 @@ export function useEmptyGateOut() {
     mutationFn: ({ id }) =>
       customFetch(`/api/containers/${id}/empty-gate-out`, { method: "POST" }),
     onSuccess: (_data, { id }) => {
+      invalidateShipmentSummaries(qc);
       qc.invalidateQueries({ queryKey: [`/api/containers/${id}`] });
       qc.invalidateQueries({ queryKey: ["containers", "gate-log"] });
       qc.invalidateQueries({ queryKey: ["analytics", "deliveries"] });

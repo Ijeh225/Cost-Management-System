@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useCreateContainer, useListClients } from "@workspace/api-client-react";
+import { useCreateContainer, useListClients, invalidateShipmentSummaries } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useBranchScope } from "@/components/layout/branch-provider";
@@ -35,6 +36,7 @@ interface NewContainerDialogProps {
 }
 
 export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogProps) {
+  const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const createMutation = useCreateContainer();
@@ -136,6 +138,8 @@ export function NewContainerDialog({ open, onOpenChange }: NewContainerDialogPro
           ...(isSuperAdmin && branchId != null && { branchId }),
         },
       });
+      await invalidateShipmentSummaries(queryClient);
+      queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
       toast({ title: "Container created", description: `${container.containerNumber} has been added.` });
       onOpenChange(false);
       setLocation(`/containers/${container.id}`);

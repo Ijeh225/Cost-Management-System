@@ -1768,8 +1768,16 @@ export const GetMyTasksResponse = zod.object({
  */
 export const GetDashboardStatsResponse = zod.object({
   totalContainers: zod.number(),
-  inProgress: zod.number(),
-  completed: zod.number(),
+  inProgress: zod
+    .number()
+    .describe(
+      "Containers without a recorded delivery date; displayed as Undelivered.",
+    ),
+  completed: zod
+    .number()
+    .describe(
+      "Containers with a recorded delivery date; displayed as Delivered, independent of job closure.",
+    ),
   closed: zod.number(),
   totalCost: zod.number(),
   totalClearingCharges: zod.number(),

@@ -27,6 +27,7 @@ import {
   useAuthorizeEarlyStart,
   useRevokeEarlyStart,
   getCsrfHeaders,
+  invalidateShipmentSummaries,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
@@ -1731,6 +1732,7 @@ export default function ContainerDetail() {
   };
 
   const invalidate = () => {
+    invalidateShipmentSummaries(queryClient);
     queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
     queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}/audit`] });
     queryClient.invalidateQueries({ queryKey: ["/api/approvals"] });
@@ -2078,7 +2080,10 @@ export default function ContainerDetail() {
             eta: container.eta ?? null,
             consignee: container.consignee ?? null,
           }}
-          onSaved={() => queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] })}
+          onSaved={() => {
+            invalidateShipmentSummaries(queryClient);
+            queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+          }}
         />
       )}
 

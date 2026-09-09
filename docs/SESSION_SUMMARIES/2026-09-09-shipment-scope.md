@@ -115,3 +115,16 @@
   Both Medium, source traced and documented; no fixes silently implemented.
 - Full bounded evidence: CAP04_LIVE_ACCEPTANCE_2026-09-09.md. Core live behavior
   passed; next correct display controls and retest same records before CAP-01.
+
+## 2026-09-09 13:29 WAT (UTC+01:00) - Display Corrections Implemented
+
+- User requested both display fixes. Central targeted invalidation refreshes
+  cached shipment summaries after visit mutations, creation/import and detail edits.
+  Old and new shipment views are invalidated after membership changes.
+- Dashboard uses recorded delivery dates for complementary Undelivered/Delivered
+  cards, retaining workflow closure as a separate concept and API count.
+- 141 automated tests passed. Initial build caught a test-only cross-workspace
+  rootDir import; corrected, focused 7 tests and full build passed. Local browser
+  validates verification and delivery set/clear immediate refresh without reload,
+  unchanged sibling, import and responsive widths. No live data changed yet.
+- Next publish, confirm deployment, retest #32/#33 without a new invoice or payment.

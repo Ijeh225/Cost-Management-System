@@ -806,8 +806,8 @@ export default function Dashboard() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard title="Total Containers"       value={stats.totalContainers}        icon={Box}         branchLabel={branchLabel} />
-        <StatCard title="In Progress"            value={stats.inProgress}             icon={Activity}    colorClass="text-blue-400" branchLabel={branchLabel} />
-        <StatCard title="Completed"              value={stats.completed}              icon={CheckCircle2} colorClass="text-emerald-400" branchLabel={branchLabel} />
+        <StatCard title="Undelivered"            value={stats.inProgress}             icon={Activity}    colorClass="text-blue-400" branchLabel={branchLabel} />
+        <StatCard title="Delivered"              value={stats.completed}              icon={CheckCircle2} colorClass="text-emerald-400" branchLabel={branchLabel} />
         <StatCard
           title="Budgeted Total Cost"
           value={stats.totalCost}

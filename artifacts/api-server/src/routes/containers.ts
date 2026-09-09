@@ -7,7 +7,7 @@ import { isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 import { getFinalWorkflowMissingStages } from "../lib/workflow-readiness.js";
 import { GATE_EVENTS, gateEventError, type GateEvent } from "../lib/gate-events.js";
 import { FX_TARGET_FIELD, FX_TARGET_LABEL, FX_TOLERANCE_NGN } from "../config/fxFieldMapping.js";
-import { isContainerPhysicallyInTerminal } from "../lib/operational-definitions.js";
+import { isContainerPhysicallyInTerminal, getDeliveryCounts } from "../lib/operational-definitions.js";
 import { stageOwnerFieldFor, stageOwnerFor } from "../lib/department-stage-owners.js";
 import { hasAuthority, hasWorkspace } from "../lib/authorization.js";
 import { FINANCIAL_BASIS } from "../lib/financial-reporting.js";
@@ -2585,9 +2585,8 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
       ? await db.select().from(containersTable)
       : await db.select().from(containersTable).where(eq(containersTable.branchId, _scope));
     const totalContainers = allContainers.length;
-    const inProgress = allContainers.filter(c => c.status !== "closed").length;
-    // Match Delivery Tracking: completion requires a recorded delivery date.
-    const completed = allContainers.filter(c => c.deliveredAt != null).length;
+    // Delivery partitions the cards; workflow closure remains a separate count.
+    const { inProgress, completed } = getDeliveryCounts(allContainers);
     const closed = allContainers.filter(c => c.status === "closed").length;
     const containersInTerminalList = allContainers
       .filter(isContainerPhysicallyInTerminal)

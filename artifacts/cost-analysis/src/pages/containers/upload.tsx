@@ -1,10 +1,12 @@
 import { useState, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { containerVisitKey } from "@/lib/container-visit-key";
 import { useBranchScope } from "@/components/layout/branch-provider";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import {
   useUploadContainers,
+  invalidateShipmentSummaries,
   useListClients,
   useCheckContainerDuplicates,
 } from "@workspace/api-client-react";
@@ -92,6 +94,7 @@ function getConflictReason(status: RowStatus): string {
 }
 
 export default function UploadPage() {
+  const queryClient = useQueryClient();
   const { activeBranchId } = useBranchScope();
   const { isAdmin, user } = useAuth();
   const [, setLocation] = useLocation();
@@ -299,6 +302,8 @@ export default function UploadPage() {
     const clientId = mode === "client" && selectedClientId ? Number(selectedClientId) : undefined;
     uploadMutation.mutate({ data: { rows: approvedRows, clientId } }, {
       onSuccess: (res) => {
+        invalidateShipmentSummaries(queryClient);
+        queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
         toast({
           title: "Upload Complete",
           description: `Created ${res.created} record${res.created !== 1 ? "s" : ""}.${res.duplicates.length > 0 ? ` Skipped ${res.duplicates.length} duplicate${res.duplicates.length !== 1 ? "s" : ""}.` : ""}`,

@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
+import { getDeliveryCounts, getOperationalStatusCounts, isContainerPhysicallyInTerminal, operationalStageLabel } from "../lib/operational-definitions.js";
 
 describe("operational business definitions", () => {
+  it("partitions delivered and undelivered independently of workflow closure", () => {
+    const rows = [
+      { status: "registered", deliveredAt: new Date("2026-09-09") },
+      { status: "pending_verification", deliveredAt: null },
+      { status: "closed", deliveredAt: new Date("2026-09-08") },
+      { status: "closed", deliveredAt: null },
+    ];
+    const counts = getDeliveryCounts(rows);
+    expect(counts).toEqual({ completed: 2, inProgress: 2 });
+    expect(counts.completed + counts.inProgress).toBe(rows.length);
+    expect(rows[0].status).toBe("registered");
+    expect(rows[3].deliveredAt).toBeNull();
+  });
+
+  it("handles empty scopes and delivery correction without overlapping counts", () => {
+    expect(getDeliveryCounts([])).toEqual({ completed: 0, inProgress: 0 });
+    expect(getDeliveryCounts([{ deliveredAt: "2026-09-09" }])).toEqual({ completed: 1, inProgress: 0 });
+    expect(getDeliveryCounts([{ deliveredAt: null }])).toEqual({ completed: 0, inProgress: 1 });
+  });
   it("counts only physical terminal statuses that have not gate-out", () => {
     expect(isContainerPhysicallyInTerminal({ status: "gate_in", gateOutDate: null })).toBe(true);
     expect(isContainerPhysicallyInTerminal({ status: "examination", gateOutDate: null })).toBe(true);

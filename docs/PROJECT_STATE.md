@@ -45,6 +45,15 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-09 13:29 WAT: user authorized fixes for CAP04-UI-001 and DASH-002.
+  Added targeted shipment-cache invalidation across visit delivery, verification,
+  status/gate/stage actions, detail edits, create/import and approval callbacks.
+  Dashboard now labels date-based complementary counts Undelivered and Delivered;
+  closure stays independent. No financial formula, persisted date or status altered.
+  141 tests passed; full build passed (initial test-import rootDir error corrected).
+  Local browser passes verification and delivery set/clear without reload, sibling
+  independence, upload and 390/768/1440 layouts. Publishing and live retest next,
+  using #32/#33 and invoice #14; do not create or charge another test shipment.
 - 2026-09-09 13:15 WAT: bounded CAP-04 live acceptance completed. Same-B/L visits
   #32/#33, independent registration/owner/due/delivery fields and one NGN 300
   invoice #14 passed. Dashboard/P&L/AR recognized exactly +300; paid costs,

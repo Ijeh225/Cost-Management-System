@@ -27,7 +27,7 @@ try {
   const rows = [31,32,33].map((id,index) => ({ id, branchId: 1, shipmentId: 5, containerNumber: `QA-BOX-${id}`, blNumber: "QA-SHARED-BL",
     customerName: "QA", status: index === 0 ? "closed" : "shipping", size: "40FT", vessel: "QA vessel", command: "PTML", isLocked: false,
     deliveredAt: index === 0 ? "2026-09-09T10:00:00Z" : null, createdAt: "2026-09-09T09:00:00Z", updatedAt: "2026-09-09T09:00:00Z",
-    transireStageOwner: `Transire ${id}`, shippingStageOwner: `Shipping ${id}`, lockedSections: [], clearingCharges: 0, totalCost: 0, grossProfit: 0 }));
+    verificationOfficerIds: [1], verificationOfficerName: "QA", transireStageOwner: `Transire ${id}`, shippingStageOwner: `Shipping ${id}`, lockedSections: [], clearingCharges: 0, totalCost: 0, grossProfit: 0 }));
   await page.route("**/*", async route => {
     const url = new URL(route.request().url());
     if (url.origin !== origin) { await route.abort(); return; }
@@ -40,8 +40,16 @@ try {
       role: owner ? "super_admin" : "shipping_user",
       accessProfile: { source: "modern", authorityLevel: owner ? "super_admin" : "staff", jobFunction: owner ? "general_staff" : "operations", workspaces: owner ? [] : ["shipping"], errors: [] } };
     else if (url.pathname === "/api/branches") data = [{ id: 1, name: "QA Branch", isActive: true }];
-    else if (/^\/api\/containers\/\d+\/shipment$/.test(url.pathname)) data = { shipmentId: 5, branchId: 1, blNumber: "QA-SHARED-BL", total: 3, delivered: 1, completed: 1, containers: rows };
-    else if (/^\/api\/containers\/\d+$/.test(url.pathname)) data = { container: rows.find(row => row.id === Number(url.pathname.split("/").at(-1))), charges: { shipping: {},customs: {},terminal: {},delivery: {},operations: {},extraCharges: [],totalCost: 0 }, sectionApprovals: [] };
+    else if (/^\/api\/containers\/\d+\/shipment$/.test(url.pathname)) data = { shipmentId: 5, branchId: 1, blNumber: "QA-SHARED-BL", total: 3, delivered: rows.filter(row => row.deliveredAt).length, completed: rows.filter(row => row.status === "closed").length, containers: rows };
+    else if (/^\/api\/containers\/\d+\/verify$/.test(url.pathname)) {
+      const row = rows.find(row => row.id === Number(url.pathname.split("/").at(-2)));
+      row.status = "registered"; data = row;
+    }
+    else if (/^\/api\/containers\/\d+$/.test(url.pathname)) {
+      const row = rows.find(row => row.id === Number(url.pathname.split("/").at(-1)));
+      if (method === "PATCH") { Object.assign(row, route.request().postDataJSON()); data = row; }
+      else data = { container: row, charges: { shipping: {},customs: {},terminal: {},delivery: {},operations: {},extraCharges: [],totalCost: 0 }, sectionApprovals: [] };
+    }
     else if (url.pathname === "/api/containers") data = { containers: rows, total: 3, page: 1, limit: 20 };
     else if (url.pathname === "/api/containers/check-duplicates") data = { existingContainerNumbers: ["QA-BOX-31"], existingBlNumbers: ["QA-SHARED-BL"], existingVisits: [{ containerNumber: "QA-BOX-31", blNumber: "QA-SHARED-BL", branchId: 1 }] };
     else if (url.pathname === "/api/containers/upload") data = { created: 2, duplicates: [], errors: [] };
@@ -60,6 +68,21 @@ try {
   await page.getByRole("heading", { name: "QA-BOX-32", exact: true }).waitFor();
   console.log("PASS: sibling links, independent visit navigation, partial delivery, 390/768/1440 layouts");
   owner = true;
+  rows[1].status = "pending_verification";
+  await page.goto(`${origin}/containers/32`);
+  await page.getByRole("button", { name: "Verify Container", exact: true }).click();
+  await page.getByRole("link", { name: /QA-BOX-32.*Registered.*Visit #32/ }).waitFor();
+  await page.getByRole("button", { name: "Set Delivery Date", exact: true }).click();
+  await page.locator('input[type="date"]').fill("2026-09-09");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByText(/2 of 3 delivered/).waitFor();
+  assert.equal(rows[2].deliveredAt, null);
+  assert.equal(rows[2].status, "shipping");
+  await page.getByRole("button", { name: "Edit Date", exact: true }).click();
+  await page.locator('input[type="date"]').fill("");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByText(/1 of 3 delivered/).waitFor();
+  console.log("PASS: verification and delivery set/clear refresh shipment immediately without reload; sibling unchanged");
   await page.goto(`${origin}/containers/upload`);
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles({ name: "multi.csv", mimeType: "text/csv", buffer: Buffer.from(
@@ -73,7 +96,7 @@ try {
   const upload = writes.find(write => write.path === "/api/containers/upload");
   assert.equal(upload.body.rows.length, 2);
   assert.equal(new Set(upload.body.rows.map(row => row.blNumber)).size, 1);
-  assert.ok(writes.every(write => ["/api/containers/check-duplicates", "/api/containers/upload"].includes(write.path)));
+  assert.ok(writes.every(write => ["/api/containers/check-duplicates", "/api/containers/upload", "/api/containers/32", "/api/containers/32/verify"].includes(write.path)));
   assert.deepEqual(errors, []);
   console.log("PASS: upload accepts two different containers under an existing B/L; no browser exceptions");
 } finally {

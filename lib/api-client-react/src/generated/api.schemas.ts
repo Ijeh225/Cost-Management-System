@@ -540,7 +540,9 @@ export type DashboardStatsMonthlyTrendItem = {
 
 export interface DashboardStats {
   totalContainers: number;
+  /** Containers without a recorded delivery date; displayed as Undelivered. */
   inProgress: number;
+  /** Containers with a recorded delivery date; displayed as Delivered, independent of job closure. */
   completed: number;
   closed: number;
   totalCost: number;

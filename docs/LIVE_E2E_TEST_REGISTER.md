@@ -9,6 +9,14 @@ action` label below does not override this current register.
 
 ### CAP-04 Feature Verification - 2026-09-09 13:15 WAT
 
+- 2026-09-09 13:29 WAT fix milestone: CAP04-UI-001/DASH-002 implemented, pending
+  deployment and live closure. Shipment queries now invalidate explicitly across
+  mutations; Dashboard date-based Undelivered + Delivered is a complete partition.
+  No auto-closing or delivery-date backfill. 141 automated tests / 30 files passed;
+  7 focused tests passed after fixing test-only rootDir import. Full build passed.
+  Browser fixtures passed verification and delivery set/clear without reload,
+  sibling independence, import and responsive widths. Actual live retest pending.
+
 - Bounded live core checks PASS: visits #32 CAPU2609091 and #33 CAPU2609092 share
   CAP04-LIVE-20260909 under Lagos/client #6. Only #32 registered, assigned and
   delivery-dated; #33 remains pending/unassigned/undelivered. Reload shows 1 of 2

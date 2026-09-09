@@ -40,6 +40,11 @@ export function getOperationalStatusCounts(containers: Array<{ status: string }>
   }, {});
 }
 
+export function getDeliveryCounts(containers: ReadonlyArray<{ deliveredAt?: Date | string | null }>) {
+  const completed = containers.filter(container => container.deliveredAt != null).length;
+  return { completed, inProgress: containers.length - completed };
+}
+
 export function operationalStageLabel(status: string): string {
   return OPERATIONAL_STAGE_DEFINITIONS[status as keyof typeof OPERATIONAL_STAGE_DEFINITIONS]?.label
     ?? status.replace(/_/g, " ");

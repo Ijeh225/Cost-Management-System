@@ -2034,8 +2034,10 @@ components:
           type: integer
         inProgress:
           type: integer
+          description: Containers without a recorded delivery date; displayed as Undelivered.
         completed:
           type: integer
+          description: Containers with a recorded delivery date; displayed as Delivered, independent of job closure.
         closed:
           type: integer
         totalCost:
