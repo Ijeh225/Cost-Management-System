@@ -9,6 +9,14 @@ action` label below does not override this current register.
 
 ### CAP-01 Collapsible Presentation - 2026-09-10 17:55 WAT
 
+- 18:06 WAT live closure: code4e81bb8 deployed SUCCESS as
+  c21e782b-4eb6-4c2e-a6a4-a12c52208d4a. Fresh owner login, #32 closed by default;
+  click expanded grouped details and B/L list; second click collapsed only that
+  panel. Existing lower controls and Accounting Summary still exposed. #33 also
+  default closed, retaining its own pending/unassigned/undelivered state. #32
+  clearing100, #33 clearing200, shared invoice300 unchanged. No live writes.
+  Requested presentation scope closed; no repeated financial/staff-write test.
+  Earlier pending deployment note below is superseded by this observation.
 - User authorized UI-only refinement, leaving original container detail controls
   unchanged. Overview and B/L siblings now inside a closed-by-default disclosure.
 - Full production build passed. Local CAP-01 browser: Enter/Space/click toggle,

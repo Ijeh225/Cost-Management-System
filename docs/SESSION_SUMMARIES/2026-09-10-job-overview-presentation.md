@@ -1,5 +1,18 @@
 # Job Overview Presentation
 
+## 2026-09-10 18:06 WAT - Deployed and Live Checked
+
+- Code4e81bb8 committed/pushed; Railway c21e782b-4eb6-4c2e-a6a4-a12c52208d4a
+  SUCCESS on exact commit. Owner session expired; restored existing owner login.
+- Live #32: collapsed default; click opens all overview details and B/L children;
+  click closes only overview. Original verified banner, details, Stage Control,
+  tabs, charges and Accounting Summary stay available. Values unchanged.
+- Live #33: collapsed default, pending verification/unassigned/undelivered,
+  clearing200. #32 still Registered/delivered with clearing100; full shared
+  invoice300 remains one linked record. No job/task/document/financial mutation.
+- Local full build and both browser suites passed; source main detail unchanged.
+  Presentation scope complete. Await next user choice; CAP-02 not authorized.
+
 ## 2026-09-10 17:55 WAT - Implementation and Local Verification
 
 - Native details/summary provides closed-by-default keyboard/click disclosure,

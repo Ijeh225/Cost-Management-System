@@ -45,6 +45,17 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-10 18:06 WAT: overview presentation COMPLETE. Code `4e81bb8` pushed;
+  Railway deployment `c21e782b-4eb6-4c2e-a6a4-a12c52208d4a` SUCCESS for exact
+  commit. Fresh owner live #32 starts collapsed, opens all grouped details/B/L
+  siblings and collapses again; lower verification/details/Stage Control/tabs/
+  charges/Accounting Summary remain present and unchanged. #33 also starts
+  collapsed and retains Pending Verification/unassigned/undelivered and 200
+  clearing, while #32 retains Registered/delivered/100. Invoice #14 still full300.
+  Read-only acceptance; no new fixtures, record edits or finance/permission changes.
+  Local keyboard/responsive/dark-light and CAP-01/CAP-04 checks passed earlier.
+  No pending repair in this presentation scope. Await next user-selected work;
+  CAP-02 remains proposed. Session: 2026-09-10-job-overview-presentation.md.
 - 2026-09-10 17:55 WAT: collapsible overview presentation implemented. Native
   keyboard-accessible disclosure defaults closed and resets closed per visit.
   All overview and B/L siblings sit inside; existing main detail/Stage Control/
