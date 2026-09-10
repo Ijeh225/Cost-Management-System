@@ -45,6 +45,14 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-10 18:43 WAT: both new phone layout fixes implemented and locally
+  verified. Header wraps actions below identity; Operations uses full-width
+  search and natural-height vertical stages below 1024px, desktop Kanban retained.
+  Full Railway build and CAP-01/CAP-04 browser suites passed, including actual
+  owner control bounds and populated board at 320/390/495/768/1440. No live writes.
+  Next: commit/push, confirm exact deployment and inspect existing live pages.
+  Details: docs/SESSION_SUMMARIES/2026-09-10-mobile-layout.md.
+
 - 2026-09-10 18:06 WAT: overview presentation COMPLETE. Code `4e81bb8` pushed;
   Railway deployment `c21e782b-4eb6-4c2e-a6a4-a12c52208d4a` SUCCESS for exact
   commit. Fresh owner live #32 starts collapsed, opens all grouped details/B/L

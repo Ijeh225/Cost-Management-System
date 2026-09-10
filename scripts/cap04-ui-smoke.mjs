@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { tmpdir } from "node:os";
 const { chromium } = await import(pathToFileURL(process.argv[2]).href);
 const root = resolve(import.meta.dirname, "../artifacts/cost-analysis/dist/public");
 const server = createServer(async (req, res) => {
@@ -54,6 +55,10 @@ try {
       if (method === "PATCH") { Object.assign(row, route.request().postDataJSON()); data = row; }
       else data = { container: row, charges: { shipping: {},customs: {},terminal: {},delivery: {},operations: {},extraCharges: [],totalCost: 0 }, sectionApprovals: [] };
     }
+    else if (url.pathname === "/api/containers/pipeline") data = { total: 3, stages: {
+      documentation: rows.map(row => ({ ...row, status: "documentation", daysInStage: 9, assignedStaffName: "QA staff", stageOwnerName: "QA owner" })),
+      shipping: [{ ...rows[2], daysInStage: 16, assignedStaffName: "QA shipping" }],
+    } };
     else if (url.pathname === "/api/containers") data = { containers: rows, total: 3, page: 1, limit: 20 };
     else if (url.pathname === "/api/containers/check-duplicates") data = { existingContainerNumbers: ["QA-BOX-31"], existingBlNumbers: ["QA-SHARED-BL"], existingVisits: [{ containerNumber: "QA-BOX-31", blNumber: "QA-SHARED-BL", branchId: 1 }] };
     else if (url.pathname === "/api/containers/upload") data = { created: 2, duplicates: [], errors: [] };
@@ -90,6 +95,78 @@ try {
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.getByText(/1 of 3 delivered/).waitFor();
   console.log("PASS: verification and delivery set/clear refresh shipment immediately without reload; sibling unchanged");
+  // Check actual controls, not just document width: the shell hides horizontal overflow.
+  rows[1].containerNumber = "CAPU2609091";
+  rows[1].blNumber = "QA-LONG-UNBROKEN-BILL-OF-LADING-20260910";
+  await page.goto(`${origin}/containers/32`);
+  await page.getByRole("heading", { name: "CAPU2609091", exact: true }).waitFor();
+  for (const width of [320,390,495,768,1440]) {
+    await page.setViewportSize({ width, height: 850 });
+    const header = page.getByTestId("container-header");
+    await header.scrollIntoViewIfNeeded();
+    for (const control of await header.locator("button").all()) {
+      const box = await control.boundingBox();
+      assert.ok(box && box.x >= 0 && box.x + box.width <= width, `Header control clipped at ${width}`);
+    }
+    for (const name of ["Edit Details", "Lock", "Early Start", "Create Invoice"]) {
+      await header.getByRole("button", { name, exact: true }).waitFor();
+    }
+    assert.equal(await header.evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    if (width === 390) {
+      await page.screenshot({ path: resolve(tmpdir(), "mobile-container-header.png") });
+      await page.evaluate(() => { document.documentElement.classList.remove("dark"); document.documentElement.classList.add("light"); });
+      await page.screenshot({ path: resolve(tmpdir(), "mobile-container-header-light.png") });
+      await page.evaluate(() => { document.documentElement.classList.remove("light"); document.documentElement.classList.add("dark"); });
+    }
+  }
+  console.log("PASS: owner header actions and long B/L fit at 320/390/495/768/1440");
+  const writesBeforeOperations = writes.length;
+  await page.goto(`${origin}/operations`);
+  await page.getByRole("heading", { name: "Operations", exact: true }).waitFor();
+  const search = page.getByRole("textbox", { name: "Search operations" });
+  await search.waitFor();
+  const board = page.getByTestId("operations-board");
+  for (const width of [320,390,495,768,1440]) {
+    await page.setViewportSize({ width, height: 850 });
+    const searchBox = await search.boundingBox();
+    assert.ok(searchBox.width >= 200 && searchBox.x + searchBox.width <= width, `Search squeezed at ${width}`);
+    if (width === 390) {
+      await page.getByRole("heading", { name: "Operations", exact: true }).scrollIntoViewIfNeeded();
+      await page.evaluate(() => { document.documentElement.classList.remove("dark"); document.documentElement.classList.add("light"); });
+      await page.screenshot({ path: resolve(tmpdir(), "operations-mobile-filters-light.png") });
+      await page.evaluate(() => { document.documentElement.classList.remove("light"); document.documentElement.classList.add("dark"); });
+    }
+    await board.scrollIntoViewIfNeeded();
+    const first = board.locator("[data-stage]").first();
+    const second = board.locator("[data-stage]").nth(1);
+    const a = await first.boundingBox(), b = await second.boundingBox();
+    if (width < 1024) {
+      assert.ok(b.y >= a.y + a.height, "Mobile stages stack vertically");
+      const boardBox = await board.boundingBox();
+      assert.ok(a.width >= boardBox.width - 50, `Mobile cards use board width at ${width}: ${a.width}/${boardBox.width}`);
+      assert.equal(await board.evaluate(el => el.scrollWidth <= el.clientWidth), true);
+      assert.equal(await first.locator(":scope > div").last().evaluate(el => el.scrollHeight <= el.clientHeight), true, "No tiny internal mobile scroller");
+    } else assert.ok(b.x > a.x && Math.abs(b.y - a.y) < 2, "Desktop keeps horizontal Kanban");
+    if (width === 390 || width === 1440) {
+      await first.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: resolve(tmpdir(), `operations-${width}.png`) });
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 850 });
+  await search.fill("QA-BOX-31");
+  assert.equal(await board.getByRole("link").count(), 1);
+  await page.getByRole("button", { name: "Clear operations search" }).click();
+  assert.equal(await board.getByRole("link").count(), 4);
+  await page.getByRole("button", { name: "Shipping", exact: true }).click();
+  assert.equal(await board.locator("[data-stage]").count(), 1);
+  await page.getByRole("button", { name: /Documentation 3/ }).click();
+  await board.locator('[data-stage="documentation"]').waitFor();
+  assert.equal(await board.getByRole("link").count(), 3);
+  await page.getByRole("button", { name: "All Stages", exact: true }).click();
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  assert.equal(await board.getByRole("link").count(), 4);
+  assert.equal(writes.length, writesBeforeOperations, "Layout/filter tests must not advance live or fixture stages");
+  console.log("PASS: populated mobile Operations, desktop Kanban, search/clear, stage filters, active jump and refresh");
   await page.goto(`${origin}/containers/upload`);
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles({ name: "multi.csv", mimeType: "text/csv", buffer: Buffer.from(

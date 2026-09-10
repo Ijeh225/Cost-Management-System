@@ -7,6 +7,27 @@ and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
+### Mobile Header and Operations - 2026-09-10 18:34 WAT
+
+- User screenshots confirmed clipped container header actions and a squeezed
+  Operations search/board on phones. Source: non-wrapping title/actions row,
+  shared shrinking search/filter row, fixed-height horizontal board below wrapped
+  controls. These are new responsive findings, not reopened financial defects.
+- Scoped fix in progress: wrapped header actions below identity on small screens;
+  full-width search and vertical stage groups on phones/tablets; desktop Kanban
+  retained. Active-stage navigation uses actual stage positions, not fixed offsets.
+- Local owner-header and populated Operations browser regression added. Build,
+  tests, visual inspection and deployment verification pending. No live writes.
+- 18:43 WAT local result: full Railway typechecks/build passed; CAP-01 and
+  extended CAP-04 browser suites passed. Owner header control bounds and long
+  B/L verified at 320/390/495/768/1440; mobile stages stack at usable width with
+  no internal vertical clipping; desktop retains horizontal Kanban. Search,
+  clear, stage filter, active-stage navigation and refresh passed with no
+  Operations writes. Inspected phone/header and desktop board captures.
+  Initial checks caught an incorrectly targeted header wrapper (corrected before
+  release) and a test width assumption ignoring the tablet sidebar (corrected).
+  Deployment/live verification remains pending, not a claimed live pass.
+
 ### CAP-01 Collapsible Presentation - 2026-09-10 17:55 WAT
 
 - 18:06 WAT live closure: code4e81bb8 deployed SUCCESS as

@@ -20,6 +20,8 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-09-10 container header and Operations mobile layouts](2026-09-10-mobile-layout.md)
+
 - [2026-09-10 collapsible Job Overview presentation](2026-09-10-job-overview-presentation.md)
 
 - [2026-09-09 CAP-01 job overview, daily queue and live staff acceptance (17:30 WAT)](2026-09-09-cap01-job-overview.md)

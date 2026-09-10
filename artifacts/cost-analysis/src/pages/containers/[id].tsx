@@ -1979,13 +1979,13 @@ export default function ContainerDetail() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-24">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div data-testid="container-header" className="flex flex-wrap items-start gap-3 sm:gap-4">
         <Link href={typeof window !== "undefined" ? (new URLSearchParams(window.location.search).get("from") ?? "/containers") : "/containers"}>
           <Button variant="ghost" size="icon" className="hover:bg-accent rounded-full"><ArrowLeft className="w-5 h-5" /></Button>
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            <span>{container.containerNumber}</span>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="break-all">{container.containerNumber}</span>
             {container.isLocked && (
               <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 px-2 py-0.5">
                 <Lock className="w-3 h-3 mr-1" /> Locked
@@ -1997,11 +1997,11 @@ export default function ContainerDetail() {
               </Badge>
             )}
           </h1>
-          <p className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
-            <FileText className="w-3.5 h-3.5" /> BL: {container.blNumber}
+          <p className="text-muted-foreground text-sm flex items-start gap-2 mt-1">
+            <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5" /> <span className="min-w-0 break-all">BL: {container.blNumber}</span>
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-3 flex-wrap justify-end">
+        <div className="flex w-full min-w-0 items-center gap-2 flex-wrap lg:ml-auto lg:w-auto lg:max-w-[55%] lg:justify-end">
           <span className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider border ${getStatusColor(container.status)}`}>
             {getStatusLabel(container.status)}
           </span>
