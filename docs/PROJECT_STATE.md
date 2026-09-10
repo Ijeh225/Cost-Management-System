@@ -45,6 +45,16 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-10 18:49 WAT: mobile header/Operations fix COMPLETE for requested scope.
+  Code `7f1da71` committed/pushed; Railway deployment
+  `4b2bfa9e-61ac-43a6-a5b8-dc74db87f4d5` SUCCESS on exact code commit.
+  Fresh owner login: live #32 header actions, independent overview toggle and
+  unchanged lower details confirmed. Live Operations search CAPU2609091 + Shipping
+  returned exactly its existing card; clear/All Stages/refresh restored the board.
+  Pixel bounds/phone screenshots were tested locally against production build;
+  live acceptance used the current browser's accessible controls, not a separate
+  live device-width matrix. No job/financial writes. Await next user choice.
+
 - 2026-09-10 18:43 WAT: both new phone layout fixes implemented and locally
   verified. Header wraps actions below identity; Operations uses full-width
   search and natural-height vertical stages below 1024px, desktop Kanban retained.

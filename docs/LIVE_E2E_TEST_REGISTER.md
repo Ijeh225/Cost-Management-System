@@ -9,6 +9,15 @@ action` label below does not override this current register.
 
 ### Mobile Header and Operations - 2026-09-10 18:34 WAT
 
+- 18:49 WAT closure: `7f1da71` published; Railway exact-commit deployment
+  `4b2bfa9e-61ac-43a6-a5b8-dc74db87f4d5` SUCCESS. Restored existing owner login
+  after session expired. #32 retains Registered, delivered Sept 9, clearing100,
+  invoice300/collected0; all header actions and overview disclosure available.
+  Live Operations new labelled search + Shipping filter isolates CAPU2609091;
+  clear, All Stages and refresh exercised. No Advance or other write control used.
+  Responsive geometry verified locally at five widths; live check confirms
+  deployed controls/data, not an additional device-matrix run. Scope complete.
+
 - User screenshots confirmed clipped container header actions and a squeezed
   Operations search/board on phones. Source: non-wrapping title/actions row,
   shared shrinking search/filter row, fixed-height horizontal board below wrapped

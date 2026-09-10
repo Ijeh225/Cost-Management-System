@@ -1,5 +1,20 @@
 # Container Header and Operations Mobile Layout
 
+## 2026-09-10 18:49 WAT - Published and Live Acceptance
+
+- Code `7f1da71` pushed. Railway `4b2bfa9e-61ac-43a6-a5b8-dc74db87f4d5`
+  SUCCESS on `7f1da71e898caec32c2084ddcf4a7b3f67bc5932`.
+- Existing owner session expired during deployment; restored authorized login.
+  Live #32 header shows invoice/edit/lock/early-start/Operations actions; overview
+  expands and collapses, original details and financial figures unchanged.
+- Live Operations search CAPU2609091 then Shipping shows one matching existing
+  card. Cleared search, returned All Stages and refreshed. No job/financial writes.
+- Evidence boundary: local production browser tests cover pixel bounds and
+  320/390/495/768/1440 layout plus screenshots. Live acceptance checks deployed
+  accessible controls, search/filter and unchanged data in current browser.
+- Requested mobile layout work complete. Next: await user direction; CAP-02
+  remains proposed, no new feature authorized by this responsive task.
+
 ## 2026-09-10 18:43 WAT - Local Verification Complete
 
 - Implemented in container detail and Operations only; expanded existing local
