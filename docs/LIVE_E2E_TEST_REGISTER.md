@@ -7,6 +7,19 @@ and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
+### CAP-01 Collapsible Presentation - 2026-09-10 17:55 WAT
+
+- User authorized UI-only refinement, leaving original container detail controls
+  unchanged. Overview and B/L siblings now inside a closed-by-default disclosure.
+- Full production build passed. Local CAP-01 browser: Enter/Space/click toggle,
+  refresh, task deep links/completion, department access hiding, retained stale
+  queue and 390/768/1440 layouts passed. Closed overview does not hide task editor.
+- Local CAP-04 browser: sibling navigation resets overview closed; partial
+  delivery summary refresh, verification and upload checks still passed. No
+  real data used in these intercepted local tests. Light/dark captures reviewed.
+- Production deployment and read-only live toggle check pending. Reuse #32/#33;
+  do not change delivery, tasks, invoice, payment or permission fixtures.
+
 ### CAP-01 Live Staff Acceptance Passed - 2026-09-09 17:30 WAT
 
 - Acceptance evidence and read-only checker committed/pushed as `939e8ed`.

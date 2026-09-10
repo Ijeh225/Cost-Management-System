@@ -45,6 +45,22 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-09-10 17:55 WAT: collapsible overview presentation implemented. Native
+  keyboard-accessible disclosure defaults closed and resets closed per visit.
+  All overview and B/L siblings sit inside; existing main detail/Stage Control/
+  tabs/charges/Accounting Summary source remains untouched. Refined spacing,
+  status surfaces, owner/date cards and finance hierarchy; full calculation note
+  is expandable with always-visible full-invoice warning. Existing access checks
+  unchanged. Full railway:build and both CAP-01/CAP-04 browser suites PASS,
+  including keyboard, refresh, task editor, sibling navigation and 390/768/1440.
+  Light/dark viewport captures reviewed. No backend/schema/live data changed.
+  Next: publish and perform deployed read-only expand/collapse acceptance.
+- 2026-09-10 16:52 WAT: user approved a presentation-only CAP-01 refinement.
+  Job Overview must be collapsed by default; expand its neatly grouped details
+  and B/L siblings on click. Preserve the existing verification banner, main
+  container details, Stage Control, tabs, charges and Accounting Summary exactly.
+  No permission, calculation, workflow or data change. Build/browser checks and
+  publication/live read-only acceptance pending. CAP-02 has not been authorized.
 - CAP-01 staff acceptance evidence/checker committed and pushed as `939e8ed`.
   Requested owner and Operations-staff live acceptance are complete. No remaining
   test/fix in this bounded scope; await next user-selected capability. Do not

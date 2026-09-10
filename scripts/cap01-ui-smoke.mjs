@@ -73,11 +73,34 @@ try {
   await page.getByRole("link", { name: "Task #7: Follow-up overdue", exact: true }).click();
   await page.getByRole("button", { name: "Complete task 7", exact: true }).waitFor();
   await page.getByRole("heading", { name: "Job Overview", exact: true }).waitFor();
+  const disclosure = page.locator("#job-overview > details > summary");
+  assert.equal(await page.locator("#job-overview > details").getAttribute("open"), null);
+  assert.equal(await page.getByRole("heading", { name: "Financial context", exact: true }).isVisible(), false);
+  assert.equal(await page.getByRole("button", { name: "Complete task 7", exact: true }).isVisible(), true);
+  await disclosure.focus(); await page.keyboard.press("Enter");
   await page.getByRole("link", { name: "INV-MULTI", exact: true }).waitFor();
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     assert.equal(await page.locator("#job-overview").evaluate(el => el.scrollWidth <= el.clientWidth), true, `Overview overflow ${width}`);
-    if (width === 1440) await page.locator("#job-overview").screenshot({ path: resolve(process.env.TEMP, "cap01-overview-desktop.png") });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Page overflow ${width}`);
+    if (width === 1440 || width === 390) await page.locator("#job-overview").screenshot({ path: resolve(process.env.TEMP, `cap01-overview-${width}.png`) });
+  }
+  await disclosure.focus(); await page.keyboard.press("Space");
+  assert.equal(await page.getByRole("link", { name: "INV-MULTI", exact: true }).isVisible(), false);
+  assert.equal(await page.getByRole("button", { name: "Complete task 7", exact: true }).isVisible(), true);
+  await disclosure.click();
+  await page.getByRole("button", { name: "Refresh overview", exact: true }).click();
+  await page.getByRole("link", { name: "INV-MULTI", exact: true }).waitFor();
+  // The app scrolls inside its shell; viewport captures avoid clipping long element screenshots.
+  for (const theme of ["dark", "light"]) {
+    await page.evaluate(theme => { document.documentElement.classList.remove("dark", "light"); document.documentElement.classList.add(theme); }, theme);
+    for (const width of [390, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const [name, target] of [["header", disclosure], ["departments", page.getByRole("heading", { name: "Independent department milestones", exact: true })], ["finance", page.getByRole("heading", { name: "Financial context", exact: true })]]) {
+        await target.evaluate(el => el.scrollIntoView({ block: "center" }));
+        await page.screenshot({ path: resolve(process.env.TEMP, `cap01-${theme}-${width}-${name}.png`) });
+      }
+    }
   }
   await page.getByRole("button", { name: "Complete task 7", exact: true }).click();
   await page.getByRole("button", { name: "Reopen task 7", exact: true }).waitFor();
@@ -88,6 +111,8 @@ try {
   owner = false;
   await page.goto(`${origin}/containers/32?tab=tasks&taskId=8`);
   await page.getByRole("heading", { name: "Job Overview", exact: true }).waitFor();
+  assert.equal(await page.locator("#job-overview > details").getAttribute("open"), null);
+  await page.locator("#job-overview > details > summary").click();
   await page.getByRole("button", { name: "Complete task 8", exact: true }).waitFor();
   assert.equal(await page.getByRole("heading", { name: "Financial context", exact: true }).count(), 0);
   assert.equal(await page.getByRole("link", { name: "Transire", exact: true }).count(), 0);
@@ -99,4 +124,5 @@ try {
   assert.equal(await page.getByRole("link", { name: /Task #\d+: Follow-up/ }).count(), 3);
   assert.deepEqual(errors, []);
   console.log("PASS: department task link, finance/workspace restrictions, retained snapshot on refresh failure");
+  console.log("PASS: overview collapsed by default, Enter/Space/click toggle, independent task editor and responsive expanded panel");
 } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }

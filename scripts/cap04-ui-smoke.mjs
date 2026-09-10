@@ -61,6 +61,7 @@ try {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
   });
   await page.goto(`${origin}/containers/31`);
+  await page.locator("#job-overview > details > summary").click();
   await page.getByText("Containers on this B/L", { exact: true }).waitFor();
   await page.getByText(/1 of 3 delivered/).waitFor();
   for (const width of [390,768,1440]) {
@@ -70,11 +71,13 @@ try {
   await page.getByRole("link", { name: /QA-BOX-32.*Visit #32/ }).click();
   await page.waitForURL("**/containers/32");
   await page.getByRole("heading", { name: "QA-BOX-32", exact: true }).waitFor();
+  assert.equal(await page.locator("#job-overview > details").getAttribute("open"), null, "New sibling starts collapsed");
   console.log("PASS: sibling links, independent visit navigation, partial delivery, 390/768/1440 layouts");
   owner = true;
   rows[1].status = "pending_verification";
   await page.goto(`${origin}/containers/32`);
   await page.getByRole("button", { name: "Verify Container", exact: true }).click();
+  await page.locator("#job-overview > details > summary").click();
   await page.getByRole("link", { name: /QA-BOX-32.*Registered.*Visit #32/ }).waitFor();
   await page.getByRole("button", { name: "Set Delivery Date", exact: true }).click();
   await page.locator('input[type="date"]').fill("2026-09-09");
