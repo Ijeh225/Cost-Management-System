@@ -9,6 +9,43 @@ action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 
+- 18:20 WAT: synthetic quality probes completed: printed assessment 3/3 exact
+  fields (94% page confidence), skewed serif receipt 3/3 (93%), faded low-res
+  permit 3/3 (88%), blurred scan simulation 0/3 (73%), script-font simulation
+  2/3 (78%, identifier had an extra space). Total 11/15 fields on five synthetic
+  examples only. Script font is NOT human handwriting; confidence is not field
+  accuracy. Five passing probe tests mean safe processing/measurement, not five
+  accurate documents. Broader phone-photo/handwriting quality remains unverified.
+- Full regression completed: 36 files, 169 passed and 3 network-only skipped;
+  the separate private-tunnel PostgreSQL run passed all six including those
+  three simultaneous-write cases. Existing release bf24fb0 unchanged.
+- Fresh restricted-user acceptance remains BLOCKED on existing test credentials;
+  user #14 Operations QA has not been freshly authenticated in this round.
+  Prepared scripts/cap02-live-access-check.py for guarded API denials, branch
+  isolation, binary PDF retrieval and unchanged-history comparison; syntax check
+  only, not evidence of a live pass. No account/password/permission changes.
+- Resume there, not at upload or expiry. #9 historical; #10 reviewed but expired
+  2026-10-04; #11 Other/unreviewed scanned PDF. Four review entries across #9/#10.
+  Native PDF preview in the in-app browser remains unverified/blank, not labelled
+  a confirmed application defect. Expiry screenshot: Temp/cap02-expiry-verified.png.
+
+- 18:10 WAT: scanned-PDF fixture #11 stored once on #32, Other/unreviewed. Live
+  Linux OCR recovered CAP02-LIVE-20261005, NGN500.00, 2026-10-05 at 93% confidence;
+  verified amount remained blank (no implicit acceptance). Existing #10 still
+  expired after reload. Native embedded PDF viewport is blank in in-app browser;
+  OCR pass does not imply this browser's PDF preview passed. No approval submitted.
+- Six real network-PostgreSQL API cases passed in isolated cost_management_integration_test,
+  including competing reviews/applications/replacements producing exactly one
+  201 and one 409 with no duplicate history or version fork. Random namespace
+  removed and private tunnel closure verified. No production DB access for these
+  tests. First runner attempt failed; corrected incomplete fixture review body
+  and increased network-test timeout, then all six passed. Not an app defect.
+
+- 18:03 WAT: live expiry verification PASSED. Existing #10 native calendar set
+  2026-10-04 (confirmed by AX date value before save), review submitted once;
+  readiness returned expired/needs attention. No duplicate profile/file. Four
+  review entries now exist across #9/#10. Continue remaining checks independently.
+
 - 14:51 WAT: code `bf24fb0` committed/pushed, exact Railway deployment
   `67edc83f-5abf-45c7-bbc0-85f19a7d420a` SUCCESS, startup migration logged,
   /api/healthz ok. Fresh owner login used; no credentials saved in records.

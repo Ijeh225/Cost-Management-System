@@ -91,3 +91,56 @@ fixtures. Do not claim live CAP-02 acceptance until observed.
   Broader OCR quality, network-Postgres parallel races, fresh live restricted-role
   checks and live scanned-PDF OCR remain outside acceptance evidence. Local
   regressions cover permissions/stale writes/PDF OCR. No next capability started.
+
+## 2026-10-05 18:03 WAT - Remaining Verification Authorised
+
+- User asked what remains, then authorised proceeding. Read current records and
+  session; clean master at 9f80530. No completed fixture sequence restarted.
+- Native calendar solved the previous date-tool limitation: Space on the date
+  picker button opened its native table; Left/Return selected 2026-10-04, verified
+  in AX before saving. #10 reviewed once with that expiry -> expired/not ready.
+  No code change needed. Total review entries now four across existing files.
+- Remaining work underway: live scanned-PDF OCR, isolated network Postgres
+  simultaneous-write checks, restricted live staff session, broader OCR evidence.
+
+## 2026-10-05 18:10 WAT - PDF and Network Database Checks
+
+- New necessary format fixture #11: CAP02-LIVE-20261005-scanned.pdf on #32,
+  Other/unreviewed, not a replacement for expired #10. Live server OCR matched
+  all three expected fields at 93% page confidence; verified amount remained
+  blank until human acceptance (none submitted). Embedded PDF viewport blank
+  in this browser; OCR passed, native PDF preview compatibility is not verified.
+- Six isolated PostgreSQL/API tests passed through existing private Railway
+  tunnel, including simultaneous reviews/profile applications/replacements.
+  Each race gave one 201 and one 409. Random schema removed and tunnel closed.
+  Initial run failed; fixed incomplete test review body and network-test timeout
+  before all six passed. No production schema or data used for the race tests.
+- Extended existing CAP-04 runner with explicit cap02 suite selection instead
+  of copying tunnel/credential code. Credentials remain memory-only. Existing
+  CAP-04 default unchanged; no closed CAP-04 tests rerun against Railway.
+- Requested existing Operations QA login for fresh restricted-session check;
+  no password reset, new account or permission change performed. Continuing
+  synthetic OCR quality probes while awaiting access.
+
+## 2026-10-05 18:20 WAT - Quality Results and Exact Stop Point
+
+- Five synthetic OCR probes completed: printed/skewed/faded sources matched all
+  three fields each; blurred simulation matched none; script-font simulation
+  matched amount/date but inserted a space in its identifier. Total 11/15 exact
+  fields, not a general accuracy percentage or human-handwriting benchmark.
+  Documented this manual-review limitation in the CAP-02 guide and both registers.
+- Full API regression: 36 files, 169 tests passed, three network-only skipped in
+  normal mode. Separate Railway PostgreSQL run already passed all six including
+  those three races. No extra production finance or stage writes were performed.
+- Fresh Operations QA #14 credentials requested asynchronously; no response yet.
+  No password reset, role widening or duplicate account created. Guarded Python
+  live-access runner prepared and syntax checked, but NOT executed. Credentials
+  will be prompted into memory only; no passwords or session cookies saved.
+- Exact next action: authenticate existing QA #14, verify read access and denied
+  review/configuration/branch/finance requests, retrieve existing PDF #11 and
+  compare unchanged history. Reuse #32/#33; never recreate profile #1 or #9-#11.
+  Native PDF preview outside this in-app viewer and representative real-document
+  OCR quality remain unverified. No confirmed new product defect from these limits.
+- Live final state: #10 expired, four review entries across #9/#10; #11 unreviewed.
+  Evidence: C:/Users/SONOFGRACE/AppData/Local/Temp/cap02-expiry-verified.png.
+  Last verified application deployment bf24fb0; this round adds tests/docs only.

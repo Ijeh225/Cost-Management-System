@@ -90,6 +90,28 @@ use revision checks: a stale screen receives a conflict and must refresh.
 
 ## Verification and Release
 
+### Measured OCR Limits (2026-10-05)
+
+Five synthetic local probes compared identifier, amount and date exactly:
+
+| Synthetic source | Exact fields | Page confidence |
+| --- | --- | --- |
+| Clear printed assessment | 3/3 | 94% |
+| Skewed serif receipt | 3/3 | 93% |
+| Faded low-resolution permit | 3/3 | 88% |
+| Heavily blurred scan simulation | 0/3 | 73% |
+| Script-font simulation, not handwriting | 2/3 | 78% |
+
+These are bounded examples, not a general accuracy rate. A script-style identifier
+was misread despite useful amount/date suggestions; the blurred source produced
+no matching fields. Obtain a clearer source or enter values manually after
+inspection. Do not approve a source you cannot read. Genuine handwriting and
+representative phone photos still need their own benchmark.
+
+Live raster-only PDF OCR recovered all three known fields, but its embedded
+preview was blank in the in-app browser. Verify the source through an approved
+capable PDF viewer before reviewing; OCR text alone is not source verification.
+
 Consult PROJECT_STATE.md and LIVE_E2E_TEST_REGISTER.md for current publication
 and acceptance status. Local browser fixtures, isolated database tests and
 synthetic OCR checks are not evidence of a successful production migration.

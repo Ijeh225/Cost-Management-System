@@ -45,6 +45,40 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-05 18:20 WAT: remaining CAP-02 verification round recorded. Live expiry,
+  live scanned-PDF OCR and all six isolated network-PostgreSQL cases PASSED.
+  Full API regression: 36 files, 169 passed, 3 network-only cases skipped in the
+  ordinary suite (those three separately passed on Railway PostgreSQL).
+  Five synthetic OCR probes measured 11/15 exact fields: printed/skewed/faded
+  each 3/3, blurred 0/3, script-font simulation 2/3. This is not representative
+  real-document or human-handwriting accuracy; manual source review is essential.
+  No new application logic or financial/workflow mutations in this round.
+  STOP POINT: existing #32 has expired #10 and unreviewed scanned PDF #11.
+  Do not repeat their uploads/reviews. Fresh staff acceptance is NOT complete:
+  awaiting existing Operations QA user #14 credentials or a separate signed-in
+  browser; no password reset or permission changes. Prepared guarded script
+  scripts/cap02-live-access-check.py is syntax-checked, NOT live executed.
+  Also pending: PDF source-preview compatibility outside the blank in-app viewer
+  and representative real-document OCR quality. These are verification limits,
+  not confirmed new defects. Last verified application release remains bf24fb0.
+
+- 2026-10-05 18:10 WAT: CAP-02 scanned-PDF OCR live PASSED with new format
+  fixture #11 on #32 (Other, unreviewed, not a replacement); same three fields
+  matched at 93% confidence. Native PDF iframe stays blank in in-app browser;
+  source-preview compatibility is not claimed passed. Expired #10 remains intact.
+  All six isolated Railway PostgreSQL API tests passed, including three
+  simultaneous-write races; random schema removed/private tunnel closed.
+  Remaining: OCR quality probes and separate live staff authentication; current
+  QA credentials requested without resetting password or changing permissions.
+
+- 2026-10-05 18:03 WAT: user authorised remaining CAP-02 verification. Checkout
+  clean at 9f80530 before resuming. Live expiry now PASSED on existing #10:
+  native calendar (Space on date-picker button, Left then Return) set 2026-10-04;
+  reviewed dummy file correctly becomes expired/not ready. No new file/profile.
+  Continuing scanned-PDF OCR and isolated network PostgreSQL races; fresh staff
+  login and broader OCR quality still require evidence. Previous date-entry
+  limitation is superseded by this native-calendar result.
+
 - 2026-10-05 14:51 WAT: CAP-02 IMPLEMENTED, committed/pushed as `bf24fb0` and
   deployed successfully on exact commit. Railway `67edc83f-5abf-45c7-bbc0-85f19a7d420a`
   reports SUCCESS; startup logged document_readiness_v1; /api/healthz returns ok.

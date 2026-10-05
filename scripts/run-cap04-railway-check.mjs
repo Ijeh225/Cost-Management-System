@@ -4,6 +4,8 @@ import { createConnection } from "node:net";
 import { resolve } from "node:path";
 const cli = process.env.RAILWAY_CLI_PATH;
 if (!cli) throw new Error("Set RAILWAY_CLI_PATH to the authenticated Railway CLI binary");
+const suite = process.env.RAILWAY_TEST_SUITE ?? "cap04";
+if (!["cap04", "cap02"].includes(suite)) throw new Error("Unknown isolated test suite");
 const project = "30166120-54e6-4f58-86ed-18ab396913f1";
 const environment = "51a4f5a2-e7ae-443e-836f-095b2015f3cc";
 const service = "ed1e8b3d-c2e2-4654-a11d-bc16fa858bd6";
@@ -31,17 +33,21 @@ try {
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
   if (!ready) throw new Error("Timed out waiting for isolated test tunnel");
-  console.log("Existing isolated Railway SSH tunnel ready; running CAP-04 namespace-only regressions");
+  console.log(`Existing isolated Railway SSH tunnel ready; running ${suite.toUpperCase()} namespace-only regressions`);
   const url = new URL("postgresql://127.0.0.1/cost_management_integration_test");
   url.port = String(port); url.username = vars.PGUSER; url.password = vars.PGPASSWORD;
   const root = resolve(import.meta.dirname, "..");
-  const run = spawnSync(process.execPath, [resolve(root, "artifacts/api-server/node_modules/tsx/dist/cli.mjs"), resolve(root, "scripts/cap04-postgres-check.ts")], {
-    cwd: root, env: { ...process.env, TEST_DATABASE_URL: url.href, NODE_ENV: "test" },
+  const args = suite === "cap02" ? [resolve(root, "artifacts/api-server/node_modules/vitest/vitest.mjs"), "run", "src/tests/document-readiness-api.test.ts", "--reporter=verbose", "--testTimeout=60000"]
+    : [resolve(root, "artifacts/api-server/node_modules/tsx/dist/cli.mjs"), resolve(root, "scripts/cap04-postgres-check.ts")];
+  const run = spawnSync(process.execPath, args, {
+    cwd: suite === "cap02" ? resolve(root, "artifacts/api-server") : root,
+    env: { ...process.env, TEST_DATABASE_URL: url.href, NODE_ENV: "test", CAP02_NETWORK_TEST: suite === "cap02" ? "1" : "0" },
     encoding: "utf8", timeout: 180000, windowsHide: true,
   });
   // Print only known safe progress lines; errors may include a connection string.
-  for (const line of (run.stdout ?? "").split(/\r?\n/)) if (/^(PASS:|Verified )/.test(line)) console.log(line);
-  if (run.status !== 0) throw new Error("CAP-04 isolated PostgreSQL checks failed; no credentials logged");
+  for (const line of (run.stdout ?? "").split(/\r?\n/)) if (/^(PASS:|Verified )/.test(line) || /Test Files|Tests |serializes simultaneous|prevents parallel replacement/.test(line)) console.log(line);
+  if (run.status !== 0) throw new Error(`${suite.toUpperCase()} isolated PostgreSQL checks failed; no credentials logged`);
+  console.log(`PASS: ${suite.toUpperCase()} isolated network PostgreSQL checks`);
 } finally {
   if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(tunnel.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
   else tunnel.kill("SIGTERM");
