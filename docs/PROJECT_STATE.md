@@ -45,6 +45,11 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- Publication: verification commit `8bb5b7c` pushed to origin/master. API
+  typecheck and diff checks passed. This publishes tests/records, not a new
+  product fix or a claim of fresh deployment verification. Pending checks below
+  are unchanged; staff credentials have not been supplied.
+
 - 2026-10-05 18:20 WAT: remaining CAP-02 verification round recorded. Live expiry,
   live scanned-PDF OCR and all six isolated network-PostgreSQL cases PASSED.
   Full API regression: 36 files, 169 passed, 3 network-only cases skipped in the

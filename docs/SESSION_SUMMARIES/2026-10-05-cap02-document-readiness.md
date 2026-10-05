@@ -144,3 +144,6 @@ fixtures. Do not claim live CAP-02 acceptance until observed.
 - Live final state: #10 expired, four review entries across #9/#10; #11 unreviewed.
   Evidence: C:/Users/SONOFGRACE/AppData/Local/Temp/cap02-expiry-verified.png.
   Last verified application deployment bf24fb0; this round adds tests/docs only.
+- Verification commit `8bb5b7c` pushed successfully to origin/master. Final API
+  typecheck and git diff checks passed. No new live acceptance claimed from this
+  test/documentation push; the existing QA login remains the next blocker.

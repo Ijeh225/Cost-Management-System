@@ -9,6 +9,10 @@ action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 
+- Verification evidence and runners committed/pushed as `8bb5b7c`; API typecheck
+  and diff checks passed. Fresh staff acceptance is still not run; publication
+  does not convert the remaining evidence limits into passes.
+
 - 18:20 WAT: synthetic quality probes completed: printed assessment 3/3 exact
   fields (94% page confidence), skewed serif receipt 3/3 (93%), faded low-res
   permit 3/3 (88%), blurred scan simulation 0/3 (73%), script-font simulation
