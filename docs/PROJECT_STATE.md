@@ -45,6 +45,21 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-05 14:51 WAT: CAP-02 IMPLEMENTED, committed/pushed as `bf24fb0` and
+  deployed successfully on exact commit. Railway `67edc83f-5abf-45c7-bbc0-85f19a7d420a`
+  reports SUCCESS; startup logged document_readiness_v1; /api/healthz returns ok.
+  Live owner acceptance passed profile application, PNG OCR (93% page confidence),
+  checked human review, immutable replacement/reset, read-only predecessor and
+  rejection persistence after reload. Controlled #32: profile #1, files #9 v1
+  and #10 v2; current v2 intentionally rejected, NOT a real release. Do not repeat
+  uploads/reviews or delete retained evidence. #33 remains unconfigured/empty.
+  No stage/financial changes; today's dashboard and bank baselines unchanged.
+  Native expiry-date entry did not persist through this browser tool; no live
+  expiry pass is claimed. Local expiry/API tests passed. Next bounded acceptance:
+  verify date entry/expiry in a capable native browser using #10, not a new file.
+  Broader real-document OCR quality and network-PostgreSQL parallel races are not
+  claimed tested. No further feature is automatically authorised.
+
 - 2026-10-05 14:42 WAT: CAP-02 ready for publication. Final Railway build and
   typechecks passed; all 164 API tests passed including retained-document SQL
   deletion protection. CAP-02 review browser checks and CAP-01/CAP-04 regression

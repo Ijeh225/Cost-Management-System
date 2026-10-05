@@ -7,7 +7,41 @@ and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
-### CAP-02 In Progress - 2026-10-05 14:26 WAT
+### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
+
+- 14:51 WAT: code `bf24fb0` committed/pushed, exact Railway deployment
+  `67edc83f-5abf-45c7-bbc0-85f19a7d420a` SUCCESS, startup migration logged,
+  /api/healthz ok. Fresh owner login used; no credentials saved in records.
+- Live existing visit #32: created profile #1 (CAP02-LIVE-20261005 Dummy Release),
+  applied once; missing -> received (#9 PNG v1) -> reviewed/ready passed. Original
+  displayed beside OCR; identifier CAP02-LIVE-20261005, amount NGN500.00 and date
+  2026-10-05 matched at 93% page confidence. Explicit suggestions/source check
+  used; none of these values were posted as money or job-release facts.
+- Replaced #9 once with #10 v2 using the same labelled synthetic source to test
+  version semantics: readiness reset to received; v1 historical/read-only and
+  its reviews preserved. v2 rejected with reason; rejected/needs-attention state
+  persisted on reload. Two source files and three review entries retained. Two
+  entries on v1 include an expiry attempt that actually retained a blank date.
+  Never count that attempt as a live expired-status pass.
+- Browser native date entry did not set a value despite fill/segment attempts.
+  No confirmed application expiry defect: isolated date/expiry rules pass.
+  Remaining bounded live check: enter a real date using a capable browser on #10,
+  verify expired state, then retain a clearly documented dummy-test final state.
+  Do not recreate the profile, files or completed test steps.
+- #33 under the same B/L remains Pending Verification, unassigned, undelivered,
+  with no document profile applied or files uploaded. #32 remains Registered,
+  delivered Sept 9, owner christian ifeanyi, due Sept 10; no workflow mutations.
+- Same-session pre/post dashboard: containers15/undelivered13/delivered2;
+  budgeted cost2000501, clearing72004501, gross70004000, net54293698;
+  invoiced3001/collected2001/AR1000. Bank balances42499997/599/1 unchanged.
+  These are today's observed baseline, not an assertion that September totals
+  never changed. No financial writes or repeat finance acceptance performed.
+- Scope limits: branch/client/reviewer denial and conflicts tested locally using
+  real PGlite queries/API, not fresh separate live-role sessions. Synthetic
+  scanned PDF tested locally; real server OCR tested with PNG. No broad real-world
+  OCR benchmark or network-PostgreSQL simultaneous-race acceptance claimed.
+  Evidence screenshot: local Temp/cap02-live-review.png. Session and guide linked
+  in PROJECT_STATE.md; reproducible dummy sample script added.
 
 - 14:42 WAT: final build/typechecks and 164/164 API tests passed, including direct
   SQL retention rejection. CAP-02 browser test rerun passed; CAP-01 and CAP-04
