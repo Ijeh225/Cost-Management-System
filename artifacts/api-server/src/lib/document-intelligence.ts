@@ -6,10 +6,11 @@ import {
 import { eq } from "drizzle-orm";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
+import { extractScan } from "./document-ocr.js";
 
 const MAX_EXTRACTED_CHARACTERS = 1_000_000;
 
-type TextPage = { page: number; text: string };
+type TextPage = { page: number; text: string; confidence?: number | null };
 type ExtractionStatus = "indexed" | "unsupported" | "failed";
 type ExtractionResult = {
   status: ExtractionStatus;
@@ -43,7 +44,7 @@ function indexed(text: string, pages: TextPage[], pageCount: number | null = pag
   if (!cleanText) {
     return { status: "failed", text: "", pages: [], pageCount, errorMessage: "No readable text was found in this document." };
   }
-  return { status: "indexed", text: cleanText, pages: pages.map((page) => ({ page: page.page, text: normaliseText(page.text) })).filter((page) => page.text), pageCount, errorMessage: null };
+  return { status: "indexed", text: cleanText, pages: pages.map((page) => ({ ...page, text: normaliseText(page.text) })).filter((page) => page.text), pageCount, errorMessage: null };
 }
 
 async function extractPdf(buffer: Buffer): Promise<ExtractionResult> {
@@ -70,7 +71,17 @@ async function extractDocument(document: IndexableDocument, buffer: Buffer): Pro
       const text = buffer.toString("utf8");
       return indexed(text, [{ page: 1, text }], 1);
     }
-    if (extension === ".pdf" || mimeType === "application/pdf") return extractPdf(buffer);
+    if (extension === ".pdf" || mimeType === "application/pdf") {
+      try {
+        const extracted = await extractPdf(buffer);
+        // Mixed PDFs also need OCR when any page has no meaningful embedded text.
+        if (extracted.pages.length === extracted.pageCount && extracted.pages.every(p => p.text.trim().length >= 20)) return extracted;
+      } catch {
+        // The legacy text parser cannot open every PDF supported by the renderer.
+      }
+      const pages = await extractScan(buffer, true);
+      return indexed(pages.map(p => p.text).join("\n"), pages);
+    }
     if (extension === ".docx" || mimeType.includes("wordprocessingml")) {
       const extracted = await mammoth.extractRawText({ buffer });
       return indexed(extracted.value, [{ page: 1, text: extracted.value }], 1);
@@ -84,12 +95,14 @@ async function extractDocument(document: IndexableDocument, buffer: Buffer): Pro
       return indexed(pages.map((page) => page.text).join("\n\n"), pages, pages.length || null);
     }
     if ([".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(extension) || mimeType.startsWith("image/")) {
-      return { status: "unsupported", text: "", pages: [], pageCount: null, errorMessage: "OCR is not enabled for image documents yet. The file is stored safely but cannot be searched." };
+      const pages = await extractScan(buffer, false);
+      return indexed(pages.map(p => p.text).join("\n"), pages);
     }
     return { status: "unsupported", text: "", pages: [], pageCount: null, errorMessage: "This file type is stored safely but is not supported for document search yet." };
   } catch (error) {
     console.error("[document-intelligence] extraction failed", { documentId: document.id, error });
-    return { status: "failed", text: "", pages: [], pageCount: null, errorMessage: "Text extraction failed. Retry indexing, or upload a readable PDF, Word, spreadsheet, CSV, or text file." };
+    const detail = error instanceof Error && /OCR|Scanned PDFs/.test(error.message) ? error.message : "Text extraction failed. Retry indexing with a readable document.";
+    return { status: "failed", text: "", pages: [], pageCount: null, errorMessage: detail };
   }
 }
 
@@ -102,7 +115,7 @@ export async function indexContainerDocument(document: IndexableDocument, buffer
     section: document.section,
     uploadedById: document.uploadedById,
     status: extraction.status,
-    extractorVersion: "v1",
+    extractorVersion: "v2-local-ocr",
     contentText: extraction.text || null,
     pageText: JSON.stringify(extraction.pages),
     pageCount: extraction.pageCount,

@@ -2832,18 +2832,24 @@ router.delete("/containers/bulk", requireAuth, requireBranchAdminOrAbove, async 
       numIds = accessible.map(r => r.id);
       if (numIds.length === 0) return res.status(404).json({ error: "No containers found" });
     }
-    await db.delete(customFieldValuesTable).where(inArray(customFieldValuesTable.containerId, numIds));
-    await db.delete(containerDocumentsTable).where(inArray(containerDocumentsTable.containerId, numIds));
-    await db.delete(containerTimelineTable).where(inArray(containerTimelineTable.containerId, numIds));
-    await db.delete(containerTasksTable).where(inArray(containerTasksTable.containerId, numIds));
-    await db.delete(auditLogTable).where(inArray(auditLogTable.containerId, numIds));
-    await db.delete(sectionApprovalsTable).where(inArray(sectionApprovalsTable.containerId, numIds));
-    await db.delete(shippingChargesTable).where(inArray(shippingChargesTable.containerId, numIds));
-    await db.delete(customsChargesTable).where(inArray(customsChargesTable.containerId, numIds));
-    await db.delete(terminalChargesTable).where(inArray(terminalChargesTable.containerId, numIds));
-    await db.delete(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, numIds));
-    await db.delete(operationsChargesTable).where(inArray(operationsChargesTable.containerId, numIds));
-    await db.delete(containersTable).where(inArray(containersTable.id, numIds));
+    const [retained] = await db.select({ id: containerDocumentsTable.id }).from(containerDocumentsTable)
+      .where(and(inArray(containerDocumentsTable.containerId, numIds), eq(containerDocumentsTable.retained, 1))).limit(1);
+    if (retained) return res.status(409).json({ error: "A selected container has retained document history and cannot be deleted." });
+    // A database retention/FK rejection must not leave a partially deleted job.
+    await db.transaction(async tx => {
+      await tx.delete(customFieldValuesTable).where(inArray(customFieldValuesTable.containerId, numIds));
+      await tx.delete(containerDocumentsTable).where(inArray(containerDocumentsTable.containerId, numIds));
+      await tx.delete(containerTimelineTable).where(inArray(containerTimelineTable.containerId, numIds));
+      await tx.delete(containerTasksTable).where(inArray(containerTasksTable.containerId, numIds));
+      await tx.delete(auditLogTable).where(inArray(auditLogTable.containerId, numIds));
+      await tx.delete(sectionApprovalsTable).where(inArray(sectionApprovalsTable.containerId, numIds));
+      await tx.delete(shippingChargesTable).where(inArray(shippingChargesTable.containerId, numIds));
+      await tx.delete(customsChargesTable).where(inArray(customsChargesTable.containerId, numIds));
+      await tx.delete(terminalChargesTable).where(inArray(terminalChargesTable.containerId, numIds));
+      await tx.delete(deliveryChargesTable).where(inArray(deliveryChargesTable.containerId, numIds));
+      await tx.delete(operationsChargesTable).where(inArray(operationsChargesTable.containerId, numIds));
+      await tx.delete(containersTable).where(inArray(containersTable.id, numIds));
+    });
     return res.json({ deleted: numIds.length });
   } catch (err) {
     console.error(err);

@@ -9,6 +9,9 @@ import { requireAuth, AuthRequest, userCanAccessBranch } from "../lib/auth.js";
 import { deleteDocument, documentExists, getDocument, getDocumentBuffer, saveDocument } from "../lib/document-storage.js";
 import { settingsTable } from "@workspace/db";
 import { getDocumentIndex, getIndexableDocument, indexContainerDocument } from "../lib/document-intelligence.js";
+import { getDocumentContainer } from "../lib/document-access.js";
+import { documentTypeSchema, expirySchema } from "../lib/document-readiness.js";
+import { documentReviewsTable } from "@workspace/db";
 
 export const documentsRouter = Router();
 
@@ -38,14 +41,7 @@ async function getDocumentSections() {
 }
 
 async function getAccessibleContainer(req: AuthRequest, containerId: number) {
-  if (!Number.isInteger(containerId) || containerId <= 0) return null;
-  const [container] = await db.select({
-    id: containersTable.id,
-    branchId: containersTable.branchId,
-    containerNumber: containersTable.containerNumber,
-    stageOwner: containersTable.stageOwner,
-  }).from(containersTable).where(eq(containersTable.id, containerId)).limit(1);
-  return container && userCanAccessBranch(req, container.branchId) ? container : null;
+  return getDocumentContainer(req, containerId);
 }
 
 function documentIntelligenceResponse(index: DocumentIntelligenceIndex | null) {
@@ -69,6 +65,10 @@ documentsRouter.get("/containers/:id/documents", requireAuth, async (req: AuthRe
     if (!container) return res.status(404).json({ error: "Container not found" });
     const docs = await db.select({
       id: containerDocumentsTable.id,
+      documentType: containerDocumentsTable.documentType,
+      versionNumber: containerDocumentsTable.versionNumber,
+      previousVersionId: containerDocumentsTable.previousVersionId,
+      retained: containerDocumentsTable.retained,
       containerId: containerDocumentsTable.containerId,
       section: containerDocumentsTable.section,
       filename: containerDocumentsTable.filename,
@@ -90,6 +90,10 @@ documentsRouter.get("/containers/:id/documents", requireAuth, async (req: AuthRe
 
     return res.json(docs.map(d => ({
       id: d.id,
+      documentType: d.documentType,
+      versionNumber: d.versionNumber,
+      previousVersionId: d.previousVersionId,
+      retained: d.retained,
       containerId: d.containerId,
       section: d.section,
       filename: d.filename,
@@ -137,18 +141,42 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
       return res.status(400).json({ error: "Choose a valid document section." });
     }
 
+    const documentType = documentTypeSchema.safeParse(req.body.documentType ?? "other");
+    const expiry = expirySchema.safeParse(req.body.expiresOn || null);
+    const previousId = req.body.previousVersionId ? Number(req.body.previousVersionId) : null;
+    const issuer = typeof req.body.issuer === "string" ? req.body.issuer.trim() : "";
+    if (!documentType.success || !expiry.success || issuer.length > 200 ||
+      (previousId !== null && (!Number.isSafeInteger(previousId) || previousId <= 0))) {
+      return res.status(400).json({ error: "Invalid document classification, issuer, expiry or version." });
+    }
+
     await saveDocument(objectKey, req.file.buffer, req.file.mimetype);
 
-    const [doc] = await db.insert(containerDocumentsTable).values({
+    const doc = await db.transaction(async tx => {
+      let previous = null;
+      if (previousId !== null) {
+        [previous] = await tx.select().from(containerDocumentsTable).where(and(
+          eq(containerDocumentsTable.id, previousId), eq(containerDocumentsTable.containerId, containerId),
+          eq(containerDocumentsTable.branchId, container.branchId))).for("update");
+        if (!previous) throw new Error("VERSION_CONFLICT");
+        const successors = await tx.select().from(containerDocumentsTable).where(eq(containerDocumentsTable.previousVersionId, previousId));
+        if (successors.length) throw new Error("VERSION_CONFLICT");
+        await tx.update(containerDocumentsTable).set({ retained: 1 }).where(eq(containerDocumentsTable.id, previousId));
+      }
+      const [created] = await tx.insert(containerDocumentsTable).values({
+      documentType: documentType.data, issuer, expiresOn: expiry.data,
+      previousVersionId: previousId, versionNumber: previous ? previous.versionNumber + 1 : 1, retained: 1,
       containerId,
       branchId: container.branchId,
       section: section || null,
       filename: objectKey,
-      originalName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      size: req.file.size,
+      originalName: req.file!.originalname,
+      mimeType: req.file!.mimetype,
+      size: req.file!.size,
       uploadedById: req.user!.id,
-    }).returning();
+      }).returning();
+      return created;
+    });
 
     try {
       const docMsg = `Document uploaded: "${req.file.originalname}" — ${container.containerNumber}`;
@@ -181,6 +209,7 @@ documentsRouter.post("/containers/:id/documents", requireAuth, upload.single("fi
     console.error("[documents] upload error:", err);
     try { await deleteDocument(objectKey); } catch {}
     const message = err instanceof Error ? err.message : "";
+    if (message === "VERSION_CONFLICT") return res.status(409).json({ error: "The source version is unavailable or already replaced. Refresh and choose the latest version." });
     return res.status(message.includes("Document storage is not configured") ? 503 : 500)
       .json({ error: message.includes("Document storage is not configured") ? message : "Document upload failed" });
   }
@@ -198,6 +227,8 @@ documentsRouter.post("/containers/:id/documents/:docId/intelligence/retry", requ
     }
     const canRetry = document.uploadedById === req.user!.id || ["super_admin", "admin", "branch_admin"].includes(req.user!.role);
     if (!canRetry) return res.status(403).json({ error: "Only the uploader or a branch administrator can retry document indexing." });
+    const reviews = await db.select().from(documentReviewsTable).where(eq(documentReviewsTable.documentId, docId)).limit(1);
+    if (reviews.length) return res.status(409).json({ error: "Reviewed extraction is retained. Upload a new version to re-extract." });
     const buffer = await getDocumentBuffer(document.filename);
     const index = await indexContainerDocument(document, buffer);
     return res.json({ success: true, intelligence: documentIntelligenceResponse(index) });
@@ -220,7 +251,7 @@ documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, r
       originalName: containerDocumentsTable.originalName,
       mimeType: containerDocumentsTable.mimeType,
     }).from(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
-    if (!doc || !userCanAccessBranch(req, doc.branchId)) return res.status(404).json({ error: "Document not found" });
+    if (!doc || !await getAccessibleContainer(req, doc.containerId)) return res.status(404).json({ error: "Document not found" });
 
     if (!await documentExists(doc.filename)) return res.status(404).json({ error: "File not found in storage" });
     const storedDocument = await getDocument(doc.filename);
@@ -228,7 +259,9 @@ documentsRouter.get("/documents/:docId", requireAuth, async (req: AuthRequest, r
 
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "private, max-age=3600");
-    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(doc.originalName)}"`);
+    const inline = /^(application\/pdf|text\/plain|image\/(png|jpeg|webp|gif))$/i.test(contentType.split(";")[0].trim());
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", `${inline ? "inline" : "attachment"}; filename="${encodeURIComponent(doc.originalName)}"`);
     if (storedDocument.contentLength) res.setHeader("Content-Length", String(storedDocument.contentLength));
 
     storedDocument.stream
@@ -252,18 +285,19 @@ documentsRouter.delete("/containers/:id/documents/:docId", requireAuth, async (r
   try {
     const container = await getAccessibleContainer(req, containerId);
     if (!container) return res.status(404).json({ error: "Container not found" });
-    const [doc] = await db.select().from(containerDocumentsTable)
-      .where(and(eq(containerDocumentsTable.id, docId), eq(containerDocumentsTable.containerId, containerId)));
-    if (!doc || doc.branchId !== container.branchId) return res.status(404).json({ error: "Document not found" });
-    const canDelete = doc.uploadedById === req.user!.id || ["super_admin", "admin", "branch_admin"].includes(req.user!.role);
-    if (!canDelete) return res.status(403).json({ error: "Only the uploader or a branch administrator can delete this document." });
-    try {
-      await deleteDocument(doc.filename);
-    } catch (storageErr) {
-      console.error("[documents] storage delete failed:", storageErr);
-      return res.status(502).json({ error: "Document storage is temporarily unavailable. The document was not deleted." });
-    }
-    await db.delete(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
+    const outcome = await db.transaction(async tx => {
+      const [doc] = await tx.select().from(containerDocumentsTable)
+        .where(and(eq(containerDocumentsTable.id, docId), eq(containerDocumentsTable.containerId, containerId))).for("update");
+      if (!doc || doc.branchId !== container.branchId) return { status: 404, error: "Document not found" };
+      const canDelete = doc.uploadedById === req.user!.id || ["super_admin", "admin", "branch_admin"].includes(req.user!.role);
+      if (!canDelete) return { status: 403, error: "Only the uploader or a branch administrator can delete this document." };
+      if (doc.retained) return { status: 409, error: "Document versions are retained for audit. Reject or upload a replacement version instead." };
+      try { await deleteDocument(doc.filename); }
+      catch { return { status: 502, error: "Storage unavailable. Document was not deleted." }; }
+      await tx.delete(containerDocumentsTable).where(eq(containerDocumentsTable.id, docId));
+      return null;
+    });
+    if (outcome) return res.status(outcome.status).json({ error: outcome.error });
     return res.json({ success: true });
   } catch (err) {
     console.error("[documents] delete error:", err);

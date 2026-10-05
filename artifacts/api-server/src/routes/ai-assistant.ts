@@ -1808,6 +1808,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     }));
     result.notes = [
       "Only readable, indexed documents within your authorised branch scope were searched.",
+      "Extracted/OCR text is unverified source text, not document approval. Check version, expiry and review history in Documents before relying on identifiers, dates or amounts.",
       "Open the linked container's Documents tab to view the source file; confirm wording against the original document.",
     ];
     return result;

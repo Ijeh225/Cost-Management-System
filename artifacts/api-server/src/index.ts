@@ -849,6 +849,10 @@ async function runStartupMigrations() {
       await pool.query(`CREATE INDEX IF NOT EXISTS document_intelligence_container_idx ON document_intelligence_index(container_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS document_intelligence_status_idx ON document_intelligence_index(status)`);
     });
+    await runMigration("document_readiness_v1", async () => {
+      const { documentReadinessMigration } = await import("./lib/document-readiness-migration.js");
+      await pool.query(documentReadinessMigration);
+    });
     await runMigration("ai_assistant_action_drafts_v1", async () => {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS ai_assistant_action_drafts (

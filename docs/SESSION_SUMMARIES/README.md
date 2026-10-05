@@ -20,6 +20,8 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-10-05 CAP-02 implementation](2026-10-05-cap02-document-readiness.md)
+
 - [2026-10-05 records-only project status review](2026-10-05-status-review.md)
 
 - [2026-09-10 container header and Operations mobile layouts](2026-09-10-mobile-layout.md)

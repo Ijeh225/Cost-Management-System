@@ -1,6 +1,6 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-09-09
+## Current Work Register - Authoritative as of 2026-10-05
 
 Use this section to choose the next task. Earlier plans, next-action lines,
 and issue statuses in this document are historical evidence, not the current
@@ -44,6 +44,26 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 `644c3d66-5bea-4b2c-8c6e-8c91b39a4786`. Fresh live staff acceptance passed.
 
 ### Next Action
+
+- 2026-10-05 14:42 WAT: CAP-02 ready for publication. Final Railway build and
+  typechecks passed; all 164 API tests passed including retained-document SQL
+  deletion protection. CAP-02 review browser checks and CAP-01/CAP-04 regression
+  suites passed. Publishing next; production migration and live acceptance remain
+  unverified. No live fixtures created. OCR accuracy evidence is synthetic only.
+
+- 2026-10-05 14:36 WAT: CAP-02 implementation locally verified: 164 API tests
+  passed, OCR synthetic image/PDF checks and desktop/mobile review fixtures
+  passed. Final build/regression and retention guard rerun underway. Not yet
+  committed, deployed or live accepted. Guide: docs/CAP02_DOCUMENT_READINESS.md.
+  Current session: docs/SESSION_SUMMARIES/2026-10-05-cap02-document-readiness.md.
+
+- 2026-10-05: CAP-02 now AUTHORIZED and in progress. Extend existing Documents
+  workflow with job/cargo requirement profiles, per-visit readiness, immutable
+  versions, issuer/expiry/reviewer history and locally processed OCR with human
+  acceptance. No automatic workflow/payment approval or migration of historical
+  uploads to reviewed. Preserve branch/client isolation and CAP-04 identities.
+  Implement, test additive migration/API/UI/OCR, then record publication and
+  bounded acceptance separately. Earlier proposed-only notes are superseded.
 
 - 2026-10-05 14:00 WAT: records-only resumption check. Last implementation remains
   `7f1da71`, with acceptance records in `bded791`; checkout was clean. CAP-04,

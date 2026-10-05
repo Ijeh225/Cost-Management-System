@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Upload, Trash2, FileText, Download, File, Image, FileSpreadsheet, RefreshCw } from "lucide-react";
+import { DocumentReadiness, DOCUMENT_TYPES } from "./DocumentReadiness";
+import { Input } from "@/components/ui/input";
 
 const DEFAULT_SECTION_OPTIONS: DocumentSection[] = [
   { id: "general", label: "General" },
@@ -41,6 +43,11 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [section, setSection] = useState("general");
+  const [documentType, setDocumentType] = useState("other");
+  const [issuer, setIssuer] = useState("");
+  const [expiresOn, setExpiresOn] = useState("");
+  const [previousVersionId, setPreviousVersionId] = useState("");
+  const [reviewId, setReviewId] = useState<number | null>(null);
   const [previewDocument, setPreviewDocument] = useState<any | null>(null);
   const [retryingDocumentId, setRetryingDocumentId] = useState<number | null>(null);
 
@@ -55,6 +62,8 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
   const documentsQueryKey = getGetContainerDocumentsQueryKey(containerId);
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: documentsQueryKey });
+    qc.invalidateQueries({ queryKey: ["document-readiness", containerId] });
+    qc.invalidateQueries({ queryKey: ["document-extraction", containerId] });
     invalidateShipmentSummaries(qc);
   };
 
@@ -77,19 +86,24 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("section", section);
+      formData.append("documentType", documentType);
+      formData.append("issuer", issuer);
+      formData.append("expiresOn", expiresOn);
+      if (previousVersionId) formData.append("previousVersionId", previousVersionId);
       const resp = await fetch(`/api/containers/${containerId}/documents`, {
         method: "POST",
         credentials: "include",
         headers: await getCsrfHeaders(),
         body: formData,
       });
-      if (!resp.ok) throw new Error("Upload failed");
+      if (!resp.ok) throw new Error((await resp.json()).error ?? "Upload failed");
       const uploadedDocument = await resp.json();
       qc.setQueryData<any[]>(documentsQueryKey, (current = []) => [...current, uploadedDocument]);
       invalidate();
+      setPreviousVersionId("");
       toast({ title: "Document uploaded", description: file.name });
-    } catch {
-      toast({ variant: "destructive", title: "Upload failed", description: "Please try again" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Upload failed", description: error instanceof Error ? error.message : "Please try again" });
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -110,7 +124,7 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
     window.open(`/api/documents/${doc.id}`, "_blank");
   };
 
-  const canDelete = (doc: any) => isAdminOrAbove || doc.uploadedById === user?.id;
+  const canDelete = (doc: any) => !doc.retained && (isAdminOrAbove || doc.uploadedById === user?.id);
   const canRetryIndex = (doc: any) => isAdminOrAbove || doc.uploadedById === user?.id;
 
   const handleRetryIndex = async (doc: any) => {
@@ -142,12 +156,19 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
 
   return (
     <div className="space-y-4">
+      <DocumentReadiness containerId={containerId} reviewId={reviewId} onReview={setReviewId} onChanged={invalidate} />
       {/* Upload Area */}
       <div className="border-2 border-dashed border-border/50 rounded-xl p-6 flex flex-col items-center gap-3 hover:border-primary/40 transition-colors">
         <Upload className="w-8 h-8 text-muted-foreground" />
         <div className="text-center">
           <p className="text-sm font-medium">Upload Document</p>
-          <p className="text-xs text-muted-foreground mt-0.5">PDF, images, Excel, Word — up to 20MB</p>
+          <p className="text-xs text-muted-foreground mt-0.5">PDF, images, Excel, Word — up to 20MB. Versions are retained, never silently replaced. Local English OCR: up to 6 scanned PDF pages or 12MP images.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 w-full">
+          <label className="text-sm">Document type<select aria-label="Upload document type" className="w-full border rounded p-2 bg-background" value={documentType} onChange={e => setDocumentType(e.target.value)}>{Object.entries(DOCUMENT_TYPES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+          <label className="text-sm">Issuer<Input value={issuer} maxLength={200} onChange={e => setIssuer(e.target.value)} /></label>
+          <label className="text-sm">Expiry (optional)<Input type="date" value={expiresOn} onChange={e => setExpiresOn(e.target.value)} /></label>
+          <label className="text-sm">Version<select aria-label="Document version" className="w-full border rounded p-2 bg-background" value={previousVersionId} onChange={e => setPreviousVersionId(e.target.value)}><option value="">New document</option>{(documents as any[]).filter(d => !(documents as any[]).some(other => other.previousVersionId === d.id)).map(d => <option key={d.id} value={d.id}>Replace {d.originalName} (v{d.versionNumber ?? 1})</option>)}</select></label>
         </div>
         <div className="flex items-center gap-3 flex-wrap justify-center">
           <div className="space-y-1">
@@ -191,6 +212,7 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
                   <Badge variant="outline" className="text-[10px] py-0 px-1.5">{sectionLabels.get(doc.section ?? "general") ?? doc.section ?? "General"}</Badge>
                   <Badge variant="outline" className="text-[10px] py-0 px-1.5">{intelligenceLabel(doc)}</Badge>
+                  <Badge variant="outline">v{doc.versionNumber ?? 1}{(documents as any[]).some(d => d.previousVersionId === doc.id) ? " / historical" : ""}</Badge>
                   <span>{formatBytes(doc.size)}</span>
                   <span>·</span>
                   <span>{doc.uploaderName}</span>
@@ -198,7 +220,8 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
                   <span>{new Date(doc.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span>
                 </div>
               </button>
-              <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+              <div className="flex flex-wrap gap-1">
+                <Button size="sm" variant="outline" onClick={() => setReviewId(doc.id)}>Review</Button>
                 {doc.intelligence?.status !== "indexed" && canRetryIndex(doc) && <button onClick={() => handleRetryIndex(doc)} disabled={retryingDocumentId === doc.id} className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-50 transition-colors rounded" title="Retry document indexing">
                   {retryingDocumentId === doc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 </button>}

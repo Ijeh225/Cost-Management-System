@@ -1,11 +1,30 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-09-09
+## Current Test and Defect Register - Authoritative as of 2026-10-05
 
 Use this register before selecting the next test or fix. The detailed test rows
 and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
+
+### CAP-02 In Progress - 2026-10-05 14:26 WAT
+
+- 14:42 WAT: final build/typechecks and 164/164 API tests passed, including direct
+  SQL retention rejection. CAP-02 browser test rerun passed; CAP-01 and CAP-04
+  existing UI/regression suites passed. Publishing next; not live acceptance.
+- 14:36 WAT: full API regression 164/164 passed. Fixture browser review workflow
+  and responsive dialog at 320/390/768/1440 passed; original shipment fixture
+  corrected and animation awaited. Not a production test. Retention guard now
+  also covers database/parent deletion; final build/regression rerun underway.
+- Authorized document readiness/versioning/reviewed OCR implementation underway.
+  No CAP-02 production writes or live acceptance yet.
+- Eight rule/API tests passed on isolated PGlite including additive migration
+  rerun, legacy preservation, forged branch/client denial, unauthorized review,
+  profile/application conflicts, immutable retained versions and replacement
+  readiness reset. Three synthetic OCR tests passed: printed PNG fields, scanned
+  PDF rendering/recognition, invalid image failure. Not a broad OCR quality claim.
+- Next: final build, broader regression and browser checks; only then publication
+  and bounded live verification. Session: 2026-10-05-cap02-document-readiness.md.
 
 ### Records Review - 2026-10-05 14:00 WAT
 

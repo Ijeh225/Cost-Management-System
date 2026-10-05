@@ -69,7 +69,7 @@ export function JobOverviewPanel({ containerId, children }: { containerId: numbe
           <Link className="text-sm text-primary underline" href="/my-tasks">Open my daily queue</Link>
         </section>
         <section className="rounded-xl border border-border/60 bg-card p-4 sm:p-5 space-y-3"><h3 className="font-semibold">Documents ({data.documents.length}) and approvals</h3>
-          <p className="text-xs text-muted-foreground">Uploaded files are not a reviewed document-readiness checklist.</p>
+          <p className="text-xs text-muted-foreground">Uploading alone does not approve a document. <Link href={`/containers/${containerId}?tab=documents`} className="text-primary underline">Open the document-readiness checklist</Link>.</p>
           <ul className="space-y-1">{data.documents.map(d => <li key={d.id}><Link className="text-sm underline text-primary" href={`/containers/${containerId}?tab=documents&previewDocument=${d.id}`}>{d.name}</Link></li>)}</ul>
           {!data.documents.length && <p className="text-sm">No uploaded documents on this visit.</p>}
           {data.approvals.map(a => <p key={a.id} className="text-sm">{a.section.replaceAll("_", " ")}: {a.status}{a.rejectionReason ? ` - ${a.rejectionReason}` : ""}</p>)}

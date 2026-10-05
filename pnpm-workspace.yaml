@@ -36,6 +36,7 @@ allowBuilds:
   core-js: false
   esbuild: true
   msw: true
+  tesseract.js: false
   unrs-resolver: true
 
 overrides:
