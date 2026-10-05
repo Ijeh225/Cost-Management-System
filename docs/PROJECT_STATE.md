@@ -45,6 +45,14 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-05 14:00 WAT: records-only resumption check. Last implementation remains
+  `7f1da71`, with acceptance records in `bded791`; checkout was clean. CAP-04,
+  CAP-01, overview presentation and mobile layout work remain complete for their
+  recorded scopes. Last observed deployment/live acceptance: Sept 10, 18:49 WAT.
+  No fresh live testing or Railway status check today. No new repair authorized.
+  Next: user selects next capability; CAP-02 remains proposed/unapproved.
+  Session: docs/SESSION_SUMMARIES/2026-10-05-status-review.md.
+
 - 2026-09-10 18:49 WAT: mobile header/Operations fix COMPLETE for requested scope.
   Code `7f1da71` committed/pushed; Railway deployment
   `4b2bfa9e-61ac-43a6-a5b8-dc74db87f4d5` SUCCESS on exact code commit.

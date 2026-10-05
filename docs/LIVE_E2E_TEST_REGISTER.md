@@ -7,6 +7,16 @@ and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
+### Records Review - 2026-10-05 14:00 WAT
+
+- Rechecked current state, latest session and Git on user's status request.
+  No new tests, defects, fixtures or application changes. Sept 10 mobile
+  deployment/live acceptance remains the latest recorded test milestone.
+- Earlier pending lines below are historical, superseded by their later closure
+  entries. Do not repeat completed financial writes or reopen closed test tasks.
+- CAP-02 remains proposed; await user authorization of the next capability.
+  This review does not independently verify today's production health.
+
 ### Mobile Header and Operations - 2026-09-10 18:34 WAT
 
 - 18:49 WAT closure: `7f1da71` published; Railway exact-commit deployment
