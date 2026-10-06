@@ -90,6 +90,12 @@ use revision checks: a stale screen receives a conflict and must refresh.
 
 ## Verification and Release
 
+The [2026-10-06 real-receipt benchmark](CAP02_REAL_RECEIPT_BENCHMARK_2026-10-06.md)
+tested twelve public scans, with ten within the image-size limit. Only 2/20
+date/total suggestions matched exactly, despite 15 values appearing in raw OCR.
+Tax amounts and mixed date/time text can become incorrect suggestions. Always
+compare the source; this benchmark is not a general extraction-accuracy pass.
+
 ### Measured OCR Limits (2026-10-05)
 
 Five synthetic local probes compared identifier, amount and date exactly:

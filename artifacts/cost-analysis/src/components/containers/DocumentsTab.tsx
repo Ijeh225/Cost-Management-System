@@ -225,7 +225,10 @@ export function DocumentsTab({ containerId }: { containerId: number }) {
                 {doc.intelligence?.status !== "indexed" && canRetryIndex(doc) && <button onClick={() => handleRetryIndex(doc)} disabled={retryingDocumentId === doc.id} className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-50 transition-colors rounded" title="Retry document indexing">
                   {retryingDocumentId === doc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 </button>}
-                <button onClick={() => handleDownload(doc)} className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded">
+                <button type="button" onClick={() => handleDownload(doc)}
+                  aria-label={`Download ${doc.originalName} (version ${doc.versionNumber ?? 1})`}
+                  title={`Open or download ${doc.originalName} (version ${doc.versionNumber ?? 1}) in a new tab`}
+                  className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded">
                   <Download className="w-3.5 h-3.5" />
                 </button>
                 {canDelete(doc) && <button onClick={() => handleDelete(doc.id)} className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded">

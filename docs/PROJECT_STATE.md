@@ -45,6 +45,27 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-06 11:40 WAT: download accessibility fix implemented locally in shared
+  DocumentsTab: filename/version aria-label, tooltip explaining new tab, explicit
+  button type; existing file-open behavior unchanged. Railway build/typechecks
+  and production-frontend fixture tests passed, including Enter/Space activation
+  and zero download-triggered writes. Commit/deployment/live verification pending.
+  Broader OCR benchmark completed on 12 preselected public SROIE receipt scans:
+  10 processed, 2 correctly rejected >12MP; raw values present 15/20 but exact
+  date/total suggestions only 2/20. New OPEN Medium findings CAP02-OCR-001
+  (tax/incorrect amount selection) and CAP02-OCR-002 (unvalidated/contaminated date
+  suggestions). Parser was NOT changed in this testing task. Detailed provenance,
+  results and next fixes: docs/CAP02_REAL_RECEIPT_BENCHMARK_2026-10-06.md.
+  Real receipt testing is complete for this sample, not Nigerian-document or
+  human-handwriting accuracy acceptance. No live uploads or financial writes.
+
+- 2026-10-06 11:33 WAT: user authorised download accessibility fix and broader
+  real-document OCR tests. Adding per-file/version names to existing download
+  buttons without changing file-open behavior. Extending local keyboard checks.
+  Public scanned-receipt samples will run locally only, not be uploaded into
+  live client records or sent to an OCR provider. Evidence must distinguish
+  real receipt layouts from synthetic fixtures and Nigerian clearing documents.
+
 - Acceptance evidence published in `32a9842` on origin/master. Documentation-only
   update; no new app deployment claim. The completed staff/PDF checks below
   replace prior pending labels; do not restart them.

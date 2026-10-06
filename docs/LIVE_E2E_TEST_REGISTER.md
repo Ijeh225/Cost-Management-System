@@ -9,6 +9,21 @@ action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 
+- 2026-10-06 11:40 WAT: download-label correction locally PASS: exact per-file/
+  version accessible name, explanatory tooltip, Enter/Space open original target
+  with no data writes. Production build/typechecks and CAP-02 UI fixture passed.
+  Deployment/live label acceptance still pending at this entry.
+- Public real-receipt OCR benchmark completed, NOT an accuracy pass: 12 fixed
+  offsets, 10 processed, 2 >12MP rejected; raw value presence 15/20, exact field
+  suggestions 2/20. All emitted suggestions still require review. No production
+  attachments or transactions created. Scope/source/results in
+  CAP02_REAL_RECEIPT_BENCHMARK_2026-10-06.md; handwritten/Nigerian sources untested.
+- OPEN Medium CAP02-OCR-001: tax total selected as amount (1.26 versus visually
+  verified total 46.20); no context-aware monetary validation in suggestFields.
+- OPEN Medium CAP02-OCR-002: date suggestions include time/noise or misread month;
+  parser copies line tails and does not validate a complete date. Both need
+  conservative parsing/abstention regressions; no automatic financial posting.
+
 - 2026-10-06 10:53 WAT: fresh restricted-account acceptance PASSED. Existing QA
   #14/branch2 authenticated using user-supplied credential, not a changed role or
   duplicate account. scripts/cap02-live-access-check.py completed 24 expected HTTP

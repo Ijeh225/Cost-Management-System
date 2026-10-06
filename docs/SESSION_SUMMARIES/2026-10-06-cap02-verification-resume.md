@@ -70,3 +70,25 @@
   or a confirmed defect). No new capability or product fix started this turn.
 - Acceptance evidence committed/pushed as 32a9842; documentation-only diff checks
   passed. This does not claim a new application deployment or broader OCR accuracy.
+
+## 2026-10-06 11:40 WAT - Labels and Real Receipt Benchmark
+
+- User authorised download accessibility labels and broader real-document OCR
+  testing. Clean master at 63358e1 before changes. Shared DocumentsTab now names
+  download actions by filename/version and supplies a new-tab tooltip/type.
+  Existing open/download semantics, data, permissions and review logic unchanged.
+- Full Railway build/typechecks passed (existing sourcemap/chunk warnings).
+  CAP-02 production-frontend fixtures passed, now also testing named download
+  lookup, Enter and Space, correct target URL and absence of mutation requests.
+- Used twelve preselected public SROIE test-split scans locally; no live uploads
+  or OCR provider. Attribution/license, dataset revision, image/source hashes,
+  exact comparison and results retained by reproducible resumable benchmark.
+  Initial HTTP 502 was a source-service failure; resume did not repeat samples.
+- Ten processed; two correctly rejected >12 MP. Raw date/total presence 15/20,
+  exact suggestions 2/20. Not representative Nigerian clearing/handwriting data.
+  Visually verified sample90 total46.20 vs tax1.26 incorrectly suggested as amount.
+- Recorded Medium OPEN CAP02-OCR-001 amount-context/validation and CAP02-OCR-002
+  date contamination/validation. User asked to test OCR, so product OCR parser
+  is unchanged; suggested follow-up must use this evidence, not an accuracy claim.
+- Next: publish label fix, confirm exact deployment and live labels. No repeat
+  staff permission or finance tests. Report: CAP02_REAL_RECEIPT_BENCHMARK_2026-10-06.md.

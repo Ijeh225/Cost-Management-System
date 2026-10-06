@@ -63,6 +63,18 @@ try {
   await page.goto(`${origin}/containers/32?tab=documents`);
   try { await page.getByText("Document readiness", { exact: true }).waitFor({ timeout: 10000 }); }
   catch (error) { console.error(await page.locator("body").innerText()); throw error; }
+  const download = page.getByRole("button", { name: "Download scan.txt (version 1)", exact: true });
+  assert.equal(await download.getAttribute("type"), "button");
+  assert.match(await download.getAttribute("title"), /new tab/);
+  for (const key of ["Enter", "Space"]) {
+    await download.focus();
+    const popupPromise = page.waitForEvent("popup");
+    await download.press(key);
+    const popup = await popupPromise;
+    await popup.waitForURL(`${origin}/api/documents/1`);
+    await popup.close();
+  }
+  assert.deepEqual(writes, [], "Download keyboard actions do not submit a form or write data");
   await page.getByText("Configure requirements", { exact: true }).click();
   await page.getByLabel("Profile name", { exact: true }).fill("General import");
   await page.getByLabel("Job type", { exact: true }).fill("Import");
@@ -99,5 +111,5 @@ try {
   assert.equal(await page.getByText("Configure requirements", { exact: true }).count(), 0);
   assert.deepEqual(errors, []);
   assert.deepEqual(writes, ["/api/containers/32/document-readiness/profiles", "/api/containers/32/document-readiness/apply", "/api/containers/32/document-readiness/1/review"]);
-  console.log("PASS: profile application, low-confidence manual correction, required confirmation, ready refresh, read-only review, mobile/desktop dialog; no financial writes");
+  console.log("PASS: named download button and Enter/Space navigation; profile application, low-confidence manual correction, required confirmation, ready refresh, read-only review, mobile/desktop dialog; no financial writes");
 } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }
