@@ -9,6 +9,12 @@ action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 
+- Additional low-priority accessibility observation: all three document download
+  icon buttons on #32 have no visible text, title or aria-label; nested SVG is
+  aria-hidden. Screen-reader action names are missing. Needs accessible labels;
+  no product fix applied in this verification turn. Evidence records pushed in
+  `9b28fc1`; previous acceptance statuses unchanged.
+
 - Follow-up 2026-10-06 10:40 WAT: restricted-session/PDF acceptance not completed.
   Existing Chrome tab moved from login to app homepage during the interrupted
   browser attempt; identity is unknown because browser control is unavailable

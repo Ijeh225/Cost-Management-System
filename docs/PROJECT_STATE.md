@@ -45,6 +45,10 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- Resume records committed/pushed in `9b28fc1`. Small observed UI gap to retain
+  for follow-up: document download icon buttons have no accessible name. No fix
+  implemented; unrelated to the authentication/browser blockers below.
+
 - 2026-10-06 10:40 WAT: user authorised continuation; no completed test repeated.
   Chrome initially showed the login page; existing QA sign-in was requested.
   On recovery it showed the application homepage, but browser control reported

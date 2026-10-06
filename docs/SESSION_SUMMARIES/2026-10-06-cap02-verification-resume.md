@@ -23,3 +23,6 @@
 - Exact next action: restore Chrome automation access, confirm existing QA #14
   identity/branch/role, then complete permission checks and inspect existing PDF
   #11. User action is required for the browser/auth blocker, not new business data.
+- Resume record committed and pushed in 9b28fc1. The low-priority missing
+  accessible names on document download buttons are also recorded in both
+  authoritative registers; no implementation started.
