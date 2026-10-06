@@ -1,5 +1,26 @@
 # CAP-02 Verification Resume
 
+## 2026-10-06 13:14 WAT - OCR Fixes Published and Deployment Verified
+
+- Fix 8f65890 committed/pushed. Railway exact deployment
+  4aaf2eb9-801b-45d3-94fa-20dbabba41cd SUCCESS; build log healthcheck
+  /api/healthz passed. Final API typecheck passed as well as recorded full build.
+- Read-only Chrome live smoke on existing #32/#11: native PDF source visible;
+  identifier CAP02-LIVE-20261005, amount NGN500.00, date 2026-10-05 suggestions
+  correct. Page confidence still 93%, not a field guarantee. Verified fields
+  empty; Mark reviewed and Reject disabled until required confirmation. Closed
+  dialog with no save, upload, re-index, workflow or financial write.
+- Snapshot cap02-ocr-fixes-live-20261006.png saved in OS temp. Earlier local
+  regressions/benchmark are the failure-specific proof; live evidence is the
+  deployment plus unchanged existing-document smoke, not a new bad-scan upload.
+- CAP02-OCR-001/002 closed for recorded parser defects. No broad accuracy promise.
+  Remaining potential work: representative clearing-document/handwriting quality
+  checks. Do not recreate completed CAP-02 acceptance fixtures.
+- Provider tooling warning also observed: Railway CLI reports Config-as-Code
+  deprecation with 2026-12-01 end date. Record for a separate verified migration
+  plan; no infrastructure/configuration change authorised or attempted here.
+- Final evidence commit will contain all three project records and the index.
+
 ## 2026-10-06 13:07 WAT - OCR Parser Corrections and Same-Sample Regression
 
 - User authorised CAP02-OCR-001/002 fixes. Started clean at b0b241b; preserved

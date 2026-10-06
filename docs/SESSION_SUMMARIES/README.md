@@ -20,7 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-10-06 CAP-02 OCR parser corrections and benchmark, updated 13:07 WAT](2026-10-06-cap02-verification-resume.md)
+- [2026-10-06 CAP-02 OCR fixes deployed and smoke-verified, updated 13:14 WAT](2026-10-06-cap02-verification-resume.md)
 
 - [2026-10-05 CAP-02 implementation and acceptance, updated 18:20 WAT](2026-10-05-cap02-document-readiness.md)
 

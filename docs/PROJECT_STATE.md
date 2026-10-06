@@ -45,6 +45,25 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-06 13:14 WAT: CAP02-OCR-001/002 RESOLVED for the recorded parser
+  defects. Fix `8f65890` committed/pushed; exact Railway deployment
+  `4aaf2eb9-801b-45d3-94fa-20dbabba41cd` SUCCESS and /api/healthz healthcheck passed.
+  Live read-only smoke on existing #32/#11 shows source PDF and correct identifier,
+  NGN500.00 amount and 2026-10-05 date suggestions at 93% page confidence. Verified
+  fields remain empty; Mark reviewed/Reject stay disabled without confirmation.
+  Closed dialog without saving; same three documents/profile/expired state remain.
+  Failure-specific regressions and real-receipt benchmark ran LOCALLY; this live
+  check is a deployed existing-document smoke test, not a new receipt upload.
+  Final API typecheck passed. No source/review/financial mutations or migration.
+- Remaining OCR work is representative domain/handwriting quality evaluation,
+  not these two closed parser bugs. Supported formats and conservative blanks
+  are documented; a valid-looking recognition error is still possible. Human
+  verification remains required. Existing accepted values were not rewritten.
+- Deployment tooling follow-up (not an OCR/application failure): Railway CLI
+  emitted a Config-as-Code deprecation warning for railway.json/railway.toml,
+  reporting support until 2026-12-01. Verify migration guidance before planning
+  a separate infrastructure change; no configuration migration done here.
+
 - 2026-10-06 13:07 WAT: CAP02-OCR-001/002 implemented and locally verified;
   publication/deployment acceptance pending. Amount suggestions use whole labels,
   exclude tax/subtotal/quantity and tax-summary context, validate numbers and

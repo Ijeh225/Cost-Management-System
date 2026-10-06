@@ -9,6 +9,19 @@ action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 
+- 2026-10-06 13:14 WAT: CAP02-OCR-001/002 RESOLVED (bounded parser regressions),
+  superseding earlier OPEN/pending entries. Commit 8f65890 deployed SUCCESS as
+  4aaf2eb9-801b-45d3-94fa-20dbabba41cd; provider /api/healthz passed.
+  Live smoke only: opened existing #11 review on #32 after refresh. Source PDF
+  renders; identifier CAP02-LIVE-20261005, amount NGN500.00 and date 2026-10-05
+  suggestions appear with source page/confidence. Verified fields empty, both
+  review actions disabled before confirmation. Closed without using suggestions,
+  reviewing, re-indexing, uploading or changing any application record.
+  Screenshot: C:/Users/SONOFGRACE/AppData/Local/Temp/cap02-ocr-fixes-live-20261006.png.
+  Malformed/conflicting-field failures were reproduced and fixed in local tests
+  and identical-source benchmark, not new live business records. General OCR
+  accuracy, human handwriting and Nigerian domain coverage are NOT certified.
+
 - 2026-10-06 13:07 WAT: CAP02-OCR-001/002 FIXED/LOCAL VERIFIED, awaiting deployment.
   Whole-label/context-aware numeric amounts; calendar-validated isolated dates;
   conflicting/unreadable evidence yields no suggestion, never a guessed value.
