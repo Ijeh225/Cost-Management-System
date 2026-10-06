@@ -68,3 +68,5 @@
   functional acceptance is complete. Remaining: minor unlabeled download icons
   and broader representative real-document/handwriting OCR quality (not a pass
   or a confirmed defect). No new capability or product fix started this turn.
+- Acceptance evidence committed/pushed as 32a9842; documentation-only diff checks
+  passed. This does not claim a new application deployment or broader OCR accuracy.

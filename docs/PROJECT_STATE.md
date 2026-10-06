@@ -45,6 +45,10 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- Acceptance evidence published in `32a9842` on origin/master. Documentation-only
+  update; no new app deployment claim. The completed staff/PDF checks below
+  replace prior pending labels; do not restart them.
+
 - 2026-10-06 10:53 WAT: CAP-02 fresh staff and native PDF acceptance PASSED.
   User supplied the existing QA credential after the password handoff; credential
   used only for authentication, never saved to files. Guarded live API runner
