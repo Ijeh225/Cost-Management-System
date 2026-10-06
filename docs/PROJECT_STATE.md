@@ -45,6 +45,23 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-06 10:53 WAT: CAP-02 fresh staff and native PDF acceptance PASSED.
+  User supplied the existing QA credential after the password handoff; credential
+  used only for authentication, never saved to files. Guarded live API runner
+  completed all 24 expected HTTP responses including login/logout: QA #14/branch2
+  can read #32/#33 and binary PDF #11; review/profile/apply requests denied 403,
+  cross-branch reads denied 404 despite forged scope headers, banks/invoices/
+  schedules/users denied 403. Before/after document/history/profile/checklist
+  comparisons unchanged. Separate browser staff login reached Transire; #32
+  operational Documents view has disabled review fields/approval controls and
+  no requirement-configuration control. Existing #11 visibly renders in Chrome.
+  Previous credential/browser/PDF acceptance blockers are superseded by this
+  result; do not repeat their tests or recreate fixtures. Owner session remains
+  in Chrome; QA session is in the in-app browser. No application-code changes.
+  REMAINING: low-priority accessible names for download buttons; representative
+  real-document/handwriting OCR benchmark (not a confirmed product defect).
+  CAP-02 bounded functional acceptance is complete, not a universal OCR guarantee.
+
 - 2026-10-06 10:45 WAT: Chrome control restored. Confirmed Chrome is signed in
   as owner Super Admin, NOT QA staff. User correctly recalled agent-created QA
   account; Sept 9 record confirms temporary password rotation with no credential

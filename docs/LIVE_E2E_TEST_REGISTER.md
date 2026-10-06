@@ -9,6 +9,29 @@ action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 
+- 2026-10-06 10:53 WAT: fresh restricted-account acceptance PASSED. Existing QA
+  #14/branch2 authenticated using user-supplied credential, not a changed role or
+  duplicate account. scripts/cap02-live-access-check.py completed 24 expected HTTP
+  responses including auth lifecycle. Permitted #32/#33 reads and PDF #11 binary
+  retrieval returned 200; forbidden review/profile/application returned 403;
+  forged branch headers all/1/3 did not expose other-branch #24/#25 (404);
+  banks/invoices/payment-schedules/users returned 403. Documents, histories,
+  profiles, applications and readiness items identical before/after. API logout
+  succeeded. No credential or cookie stored in project files.
+- Separate browser login PASSED: landed at /workspace/transire, #32 Documents
+  operational view omitted configuration control; review #10 displayed original
+  and disabled classification/issuer/expiry/verified fields/confirmation/approval
+  controls. No mutation submitted. Staff in-app session retained, owner in Chrome.
+- Chrome native PDF preview PASSED for existing #11: one page visibly shows
+  labelled dummy source, identifier CAP02-LIVE-20261005, NGN500.00 and 2026-10-05.
+  This resolves the outside-in-app-viewer verification, not IAB PDF support.
+  No new source/version/review created. Prior expiry/OCR/concurrency passes stand.
+  Evidence: Temp/cap02-staff-readonly-20261006.png and
+  Temp/cap02-chrome-pdf-verified-20261006.png.
+- Remaining scope limits: broader real-world/handwriting OCR quality unverified;
+  minor download-button accessible-name defect still open. No critical CAP-02
+  defect discovered in this round; bounded functional acceptance complete.
+
 - 2026-10-06 10:45 WAT: Chrome control now works. Profile menu proves current
   browser account is owner Super Admin. User Management confirms existing QA #14
   active, Lagos, Staff/Operations, Transire+Shipping; not a staff-session test.

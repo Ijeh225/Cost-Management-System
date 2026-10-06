@@ -108,9 +108,12 @@ no matching fields. Obtain a clearer source or enter values manually after
 inspection. Do not approve a source you cannot read. Genuine handwriting and
 representative phone photos still need their own benchmark.
 
-Live raster-only PDF OCR recovered all three known fields, but its embedded
-preview was blank in the in-app browser. Verify the source through an approved
-capable PDF viewer before reviewing; OCR text alone is not source verification.
+Live raster-only PDF OCR recovered all three known fields. On 2026-10-06 the
+existing uploaded source also rendered correctly in Chrome's native PDF viewer.
+The in-app browser preview was blank; this is not a cross-browser PDF guarantee.
+Verify the source through a capable PDF viewer before reviewing; OCR text alone
+is not source verification. Fresh Operations QA API and read-only review UI
+acceptance passed without changing its permissions or any retained documents.
 
 Consult PROJECT_STATE.md and LIVE_E2E_TEST_REGISTER.md for current publication
 and acceptance status. Local browser fixtures, isolated database tests and

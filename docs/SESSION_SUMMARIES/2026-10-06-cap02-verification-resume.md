@@ -42,3 +42,29 @@
   authenticate the staff session. This resolves missing credentials legitimately.
 - Screenshot: C:/Users/SONOFGRACE/AppData/Local/Temp/cap02-qa-password-handoff.png.
   Browser tab retained for handoff. Staff/PDF acceptance still incomplete.
+
+## 2026-10-06 10:53 WAT - Staff and PDF Acceptance Passed
+
+- User supplied the test password after completing the handoff. Used through
+  no-echo terminal input and the ordinary login UI only; not saved in records,
+  scripts or environment files. No agent password reset or permission change.
+- Guarded live checker authenticated existing #14/branch2/staff and passed all
+  24 expected HTTP responses, including login/CSRF/me/logout. Same-branch #32/#33
+  reads and PDF #11 binary retrieval passed. Valid forbidden review/profile/apply
+  attempts returned 403; cross-branch #24/#25 returned 404 under forged all/1/3
+  scope headers; banks/invoices/schedules/users returned 403. Documents/history/
+  profiles/applications/items remained exactly equal before and after.
+- After API logout, separate in-app browser login reached Transire workspace.
+  Native typing first failed client-side email validation; corrected ordinary
+  labelled-field entry succeeded. Not a confirmed application defect. #32's
+  operational Documents view shows no requirement configuration; #10 review
+  fields, confirmation and approval buttons disabled. Screenshot retained.
+- Chrome remains signed in as owner. Existing #11 attachment opened in native
+  PDF viewer and visibly rendered one-page dummy source with all three expected
+  fields. No re-upload, replacement, approval or financial/workflow mutation.
+- Evidence files: Temp/cap02-staff-readonly-20261006.png and
+  Temp/cap02-chrome-pdf-verified-20261006.png. In-app QA tab and Chrome PDF retained.
+- Supersedes the earlier credential/browser/PDF blockers. Bounded CAP-02
+  functional acceptance is complete. Remaining: minor unlabeled download icons
+  and broader representative real-document/handwriting OCR quality (not a pass
+  or a confirmed defect). No new capability or product fix started this turn.
