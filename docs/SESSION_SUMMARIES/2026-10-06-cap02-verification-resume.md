@@ -26,3 +26,19 @@
 - Resume record committed and pushed in 9b28fc1. The low-priority missing
   accessible names on document download buttons are also recorded in both
   authoritative registers; no implementation started.
+
+## 2026-10-06 10:45 WAT - QA Account Ownership Clarified
+
+- User pointed out the agent created the test account and asked to log in.
+  Confirmed creation in original live register and latest recorded temporary
+  password rotation in Sept 9 CAP-01 summary. Credentials intentionally were
+  not saved in project files; do not guess a password or reuse the owner's.
+- Chrome browser control now works. Profile menu identifies owner Super Admin,
+  not QA. Existing QA row confirms active Lagos Staff/Operations with only
+  Transire and Shipping. No duplicate account or widened permissions needed.
+- Opened Edit User - E2E Operations QA for user password-change handoff. Every
+  field remained unchanged; no password entered or Save Changes submitted.
+  User must enter and save a temporary password, then provide it for sign-in or
+  authenticate the staff session. This resolves missing credentials legitimately.
+- Screenshot: C:/Users/SONOFGRACE/AppData/Local/Temp/cap02-qa-password-handoff.png.
+  Browser tab retained for handoff. Staff/PDF acceptance still incomplete.

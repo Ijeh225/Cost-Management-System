@@ -9,6 +9,13 @@ action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 
+- 2026-10-06 10:45 WAT: Chrome control now works. Profile menu proves current
+  browser account is owner Super Admin. User Management confirms existing QA #14
+  active, Lagos, Staff/Operations, Transire+Shipping; not a staff-session test.
+  Existing account Edit form opened only, blank New Password left untouched.
+  Password entry/submission handed to user; no role, branch or account changes.
+  Fresh restricted login and CAP-02 denials remain pending credentials.
+
 - Additional low-priority accessibility observation: all three document download
   icon buttons on #32 have no visible text, title or aria-label; nested SVG is
   aria-hidden. Screen-reader action names are missing. Needs accessible labels;

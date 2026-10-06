@@ -45,6 +45,15 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-06 10:45 WAT: Chrome control restored. Confirmed Chrome is signed in
+  as owner Super Admin, NOT QA staff. User correctly recalled agent-created QA
+  account; Sept 9 record confirms temporary password rotation with no credential
+  retention. Live existing Operations QA is active, Lagos, Staff/Operations,
+  Transire+Shipping only. Opened its Edit form for user handoff; NO fields changed
+  and NO save submitted. User must enter/submit a temporary password, then supply
+  that test credential or sign in as QA. Do not claim staff authentication passed.
+  The former Chrome-control blocker is resolved; credential blocker remains.
+
 - Resume records committed/pushed in `9b28fc1`. Small observed UI gap to retain
   for follow-up: document download icon buttons have no accessible name. No fix
   implemented; unrelated to the authentication/browser blockers below.
