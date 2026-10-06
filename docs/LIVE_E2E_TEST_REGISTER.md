@@ -9,6 +9,16 @@ action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 
+- 2026-10-06 13:47 WAT: records-only reconciliation, no new live testing. Current
+  closures supersede old defect-log OPEN labels, including both OCR parser fixes.
+  Remaining OCR quality coverage is real clearing documents/handwriting, not an
+  uncompleted replay of the 12-receipt sample or the six isolated CAP-02 checks.
+  Wider AI provider rollout acceptance is a separate evidence gate in
+  AI_Assistant_Phase_8_Acceptance.md; no consolidated pass was located in these
+  records. Do not infer it from closed AI-002 through AI-008 individual defects.
+  Railway tooling verification, manual-edition refresh and future CAP proposals
+  are maintenance/planning work, not newly reproduced application failures.
+
 - 2026-10-06 13:14 WAT: CAP02-OCR-001/002 RESOLVED (bounded parser regressions),
   superseding earlier OPEN/pending entries. Commit 8f65890 deployed SUCCESS as
   4aaf2eb9-801b-45d3-94fa-20dbabba41cd; provider /api/healthz passed.

@@ -1,5 +1,26 @@
 # CAP-02 Verification Resume
 
+## 2026-10-06 13:47 WAT - Pending-Work Records Audit
+
+- User first asked to fix both OCR findings, then confirmed project files were
+  updated, then asked whether any project/test/session or other files still show
+  issues. Checked clean master at 7902884 and the current registers, latest session,
+  capability review/priorities, controlled runbook, AI acceptance and manual README.
+- No currently unresolved confirmed product defect found in the authoritative
+  repair entries. Do not reopen historical OPEN rows or call skipped network-only
+  tests unexecuted lifetime checks; their earlier isolated passes remain recorded.
+- Separate follow-ups: representative domain/handwriting OCR evaluation; verify
+  Railway's recorded deprecation warning before infrastructure planning; update
+  the Sept 5 historical manual for CAP-01/02/04 and subsequent changes. No rewrite
+  or infrastructure work is authorised by this status question.
+- AI Phase 8 contains a broader provider evaluation/performance/cost rollout gate.
+  No consolidated completion record located in state/test/session files; this is
+  missing acceptance evidence, not proof that the AI is broken or incorrectly
+  configured. Verify actual rollout and results before wider enablement.
+- CAP-03 and CAP-05 through CAP-16 remain proposed capability work. CAP-01/02/04
+  have completed bounded scopes. Current answer is file-based, not a fresh live
+  audit or a guarantee of no undiscovered defects. No application data changed.
+
 ## 2026-10-06 13:14 WAT - OCR Fixes Published and Deployment Verified
 
 - Fix 8f65890 committed/pushed. Railway exact deployment

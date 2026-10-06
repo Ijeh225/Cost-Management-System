@@ -45,6 +45,21 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-06 13:47 WAT: records-only pending-work audit after user asked about
+  all project/test/session files. Latest authoritative entries contain no remaining
+  confirmed application defect from the completed repair scopes. CAP02-OCR-001/002
+  are closed; older OPEN/pending rows are historical, not reopened bugs. This
+  review is not a fresh full-app test or a guarantee that no undiscovered bug exists.
+  Follow-ups: representative clearing-document/handwriting OCR evaluation;
+  verify the recorded Railway configuration deprecation warning before a separate
+  migration plan; refresh the historical Sept 5 manual edition for later features.
+  AI_Assistant_Phase_8_Acceptance.md also defines provider evaluation/performance/
+  cost and rollout gates: no completed consolidated result found in the current
+  state/test/session records, so do not certify wider AI rollout from earlier
+  individual AI bug closures. CAP-03 and CAP-05 through CAP-16 remain proposals,
+  not authorised fixes; CAP-01/02/04 have completed their documented scopes.
+  No implementation, live tests or business-data changes in this records review.
+
 - 2026-10-06 13:14 WAT: CAP02-OCR-001/002 RESOLVED for the recorded parser
   defects. Fix `8f65890` committed/pushed; exact Railway deployment
   `4aaf2eb9-801b-45d3-94fa-20dbabba41cd` SUCCESS and /api/healthz healthcheck passed.
