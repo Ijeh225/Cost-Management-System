@@ -85,16 +85,25 @@ use revision checks: a stale screen receives a conflict and must refresh.
   OCR confidence; it is not labelled 100% accurate.
 - AI document searches may retrieve raw, unverified extraction. They must not
   treat it as a valid release or a posted transaction.
+- Amount/date suggestions are conservative: supported total/amount labels only,
+  validated non-negative monetary values, no tax/subtotal selection, and no
+  guess when values conflict. Numeric dates support year-month-day and
+  day-month-year with matching slash/hyphen separators. Two-digit years remain
+  as printed, without a resolved century; month-first/named-month formats are
+  not promised. Known labelled due/expiry/delivery dates are not issue dates.
+  Blank suggestions mean manual source inspection is needed, not zero/absent
+  financial value. Original OCR and previously accepted reviews are not rewritten.
 - Handwriting, blurred phone photos, languages other than English and arbitrary
   real-world layouts have not passed a representative accuracy benchmark.
 
 ## Verification and Release
 
 The [2026-10-06 real-receipt benchmark](CAP02_REAL_RECEIPT_BENCHMARK_2026-10-06.md)
-tested twelve public scans, with ten within the image-size limit. Only 2/20
-date/total suggestions matched exactly, despite 15 values appearing in raw OCR.
-Tax amounts and mixed date/time text can become incorrect suggestions. Always
-compare the source; this benchmark is not a general extraction-accuracy pass.
+tested twelve public scans, with ten within the image-size limit. The baseline
+had 2/20 exact date/total suggestions and six wrong values. Following conservative
+parser corrections, the identical sample had eight exact values, twelve blank
+fields and no wrong suggestions. Always compare the source; this small benchmark
+is not a general extraction-accuracy pass, and recognition errors can still occur.
 
 ### Measured OCR Limits (2026-10-05)
 

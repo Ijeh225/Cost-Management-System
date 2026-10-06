@@ -1,5 +1,27 @@
 # CAP-02 Verification Resume
 
+## 2026-10-06 13:07 WAT - OCR Parser Corrections and Same-Sample Regression
+
+- User authorised CAP02-OCR-001/002 fixes. Started clean at b0b241b; preserved
+  prior deployments, reviews, fixtures and test evidence. Existing regexes could
+  select TAX TOTAL/subtotal and copy unvalidated date-line tails.
+- Implemented anchored amount labels, tax-summary exclusions, complete monetary
+  validation and conflict abstention. Dates now isolate calendar-valid numeric
+  tokens, exclude known non-document dates and abstain on conflicts/invalid text.
+  No guessed digit substitutions; short years remain printed, no resolved century.
+- Existing on-read suggestion architecture reused. No schema, workflow, financial,
+  access-control or accepted-review mutation. API test verifies unchanged source
+  text and history after recomputation. Regression: 226 passed, 3 network-only
+  skipped across 37 files. Production build passed; final API typecheck follows.
+- Re-ran all 12 public receipt scans with final parser in OS temp directory
+  cap02-real-receipts-final-20261006. Dataset revision, image hashes and raw OCR
+  identical to baseline. Ten processed; two size-rejected. Exact fields 2 -> 8;
+  wrong suggestions 6 -> 0; absent fields remain 12. Do not claim universal OCR
+  accuracy or validated handwriting/Nigerian clearing-document coverage.
+- Next: publish and verify exact Railway deployment, then read existing #11
+  without creating replacement files or altering reviews. Records will distinguish
+  deployed smoke checks from the locally reproduced failure-specific regressions.
+
 ## 2026-10-06 11:50 WAT - Download Labels Deployed; OCR Findings Remain Open
 
 - Committed/pushed the label correction, keyboard regression and public-receipt

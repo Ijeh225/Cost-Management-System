@@ -9,6 +9,17 @@ action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 
+- 2026-10-06 13:07 WAT: CAP02-OCR-001/002 FIXED/LOCAL VERIFIED, awaiting deployment.
+  Whole-label/context-aware numeric amounts; calendar-validated isolated dates;
+  conflicting/unreadable evidence yields no suggestion, never a guessed value.
+  Full API suite: 226 passed, 3 prior network-only skipped, 37 files. Read-route
+  regression proves original OCR and accepted history remain identical.
+  Fresh real-scan benchmark on identical source hashes/raw text: 8 correct,
+  12 absent, zero wrong date/amount suggestions out of 20 evaluated fields;
+  10 scans processed, two >12MP safely refused. All suggestions require review.
+  Detailed before/after in CAP02_REAL_RECEIPT_BENCHMARK_2026-10-06.md.
+  Old OPEN entries below describe pre-fix evidence; no fresh live parser test yet.
+
 - 2026-10-06 11:50 WAT: download-label live acceptance PASS after production
   deployment `e737b841-29fc-42df-9601-8ef0374b94a4` SUCCESS, commit `d3c7f1a`.
   #32 lists named PNG v1/v2 and PDF v1 buttons with matching type/title attributes.

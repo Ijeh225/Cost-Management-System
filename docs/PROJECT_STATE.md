@@ -45,6 +45,28 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-06 13:07 WAT: CAP02-OCR-001/002 implemented and locally verified;
+  publication/deployment acceptance pending. Amount suggestions use whole labels,
+  exclude tax/subtotal/quantity and tax-summary context, validate numbers and
+  currencies, and abstain on malformed/conflicting candidates. Dates isolate
+  calendar-valid numeric tokens, exclude labelled due/expiry/delivery dates and
+  abstain on conflicts. Two-digit years stay as printed, not century-resolved.
+  Human confirmation and source page/confidence remain mandatory/unchanged.
+- Final API regression: 37 files, 226 passed, 3 existing network-only skipped.
+  API read test proves recomputation preserves raw extraction and stored reviews.
+  Railway build passed; final API typecheck checked separately. Same 12 real
+  receipt scans rerun locally, matching original revision/image hashes/raw text:
+  10 processed, 2 size-refused, 8/20 exact suggestions, 12 abstentions, zero wrong
+  emitted date/amount suggestions (baseline 2 exact, 12 absent, 6 wrong).
+  This is a bounded sample pass for the recorded parser defects, not universal
+  OCR accuracy. No live uploads, migration, re-indexing, review or financial writes.
+
+- 2026-10-06 12:57 WAT: user authorised fixes for CAP02-OCR-001/002. Scope:
+  conservative amount/date suggestions, regression coverage, same-sample OCR
+  evaluation, then publication/deployment verification. Preserve accepted reviews,
+  source text, mandatory human confirmation and existing live fixtures. No DB
+  migration or financial writes required; suggestions are computed on read.
+
 - 2026-10-06 11:50 WAT: download accessibility correction committed/pushed as
   `d3c7f1a`; Railway deployment `e737b841-29fc-42df-9601-8ef0374b94a4`
   is SUCCESS for that exact commit. Live container #32 exposes distinct named

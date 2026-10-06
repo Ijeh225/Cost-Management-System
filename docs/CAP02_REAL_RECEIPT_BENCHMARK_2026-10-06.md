@@ -85,3 +85,48 @@ Public receipt evidence broadens the previous synthetic-only tests. It does not
 replace a representative set of actual B/Ls, customs assessments, release/permit
 documents, phone photographs or human handwriting. No such accuracy pass is
 claimed. Manual review and a clearer source remain required when OCR is uncertain.
+
+## Post-Fix Regression - 2026-10-06 13:07 WAT
+
+CAP02-OCR-001/002 parser corrections implemented; exact deployment verification
+is tracked in PROJECT_STATE.md. The OPEN descriptions above are historical
+baseline findings, not the current implementation status.
+
+- Whole-label monetary candidates exclude tax/subtotal/quantity and recognized
+  tax-summary blocks. Currency/numeric formats are validated; conflicting or
+  malformed candidates produce no amount. No OCR digit guessing is performed.
+- Numeric dates are isolated and calendar validated. Conflicting dates abstain;
+  recognized due/expiry/delivery labels are excluded. Short years stay printed.
+  Wrong-but-valid OCR dates without contradictory evidence can still occur.
+- Source text, accepted reviews and mandatory human confirmation are unchanged.
+- Final fingerprint: `b4bd7324f5474ace78ee9e19b4f68aa318420401c21387e0d6f826fc08fde672`.
+- Fresh OCR run directory: `C:/Users/SONOFGRACE/AppData/Local/Temp/cap02-real-receipts-final-20261006`.
+- Dataset revision, all image SHA256 values and raw extracted text matched the
+  baseline. All 12 offsets were attempted again; no sample substitution.
+
+| Offset | Date suggestion | Amount suggestion | Exact / 2 |
+| --- | --- | --- | --- |
+| 0 | 15/01/2019 | 193.00 | 2 |
+| 30 | 20/03/18 | Blank | 1 |
+| 60 | 09/02/2018 | Blank | 1 |
+| 90 | 29/01/2018 | Blank: total unreadable, tax not substituted | 1 |
+| 120 | 05/03/2018 | Blank | 1 |
+| 150 | Blank: malformed date | Blank | 0 |
+| 180 | 07-02-17 | Blank | 1 |
+| 210 | Blank: conflicting dates | Blank | 0 |
+| 240 | Blank: no valid date | Blank | 0 |
+| 270 | Blank: second date token conflicts | RM36.96 | 1 |
+| 300 | Size guard | Size guard | N/A |
+| 330 | Size guard | Size guard | N/A |
+
+Of twenty evaluated fields, eight suggestions are exact, twelve abstain, none
+are wrong. Baseline: two exact, twelve absent and six wrong. All emitted
+suggestions still require review. The isolated date-line regression for offset
+270 correctly strips the time tail; the full receipt abstains because it also
+contains a different date. This is intentional, not a fabricated correct date.
+
+Regression tests also cover invalid grouping/digits, tax summaries, repeated and
+conflicting page values/currencies, leap days, malformed/partial dates, two-digit
+years, date-type labels, provenance and no mutation through the extraction API.
+The full API suite passed 226 tests (37 files), with three pre-existing network
+concurrency cases skipped. No new database concurrency change was introduced.

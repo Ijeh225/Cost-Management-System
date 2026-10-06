@@ -7,10 +7,11 @@ import { createRequire } from "node:module";
 import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({ db: { select: vi.fn(), insert: vi.fn(), update: vi.fn(), delete: vi.fn(), transaction: vi.fn() } }));
+const indexing = vi.hoisted(() => ({ getDocumentIndex: vi.fn(async () => null as null | { status: string; pageText: string; extractorVersion: string }) }));
 vi.mock("@workspace/db", async () => ({ ...await import("../../../../lib/db/src/schema/index.js"), db: mock.db }));
 vi.mock("../lib/auth.js", async importOriginal => ({ ...await importOriginal<object>(), requireAuth: (_req: unknown, _res: unknown, next: () => void) => next() }));
 vi.mock("../lib/document-storage.js", () => ({ saveDocument: vi.fn(), deleteDocument: vi.fn(), getDocumentBuffer: vi.fn(), documentExists: vi.fn(), getDocument: vi.fn() }));
-vi.mock("../lib/document-intelligence.js", () => ({ getDocumentIndex: async () => null, indexContainerDocument: async () => null, getIndexableDocument: vi.fn() }));
+vi.mock("../lib/document-intelligence.js", () => ({ getDocumentIndex: indexing.getDocumentIndex, indexContainerDocument: async () => null, getIndexableDocument: vi.fn() }));
 import { containersTable, usersTable, userClientAssignmentsTable, workflowNotificationsTable, settingsTable } from "@workspace/db";
 import { documentReadinessMigration } from "../lib/document-readiness-migration.js";
 import { documentReadinessRouter } from "../routes/document-readiness.js";
@@ -112,6 +113,25 @@ describe("CAP-02 isolated database/API", () => {
     expect(after.body.history).toHaveLength(1); expect(after.body.documents).toHaveLength(2);
     expect((await request(app).delete(`/containers/1/documents/${result.body.id}`)).status).toBe(409);
     await expect(pg.exec(`DELETE FROM container_documents WHERE id=${result.body.id}`)).rejects.toThrow("Retained document history cannot be deleted");
+  });
+  it("recomputes safe suggestions from stored OCR without changing source or accepted reviews", async () => {
+    const before = (await request(app).get("/containers/1/document-readiness")).body;
+    for (const [text, expected] of [
+      ["TOTAL a8 20\nTAX TOTAL: 1.26\nDate: ANA 9:29:44 AM", []],
+      ["Subtotal: M31 70\nTotal RM36 . 96\nDate: 12/10/2017 [IME : Vedi od", [
+        { field: "amount", value: "RM36.96", page: 1, confidence: 61, requiresReview: true },
+        { field: "date", value: "12/10/2017", page: 1, confidence: 61, requiresReview: true },
+      ]],
+    ] as const) {
+      const pages = [{ page: 1, text, confidence: 61 }];
+      indexing.getDocumentIndex.mockResolvedValueOnce({ status: "indexed", pageText: JSON.stringify(pages), extractorVersion: "stored-ocr" });
+      const response = await request(app).get("/containers/1/document-readiness/1/extraction");
+      expect(response.status).toBe(200);
+      expect(response.body.suggestions).toEqual(expected);
+      expect(response.body.pages).toEqual(pages);
+      expect(response.body.extractorVersion).toBe("stored-ocr");
+    }
+    expect((await request(app).get("/containers/1/document-readiness")).body).toEqual(before);
   });
   it.skipIf(!networkTest)("serializes simultaneous human reviews on network PostgreSQL", async () => {
     const state = (await request(app).get("/containers/1/document-readiness")).body;
