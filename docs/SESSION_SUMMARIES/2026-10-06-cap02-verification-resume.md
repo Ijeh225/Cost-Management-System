@@ -1,5 +1,26 @@
 # CAP-02 Verification Resume
 
+## 2026-10-06 11:50 WAT - Download Labels Deployed; OCR Findings Remain Open
+
+- Committed/pushed the label correction, keyboard regression and public-receipt
+  benchmark/report as d3c7f1a. Railway confirms exact commit SUCCESS in deployment
+  e737b841-29fc-42df-9601-8ef0374b94a4. Production build and local UI checks passed.
+- Refreshed existing owner Chrome #32 Documents tab. Named download controls
+  distinguish PNG versions 1/2 and PDF version 1. All have explicit button type
+  and tooltip explaining new-tab behavior. Enter opens the existing PDF URL
+  /api/documents/11. Chrome extension UI blocked the fresh native viewer read;
+  did not bypass it or claim another rendering/download success.
+- Screenshot saved as cap02-download-labels-live-20261006.png in OS temp.
+  No application records created or altered. Existing staff/native PDF acceptance
+  remains separately recorded; no duplicate test records or permission changes.
+- Broader OCR benchmark is complete but not a quality pass: 12 public receipt
+  scans attempted, 10 processed, 2 rejected by 12MP guard; 2/20 date/amount
+  suggestions matched exactly. CAP02-OCR-001 (amount context) and CAP02-OCR-002
+  (date contamination/validation) are confirmed Medium open issues, not fixed.
+- Next proposed action: scoped conservative parser fixes and regression tests
+  for these two findings, followed by the same benchmark. Genuine Nigerian
+  clearing-document and handwriting performance remains unverified.
+
 ## 2026-10-06 10:40 WAT - Access Blocker, No Repeated Tests
 
 - User said proceed. Read current project/test/session records and confirmed

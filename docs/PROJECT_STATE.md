@@ -45,6 +45,19 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-06 11:50 WAT: download accessibility correction committed/pushed as
+  `d3c7f1a`; Railway deployment `e737b841-29fc-42df-9601-8ef0374b94a4`
+  is SUCCESS for that exact commit. Live container #32 exposes distinct named
+  download buttons for PNG versions 1/2 and PDF version 1, correct new-tab
+  tooltips and type=button. Enter on PDF opens /api/documents/11. A fresh native
+  PDF-viewer inspection was blocked by Chrome extension UI; earlier verified
+  native-rendering evidence remains historical, not a new rendering pass.
+  No live records changed. Label implementation/acceptance is complete.
+- Next proposed work is the two confirmed Medium OCR follow-ups below, not a
+  repeat of completed CAP-02 permission/profile tests. Real clearing-document
+  and handwriting accuracy remain unverified; public receipt results do not
+  establish those capabilities. No OCR parser fix was included in this turn.
+
 - 2026-10-06 11:40 WAT: download accessibility fix implemented locally in shared
   DocumentsTab: filename/version aria-label, tooltip explaining new tab, explicit
   button type; existing file-open behavior unchanged. Railway build/typechecks

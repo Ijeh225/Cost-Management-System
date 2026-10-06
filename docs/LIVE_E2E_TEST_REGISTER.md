@@ -9,6 +9,16 @@ action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 
+- 2026-10-06 11:50 WAT: download-label live acceptance PASS after production
+  deployment `e737b841-29fc-42df-9601-8ef0374b94a4` SUCCESS, commit `d3c7f1a`.
+  #32 lists named PNG v1/v2 and PDF v1 buttons with matching type/title attributes.
+  Enter on the PDF control opens /api/documents/11 in a new tab. Native viewer
+  inspection was blocked by another Chrome extension UI; no fresh rendering
+  or saved-download result is claimed. Local Enter/Space checks already passed.
+  Screenshot: C:/Users/SONOFGRACE/AppData/Local/Temp/cap02-download-labels-live-20261006.png.
+  No uploads/reviews/profiles/workflow/financial records changed. This supersedes
+  the earlier pending-publication label entry, not the two open OCR findings.
+
 - 2026-10-06 11:40 WAT: download-label correction locally PASS: exact per-file/
   version accessible name, explanatory tooltip, Enter/Space open original target
   with no data writes. Production build/typechecks and CAP-02 UI fixture passed.
