@@ -1,6 +1,6 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-10-05
+## Current Work Register - Authoritative as of 2026-10-06
 
 Use this section to choose the next task. Earlier plans, next-action lines,
 and issue statuses in this document are historical evidence, not the current
@@ -44,6 +44,20 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 `644c3d66-5bea-4b2c-8c6e-8c91b39a4786`. Fresh live staff acceptance passed.
 
 ### Next Action
+
+- 2026-10-06 10:40 WAT: user authorised continuation; no completed test repeated.
+  Chrome initially showed the login page; existing QA sign-in was requested.
+  On recovery it showed the application homepage, but browser control reported
+  an unattached debugger, so identity/role could not be verified. In-app PDF #11
+  action opened /api/documents/11 in another tab, which returned "Session expired.
+  Please log in again." No completed download or PDF-rendering pass is claimed.
+  Main document page still shows cached prior state; it is not fresh auth evidence.
+  No document/review/profile/permission/financial writes or application-code changes.
+  NEXT: restore Chrome control and confirm existing Operations QA #14 identity,
+  then run its remaining permission checks and inspect existing PDF #11. Do not
+  reset credentials, widen access, duplicate fixtures or call this a new app defect.
+  Prior passed tests stand; representative real-document OCR remains unverified.
+  Session: docs/SESSION_SUMMARIES/2026-10-06-cap02-verification-resume.md.
 
 - Publication: verification commit `8bb5b7c` pushed to origin/master. API
   typecheck and diff checks passed. This publishes tests/records, not a new

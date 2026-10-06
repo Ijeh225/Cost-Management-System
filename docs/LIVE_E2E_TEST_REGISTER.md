@@ -1,6 +1,6 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-10-05
+## Current Test and Defect Register - Authoritative as of 2026-10-06
 
 Use this register before selecting the next test or fix. The detailed test rows
 and defect log below preserve their original observation date and are therefore
@@ -8,6 +8,16 @@ historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
+
+- Follow-up 2026-10-06 10:40 WAT: restricted-session/PDF acceptance not completed.
+  Existing Chrome tab moved from login to app homepage during the interrupted
+  browser attempt; identity is unknown because browser control is unavailable
+  (debugger unattached). Existing #11 download action opened its API source tab;
+  recovered tab returned session-expired JSON, not a rendered PDF. Browser wait
+  timed out and no downloaded path was obtained. Do not interpret cached owner
+  page, homepage URL, or attempted click as an auth/access/preview pass.
+  No repeat writes, uploads, account changes or confirmed new application defect.
+  Resume using existing #14 and #11 after working authenticated browser access.
 
 - Verification evidence and runners committed/pushed as `8bb5b7c`; API typecheck
   and diff checks passed. Fresh staff acceptance is still not run; publication

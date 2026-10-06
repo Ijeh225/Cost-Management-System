@@ -20,6 +20,8 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-10-06 CAP-02 verification resume and browser-access blocker, 10:40 WAT](2026-10-06-cap02-verification-resume.md)
+
 - [2026-10-05 CAP-02 implementation and acceptance, updated 18:20 WAT](2026-10-05-cap02-document-readiness.md)
 
 - [2026-10-05 records-only project status review](2026-10-05-status-review.md)
