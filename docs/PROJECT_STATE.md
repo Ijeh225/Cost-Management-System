@@ -1,6 +1,6 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-10-06
+## Current Work Register - Authoritative as of 2026-10-08
 
 Use this section to choose the next task. Earlier plans, next-action lines,
 and issue statuses in this document are historical evidence, not the current
@@ -44,6 +44,45 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 `644c3d66-5bea-4b2c-8c6e-8c91b39a4786`. Fresh live staff acceptance passed.
 
 ### Next Action
+
+- 2026-10-08 13:38 WAT: user authorised accounting Steps 1 and 2 only:
+  verified code checkpoint/database backup and baseline, isolated reproduction,
+  then ACCT-001/002/003 cash/deposit corrections. Duplicate-work check finds
+  those paths unchanged and no existing source-linked allocation fix. Reuse
+  existing integration-test environment/tooling; preserve previous checkpoints.
+  Steps 3-12 remain unapproved. Work IN PROGRESS; no new test/backup pass yet.
+
+- 2026-10-08 12:18 WAT: proposed 12-step accounting roadmap recorded in
+  `docs/ACCOUNTING_REMEDIATION_PLAN.md` following user's plan request. Steps
+  1-5 protect the baseline and fix ACCT-001 through ACCT-007 with isolated
+  regressions and deployed acceptance; Steps 6-12 are a separate proposed
+  expansion for accounting foundation, source integration/openings, GL/TB,
+  authorised journals, Balance Sheet/management accounts, Statement of Affairs
+  and controlled rollout/training. Native versus integration and recognition/
+  cutover policy need owner/accountant agreement. No implementation authorised,
+  no new tests or live writes, no commit/push. Next: review/approve scope; if
+  authorised, start with Steps 1 and 2. All seven ACCT findings remain open.
+
+- 2026-10-08 12:08 WAT: accounting feature review completed, REVIEW ONLY.
+  Full report: `docs/ACCOUNTING_FEATURE_REVIEW_2026-10-08.md`. Trial Balance,
+  Balance Sheet and Statement of Affairs are missing; a proper General Ledger
+  and general journals are missing despite related money-ledger/reversal
+  controls; Management Accounts has partial operational reporting coverage.
+  No full double-entry chart/account/journal/period-close foundation found.
+  Production exact commit 5f67dff confirmed SUCCESS in deployment
+  d9b14b32-a6c4-4eba-8bb9-55e516335f88. Fresh read-only live finance inspection
+  confirms Dashboard/P&L equality for current All-Time/All-Branches figures.
+  NEW open findings ACCT-001 through ACCT-007, not reopened old audit rows:
+  ledger omits live NGN50M deposit; deposit allocation duplicates cash sources;
+  non-cash credit/credit-note rows counted as cash; credit-note P&L/VAT source
+  mismatch; bad-debt loss absent from P&L; standalone payments unclassified;
+  Dashboard 90d+ label includes 61-90. ACCT-001/007 reproduced live read-only;
+  ACCT-002/003/004/005 source-confirmed, not new live writes; ACCT-006 is an
+  accounting classification gap, not proof every schedule is an expense.
+  Existing safe unit/mocked HTTP checks: 5 files, 16 passed. No schema/code,
+  app-data, permission or deployment changes. Await user approval; do not start
+  accounting features/fixes. Separate concurrency/classification evidence
+  limits and exact next action are in the report and timestamped session.
 
 - 2026-10-06 13:47 WAT: records-only pending-work audit after user asked about
   all project/test/session files. Latest authoritative entries contain no remaining

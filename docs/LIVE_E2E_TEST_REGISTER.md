@@ -1,11 +1,49 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-10-06
+## Current Test and Defect Register - Authoritative as of 2026-10-08
 
 Use this register before selecting the next test or fix. The detailed test rows
 and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
+
+### Accounting Review - 2026-10-08 12:08 WAT
+
+Planning update 2026-10-08 12:18 WAT: proposed dependency-ordered 12-step roadmap
+saved as `ACCOUNTING_REMEDIATION_PLAN.md`. Steps 1-5 cover the seven ACCT issues;
+Steps 6-12 cover separately approved full-accounting expansion. Isolated failure
+reproduction, historical-link exceptions, concurrency, branch/role restrictions,
+source-to-control reconciliation and exact deployment/live acceptance are gates,
+not completed tests. No new tests/fixes executed. All ACCT statuses unchanged.
+
+Review only: `ACCOUNTING_FEATURE_REVIEW_2026-10-08.md` contains the full six-feature
+status matrix, source pointers, live reconciliations and evidence limits.
+No accounting module implemented; no live financial writes or duplicate fixtures.
+Latest production 5f67dff confirmed SUCCESS (d9b14b32-a6c4-4eba-8bb9-55e516335f88).
+Five existing unit/mocked-HTTP files passed 16 tests; not a fresh DB concurrency run.
+
+| New ID | Priority | Status/evidence | Confirmed problem or implementation gap |
+| --- | --- | --- | --- |
+| ACCT-001 | High | OPEN; live read-only and source confirmed | Financial Ledger lacks original client deposits: current NGN50M deposit is present in AR/Cash Flow/bank, absent from Financial Ledger. All-Time net discrepancy exactly NGN50M after internal transfer elimination. |
+| ACCT-002 | High | OPEN; source-confirmed, fresh live write NOT run | Deposit allocation creates bank-linked invoice payment while original deposit is also summed by bank/Cash Flow, duplicating the allocated receipt. |
+| ACCT-003 | High | OPEN; source-confirmed, fresh live write NOT run | Non-cash client credit and credit-note invoice adjustments are treated as cash in Financial Ledger/Cash Flow, including opening totals. |
+| ACCT-004 | High | OPEN; source-confirmed, fresh live write NOT run | Credit notes reduce settlements but P&L/printable VAT Summary use original invoice subtotal/VAT; VAT Tracking separately handles credit-note VAT. |
+| ACCT-005 | High | OPEN; source-confirmed, fresh live write NOT run | Bad-debt write-off creates an overhead record, not a non-cash expense posting; P&L keeps invoice revenue and reads only actual expense payments. |
+| ACCT-006 | High | OPEN classification gap; source and live population separation | NGN501 standalone schedule payments are in cash/bank/ledger, with no accounting head/P&L mapping. Do not presume they are all operating expenses; require classification/review. |
+| ACCT-007 | Medium | OPEN; live read-only and source confirmed | Dashboard combines 61-90 with 90+ and labels both 90d+. Existing invoice is 68 days overdue/AR 61-90, but Dashboard says 90d+. Totals unchanged. |
+
+Positive bounded observations: Dashboard and P&L match revenue NGN3,001, COGS
+NGN701, paid overhead NGN15,710,302 and net -NGN15,708,002. Bank #3 credits 2,003
+less debits 1,404 = NGN599, including existing duty/payment reversals and NGN501
+standalone schedules. Cash Flow All-Banks excludes internal transfer NGN1 on
+both sides; this is expected and not a duplicate. AR/Invoices totals match and
+cancelled history stays outside aggregates. Previous recorded repair closures
+remain valid for their bounded scopes; none certifies the newly requested full GL.
+
+Additional unexecuted verification: deposit/credit/credit-note concurrency;
+historic expense metadata retention; accountant-approved recognition/classification
+policy. No new live corruption or universal duplicate guard claimed. No fixes
+authorised yet. Stop at completed review and await user decision.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 

@@ -20,6 +20,8 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-10-08 accounting review and proposed roadmap, updated 12:18 WAT](2026-10-08-accounting-feature-review.md)
+
 - [2026-10-06 OCR closure and pending-work records audit, updated 13:47 WAT](2026-10-06-cap02-verification-resume.md)
 
 - [2026-10-05 CAP-02 implementation and acceptance, updated 18:20 WAT](2026-10-05-cap02-document-readiness.md)
