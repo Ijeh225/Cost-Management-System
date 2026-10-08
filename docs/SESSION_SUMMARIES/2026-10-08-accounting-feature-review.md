@@ -1,5 +1,28 @@
 # Accounting Review and Cash Corrections Session
 
+## 2026-10-08 15:23 WAT - Migration Correction Verified Locally
+
+- Read-only production metadata confirms no new cash fields, old reversal
+  migration recorded once. Added independent invoice_cash_settlements_v1.
+- One new isolated existing-schema test PASS: existing payment unchanged,
+  additive upgrade repeatable, retry uniqueness enforced. Prior 19 deliberately
+  filtered, not repeated or failed. Fixture counts/tunnel cleanup verified.
+  API typecheck/server build PASS. Publishing correction before live acceptance.
+- Added guarded live runner for one labelled dummy job; refuses existing fixture
+  before writes, supports inspect-only, never saves login/cookies. No test run
+  claimed until corrected schema/deployment observed.
+
+## 2026-10-08 15:21 WAT - Release Migration Defect Found
+
+- d37d4b4 and immutable checkpoint tag pushed. Exact Railway deployment
+  158f6fce-9d41-4174-abe1-78dfdee1a6e3 SUCCESS and healthz OK. Post-deploy
+  source baseline/checksum unchanged, but this does not prove functional success.
+- First owner API read Financial Ledger returned 500 before test fixtures.
+  ACCT-DEPLOY-001: new cash fields were included in the old recorded reversal
+  migration, skipped on production. No live financial records changed; session
+  logged out. Fix separate invoice_cash_settlements_v1 startup registration,
+  verify older-schema upgrade isolated, redeploy, then resume exact acceptance.
+
 ## 2026-10-08 15:14 WAT - Release Authorised
 
 - User asked why fixes were not deployed, then authorised proceeding with

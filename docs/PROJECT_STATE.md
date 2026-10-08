@@ -45,6 +45,25 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-08 15:23 WAT: ACCT-DEPLOY-001 fix locally verified. New independent
+  invoice_cash_settlements_v1 startup migration adds only nullable source/retry
+  fields and their partial unique index. Read-only production inspection confirms
+  all three fields absent and prior reversal migration recorded once. New isolated
+  upgrade test preserves old payment row, safely reruns and rejects duplicate
+  keys; PASS, other 19 deliberately filtered/prior passes retained. Test fixtures
+  restored/tunnel closed. API typecheck/build PASS. Publishing correction next;
+  no live accounting acceptance writes yet. Guarded live runner refuses duplicate
+  labelled fixtures and keeps credentials/cookies in process memory only.
+
+- 2026-10-08 15:21 WAT: d37d4b4 and protected checkpoint tag pushed;
+  deployment 158f6fce-9d41-4174-abe1-78dfdee1a6e3 reports SUCCESS and healthz OK.
+  First authenticated live read found ACCT-DEPLOY-001: Financial Ledger HTTP
+  500, because new fields were inside already-recorded reversal migration v1.
+  No acceptance fixture/financial write occurred; independent session logged out.
+  Correcting with separate additive invoice_cash_settlements_v1 migration and
+  an isolated existing-schema upgrade regression, then redeploy/retest. Original
+  production source totals and archive still match before any acceptance writes.
+
 - 2026-10-08 15:14 WAT: user authorised release of accounting Steps 1/2.
   Existing 19-case isolated evidence/build results reused, not repeated.
   Fresh read-only production counts/totals and immutable archive checksum

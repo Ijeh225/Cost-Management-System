@@ -9,6 +9,21 @@ action` label below does not override this current register.
 
 ### Accounting Steps 1/2 - 2026-10-08 14:05 WAT
 
+- 2026-10-08 15:23 WAT: ACCT-DEPLOY-001 source fix verified with one new
+  isolated older-schema upgrade test (1 PASS, 19 intentionally filtered).
+  Prior row preserved, repeated additive upgrade safe, unique retry-key index
+  rejects duplicates. API typecheck/server build PASS; fixture counts restored
+  and tunnel closed. Production read-only metadata confirms missing fields and
+  old migration recorded. New versioned migration awaits corrected deployment.
+
+- 2026-10-08 15:21 WAT: release d37d4b4 pushed, exact Railway deployment
+  158f6fce-9d41-4174-abe1-78dfdee1a6e3 SUCCESS/healthz OK, but first live
+  GET Financial Ledger failed 500. New High ACCT-DEPLOY-001: cash fields added
+  under already-recorded invoice_payment_reversals_v1, so startup skipped them.
+  No test client/job/invoice/payment created. Source counts/backup verified
+  unchanged after deploy. Separate versioned additive migration being fixed
+  before continuing; do not claim ACCT-001/002/003 live acceptance yet.
+
 - 2026-10-08 15:14 WAT: release authorised. Pre-release read-only production
   baseline and saved archive checksum match. Reuse the 19 distinct isolated
   passes; commit/push, exact production deployment and bounded live acceptance

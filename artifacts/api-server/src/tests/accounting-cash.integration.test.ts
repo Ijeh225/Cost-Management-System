@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import app from "../app";
 import { db, pool, branchesTable, usersTable, clientsTable, banksTable, invoicesTable, invoicePaymentsTable, clientDepositsTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
+import { ensureInvoiceCashSettlementSchema } from "../lib/invoice-payment-reversal-schema";
 
 const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const branches: number[] = [];
@@ -73,6 +74,25 @@ async function assertCash(f: Fixture, amount: number) {
 }
 
 describe("accounting cash source regressions", () => {
+  it("upgrades the existing reversal schema without replacing rows and is repeatable", async () => {
+    const connection = await pool.connect();
+    try {
+      await connection.query("BEGIN");
+      await connection.query("CREATE TEMP TABLE client_deposits (id integer PRIMARY KEY) ON COMMIT DROP");
+      await connection.query("CREATE TEMP TABLE invoice_payments (id integer PRIMARY KEY, amount numeric(15,2), entry_type text) ON COMMIT DROP");
+      await connection.query("INSERT INTO invoice_payments VALUES (1,100,'payment')");
+      await ensureInvoiceCashSettlementSchema(connection);
+      await ensureInvoiceCashSettlementSchema(connection);
+      const result = await connection.query("SELECT id,amount,entry_type,source_deposit_id,settlement_request_key,settlement_request_amount FROM invoice_payments");
+      expect(result.rows).toEqual([{ id: 1, amount: "100.00", entry_type: "payment", source_deposit_id: null, settlement_request_key: null, settlement_request_amount: null }]);
+      await connection.query("INSERT INTO invoice_payments(id,amount,entry_type,settlement_request_key) VALUES (2,50,'payment','same-test-key')");
+      await expect(connection.query("INSERT INTO invoice_payments(id,amount,entry_type,settlement_request_key) VALUES (3,50,'payment','same-test-key')")).rejects.toMatchObject({ code: "23505" });
+    } finally {
+      await connection.query("ROLLBACK");
+      connection.release();
+    }
+  });
+
   it("ACCT-001 includes an original deposit once in branch and date scoped Financial Ledger", async () => {
     const f = await fixture();
     const id = await deposit(f);
