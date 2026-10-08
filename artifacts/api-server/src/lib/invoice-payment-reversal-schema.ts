@@ -6,6 +6,10 @@ export async function ensureInvoicePaymentReversalSchema(pool: SqlExecutor) {
   await pool.query(`ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS entry_type TEXT NOT NULL DEFAULT 'payment'`);
   await pool.query(`ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS reversal_of_payment_id INTEGER REFERENCES invoice_payments(id) ON DELETE RESTRICT`);
   await pool.query(`ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS reversal_reason TEXT`);
+  await pool.query(`ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS source_deposit_id INTEGER REFERENCES client_deposits(id) ON DELETE RESTRICT`);
+  await pool.query(`ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS settlement_request_key TEXT`);
+  await pool.query(`ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS settlement_request_amount NUMERIC(15,2)`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS invoice_payments_settlement_request_idx ON invoice_payments(settlement_request_key) WHERE settlement_request_key IS NOT NULL`);
   await pool.query(`ALTER TABLE invoice_payments DROP CONSTRAINT IF EXISTS invoice_payments_amount_nonzero_check`);
   await pool.query(`ALTER TABLE invoice_payments ADD CONSTRAINT invoice_payments_amount_nonzero_check CHECK (amount <> 0)`);
   await pool.query(`ALTER TABLE invoice_payments DROP CONSTRAINT IF EXISTS invoice_payments_entry_type_check`);

@@ -4,12 +4,14 @@ import {
   db, clientsTable, containersTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable,
   clientDepositsTable, shippingChargesTable, customsChargesTable,
   terminalChargesTable, deliveryChargesTable, operationsChargesTable,
-  usersTable, banksTable, shipmentsTable,
+  usersTable, banksTable, shipmentsTable, invoiceAuditLogTable,
 } from "@workspace/db";
 import { eq, desc, sum, inArray, gte, and, isNull, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, verifyPassword, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 import { calcTotalCost } from "../lib/calculations.js";
 import { isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
+import { getEffectiveInvoiceStatus } from "../lib/invoice-status.js";
+import { settlementAmount, settlementRequestKey } from "../lib/invoice-cash.js";
 
 export const clientsRouter = Router();
 
@@ -488,9 +490,10 @@ clientsRouter.post("/clients/:id/deposits", requireBranchAdminOrAbove, async (re
   try {
     const clientId = parseInt(String(req.params.id));
     if (isNaN(clientId)) return res.status(400).json({ error: "Invalid ID" });
-    const { amount, paymentMethod, reference, notes, bankId } = req.body;
-    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-      return res.status(400).json({ error: "Amount must be a positive number" });
+    const { amount, paymentMethod, reference, notes, bankId } = req.body ?? {};
+    const receiptAmount = settlementAmount(amount);
+    if (receiptAmount === null) {
+      return res.status(400).json({ error: "Amount must be positive with at most two decimal places" });
     }
     if (!paymentMethod || !ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
       return res.status(400).json({ error: `Payment method must be one of: ${ALLOWED_PAYMENT_METHODS.join(", ")}` });
@@ -506,13 +509,14 @@ clientsRouter.post("/clients/:id/deposits", requireBranchAdminOrAbove, async (re
     }
     if (bankId) {
       const [bk] = await db.select({ branchId: banksTable.branchId }).from(banksTable).where(eq(banksTable.id, Number(bankId)));
-      if (bk && bk.branchId !== client.branchId) {
+      if (!bk) return res.status(400).json({ error: "Selected bank does not exist." });
+      if (bk.branchId !== client.branchId) {
         return res.status(400).json({ error: "Selected bank belongs to a different branch than the client." });
       }
     }
     const [deposit] = await db.insert(clientDepositsTable).values({
       clientId,
-      amount: String(parseFloat(amount)),
+      amount: receiptAmount.toFixed(2),
       paymentMethod,
       reference: reference ?? null,
       notes: notes ?? null,
@@ -552,21 +556,25 @@ clientsRouter.delete("/clients/:id/deposits/:depositId", requireBranchAdminOrAbo
     const clientId = parseInt(String(req.params.id));
     const depositId = parseInt(String(req.params.depositId));
     if (isNaN(clientId) || isNaN(depositId)) return res.status(400).json({ error: "Invalid ID" });
-    const [existing] = await db.select().from(clientDepositsTable)
-      .where(eq(clientDepositsTable.id, depositId));
-    if (!existing || existing.clientId !== clientId) return res.status(404).json({ error: "Deposit not found" });
-    if (!userCanAccessBranch(req, existing.branchId)) {
-      return res.status(404).json({ error: "Deposit not found" });
-    }
-    const _scope = getBranchScope(req);
-    if (_scope === null && req.user?.role === "super_admin") {
-      return res.status(400).json({ error: "Select a specific branch from the switcher before deleting a deposit." });
-    }
-    const allocatedAmount = parseFloat(existing.allocatedAmount ?? "0");
-    if (allocatedAmount > 0) {
-      return res.status(400).json({ error: "Cannot remove a deposit that has been allocated to an invoice. Remove the invoice payment first." });
-    }
-    await db.delete(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM client_deposits WHERE id = ${depositId} FOR UPDATE`);
+      const [existing] = await tx.select().from(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
+      if (!existing || existing.clientId !== clientId || !userCanAccessBranch(req, existing.branchId)) {
+        return { code: 404, error: "Deposit not found" };
+      }
+      if (getBranchScope(req) === null && req.user?.role === "super_admin") {
+        return { code: 400, error: "Select a specific branch from the switcher before deleting a deposit." };
+      }
+      if (Number(existing.allocatedAmount) > 0) {
+        return { code: 400, error: "Cannot remove a deposit that has been allocated to an invoice." };
+      }
+      const [linked] = await tx.select({ id: invoicePaymentsTable.id }).from(invoicePaymentsTable)
+        .where(eq(invoicePaymentsTable.sourceDepositId, depositId)).limit(1);
+      if (linked) return { code: 409, error: "This receipt has invoice settlement history and must be retained, even after reversal." };
+      await tx.delete(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
+      return { code: 200, error: null };
+    });
+    if (result.error) return res.status(result.code).json({ error: result.error });
     return res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -581,100 +589,73 @@ clientsRouter.post("/client-deposits/:id/allocate", requireBranchAdminOrAbove, a
     const depositId = parseInt(String(req.params.id));
     if (isNaN(depositId)) return res.status(400).json({ error: "Invalid deposit ID" });
 
-    const { invoiceId, amount: rawAmount } = req.body as { invoiceId: number; amount: number };
-    if (!invoiceId || isNaN(invoiceId)) return res.status(400).json({ error: "invoiceId is required" });
-    const allocationAmount = parseFloat(String(rawAmount));
-    if (isNaN(allocationAmount) || allocationAmount <= 0) {
-      return res.status(400).json({ error: "Allocation amount must be a positive number" });
+    const { invoiceId, amount: rawAmount, requestKey: rawKey } = (req.body ?? {}) as { invoiceId: number; amount: number; requestKey?: string };
+    if (!Number.isInteger(invoiceId) || invoiceId <= 0) return res.status(400).json({ error: "invoiceId is required" });
+    const allocationAmount = settlementAmount(rawAmount);
+    const requestKey = settlementRequestKey(rawKey);
+    if (allocationAmount === null || requestKey === false) {
+      return res.status(400).json({ error: "Use a positive amount with at most two decimals and a valid request key" });
     }
 
     const _scope = getBranchScope(req);
     if (_scope === null && req.user?.role === "super_admin") {
       return res.status(400).json({ error: "Select a specific branch from the switcher before allocating a deposit." });
     }
-    const [deposit] = await db.select().from(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
-    if (!deposit) return res.status(404).json({ error: "Deposit not found" });
-    if (!userCanAccessBranch(req, deposit.branchId)) {
-      return res.status(404).json({ error: "Deposit not found" });
-    }
+    const result = await db.transaction(async (tx) => {
+      if (requestKey) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${requestKey}, 0))`);
+      // Every settlement locks the invoice first; deposit locking serializes
+      // applications to different invoices that consume the same receipt.
+      await tx.execute(sql`SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE`);
+      await tx.execute(sql`SELECT id FROM client_deposits WHERE id = ${depositId} FOR UPDATE`);
+      const [inv] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+      const [deposit] = await tx.select().from(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
+      if (!inv || !userCanAccessBranch(req, inv.branchId)) return { error: { code: 404, message: "Invoice not found" } };
+      if (!deposit || !userCanAccessBranch(req, deposit.branchId)) return { error: { code: 404, message: "Deposit not found" } };
+      if (inv.clientId !== deposit.clientId || inv.branchId !== deposit.branchId) return { error: { code: 400, message: "Deposit and invoice must belong to the same client and branch" } };
 
-    const depositTotal = parseFloat(deposit.amount);
-    const alreadyAllocated = parseFloat(deposit.allocatedAmount ?? "0");
-    const remainingOnDeposit = depositTotal - alreadyAllocated;
-    if (allocationAmount > remainingOnDeposit + 0.001) {
-      return res.status(400).json({
-        error: `Allocation amount (₦${allocationAmount.toLocaleString()}) exceeds the deposit's remaining balance (₦${remainingOnDeposit.toLocaleString()})`,
-      });
-    }
-
-    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!inv) return res.status(404).json({ error: "Invoice not found" });
-    if (inv.clientId !== deposit.clientId) {
-      return res.status(400).json({ error: "Deposit and invoice must belong to the same client" });
-    }
-    if (inv.branchId !== deposit.branchId) {
-      return res.status(400).json({ error: "Deposit and invoice belong to different branches — cross-branch allocation is not allowed." });
-    }
-    if (!userCanAccessBranch(req, inv.branchId)) {
-      return res.status(403).json({ error: "Invoice belongs to another branch." });
-    }
-    if (!isInvoiceFinanciallyActive(inv.status)) {
-      return res.status(400).json({ error: "Cannot allocate a deposit against a draft, cancelled, or written-off invoice" });
-    }
-
-    const existingPayments = await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
-    const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
-    const invoiceTotal = parseFloat(inv.total ?? "0");
-    const invoiceOutstanding = Math.max(0, invoiceTotal - totalPaid);
-    if (invoiceOutstanding <= 0) {
-      return res.status(400).json({ error: "Invoice is already fully paid" });
-    }
-    if (allocationAmount > invoiceOutstanding + 0.001) {
-      return res.status(400).json({
-        error: `Allocation amount exceeds invoice outstanding balance (₦${invoiceOutstanding.toLocaleString()})`,
-      });
-    }
-
-    await db.transaction(async (tx) => {
+      const alreadyAllocated = Number(deposit.allocatedAmount);
+      const remainingOnDeposit = Math.round((Number(deposit.amount) - alreadyAllocated) * 100) / 100;
+      if (requestKey) {
+        const [prior] = await tx.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.settlementRequestKey, requestKey));
+        if (prior) {
+          if (prior.invoiceId !== invoiceId || prior.sourceDepositId !== depositId || prior.paymentMethod !== "deposit" || Number(prior.settlementRequestAmount) !== allocationAmount) return { error: { code: 409, message: "Request key was already used for another settlement" } };
+          return { ok: { success: true, depositId, invoiceId, allocationAmount: Number(prior.amount), remainingOnDeposit, replayed: true } };
+        }
+      }
+      if (!isInvoiceFinanciallyActive(inv.status)) return { error: { code: 400, message: "Cannot allocate a deposit against a draft, cancelled, or written-off invoice" } };
+      if (allocationAmount > remainingOnDeposit) return { error: { code: 400, message: "Allocation amount exceeds the deposit's remaining balance" } };
+      const payments = await tx.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+      const totalPaid = payments.reduce((sum, row) => sum + Number(row.amount), 0);
+      const invoiceTotal = Number(inv.total);
+      const outstanding = Math.round(Math.max(0, invoiceTotal - totalPaid) * 100) / 100;
+      if (allocationAmount > outstanding) return { error: { code: 400, message: "Allocation amount exceeds invoice outstanding balance" } };
       await tx.insert(invoicePaymentsTable).values({
         invoiceId,
-        amount: String(allocationAmount),
-        paymentMethod: deposit.paymentMethod,
+        amount: allocationAmount.toFixed(2),
+        paymentMethod: "deposit",
+        sourceDepositId: depositId,
+        settlementRequestKey: requestKey,
+        settlementRequestAmount: requestKey ? allocationAmount.toFixed(2) : null,
         reference: deposit.reference ?? "",
         notes: `Applied from deposit #${depositId}${deposit.notes ? ` — ${deposit.notes}` : ""}`,
         paidAt: new Date(),
-        bankId: deposit.bankId ?? null,
+        bankId: null,
         branchId: inv.branchId,
       });
 
       const newAllocated = alreadyAllocated + allocationAmount;
       await tx.update(clientDepositsTable)
-        .set({ allocatedAmount: String(newAllocated), allocatedInvoiceId: invoiceId })
+        .set({ allocatedAmount: newAllocated.toFixed(2), allocatedInvoiceId: invoiceId })
         .where(eq(clientDepositsTable.id, depositId));
 
-      const newTotalPaid = totalPaid + allocationAmount;
-      let newStatus = inv.status;
-      if (newTotalPaid >= invoiceTotal) {
-        newStatus = "paid";
-      } else if (newTotalPaid > 0) {
-        newStatus = "partial";
-      }
       await tx.update(invoicesTable)
-        .set({ status: newStatus, updatedAt: new Date() })
+        .set({ status: getEffectiveInvoiceStatus({ status: inv.status, total: invoiceTotal, totalPaid: totalPaid + allocationAmount, dueDate: inv.dueDate }), updatedAt: new Date() })
         .where(eq(invoicesTable.id, invoiceId));
+      await tx.insert(invoiceAuditLogTable).values({ invoiceId, branchId: inv.branchId, action: "deposit_applied", details: `Deposit #${depositId}: ${allocationAmount.toFixed(2)} applied without new cash`, performedBy: req.user?.id ?? null });
+      return { ok: { success: true, depositId, invoiceId, allocationAmount, remainingOnDeposit: Math.round((remainingOnDeposit - allocationAmount) * 100) / 100, replayed: false } };
     });
-
-    const [updatedDeposit] = await db.select().from(clientDepositsTable).where(eq(clientDepositsTable.id, depositId));
-    const updatedAmount = parseFloat(updatedDeposit.amount);
-    const updatedAllocated = parseFloat(updatedDeposit.allocatedAmount ?? "0");
-
-    return res.json({
-      success: true,
-      depositId,
-      invoiceId,
-      allocationAmount,
-      remainingOnDeposit: updatedAmount - updatedAllocated,
-    });
+    if (result.error) return res.status(result.error.code).json({ error: result.error.message });
+    return res.json(result.ok);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });

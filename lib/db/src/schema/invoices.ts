@@ -1,7 +1,9 @@
-import { pgTable, serial, integer, text, numeric, timestamp, date, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, numeric, timestamp, date, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { containersTable } from "./containers";
 import { clientsTable } from "./clients";
 import { banksTable } from "./banks";
+import { clientDepositsTable } from "./client-deposits";
 
 export const invoicesTable = pgTable("invoices", {
   id: serial("id").primaryKey(),
@@ -41,11 +43,17 @@ export const invoicePaymentsTable = pgTable("invoice_payments", {
   reference: text("reference").notNull().default(""),
   notes: text("notes").notNull().default(""),
   bankId: integer("bank_id").references(() => banksTable.id, { onDelete: "set null" }),
+  sourceDepositId: integer("source_deposit_id").references((): AnyPgColumn => clientDepositsTable.id, { onDelete: "restrict" }),
+  settlementRequestKey: text("settlement_request_key"),
+  settlementRequestAmount: numeric("settlement_request_amount", { precision: 15, scale: 2 }),
   entryType: text("entry_type").notNull().default("payment"),
   reversalOfPaymentId: integer("reversal_of_payment_id").references((): AnyPgColumn => invoicePaymentsTable.id, { onDelete: "restrict" }),
   reversalReason: text("reversal_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("invoice_payments_settlement_request_idx").on(table.settlementRequestKey)
+    .where(sql`${table.settlementRequestKey} IS NOT NULL`),
+]);
 
 export type Invoice = typeof invoicesTable.$inferSelect;
 export type InvoiceItem = typeof invoiceItemsTable.$inferSelect;

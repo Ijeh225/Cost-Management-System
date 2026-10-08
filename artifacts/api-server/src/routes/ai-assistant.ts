@@ -1,4 +1,5 @@
 import { NextFunction, Response, Router } from "express";
+import { invoiceCashCondition } from "../lib/invoice-cash.js";
 import { findContainerVisit } from "../lib/container-visit-lookup.js";
 import {
   aiAssistantAuditLogsTable,
@@ -1336,7 +1337,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     const period = getReportPeriod(body);
     const [allInvoices, allInvoicePayments, allDeposits, allOverheadPayments, allContainerPayments] = await Promise.all([
       db.select({ id: invoicesTable.id, branchId: invoicesTable.branchId, status: invoicesTable.status }).from(invoicesTable),
-      db.select({ id: invoicePaymentsTable.id, branchId: invoicePaymentsTable.branchId, invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount, paidAt: invoicePaymentsTable.paidAt }).from(invoicePaymentsTable),
+      db.select({ id: invoicePaymentsTable.id, branchId: invoicePaymentsTable.branchId, invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount, paidAt: invoicePaymentsTable.paidAt }).from(invoicePaymentsTable).where(invoiceCashCondition(invoicePaymentsTable)),
       db.select({ id: clientDepositsTable.id, branchId: clientDepositsTable.branchId, clientId: clientDepositsTable.clientId, amount: clientDepositsTable.amount, createdAt: clientDepositsTable.createdAt }).from(clientDepositsTable),
       db.select({ id: expensePaymentsTable.id, branchId: expensePaymentsTable.branchId, expenseId: expensePaymentsTable.expenseId, amount: expensePaymentsTable.amount, paidAt: expensePaymentsTable.paidAt }).from(expensePaymentsTable),
       db.select({ id: containerExpensePaymentsTable.id, branchId: containerExpensePaymentsTable.branchId, containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount, paidAt: containerExpensePaymentsTable.paidAt }).from(containerExpensePaymentsTable),
@@ -1354,7 +1355,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     result.facts = [
       { label: "Report period", value: period.label },
       { label: "Invoice collections", value: money(collections), detail: `${invoicePayments.length} recorded collection(s).` },
-      { label: "Client deposits", value: money(depositTotal), detail: `${deposits.length} recorded deposit(s); may include allocations already reflected in collections.` },
+      { label: "Client deposits", value: money(depositTotal), detail: `${deposits.length} original receipt(s); later allocations are not new cash collections.` },
       { label: "Overhead payments", value: money(overheadTotal), detail: `${overheadPayments.length} actual payment(s).` },
       { label: "Container disbursements", value: money(containerTotal), detail: `${containerPayments.length} actual payment(s).` },
       { label: "Recorded outflows", value: money(overheadTotal + containerTotal), detail: "Overhead and container payments only; excludes inter-bank transfers." },
@@ -1415,7 +1416,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     const period = getReportPeriod(body);
     const [allInvoices, allInvoicePayments, allDeposits, allOverheadPayments, allContainerPayments] = await Promise.all([
       db.select({ id: invoicesTable.id, branchId: invoicesTable.branchId, invoiceNumber: invoicesTable.invoiceNumber, total: invoicesTable.total, createdAt: invoicesTable.createdAt, status: invoicesTable.status }).from(invoicesTable),
-      db.select({ id: invoicePaymentsTable.id, branchId: invoicePaymentsTable.branchId, invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount, paidAt: invoicePaymentsTable.paidAt }).from(invoicePaymentsTable),
+      db.select({ id: invoicePaymentsTable.id, branchId: invoicePaymentsTable.branchId, invoiceId: invoicePaymentsTable.invoiceId, amount: invoicePaymentsTable.amount, paidAt: invoicePaymentsTable.paidAt }).from(invoicePaymentsTable).where(invoiceCashCondition(invoicePaymentsTable)),
       db.select({ id: clientDepositsTable.id, branchId: clientDepositsTable.branchId, amount: clientDepositsTable.amount, allocatedAmount: clientDepositsTable.allocatedAmount, createdAt: clientDepositsTable.createdAt }).from(clientDepositsTable),
       db.select({ id: expensePaymentsTable.id, branchId: expensePaymentsTable.branchId, expenseId: expensePaymentsTable.expenseId, amount: expensePaymentsTable.amount, paidAt: expensePaymentsTable.paidAt }).from(expensePaymentsTable),
       db.select({ id: containerExpensePaymentsTable.id, branchId: containerExpensePaymentsTable.branchId, containerId: containerExpensePaymentsTable.containerId, amount: containerExpensePaymentsTable.amount, paidAt: containerExpensePaymentsTable.paidAt }).from(containerExpensePaymentsTable),
@@ -1439,7 +1440,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
       { label: "Invoice collections", value: money(collected), detail: `${collections.length} recorded payment(s).` },
       { label: "Client deposits received", value: money(depositsReceived), detail: "Includes allocated and unallocated deposits." },
       { label: "Recorded operating expenses", value: money(totalExpenses), detail: `${money(overheadPaid)} overhead and ${money(containerCostPaid)} container disbursements.` },
-      { label: "Net recorded cash movement", value: money(collected + depositsReceived - totalExpenses), detail: "Collections plus deposits less actual recorded payments; this is not an accrual profit figure." },
+      { label: "Net recorded cash movement", value: money(collected + depositsReceived - totalExpenses), detail: "Invoice cash plus original deposits less overhead/container payments only; excludes non-cash settlements and is not the complete Cash Flow report." },
     ];
     result.records = [
       { title: "Financial Reports", detail: `Open the existing reports for the ${period.label} period, preview totals, or export PDF/Excel.`, href: `/reports?from=${period.from.toISOString().slice(0, 10)}&to=${period.to.toISOString().slice(0, 10)}`, badges: ["Report draft"] },
@@ -1505,7 +1506,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
   if (toolId === "bank_ledger_reconciliation") {
     const [allBanks, allPayments, allDeposits, allTransfers, allFundAdditions, allOverheadPayments, allContainerPayments] = await Promise.all([
       db.select({ id: banksTable.id, branchId: banksTable.branchId, name: banksTable.name, accountNumber: banksTable.accountNumber, isActive: banksTable.isActive }).from(banksTable),
-      db.select({ branchId: invoicePaymentsTable.branchId, bankId: invoicePaymentsTable.bankId, amount: invoicePaymentsTable.amount }).from(invoicePaymentsTable),
+      db.select({ branchId: invoicePaymentsTable.branchId, bankId: invoicePaymentsTable.bankId, amount: invoicePaymentsTable.amount }).from(invoicePaymentsTable).where(invoiceCashCondition(invoicePaymentsTable)),
       db.select({ branchId: clientDepositsTable.branchId, bankId: clientDepositsTable.bankId, amount: clientDepositsTable.amount }).from(clientDepositsTable),
       db.select({ branchId: bankTransfersTable.branchId, fromBankId: bankTransfersTable.fromBankId, toBankId: bankTransfersTable.toBankId, amount: bankTransfersTable.amount }).from(bankTransfersTable),
       db.select({ branchId: bankFundAdditionsTable.branchId, bankId: bankFundAdditionsTable.bankId, amount: bankFundAdditionsTable.amount }).from(bankFundAdditionsTable),
@@ -1544,7 +1545,7 @@ async function runApprovedTool(toolId: ToolId, req: AuthRequest, body: Record<st
     }));
     result.sources = rows.slice(0, limit).map((bank) => ({ type: "bank", id: bank.id, label: bank.name, href: `/banks?bankId=${bank.id}` }));
     result.notes = [
-      "This reconciles application ledger entries only: invoice payments, client deposits, fund additions, transfers, and recorded expenses.",
+      "This partial ledger draft includes invoice cash, original deposits, fund additions, transfers, and overhead/container payments; duty and standalone schedule payments are not included. Use Bank Management for the complete application balance.",
       "No imported bank statement is available, so this cannot confirm the external bank balance or detect statement-only transactions.",
     ];
     return result;

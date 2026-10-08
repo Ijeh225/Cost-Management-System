@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
+import { useSettlementRequestKey } from "@/hooks/use-settlement-request-key";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -42,6 +43,7 @@ function ApplyDepositDialog({
 }) {
   const { toast } = useToast();
   const allocate = useAllocateDeposit(clientId);
+  const requestKey = useSettlementRequestKey();
   const { data: deposits = [] } = useGetClientDeposits(open ? clientId : null);
   const [selectedDepositId, setSelectedDepositId] = useState<string>("");
   const [amount, setAmount] = useState("");
@@ -52,11 +54,14 @@ function ApplyDepositDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (allocate.isPending) return;
     if (!selected) { toast({ variant: "destructive", title: "Select a deposit" }); return; }
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) { toast({ variant: "destructive", title: "Enter a valid amount" }); return; }
     try {
-      const res = await allocate.mutateAsync({ depositId: selected.id, invoiceId, amount: amt });
+      const payload = { depositId: selected.id, invoiceId, amount: amt };
+      const res = await allocate.mutateAsync({ ...payload, requestKey: requestKey.forPayload(payload) });
+      requestKey.reset();
       toast({ title: `₦${res.allocationAmount.toLocaleString()} applied from deposit. Remaining on deposit: ₦${res.remainingOnDeposit.toLocaleString()}` });
       onClose();
       setSelectedDepositId("");
@@ -139,6 +144,7 @@ function ApplyCreditDialog({
 }) {
   const { toast } = useToast();
   const applyCredit = useApplyClientCredit();
+  const requestKey = useSettlementRequestKey();
   const { data: walletSummary } = useGetClientWalletSummary(open ? clientId : null);
   const [amount, setAmount] = useState("");
 
@@ -147,10 +153,13 @@ function ApplyCreditDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (applyCredit.isPending) return;
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) { toast({ variant: "destructive", title: "Enter a valid amount" }); return; }
     try {
-      const res = await applyCredit.mutateAsync({ invoiceId, amount: amt });
+      const payload = { invoiceId, amount: amt };
+      const res = await applyCredit.mutateAsync({ ...payload, requestKey: requestKey.forPayload(payload) });
+      requestKey.reset();
       toast({ title: `₦${res.appliedAmount.toLocaleString()} credit applied. Remaining credit: ₦${res.remainingCredit.toLocaleString()}` });
       onClose();
       setAmount("");

@@ -7,14 +7,73 @@ and defect log below preserve their original observation date and are therefore
 historical evidence. An older `Open`, `Failed`, `Blocked`, or `Next exact
 action` label below does not override this current register.
 
+### Accounting Steps 1/2 - 2026-10-08 14:05 WAT
+
+- 2026-10-08 15:14 WAT: release authorised. Pre-release read-only production
+  baseline and saved archive checksum match. Reuse the 19 distinct isolated
+  passes; commit/push, exact production deployment and bounded live acceptance
+  are in progress. No new live test result yet; prior protected records retained.
+
+- FINAL 2026-10-08 14:33 WAT: ACCT-001/002/003 FIXED / ISOLATED VERIFIED,
+  not deployed/live-accepted. 19 distinct DB cases passed: original 14, three
+  targeted controls, then two final AI/fractional cases. Last run's other 17
+  tests were intentionally filtered, NOT new failures or unverified cases.
+  Test implementation: artifacts/api-server/src/tests/accounting-cash.integration.test.ts.
+  Cash Ledger, Cash Flow current/opening, Bank statement/balance, partial/full
+  invoice settlement, concurrent shared-deposit/shared-credit consumption,
+  identical-key retries, changed-key-payload rejection, balance-restoring
+  reversals, immutable linked receipt history, actual cash reversal, input/
+  client/branch guards, non-finance denial, old bank-linked non-cash rows, AI
+  cash tools and stored fractional balances are covered. Optional request keys
+  deduplicate the same attempt; no universal content-based duplicate guard claimed.
+  All fixtures restored to pre-run counts; temporary SSH tunnels closed.
+  Full unit/mocked API suite 38 files/228 passed/3 existing network-only skips;
+  final API typecheck and server rebuild passed; prior library/web typechecks
+  and web build passed with existing sourcemap/chunk warnings.
+  Production source totals/checksum unchanged; no production writes/DDL/release.
+  Fix source and updated records are saved locally, not committed/pushed.
+  Remaining gate: release/deployment confirmation and bounded live acceptance.
+  ACCT-004/005/006/007 remain OPEN and unimplemented under this authorisation.
+
+- 2026-10-08 14:24 WAT milestone: first 14 isolated cases PASS, then three
+  additional cases PASS (bank-linked non-cash rows; fully settled invoice;
+  separate non-finance staff HTTP 403 on four settlement paths). Original
+  fixtures/counts restored and secure tunnels closed after both successful runs.
+  Full API suite 228 passed/3 pre-existing network-only skips. Typechecks/builds
+  PASS; existing frontend build warnings retained, not new failures.
+- Read-only production source counts/totals and saved archive checksum unchanged.
+  No live financial edits or production DDL; cash patches remain local.
+- AI cash-summary population received the same predicate after source tracing;
+  first targeted check failed because SSH/DB connection reset, including cleanup.
+  NOT classified as an arithmetic/product failure. Exact isolated run branches
+  #47/#48 identified and cleaned through SSH; zero ACCT fixture branches verified.
+  New clean AI/fractional run IN PROGRESS; do not claim that test passed yet.
+- Source coverage note: broader AI bank draft omits duty and standalone schedule
+  sources. Scope limitation now explicit; not a complete Bank Management balance
+  certification. Existing duty/schedule population support in Bank Management and
+  Cash Flow remains unchanged. Broader AI reconciliation is a separate follow-up.
+
+- User authorised protection and ACCT-001/002/003 only, with duplicate-work check.
+- Checkpoint cf29433/tag checkpoint-before-accounting-cash-fixes-2026-10-08
+  and verified production archive/full temporary isolated restore are complete.
+  See ACCOUNTING_CHECKPOINT_2026-10-08.md. Existing isolated DB was not reset.
+- Corrected isolated pre-fix run: eight genuine failures (deposit missing;
+  allocation/credit/credit-note cash miscount; concurrent deposit/credit over-use;
+  deposit/credit reversals fail to restore balances). Initial admin fixture access
+  failures excluded from defect evidence. Run-owned fixtures cleaned afterward.
+- Fixes implemented locally; expanded 14-case isolated verification NOT yet run.
+  Do not mark these issues closed or deployed. Production remains unchanged.
+  ACCT-004/005/006/007 remain OPEN and outside approved Steps 1/2.
+
 ### Accounting Review - 2026-10-08 12:08 WAT
 
-Planning update 2026-10-08 12:18 WAT: proposed dependency-ordered 12-step roadmap
+Original planning update 2026-10-08 12:18 WAT: proposed dependency-ordered 12-step roadmap
 saved as `ACCOUNTING_REMEDIATION_PLAN.md`. Steps 1-5 cover the seven ACCT issues;
 Steps 6-12 cover separately approved full-accounting expansion. Isolated failure
 reproduction, historical-link exceptions, concurrency, branch/role restrictions,
 source-to-control reconciliation and exact deployment/live acceptance are gates,
-not completed tests. No new tests/fixes executed. All ACCT statuses unchanged.
+not completed tests at that time. No tests/fixes had been executed at that
+planning point. Current fix statuses below incorporate the later Steps 1/2 work.
 
 Review only: `ACCOUNTING_FEATURE_REVIEW_2026-10-08.md` contains the full six-feature
 status matrix, source pointers, live reconciliations and evidence limits.
@@ -24,9 +83,9 @@ Five existing unit/mocked-HTTP files passed 16 tests; not a fresh DB concurrency
 
 | New ID | Priority | Status/evidence | Confirmed problem or implementation gap |
 | --- | --- | --- | --- |
-| ACCT-001 | High | OPEN; live read-only and source confirmed | Financial Ledger lacks original client deposits: current NGN50M deposit is present in AR/Cash Flow/bank, absent from Financial Ledger. All-Time net discrepancy exactly NGN50M after internal transfer elimination. |
-| ACCT-002 | High | OPEN; source-confirmed, fresh live write NOT run | Deposit allocation creates bank-linked invoice payment while original deposit is also summed by bank/Cash Flow, duplicating the allocated receipt. |
-| ACCT-003 | High | OPEN; source-confirmed, fresh live write NOT run | Non-cash client credit and credit-note invoice adjustments are treated as cash in Financial Ledger/Cash Flow, including opening totals. |
+| ACCT-001 | High | FIXED / ISOLATED VERIFIED; deployment/live pending | Original review: Financial Ledger omitted the NGN50M deposit, a net difference of NGN50M. Source now includes original receipts once; isolated branch/date/cash tests passed. |
+| ACCT-002 | High | FIXED / ISOLATED VERIFIED; deployment/live pending | Original allocation created a second bank-linked receipt. Applications now link the original deposit and settle the invoice without new cash; concurrency, retry and reversal tests passed. |
+| ACCT-003 | High | FIXED / ISOLATED VERIFIED; deployment/live pending | Original credit/credit-note adjustments inflated cash/current/opening totals. Shared cash predicate excludes non-cash settlements while AR retains them; isolated cash and AI draft cases passed. |
 | ACCT-004 | High | OPEN; source-confirmed, fresh live write NOT run | Credit notes reduce settlements but P&L/printable VAT Summary use original invoice subtotal/VAT; VAT Tracking separately handles credit-note VAT. |
 | ACCT-005 | High | OPEN; source-confirmed, fresh live write NOT run | Bad-debt write-off creates an overhead record, not a non-cash expense posting; P&L keeps invoice revenue and reads only actual expense payments. |
 | ACCT-006 | High | OPEN classification gap; source and live population separation | NGN501 standalone schedule payments are in cash/bank/ledger, with no accounting head/P&L mapping. Do not presume they are all operating expenses; require classification/review. |
@@ -40,10 +99,13 @@ both sides; this is expected and not a duplicate. AR/Invoices totals match and
 cancelled history stays outside aggregates. Previous recorded repair closures
 remain valid for their bounded scopes; none certifies the newly requested full GL.
 
-Additional unexecuted verification: deposit/credit/credit-note concurrency;
-historic expense metadata retention; accountant-approved recognition/classification
-policy. No new live corruption or universal duplicate guard claimed. No fixes
-authorised yet. Stop at completed review and await user decision.
+Additional review-stage verification included deposit/credit/credit-note concurrency,
+historic expense metadata retention and accountant-approved recognition/classification
+policy. Deposit/client-credit concurrency now passed under Step 2; credit-note
+recognition/concurrency, expense metadata and accounting policy remain separate.
+No new live corruption or universal duplicate guard claimed. Those were
+the review-stage gates; Steps 1/2 were subsequently authorised and verified
+above. Deployment/live acceptance and later accounting steps are still pending.
 
 ### CAP-02 Implementation and Bounded Acceptance - 2026-10-05
 

@@ -43,6 +43,7 @@ export type InvoicePayment = {
   reference: string;
   notes: string;
   bankId: number | null;
+  sourceDepositId?: number | null;
   entryType: "payment" | "reversal";
   reversalOfPaymentId: number | null;
   reversalReason: string | null;
@@ -230,6 +231,10 @@ export function useReverseInvoicePayment() {
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
       qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
       qc.invalidateQueries({ queryKey: ["/api/banks"] });
+      qc.invalidateQueries({ queryKey: ["/api/clients"] });
+      qc.invalidateQueries({ queryKey: ["/api/reports/cashflow"] });
+      qc.invalidateQueries({ queryKey: ["/api/reports/client-statement"] });
+      qc.invalidateQueries({ queryKey: ["/api/reports/invoice-aging"] });
     },
   });
 }
@@ -479,19 +484,22 @@ export function useWriteOffInvoice() {
 export function useApplyClientCredit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ invoiceId, amount }: { invoiceId: number; amount: number }) =>
+    mutationFn: ({ invoiceId, amount, requestKey }: { invoiceId: number; amount: number; requestKey?: string }) =>
       customFetch<{ success: boolean; appliedAmount: number; remainingCredit: number }>(
         `/api/invoices/${invoiceId}/apply-credit`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount }),
+          body: JSON.stringify({ amount, requestKey }),
         }
       ),
     onSuccess: (_, { invoiceId }) => {
       qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
       qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
+      qc.invalidateQueries({ queryKey: ["/api/clients"] });
+      qc.invalidateQueries({ queryKey: ["/api/reports/client-statement"] });
+      qc.invalidateQueries({ queryKey: ["/api/reports/invoice-aging"] });
     },
   });
 }

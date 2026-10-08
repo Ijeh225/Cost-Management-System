@@ -3,6 +3,7 @@ import { db, banksTable, bankTransfersTable, usersTable, invoicePaymentsTable, i
 import { eq, desc, and, gte, lte, or, SQL, sum, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthRequest, userCanAccessBranch, getBranchScope, resolveCreateBranch } from "../lib/auth.js";
 import { hasExistingBankReference, normaliseBankReference } from "../lib/bank-reference-guard.js";
+import { invoiceCashCondition } from "../lib/invoice-cash.js";
 
 export const banksRouter = Router();
 
@@ -27,7 +28,7 @@ banksRouter.get("/banks", requireAuth, async (req: AuthRequest, res) => {
     // Compute current balance for each bank from all transaction sources
     const [paymentsRows, depositsRows, transfersInRows, transfersOutRows, expensesRows, fundAddRows, containerExpRows, dutyPaymentRows, schedulePaymentRows] = await Promise.all([
       db.select({ bankId: invoicePaymentsTable.bankId, total: sum(invoicePaymentsTable.amount) })
-        .from(invoicePaymentsTable).where(isNotNull(invoicePaymentsTable.bankId)).groupBy(invoicePaymentsTable.bankId),
+        .from(invoicePaymentsTable).where(and(isNotNull(invoicePaymentsTable.bankId), invoiceCashCondition(invoicePaymentsTable))).groupBy(invoicePaymentsTable.bankId),
       db.select({ bankId: clientDepositsTable.bankId, total: sum(clientDepositsTable.amount) })
         .from(clientDepositsTable).where(isNotNull(clientDepositsTable.bankId)).groupBy(clientDepositsTable.bankId),
       db.select({ bankId: bankTransfersTable.toBankId, total: sum(bankTransfersTable.amount) })
@@ -230,7 +231,7 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
 
     // 1. Invoice payments credited to this bank
     if (!typeFilter || typeFilter === "payment") {
-      const paymentConditions: SQL<unknown>[] = [eq(invoicePaymentsTable.bankId, id)];
+      const paymentConditions: SQL<unknown>[] = [eq(invoicePaymentsTable.bankId, id), invoiceCashCondition(invoicePaymentsTable)];
       if (fromDate) paymentConditions.push(gte(invoicePaymentsTable.paidAt, fromDate));
       if (toDate)   paymentConditions.push(lte(invoicePaymentsTable.paidAt, toDate));
 

@@ -1,10 +1,18 @@
 # Accounting Remediation and Feature Plan
 
 Recorded: 2026-10-08 12:18 WAT (Africa/Lagos, UTC+01:00).
-Status: PROPOSED; user requested a plan, not implementation.
+Original status: PROPOSED at 12:18 WAT. Later user authorised Steps 1/2 only.
 Basis: ACCOUNTING_FEATURE_REVIEW_2026-10-08.md and current authoritative
-PROJECT_STATE.md / LIVE_E2E_TEST_REGISTER.md. The seven ACCT findings remain
-open. The requested six accounting features are not six newly reproduced bugs.
+PROJECT_STATE.md / LIVE_E2E_TEST_REGISTER.md. The requested six accounting
+features are not six newly reproduced bugs.
+
+Execution update 2026-10-08 14:33 WAT: Step 1 protected checkpoint/backup/full
+restore/baseline and isolated failure reproduction complete. Step 2 ACCT-001/
+002/003 implemented locally; 19 isolated cases plus 228 API unit/mocked tests
+passed (3 existing skips), typechecks/builds passed. Source remains uncommitted/
+unpushed after the protection commit; deployment/live acceptance pending.
+Steps 3-12 not authorised or implemented; ACCT-004..007 remain OPEN. See the
+current authoritative registers for exact proofs, transport recovery and limits.
 
 ## Scope and Rules
 

@@ -6,6 +6,7 @@ import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthReque
 import { toE164Nigerian, sendWhatsAppTemplate, assertBranchWhatsAppSenderSupported } from "../lib/whatsapp.js";
 import { getEffectiveInvoiceStatus, isInvoiceCollectable, isInvoiceEditable } from "../lib/invoice-status.js";
 import { getReversibleOverpaymentCredit } from "../lib/invoice-payment-reversal.js";
+import { settlementAmount, settlementRequestKey } from "../lib/invoice-cash.js";
 
 const router = Router();
 
@@ -81,6 +82,7 @@ async function fetchPaymentsWithBank(invoiceId: number) {
       reference: invoicePaymentsTable.reference,
       notes: invoicePaymentsTable.notes,
       bankId: invoicePaymentsTable.bankId,
+      sourceDepositId: invoicePaymentsTable.sourceDepositId,
       entryType: invoicePaymentsTable.entryType,
       reversalOfPaymentId: invoicePaymentsTable.reversalOfPaymentId,
       reversalReason: invoicePaymentsTable.reversalReason,
@@ -157,10 +159,11 @@ async function formatInvoice(inv: any, payments: any[], items?: any[], creditNot
       reference: p.reference,
       notes: p.notes,
       bankId: p.bankId ?? null,
+      sourceDepositId: p.sourceDepositId ?? null,
       entryType: p.entryType,
       reversalOfPaymentId: p.reversalOfPaymentId ?? null,
       reversalReason: p.reversalReason ?? null,
-      canReverse: p.entryType === "payment" && !reversedPaymentIds.has(p.id),
+      canReverse: p.entryType === "payment" && p.paymentMethod !== "credit_note" && !reversedPaymentIds.has(p.id),
       bankName: p.bankName ?? null,
       createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
     })),
@@ -1172,40 +1175,46 @@ router.post("/invoices/:id/apply-credit", requireBranchAdminOrAbove, async (req:
     const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
-    const { amount: rawAmount } = req.body as { amount?: number };
-    const applyAmount = parseFloat(String(rawAmount ?? 0));
-    if (isNaN(applyAmount) || applyAmount <= 0) {
-      return res.status(400).json({ error: "Valid amount is required" });
+    const { amount: rawAmount, requestKey: rawKey } = (req.body ?? {}) as { amount?: number; requestKey?: string };
+    const applyAmount = settlementAmount(rawAmount);
+    const requestKey = settlementRequestKey(rawKey);
+    if (applyAmount === null || requestKey === false) {
+      return res.status(400).json({ error: "Use a positive amount with at most two decimals and a valid request key" });
     }
 
-    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
-    if (!isInvoiceCollectable(inv.status)) return res.status(400).json({ error: "A draft, cancelled, or written-off invoice cannot receive client credit" });
-    if (!inv.clientId) return res.status(400).json({ error: "Invoice has no linked client" });
-
-    const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, inv.clientId));
-    if (!client || !userCanAccessBranch(req, client.branchId)) return res.status(404).json({ error: "Client not found" });
-    if (client.branchId !== inv.branchId) return res.status(400).json({ error: "Invoice and client must belong to the same branch" });
-
-    const creditBalance = parseFloat(client.creditBalance ?? "0");
-    if (creditBalance <= 0) return res.status(400).json({ error: "Client has no credit balance" });
-
-    const applyActual = Math.min(applyAmount, creditBalance);
-
-    const existingPayments = await db.select().from(invoicePaymentsTable)
-      .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
-    const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
-    const invoiceTotal = parseFloat(inv.total ?? "0");
-    const outstanding = Math.max(0, invoiceTotal - totalPaid);
-    if (outstanding <= 0) return res.status(400).json({ error: "Invoice is already fully paid" });
-
-    const actualApply = Math.min(applyActual, outstanding);
-
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
+      if (requestKey) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${requestKey}, 0))`);
+      await tx.execute(sql`SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE`);
+      const [inv] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+      if (!inv || !userCanAccessBranch(req, inv.branchId)) return { error: { code: 404, message: "Invoice not found" } };
+      if (!inv.clientId) return { error: { code: 400, message: "Invoice has no linked client" } };
+      if (getBranchScope(req) === null && req.user?.role === "super_admin") return { error: { code: 400, message: "Select the invoice branch before applying credit" } };
+      await tx.execute(sql`SELECT id FROM clients WHERE id = ${inv.clientId} FOR UPDATE`);
+      const [client] = await tx.select().from(clientsTable).where(eq(clientsTable.id, inv.clientId));
+      if (!client || !userCanAccessBranch(req, client.branchId)) return { error: { code: 404, message: "Client not found" } };
+      if (client.branchId !== inv.branchId) return { error: { code: 400, message: "Invoice and client must belong to the same branch" } };
+      const creditBalance = Number(client.creditBalance);
+      if (requestKey) {
+        const [prior] = await tx.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.settlementRequestKey, requestKey));
+        if (prior) {
+          if (prior.invoiceId !== invoiceId || prior.paymentMethod !== "credit" || Number(prior.settlementRequestAmount) !== applyAmount) return { error: { code: 409, message: "Request key was already used for another settlement" } };
+          return { ok: { success: true, appliedAmount: Number(prior.amount), remainingCredit: creditBalance, replayed: true } };
+        }
+      }
+      if (!isInvoiceCollectable(inv.status)) return { error: { code: 400, message: "A draft, cancelled, or written-off invoice cannot receive client credit" } };
+      if (creditBalance <= 0) return { error: { code: 400, message: "Client has no credit balance" } };
+      const existingPayments = await tx.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+      const totalPaid = existingPayments.reduce((sum, row) => sum + Number(row.amount), 0);
+      const invoiceTotal = Number(inv.total);
+      const outstanding = Math.round(Math.max(0, invoiceTotal - totalPaid) * 100) / 100;
+      if (outstanding <= 0) return { error: { code: 400, message: "Invoice is already fully paid" } };
+      const actualApply = Math.min(applyAmount, creditBalance, outstanding);
       await tx.insert(invoicePaymentsTable).values({
         invoiceId,
-        amount: String(actualApply),
+        amount: actualApply.toFixed(2),
         paymentMethod: "credit",
+        settlementRequestKey: requestKey,
+        settlementRequestAmount: requestKey ? applyAmount.toFixed(2) : null,
         reference: "",
         notes: `Applied from client credit balance`,
         paidAt: new Date(),
@@ -1214,7 +1223,7 @@ router.post("/invoices/:id/apply-credit", requireBranchAdminOrAbove, async (req:
       });
 
       await tx.update(clientsTable)
-        .set({ creditBalance: sql`GREATEST(0, ${clientsTable.creditBalance}::numeric - ${String(actualApply)})` })
+        .set({ creditBalance: (creditBalance - actualApply).toFixed(2) })
         .where(eq(clientsTable.id, inv.clientId!));
 
       const newTotalPaid = totalPaid + actualApply;
@@ -1227,16 +1236,11 @@ router.post("/invoices/:id/apply-credit", requireBranchAdminOrAbove, async (req:
       await tx.update(invoicesTable)
         .set({ status: newStatus, updatedAt: new Date() })
         .where(eq(invoicesTable.id, invoiceId));
+      await tx.insert(invoiceAuditLogTable).values({ invoiceId, branchId: inv.branchId, action: "credit_applied", details: `${actualApply.toFixed(2)} client credit applied without new cash`, performedBy: req.user?.id ?? null });
+      return { ok: { success: true, appliedAmount: actualApply, remainingCredit: Math.round((creditBalance - actualApply) * 100) / 100, replayed: false } };
     });
-
-    const [updatedClient] = await db.select({ creditBalance: clientsTable.creditBalance })
-      .from(clientsTable).where(eq(clientsTable.id, inv.clientId));
-
-    return res.status(201).json({
-      success: true,
-      appliedAmount: actualApply,
-      remainingCredit: parseFloat(updatedClient?.creditBalance ?? "0"),
-    });
+    if (result.error) return res.status(result.error.code).json({ error: result.error.message });
+    return res.status(201).json(result.ok);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to apply credit" });
@@ -1264,9 +1268,9 @@ router.post("/invoices/:id/payments/:paymentId/reverse", requireBranchAdminOrAbo
     }
 
     const result = await db.transaction(async (tx) => {
-      type PaymentRow = { id: number; invoice_id: number; branch_id: number; amount: string; payment_method: string; bank_id: number | null; entry_type: string; paid_at: Date | string };
+      type PaymentRow = { id: number; invoice_id: number; branch_id: number; amount: string; payment_method: string; bank_id: number | null; source_deposit_id: number | null; entry_type: string; paid_at: Date | string };
       const locked = await tx.execute(sql`
-        SELECT id, invoice_id, branch_id, amount, payment_method, bank_id, entry_type, paid_at
+        SELECT id, invoice_id, branch_id, amount, payment_method, bank_id, source_deposit_id, entry_type, paid_at
         FROM invoice_payments WHERE id = ${paymentId} FOR UPDATE
       `);
       const payment = ((Array.isArray(locked) ? locked : (locked as { rows?: unknown[] }).rows ?? []) as PaymentRow[])[0];
@@ -1274,10 +1278,12 @@ router.post("/invoices/:id/payments/:paymentId/reverse", requireBranchAdminOrAbo
       if (payment.entry_type !== "payment" || Number(payment.amount) <= 0) {
         return { error: { code: 400, message: "Only an original invoice payment can be reversed" } } as const;
       }
+      if (payment.payment_method === "credit_note") return { error: { code: 409, message: "A credit-note adjustment requires a credit-note correction, not a payment reversal" } } as const;
       if (reversalDateClean && reversalDateClean < new Date(payment.paid_at).toISOString().slice(0, 10)) {
         return { error: { code: 400, message: "A reversal date cannot be before the original payment date" } } as const;
       }
 
+      await tx.execute(sql`SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE`);
       const [inv] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
       if (!inv || !userCanAccessBranch(req, inv.branchId)) return { error: { code: 404, message: "Invoice not found" } } as const;
       const scope = getBranchScope(req);
@@ -1296,12 +1302,33 @@ router.post("/invoices/:id/payments/:paymentId/reverse", requireBranchAdminOrAbo
       const payments = await tx.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
       const originalAmount = Number(payment.amount);
       const otherPaymentTotal = payments.filter(row => row.id !== paymentId).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
-      const creditToReverse = getReversibleOverpaymentCredit(inv.total, otherPaymentTotal, originalAmount);
+      const isDeposit = payment.payment_method === "deposit" || payment.source_deposit_id !== null;
+      const isCredit = payment.payment_method === "credit";
+      const creditToReverse = isDeposit || isCredit ? 0 : getReversibleOverpaymentCredit(inv.total, otherPaymentTotal, originalAmount);
+
+      if (isDeposit) {
+        if (!payment.source_deposit_id) return { error: { code: 409, message: "Deposit source is missing; review the original settlement before reversal" } } as const;
+        await tx.execute(sql`SELECT id FROM client_deposits WHERE id = ${payment.source_deposit_id} FOR UPDATE`);
+        const [deposit] = await tx.select().from(clientDepositsTable).where(eq(clientDepositsTable.id, payment.source_deposit_id));
+        if (!deposit || deposit.branchId !== inv.branchId || deposit.clientId !== inv.clientId || Number(deposit.allocatedAmount) < originalAmount) return { error: { code: 409, message: "Deposit allocation has changed and cannot be restored safely" } } as const;
+        if (deposit.notes?.includes("[VOIDED by wallet reset")) return { error: { code: 409, message: "This deposit was voided by a wallet reset and requires review before reversal" } } as const;
+        const allocatedAmount = Number(deposit.allocatedAmount) - originalAmount;
+        await tx.update(clientDepositsTable).set({ allocatedAmount: allocatedAmount.toFixed(2), allocatedInvoiceId: allocatedAmount === 0 ? null : deposit.allocatedInvoiceId }).where(eq(clientDepositsTable.id, deposit.id));
+      }
+      if (isCredit) {
+        if (!inv.clientId) return { error: { code: 409, message: "Linked client is missing; credit cannot be restored safely" } } as const;
+        await tx.execute(sql`SELECT id FROM clients WHERE id = ${inv.clientId} FOR UPDATE`);
+        const [client] = await tx.select().from(clientsTable).where(eq(clientsTable.id, inv.clientId));
+        if (!client || client.branchId !== inv.branchId) return { error: { code: 409, message: "Linked client has changed; credit cannot be restored safely" } } as const;
+        if (client.walletResetAt && client.walletResetAt > new Date(payment.paid_at)) return { error: { code: 409, message: "Client wallet was reset after this settlement; review before restoring credit" } } as const;
+        await tx.update(clientsTable).set({ creditBalance: (Number(client.creditBalance) + originalAmount).toFixed(2) }).where(eq(clientsTable.id, inv.clientId));
+      }
 
       if (creditToReverse > 0.005) {
         if (!inv.clientId) {
           return { error: { code: 409, message: "This payment created client credit, but the invoice no longer has a linked client to correct safely" } } as const;
         }
+        await tx.execute(sql`SELECT id FROM clients WHERE id = ${inv.clientId} FOR UPDATE`);
         const [client] = await tx.select({ creditBalance: clientsTable.creditBalance }).from(clientsTable).where(eq(clientsTable.id, inv.clientId));
         if (!client || Number(client.creditBalance ?? 0) + 0.005 < creditToReverse) {
           return { error: { code: 409, message: "The linked client credit has been used or changed, so this payment cannot be reversed safely" } } as const;
@@ -1318,6 +1345,7 @@ router.post("/invoices/:id/payments/:paymentId/reverse", requireBranchAdminOrAbo
         amount: String(-originalAmount),
         paymentMethod: payment.payment_method,
         bankId: payment.bank_id,
+        sourceDepositId: payment.source_deposit_id,
         reference,
         notes: `Reversal of invoice payment #${payment.id}`,
         entryType: "reversal",

@@ -27,6 +27,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useSettlementRequestKey } from "@/hooks/use-settlement-request-key";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Building2, Phone, Mail, MapPin,
@@ -62,6 +63,7 @@ function AllocateDepositDialog({
 }) {
   const { toast } = useToast();
   const allocate = useAllocateDeposit(clientId);
+  const requestKey = useSettlementRequestKey();
   const [invoiceId, setInvoiceId] = useState<number | null>(null);
   const [amount, setAmount] = useState("");
 
@@ -79,7 +81,7 @@ function AllocateDepositDialog({
   };
 
   const handleSubmit = async () => {
-    if (!deposit) return;
+    if (!deposit || allocate.isPending) return;
     if (!invoiceId) { toast({ variant: "destructive", title: "Select an invoice" }); return; }
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) { toast({ variant: "destructive", title: "Enter a valid amount" }); return; }
@@ -88,7 +90,9 @@ function AllocateDepositDialog({
       return;
     }
     try {
-      await allocate.mutateAsync({ depositId: deposit.id, invoiceId, amount: amt });
+      const payload = { depositId: deposit.id, invoiceId, amount: amt };
+      await allocate.mutateAsync({ ...payload, requestKey: requestKey.forPayload(payload) });
+      requestKey.reset();
       toast({ title: "Deposit applied to invoice successfully" });
       onOpenChange(false);
     } catch (err: any) {

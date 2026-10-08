@@ -45,6 +45,68 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-08 15:14 WAT: user authorised release of accounting Steps 1/2.
+  Existing 19-case isolated evidence/build results reused, not repeated.
+  Fresh read-only production counts/totals and immutable archive checksum
+  still match the protected baseline. Preparing new implementation commit
+  and push; preserve cf29433/checkpoint tag. Next: verify exact Railway
+  deployment, additive startup schema and live ACCT-001/002/003 acceptance.
+  No deployment or new live financial-write pass claimed at this point.
+
+- 2026-10-08 14:33 WAT: approved accounting Steps 1/2 COMPLETE locally and in
+  isolated verification; RELEASE STILL PENDING. Protection checkpoint cf29433,
+  annotated tag and immutable private archives verified; full restore rehearsal
+  passed and production baseline/checksum remain unchanged. ACCT-001 adds
+  original deposits to Financial Ledger; ACCT-002 links deposit settlements and
+  excludes them from new cash; ACCT-003 excludes credit/credit-note settlements
+  from cash/current/opening totals. Existing AR settlement sums remain intact.
+  Source locking, stable optional retry keys, wallet/deposit restoration on
+  reversal and linked-receipt retention verified. No duplicate cash subsystem.
+  19 distinct isolated cases PASS (14 + 3 + final 2 targeted checks). An AI-only
+  run interrupted by connection reset was not counted; exact fixtures recovered
+  and removed before the successful retry. All run fixture counts restored and
+  SSH tunnels closed. Full API suite 228 passed/3 prior skips; library/API/web
+  typechecks and both builds PASS, retaining prior frontend build warnings.
+  Existing code tags preserved; only checkpoint/review commit is committed.
+  Fixes/docs remain uncommitted/unpushed; production 5f67dff unchanged. Next:
+  release commit/push and verify deployment, then controlled live acceptance
+  against the saved baseline without repeating unrelated closed workflows.
+  ACCT-004..007 and full accounting expansion remain unapproved/unimplemented.
+  Separate source limitation: AI bank draft omits duty/standalone schedules;
+  now explicitly labelled partial, not certified as the full bank balance.
+
+- 2026-10-08 14:24 WAT: 17 isolated cash/settlement/control cases PASS across
+  the original 14-case run and three targeted follow-ups. Full API suite 228
+  passed/3 existing network-only skipped; library/API/frontend typechecks and
+  both builds PASS (existing Vite sourcemap/chunk warnings). Production source
+  totals and archive checksum reverified unchanged using read-only access.
+  Additional AI cash-population check interrupted by ECONNRESET, NOT a pass;
+  exact run-owned isolated branches #47/#48 and their fixtures cleaned via SSH,
+  zero accounting fixture branches verified. Retrying AI/fractional cases only.
+  Same known cash predicate now reused by AI payment/monthly cash tools.
+  Broader AI bank draft excludes duty/standalone schedules; limitation explicitly
+  labelled, complete population repair is not certified by these scoped fixes.
+  No push/deployment/live acceptance. ACCT-004..007 remain outside this scope.
+
+- 2026-10-08 14:05 WAT: Steps 1/2 implementation IN PROGRESS. Corrected isolated
+  fixture run reproduced all eight pre-fix cash/balance/concurrency regressions;
+  the earlier access failures were fixture errors, not product findings. Source
+  now separates original receipts from non-cash settlement, links applications
+  to their deposit, serializes balance consumption, restores balances on reversal,
+  and supports retry keys. Frontend submits stable keys; linked receipt history
+  cannot be deleted after reversal. Wider 14-case isolated run pending. No
+  production schema/financial mutation, push or deployment. ACCT-004..007 untouched.
+
+- 2026-10-08: Steps 1/2 protection milestone VERIFIED. Code checkpoint
+  cf29433/tag `checkpoint-before-accounting-cash-fixes-2026-10-08` and complete
+  recovery bundle verified. Production DB custom archive checksum verified and
+  fully restored/checked in a temporary isolated DB, then temporary DB removed.
+  Details/baseline/coverage: `docs/ACCOUNTING_CHECKPOINT_2026-10-08.md`.
+  Production unchanged, existing test DB retained. Failure-specific accounting
+  regressions being established before runtime edits. First fixture run used
+  a branch-limited admin and failed access checks, NOT defect reproduction;
+  fixture corrected to scoped isolated super-admin for the next run.
+
 - 2026-10-08 13:38 WAT: user authorised accounting Steps 1 and 2 only:
   verified code checkpoint/database backup and baseline, isolated reproduction,
   then ACCT-001/002/003 cash/deposit corrections. Duplicate-work check finds

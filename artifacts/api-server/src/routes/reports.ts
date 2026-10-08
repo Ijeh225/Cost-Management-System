@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { invoiceCashCondition } from "../lib/invoice-cash.js";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, dutyPaymentTransactionsTable, paymentSchedulePaymentsTable, paymentSchedulesTable, reportSubscriptionsTable, reportDeliveryLogsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, isNull, sql, desc, type SQL, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -215,9 +216,11 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
 
     const fromBank = alias(banksTable, "financial_ledger_from_bank");
     const toBank = alias(banksTable, "financial_ledger_to_bank");
-    const [invoiceRows, dutyRows, overheadRows, containerRows, scheduleRows, fundingRows, transferRows] = await Promise.all([
+    const [invoiceRows, depositRows, dutyRows, overheadRows, containerRows, scheduleRows, fundingRows, transferRows] = await Promise.all([
       db.select({ id: invoicePaymentsTable.id, date: invoicePaymentsTable.paidAt, amount: invoicePaymentsTable.amount, entryType: invoicePaymentsTable.entryType, reversalReason: invoicePaymentsTable.reversalReason, method: invoicePaymentsTable.paymentMethod, reference: invoicePaymentsTable.reference, notes: invoicePaymentsTable.notes, invoiceNumber: invoicesTable.invoiceNumber, bankName: banksTable.name })
-        .from(invoicePaymentsTable).leftJoin(invoicesTable, eq(invoicePaymentsTable.invoiceId, invoicesTable.id)).leftJoin(banksTable, eq(invoicePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(invoicePaymentsTable.paidAt, invoicePaymentsTable.branchId))),
+        .from(invoicePaymentsTable).leftJoin(invoicesTable, eq(invoicePaymentsTable.invoiceId, invoicesTable.id)).leftJoin(banksTable, eq(invoicePaymentsTable.bankId, banksTable.id)).where(and(invoiceCashCondition(invoicePaymentsTable), ...byDateAndBranch(invoicePaymentsTable.paidAt, invoicePaymentsTable.branchId))),
+      db.select({ id: clientDepositsTable.id, clientId: clientDepositsTable.clientId, date: clientDepositsTable.createdAt, amount: clientDepositsTable.amount, method: clientDepositsTable.paymentMethod, reference: clientDepositsTable.reference, notes: clientDepositsTable.notes, clientName: clientsTable.name, bankName: banksTable.name })
+        .from(clientDepositsTable).leftJoin(clientsTable, eq(clientDepositsTable.clientId, clientsTable.id)).leftJoin(banksTable, eq(clientDepositsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(clientDepositsTable.createdAt, clientDepositsTable.branchId))),
       db.select({ id: dutyPaymentTransactionsTable.id, date: dutyPaymentTransactionsTable.paidAt, amount: dutyPaymentTransactionsTable.amount, entryType: dutyPaymentTransactionsTable.entryType, reversalReason: dutyPaymentTransactionsTable.reversalReason, method: dutyPaymentTransactionsTable.paymentMethod, reference: dutyPaymentTransactionsTable.reference, notes: dutyPaymentTransactionsTable.notes, containerId: containersTable.id, containerNumber: containersTable.containerNumber, bankName: banksTable.name })
         .from(dutyPaymentTransactionsTable).leftJoin(containersTable, eq(dutyPaymentTransactionsTable.containerId, containersTable.id)).leftJoin(banksTable, eq(dutyPaymentTransactionsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(dutyPaymentTransactionsTable.paidAt, dutyPaymentTransactionsTable.branchId))),
       db.select({ id: expensePaymentsTable.id, date: expensePaymentsTable.paidAt, amount: expensePaymentsTable.amount, method: expensePaymentsTable.paymentMethod, notes: expensePaymentsTable.notes, expenseId: overheadExpensesTable.id, description: overheadExpensesTable.description, category: overheadExpensesTable.category, bankName: banksTable.name })
@@ -236,6 +239,7 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
     ]);
 
     const entries: FinancialLedgerEntry[] = [
+      ...depositRows.map(row => ({ id: `deposit-${row.id}`, date: row.date.toISOString(), direction: "in" as const, source: "Client deposit", description: row.clientName ? `Deposit from ${row.clientName}` : "Client deposit", amount: Number(row.amount), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: `/clients/${row.clientId}` })),
       ...invoiceRows.map(row => {
         const amount = Number(row.amount ?? 0);
         const isReversal = row.entryType === "reversal" || amount < 0;
@@ -270,7 +274,7 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
     ].sort((a, b) => b.date.localeCompare(a.date));
     const totalIn = entries.filter(entry => entry.direction === "in").reduce((sum, entry) => sum + entry.amount, 0);
     const totalOut = entries.filter(entry => entry.direction === "out").reduce((sum, entry) => sum + entry.amount, 0);
-    return res.json({ branchScope, period: { from: range.from?.toISOString() ?? null, to: range.to?.toISOString() ?? null }, summary: { entries: entries.length, totalIn, totalOut, net: totalIn - totalOut }, entries, evidenceNote: "This ledger includes only dated money movements from source payment and bank tables. Charge estimates, approved schedules, and running balances are excluded until an actual transaction is recorded." });
+    return res.json({ branchScope, period: { from: range.from?.toISOString() ?? null, to: range.to?.toISOString() ?? null }, summary: { entries: entries.length, totalIn, totalOut, net: totalIn - totalOut }, entries, evidenceNote: "This cash-movement ledger includes original deposits once, dated cash receipts/payments, and both sides of bank transfers. Deposit applications, client credit, credit-note adjustments, charge estimates and approved-but-unpaid schedules are not new cash. It is not a double-entry General Ledger." });
   } catch (err) {
     console.error("Financial ledger report failed", err);
     return res.status(500).json({ error: "Unable to build financial ledger." });
@@ -1395,7 +1399,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
     }
 
     // INFLOWS — invoice_payments
-    const invPayConds: SQL[] = [];
+    const invPayConds: SQL[] = [invoiceCashCondition(invoicePaymentsTable)];
     if (fromDate) invPayConds.push(gte(invoicePaymentsTable.paidAt, fromDate));
     if (toDate)   invPayConds.push(lte(invoicePaymentsTable.paidAt, toDate));
     if (bankIdNum !== null) invPayConds.push(eq(invoicePaymentsTable.bankId, bankIdNum));
@@ -1786,7 +1790,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
     // Opening balance — sum of all matched transaction types BEFORE the period start
     let openingBalance = 0;
     if (fromDate) {
-      const prevInvPayConds: SQL[] = [lt(invoicePaymentsTable.paidAt, fromDate)];
+      const prevInvPayConds: SQL[] = [lt(invoicePaymentsTable.paidAt, fromDate), invoiceCashCondition(invoicePaymentsTable)];
       if (bankIdNum !== null) prevInvPayConds.push(eq(invoicePaymentsTable.bankId, bankIdNum));
       if (branchScope.id !== null) prevInvPayConds.push(eq(invoicePaymentsTable.branchId, branchScope.id));
       const prevDepConds: SQL[] = [lt(clientDepositsTable.createdAt, fromDate)];

@@ -259,6 +259,8 @@ export function useCreateClientDeposit(clientId: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "deposits"] });
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"] });
+      qc.invalidateQueries({ queryKey: ["/api/banks"] });
+      qc.invalidateQueries({ queryKey: ["/api/reports/cashflow"] });
     },
   });
 }
@@ -273,6 +275,8 @@ export function useDeleteClientDeposit(clientId: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "deposits"] });
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"] });
+      qc.invalidateQueries({ queryKey: ["/api/banks"] });
+      qc.invalidateQueries({ queryKey: ["/api/reports/cashflow"] });
     },
   });
 }
@@ -296,13 +300,13 @@ export function useResetClientWallet(clientId: number) {
 export function useAllocateDeposit(clientId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ depositId, invoiceId, amount }: { depositId: number; invoiceId: number; amount: number }) =>
+    mutationFn: async ({ depositId, invoiceId, amount, requestKey }: { depositId: number; invoiceId: number; amount: number; requestKey?: string }) =>
       customFetch<{ success: boolean; depositId: number; invoiceId: number; allocationAmount: number; remainingOnDeposit: number }>(
         `/api/client-deposits/${depositId}/allocate`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ invoiceId, amount }),
+          body: JSON.stringify({ invoiceId, amount, requestKey }),
         }
       ),
     onSuccess: (_, { invoiceId }) => {
@@ -310,7 +314,9 @@ export function useAllocateDeposit(clientId: number) {
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "wallet-summary"] });
       qc.invalidateQueries({ queryKey: [...CLIENTS_QUERY_KEY, clientId, "receivables"] });
       qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
-      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices"] });
+      qc.invalidateQueries({ queryKey: ["/api/reports/client-statement"] });
+      qc.invalidateQueries({ queryKey: ["/api/reports/invoice-aging"] });
     },
   });
 }
