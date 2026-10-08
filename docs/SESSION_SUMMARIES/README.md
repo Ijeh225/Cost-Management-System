@@ -20,7 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-10-08 protected checkpoint and verified cash fixes; release pending, updated 14:33 WAT](2026-10-08-accounting-feature-review.md)
+- [2026-10-08 protected checkpoint, deployed cash fixes and live acceptance, updated 15:33 WAT](2026-10-08-accounting-feature-review.md)
 
 - [2026-10-06 OCR closure and pending-work records audit, updated 13:47 WAT](2026-10-06-cap02-verification-resume.md)
 

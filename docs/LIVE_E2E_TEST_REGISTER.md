@@ -9,6 +9,22 @@ action` label below does not override this current register.
 
 ### Accounting Steps 1/2 - 2026-10-08 14:05 WAT
 
+- LIVE FINAL 2026-10-08 15:33 WAT: ACCT-001/002/003 CLOSED / LIVE ACCEPTED.
+  ACCT-DEPLOY-001 also CLOSED after db68c79 exact deployment
+  05de367d-7c1d-429d-8e7f-1719ddeebaa9 SUCCESS, provider healthcheck/startup
+  migration/schema/index verification. One new guarded acceptance fixture,
+  no completed historical test repeated. Existing 50M receipt appears once;
+  original Ledger/Cash Flow net both 32,290,497. Allocation/retry/CN/credit and
+  both non-cash reversals passed; invoice/AR settlement retained. Final fixture
+  #10 client/#34 job/#15 invoice/#4 deposit/#1 CN left auditable, not deleted.
+  Bank #3 1,599; final consolidated cash net 32,291,497, exactly +1,000 original
+  dummy receipt. Future opening excludes non-cash settlement. Original source
+  counts/totals match checkpoint excluding only exact acceptance fixture IDs.
+  Details: ACCOUNTING_LIVE_ACCEPTANCE_2026-10-08.md. Original 19 isolated passes
+  plus new existing-schema migration case PASS; final 228 API passed/3 existing
+  skips, API typecheck/server build PASS. Browser invoice totals/history verified;
+  owner signed-in session restored. ACCT-004..007 remain OPEN/unimplemented.
+
 - 2026-10-08 15:23 WAT: ACCT-DEPLOY-001 source fix verified with one new
   isolated older-schema upgrade test (1 PASS, 19 intentionally filtered).
   Prior row preserved, repeated additive upgrade safe, unique retry-key index
@@ -98,9 +114,10 @@ Five existing unit/mocked-HTTP files passed 16 tests; not a fresh DB concurrency
 
 | New ID | Priority | Status/evidence | Confirmed problem or implementation gap |
 | --- | --- | --- | --- |
-| ACCT-001 | High | FIXED / ISOLATED VERIFIED; deployment/live pending | Original review: Financial Ledger omitted the NGN50M deposit, a net difference of NGN50M. Source now includes original receipts once; isolated branch/date/cash tests passed. |
-| ACCT-002 | High | FIXED / ISOLATED VERIFIED; deployment/live pending | Original allocation created a second bank-linked receipt. Applications now link the original deposit and settle the invoice without new cash; concurrency, retry and reversal tests passed. |
-| ACCT-003 | High | FIXED / ISOLATED VERIFIED; deployment/live pending | Original credit/credit-note adjustments inflated cash/current/opening totals. Shared cash predicate excludes non-cash settlements while AR retains them; isolated cash and AI draft cases passed. |
+| ACCT-001 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | Original NGN50M receipt now appears once; Ledger/Cash Flow net reconciles. Additional labelled receipt counted once. |
+| ACCT-002 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | Source-linked allocation/retry changes invoice balances but not Bank/Ledger/Cash Flow; reversal restores available deposit. Concurrency remains independently isolated-verified. |
+| ACCT-003 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | Credit note/client credit and their non-cash reversals do not create cash/current/opening movements; invoice/AR settlement remains accurate. |
+| ACCT-DEPLOY-001 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | First release skipped new fields under old migration. New independently versioned additive migration applied; fields/index and authenticated finance reads verified. |
 | ACCT-004 | High | OPEN; source-confirmed, fresh live write NOT run | Credit notes reduce settlements but P&L/printable VAT Summary use original invoice subtotal/VAT; VAT Tracking separately handles credit-note VAT. |
 | ACCT-005 | High | OPEN; source-confirmed, fresh live write NOT run | Bad-debt write-off creates an overhead record, not a non-cash expense posting; P&L keeps invoice revenue and reads only actual expense payments. |
 | ACCT-006 | High | OPEN classification gap; source and live population separation | NGN501 standalone schedule payments are in cash/bank/ledger, with no accounting head/P&L mapping. Do not presume they are all operating expenses; require classification/review. |

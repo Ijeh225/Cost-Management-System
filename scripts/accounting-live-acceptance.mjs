@@ -74,6 +74,18 @@ try {
     const client = await request("GET", `/clients/${existing[0].id}`);
     const deposits = await request("GET", `/clients/${client.id}/deposits`);
     const invoices = (await request("GET", "/invoices")).filter(row => row.clientId === client.id);
+    assert.equal(invoices.length, 1);
+    equalMoney(invoices[0].totalPaid, 600); equalMoney(invoices[0].outstanding, 400);
+    equalMoney(client.creditBalance, 100);
+    assert.equal(deposits.length, 1); equalMoney(deposits[0].allocatedAmount, 0);
+    const current = await snapshot(bank.id);
+    const future = await request("GET", "/reports/cashflow?from=2099-01-01&to=2099-01-31");
+    equalMoney(future.totals.openingBalance, current.cashflow.totals.closingBalance,
+      "Non-cash settlements must not inflate future opening balance");
+    equalMoney(future.totals.totalIn, 0); equalMoney(future.totals.totalOut, 0);
+    equalMoney(current.bankBalance, 1599);
+    checkpoint("Live non-cash opening balance and final bank reconciliation", {
+      bankBalance: current.bankBalance, openingBalance: future.totals.openingBalance });
     checkpoint("Existing retained acceptance fixture inspection", { clientId: client.id, creditBalance: client.creditBalance,
       deposits, invoices: invoices.map(row => ({ id: row.id, invoiceNumber: row.invoiceNumber, status: row.status,
         totalPaid: row.totalPaid, outstanding: row.outstanding, payments: row.payments })) });

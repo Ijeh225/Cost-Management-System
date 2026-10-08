@@ -45,6 +45,30 @@ release `6a327a5`, which includes that fix, is Active / Deployment successful:
 
 ### Next Action
 
+- 2026-10-08 15:33 WAT: accounting Steps 1/2 RELEASED AND LIVE ACCEPTED.
+  d37d4b4 implementation/checkpoint tag pushed; follow-up db68c79 corrects
+  ACCT-DEPLOY-001 with independent invoice_cash_settlements_v1. Exact deployment
+  05de367d-7c1d-429d-8e7f-1719ddeebaa9 SUCCESS, provider healthcheck passed,
+  startup log confirms migration, all three fields and retry index verified.
+  ACCT-001/002/003 and ACCT-DEPLOY-001 CLOSED for the tested scopes. Full proof:
+  docs/ACCOUNTING_LIVE_ACCEPTANCE_2026-10-08.md. Existing 50M deposit appears
+  once; pre-fixture Ledger/Cash Flow net both 32,290,497. One new labelled Lagos
+  client #10/job #34/invoice #15/deposit #4/CN #1 retained; no physical movement,
+  messages or external bank transactions. Original source counts/totals match
+  protected baseline when those exact fixtures are excluded. Allocation 400,
+  CN 600 invoice settlement/100 reusable credit, credit application 50, retries
+  and balance-restoring reversals never add cash. Final invoice settlement 600,
+  outstanding 400; available deposit 1,000, client credit 100; bank #3 1,599;
+  consolidated Ledger/Cash Flow net 32,291,497. Future opening excludes non-cash.
+  Browser UI/history confirmed and owner session restored. Prior 19 isolated
+  cases plus one new existing-schema upgrade PASS; final API 228 passed/3 skips,
+  API typecheck/build PASS. No tests/data reset or protected archive overwrite.
+  Remaining approved scope is complete. Next proposed Part A is Step 3,
+  ACCT-004/005 recognition policy/corrections; await separate approval.
+  ACCT-006/007, full accounting expansion and partial AI source limitations
+  are NOT resolved by this release. Evidence records being committed/pushed;
+  their later docs-only deployment has identical application runtime sources.
+
 - 2026-10-08 15:23 WAT: ACCT-DEPLOY-001 fix locally verified. New independent
   invoice_cash_settlements_v1 startup migration adds only nullable source/retry
   fields and their partial unique index. Read-only production inspection confirms

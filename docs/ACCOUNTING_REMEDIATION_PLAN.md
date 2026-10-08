@@ -6,11 +6,14 @@ Basis: ACCOUNTING_FEATURE_REVIEW_2026-10-08.md and current authoritative
 PROJECT_STATE.md / LIVE_E2E_TEST_REGISTER.md. The requested six accounting
 features are not six newly reproduced bugs.
 
-Execution update 2026-10-08 14:33 WAT: Step 1 protected checkpoint/backup/full
-restore/baseline and isolated failure reproduction complete. Step 2 ACCT-001/
-002/003 implemented locally; 19 isolated cases plus 228 API unit/mocked tests
-passed (3 existing skips), typechecks/builds passed. Source remains uncommitted/
-unpushed after the protection commit; deployment/live acceptance pending.
+Execution update 2026-10-08 15:33 WAT: Steps 1/2 complete, committed/pushed,
+deployed and live accepted. Protected checkpoint/backup/full restore/baseline
+preserved. ACCT-001/002/003 and release migration defect ACCT-DEPLOY-001 closed;
+19 original isolated cases plus one new older-schema upgrade passed, 228 API
+unit/mocked tests passed (3 prior skips), typechecks/builds passed. Exact runtime
+release db68c79 SUCCESS; guarded live deposit/allocation/credit/reversal checks
+passed. See ACCOUNTING_LIVE_ACCEPTANCE_2026-10-08.md for retained dummy IDs,
+source-total reconciliation, release metadata and evidence boundaries.
 Steps 3-12 not authorised or implemented; ACCT-004..007 remain OPEN. See the
 current authoritative registers for exact proofs, transport recovery and limits.
 

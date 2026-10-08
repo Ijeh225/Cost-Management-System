@@ -1,5 +1,30 @@
 # Accounting Review and Cash Corrections Session
 
+## 2026-10-08 15:33 WAT - Steps 1/2 Deployed and Live Accepted
+
+- d37d4b4/checkpoint tag pushed; db68c79 fixed the release-only migration defect.
+  Exact corrected deployment 05de367d-7c1d-429d-8e7f-1719ddeebaa9 SUCCESS;
+  provider healthcheck/startup logs and DB fields/index/migration verified.
+- ACCT-001/002/003 and ACCT-DEPLOY-001 closed for exercised scopes. Existing
+  deposit appears once; original Ledger/Cash Flow net matches 32,290,497.
+  One labelled client #10/container #34/invoice #15 INV-202610-001/deposit #4/
+  CN #1 created. Allocation 400, retries, CN 700 (600 settlement/100 credit),
+  deposit reversal, credit apply/retry 50 and credit reversal all passed.
+- Final invoice/AR 600 settlement/400 outstanding; deposit 1,000 available,
+  client credit 100, bank #3 1,599, consolidated net 32,291,497. Non-cash never
+  increases cash/current/opening; cash difference exactly 1,000 original receipt.
+  Original source totals/counts match backup excluding only explicit fixtures.
+  Retained all new history; no external bank transaction, message, operational
+  progress or unrelated record edit. Browser invoice UI/history confirmed.
+- API test sessions logged out; owner browser sign-in restored. No credentials
+  saved. Final API suite 228 passed/3 prior skips; typecheck/build PASS; one new
+  isolated schema-upgrade pass adds to prior 19, fixture/tunnel cleanup verified.
+- Detailed proof: ACCOUNTING_LIVE_ACCEPTANCE_2026-10-08.md. Next proposed
+  Step 3 ACCT-004/005 needs separate approval/policy; ACCT-006/007 and full
+  accounting capabilities are not implemented. Do not restart closed tests.
+- Evidence updates being committed/pushed; any resulting records-only release
+  has unchanged application runtime sources compared with verified db68c79.
+
 ## 2026-10-08 15:23 WAT - Migration Correction Verified Locally
 
 - Read-only production metadata confirms no new cash fields, old reversal
