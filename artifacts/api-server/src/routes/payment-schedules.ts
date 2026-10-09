@@ -561,6 +561,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/pay", requireAuth, async (r
       if (schedule.overheadExpenseId) {
         const [expense] = await tx.select().from(overheadExpensesTable)
           .where(eq(overheadExpensesTable.id, schedule.overheadExpenseId)).for("update");
+        if (expense?.category === "Bad Debt") throw new Error("PAYMENT_BAD_DEBT_NON_CASH");
         if (!expense || expense.branchId !== schedule.branchId) throw new Error("PAYMENT_OVERHEAD_NOT_FOUND");
         const [paidRow] = await tx.select({ total: sql<string>`COALESCE(SUM(${expensePaymentsTable.amount}), 0)` })
           .from(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, expense.id));
@@ -616,6 +617,7 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/pay", requireAuth, async (r
       PAYMENT_EXCEEDS_APPROVED: "Payment exceeds approved balance",
       PAYMENT_OVERHEAD_NOT_FOUND: "Linked overhead expense was not found",
       PAYMENT_EXCEEDS_OVERHEAD: "Payment exceeds remaining overhead expense balance",
+      PAYMENT_BAD_DEBT_NON_CASH: "Bad debt is a non-cash adjustment and cannot be paid",
     };
     if (errorMessages[code]) return res.status(code === "PAYMENT_SCHEDULE_NOT_FOUND" ? 404 : 400).json({ error: errorMessages[code] });
     console.error("[payment-schedules] pay error:", err);

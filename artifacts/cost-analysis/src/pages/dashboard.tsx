@@ -606,7 +606,7 @@ function FinancialDashboardView({
               isCurrency
               colorClass="text-primary"
               branchLabel={branchLabel}
-              tooltip="Issued invoice revenue excluding VAT. Draft and cancelled invoices are excluded."
+              tooltip="Issued invoice revenue excluding VAT, less net credit notes dated in this period. Draft and cancelled invoices are excluded."
             />
             <StatCard
               title="Actual Paid Container Costs"
@@ -626,17 +626,23 @@ function FinancialDashboardView({
               branchLabel={branchLabel}
               tooltip="Dated overhead payments in the selected period."
             />
+            <StatCard title="Non-cash Bad Debts" value={data.adjustments?.totalBadDebts ?? 0}
+              icon={ReceiptText} isCurrency colorClass="text-destructive" branchLabel={branchLabel}
+              tooltip="Outstanding invoices written off on their audited write-off date. No bank payment or automatic VAT relief." />
             <StatCard
-              title="True Net Profit"
+              title="Net Profit"
               value={data.netProfit}
               icon={data.netProfit >= 0 ? TrendingUp : TrendingDown}
               isCurrency
               colorClass={data.netProfit >= 0 ? "text-emerald-400" : "text-destructive"}
               branchLabel={branchLabel}
-              tooltip="Accrual revenue minus actual paid container costs and actual paid overhead, matching P&L."
+              tooltip="Revenue net of credit notes, less recognised costs, paid overhead and separate non-cash bad debts, matching P&L."
             />
           </div>
 
+          <p className="text-xs text-muted-foreground">{data.adjustments?.policy}</p>
+          {!!data.adjustments?.undatedBadDebts.length && <p className="text-sm text-destructive">Review required: {data.adjustments.undatedBadDebts.length} legacy write-offs lack an audited date and are excluded from dated loss totals.</p>}
+          {!!data.adjustments?.legacyBadDebtPayments?.length && <p className="text-sm text-destructive">Review historical Bad Debt cash postings: {data.adjustments.legacyBadDebtPayments.length}. Cash history is retained; these are not also counted as paid overhead.</p>}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card className="border-border/40 bg-card/40 lg:col-span-2">
               <CardHeader className="pb-2">
@@ -653,12 +659,13 @@ function FinancialDashboardView({
                         <YAxis tickFormatter={(value) => `₦${(value / 1_000_000).toFixed(1)}M`} stroke="hsl(var(--muted-foreground))" fontSize={11} width={58} />
                         <Tooltip
                           contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px" }}
-                          formatter={(value: number, name: string) => [formatCurrency(value), name === "revenue" ? "Accrual Revenue" : name === "costOfSales" ? "Actual Paid Costs" : name === "overheads" ? "Actual Paid Overhead" : "True Net Profit"]}
+                          formatter={(value: number, name: string) => [formatCurrency(value), name === "revenue" ? "Accrual Revenue" : name === "costOfSales" ? "Actual Paid Costs" : name === "overheads" ? "Actual Paid Overhead" : name === "badDebts" ? "Non-cash Bad Debt" : "Net Profit"]}
                         />
-                        <Legend iconType="circle" wrapperStyle={{ fontSize: "11px" }} formatter={(value) => value === "revenue" ? "Revenue" : value === "costOfSales" ? "Costs" : value === "overheads" ? "Overhead" : "Net Profit"} />
+                        <Legend iconType="circle" wrapperStyle={{ fontSize: "11px" }} formatter={(value) => value === "revenue" ? "Revenue" : value === "costOfSales" ? "Costs" : value === "overheads" ? "Overhead" : value === "badDebts" ? "Non-cash Bad Debt" : "Net Profit"} />
                         <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
                         <Bar dataKey="costOfSales" fill="hsl(var(--chart-3))" radius={[3, 3, 0, 0]} />
                         <Bar dataKey="overheads" fill="hsl(var(--chart-4))" radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="badDebts" fill="hsl(var(--destructive))" radius={[3, 3, 0, 0]} />
                         <Bar dataKey="netProfit" fill="hsl(var(--chart-2))" radius={[3, 3, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>

@@ -94,8 +94,9 @@ async function buildExpensesWithPayments(expenseRows: (typeof overheadExpensesTa
     }, 0);
     const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
     const totalAmount = parseFloat(e.amount ?? "0");
-    const balance = Math.max(0, totalAmount - totalPaid);
-    const status: "unpaid" | "partial" | "paid" =
+    const isNonCash = e.category === "Bad Debt";
+    const balance = isNonCash ? 0 : Math.max(0, totalAmount - totalPaid);
+    const status: "unpaid" | "partial" | "paid" | "non_cash" = isNonCash ? "non_cash" :
       totalPaid <= 0 ? "unpaid" : balance <= 0.005 ? "paid" : "partial";
 
     return {
@@ -291,6 +292,7 @@ overheadExpensesRouter.get("/overhead-expenses", requireBranchAdminOrAbove, asyn
 overheadExpensesRouter.post("/overhead-expenses", requireBranchAdminOrAbove, async (req: AuthRequest, res) => {
   try {
     const { category, description, amount, reference } = req.body;
+    if (category === "Bad Debt") return res.status(400).json({ error: "Record bad debt through the invoice write-off action, not a payable expense" });
     if (!category || !description || amount === undefined) {
       return res.status(400).json({ error: "category, description and amount are required" });
     }
@@ -314,8 +316,9 @@ overheadExpensesRouter.patch("/overhead-expenses/:id", requireBranchAdminOrAbove
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
-    const [existing] = await db.select({ branchId: overheadExpensesTable.branchId }).from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
+    const [existing] = await db.select({ branchId: overheadExpensesTable.branchId, category: overheadExpensesTable.category }).from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
     if (!existing || !userCanAccessBranch(req, existing.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
+    if (existing.category === "Bad Debt" || req.body.category === "Bad Debt") return res.status(409).json({ error: "Invoice bad-debt evidence cannot be edited as a payable expense" });
     const { category, description, amount, reference } = req.body;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (category !== undefined) updates.category = category;
@@ -337,8 +340,9 @@ overheadExpensesRouter.delete("/overhead-expenses/:id", requireBranchAdminOrAbov
   try {
     const id = Number(_req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
-    const [existing] = await db.select({ branchId: overheadExpensesTable.branchId }).from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
+    const [existing] = await db.select({ branchId: overheadExpensesTable.branchId, category: overheadExpensesTable.category }).from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
     if (!existing || !userCanAccessBranch(_req, existing.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
+    if (existing.category === "Bad Debt") return res.status(409).json({ error: "Retain invoice bad-debt evidence and audit history" });
     await db.delete(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
     return res.json({ ok: true });
   } catch (err) {
@@ -365,6 +369,7 @@ overheadExpensesRouter.post("/overhead-expenses/:id/topups", requireBranchAdminO
     const [expense] = await db.select().from(overheadExpensesTable)
       .where(eq(overheadExpensesTable.id, expenseId));
     if (!expense || !userCanAccessBranch(req, expense.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
+    if (expense.category === "Bad Debt") return res.status(409).json({ error: "Bad debt is a non-cash adjustment, not a payable expense" });
     const scope = getBranchScope(req);
     if (scope !== null && expense.branchId !== scope) { res.status(404).json({ error: "Expense not found" }); return; }
     if (scope === null && req.user?.role === "super_admin") {
@@ -403,6 +408,7 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payment-schedules", requireB
     const [expense] = await db.select().from(overheadExpensesTable)
       .where(eq(overheadExpensesTable.id, expenseId));
     if (!expense || !userCanAccessBranch(req, expense.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
+    if (expense.category === "Bad Debt") return res.status(409).json({ error: "Bad debt is a non-cash adjustment, not a payable expense" });
     const scope = getBranchScope(req);
     if (scope !== null && expense.branchId !== scope) { res.status(404).json({ error: "Expense not found" }); return; }
     if (scope === null && req.user?.role === "super_admin") {
@@ -499,6 +505,7 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireBranchAdmi
     const [expense] = await db.select().from(overheadExpensesTable)
       .where(eq(overheadExpensesTable.id, expenseId));
     if (!expense || !userCanAccessBranch(req, expense.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
+    if (expense.category === "Bad Debt") return res.status(409).json({ error: "Bad debt is a non-cash adjustment, not a payable expense" });
     {
       const _scope = getBranchScope(req);
       if (_scope !== null && expense.branchId !== _scope) { res.status(404).json({ error: "Expense not found" }); return; }
@@ -513,6 +520,7 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireBranchAdmi
       const [lockedExpense] = await tx.select().from(overheadExpensesTable)
         .where(eq(overheadExpensesTable.id, expenseId)).for("update");
       if (!lockedExpense || !userCanAccessBranch(req, lockedExpense.branchId)) throw new Error("EXPENSE_NOT_FOUND");
+      if (lockedExpense.category === "Bad Debt") throw new Error("BAD_DEBT_NON_CASH");
 
       if (paymentMethod === "bank" && bankId) {
         const [bank] = await tx.select({ branchId: banksTable.branchId }).from(banksTable)
@@ -554,6 +562,7 @@ overheadExpensesRouter.post("/overhead-expenses/:id/payments", requireBranchAdmi
       BANK_NOT_FOUND: "Selected bank was not found",
       BANK_BRANCH_MISMATCH: "Selected bank belongs to a different branch than the expense.",
       PAYMENT_EXCEEDS_EXPENSE: "Payment exceeds the remaining overhead expense balance.",
+      BAD_DEBT_NON_CASH: "Bad debt is a non-cash adjustment and cannot be paid.",
     };
     if (errorMessages[code]) return res.status(code === "EXPENSE_NOT_FOUND" ? 404 : 400).json({ error: errorMessages[code] });
     console.error("POST /overhead-expenses/:id/payments error:", err);

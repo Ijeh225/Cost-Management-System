@@ -1,6 +1,55 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-10-08
+## Current Test and Defect Register - Authoritative as of 2026-10-10
+
+### Accounting Step 3 Release Authorised - 2026-10-10 00:53 WAT
+
+- User explicitly authorised push/deploy after review of the recognition rules.
+  Release and provider verification IN PROGRESS, not yet live accepted.
+  Twelve distinct isolated passes and 234 unit/mocked passes preserved.
+  Prior fixture/history retained; no new financial write or duplicate live test.
+
+### Accounting Step 3 Final Local Verification - 2026-10-10 00:28 WAT
+
+- ACCT-004/005 FIXED LOCALLY / ISOLATED VERIFIED, not live-closed. Twelve
+  distinct cases passed: ten main cases; four follow-up passes adding legacy
+  cash double-count protection; one final pass for due-today/fully-settled
+  write-off refusal. Last run 1 PASS / 31 intentionally filtered; no claim
+  that every historical integration case was re-run. Original three failures
+  reproduced before fixes. Isolated namespace restored and tunnels closed.
+- Scope includes note net/VAT/date/penny rounding, partial/full/paid-invoice
+  credit, concurrent notes/write-offs, invoice lifecycle and branch/staff access,
+  non-cash evidence/payment/schedule/reversal guards, Lagos midnight periods,
+  undated historical loss warnings and preservation of actual legacy cash facts.
+- Latest safe API run 234 PASS / 3 prior network-only skips in 39 files.
+  Library/API/frontend typechecks, server/frontend builds and diff check PASS.
+  Frontend existing sourcemap/chunk warnings remain. No live/browser UI pass.
+- No production mutation, new live fixture, reset, migration, push or deploy.
+  Recognition policy awaiting owner confirmation before release; fixtures and
+  cash closures ACCT-001/002/003 preserved. Details and release/live plan:
+  ACCOUNTING_ADJUSTMENTS_2026-10-10.md. ACCT-006/007 remain OPEN, not worked here.
+
+### Accounting Step 3 Milestone - 2026-10-10 00:16 WAT
+
+- Three baseline failures reproduced: P&L ignores credit-note net reduction,
+  bad-debt loss omitted, cumulative notes exceed invoice face. Isolated fixtures
+  cleaned and secure tunnel closed after each completed run; no production writes.
+- Nine targeted cases PASS after local fixes. Two earlier partial-run failures
+  were resolved: period-fixture UTC/Lagos midnight mismatch and floating-point
+  remainder after full notes. Final ten-case run covers explicit Lagos day/month
+  boundaries and is still IN PROGRESS. Previous 20 cash cases filtered, not failed.
+- Initial latest unit run: 39 files / 234 passed / 3 existing skips. Library/API
+  typechecks pass; final frontend/build checks pending. No release/live pass.
+- Date/VAT management convention is a local draft awaiting owner confirmation
+  before release. ACCT-004/005 not closed; ACCT-006/007 not implemented here.
+
+### Accounting Step 3 - 2026-10-09 23:36 WAT
+
+- ACCT-004/005 newly authorised and IN PROGRESS, not closed or deployed.
+  Existing note/write-off paths and P&L/VAT/branch sources inspected; cash
+  corrections remain closed. New isolated regressions pending; production
+  records and previous acceptance fixture preserved. Date/VAT policy question
+  sent before changing recognition. No new live test result claimed.
 
 Use this register before selecting the next test or fix. The detailed test rows
 and defect log below preserve their original observation date and are therefore
@@ -118,8 +167,8 @@ Five existing unit/mocked-HTTP files passed 16 tests; not a fresh DB concurrency
 | ACCT-002 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | Source-linked allocation/retry changes invoice balances but not Bank/Ledger/Cash Flow; reversal restores available deposit. Concurrency remains independently isolated-verified. |
 | ACCT-003 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | Credit note/client credit and their non-cash reversals do not create cash/current/opening movements; invoice/AR settlement remains accurate. |
 | ACCT-DEPLOY-001 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | First release skipped new fields under old migration. New independently versioned additive migration applied; fields/index and authenticated finance reads verified. |
-| ACCT-004 | High | OPEN; source-confirmed, fresh live write NOT run | Credit notes reduce settlements but P&L/printable VAT Summary use original invoice subtotal/VAT; VAT Tracking separately handles credit-note VAT. |
-| ACCT-005 | High | OPEN; source-confirmed, fresh live write NOT run | Bad-debt write-off creates an overhead record, not a non-cash expense posting; P&L keeps invoice revenue and reads only actual expense payments. |
+| ACCT-004 | High | FIXED LOCALLY / ISOLATED VERIFIED; policy/release/live gates pending | Shared dated proportional net/VAT adjustments; cumulative/concurrent note limits, penny rounding, paid-invoice credit and Lagos periods verified. Original live failure not yet re-tested. |
+| ACCT-005 | High | FIXED LOCALLY / ISOLATED VERIFIED; policy/release/live gates pending | Audited non-cash loss once; outstanding-only write-off locks; immutable non-payable evidence; historical cash/dates flagged; due-today/settled refusal verified. No automatic VAT relief. Original live failure not yet re-tested. |
 | ACCT-006 | High | OPEN classification gap; source and live population separation | NGN501 standalone schedule payments are in cash/bank/ledger, with no accounting head/P&L mapping. Do not presume they are all operating expenses; require classification/review. |
 | ACCT-007 | Medium | OPEN; live read-only and source confirmed | Dashboard combines 61-90 with 90+ and labels both 90d+. Existing invoice is 68 days overdue/AR 61-90, but Dashboard says 90d+. Totals unchanged. |
 

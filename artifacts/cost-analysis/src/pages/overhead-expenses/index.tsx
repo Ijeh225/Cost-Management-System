@@ -29,11 +29,13 @@ import { formatCurrency } from "@/lib/format";
 import { BranchChip } from "@/components/layout/branch-chip";
 
 const STATUS_COLORS: Record<string, string> = {
+  non_cash: "border-slate-500/30 text-slate-400 bg-slate-500/10",
   unpaid:  "border-red-500/30 text-red-400 bg-red-500/10",
   partial: "border-amber-500/30 text-amber-400 bg-amber-500/10",
   paid:    "border-green-500/30 text-green-400 bg-green-500/10",
 };
 const STATUS_LABELS: Record<string, string> = {
+    non_cash: "Non-cash write-off",
   unpaid: "Unpaid", partial: "Partial", paid: "Paid",
 };
 
@@ -113,7 +115,7 @@ function ExpenseForm({ categories, defaultValues, onSubmit, onCancel, isPending,
         <Controller name="category" control={control} rules={{ required: true }} render={({ field }) => (
           <Select onValueChange={field.onChange} value={field.value}>
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{categories.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
+            <SelectContent>{categories.filter(c => c.name !== "Bad Debt").map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
         )} />
       </div>
@@ -807,10 +809,10 @@ export default function OverheadExpensesPage() {
                               >
                                 <Receipt className="w-3 h-3" /> Generate Statement
                               </Button>
-                              <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1 text-blue-400 border-blue-500/30 hover:bg-blue-500/10" onClick={() => setTopupTarget(e)}>
+                              <Button disabled={e.status === "non_cash"} size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1 text-blue-400 border-blue-500/30 hover:bg-blue-500/10" onClick={() => setTopupTarget(e)}>
                                 <WalletCards className="w-3 h-3" /> Add Money
                               </Button>
-                              {e.status !== "paid" && (
+                              {e.status !== "paid" && e.status !== "non_cash" && (
                                 <>
                                   <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1 text-green-400 border-green-500/30 hover:bg-green-500/10" onClick={() => setPaymentTarget(e)}>
                                     <CreditCard className="w-3 h-3" /> Pay Now
@@ -825,8 +827,9 @@ export default function OverheadExpensesPage() {
                                   )}
                                 </>
                               )}
-                              <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => setEditTarget(e)}><Pencil className="w-3.5 h-3.5" /></Button>
-                              <Button size="icon" variant="ghost" className="w-7 h-7 text-destructive hover:text-destructive" onClick={() => setDeleteId(e.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                              <Button disabled={e.status === "non_cash"} size="icon" variant="ghost" className="w-7 h-7" onClick={() => setEditTarget(e)}><Pencil className="w-3.5 h-3.5" /></Button>
+                              <Button disabled={e.status === "non_cash"} size="icon" variant="ghost" className="w-7 h-7 text-destructive hover:text-destructive" onClick={() => setDeleteId(e.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                              {e.status === "non_cash" && <span className="text-xs text-muted-foreground">Audit evidence only; not payable.</span>}
                             </div>
                           </div>
                         </div>

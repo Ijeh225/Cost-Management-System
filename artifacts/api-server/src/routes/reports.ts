@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { invoiceCashCondition } from "../lib/invoice-cash.js";
+import { loadInvoiceAdjustments } from "../lib/invoice-adjustments.js";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, dutyPaymentTransactionsTable, paymentSchedulePaymentsTable, paymentSchedulesTable, reportSubscriptionsTable, reportDeliveryLogsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, isNull, sql, desc, type SQL, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -7,7 +8,7 @@ import { requireAuth, requireBranchAdminOrAbove, requireBranchMemberOrAbove, req
 import { calcTotalCost, sumShipping, sumCustoms, sumTerminal, sumDelivery, sumOperations } from "../lib/calculations.js";
 import { deliverReportSubscription } from "../lib/report-delivery.js";
 import { normalizeReportRecipients, normalizeReportSendAt, normalizeReportSendDayOfWeek, SCHEDULED_REPORT_FREQUENCIES, SCHEDULED_REPORT_KINDS } from "../lib/report-delivery-rules.js";
-import { FINANCIAL_BASIS, normalizeContainerCostBasis, profitLossBasis } from "../lib/financial-reporting.js";
+import { FINANCIAL_BASIS, normalizeContainerCostBasis, profitLossBasis, roundMoney, financialDateBoundary, financialDateKey } from "../lib/financial-reporting.js";
 import { getInvoiceFinancialEffect, isInvoiceFinanciallyActive } from "../lib/invoice-status.js";
 
 export const reportsRouter = Router();
@@ -795,13 +796,13 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireBranchMemberOrAbov
   try {
     const { from, to } = req.query as Record<string, string>;
     const branchScope = await resolveBranchScopeInfo(req);
+    const fromDate = from ? financialDateBoundary(from) : null;
+    const toDate = to ? financialDateBoundary(to, true) : null;
+    if ((fromDate && isNaN(fromDate.getTime())) || (toDate && isNaN(toDate.getTime())) || (fromDate && toDate && fromDate > toDate)) return res.status(400).json({ error: "Invalid report date range" });
 
     const conditions: SQL[] = [];
-    if (from) conditions.push(gte(invoicesTable.createdAt, new Date(from)));
-    if (to) {
-      const toDate = new Date(to + "T23:59:59");
-      conditions.push(lte(invoicesTable.createdAt, toDate));
-    }
+    if (fromDate) conditions.push(gte(invoicesTable.createdAt, fromDate));
+    if (toDate) conditions.push(lte(invoicesTable.createdAt, toDate));
     if (branchScope.id !== null) conditions.push(eq(invoicesTable.branchId, branchScope.id));
 
     const invoices = await db
@@ -824,7 +825,7 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireBranchMemberOrAbov
     let totalVat = 0;
     let totalInvoiced = 0;
 
-    const rows = invoices.filter((inv) => isInvoiceFinanciallyActive(inv.status)).map(inv => {
+    const rows = invoices.filter((inv) => !["draft", "cancelled"].includes(inv.status)).map(inv => {
       const subtotal = parseFloat(inv.subtotal ?? "0");
       const vat = parseFloat(inv.vatAmount ?? "0");
       const total = parseFloat(inv.total ?? "0");
@@ -843,11 +844,19 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireBranchMemberOrAbov
       };
     });
 
+    const adjustments = await loadInvoiceAdjustments({ branchId: branchScope.id, from: fromDate, to: toDate });
+    for (const note of adjustments.creditNotes) {
+      totalSubtotal -= note.netAmount;
+      totalVat -= note.vatAmount;
+      totalInvoiced -= note.amount;
+    }
     return res.json({
       period: { from: from ?? null, to: to ?? null },
       branchScope,
       invoices: rows,
-      totals: { totalSubtotal, totalVat, totalInvoiced },
+      creditNotes: adjustments.creditNotes,
+      adjustmentPolicy: adjustments.policy,
+      totals: { totalSubtotal: roundMoney(totalSubtotal), totalVat: roundMoney(totalVat), totalInvoiced: roundMoney(totalInvoiced) },
     });
   } catch (err) {
     console.error(err);
@@ -858,9 +867,9 @@ reportsRouter.get("/reports/vat-summary", requireAuth, requireBranchMemberOrAbov
 reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchMemberOrAbove, async (req: AuthRequest, res) => {
   try {
     const branchScope = await resolveBranchScopeInfo(req);
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
+    const now = new Date(Date.now() + 3600000);
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth();
     const currentQuarterNum = Math.floor(currentMonth / 3) + 1;
 
     const quarterDefs: Array<{ label: string; year: number; quarter: number; from: Date; to: Date }> = [];
@@ -869,8 +878,8 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchMemberOrAb
       let y = currentYear;
       while (q <= 0) { q += 4; y--; }
       const qStartMonth = (q - 1) * 3;
-      const from = new Date(y, qStartMonth, 1);
-      const to = new Date(y, qStartMonth + 3, 0, 23, 59, 59, 999);
+      const from = new Date(Date.UTC(y, qStartMonth, 1) - 3600000);
+      const to = new Date(Date.UTC(y, qStartMonth + 3, 1) - 3600000 - 1);
       quarterDefs.push({ label: `Q${q} ${y}`, year: y, quarter: q, from, to });
     }
 
@@ -895,35 +904,8 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchMemberOrAb
         )
       );
 
-    // Fetch credit notes for invoices in this window to derive VAT reduction
-    const invoiceIds = invoices.map(inv => inv.id);
-    type CreditNoteVatRow = { invoiceId: number; creditAmount: number; invoiceTotal: number; invoiceVat: number };
-    let creditNoteRows: CreditNoteVatRow[] = [];
-    if (invoiceIds.length > 0) {
-      const cnRows = await db.select({
-        invoiceId: creditNotesTable.invoiceId,
-        amount: creditNotesTable.amount,
-        status: creditNotesTable.status,
-        createdAt: creditNotesTable.createdAt,
-        invoiceTotal: invoicesTable.total,
-        invoiceVat: invoicesTable.vatAmount,
-      })
-        .from(creditNotesTable)
-        .innerJoin(invoicesTable, eq(creditNotesTable.invoiceId, invoicesTable.id))
-        .where(
-          and(
-            inArray(creditNotesTable.invoiceId, invoiceIds),
-            ne(creditNotesTable.status, "voided"),
-          )
-        );
-      // VAT credit = pro-rata of invoice VAT based on credit note amount vs invoice total
-      creditNoteRows = cnRows.map(cn => ({
-        invoiceId: cn.invoiceId,
-        creditAmount: parseFloat(cn.amount ?? "0"),
-        invoiceTotal: parseFloat(cn.invoiceTotal ?? "1"),
-        invoiceVat: parseFloat(cn.invoiceVat ?? "0"),
-      }));
-    }
+    const adjustments = await loadInvoiceAdjustments({ branchId: branchScope.id, from: earliestFrom });
+    const creditNoteRows = adjustments.creditNotes;
 
     // Helper: get quarter index for a date
     const getQuarterIdx = (d: Date): number => {
@@ -946,19 +928,11 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchMemberOrAb
       qAccs[qi].count++;
     }
 
-    // Build a lookup: invoiceId -> invoice createdAt quarter index
-    const invQuarterMap: Record<number, number> = {};
-    for (const inv of invoices) {
-      const d = inv.createdAt instanceof Date ? inv.createdAt : new Date(inv.createdAt!);
-      invQuarterMap[inv.id] = getQuarterIdx(d);
-    }
-
     for (const cn of creditNoteRows) {
-      const qi = invQuarterMap[cn.invoiceId] ?? -1;
+      const qi = getQuarterIdx(cn.createdAt);
       if (qi < 0) continue;
-      const invTotal = cn.invoiceTotal > 0 ? cn.invoiceTotal : 1;
-      const vatCredit = (cn.creditAmount / invTotal) * cn.invoiceVat;
-      qAccs[qi].creditVat += vatCredit;
+      qAccs[qi].creditVat += cn.vatAmount;
+      qAccs[qi].taxable -= cn.netAmount;
     }
 
     // Build monthly breakdown for the current quarter
@@ -966,29 +940,23 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchMemberOrAb
     const cqStartMonth = (cqDef.quarter - 1) * 3;
     const months = [0, 1, 2].map(offset => {
       const mNum = cqStartMonth + offset;
-      const mFrom = new Date(cqDef.year, mNum, 1);
-      const mTo = new Date(cqDef.year, mNum + 1, 0, 23, 59, 59, 999);
-      const mLabel = mFrom.toLocaleString("en-NG", { month: "short" });
+      const mFrom = new Date(Date.UTC(cqDef.year, mNum, 1) - 3600000);
+      const mTo = new Date(Date.UTC(cqDef.year, mNum + 1, 1) - 3600000 - 1);
+      const mLabel = mFrom.toLocaleString("en-NG", { month: "short", timeZone: "Africa/Lagos" });
       const mInvs = invoices.filter(inv => {
         const d = inv.createdAt instanceof Date ? inv.createdAt : new Date(inv.createdAt!);
         return d >= mFrom && d <= mTo;
       });
       const mGrossVat = mInvs.reduce((s, inv) => s + parseFloat(inv.vatAmount ?? "0"), 0);
       const mTaxable = mInvs.reduce((s, inv) => s + parseFloat(inv.subtotal ?? "0"), 0);
-      // Credit VAT credit attributable to this month's invoices
-      const mInvIds = new Set(mInvs.map(inv => inv.id));
-      const mCreditVat = creditNoteRows
-        .filter(cn => mInvIds.has(cn.invoiceId))
-        .reduce((s, cn) => {
-          const invTotal = cn.invoiceTotal > 0 ? cn.invoiceTotal : 1;
-          return s + (cn.creditAmount / invTotal) * cn.invoiceVat;
-        }, 0);
+      const mNotes = creditNoteRows.filter(cn => cn.createdAt >= mFrom && cn.createdAt <= mTo);
+      const mCreditVat = mNotes.reduce((s, cn) => s + cn.vatAmount, 0);
       return {
         label: mLabel,
         month: mNum + 1,
         year: cqDef.year,
-        vatCollected: Math.max(0, mGrossVat - mCreditVat),
-        taxableAmount: mTaxable,
+        vatCollected: roundMoney(mGrossVat - mCreditVat),
+        taxableAmount: roundMoney(mTaxable - mNotes.reduce((s, cn) => s + cn.netAmount, 0)),
         invoiceCount: mInvs.length,
       };
     });
@@ -997,10 +965,10 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchMemberOrAb
       label: q.label,
       year: q.year,
       quarter: q.quarter,
-      from: q.from.toISOString().slice(0, 10),
-      to: q.to.toISOString().slice(0, 10),
-      vatCollected: Math.max(0, qAccs[i].grossVat - qAccs[i].creditVat),
-      taxableAmount: qAccs[i].taxable,
+      from: financialDateKey(q.from),
+      to: financialDateKey(q.to),
+      vatCollected: roundMoney(qAccs[i].grossVat - qAccs[i].creditVat),
+      taxableAmount: roundMoney(qAccs[i].taxable),
       invoiceCount: qAccs[i].count,
       creditNoteVatDeduction: qAccs[i].creditVat,
       ...(i === 0 ? { months } : {}),
@@ -1014,7 +982,7 @@ reportsRouter.get("/reports/vat-liability", requireAuth, requireBranchMemberOrAb
       invoiceCount: currentYearQuarters.reduce((s, q) => s + q.invoiceCount, 0),
     };
 
-    return res.json({ currentQuarter, quarters: quarterData, currentYearTotal, branchScope });
+    return res.json({ currentQuarter, quarters: quarterData, currentYearTotal, branchScope, adjustmentPolicy: adjustments.policy });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -1030,11 +998,11 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
     let fromDate: Date | null = null;
     let toDate: Date | null = null;
     if (from) {
-      fromDate = new Date(from);
+      fromDate = financialDateBoundary(from);
       if (isNaN(fromDate.getTime())) return res.status(400).json({ error: "Invalid 'from' date" });
     }
     if (to) {
-      toDate = new Date(to + "T23:59:59");
+      toDate = financialDateBoundary(to, true);
       if (isNaN(toDate.getTime())) return res.status(400).json({ error: "Invalid 'to' date" });
     }
     if (fromDate && toDate && fromDate > toDate) {
@@ -1087,6 +1055,21 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
       revenueByClient[key].revenue += subtotal;
       revenueByClient[key].invoiceCount += 1;
     }
+
+    const adjustments = await loadInvoiceAdjustments({ branchId: branchScope.id, clientId: clientIdNum, from: fromDate, to: toDate });
+    for (const note of adjustments.creditNotes) {
+      totalRevenue -= note.netAmount;
+      totalInvoicedInclVat -= note.amount;
+      totalVatCollected -= note.vatAmount;
+      const key = String(note.clientId);
+      revenueByClient[key] ??= { clientId: note.clientId ?? 0, clientName: note.clientName ?? "Unknown", revenue: 0, invoiceCount: 0 };
+      revenueByClient[key].revenue -= note.netAmount;
+    }
+    totalRevenue = roundMoney(totalRevenue);
+    totalInvoicedInclVat = roundMoney(totalInvoicedInclVat);
+    totalVatCollected = roundMoney(totalVatCollected);
+    for (const client of Object.values(revenueByClient)) client.revenue = roundMoney(client.revenue);
+    const totalBadDebts = roundMoney(adjustments.badDebts.reduce((sum, row) => sum + row.amount, 0));
 
     // ===== COST OF SALES: attributed to each container's first-ever invoice date =====
     // We query ALL non-draft invoice items globally (optionally filtered by client) to find
@@ -1275,7 +1258,9 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
 
     let totalOverheads = 0;
     const overheadByCategory: Record<string, number> = {};
-    for (const r of overheadRows) {
+    const legacyBadDebtPayments = overheadRows.filter(row => row.category === "Bad Debt");
+    const cashOverheadRows = overheadRows.filter(row => row.category !== "Bad Debt");
+    for (const r of cashOverheadRows) {
       const amt = parseFloat(r.amount as string ?? "0");
       totalOverheads += amt;
       const cat = r.category ?? "Other";
@@ -1284,17 +1269,17 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
 
     // When a client filter is applied, do NOT subtract company-wide overheads from that
     // client's gross profit — Net Profit only makes sense at the company level.
-    const netProfit = clientIdNum !== null ? grossProfit : grossProfit - totalOverheads;
+    const netProfit = roundMoney(grossProfit - totalBadDebts - (clientIdNum !== null ? 0 : totalOverheads));
     const netMarginPct = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
     const avgProfitPerContainer = containerCount > 0 ? grossProfit / containerCount : 0;
 
     // ===== MONTHLY BREAKDOWN =====
-    const monthKey = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const monthKey = (d: Date) => financialDateKey(d).slice(0, 7);
     const months: Record<string, {
-      month: string; revenue: number; costOfSales: number; grossProfit: number; overheads: number; netProfit: number; containerCount: number;
+      month: string; revenue: number; costOfSales: number; grossProfit: number; overheads: number; badDebts: number; netProfit: number; containerCount: number;
     }> = {};
     const ensureMonth = (k: string) => {
-      if (!months[k]) months[k] = { month: k, revenue: 0, costOfSales: 0, grossProfit: 0, overheads: 0, netProfit: 0, containerCount: 0 };
+      if (!months[k]) months[k] = { month: k, revenue: 0, costOfSales: 0, grossProfit: 0, overheads: 0, badDebts: 0, netProfit: 0, containerCount: 0 };
       return months[k];
     };
 
@@ -1302,6 +1287,8 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
       const d = inv.createdAt instanceof Date ? inv.createdAt : new Date(inv.createdAt);
       ensureMonth(monthKey(d)).revenue += parseFloat(inv.subtotal ?? "0");
     }
+    for (const note of adjustments.creditNotes) ensureMonth(monthKey(note.createdAt)).revenue -= note.netAmount;
+    for (const loss of adjustments.badDebts) ensureMonth(monthKey(loss.createdAt)).badDebts += loss.amount;
 
     // Monthly COGS: invoiced containers attributed to their invoice month
     // Uninvoiced containers are excluded from the monthly breakdown (captured in costOfSales.uninvoicedCogs)
@@ -1312,14 +1299,16 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
       m.containerCount += 1;
     }
 
-    for (const r of overheadRows) {
+    for (const r of cashOverheadRows) {
       const d = r.paidAt instanceof Date ? r.paidAt : new Date(r.paidAt as any);
       ensureMonth(monthKey(d)).overheads += parseFloat(r.amount as string ?? "0");
     }
 
     for (const m of Object.values(months)) {
+      m.revenue = roundMoney(m.revenue);
+      m.badDebts = roundMoney(m.badDebts);
       m.grossProfit = m.revenue - m.costOfSales;
-      m.netProfit = clientIdNum !== null ? m.grossProfit : m.grossProfit - m.overheads;
+      m.netProfit = roundMoney(m.grossProfit - m.badDebts - (clientIdNum !== null ? 0 : m.overheads));
     }
     const monthly = Object.values(months).sort((a, b) => a.month.localeCompare(b.month));
 
@@ -1332,6 +1321,11 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
       filters: { clientId: clientIdNum },
       costBasis: normalizedCostBasis,
       financialBasis: profitLossBasis(normalizedCostBasis),
+      adjustments: { policy: adjustments.policy, creditNotes: adjustments.creditNotes, badDebts: adjustments.badDebts,
+        totalCreditNoteNet: roundMoney(adjustments.creditNotes.reduce((sum, note) => sum + note.netAmount, 0)),
+        totalCreditNoteVat: roundMoney(adjustments.creditNotes.reduce((sum, note) => sum + note.vatAmount, 0)),
+        totalBadDebts, undatedBadDebts: adjustments.undatedBadDebts,
+        legacyBadDebtPayments: legacyBadDebtPayments.map(row => ({ paymentId: row.id, amount: Number(row.amount) })) },
       revenue: {
         totalRevenue,                 // ex-VAT (recognised revenue)
         totalInvoicedInclVat,         // gross invoiced (informational)
@@ -2305,13 +2299,15 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
     let fromDate: Date | null = null;
     let toDate: Date | null = null;
     if (from) {
-      fromDate = new Date(from);
+      fromDate = financialDateBoundary(from);
       if (isNaN(fromDate.getTime())) return res.status(400).json({ error: "Invalid 'from' date" });
     }
     if (to) {
-      toDate = new Date(to + "T23:59:59");
+      toDate = financialDateBoundary(to, true);
       if (isNaN(toDate.getTime())) return res.status(400).json({ error: "Invalid 'to' date" });
     }
+
+    if (fromDate && toDate && fromDate > toDate) return res.status(400).json({ error: "'from' must be on or before 'to'" });
 
     // Active branches only — inactive branches are not part of the comparison.
     const branches = await db
@@ -2388,8 +2384,9 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
             .from(dutyPaymentTransactionsTable)
             .where(inArray(dutyPaymentTransactionsTable.containerId, recognizedContainerIds))
         : Promise.resolve([]),
-      db.select({ branchId: expensePaymentsTable.branchId, amount: expensePaymentsTable.amount })
-        .from(expensePaymentsTable).where(overheadPaymentConds.length ? and(...overheadPaymentConds) : undefined),
+      db.select({ branchId: expensePaymentsTable.branchId, amount: expensePaymentsTable.amount, category: overheadExpensesTable.category, id: expensePaymentsTable.id })
+        .from(expensePaymentsTable).leftJoin(overheadExpensesTable, eq(expensePaymentsTable.expenseId, overheadExpensesTable.id))
+        .where(overheadPaymentConds.length ? and(...overheadPaymentConds) : undefined),
     ]);
 
     const sumByBranch = (rows: Array<{ branchId: number; amount: string | null }>) => {
@@ -2408,11 +2405,17 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
     for (const payment of dutyPayments) {
       addRecognizedCost(payment.containerId, payment.amount);
     }
-    const overheadsByBranch = sumByBranch(overheadPayments);
+    const overheadsByBranch = sumByBranch(overheadPayments.filter(row => row.category !== "Bad Debt"));
+    const adjustments = await loadInvoiceAdjustments({ from: fromDate, to: toDate });
+    for (const note of adjustments.creditNotes) {
+      revenueByBranch.set(note.branchId, (revenueByBranch.get(note.branchId) ?? 0) - note.netAmount);
+    }
+    const badDebtsByBranch = new Map<number, number>();
+    for (const loss of adjustments.badDebts) badDebtsByBranch.set(loss.branchId, (badDebtsByBranch.get(loss.branchId) ?? 0) + loss.amount);
 
     // Outstanding receivables per branch (sum of unpaid invoice balances).
     // Period-filtered to match container metrics: only invoices issued within range.
-    const arInvoiceConds: SQL[] = [ne(invoicesTable.status, "draft"), ne(invoicesTable.status, "cancelled")];
+    const arInvoiceConds: SQL[] = [ne(invoicesTable.status, "draft"), ne(invoicesTable.status, "cancelled"), ne(invoicesTable.status, "written_off")];
     if (fromDate) arInvoiceConds.push(gte(invoicesTable.createdAt, fromDate));
     if (toDate)   arInvoiceConds.push(lte(invoicesTable.createdAt, toDate));
     const arInvoices = await db.select({
@@ -2441,11 +2444,12 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
     const rows = branches.map(b => {
       const branchContainers = containers.filter(c => c.branchId === b.id);
       const containerCount = branchContainers.length;
-      const revenue = revenueByBranch.get(b.id) ?? 0;
+      const revenue = roundMoney(revenueByBranch.get(b.id) ?? 0);
       const costs = costsByBranch.get(b.id) ?? 0;
       const grossProfit = revenue - costs;
       const overheads = overheadsByBranch.get(b.id) ?? 0;
-      const netProfit = grossProfit - overheads;
+      const badDebts = roundMoney(badDebtsByBranch.get(b.id) ?? 0);
+      const netProfit = roundMoney(grossProfit - overheads - badDebts);
       const marginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
       // Turnaround = gate-in → delivered (operational lifecycle), not created → closed.
@@ -2467,6 +2471,7 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
         costs,
         grossProfit,
         overheads,
+        badDebts,
         netProfit,
         marginPct,
         avgTurnaroundDays: Math.round(turnaroundDays * 10) / 10,
@@ -2480,6 +2485,7 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       costs: rows.reduce((s, r) => s + r.costs, 0),
       grossProfit: rows.reduce((s, r) => s + r.grossProfit, 0),
       overheads: rows.reduce((s, r) => s + r.overheads, 0),
+      badDebts: rows.reduce((s, r) => s + r.badDebts, 0),
       netProfit: rows.reduce((s, r) => s + r.netProfit, 0),
       outstandingReceivables: rows.reduce((s, r) => s + r.outstandingReceivables, 0),
     };
@@ -2492,9 +2498,12 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
         revenue: FINANCIAL_BASIS.accrual,
         containerCosts: FINANCIAL_BASIS.actual_paid,
         overheads: FINANCIAL_BASIS.actual_paid,
-        summary: "Issued invoice revenue less actual paid costs for containers recognised by their first active invoice, including customs duty, and actual paid overhead.",
+        summary: "Issued revenue net of dated credit notes, less actual paid costs recognised by first active invoice, paid overhead and separate audited non-cash bad debts.",
       },
       generatedAt: new Date().toISOString(),
+      adjustmentPolicy: adjustments.policy,
+      undatedBadDebts: adjustments.undatedBadDebts,
+      legacyBadDebtPayments: overheadPayments.filter(row => row.category === "Bad Debt").map(row => ({ paymentId: row.id, amount: Number(row.amount) })),
     });
   } catch (err) {
     console.error("GET /reports/branch-comparison error:", err);

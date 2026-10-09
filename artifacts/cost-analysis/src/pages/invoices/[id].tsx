@@ -211,10 +211,10 @@ function ApplyCreditDialog({
 }
 
 function RaiseCreditNoteDialog({
-  open, onClose, invoiceId, outstanding, invoiceTotal,
+  open, onClose, invoiceId, outstanding, invoiceTotal, remainingCredit,
 }: {
   open: boolean; onClose: () => void;
-  invoiceId: number; outstanding: number; invoiceTotal: number;
+  invoiceId: number; outstanding: number; invoiceTotal: number; remainingCredit: number;
 }) {
   const { toast } = useToast();
   const raise = useRaiseCreditNote();
@@ -229,7 +229,7 @@ function RaiseCreditNoteDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isNaN(amt) || amt <= 0) { toast({ variant: "destructive", title: "Enter a valid amount" }); return; }
-    if (amt > invoiceTotal) { toast({ variant: "destructive", title: `Amount cannot exceed invoice total (${formatCurrency(invoiceTotal)})` }); return; }
+    if (amt > remainingCredit) { toast({ variant: "destructive", title: `Amount cannot exceed remaining credit-note allowance (${formatCurrency(remainingCredit)})` }); return; }
     if (!reason.trim()) { toast({ variant: "destructive", title: "Reason is required" }); return; }
     try {
       const cn = await raise.mutateAsync({ invoiceId, data: { amount: amt, reason: reason.trim() } });
@@ -267,8 +267,8 @@ function RaiseCreditNoteDialog({
               type="number"
               min="0.01"
               step="0.01"
-              max={invoiceTotal}
-              placeholder={`Up to ${formatCurrency(invoiceTotal)}`}
+              max={remainingCredit}
+              placeholder={`Up to ${formatCurrency(remainingCredit)}`}
               value={amount}
               onChange={e => setAmount(e.target.value)}
               className="mt-1 font-mono"
@@ -291,7 +291,7 @@ function RaiseCreditNoteDialog({
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Credit notes up to the invoice total are allowed. Any amount beyond the current outstanding is posted to the client's credit balance.
+            Remaining credit-note allowance: {formatCurrency(remainingCredit)} including VAT. All active notes together cannot exceed the invoice total. Any excess over the outstanding balance becomes client credit, not a cash refund.
           </p>
           <div className="flex gap-2 justify-end pt-1">
             <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
@@ -844,10 +844,10 @@ export default function InvoiceDetailPage() {
   };
 
   const handleWriteOff = async () => {
-    if (!confirm(`Write off invoice ${invoice?.invoiceNumber}? This will create a Bad Debt expense entry and mark the invoice as unrecoverable. This cannot be undone.`)) return;
+    if (!confirm(`Write off invoice ${invoice?.invoiceNumber}? This records the outstanding balance as a non-cash bad-debt loss, retains its audit evidence and removes it from active receivables. No bank payment or automatic VAT relief is created. This cannot be undone.`)) return;
     try {
       await writeOffMutation.mutateAsync({ invoiceId });
-      toast({ title: "Invoice written off", description: "A Bad Debt expense entry has been created." });
+      toast({ title: "Invoice written off", description: "A non-cash bad-debt loss and retained audit evidence have been recorded." });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to write off invoice";
       toast({ variant: "destructive", title: "Error", description: msg });
@@ -894,8 +894,10 @@ export default function InvoiceDetailPage() {
   const isDraft = invoice.status === "draft";
   const canCollect = !isLocked && !isDraft && invoice.total > 0;
   const canRecordPayment = canCollect && invoice.outstanding > 0;
-  const canRaiseCreditNote = isAdmin && canCollect && invoice.outstanding > 0;
-  const isOverdue = !!invoice.dueDate && new Date(invoice.dueDate) < new Date();
+  const remainingCredit = Math.max(0, Math.round((invoice.total - (invoice.creditNotes ?? []).filter(note => note.status !== "voided").reduce((sum, note) => sum + note.amount, 0)) * 100) / 100);
+  const canRaiseCreditNote = isAdmin && canCollect && remainingCredit > 0;
+  const lagosToday = new Date(Date.now() + 3600000).toISOString().slice(0, 10);
+  const isOverdue = !!invoice.dueDate && invoice.dueDate < lagosToday;
   const canWriteOff = isAdmin && canCollect && invoice.status !== "paid" && invoice.outstanding > 0 && isOverdue;
   const canCancel = isAdmin && (invoice.status === "sent" || invoice.status === "overdue") && invoice.totalPaid === 0;
 
@@ -925,7 +927,7 @@ export default function InvoiceDetailPage() {
           <FileX className="w-5 h-5 text-zinc-400 shrink-0" />
           <div>
             <p className="text-sm font-semibold text-zinc-300">This invoice has been written off as a bad debt.</p>
-            <p className="text-xs text-muted-foreground mt-0.5">It is excluded from the active accounts receivable balance. A Bad Debt expense entry has been recorded.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">It is excluded from active receivables. Its outstanding balance is a dated non-cash P&amp;L loss, not a payable expense or bank payment.</p>
           </div>
         </div>
       )}
@@ -1569,6 +1571,7 @@ export default function InvoiceDetailPage() {
       )}
 
       <RaiseCreditNoteDialog
+        remainingCredit={remainingCredit}
         open={creditNoteOpen}
         onClose={() => setCreditNoteOpen(false)}
         invoiceId={invoiceId}

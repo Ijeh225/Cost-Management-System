@@ -15,6 +15,9 @@ type Row = {
   revenue: number;
   costs: number;
   grossProfit: number;
+  overheads: number;
+  badDebts?: number;
+  netProfit: number;
   marginPct: number;
   avgTurnaroundDays: number;
   outstandingReceivables: number;
@@ -23,7 +26,9 @@ type Row = {
 type Response = {
   period: { from: string | null; to: string | null };
   rows: Row[];
-  totals: { containers: number; revenue: number; costs: number; grossProfit: number; outstandingReceivables: number };
+  totals: { containers: number; revenue: number; costs: number; grossProfit: number; overheads: number; badDebts?: number; netProfit: number; outstandingReceivables: number };
+  adjustmentPolicy?: string;
+  legacyBadDebtPayments?: Array<{ paymentId: number; amount: number }>;
   generatedAt: string;
   financialBasis?: { summary: string };
 };
@@ -39,6 +44,7 @@ function useQueryParams() {
 
 function downloadCsv(rows: Row[], totals: Response["totals"], filename: string) {
   const headers = ["Branch", "Status", "Containers", "Revenue (₦)", "Costs (₦)", "Gross Profit (₦)", "Margin %", "Avg Turnaround (days)", "Outstanding AR (₦)"];
+  headers.splice(6, 0, "Paid Overhead (NGN)", "Non-cash Bad Debt (NGN)", "Net Profit (NGN)");
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const lines = [headers.join(",")];
   for (const r of rows) {
@@ -49,6 +55,9 @@ function downloadCsv(rows: Row[], totals: Response["totals"], filename: string) 
       r.revenue.toFixed(2),
       r.costs.toFixed(2),
       r.grossProfit.toFixed(2),
+      r.overheads.toFixed(2),
+      (r.badDebts ?? 0).toFixed(2),
+      r.netProfit.toFixed(2),
       r.marginPct.toFixed(2),
       r.avgTurnaroundDays.toFixed(1),
       r.outstandingReceivables.toFixed(2),
@@ -57,7 +66,7 @@ function downloadCsv(rows: Row[], totals: Response["totals"], filename: string) 
   lines.push([
     esc("TOTAL"), esc(""), totals.containers,
     totals.revenue.toFixed(2), totals.costs.toFixed(2),
-    totals.grossProfit.toFixed(2), "", "", totals.outstandingReceivables.toFixed(2),
+    totals.grossProfit.toFixed(2), totals.overheads.toFixed(2), (totals.badDebts ?? 0).toFixed(2), totals.netProfit.toFixed(2), "", "", totals.outstandingReceivables.toFixed(2),
   ].join(","));
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -256,6 +265,13 @@ export default function BranchComparisonPrint() {
           )}
         </div>
 
+        <div className="section-heading">Net Profit Reconciliation</div>
+        <p className="note">{data.adjustmentPolicy}</p>
+        {!!data.legacyBadDebtPayments?.length && <p className="note">Review required: {data.legacyBadDebtPayments.length} historical Bad Debt cash postings remain in cash history but are excluded from paid overhead to avoid counting the loss twice.</p>}
+        <table><thead><tr><th>Branch</th><th className="right">Gross Profit</th><th className="right">Paid Overhead</th><th className="right">Non-cash Bad Debt</th><th className="right">Net Profit</th></tr></thead>
+          <tbody>{rows.map(row => <tr key={row.branchId}><td>{row.branchName}</td><td className="right">{fmt(row.grossProfit)}</td><td className="right">{fmt(row.overheads)}</td><td className="right">{fmt(row.badDebts ?? 0)}</td><td className="right">{fmt(row.netProfit)}</td></tr>)}</tbody>
+          <tfoot><tr><td>Total</td><td className="right">{fmt(totals.grossProfit)}</td><td className="right">{fmt(totals.overheads)}</td><td className="right">{fmt(totals.badDebts ?? 0)}</td><td className="right">{fmt(totals.netProfit)}</td></tr></tfoot>
+        </table>
         <div className="footer">
           <p>Bonded Terminal Clearing System · Branch Comparison Report · {periodLabel} · All Branches</p>
           <p style={{ marginTop: 4 }}>

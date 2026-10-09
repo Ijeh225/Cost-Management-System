@@ -63,7 +63,7 @@ export type OverheadExpense = {
   updatedAt: string;
   totalPaid: number;
   balance: number;
-  status: "unpaid" | "partial" | "paid";
+  status: "unpaid" | "partial" | "paid" | "non_cash";
   scheduledRequestedTotal: number;
   scheduledApprovedTotal: number;
   scheduledPaidTotal: number;

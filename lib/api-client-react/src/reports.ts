@@ -65,6 +65,8 @@ export type VatSummaryInvoice = {
 };
 
 export type VatSummaryResponse = {
+  adjustmentPolicy?: string;
+  creditNotes?: Array<{ id: number; creditNoteNumber: string; invoiceNumber: string; clientName: string | null; amount: number; netAmount: number; vatAmount: number; createdAt: string }>;
   period: { from: string | null; to: string | null };
   invoices: VatSummaryInvoice[];
   totals: { totalSubtotal: number; totalVat: number; totalInvoiced: number };
@@ -141,6 +143,16 @@ export function useGetInvoiceAging(options?: { enabled?: boolean }) {
 }
 
 export type ProfitLossResponse = {
+  adjustments?: {
+    policy: string;
+    totalCreditNoteNet: number;
+    totalCreditNoteVat: number;
+    totalBadDebts: number;
+    undatedBadDebts: number[];
+    legacyBadDebtPayments: Array<{ paymentId: number; amount: number }>;
+    creditNotes: Array<{ id: number; creditNoteNumber: string; invoiceNumber: string; amount: number; netAmount: number; vatAmount: number; createdAt: string }>;
+    badDebts: Array<{ invoiceId: number; invoiceNumber: string; amount: number; createdAt: string }>;
+  };
   period: { from: string | null; to: string | null };
   filters: { clientId: number | null };
   costBasis?: "budgeted" | "actual_paid";
@@ -183,6 +195,7 @@ export type ProfitLossResponse = {
   avgProfitPerContainer: number;
   monthly: Array<{
     month: string;
+    badDebts?: number;
     revenue: number;
     costOfSales: number;
     grossProfit: number;
@@ -430,6 +443,7 @@ export type BranchComparisonRow = {
   costs: number;
   grossProfit: number;
   overheads: number;
+  badDebts?: number;
   netProfit: number;
   marginPct: number;
   avgTurnaroundDays: number;
@@ -437,6 +451,9 @@ export type BranchComparisonRow = {
 };
 
 export type BranchComparisonResponse = {
+  legacyBadDebtPayments?: Array<{ paymentId: number; amount: number }>;
+  adjustmentPolicy?: string;
+  undatedBadDebts?: number[];
   period: { from: string | null; to: string | null };
   rows: BranchComparisonRow[];
   totals: {
@@ -445,6 +462,7 @@ export type BranchComparisonResponse = {
     costs: number;
     grossProfit: number;
     overheads: number;
+    badDebts?: number;
     netProfit: number;
     outstandingReceivables: number;
   };

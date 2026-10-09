@@ -69,6 +69,8 @@ export type CreditNote = {
   creditNoteNumber: string;
   reason: string;
   amount: number;
+  netAmount?: number;
+  vatAmount?: number;
   status: string;
   createdBy: number | null;
   createdAt: string;
@@ -89,6 +91,7 @@ export type Invoice = {
   total: number;
   totalPaid: number;
   outstanding: number;
+  writtenOffAmount?: number | null;
   dueDate: string | null;
   notes: string;
   createdAt: string;
@@ -417,6 +420,12 @@ export function useRemoveInvoiceItem() {
 
 const CREDIT_NOTES_KEY = "/api/credit-notes";
 
+function invalidateInvoiceAdjustments(qc: ReturnType<typeof useQueryClient>) {
+  for (const path of [CREDIT_NOTES_KEY, "/api/clients", "/api/dashboard/stats", "/api/overhead-expenses",
+    "/api/reports/pl", "/api/reports/vat-summary", "/api/reports/vat-liability", "/api/reports/branch-comparison",
+    "/api/reports/client-statement", "/api/reports/invoice-aging"]) qc.invalidateQueries({ queryKey: [path] });
+}
+
 export function useGetAllCreditNotes(invoiceId?: number) {
   const url = invoiceId ? `${CREDIT_NOTES_KEY}?invoiceId=${invoiceId}` : CREDIT_NOTES_KEY;
   return useQuery<CreditNote[]>({
@@ -443,6 +452,7 @@ export function useRaiseCreditNote() {
         body: JSON.stringify(data),
       }),
     onSuccess: (_, { invoiceId }) => {
+      invalidateInvoiceAdjustments(qc);
       qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
       qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });
@@ -474,6 +484,7 @@ export function useWriteOffInvoice() {
         method: "POST",
       }),
     onSuccess: (_, { invoiceId }) => {
+      invalidateInvoiceAdjustments(qc);
       qc.invalidateQueries({ queryKey: INVOICES_QUERY_KEY });
       qc.invalidateQueries({ queryKey: [...INVOICES_QUERY_KEY, invoiceId] });
       qc.invalidateQueries({ queryKey: ["/api/invoices/accounts-receivable"] });

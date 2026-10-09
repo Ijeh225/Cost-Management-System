@@ -21,6 +21,7 @@ const fmtDate = (value: string | null | undefined, long = false) => {
 };
 
 const statusLabel: Record<OverheadExpense["status"], string> = {
+  non_cash: "Non-cash write-off (not payable)",
   unpaid: "Unpaid",
   partial: "Partially Paid",
   paid: "Paid",

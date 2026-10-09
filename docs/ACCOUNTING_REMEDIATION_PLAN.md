@@ -1,5 +1,15 @@
 # Accounting Remediation and Feature Plan
 
+Release authorisation 2026-10-10 00:53 WAT: user instructed push and deploy
+Step 3 after the local rules/status summary. Implemented management convention
+authorised for release; no statutory certification. Deployment in progress.
+
+Current update 2026-10-10 00:28 WAT: Step 3 (ACCT-004/005) authorised,
+fixed locally and isolated verified (12 distinct cases). Recognition convention
+is a local draft pending owner confirmation before release. Not committed,
+pushed, deployed or live accepted. Details: ACCOUNTING_ADJUSTMENTS_2026-10-10.md.
+Later steps remain proposals. Steps 1/2 retain deployed/live-accepted status.
+
 Recorded: 2026-10-08 12:18 WAT (Africa/Lagos, UTC+01:00).
 Original status: PROPOSED at 12:18 WAT. Later user authorised Steps 1/2 only.
 Basis: ACCOUNTING_FEATURE_REVIEW_2026-10-08.md and current authoritative
@@ -73,6 +83,14 @@ increasing cash. Concurrent requests cannot spend the same balance twice.
 ### Step 3 - Reconcile Credit Notes and Bad Debts
 
 Addresses ACCT-004 and ACCT-005.
+
+Execution 2026-10-10 00:28 WAT: existing routes/reports repaired without a
+new ledger or migration. Local draft adopts proportional note-date net/VAT
+and audited write-off-date gross non-cash loss. Policy question was sent first,
+but no owner response received; this is not an approved production/tax policy.
+12 isolated cases, 234 unit/mocked cases, typechecks/builds pass. Release/live
+acceptance still pending. Generic note reversal/cash refund and bad-debt
+recovery journals are not newly implemented or certified by these corrections.
 
 - Agree credit-note net/VAT/date and bad-debt recognition rules before coding.
   Do not presume a VAT-inclusive credit note equals an ex-VAT revenue reduction.

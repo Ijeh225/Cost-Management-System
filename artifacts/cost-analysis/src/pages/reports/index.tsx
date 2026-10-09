@@ -992,7 +992,7 @@ function PrintableReportsSection() {
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Receipt className="w-4 h-4 text-blue-400" /> VAT Summary
             </CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">Total VAT collected for a period — formatted for FIRS filing.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Invoice VAT less dated credit notes. Management summary for accountant review before tax filing.</p>
           </CardHeader>
           <CardContent className="p-4 space-y-3">
             <div className="grid grid-cols-2 gap-2">

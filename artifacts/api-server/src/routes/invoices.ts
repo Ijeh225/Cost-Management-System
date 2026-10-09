@@ -7,6 +7,7 @@ import { toE164Nigerian, sendWhatsAppTemplate, assertBranchWhatsAppSenderSupport
 import { getEffectiveInvoiceStatus, isInvoiceCollectable, isInvoiceEditable } from "../lib/invoice-status.js";
 import { getReversibleOverpaymentCredit } from "../lib/invoice-payment-reversal.js";
 import { settlementAmount, settlementRequestKey } from "../lib/invoice-cash.js";
+import { creditNoteSplit, financialDateKey } from "../lib/financial-reporting.js";
 
 const router = Router();
 
@@ -95,12 +96,12 @@ async function fetchPaymentsWithBank(invoiceId: number) {
     .orderBy(invoicePaymentsTable.paidAt);
 }
 
-async function generateCreditNoteNumber(): Promise<string> {
+async function generateCreditNoteNumber(executor: Pick<typeof db, "select"> = db): Promise<string> {
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const prefix = `CN-${yyyy}${mm}-`;
-  const rows = await db
+  const rows = await executor
     .select({ creditNoteNumber: creditNotesTable.creditNoteNumber })
     .from(creditNotesTable)
     .where(sql`${creditNotesTable.creditNoteNumber} LIKE ${prefix + "%"}`)
@@ -118,8 +119,9 @@ async function formatInvoice(inv: any, payments: any[], items?: any[], creditNot
     .filter(payment => payment.entryType === "reversal" && payment.reversalOfPaymentId != null)
     .map(payment => payment.reversalOfPaymentId));
   const total = parseFloat(inv.total ?? "0");
-  const outstanding = Math.max(0, total - totalPaid);
+  const outstanding = inv.status === "written_off" ? 0 : Math.max(0, total - totalPaid);
   const status = getEffectiveInvoiceStatus({ status: inv.status, total, totalPaid, dueDate: inv.dueDate });
+  let priorCredit = 0;
 
   return {
     id: inv.id,
@@ -135,6 +137,7 @@ async function formatInvoice(inv: any, payments: any[], items?: any[], creditNot
     vatAmount: parseFloat(inv.vatAmount ?? "0"),
     total,
     totalPaid,
+    writtenOffAmount: inv.writtenOffAmount == null ? null : Number(inv.writtenOffAmount),
     outstanding,
     dueDate: inv.dueDate ?? null,
     notes: inv.notes ?? "",
@@ -163,18 +166,27 @@ async function formatInvoice(inv: any, payments: any[], items?: any[], creditNot
       entryType: p.entryType,
       reversalOfPaymentId: p.reversalOfPaymentId ?? null,
       reversalReason: p.reversalReason ?? null,
-      canReverse: p.entryType === "payment" && p.paymentMethod !== "credit_note" && !reversedPaymentIds.has(p.id),
+      canReverse: inv.status !== "written_off" && p.entryType === "payment" && p.paymentMethod !== "credit_note" && !reversedPaymentIds.has(p.id),
       bankName: p.bankName ?? null,
       createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
     })),
-    creditNotes: (creditNotes ?? []).map(cn => ({
+    creditNotes: [...(creditNotes ?? [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id - b.id).map(cn => {
+      const split = creditNoteSplit(Number(cn.amount), total, Number(inv.vatAmount ?? 0), priorCredit);
+      if (cn.status !== "voided") priorCredit += Number(cn.amount);
+      return {
       id: cn.id,
       invoiceId: cn.invoiceId,
+      invoiceNumber: inv.invoiceNumber,
+      clientName: inv.clientName ?? null,
+      createdBy: cn.createdBy ?? null,
       creditNoteNumber: cn.creditNoteNumber,
       reason: cn.reason,
       amount: parseFloat(cn.amount ?? "0"),
+      status: cn.status,
+      netAmount: cn.status === "voided" ? 0 : split.netAmount,
+      vatAmount: cn.status === "voided" ? 0 : split.vatAmount,
       createdAt: cn.createdAt instanceof Date ? cn.createdAt.toISOString() : cn.createdAt,
-    })),
+    }; }),
   };
 }
 
@@ -197,6 +209,7 @@ router.get("/invoices", requireAuth, async (req: AuthRequest, res) => {
         total: invoicesTable.total,
         dueDate: invoicesTable.dueDate,
         notes: invoicesTable.notes,
+        writtenOffAmount: invoicesTable.writtenOffAmount,
         createdAt: invoicesTable.createdAt,
         updatedAt: invoicesTable.updatedAt,
       })
@@ -650,6 +663,7 @@ router.get("/invoices/:id", requireAuth, async (req: AuthRequest, res) => {
         total: invoicesTable.total,
         dueDate: invoicesTable.dueDate,
         notes: invoicesTable.notes,
+        writtenOffAmount: invoicesTable.writtenOffAmount,
         createdAt: invoicesTable.createdAt,
         updatedAt: invoicesTable.updatedAt,
         branchId: invoicesTable.branchId,
@@ -1286,6 +1300,7 @@ router.post("/invoices/:id/payments/:paymentId/reverse", requireBranchAdminOrAbo
       await tx.execute(sql`SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE`);
       const [inv] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
       if (!inv || !userCanAccessBranch(req, inv.branchId)) return { error: { code: 404, message: "Invoice not found" } } as const;
+      if (inv.status === "written_off") return { error: { code: 409, message: "Review the bad-debt adjustment before reversing a payment on a written-off invoice" } } as const;
       const scope = getBranchScope(req);
       if (scope === null && req.user?.role === "super_admin") {
         return { error: { code: 400, message: "Select the invoice branch before reversing a payment." } } as const;
@@ -1765,40 +1780,46 @@ router.post("/invoices/:id/credit-note", requireBranchAdminOrAbove, async (req: 
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
     const { amount: rawAmount, reason } = req.body as { amount?: number; reason?: string };
-    const amount = parseFloat(String(rawAmount ?? 0));
-    if (isNaN(amount) || amount <= 0) return res.status(400).json({ error: "Valid amount is required" });
-    if (!reason?.trim()) return res.status(400).json({ error: "Reason is required" });
+    const amount = settlementAmount(rawAmount);
+    if (amount === null) return res.status(400).json({ error: "A positive amount with at most two decimal places is required" });
+    if (typeof reason !== "string" || !reason.trim()) return res.status(400).json({ error: "Reason is required" });
 
-    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
-    if (!isInvoiceCollectable(inv.status)) return res.status(400).json({ error: "Cannot raise a credit note on a draft, cancelled, or written-off invoice" });
-    if (inv.clientId) {
-      const [cnClient] = await db.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, inv.clientId));
-      if (cnClient && cnClient.branchId !== inv.branchId) {
-        return res.status(400).json({ error: "Invoice and client must belong to the same branch" });
+    const result = await db.transaction(async (tx) => {
+      const [inv] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId)).for("update");
+      if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
+      const scope = getBranchScope(req);
+      if (scope !== null && scope !== inv.branchId) return res.status(404).json({ error: "Invoice not found" });
+      if (!isInvoiceCollectable(inv.status)) return res.status(400).json({ error: "Cannot raise a credit note on a draft, cancelled, or written-off invoice" });
+      if (inv.clientId) {
+        const [cnClient] = await tx.select({ branchId: clientsTable.branchId }).from(clientsTable).where(eq(clientsTable.id, inv.clientId)).for("update");
+        if (!cnClient || cnClient.branchId !== inv.branchId) {
+          return res.status(400).json({ error: "Invoice and client must belong to the same branch" });
+        }
       }
-    }
 
-    const existingPayments = await db.select({ amount: invoicePaymentsTable.amount })
-      .from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
-    const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
-    const invoiceTotal = parseFloat(inv.total ?? "0");
-    const outstanding = Math.max(0, invoiceTotal - totalPaid);
+      const existingPayments = await tx.select({ amount: invoicePaymentsTable.amount })
+        .from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+      const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+      const invoiceTotal = parseFloat(inv.total ?? "0");
+      const outstanding = Math.max(0, invoiceTotal - totalPaid);
 
-    // Allow credit note up to full invoice value; excess beyond outstanding posts to client credit
-    if (amount > invoiceTotal) {
-      return res.status(400).json({ error: `Credit note cannot exceed the invoice total (₦${invoiceTotal.toLocaleString()})` });
-    }
+      const notes = await tx.select({ amount: creditNotesTable.amount }).from(creditNotesTable)
+        .where(and(eq(creditNotesTable.invoiceId, invoiceId), ne(creditNotesTable.status, "voided")));
+      const credited = notes.reduce((sum, note) => sum + Number(note.amount), 0);
+      if (Math.round((credited + amount) * 100) > Math.round(invoiceTotal * 100)) {
+        return res.status(400).json({ error: "Total active credit notes cannot exceed the invoice value" });
+      }
 
-    // Amount applied to reduce invoice balance (capped at outstanding)
-    const applyToInvoice = Math.min(amount, outstanding);
-    // Any excess beyond outstanding becomes a client credit balance
-    const excessCredit = Math.max(0, amount - outstanding);
+      // Amount applied to reduce invoice balance (capped at outstanding)
+      const applyToInvoice = Math.min(amount, outstanding);
+      // Any excess beyond outstanding becomes a client credit balance
+      const excessCredit = Math.max(0, amount - outstanding);
 
-    const creditNoteNumber = await generateCreditNoteNumber();
+      if (excessCredit > 0 && !inv.clientId) return res.status(400).json({ error: "A linked client is required for excess credit" });
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('credit-note-number'))`);
+      const creditNoteNumber = await generateCreditNoteNumber(tx);
 
-    const userId = (req as AuthRequest).user?.id ?? null;
-    const [cn] = await db.transaction(async (tx) => {
+      const userId = (req as AuthRequest).user?.id ?? null;
       const [inserted] = await tx.insert(creditNotesTable).values({
         invoiceId,
         creditNoteNumber,
@@ -1850,9 +1871,10 @@ router.post("/invoices/:id/credit-note", requireBranchAdminOrAbove, async (req: 
         branchId: inv.branchId,
       });
 
-      return [inserted];
+      return { cn: inserted, applyToInvoice, excessCredit };
     });
-
+    if (!result || !("cn" in result)) return;
+    const { cn, applyToInvoice, excessCredit } = result;
     return res.status(201).json({
       id: cn.id,
       invoiceId: cn.invoiceId,
@@ -1904,26 +1926,25 @@ router.post("/invoices/:id/write-off", requireBranchAdminOrAbove, async (req: Au
     const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
-    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
-    if (!isInvoiceCollectable(inv.status)) return res.status(400).json({ error: "A draft, cancelled, or written-off invoice cannot be written off" });
-    if (inv.status === "written_off") return res.status(400).json({ error: "Invoice is already written off" });
-    if (inv.status === "paid") return res.status(400).json({ error: "Invoice is already fully paid" });
-    if (!inv.dueDate) return res.status(400).json({ error: "Cannot write off an invoice without a due date" });
-    const dueDate = new Date(inv.dueDate);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    if (dueDate >= today) return res.status(400).json({ error: "Only overdue invoices (past their due date) can be written off as bad debt" });
+    const result = await db.transaction(async (tx) => {
+      const [inv] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId)).for("update");
+      if (!inv || !userCanAccessBranch(req, inv.branchId)) return res.status(404).json({ error: "Invoice not found" });
+      const scope = getBranchScope(req);
+      if (scope !== null && scope !== inv.branchId) return res.status(404).json({ error: "Invoice not found" });
+      if (!isInvoiceCollectable(inv.status)) return res.status(400).json({ error: "A draft, cancelled, or written-off invoice cannot be written off" });
+      if (inv.status === "paid") return res.status(400).json({ error: "Invoice is already fully paid" });
+      if (!inv.dueDate) return res.status(400).json({ error: "Cannot write off an invoice without a due date" });
+      if (inv.dueDate >= financialDateKey(new Date())) return res.status(400).json({ error: "Only overdue invoices (past their due date in Lagos) can be written off as bad debt" });
 
-    const existingPayments = await db.select({ amount: invoicePaymentsTable.amount })
-      .from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
-    const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
-    const invoiceTotal = parseFloat(inv.total ?? "0");
-    const outstanding = Math.max(0, invoiceTotal - totalPaid);
+      const existingPayments = await tx.select({ amount: invoicePaymentsTable.amount })
+        .from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+      const totalPaid = existingPayments.reduce((s, p) => s + parseFloat(p.amount ?? "0"), 0);
+      const invoiceTotal = parseFloat(inv.total ?? "0");
+      const outstanding = Math.max(0, invoiceTotal - totalPaid);
 
-    const writeOffAmount = outstanding > 0 ? outstanding : invoiceTotal;
-    const writeOffUserId = (req as AuthRequest).user?.id ?? null;
-    let expenseId = 0;
-    await db.transaction(async (tx) => {
+      if (outstanding <= 0) return res.status(400).json({ error: "Invoice has no outstanding balance to write off" });
+      const writeOffAmount = Math.round(outstanding * 100) / 100;
+      const writeOffUserId = (req as AuthRequest).user?.id ?? null;
       await tx.update(invoicesTable)
         .set({ status: "written_off", writtenOffAmount: String(writeOffAmount), updatedAt: new Date() })
         .where(eq(invoicesTable.id, invoiceId));
@@ -1934,10 +1955,9 @@ router.post("/invoices/:id/write-off", requireBranchAdminOrAbove, async (req: Au
         amount: String(writeOffAmount),
         reference: inv.invoiceNumber,
         recordedBy: writeOffUserId,
-        paidAt: new Date(),
+        paidAt: null,
         branchId: inv.branchId,
       }).returning({ id: overheadExpensesTable.id });
-      expenseId = exp.id;
 
       await tx.insert(invoiceAuditLogTable).values({
         invoiceId,
@@ -1946,9 +1966,10 @@ router.post("/invoices/:id/write-off", requireBranchAdminOrAbove, async (req: Au
         performedBy: writeOffUserId,
         branchId: inv.branchId,
       });
+      return { expenseId: exp.id, writeOffAmount };
     });
-
-    return res.status(201).json({ success: true, overheadExpenseId: expenseId, writtenOffAmount: writeOffAmount });
+    if (!result || !("expenseId" in result)) return;
+    return res.status(201).json({ success: true, overheadExpenseId: result.expenseId, writtenOffAmount: result.writeOffAmount });
   } catch (err) {
     console.error("POST /invoices/:id/write-off error:", err);
     return res.status(500).json({ error: "Failed to write off invoice" });

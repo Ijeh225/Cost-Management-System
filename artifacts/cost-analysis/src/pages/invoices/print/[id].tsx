@@ -209,6 +209,7 @@ export default function InvoicePrintPage() {
                 <span className="value">{fmt(invoice.totalPaid)}</span>
               </div>
             )}
+            {invoice.status === "written_off" && <div className="totals-row"><span className="label">Bad debt written off (non-cash)</span><span className="value">{fmt(invoice.writtenOffAmount ?? Math.max(0, invoice.total - invoice.totalPaid))}</span></div>}
             {invoice.outstanding > 0 && (
               <div className="totals-row outstanding-line">
                 <span className="label">Outstanding</span>

@@ -29,9 +29,10 @@ function downloadCsv(data: ProfitLossResponse, filename: string) {
   const lines: string[] = [];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   lines.push("Financial basis,Type,Definition");
-  lines.push(`Revenue,${data.financialBasis?.revenue.label ?? "Accrual"},${data.financialBasis?.revenue.description ?? "Issued invoice revenue excluding VAT."}`);
-  lines.push(`Container costs,${data.financialBasis?.containerCosts.label ?? "Budgeted"},${data.financialBasis?.containerCosts.description ?? "Configured charge amounts."}`);
-  lines.push(`Overheads,${data.financialBasis?.overheads.label ?? "Actual Paid"},${data.financialBasis?.overheads.description ?? "Dated overhead payment records."}`);
+  lines.push(`Revenue,${esc(data.financialBasis?.revenue.label ?? "Accrual")},${esc(data.financialBasis?.revenue.description ?? "Issued invoice revenue excluding VAT.")}`);
+  lines.push(`Container costs,${esc(data.financialBasis?.containerCosts.label ?? "Budgeted")},${esc(data.financialBasis?.containerCosts.description ?? "Configured charge amounts.")}`);
+  lines.push(`Overheads,${esc(data.financialBasis?.overheads.label ?? "Actual Paid")},${esc(data.financialBasis?.overheads.description ?? "Dated overhead payment records.")}`);
+  lines.push(`Adjustments,Management convention,${esc(data.adjustments?.policy ?? "")}`);
   lines.push("");
   lines.push("Section,Line,Amount");
   lines.push(`Revenue,Net Sales (excl. VAT),${data.revenue.totalRevenue.toFixed(2)}`);
@@ -50,6 +51,8 @@ function downloadCsv(data: ProfitLossResponse, filename: string) {
     lines.push(`Overheads,${esc(cat)},${amt.toFixed(2)}`);
   }
   lines.push(`Overheads,TOTAL Overheads,${data.overheads.total.toFixed(2)}`);
+  lines.push(`Non-cash adjustments,Bad debt write-offs,${(data.adjustments?.totalBadDebts ?? 0).toFixed(2)}`);
+  lines.push(`Revenue adjustments,Credit-note net reductions,${(data.adjustments?.totalCreditNoteNet ?? 0).toFixed(2)}`);
   lines.push(`Profit,Net Profit,${data.netProfit.toFixed(2)}`);
   lines.push(`Profit,Net Margin %,${data.netMarginPct.toFixed(2)}`);
   lines.push("");
@@ -61,9 +64,9 @@ function downloadCsv(data: ProfitLossResponse, filename: string) {
   if (data.monthly.length > 1) {
     lines.push("");
     lines.push("Monthly Breakdown");
-    lines.push("Month,Containers,Revenue,Cost of Sales,Gross Profit,Overheads,Net Profit");
+    lines.push("Month,Containers,Revenue,Cost of Sales,Gross Profit,Overheads,Non-cash Bad Debt,Net Profit");
     for (const m of data.monthly) {
-      lines.push(`${esc(fmtMonth(m.month))},${m.containerCount},${m.revenue.toFixed(2)},${m.costOfSales.toFixed(2)},${m.grossProfit.toFixed(2)},${m.overheads.toFixed(2)},${m.netProfit.toFixed(2)}`);
+      lines.push(`${esc(fmtMonth(m.month))},${m.containerCount},${m.revenue.toFixed(2)},${m.costOfSales.toFixed(2)},${m.grossProfit.toFixed(2)},${m.overheads.toFixed(2)},${(m.badDebts ?? 0).toFixed(2)},${m.netProfit.toFixed(2)}`);
     }
   }
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -189,11 +192,14 @@ export default function ProfitLossPrint() {
 
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px", marginBottom: 20, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, fontSize: 12, color: "#166534", lineHeight: 1.5 }}>
           <span style={{ fontWeight: 700, flexShrink: 0 }}>ℹ</span>
-          <span>
+          <div>
             Revenue is recognised from <strong>issued invoices</strong> (net of VAT). Draft invoices are excluded.
-            Net profit deducts <strong>actual paid branch overheads</strong> from gross profit.
-            The Dashboard and Analytics page show gross profit based on <em>budgeted clearing charges</em> — figures may differ from this report.
-          </span>
+            Net profit deducts <strong>actual paid branch overheads and separate non-cash bad debts</strong> from gross profit.
+            <p>{data.adjustments?.policy}</p>
+            {!!data.adjustments?.undatedBadDebts.length && <p>Review required: {data.adjustments.undatedBadDebts.length} legacy write-offs have no audited recognition date and are excluded from dated loss totals.</p>}
+            {!!data.adjustments?.legacyBadDebtPayments?.length && <p>Review required: {data.adjustments.legacyBadDebtPayments.length} historical cash payments labelled Bad Debt remain in cash records but are excluded from overhead here to avoid double-counting non-cash losses. Review their classification and any required reversal.</p>}
+            Financial Dashboard matches this Actual Paid P&amp;L. Operations Dashboard and Analytics retain their labelled budgeted estimates.
+          </div>
         </div>
 
         <div className="summary-cards">
@@ -264,8 +270,9 @@ export default function ProfitLossPrint() {
                 <td className="amt">{fmt(overheads.total)}</td>
               </tr>
 
+              <tr><td className="lbl">Bad debt write-offs (non-cash)</td><td className="amt">{fmt(data.adjustments?.totalBadDebts ?? 0)}</td></tr>
               <tr className={`net ${netProfit < 0 ? "negative" : ""}`}>
-                <td className="lbl">{overheads.appliedToNet ? `Net Profit (${fmtPct(netMarginPct)})` : `Gross Profit — Client View (overheads excluded)`}</td>
+                <td className="lbl">{overheads.appliedToNet ? `Net Profit (${fmtPct(netMarginPct)})` : `Client Result (company overheads excluded)`}</td>
                 <td className="amt">{fmt(netProfit)}</td>
               </tr>
             </tbody>
@@ -318,6 +325,7 @@ export default function ProfitLossPrint() {
                   <th className="right">Cost of Sales (₦)</th>
                   <th className="right">Gross Profit (₦)</th>
                   <th className="right">Overheads (₦)</th>
+                  <th className="right">Non-cash Bad Debt</th>
                   <th className="right">Net Profit (₦)</th>
                 </tr>
               </thead>
@@ -330,6 +338,7 @@ export default function ProfitLossPrint() {
                     <td className="right">{fmt(m.costOfSales)}</td>
                     <td className={`right ${m.grossProfit < 0 ? "neg" : "pos"}`}>{fmt(m.grossProfit)}</td>
                     <td className="right">{fmt(m.overheads)}</td>
+                    <td className="right">{fmt(m.badDebts ?? 0)}</td>
                     <td className={`right ${m.netProfit < 0 ? "neg" : "pos"}`}>{fmt(m.netProfit)}</td>
                   </tr>
                 ))}
@@ -345,7 +354,7 @@ export default function ProfitLossPrint() {
             {" · "}Net Margin: <strong>{fmtPct(netMarginPct)}</strong>
           </p>
           {!overheads.appliedToNet && (
-            <p className="note">Overheads are organisation-wide and not subtracted when filtering by a single client. The client view shows gross profit only.</p>
+            <p className="note">Company-wide overheads are excluded from a client view; that client's audited bad-debt losses are still deducted.</p>
           )}
           <p className="note">Revenue is recognised on invoice issuance using net sales (ex-VAT). Draft invoices are excluded. VAT collected is a tax liability, not revenue.</p>
         </div>

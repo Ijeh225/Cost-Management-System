@@ -1,6 +1,80 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-10-08
+## Current Work Register - Authoritative as of 2026-10-10
+
+### Accounting Step 3 Release Authorised - 2026-10-10 00:53 WAT
+
+- User explicitly instructed push and deploy after the local-fix/policy summary.
+  This authorises release of the implemented management-report convention:
+  proportional net/VAT on credit-note date and gross non-cash loss on audited
+  write-off date, without automatic VAT relief. No statutory tax approval claimed.
+- Twelve scoped isolated cases, 234 unit/mocked passes and successful builds/
+  typechecks retained as evidence; do not repeat completed financial writes.
+- Commit/push and exact Railway production verification now IN PROGRESS.
+  No deployment success or new live acceptance claimed yet. Protected checkpoint
+  remains unchanged; no new schema migration or historical posting rewrite.
+
+### Accounting Step 3 Final Local Verification - 2026-10-10 00:28 WAT
+
+- ACCT-004/005 FIXED LOCALLY / ISOLATED VERIFIED. Twelve distinct scoped
+  PostgreSQL cases passed across the ten-case run, four-case follow-up (one
+  additional historical-payment case), and final due-today/fully-settled case.
+  Other suite cases intentionally filtered, not new failures. All run-owned
+  fixtures cleaned; namespace counts restored and secure tunnels closed.
+- Credit notes reduce proportional net revenue/VAT on note date; cumulative
+  limits and locks protect concurrent adjustments. Bad debts are separately
+  deducted once on audited write-off date, without cash posting or VAT relief.
+  Lagos-date UI/backend/report rules align; missing historical audit dates and
+  old Bad Debt cash payments are explicitly flagged, never silently rewritten.
+- Shared report sources, Dashboard, invoice/overhead UI, branch/P&L/VAT print
+  and CSV paths updated. Non-cash evidence cannot be edited, deleted, paid or
+  scheduled; written-off invoice payment reversal requires adjustment review.
+- Latest unit/mocked run 39 files / 234 PASS / 3 existing network-only skips.
+  Library/API/frontend typechecks and server/frontend builds PASS. Existing
+  frontend sourcemap and large-chunk warnings remain; diff whitespace check
+  PASS. No browser visual/live acceptance performed in this session.
+- Work UNCOMMITTED / UNPUSHED / NOT DEPLOYED. No production writes, schema
+  migration, replacement ledger or protected checkpoint/backup modification.
+  Proposed recognition convention remains a LOCAL DRAFT: owner response to
+  policy question is pending; do not claim approved tax treatment or live closure.
+- Exact next: confirm note-date net/VAT and write-off-date gross non-cash loss
+  convention; then commit/push this code and records, confirm exact deployment,
+  perform bounded live acceptance using retained fixtures where suitable.
+  ACCT-006/007 and full accounting expansion remain outside this authorised fix.
+  Detailed evidence: ACCOUNTING_ADJUSTMENTS_2026-10-10.md and current session.
+
+### Accounting Step 3 Milestone - 2026-10-10 00:16 WAT
+
+- ACCT-004/005 fixes are LOCAL, UNCOMMITTED and NOT DEPLOYED. Production
+  and prior live fixtures untouched; no schema reset or replacement ledger.
+- Three original isolated failures reproduced before fixes. Subsequent nine
+  targeted cases passed, including proportional VAT, dated notes, paid-invoice
+  credit, note/write-off concurrency, non-cash payment/evidence guards, branch/
+  staff restrictions and undated legacy warnings. Final ten-case run including
+  explicit Lagos-midnight boundaries still running; do not claim final pass yet.
+- Proposed note-date/proportional VAT and write-off-date/gross loss convention
+  implemented as a LOCAL DRAFT. Owner policy response still pending before
+  release; no statutory VAT relief or tax compliance asserted. Bad debt does
+  not reduce original VAT. Missing audited loss dates are flagged, not guessed.
+- P&L/VAT/branch reports share adjustment sources; Dashboard, print/export and
+  mutation cache refresh updated. Non-cash bad-debt evidence is not payable;
+  payment reversal on written-off invoices requires prior adjustment review.
+- Prior protected tags/backup preserved. Next: finish final isolated run and
+  latest builds/tests, review diff, record precise release/live acceptance gates.
+
+### Active Accounting Step 3 - 2026-10-09 23:36 WAT
+
+- User authorised ACCT-004 credit-note and ACCT-005 bad-debt corrections.
+  ACCT-001/002/003 and their live closures remain preserved, not reopened.
+- Clean master at e3e65cd verified; existing protected checkpoint retained.
+  Tracing existing routes and reports before edits; no duplicate accounting module.
+- Proposed policy question sent: recognise proportional net/VAT credit-note
+  adjustments on note date, and gross outstanding bad debt as a separate
+  non-cash loss on write-off date without automatic VAT relief. Awaiting answer;
+  isolated reproduction can proceed without assuming tax-policy approval.
+- No Step 3 implementation, test pass, release or live write claimed yet.
+  Exact next: isolated failure reproduction, resolve recognition policy, fix
+  shared reporting and mutation controls, then verify affected report/UI paths.
 
 Use this section to choose the next task. Earlier plans, next-action lines,
 and issue statuses in this document are historical evidence, not the current

@@ -5,7 +5,7 @@ const fmt = (n: number) =>
   "\u20a6" + Number(n).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtDate = (d: string | null | undefined) =>
-  d ? new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" }) : "\u2014";
+  d ? new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Lagos" }) : "\u2014";
 
 function useQueryParams() {
   const search = typeof window !== "undefined" ? window.location.search : "";
@@ -17,20 +17,28 @@ export default function VatSummaryPrint() {
   const { from, to } = useQueryParams();
   const { data, isLoading, isError } = useGetVatSummary({ from, to });
   const invoices = data?.invoices ?? [];
+  const creditNotes = data?.creditNotes ?? [];
 
   const quarterlyBreakdown = useMemo(() => {
     const map: Record<string, { label: string; vatCollected: number; taxableAmount: number; count: number }> = {};
     for (const inv of invoices) {
-      const d = new Date(inv.createdAt);
-      const q = Math.floor(d.getMonth() / 3) + 1;
-      const key = `Q${q} ${d.getFullYear()}`;
+      const d = new Date(new Date(inv.createdAt).getTime() + 3600000);
+      const q = Math.floor(d.getUTCMonth() / 3) + 1;
+      const key = `Q${q} ${d.getUTCFullYear()}`;
       if (!map[key]) map[key] = { label: key, vatCollected: 0, taxableAmount: 0, count: 0 };
       map[key].vatCollected += inv.vatAmount;
       map[key].taxableAmount += inv.subtotal;
       map[key].count++;
     }
+    for (const note of creditNotes) {
+      const d = new Date(new Date(note.createdAt).getTime() + 3600000);
+      const key = `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
+      map[key] ??= { label: key, vatCollected: 0, taxableAmount: 0, count: 0 };
+      map[key].vatCollected -= note.vatAmount;
+      map[key].taxableAmount -= note.netAmount;
+    }
     return Object.values(map).sort((a, b) => a.label.localeCompare(b.label));
-  }, [invoices]);
+  }, [invoices, creditNotes]);
 
   if (isLoading) {
     return (
@@ -142,15 +150,15 @@ export default function VatSummaryPrint() {
         <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "14px 18px", marginBottom: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: totals.totalVat > 0 ? 10 : 0 }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", color: "#1d4ed8", marginBottom: 2 }}>VAT Return Summary · For FIRS Filing</div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", color: "#1d4ed8", marginBottom: 2 }}>VAT Management Summary · Review Before Filing</div>
               <div style={{ fontSize: 12, color: "#475569" }}>
                 Period: <strong>{periodLabel}</strong>
                 {vatRate && <span style={{ marginLeft: 12 }}>Effective VAT rate: <strong>{vatRate}%</strong></span>}
               </div>
             </div>
             <div style={{ textAlign: "right", fontSize: 11, color: "#64748b" }}>
-              <div>FIRS VAT is due on the <strong>21st of the month</strong> following the filing period.</div>
-              <div style={{ marginTop: 2 }}>VAT Registration Number required on submission.</div>
+              <div>Credit-note VAT follows the stated management-report convention.</div>
+              <div style={{ marginTop: 2 }}>Your accountant must confirm filing-period treatment and any tax relief.</div>
             </div>
           </div>
           {totals.totalVat > 0 && (
@@ -160,7 +168,7 @@ export default function VatSummaryPrint() {
                 <div style={{ fontSize: 15, fontWeight: 800, fontFamily: "monospace", color: "#1e293b" }}>{fmt(totals.totalSubtotal)}</div>
               </div>
               <div style={{ background: "#fff", borderRadius: 6, border: "1px solid #bfdbfe", padding: "8px 14px", minWidth: 140 }}>
-                <div style={{ fontSize: 10, textTransform: "uppercase", color: "#94a3b8", letterSpacing: "0.8px", marginBottom: 4 }}>VAT Payable to FIRS</div>
+                <div style={{ fontSize: 10, textTransform: "uppercase", color: "#94a3b8", letterSpacing: "0.8px", marginBottom: 4 }}>Invoice VAT less Credit Notes</div>
                 <div style={{ fontSize: 15, fontWeight: 800, fontFamily: "monospace", color: "#1d4ed8" }}>{fmt(totals.totalVat)}</div>
               </div>
               <div style={{ background: "#fff", borderRadius: 6, border: "1px solid #bfdbfe", padding: "8px 14px", minWidth: 140 }}>
@@ -205,8 +213,9 @@ export default function VatSummaryPrint() {
           </>
         )}
 
-        <div className="section-heading">Invoice Breakdown</div>
-        {invoices.length === 0 ? (
+        <p>{data.adjustmentPolicy}</p>
+        <div className="section-heading">Invoices and Credit-Note Adjustments</div>
+        {invoices.length === 0 && creditNotes.length === 0 ? (
           <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8", fontSize: 13 }}>
             No invoices found for this period.
           </div>
@@ -237,6 +246,17 @@ export default function VatSummaryPrint() {
                   <td className="right" style={{ fontWeight: 600 }}>{fmt(inv.total)}</td>
                 </tr>
               ))}
+              {creditNotes.map(note => (
+                <tr key={`cn-${note.id}`}>
+                  <td className="mono">{note.creditNoteNumber}<br />{note.invoiceNumber}</td>
+                  <td>{fmtDate(note.createdAt)}</td>
+                  <td>{note.clientName ?? "Unknown"}</td>
+                  <td>Credit note (non-cash)</td>
+                  <td className="right">{fmt(-note.netAmount)}</td>
+                  <td className="right">{fmt(-note.vatAmount)}</td>
+                  <td className="right">{fmt(-note.amount)}</td>
+                </tr>
+              ))}
             </tbody>
             <tfoot>
               <tr>
@@ -250,7 +270,7 @@ export default function VatSummaryPrint() {
         )}
 
         <div className="footer">
-          <p>Bonded Terminal Clearing · VAT Summary Report · For FIRS Filing Use Only</p>
+          <p>Bonded Terminal Clearing · VAT Management Summary · Accountant review required before tax filing</p>
           <p style={{ marginTop: 4 }}>{periodLabel} · Generated {new Date().toLocaleDateString("en-NG")}</p>
         </div>
       </div>

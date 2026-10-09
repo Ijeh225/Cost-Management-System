@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
 import app from "../app";
-import { db, pool, branchesTable, usersTable, clientsTable, banksTable, invoicesTable, invoicePaymentsTable, clientDepositsTable } from "@workspace/db";
+import { db, pool, branchesTable, usersTable, clientsTable, banksTable, invoicesTable, invoicePaymentsTable, clientDepositsTable, expensePaymentsTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { ensureInvoiceCashSettlementSchema } from "../lib/invoice-payment-reversal-schema";
 
@@ -34,6 +34,10 @@ afterAll(async () => {
   await pool.query("DELETE FROM credit_notes WHERE branch_id=ANY($1)", [branches]);
   await pool.query("DELETE FROM workflow_notifications WHERE branch_id=ANY($1)", [branches]);
   await pool.query("DELETE FROM ai_assistant_audit_logs WHERE branch_id=ANY($1)", [branches]);
+  await pool.query("DELETE FROM expense_payments WHERE branch_id=ANY($1)", [branches]);
+  await pool.query("DELETE FROM payment_schedule_events WHERE branch_id=ANY($1)", [branches]);
+  await pool.query("DELETE FROM payment_schedules WHERE branch_id=ANY($1)", [branches]);
+  await pool.query("DELETE FROM overhead_expenses WHERE branch_id=ANY($1)", [branches]);
   await db.delete(clientDepositsTable).where(inArray(clientDepositsTable.branchId, branches));
   await db.delete(invoicesTable).where(inArray(invoicesTable.branchId, branches));
   await db.delete(clientsTable).where(inArray(clientsTable.branchId, branches));
@@ -74,6 +78,215 @@ async function assertCash(f: Fixture, amount: number) {
 }
 
 describe("accounting cash source regressions", () => {
+  it("ACCT-004 reconciles proportional credit-note net and VAT in P&L and VAT Summary", async () => {
+    const f = await fixture();
+    await db.update(invoicesTable).set({ vatAmount: "75", total: "1075" }).where(eq(invoicesTable.id, f.invoice.id));
+    const cn = await post(f, `/invoices/${f.invoice.id}/credit-note`, { amount: 107.5, reason: "Isolated VAT adjustment" });
+    expect(cn.status, JSON.stringify(cn.body)).toBe(201);
+    const pl = await get(f, "/reports/pl?costBasis=actual_paid");
+    const vat = await get(f, "/reports/vat-summary");
+    expect(pl.status).toBe(200);
+    expect(vat.status).toBe(200);
+    expect(pl.body.revenue.totalRevenue).toBe(900);
+    expect(pl.body.revenue.totalVatCollected).toBe(67.5);
+    expect(vat.body.totals.totalSubtotal).toBe(900);
+    expect(vat.body.totals.totalVat).toBe(67.5);
+    expect((await get(f, `/invoices/${f.invoice.id}`)).body.outstanding).toBe(967.5);
+    await assertCash(f, 0);
+  });
+
+  it("ACCT-005 recognises outstanding bad debt once without a cash expense", async () => {
+    const f = await fixture();
+    await db.update(invoicesTable).set({ dueDate: "2020-01-01", vatAmount: "75", total: "1075" }).where(eq(invoicesTable.id, f.invoice.id));
+    const [payment] = await db.insert(invoicePaymentsTable).values({ invoiceId: f.invoice.id, branchId: f.branch.id, bankId: f.bank.id, amount: "300" }).returning();
+    const result = await post(f, `/invoices/${f.invoice.id}/write-off`, {});
+    expect(result.status, JSON.stringify(result.body)).toBe(201);
+    expect(result.body.writtenOffAmount).toBe(775);
+    const pl = await get(f, "/reports/pl?costBasis=actual_paid");
+    expect(pl.status).toBe(200);
+    expect(pl.body.revenue.totalRevenue).toBe(1000);
+    expect(pl.body.adjustments.totalBadDebts, JSON.stringify(pl.body.adjustments)).toBe(775);
+    expect(pl.body.netProfit).toBe(225);
+    expect((await get(f, "/reports/vat-summary")).body.totals.totalVat).toBe(75);
+    const comparison = await get(f, "/reports/branch-comparison");
+    const branch = comparison.body.rows.find((row: { branchId: number }) => row.branchId === f.branch.id);
+    expect(branch.netProfit).toBe(225);
+    expect(branch.outstandingReceivables).toBe(0);
+    expect((await get(f, `/invoices/${f.invoice.id}`)).body.outstanding).toBe(0);
+    expect((await post(f, `/invoices/${f.invoice.id}/payments/${payment.id}/reverse`, { reference: "ACCT-FROZEN", reason: "Cannot alter frozen loss" })).status).toBe(409);
+    expect((await post(f, `/invoices/${f.invoice.id}/write-off`, {})).status).toBe(400);
+    expect((await pool.query("SELECT count(*)::int AS n FROM expense_payments WHERE branch_id=$1", [f.branch.id])).rows[0].n).toBe(0);
+    await assertCash(f, 300);
+  });
+
+  it("ACCT-005 refuses due-today and fully settled write-offs without creating evidence", async () => {
+    const f = await fixture();
+    const today = new Date(Date.now() + 3600000).toISOString().slice(0, 10);
+    await db.update(invoicesTable).set({ dueDate: today }).where(eq(invoicesTable.id, f.invoice.id));
+    expect((await post(f, `/invoices/${f.invoice.id}/write-off`, {})).status).toBe(400);
+    await db.update(invoicesTable).set({ dueDate: "2020-01-01" }).where(eq(invoicesTable.id, f.invoice.id));
+    await db.insert(invoicePaymentsTable).values({ invoiceId: f.invoice.id, branchId: f.branch.id, amount: "1000", paymentMethod: "credit_note" });
+    expect((await post(f, `/invoices/${f.invoice.id}/write-off`, {})).status).toBe(400);
+    expect((await pool.query("SELECT count(*)::int AS n FROM overhead_expenses WHERE branch_id=$1", [f.branch.id])).rows[0].n).toBe(0);
+    expect((await get(f, "/reports/pl")).body.adjustments.totalBadDebts).toBe(0);
+    await assertCash(f, 0);
+  });
+
+  it("ACCT-005 flags legacy cash postings without deducting the bad debt twice", async () => {
+    const f = await fixture();
+    await db.update(invoicesTable).set({ dueDate: "2020-01-01" }).where(eq(invoicesTable.id, f.invoice.id));
+    const result = await post(f, `/invoices/${f.invoice.id}/write-off`, {});
+    expect(result.status).toBe(201);
+    // Simulate old data only inside this run's isolated branch; new API writes refuse this.
+    const [payment] = await db.insert(expensePaymentsTable).values({ expenseId: result.body.overheadExpenseId,
+      branchId: f.branch.id, bankId: f.bank.id, amount: "100", paymentMethod: "bank" }).returning();
+    const pl = await get(f, "/reports/pl?costBasis=actual_paid");
+    expect(pl.status).toBe(200);
+    expect(pl.body.overheads.total).toBe(0);
+    expect(pl.body.adjustments.totalBadDebts).toBe(1000);
+    expect(pl.body.netProfit).toBe(0);
+    expect(pl.body.adjustments.legacyBadDebtPayments).toEqual([{ paymentId: payment.id, amount: 100 }]);
+    const comparison = await get(f, "/reports/branch-comparison");
+    const branch = comparison.body.rows.find((row: { branchId: number }) => row.branchId === f.branch.id);
+    expect(branch.overheads).toBe(0);
+    expect(branch.badDebts).toBe(1000);
+    expect(branch.netProfit).toBe(0);
+    expect(comparison.body.legacyBadDebtPayments).toContainEqual({ paymentId: payment.id, amount: 100 });
+    await assertCash(f, -100);
+  });
+
+  it("ACCT-004 rejects cumulative notes beyond the invoice face value", async () => {
+    const f = await fixture();
+    expect((await post(f, `/invoices/${f.invoice.id}/credit-note`, { amount: 700, reason: "First adjustment" })).status).toBe(201);
+    expect((await post(f, `/invoices/${f.invoice.id}/credit-note`, { amount: 700, reason: "Excess adjustment" })).status).toBe(400);
+  });
+
+  it("ACCT-004 dates credit notes independently of their original invoice period", async () => {
+    const f = await fixture();
+    const now = new Date();
+    const quarterStart = new Date(Date.UTC(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1));
+    const oldDate = new Date(quarterStart.getTime() - 12 * 3600000);
+    await db.update(invoicesTable).set({ createdAt: oldDate, vatAmount: "75", total: "1075" }).where(eq(invoicesTable.id, f.invoice.id));
+    const note = await post(f, `/invoices/${f.invoice.id}/credit-note`, { amount: 107.5, reason: "Later-period adjustment" });
+    expect(note.status).toBe(201);
+    const from = `${now.getFullYear()}-${String(quarterStart.getMonth() + 1).padStart(2, "0")}-01`;
+    const pl = await get(f, `/reports/pl?from=${from}&costBasis=actual_paid`);
+    const vat = await get(f, `/reports/vat-summary?from=${from}`);
+    const liability = await get(f, "/reports/vat-liability");
+    expect(pl.body.revenue.totalRevenue).toBe(-100);
+    expect(vat.body.totals.totalVat).toBe(-7.5);
+    expect(liability.body.currentQuarter.vatCollected).toBe(-7.5);
+    expect(liability.body.currentQuarter.taxableAmount).toBe(-100);
+    const before = oldDate.toISOString().slice(0, 10);
+    expect((await get(f, `/reports/pl?to=${before}`)).body.revenue.totalRevenue).toBe(1000);
+    expect((await get(f, `/reports/vat-summary?to=${before}`)).body.totals.totalVat).toBe(75);
+    const comparison = await get(f, `/reports/branch-comparison?from=${from}`);
+    expect(comparison.body.rows.find((row: { branchId: number }) => row.branchId === f.branch.id).revenue).toBe(-100);
+    expect((await get(f, `/reports/pl?clientId=${f.client.id}&from=${from}`)).body.revenue.totalRevenue).toBe(-100);
+  });
+
+  it("ACCT-004 serializes simultaneous notes against the remaining invoice value", async () => {
+    const f = await fixture();
+    const results = await Promise.all([1, 2].map(n => post(f, `/invoices/${f.invoice.id}/credit-note`, { amount: 700, reason: `Concurrent adjustment ${n}` })));
+    expect(results.map(row => row.status).sort()).toEqual([201, 400]);
+    expect((await get(f, "/reports/pl")).body.revenue.totalRevenue).toBe(300);
+  });
+
+  it("ACCT-004 reconciles Lagos midnight across report periods and months", async () => {
+    const f = await fixture();
+    const now = new Date();
+    const month = Math.floor(now.getUTCMonth() / 3) * 3 + 1;
+    const day = `${now.getUTCFullYear()}-${String(month).padStart(2, "0")}-01`;
+    const date = new Date(`${day}T00:15:00+01:00`);
+    await db.update(invoicesTable).set({ createdAt: date, vatAmount: "75", total: "1075" }).where(eq(invoicesTable.id, f.invoice.id));
+    expect((await post(f, `/invoices/${f.invoice.id}/credit-note`, { amount: 107.5, reason: "Midnight accounting date" })).status).toBe(201);
+    await pool.query("UPDATE credit_notes SET created_at=$1 WHERE invoice_id=$2", [date, f.invoice.id]);
+    const pl = await get(f, `/reports/pl?from=${day}&to=${day}`);
+    const vat = await get(f, `/reports/vat-summary?from=${day}&to=${day}`);
+    expect(pl.body.revenue.totalRevenue).toBe(900);
+    expect(pl.body.monthly.map((row: { month: string }) => row.month)).toEqual([day.slice(0, 7)]);
+    expect(vat.body.totals.totalVat).toBe(67.5);
+    expect((await get(f, "/reports/vat-liability")).body.currentQuarter.vatCollected).toBe(67.5);
+    const comparison = await get(f, `/reports/branch-comparison?from=${day}&to=${day}`);
+    expect(comparison.body.rows.find((row: { branchId: number }) => row.branchId === f.branch.id).revenue).toBe(900);
+  });
+
+  it("ACCT-004 full notes on paid invoices create reusable credit without cash or duplicate VAT", async () => {
+    const f = await fixture();
+    await db.update(invoicesTable).set({ vatAmount: "75", total: "1075", status: "paid" }).where(eq(invoicesTable.id, f.invoice.id));
+    await db.insert(invoicePaymentsTable).values({ invoiceId: f.invoice.id, branchId: f.branch.id, bankId: f.bank.id, amount: "1075" });
+    for (const amount of [358.33, 358.33, 358.34]) {
+      expect((await post(f, `/invoices/${f.invoice.id}/credit-note`, { amount, reason: "Paid invoice adjustment" })).status).toBe(201);
+    }
+    const pl = await get(f, "/reports/pl");
+    expect(pl.body.revenue.totalRevenue).toBe(0);
+    expect(pl.body.revenue.totalVatCollected).toBe(0);
+    expect((await db.select().from(clientsTable).where(eq(clientsTable.id, f.client.id)))[0].creditBalance).toBe("1075.00");
+    await assertCash(f, 1075);
+  });
+
+  it("ACCT-005 serializes write-offs and protects non-cash evidence from payment and editing", async () => {
+    const f = await fixture();
+    await db.update(invoicesTable).set({ dueDate: "2020-01-01" }).where(eq(invoicesTable.id, f.invoice.id));
+    const results = await Promise.all([post(f, `/invoices/${f.invoice.id}/write-off`, {}), post(f, `/invoices/${f.invoice.id}/write-off`, {})]);
+    expect(results.map(row => row.status).sort()).toEqual([201, 400]);
+    const expenseId = results.find(row => row.status === 201)!.body.overheadExpenseId;
+    const legacySchedule = (await pool.query("INSERT INTO payment_schedules(branch_id,schedule_date,overhead_expense_id,vendor_beneficiary,description,amount_requested,amount_approved,status) VALUES ($1,now(),$2,'ACCT bad debt','Invalid legacy payable',100,100,'approved') RETURNING id", [f.branch.id, expenseId])).rows[0].id;
+    expect((await agent.patch(`/api/payment-schedules/${legacySchedule}/pay`).set("X-Branch-Id", String(f.branch.id)).set("X-CSRF-Token", csrf).send({ amount: 100, paymentMethod: "bank", bankId: f.bank.id })).status).toBe(400);
+    expect((await post(f, `/overhead-expenses/${expenseId}/payments`, { amount: 100, paymentMethod: "bank", bankId: f.bank.id })).status).toBe(409);
+    expect((await post(f, `/overhead-expenses/${expenseId}/payment-schedules`, { amountRequested: 100 })).status).toBe(409);
+    expect((await post(f, `/overhead-expenses/${expenseId}/topups`, { amount: 100, description: "Invalid topup" })).status).toBe(409);
+    expect((await agent.patch(`/api/overhead-expenses/${expenseId}`).set("X-Branch-Id", String(f.branch.id)).set("X-CSRF-Token", csrf).send({ category: "Other" })).status).toBe(409);
+    expect((await agent.delete(`/api/overhead-expenses/${expenseId}`).set("X-Branch-Id", String(f.branch.id)).set("X-CSRF-Token", csrf)).status).toBe(409);
+    const overheads = await get(f, "/overhead-expenses");
+    expect(overheads.body.expenses.find((row: { id: number }) => row.id === expenseId).status).toBe("non_cash");
+    expect(overheads.body.totalOutstanding).toBe(0);
+    expect((await get(f, "/reports/pl")).body.adjustments.totalBadDebts).toBe(1000);
+    await assertCash(f, 0);
+  });
+
+  it("ACCT-004/005 enforce active branch, status, input and non-finance access", async () => {
+    const f = await fixture();
+    const other = await fixture();
+    expect((await post(other, `/invoices/${f.invoice.id}/credit-note`, { amount: 10, reason: "Wrong active branch" })).status).toBe(404);
+    expect((await post(other, `/invoices/${f.invoice.id}/write-off`, {})).status).toBe(404);
+    for (const amount of [0, -1, 0.001, "1junk", null]) {
+      expect((await post(f, `/invoices/${f.invoice.id}/credit-note`, { amount, reason: "Invalid money" })).status).toBe(400);
+    }
+    for (const status of ["draft", "cancelled", "written_off"]) {
+      await db.update(invoicesTable).set({ status }).where(eq(invoicesTable.id, f.invoice.id));
+      expect((await post(f, `/invoices/${f.invoice.id}/credit-note`, { amount: 10, reason: "Invalid lifecycle" })).status).toBe(400);
+    }
+    await db.update(invoicesTable).set({ status: "sent" }).where(eq(invoicesTable.id, f.invoice.id));
+    const email = `acct-staff-${suffix}@example.test`;
+    await db.insert(usersTable).values({ branchId: f.branch.id, name: "Non-finance adjustment QA", email,
+      passwordHash: await bcrypt.hash(password, 10), role: "staff", authorityLevel: "staff", jobFunction: "operations",
+      workspaceAccess: '["transire"]', accessProfileMigratedAt: new Date() });
+    const staff = request.agent(app);
+    expect((await staff.post("/api/auth/login").send({ email, password })).status).toBe(200);
+    const token = (await staff.get("/api/auth/csrf")).body.token;
+    for (const path of ["credit-note", "write-off"]) {
+      expect((await staff.post(`/api/invoices/${f.invoice.id}/${path}`).set("X-CSRF-Token", token).send({ amount: 10, reason: "Must not post" })).status).toBe(403);
+    }
+  });
+
+  it("ACCT-005 recognises loss in its audited period and flags undated legacy write-offs", async () => {
+    const f = await fixture();
+    await db.update(invoicesTable).set({ createdAt: new Date("2020-01-01"), dueDate: "2020-01-02" }).where(eq(invoicesTable.id, f.invoice.id));
+    expect((await post(f, `/invoices/${f.invoice.id}/write-off`, {})).status).toBe(201);
+    const from = new Date().toISOString().slice(0, 10);
+    const pl = await get(f, `/reports/pl?from=${from}`);
+    expect(pl.body.revenue.totalRevenue).toBe(0);
+    expect(pl.body.adjustments.totalBadDebts).toBe(1000);
+    expect(pl.body.netProfit).toBe(-1000);
+    expect(pl.body.monthly[0].badDebts).toBe(1000);
+    expect((await get(f, `/reports/pl?to=2020-12-31`)).body.netProfit).toBe(1000);
+    await pool.query("DELETE FROM invoice_audit_log WHERE invoice_id=$1 AND action='written_off'", [f.invoice.id]);
+    const legacy = await get(f, "/reports/pl");
+    expect(legacy.body.adjustments.undatedBadDebts).toEqual([f.invoice.id]);
+    expect(legacy.body.adjustments.totalBadDebts).toBe(0);
+  });
+
   it("upgrades the existing reversal schema without replacing rows and is repeatable", async () => {
     const connection = await pool.connect();
     try {
