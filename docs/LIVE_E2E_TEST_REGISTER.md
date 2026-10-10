@@ -2,6 +2,66 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-10
 
+### Step 6 Final Engineering Acceptance PASS - 2026-10-10 22:24 WAT
+
+- Final foundation subset5/5 PASS,17not-selected in211.09s; tests cover pending
+  drafts, grants/revocations/disabled profiles, database specialist profiles,
+  abandoned-draft cancellation and all-branch shared-book configuration.
+- Combined evidence covers all22 distinct foundation cases (prior full20,
+  focused3, final5), NOT one uninterrupted full22 run. Own schemas cleaned up,
+  source baseline assertions PASS, isolated SSH tunnel verified closed.
+- Fresh complete existing accounting-cash43/43 PASS in921.23s; owned fixture
+  namespace counts restored. Unit270PASS/3pre-existing skips in97.79s; all
+  typechecks, full build and inactive bundle no-connection/write smoke PASS.
+- No new live write test records, production grants or accounting activation.
+  Inactive code publication/deployment proof next. Policy sign-off, source
+  completeness adapters, cutover and user-facing accounting reports remain future.
+
+### Existing43 Regression PASS / Final Foundation Checks - 2026-10-10 22:20 WAT
+
+- Complete fresh accounting-cash integration43/43 PASS in921.23s. Includes
+  deposits, credit notes, bad debts, standalone classifications, aging, races,
+  access restrictions and report reconciliation. Fixture counts restored;
+  owned isolated tunnel verified closed. No repeated live write suite.
+- Final five-case foundation permission/cancellation rerun, unit suite and build
+  running after shared-book scope and valid historical-date hardening. Outcomes
+  pending; not yet a single full22 foundation run or new production release.
+- Existing21 distinct controls retain prior PASS evidence. No accountant policy
+  approval, production activation or source adapter inferred from test results.
+
+### Foundation21 Controls Accepted / Legacy43 Running - 2026-10-10 22:02 WAT
+
+- Full20 foundation PASS (515s), then focused3PASS/18not-selected (124s) on final
+  grant audit/cancellation changes; total21distinct controls, not full21single run.
+  Owned schemas removed and tunnels closed; existing source baselines unchanged.
+- Final unit269PASS/3prior skips, full build/typechecks and built inactive-module
+  import without a database connection PASS. Backup/checksum/current production
+  62-table financial source baseline unchanged/read-only verification PASS.
+- Full43existing integration regressions started; outcome pending. No live write,
+  source adapter, policy approval, posted accounting journal or production grant.
+
+### Foundation First Acceptance PASS - 2026-10-10 21:54 WAT
+
+- 18 original isolated controls PASS in452s; temporary schema removed, existing
+  source counts/totals unchanged, owned tunnel closed. Includes exact large amount,
+  concurrent prepare/post idempotency, conflicting retry, rollback, direct-SQL
+  unbalanced commit, immutable posted facts, exact reversal, close/post races,
+  branch/role grants and disabled/invalid profiles.
+- Unit269PASS/3existing skips across41files; final20-case hardened run in progress.
+  Added schema-push ownership guard and same-book audit/workspace constraints.
+- Actual production switch read-only check: schema=false, posting=false.
+  No live records created/repeated, no production accounting activation or release.
+
+### Foundation First Acceptance Running - 2026-10-10 21:42 WAT
+
+- Fresh pre-foundation backup/full restore PASS; production retained 62 tables,
+  standalone payment facts8/507, deposit total50,001,000, invoice payments2,708.50,
+  overhead15,710,302, duty2,000,501. These are raw source totals, not net P&L.
+- New exact validation unit suite and 18 isolated foundation controls launched.
+  Run-owned schemas only; no new live fixtures or repeated Part A writes.
+- Initial typecheck errors repaired; final build and integration outcomes pending.
+  No production deployment/activation or professional accounting approval claimed.
+
 ### Step 6 Foundation Acceptance Started - 2026-10-10 21:25 WAT
 
 - All6A-6F authorized; new checks will target existing isolated database only.

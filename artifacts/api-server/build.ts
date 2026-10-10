@@ -55,7 +55,8 @@ async function buildAll() {
   );
 
   await esbuild({
-    entryPoints: [path.resolve(__dirname, "src/index.ts"), path.resolve(__dirname, "src/migrate-shipments.ts")],
+    entryPoints: [path.resolve(__dirname, "src/index.ts"), path.resolve(__dirname, "src/migrate-shipments.ts"),
+      path.resolve(__dirname, "src/accounting-foundation.ts")],
     platform: "node",
     bundle: true,
     format: "cjs",

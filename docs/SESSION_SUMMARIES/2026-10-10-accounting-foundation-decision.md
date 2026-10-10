@@ -1,5 +1,71 @@
 # Accounting Foundation Architecture Decision
 
+## 2026-10-10 22:24 WAT - Step 6 Engineering Accepted, Inactive Release Next
+
+- All22 distinct foundation controls PASS across full20/focused3/final5 runs;
+  final5/17not-selected in211.09s. Not a single full22 run. Own schemas removed,
+  source baseline assertions unchanged, tunnel closed. Fresh original43/43 PASS.
+- Final unit270PASS/3existing skips/typechecks/full build/internal bundle smoke
+  PASS. Checkpoint bec6dca/remote annotated tag and private verified DB backup
+  preserved; no new live financial fixtures or duplicate implementation.
+- All6A-6F technical scope built: draft rules, additive empty schema, exact
+  atomic balanced/idempotent engine, immutable audit/reversal, period controls,
+  independent explicit grants and isolated acceptance. 6A professional sign-off
+  and approved production settings/grants remain pending, not invented.
+- Publishing inactive code next, then exact deployment/health/false flags and
+  schema/totals verification. No automatic postings, backfill, source adapters
+  or GL/TB/BS/manual journal UI. Next policy review before separately approved7.
+
+## 2026-10-10 22:20 WAT - Existing Finance Regression PASS
+
+- Fresh full43/43 accounting-cash regression PASS; own fixtures/tunnel cleaned up.
+  Existing finance corrections remain valid under the additive foundation changes.
+- Shared-book chart/policy/calendar management now needs configure grants across
+  all book branches. Canonical workspace set matching reused; user queries omit
+  passwords and legacy access fields. Historical valid dates need no arbitrary
+  year2000 restriction; book cutover still requires approved policy.
+- Final five-case foundation rerun, unit suite and complete build in progress.
+  No production release/activation, accountant approval or duplicate live record.
+  Exact next finish verification, publish status and all authoritative records.
+
+## 2026-10-10 22:02 WAT - Foundation Accepted, Legacy Regression Running
+
+- Full20foundation PASS, final3case rerun PASS incl one new abandoned-draft case;
+  all21distinct controls covered, not a single full21run. Grant/revocation audit
+  now stores target user/permission; cancellation needs prepare plus configure
+  for another preparer's draft, immutable audit, never edits a posted journal.
+- Unit269PASS/3existing skips/full build and inactive internal bundle smoke PASS.
+  Production archive/current financial baseline unchanged read-only verification.
+- Started full43original accounting regressions to protect existing fixes.
+  No live financial writes/new fixtures, schema activation, accountant sign-off,
+  source adapters or accounting UI. Runtime publication still pending acceptance.
+
+## 2026-10-10 21:54 WAT - First Foundation PASS, Final Checks Running
+
+- First18isolated cases PASS/cleanup/tunnel close/source baseline unchanged.
+  Unit269PASS/3prior skips; full build PASS. Final20case run in progress.
+- Deployment review found generic schema push would discover/drop unmanaged
+  accounting definitions. Moved models outside discovery and excluded accounting_*
+  introspection, preserving dedicated transactional/deferred-trigger ownership.
+- Added same-book audit FKs, canonical workspace checks derived from existing
+  access policy, inactive-account final approval rollback case, year-end validation,
+  and internal engine build entry point (no public routes/frontend or auto writers).
+- Production flags verified false read-only. No production accounting migration,
+  policy approval, permissions, posting or release. Next finish hardened/legacy
+  regressions, final build/checkpoint verification, record technical scope clearly.
+
+## 2026-10-10 21:42 WAT - Protected Foundation Built, Acceptance Running
+
+- New bec6dca protected tag and private backup/full isolated restore PASS,
+  archive286,816bytes SHA25630b6920259ebfda974bff75e2e99a03c276a4cc798c81c7fcbf2ed639ba8b76b.
+- Added rules/spec, empty native schema/models, exact atomic/idempotent journal
+  service, immutable postings/audits, reversal, period review/locking and explicit
+  branch grants/independent approval. Reused existing tunnel runner (foundation
+  selector), no new parallel accounting/cash writer or UI module.
+- Unit/integration first run in progress; type errors corrected, no final PASS.
+  Both production switches default off; no existing source fact or live grant
+  changed. Professional policy/cutover/named access approval still outstanding.
+
 ## 2026-10-10 21:25 WAT - All Foundation Phases Authorized
 
 - User requests implementation of Step6 and all six phases, checking duplicates.

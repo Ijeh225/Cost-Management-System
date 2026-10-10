@@ -2,9 +2,10 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
-Status: architecture selected; implementation sequence prepared for review.
+Status updated2026-10-10 22:24 WAT: Step6 inactive engineering foundation built
+and accepted; code publication/deployment verification next. Steps7-12 not started.
 Accountant policy, named permissions and production cutover are not yet approved.
-This plan does not claim an implemented module, migration, deployment or passed test.
+The original21:17 roadmap below is preserved; current evidence appears at the end.
 
 ## Roadmap Identity and Scope
 
@@ -210,6 +211,24 @@ Exit: each module has documented implementation/deployment/live acceptance,
 unresolved exceptions remain explicit and the exact next action is recorded.
 
 ## Current Status / Exact Next Action
+
+2026-10-10 22:24 WAT: all6A-6F technical scope implemented and engineering
+acceptance PASS; draft policy remains unsigned. Full20/focused3/final5 cover
+all22distinct cases, not one full22run. Fresh existing43/43, unit270PASS/3prior
+skips/typecheck/build/inactive internal bundle smoke PASS. Checkpoint/remote tag,
+private full-restored DB archive and unchanged financial baseline verified.
+Inactive publication/deployment proof next; no live schema/book/chart/grants,
+posting, backfill or GL/report UI. Exact next professional chart/policy and
+named-permission/cutover review before separately approved Step7 source adapters.
+
+2026-10-10 21:54 WAT: all6A-6F implementation now authorised. Draft policy/spec
+and inactive foundation built; protected code/DB restore PASS, first18isolated
+cases PASS, unit269PASS/3prior skips/build PASS. Hardened20-case/final bundle/
+legacy-source acceptance in progress. Professional policy/grants/cutover still
+pending; Step6 has no public journal/UI or automatic Step7 adapters. Both live
+schema/posting switches verified false; no production activation or deployment.
+Next complete final acceptance/publication records, then owner/accountant policy
+review before official books/source adapter work. Earlier status below historical.
 
 2026-10-10 21:17 WAT: native architecture selected by owner. Roadmap6-12 and
 subphases prepared, no runtime feature implemented in this planning turn.

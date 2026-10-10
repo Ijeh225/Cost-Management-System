@@ -2,6 +2,89 @@
 
 ## Current Work Register - Authoritative as of 2026-10-10
 
+### Step 6 Engineering Acceptance PASS / Inactive Publication Next - 2026-10-10 22:24 WAT
+
+- Duplicate review complete: one new native foundation reuses current canonical
+  profiles, branches, audit/source patterns and isolated test/backup helpers.
+  No second cash/payment register or replacement of existing finance workflows.
+- All22 distinct foundation controls have PASS evidence: full20, focused3 and
+  final5 reruns (final5 includes new all-branch configuration guard). This is not
+  one uninterrupted full22 run. Run-owned schemas/tunnels removed; source
+  baselines unchanged. Fresh existing accounting-cash43/43 PASS in921.23s.
+- Final unit270PASS/3existing skips, all typechecks/full web/API build PASS;
+  built inactive internal bundle import without a connection/write PASS.
+- Protected checkpoint bec6dca and annotated remote tag preserved. Fresh private
+  database archive286,816bytes/full isolated restore/62-table baseline PASS;
+  archive checksum/current production financial baseline reverified unchanged.
+- 6A chart/rule worksheet drafted, NOT professionally signed off. 6B additive
+  migration/models; 6C exact balanced atomic/idempotent postings/reversals;
+  6D period locks/close/reopen; 6E explicit branch grants/independent approval;
+  6F isolated engineering acceptance implemented within the documented scope.
+- Publish inactive code next; verify exact deployment, health, both flags false
+  and unchanged production schema/totals. No policy/grant/official book seeded.
+- Exact next after inactive release: owner/accountant chart/policy, fiscal/entity,
+  cutover/opening and named access review; then separately authorised Step7 source
+  adapters. No GL/TB/BS/manual-journal UI or Steps7-12 completion is claimed.
+
+### Legacy Finance Regression PASS / Final Scope Checks - 2026-10-10 22:20 WAT
+
+- One complete fresh run of all43 existing accounting-cash integration cases
+  PASS in921s; fixture namespace counts restored and owned SSH tunnel closed.
+- Final foundation rerun covers five controls after shared-book configuration
+  requires grants across every book branch. Canonical workspace matching follows
+  existing set semantics; actor lookup does not retrieve passwords/legacy roles.
+- Valid historical accounting dates supported without inventing a cutover.
+  Final unit suite and full typecheck/build running after the last validation edit.
+- All changes remain inactive/unpublished. No production schema, book, chart,
+  grants, journal, source adapter or live financial test record created.
+  Professional policy/cutover approval remains outstanding, not a code defect.
+
+### Step 6 Technical Acceptance / Legacy Regression Running - 2026-10-10 22:02 WAT
+
+- All21distinct foundation controls have PASS evidence: full20 plus final3case
+  rerun covering grant target/audit metadata, own-draft close guard and a new
+  audited abandoned-draft cancellation case. Not one uninterrupted full21 run.
+- Final unit269PASS/3prior skips, full typecheck/build including internal bundle
+  PASS, inactive bundle import/no connection/write smoke PASS. Production archive
+  checksum and unchanged full financial source baseline reverified read-only.
+- Fresh full43-case existing cash/accounting integration suite now running,
+  using original harness and run-owned fixture cleanup, not new live test records.
+- Engineering implementation covers6A draft spec and6B-6F foundation controls.
+  Actual accountant policy sign-off remains pending; no official accounting
+  activation/cutover, source adapters, backfill or GL/TB/BS/manual-journal UI.
+- Code not yet published/deployed. Protected checkpoint and earlier tags intact.
+
+### Foundation First PASS / Final Hardening - 2026-10-10 21:54 WAT
+
+- First isolated18/18 PASS with run-owned schema cleanup; source baselines
+  unchanged. Final20-case run includes inactive account rollback, canonical
+  database workspace validation and same-book audit foreign keys.
+- Unit269PASS/3prior skips (41 files); typecheck and complete build PASS before
+  final internal engine bundle addition. New bundle build is in progress.
+- Inspected actual preDeploy schema-push configuration and Drizzle implementation.
+  Accounting models now live outside generic discovery; !accounting_* database
+  filter protects migration-owned constraints. No public accounting API/UI yet.
+- Production variables inspected read-only: both schema/posting switches false.
+  Production has not been migrated, activated or redeployed for this foundation.
+- Policy/specification prepared, not professionally approved. Final acceptance,
+  legacy-source regressions and publication status are still being completed.
+
+### Native Foundation Built / First Acceptance Running - 2026-10-10 21:42 WAT
+
+- Protected code bec6dca/tag checkpoint-before-native-accounting-foundation-2026-10-10.
+  Fresh private archive 286,816 bytes SHA256
+  30b6920259ebfda974bff75e2e99a03c276a4cc798c81c7fcbf2ed639ba8b76b;
+  full isolated restore and 62-table financial baseline PASS; temporary DB removed.
+- Implemented draft chart/policy worksheet, additive empty nine-table foundation,
+  exact minor-unit engine, event idempotency, atomic audits, immutable posted
+  journals/source links, exact linked reversals, period lock/close/reopen review,
+  named branch-scoped grants and independent journal approval.
+- Startup schema and runtime service remain opt-in/default off. No production
+  book/chart/grant, policy sign-off, adapter/backfill, GL/report UI or cutover.
+- First unit/isolated acceptance running; initial typecheck found and repaired
+  pg overload inference and typed read-result problems. Not yet a PASS or release.
+  Existing management reports and finance transaction writers remain untouched.
+
 ### Step 6A-6F Implementation Started - 2026-10-10 21:25 WAT
 
 - Owner authorizes all six Accounting Foundation phases. Duplicate review finds

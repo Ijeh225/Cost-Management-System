@@ -6,6 +6,9 @@ if (!process.env.DATABASE_URL) {
 
 export default defineConfig({
   schema: "./src/schema/*.ts",
+  // Native accounting owns deferred constraints/triggers through its atomic,
+  // opt-in migration. Ordinary schema push must neither create nor drop it.
+  tablesFilter: ["!accounting_*"],
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,

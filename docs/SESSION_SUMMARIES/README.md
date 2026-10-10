@@ -20,7 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-10-10 native accounting selected; implementation roadmap saved, updated 21:17 WAT](2026-10-10-accounting-foundation-decision.md)
+- [2026-10-10 native foundation engineering accepted; inactive release verification next, updated 22:24 WAT](2026-10-10-accounting-foundation-decision.md)
 
 - [2026-10-10 standalone payment classification and aging deployed/live accepted; Part A closed, updated 02:44 WAT](2026-10-10-payment-classification-aging.md)
 

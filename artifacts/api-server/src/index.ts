@@ -8,6 +8,7 @@ import { getDocumentStorageConfigurationError } from "./lib/document-storage";
 import { ensureInvoicePaymentReversalSchema, ensureInvoiceCashSettlementSchema } from "./lib/invoice-payment-reversal-schema";
 import { ensurePaymentClassificationSchema } from "./lib/payment-classification-schema";
 import { ensureShipmentSchema } from "./lib/shipment-schema";
+import { ensureAccountingFoundationSchema } from "./lib/accounting-schema";
 
 async function ensureMigrationsTable() {
   await pool.query(`
@@ -1104,6 +1105,11 @@ async function runStartupMigrations() {
       `);
     });
     await ensureShipmentSchema(pool);
+    // Foundation is opt-in and empty; never seed production policy or backfill facts.
+    if (process.env.NATIVE_ACCOUNTING_SCHEMA_ENABLED === "true") {
+      await ensureAccountingFoundationSchema(pool);
+      await runMigration("native_accounting_foundation_v1", async () => {});
+    }
     await runMigration("shipment_container_visits_v1", async () => {});
   } catch (err) {
     console.error("[migration] startup migration failed:", err);

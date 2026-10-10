@@ -9,7 +9,7 @@ if (!cli) throw new Error("Set RAILWAY_CLI_PATH to the authenticated Railway CLI
 const suite = process.env.RAILWAY_TEST_SUITE ?? "cap04";
 const cleanupRun = process.env.ACCOUNTING_CLEANUP_RUN;
 if (cleanupRun && (suite !== "accounting" || !/^\d{13}-[a-z0-9]+$/.test(cleanupRun))) throw new Error("Exact accounting run suffix required for isolated recovery");
-if (!["cap04", "cap02", "accounting"].includes(suite)) throw new Error("Unknown isolated test suite");
+if (!["cap04", "cap02", "accounting", "foundation"].includes(suite)) throw new Error("Unknown isolated test suite");
 const project = "30166120-54e6-4f58-86ed-18ab396913f1";
 const environment = "51a4f5a2-e7ae-443e-836f-095b2015f3cc";
 const service = "ed1e8b3d-c2e2-4654-a11d-bc16fa858bd6";
@@ -66,18 +66,19 @@ try {
     }
     if (suite === "accounting") beforeFixtures = (await identity.query(fixtureCountsSql)).rows[0];
   } finally { await identity.end(); }
-  const args = suite === "accounting" ? [resolve(root, "artifacts/api-server/node_modules/vitest/vitest.mjs"), "run", "--config", "vitest.integration.config.ts", "src/tests/accounting-cash.integration.test.ts", "--reporter=verbose"]
+  const args = ["accounting", "foundation"].includes(suite) ? [resolve(root, "artifacts/api-server/node_modules/vitest/vitest.mjs"), "run", "--config", "vitest.integration.config.ts", suite === "foundation" ? "src/tests/accounting-foundation.integration.test.ts" : "src/tests/accounting-cash.integration.test.ts", "--reporter=verbose"]
     : suite === "cap02" ? [resolve(root, "artifacts/api-server/node_modules/vitest/vitest.mjs"), "run", "src/tests/document-readiness-api.test.ts", "--reporter=verbose", "--testTimeout=60000"]
     : [resolve(root, "artifacts/api-server/node_modules/tsx/dist/cli.mjs"), resolve(root, "scripts/cap04-postgres-check.ts")];
   if (suite === "accounting" && process.env.ACCOUNTING_TEST_FILTER) args.push("-t", process.env.ACCOUNTING_TEST_FILTER);
+  if (suite === "foundation" && process.env.ACCOUNTING_FOUNDATION_TEST_FILTER) args.push("-t", process.env.ACCOUNTING_FOUNDATION_TEST_FILTER);
   const run = cleanupRun ? { status: 0, stdout: "", stderr: "" } : spawnSync(process.execPath, args, {
     cwd: suite !== "cap04" ? resolve(root, "artifacts/api-server") : root,
     env: { ...process.env, TEST_DATABASE_URL: url.href, JWT_SECRET: randomBytes(32).toString("hex"), NODE_ENV: "test", CAP02_NETWORK_TEST: suite === "cap02" ? "1" : "0" },
-    encoding: "utf8", timeout: suite === "accounting" ? 1200000 : 180000, windowsHide: true,
+    encoding: "utf8", timeout: ["accounting", "foundation"].includes(suite) ? 1200000 : 180000, windowsHide: true,
   });
   // Print only known safe progress lines; errors may include a connection string.
   for (const line of (run.stdout ?? "").split(/\r?\n/)) if (/^(PASS:|Verified )/.test(line) || /Test Files|Tests |serializes simultaneous|prevents parallel replacement/.test(line)) console.log(line);
-  if (suite === "accounting") console.log(((run.stdout ?? "") + (run.stderr ?? "")).replaceAll(url.href, "[isolated database]").replaceAll(vars.PGPASSWORD, "[redacted]"));
+  if (["accounting", "foundation"].includes(suite)) console.log(((run.stdout ?? "") + (run.stderr ?? "")).replaceAll(url.href, "[isolated database]").replaceAll(vars.PGPASSWORD, "[redacted]"));
   if (suite === "accounting") {
     const cleanup = new Client({ connectionString: url.href });
     await cleanup.connect();

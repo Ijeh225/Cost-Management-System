@@ -1,5 +1,22 @@
 # Accounting Remediation and Feature Plan
 
+Current2026-10-10 22:24 WAT: Step6A-6F engineering acceptance PASS within
+inactive-foundation scope; all22distinct cases across full/focused runs, fresh
+existing43/43, unit270PASS/3prior skips/typechecks/build/smoke PASS. Protected
+checkpoint/remote tag/private full-restored database backup preserved. Publish
+inactive code and verify deployment next; policy/grants/cutover not approved.
+No automatic writers, source backfill or accounting UI. Exact next professional
+policy review, then separately authorised Step7 source mappings/openings.
+
+Current2026-10-10 21:54 WAT: owner authorizes all Step6A-6F implementation.
+Inactive native schema/engine/period/grant controls built; first18isolated PASS,
+unit269PASS/3prior skips/build PASS. Hardened20-case acceptance and final build
+in progress. Code bec6dca protected checkpoint/fresh private database archive
+full restore PASS. No duplicate source/cash writers; Part A remains closed.
+Production flags false, no migration/activation/release. Accountant policy,
+fiscal/entity/cutover/openings and named grants remain approval gates. Steps7-12
+not started; older planning-only statements below are timestamped history.
+
 Current2026-10-10 21:17 WAT: owner selects native official accounts inside this
 app and requests all steps. NATIVE_ACCOUNTING_IMPLEMENTATION_PLAN.md expands
 existing Part B6-12, with foundation subphases6A-6F; no roadmap renumbering.
