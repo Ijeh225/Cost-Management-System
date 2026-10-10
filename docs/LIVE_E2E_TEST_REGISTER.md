@@ -2,6 +2,38 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-10
 
+### Step 6 Foundation Acceptance Started - 2026-10-10 21:25 WAT
+
+- All6A-6F authorized; new checks will target existing isolated database only.
+  Baseline Part A fixtures and source facts must remain unchanged.
+- Planned: migration repeatability/rollback, exact money, balanced journals,
+  immutable postings/audits, duplicate/conflicting retry, independent approval,
+  branch/currency isolation, closed periods and close-versus-post races.
+- No new test executed yet. Policy approval and production activation are not
+  inferred from implementation authorization; no historical source backfill.
+
+### Native Accounting Roadmap Decision - 2026-10-10 21:17 WAT
+
+- Native accounting selected by owner; implementation plan uses existing Steps6-12.
+  Step6A-6F and each later step have explicit isolated/permission/reconciliation/
+  deployment/live acceptance gates; these are planned tests, not executed results.
+- No new financial write, fixture, isolated/live test or deployment this turn.
+  Part A accepted fixes retained; native journal/GL/TB/BS not yet implemented.
+- Exact next6A chart/policy review; architecture approved, accounting rules,
+  cutover/openings and named permission grants not presumed approved.
+
+### Accounting Foundation Decision Review - 2026-10-10 10:29 WAT
+
+- Part B Step6 requested with explicit native-versus-integration/accountant gate.
+  Source/schema/API duplicate check confirms missing foundation by design, not
+  a newly reproduced failure in the previously corrected cash reports.
+- No new isolated/live test or financial mutation performed. Part A all-seven
+  recorded acceptance remains closed; no duplicate fixtures created.
+- Draft ACCOUNTING_FOUNDATION_DECISION_2026-10-10.md defines future posting/
+  precision/idempotency/period/concurrency/permission/reversal acceptance gates.
+  Not executed tests or implemented controls. Owner requested explanations;
+  architecture choice and accountant mappings/cutover are still unapproved.
+
 ### ACCT-006/007 Closed / Live Accepted - 2026-10-10 02:44 WAT
 
 - Runtime92e59d1, Railwayd45f37a1 SUCCESS/healthz ok. Final aging print now says

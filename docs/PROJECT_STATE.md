@@ -2,6 +2,56 @@
 
 ## Current Work Register - Authoritative as of 2026-10-10
 
+### Step 6A-6F Implementation Started - 2026-10-10 21:25 WAT
+
+- Owner authorizes all six Accounting Foundation phases. Duplicate review finds
+  no existing chart, journal, accounting period or provider adapter; existing
+  classification, cash facts, canonical users and branch controls will be reused.
+- Build an inactive native foundation, not Steps7-12 source adapters/reports/UI.
+  Accountant policy/year/entity/cutover and named grants remain approval gates.
+- Before additive migrations: create a new code checkpoint and private database
+  archive with a full isolated restore rehearsal. Preserve earlier checkpoints.
+- In progress: draft chart/rules, protection, balanced atomic/idempotent journals,
+  period controls, independent permissions, isolated acceptance. No new posting,
+  production data change, deployment or test completion claimed yet.
+
+### Native Accounting Selected / Roadmap Saved - 2026-10-10 21:17 WAT
+
+- Owner explicitly chooses official accounting inside this app, not an external
+  integration, and requests the complete implementation sequence.
+- NATIVE_ACCOUNTING_IMPLEMENTATION_PLAN.md retains existing Part B Steps6-12;
+  Step6 subdivided6A-6F (rules, protection/schema, engine, periods, permissions,
+  acceptance). Steps7source/openings,8GL/TB,9manual adjustments,10BS/management,
+  11Statement of Affairs,12rollout/training. No competing numbering introduced.
+- Reuse existing finance sources/canonical access/branch and one-B/L controls;
+  prevent duplicate cash, postings and expense recognition. Unknown historical
+  purpose/metadata stay explicit; no guessed backfill or opening balance.
+- Architecture approval is not accountant policy/cutover/named-grant approval.
+  This turn saves plans/decision only: no runtime/schema/config/permission/data
+  changes, tests, provider connection or deployment. Existing Part A closure stands.
+- Exact next phase6A: chart and rule worksheet, owner/accountant review; approved
+  mappings/permissions required before corresponding production posting activation.
+
+### Part B Step 6 Decision Gate Started - 2026-10-10 10:29 WAT
+
+- Owner requests the accounting foundation, explicitly first confirming native
+  versus integrated official accounts and agreement with the accountant.
+- Current source/schema/OpenAPI duplicate check found no existing GL/chart/
+  journal/period or accounting-provider adapter. Reuse corrected existing facts
+  and canonical role/branch access; do not duplicate cash or revive old roles.
+- Conditional recommendation: native for a self-contained app unless the
+  accountant's established package must remain the official ledger. No owner
+  selection or accountant sign-off yet; response to both questions is explain
+  in detail, not architecture or policy approval.
+- Draft decision pack ACCOUNTING_FOUNDATION_DECISION_2026-10-10.md records
+  categories, rule worksheet, proposed posting/period/permission controls,
+  integration tradeoffs and isolated-test gates. All proposals, not runtime code.
+- Documentation only; no migration, grants, backfill, new live record, accounting
+  provider connection, posting, repeated tests or deployment. Part A closure and
+  historical evidence exceptions remain unchanged. Steps7-12 are not approved.
+- Exact next: explain the two questions plainly, obtain owner ledger selection
+  and accountant rules or approval to prepare a review draft before runtime work.
+
 ### Accounting Part A Closed Within Scope - 2026-10-10 02:44 WAT
 
 - ACCT-001 through ACCT-007 are implemented, isolated-verified, deployed and

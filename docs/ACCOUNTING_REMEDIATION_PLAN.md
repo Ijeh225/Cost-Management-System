@@ -1,5 +1,20 @@
 # Accounting Remediation and Feature Plan
 
+Current2026-10-10 21:17 WAT: owner selects native official accounts inside this
+app and requests all steps. NATIVE_ACCOUNTING_IMPLEMENTATION_PLAN.md expands
+existing Part B6-12, with foundation subphases6A-6F; no roadmap renumbering.
+Native architecture approved, accountant chart/rules/cutover/named grants still
+pending. Planning only, no new runtime feature or live test/deployment this turn.
+Exact next6A accounting specification review; Part A remains closed. Older
+awaiting-native-choice statements below are historical, not current status.
+
+Current2026-10-10 10:29 WAT: owner asks to start Part B Step6, explicitly first
+confirming official books native/integrated and accountant rules. Decision pack
+ACCOUNTING_FOUNDATION_DECISION_2026-10-10.md prepared after duplicate/source review.
+Owner asks for detailed explanations of both approval questions; no choice or
+accountant policy sign-off received. Runtime implementation/migration/postings
+not started. Steps7-12 remain unapproved. Part A closure below is unchanged.
+
 Current2026-10-10 02:44 WAT: Part A Steps1-5/ACCT-001..007 CLOSED within
 management-report correction scope. Runtime92e59d1 deployed exact Railway
 d45f37a1 SUCCESS/healthy; controlled live category/cash/aging/dashboard/print
