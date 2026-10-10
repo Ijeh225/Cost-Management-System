@@ -1,5 +1,14 @@
 # Accounting Remediation and Feature Plan
 
+Current2026-10-10 22:35 WAT: Step6 inactive technical scope accepted and
+deployed40aec3d/exact Railwayc687034c SUCCESS/healthz/bundle smoke PASS.
+Both switches false; production62tables/financial baseline unchanged. All23
+distinct foundation cases across full/focused runs, fresh original43/43, latest
+unit270PASS/3prior skips/typechecks/build PASS. Protected checkpoint/backup intact.
+6A professional sign-off still pending. Exact next policy/chart/entity/fiscal/
+cutover/openings/named grants review before separately authorised Step7. No
+source adapters, backfill, GL/TB/BS UI or official accounting activation yet.
+
 Current2026-10-10 22:30 WAT: final native-only cancellation/reversal follow-up
 accepted3/3; all23distinct foundation cases covered across full/focused runs.
 Latest unit270PASS/3skips/typechecks/build/smoke, original full43/43 retained.

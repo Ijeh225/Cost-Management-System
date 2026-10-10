@@ -29,6 +29,35 @@ approval evidence. No VAT rate, financial year, legal structure, historical
 classification or opening balance is inferred. Current missing evidence remains
 unclassified. Exact fiscal dates and chart details need professional review.
 
+### Proposed Chart for Review - NOT Activated
+
+| Code | Proposed account / subaccount family | Category |
+|---|---|---|
+| 1000 | Cash | Asset |
+| 1010 | Bank accounts, one subaccount per existing bank | Asset |
+| 1100 | Trade receivables | Asset |
+| 1120 | Recoverable client disbursements | Asset |
+| 1200 | Staff/supplier advances | Asset |
+| 1300 | Fixed assets | Asset |
+| 1390 | Accumulated depreciation, contra-asset | Asset |
+| 2000 | Trade payables | Liability |
+| 2100 | Unapplied client deposits | Liability |
+| 2200 | VAT/tax control | Liability |
+| 2300 | Accrued expenses | Liability |
+| 2400 | Borrowings | Liability |
+| 3000 | Owner capital | Equity |
+| 3100 | Retained earnings | Equity |
+| 4000 | Clearing/service revenue | Income |
+| 4100 | Other approved revenue | Income |
+| 5000 | Company-borne direct job costs | Expense |
+| 6000 | Existing overhead expense-head subaccounts | Expense |
+| 6100 | Bad debt expense | Expense |
+| 6200 | Depreciation expense | Expense |
+
+These mirror `native-draft-1`, not approved source mappings or tax advice.
+No account or opening balance has been seeded. Names/codes/subaccounts and
+recognition rules may be revised during professional review before activation.
+
 ## Phases 6B-6E: Controls
 
 - Additive tables only; no existing transactions or roles replaced. Schema and
@@ -77,7 +106,7 @@ unclassified. Exact fiscal dates and chart details need professional review.
 
 ## Phase 6F: Acceptance and Rollout Boundary
 
-Engineering acceptance2026-10-10 22:30 WAT:
+Engineering acceptance2026-10-10 22:35 WAT:
 
 | Phase | Implemented / verified | Approval or activation boundary |
 |---|---|---|
@@ -86,7 +115,7 @@ Engineering acceptance2026-10-10 22:30 WAT:
 | 6C | Exact atomic balanced/idempotent engine; immutable posted records, audits and linked reversals | No existing transaction writer calls it |
 | 6D | Non-overlapping periods, close/reopen audit, draft checks, post/close serialization | Source completeness is a reviewed attestation; automated adapters are Step7 |
 | 6E | Named branch grants, canonical profiles, independent approval, whole-book configuration scope | No production grants or permission changes |
-| 6F | All23distinct isolated cases across full20/focused3/5/3; existing43/43; unit270PASS/3prior skips; typechecks/build/smoke PASS | Initial inactive release verified; final native-only follow-up proof next; no official cutover |
+| 6F | All23distinct isolated cases across full20/focused3/5/3; existing43/43; unit270PASS/3prior skips; typechecks/build/smoke PASS | Final40aec3d inactive release verified; no official cutover |
 
 Not one uninterrupted full23 foundation run; final five-case rerun covers changed
 permissions and final three-case rerun covers cancelled-reversal replacement,
@@ -97,6 +126,12 @@ Fresh private archive SHA256
 `30b6920259ebfda974bff75e2e99a03c276a4cc798c81c7fcbf2ed639ba8b76b`
 passed a full isolated restore and62-table financial baseline comparison. It
 covers database schema/data, not external document storage or service secrets.
+
+Final functional release `40aec3d6f90dd4f9539e59cd5b28eae2ca0b69ec`, exact
+Railway deployment `c687034c-b1e8-48fa-aaa1-a6cf4ad3e725` SUCCESS, public
+healthz and deployed inactive-bundle smoke PASS. Read-only production checks:
+both switches false,62tables and full financial source baseline unchanged.
+Later documentation-only commits carry identical runtime code.
 
 Use the existing isolated Railway database, new run-owned schemas and no duplicate
 live records. Test migration twice, rollback, decimal boundaries, API-service

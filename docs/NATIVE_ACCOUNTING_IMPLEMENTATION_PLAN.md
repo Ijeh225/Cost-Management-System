@@ -2,8 +2,8 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
-Status updated2026-10-10 22:30 WAT: Step6 inactive engineering foundation built
-and accepted; initial release verified, final reversal follow-up publication next.
+Status updated2026-10-10 22:35 WAT: Step6 inactive engineering foundation built,
+accepted and deployed/verified at40aec3d. Professional policy review remains next.
 Steps7-12 not started.
 Accountant policy, named permissions and production cutover are not yet approved.
 The original21:17 roadmap below is preserved; current evidence appears at the end.
@@ -212,6 +212,15 @@ Exit: each module has documented implementation/deployment/live acceptance,
 unresolved exceptions remain explicit and the exact next action is recorded.
 
 ## Current Status / Exact Next Action
+
+2026-10-10 22:35 WAT: Step6 inactive technical scope closed;40aec3d exact
+Railwayc687034c SUCCESS/healthz/deployed bundle smoke PASS. Both flags false;
+production62tables/full financial baseline/archive unchanged. All23distinct
+foundation controls across full/focused runs; fresh original43/43 and latest
+270unit/3prior skips/typechecks/build PASS. Protected checkpoint/backup intact.
+6A draft policy is NOT professionally approved. Exact next approve chart/rules,
+legal entity/fiscal/calendar/cutover/openings and named grants, then separately
+authorise Step7. No new accounting screen/source adapter/backfill/live postings.
 
 2026-10-10 22:30 WAT: final reversal correction accepted3/3. All23distinct
 foundation cases covered across full20/focused3/5/3, not one full23run; latest

@@ -2,6 +2,29 @@
 
 ## Current Work Register - Authoritative as of 2026-10-10
 
+### Step 6 Inactive Foundation Deployed / Technical Scope Closed - 2026-10-10 22:35 WAT
+
+- Final runtime40aec3d6f90dd4f9539e59cd5b28eae2ca0b69ec committed/pushed;
+  exact Railwayc687034c-b1e8-48fa-aaa1-a6cf4ad3e725 SUCCESS, public healthz ok.
+  Includes foundation6c7ee61 and cancelled-reversal retry correction.
+- Deployed internal bundle smoke PASS over service SSH: inactive flag, exact
+  decimal conversion and import without a database connection/write. Live schema
+  and posting switches verified false. Production remains62tables with unchanged
+  complete financial source baseline and unchanged protected archive checksum.
+- All23distinct foundation controls PASS across full20/focused3/5/3, not one
+  full23run; fresh full43 existing finance regression PASS. Final unit270PASS/
+  3prior skips, complete typechecks/build and bundle smoke PASS. Own test schemas,
+  fixtures and SSH tunnels cleaned up. Protected bec6dca tag/backup preserved.
+- Technical implementation6A-6F accepted within inactive scope, not accountant
+  certification. 6A draft chart/rules awaits real owner/accountant sign-off;
+  production schema/grants/books/postings not activated. No duplicate cash/source
+  writer, historical backfill, source adapter or new accounting frontend route.
+- Exact next: review ACCOUNTING_FOUNDATION_SPEC.md proposal, agree legal entity,
+  chart/rules/year/currency/cutover/openings and named access; then separately
+  authorise Step7 transaction adapters/opening balances. Steps8-12 remain later.
+- Release-proof documentation follows the functional commit; later docs-only
+  commits carry the same runtime code and do not imply accounting activation.
+
 ### Final Reversal Follow-Up PASS / Inactive Release Finishing - 2026-10-10 22:30 WAT
 
 - New cancelled-reversal replacement, original exact reversal and migration

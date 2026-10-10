@@ -2,6 +2,22 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-10
 
+### Step 6 Inactive Production Release Verified - 2026-10-10 22:35 WAT
+
+- Final functional40aec3d exact Railwayc687034c-b1e8-48fa-aaa1-a6cf4ad3e725
+  SUCCESS; public healthz ok. Deployed internal bundle SSH smoke PASS: posting
+  inactive, exact conversion, import without DB connection or financial write.
+- Read-only production verification PASS: both switches false,62tables, current
+  financial counts/totals match pre-foundation baseline, saved archive checksum
+  unchanged. No native ledger migration/book/chart/grant/journal or live fixture.
+- Engineering evidence:23distinct foundation controls across full20/focused3/5/3
+  (not full23single run); fresh original43/43; latest unit270PASS/3prior skips;
+  full typechecks/build/smoke PASS. Own namespaces/tunnels cleaned up.
+- No outstanding failure in Step6 tested scope. Remaining gates are professional
+  policy/cutover/named grants and later Step7 adapters/openings, not completed
+  live journal/GL/TB/BS testing. Do not repeat old live fixtures or claim official
+  accounting activation. Documentation-only follow-up records this release proof.
+
 ### Final Foundation Reversal Acceptance PASS - 2026-10-10 22:30 WAT
 
 - Latest targeted3/3 PASS (20not-selected) in113.49s: repeat migration, exact

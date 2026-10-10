@@ -1,5 +1,22 @@
 # Accounting Foundation Architecture Decision
 
+## 2026-10-10 22:35 WAT - Inactive Foundation Release Verified
+
+- Functional commits6c7ee61/40aec3d pushed. Exact final deploymentc687034c
+  SUCCESS, healthz ok, deployed inactive/exact bundle SSH smoke PASS.
+- Both switches false; production62tables/financial baseline and protected
+  archive checksum unchanged. No live native schema, grants, books or postings.
+- All23distinct isolated foundation controls passed across full/focused runs,
+  not a single full23. Fresh full43 old finance tests and latest270unit/3prior
+  skips/typechecks/build/smoke PASS. Own schema/tunnel cleanup confirmed.
+- Duplicate review reused existing source/access/branch/backup/test architecture;
+  one foundation, not a second payment system. Checkpoint bec6dca/tag preserved.
+- 6A draft worksheet awaits real accountant/owner sign-off;6B-6F technical
+  scope accepted inactive. No GL/TB/BS UI, source adapter, backfill or cutover.
+- Exact next professional policy/entity/chart/fiscal/cutover/opening/named-grant
+  review, then separately authorised Step7. All three records updated with proof;
+  documentation-only follow-up carries the same runtime and no activation.
+
 ## 2026-10-10 22:30 WAT - Reversal Follow-Up Accepted
 
 - Final targeted3/3 PASS in113.49s, including cancelled-attempt upgrade/retry and
