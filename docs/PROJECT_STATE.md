@@ -2,6 +2,19 @@
 
 ## Current Work Register - Authoritative as of 2026-10-10
 
+### Final Runtime Reconciled; Print Labels Follow-up - 2026-10-10 02:38 WAT
+
+- Exact168ab4f deployment496b4d2f SUCCESS, healthz ok. Inspect-only acceptance
+  passed without repeating live writes: Lagos paid overhead301 matches P&L,
+  budgeted gross5,000/net4,699; Bank3 1,593/Ledger+CF1,494; AR1,400/VAT unchanged.
+- Owner Operations UI consolidated budgeted net54,295,697/five aging cells PASS.
+  Branch print net -15,707,770.50/Lagos2,231.50 and aging print current400,
+  61-90 1,000 (invoice004/day70), over90 0 match APIs.
+- Print-only follow-up corrects malformed 90+dd label, literal escaped dash and
+  outdated branch cost-basis footer. No financial-source or live-data changes.
+  Publish/verify these labels before final closure. CSV click did not return a
+  downloadable path within browser timeout; downloaded-file validation not claimed.
+
 ### Live UI Follow-up Corrected Locally - 2026-10-10 02:30 WAT
 
 - Fresh owner UI confirms Finance View/P&L overhead15,710,303/net

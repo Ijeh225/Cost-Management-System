@@ -1,5 +1,19 @@
 # Standalone Payment Classification and Aging
 
+## 2026-10-10 02:38 WAT - Runtime and Print Reconciliation
+
+- Exact168ab4f/496b4d2f SUCCESS/healthy. Inspect-only acceptance passed without
+  duplicate writes: Bank1,593/CF+Ledger1,494/LagosOH301/net2,231.50; operations
+  OH301 agrees with P&L, estimate gross5,000/net4,699. Aging1,400 unchanged.
+- Owner UI Operations global estimate54,295,697 and five cells PASS; branch print
+  net -15,707,770.50/Lagos2,231.50; aging print current400/61-90 1,000/day70/
+  over90 0 PASS. Found minor print-only labels: 90+dd, literal escaped dash,
+  old footer describing all costs instead of first-active-invoice recognition.
+  Correcting them, no data/source change. Verify exact label release before close.
+- Mobile review390x844 fits366px/required reason/head/unsaved close PASS. Saved
+  screenshot tmp/accounting-classification-dialog-mobile-20261010.jpg. CSV click
+  retrieval timed out and reset browser; no downloaded-file verification claim.
+
 ## 2026-10-10 02:30 WAT - UI and Operational Estimate Follow-up
 
 - Fresh owner Finance View net -15,707,770.50/OH15,710,303 correct. Separate

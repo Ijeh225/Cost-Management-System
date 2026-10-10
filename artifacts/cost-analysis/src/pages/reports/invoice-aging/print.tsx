@@ -138,7 +138,7 @@ export default function InvoiceAgingPrint() {
         <div className="summary-strip">
           {BUCKET_CONFIG.map(b => (
             <div key={b.key} className="strip-card" style={{ background: b.bg, border: `1px solid ${b.color}30` }}>
-              <div className="slbl" style={{ color: b.color }}>{b.label.split("(")[0].trim().replace(" Days Overdue", "d").replace("Current", "Current").replace("Over 90", "90+d")}</div>
+              <div className="slbl" style={{ color: b.color }}>{b.key === "days90plus" ? "Over 90 days" : b.label.split("(")[0].trim().replace(" Days Overdue", "d")}</div>
               <div className="sval" style={{ color: b.color }}>{fmt(totals[b.key])}</div>
               <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>{buckets[b.key].length} inv.</div>
             </div>

@@ -260,7 +260,7 @@ export default function BranchComparisonPrint() {
                   <td className="right">
                     {totals.revenue > 0 ? `${((totals.grossProfit / totals.revenue) * 100).toFixed(1)}%` : "\u2014"}
                   </td>
-                  <td className="right">\u2014</td>
+                  <td className="right">{"\u2014"}</td>
                   <td className="amber">{fmt(totals.outstandingReceivables)}</td>
                 </tr>
               </tfoot>
@@ -284,7 +284,7 @@ export default function BranchComparisonPrint() {
             {" · "}Gross Profit:{" "}
             <strong style={{ color: totals.grossProfit >= 0 ? "#059669" : "#dc2626" }}>{fmt(totals.grossProfit)}</strong>
           </p>
-          <p className="note">This report is for internal executive use only. Revenue figures are based on invoiced amounts (ex-VAT). Costs include all container disbursements recorded in the system.</p>
+          <p className="note">This report is for internal executive use only. Revenue is issued invoice revenue excluding VAT and net of credit notes. Container costs use actual paid disbursements recognised by the first active invoice; paid overhead and non-cash bad debt are shown separately.</p>
         </div>
       </div>
     </>

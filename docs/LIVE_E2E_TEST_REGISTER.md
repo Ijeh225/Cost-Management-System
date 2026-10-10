@@ -2,6 +2,19 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-10
 
+### Final Runtime and Print Acceptance - 2026-10-10 02:38 WAT
+
+- Exact168ab4f/496b4d2f SUCCESS/healthz ok. Inspect-only all-seven reconciliation
+  PASS; no duplicate controlled writes. Operational paid overhead now301/P&L301.
+- Fresh owner UI consolidated budgeted net54,295,697 and five aging cells PASS.
+  Branch printable all-time net -15,707,770.50 and Lagos2,231.50 PASS; printable
+  aging two invoices/current400/61-90 1,000/day70/over90 0/total1,400 PASS.
+- Correcting print-only 90+dd label, escaped dash and stale cost-basis footer.
+  Numeric results unchanged; label deployment/UI confirmation pending.
+- Mobile390x844 review dialog fits366px width with labels/required fields, no
+  saved UI mutation. P&L CSV click timed out without returned file path, so file
+  retrieval/content not verified; no confirmed export failure inferred.
+
 ### Live UI Follow-up - 2026-10-10 02:30 WAT
 
 - Financial View corrected totals/warnings PASS; Operations estimate source
