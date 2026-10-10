@@ -1,5 +1,31 @@
 # Standalone Payment Classification and Aging
 
+## 2026-10-10 02:44 WAT - Final Closure / Exact Resume Point
+
+- ACCT-006/007 and Part A ACCT1..7 closed within correction scope. Current
+  runtime92e59d1cccc0e83fff05639b0e3346e99cb3513e/exact Railwayd45f37a1 SUCCESS,
+  healthz ok; final print labels and accurate branch footer visually accepted.
+- Evidence reviewed, not guessed: original501 remains unknown with reasons.
+  One new schedule12/NGN6/facts3..8/all6categories retained; cash movement6 once,
+  expense-onlyOH1, reviews audit/stale409/no cash change, separate staff403.
+- DashboardFinancial/P&L/branch net -15,707,770.50/OH15,710,303; Operations
+  budgeted estimate54,295,697 now uses same overhead source, not accrual revenue.
+  LagosBank1,593/CF+Ledger1,494/OH301/net2,231.50/AR1,400/VAT unchanged.
+  Aging current400/61-90 1,000/over90 0/day70 print and Dashboard match.
+- Unit248PASS/3prior skips/build/typecheck PASS. All43 distinct isolated cases
+  passed across full/selective runs, not one uninterrupted43PASS run; additional
+  operations expense-reclassification case PASS. Namespace/tunnel cleanup PASS.
+- Queue/source audit/evidence/mobile required validation PASS; no saved browser
+  mutations. Screenshots tmp/accounting-financial-dashboard-full-20261010.jpg,
+  tmp/accounting-aging-live-20261010.jpg and mobile review shot retained locally.
+- Old501 purpose and missing expense4 metadata10,210,000 remain explicit evidence
+  exceptions. CSV downloaded-file validation unverified after browser timeout,
+  not an inferred export bug. Tags/archive checksum preserved; no fabricated data.
+- Exact next: commit/push final records, then no automatic repeat tests/new records.
+  Part B full accounting/native vs integration needs separate scope/accountant
+  decision and authority; future provider config migration before2026-12-01 also
+  separately recorded. No full GL/journals/Trial Balance/Balance Sheet implemented.
+
 ## 2026-10-10 02:38 WAT - Runtime and Print Reconciliation
 
 - Exact168ab4f/496b4d2f SUCCESS/healthy. Inspect-only acceptance passed without

@@ -2,6 +2,39 @@
 
 ## Current Work Register - Authoritative as of 2026-10-10
 
+### Accounting Part A Closed Within Scope - 2026-10-10 02:44 WAT
+
+- ACCT-001 through ACCT-007 are implemented, isolated-verified, deployed and
+  live accepted within the management-report correction scope. Current runtime
+  92e59d1cccc0e83fff05639b0e3346e99cb3513e, exact Railway deployment
+  d45f37a1-3488-4cb0-b096-a2ca64226af6 SUCCESS, public healthz ok. Prior pending
+  entries below are timestamped history, not today's outstanding release work.
+- ACCT-006 adds evidence-based classification/reviewer/version/audit to existing
+  standalone payments, not duplicate finance records. Original501 remains
+  Unclassified after source review; new controlled schedule12/6payments covers
+  all supported categories. Reclassification/stale409/cash invariance and
+  non-finance403 PASS. Only reviewed operating expenses enter paid overhead once.
+- ACCT-007 separates61-90 and over90 in Dashboard/AR/print, including90/91 and
+  Nigeria-calendar boundaries. Current400/61-90 1,000/over90 0/AR1,400 match.
+  Final live print labels/branch cost-basis footer and totals verified after deploy.
+- Final unit248PASS/3existing skips, full build/typecheck PASS. All43 distinct
+  isolated accounting cases have passing evidence across full/selective runs,
+  not a single uninterrupted43PASS run; fixture issues resolved, namespace counts
+  restored/private tunnels closed. Additional dashboard expense case PASS.
+- Finance dashboard/P&L/branch net -15,707,770.50 with paid overhead15,710,303;
+  separate Operations budgeted net54,295,697 uses the same overhead sources.
+  Bank3 1,593/LagosLedger+CF1,494; existing deposit/credit/write-off fixtures,
+  AR/VAT preserved. No external transfers/messages or duplicate old test writes.
+- Evidence exceptions remain: unknown original501 purpose and missing historical
+  expense4 metadata for10,210,000 costs. Warnings explicit; costs/cash retained,
+  no inferred category. CSV downloaded-file content not verified due to browser
+  retrieval timeout; not a confirmed export defect. Protection tags/archive
+  checksum retained. See ACCOUNTING_CLASSIFICATION_AGING_2026-10-10.md.
+- Exact stopping point: implementation, controlled acceptance and UI/print done;
+  publish these final records. Do not repeat schedule12 or prior live fixtures.
+  Part B (native GL/Trial Balance/journals/Balance Sheet or integration) requires
+  a separate owner/accountant decision and authorisation. No Part B started.
+
 ### Final Runtime Reconciled; Print Labels Follow-up - 2026-10-10 02:38 WAT
 
 - Exact168ab4f deployment496b4d2f SUCCESS, healthz ok. Inspect-only acceptance

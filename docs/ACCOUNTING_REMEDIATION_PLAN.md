@@ -1,5 +1,19 @@
 # Accounting Remediation and Feature Plan
 
+Current2026-10-10 02:44 WAT: Part A Steps1-5/ACCT-001..007 CLOSED within
+management-report correction scope. Runtime92e59d1 deployed exact Railway
+d45f37a1 SUCCESS/healthy; controlled live category/cash/aging/dashboard/print
+acceptance complete. All43 distinct isolated cases passed across full/selective
+runs (not one uninterrupted43PASS run), unit248PASS/3prior skips/build PASS.
+Original501 reviewed but purpose unsupported; retained unknown with reasons.
+Old missing overhead parent/category10,210,000 retained/flagged, not fabricated.
+CSV downloaded-file validation remains browser-limited, not a confirmed defect.
+See ACCOUNTING_CLASSIFICATION_AGING_2026-10-10.md for fixtures/totals/evidence.
+Older open/proposed/release-pending lines below are timestamped history. Part B
+Steps6-12 remain unapproved, not implemented; require native-vs-integration and
+owner/accountant policy/cutover decisions before starting. Do not call this a
+complete double-entry accounting system or repeat existing live test writes.
+
 Current2026-10-10 02:19 WAT: all43 distinct isolated accounting cases have
 passing evidence across full/selective runs (42full passes, corrected duplicate
 staff fixture,2final focused passes). Unit248PASS/3skips/build PASS. ACCT-006/007

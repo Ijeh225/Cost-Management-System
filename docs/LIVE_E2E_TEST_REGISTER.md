@@ -2,6 +2,34 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-10
 
+### ACCT-006/007 Closed / Live Accepted - 2026-10-10 02:44 WAT
+
+- Runtime92e59d1, Railwayd45f37a1 SUCCESS/healthz ok. Final aging print now says
+  Over90days; branch footer states first-active-invoice cost recognition and
+  separate paid overhead/non-cash debt. No malformed escaped dash, totals unchanged.
+- All-seven accounting corrections have isolated/current-source acceptance;
+  all43 distinct cases passed across full/selective runs, not one uninterrupted
+  full43PASS run. Unit248PASS/3prior skips/typecheck/build PASS. Setup fixture
+  corrections documented; cleanup restores namespace counts/closes SSH tunnels.
+- One new controlled schedule12/NGN6, facts3..8, all six categories; existing
+  cash and originalACCT1..5 fixtures preserved. Review audit2/stale409 and paid
+  overhead deletion409/non-finance403 PASS. Inspect-only reconciliation after
+  source follow-up PASS; no repeated live mutation suite. Original501 reviewed
+  unknown rather than guessed, plus new unknown1 => review queue502/3facts.
+- DashboardFinance/P&L/branch print: rev4,201/cost701/OH15,710,303/non-cash
+  loss967.50/net -15,707,770.50. Operations estimate54,295,697 is budgeted,
+  same overhead source. Bank3 1,593/LagosLedger+CF1,494/AR1,400/VAT unchanged.
+- Aging Dashboard/AR/print current400/61-90 1,000/over90 0,total1,400;
+  invoice004/day70 correctly61-90. Live91day record not fabricated; exact90/91
+  isolated and unit-tested. Queue/reviewer/evidence/audit/mobile required fields
+  PASS with no saved UI edits; screenshot evidence ignored tmp/.
+- Remaining evidence boundaries, not unimplemented fixes: original501 purpose
+  unavailable; old expense4 category unavailable for10,210,000 retained costs;
+  P&L CSV downloaded-file retrieval unverified after browser timeout. No guessed
+  historical repair, statutory certification, or full accounting suite claimed.
+- Exact stopping point: publish final closure records; no outstanding ACCT
+  implementation/deployment/live test within this scope. Part B remains unapproved.
+
 ### Final Runtime and Print Acceptance - 2026-10-10 02:38 WAT
 
 - Exact168ab4f/496b4d2f SUCCESS/healthz ok. Inspect-only all-seven reconciliation
@@ -324,8 +352,8 @@ Five existing unit/mocked-HTTP files passed 16 tests; not a fresh DB concurrency
 | ACCT-DEPLOY-001 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | First release skipped new fields under old migration. New independently versioned additive migration applied; fields/index and authenticated finance reads verified. |
 | ACCT-004 | High | CLOSED / LIVE ACCEPTED 2026-10-10 | Deployed a50c321; live note2 on invoice16 splits107.50 into net100/VAT7.50, reflected in P&L/Dashboard/VAT/Branch without cash movement. Twelve isolated cases retain rounding/date/concurrency proof. |
 | ACCT-005 | High | CLOSED / LIVE ACCEPTED 2026-10-10 | Invoice16 remaining967.50 written off once; audit/evidence10, AR0, non-cash P&L loss967.50, VAT retained67.50. Bank/Ledger/Cash Flow unchanged; duplicate400 and evidence payment409. UI and matching reports verified. |
-| ACCT-006 | High | OPEN classification gap; source and live population separation | NGN501 standalone schedule payments are in cash/bank/ledger, with no accounting head/P&L mapping. Do not presume they are all operating expenses; require classification/review. |
-| ACCT-007 | Medium | OPEN; live read-only and source confirmed | Dashboard combines 61-90 with 90+ and labels both 90d+. Existing invoice is 68 days overdue/AR 61-90, but Dashboard says 90d+. Totals unchanged. |
+| ACCT-006 | High | CLOSED / LIVE ACCEPTED 2026-10-10 | Existing standalone facts support six evidence-based categories, expense head, reviewer/version and auditable review. Only operating expense enters paid overhead once; cash unchanged by classification. Schedule12 six-category live test, stale409 and staff403 PASS. Historical501 remains visibly unclassified with review reasons, not a guessed expense. |
+| ACCT-007 | Medium | CLOSED / LIVE ACCEPTED 2026-10-10 | Five separate Dashboard/AR/print buckets; day90 in61-90, day91 over90, Lagos-calendar boundaries isolated/unit verified. Live70-day invoice004 correctly61-90; current400/61-90 1,000/over90 0,total1,400. All-seven regressions and exact deployed/live acceptance recorded above. |
 
 Positive bounded observations: Dashboard and P&L match revenue NGN3,001, COGS
 NGN701, paid overhead NGN15,710,302 and net -NGN15,708,002. Bank #3 credits 2,003
