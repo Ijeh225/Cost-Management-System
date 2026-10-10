@@ -1,10 +1,11 @@
 // One bounded live dummy-data acceptance; secrets/cookies stay in memory.
 import assert from "node:assert/strict";
 
-assert(process.argv.includes("--confirm=LIVE-ACCT-STEPS12-20261008"), "Explicit live test confirmation required");
+const adjustmentsOnly = process.argv.includes("--adjustments");
+assert(process.argv.includes(adjustmentsOnly ? "--confirm=LIVE-ACCT-STEP3-20261010" : "--confirm=LIVE-ACCT-STEPS12-20261008"), "Explicit live test confirmation required");
 const inspectOnly = process.argv.includes("--inspect-only");
 const base = "https://donclimaxmanagementapp.com/api";
-const label = "E2E-ACCT-20261008 Cash Settlement QA";
+const label = adjustmentsOnly ? "E2E-ACCT-20261010 Non-cash Adjustment QA" : "E2E-ACCT-20261008 Cash Settlement QA";
 const cookies = new Map();
 let branch = "all";
 let csrf;
@@ -47,6 +48,109 @@ function assertUnchangedCash(actual, expected) {
 }
 function checkpoint(name, detail) { console.log(JSON.stringify({ pass: name, ...detail })); }
 
+async function adjustmentAcceptance(selected, bank, existing) {
+  const cashBefore = await snapshot(bank.id);
+  const plBefore = await request("GET", "/reports/pl?costBasis=actual_paid");
+  const vatBefore = await request("GET", "/reports/vat-summary");
+  const trackingBefore = await request("GET", "/reports/vat-liability");
+  const comparisonBefore = await request("GET", "/reports/branch-comparison");
+  const branchBefore = comparisonBefore.rows.find(row => row.branchId === selected.id);
+  assert(branchBefore);
+  let client;
+  let invoice;
+  let containerId;
+  let expenseId;
+  if (inspectOnly) {
+    assert.equal(existing.length, 1, "Adjustment fixture missing; inspection must not recreate it");
+    client = existing[0];
+    const invoices = (await request("GET", "/invoices")).filter(row => row.clientId === client.id);
+    assert.equal(invoices.length, 1, "Expected exactly one retained adjustment invoice");
+    invoice = await request("GET", `/invoices/${invoices[0].id}`);
+  } else {
+    assert.equal(existing.length, 0, "Adjustment fixture exists: inspect it, never repeat writes automatically");
+    checkpoint("Step 3 live baseline", { ledger: cashBefore.ledger.summary, cashflow: cashBefore.cashflow.totals,
+      bankBalance: cashBefore.bankBalance, revenue: plBefore.revenue.totalRevenue,
+      badDebts: plBefore.adjustments.totalBadDebts, netProfit: plBefore.netProfit, vat: vatBefore.totals });
+    client = await request("POST", "/clients", { name: label, branchId: selected.id,
+      notes: "Owner-authorised dummy accounting acceptance; no real client, physical movement, cash or messages." }, 201);
+    checkpoint("Step 3 controlled client", { clientId: client.id, branchId: selected.id });
+    const container = await request("POST", "/containers", { containerNumber: "ACCT2610101", blNumber: "E2E-ACCT-STEP3-20261010",
+      customerName: label, clientId: client.id, branchId: selected.id, command: "PTML", clearingCharges: 1000,
+      declaration: "Dummy non-cash write-off/VAT test only; no operational progression." }, 201);
+    containerId = container.id;
+    const yesterday = new Date(Date.now() + 3600000 - 86400000).toISOString().slice(0, 10);
+    const draft = await request("POST", "/invoices", { containerIds: [container.id], branchId: selected.id,
+      vatRate: 7.5, dueDate: yesterday, notes: label }, 201);
+    checkpoint("Step 3 controlled invoice/job", { containerId, invoiceId: draft.id, invoiceNumber: draft.invoiceNumber });
+    await request("PATCH", `/invoices/${draft.id}`, { status: "sent" });
+    invoice = await request("GET", `/invoices/${draft.id}`);
+    equalMoney(invoice.subtotal, 1000); equalMoney(invoice.vatAmount, 75); equalMoney(invoice.total, 1075);
+    const cn = await request("POST", `/invoices/${invoice.id}/credit-note`, { amount: 107.5,
+      reason: "E2E-ACCT-20261010 dummy credit-note VAT/net recognition; no cash refund" }, 201);
+    equalMoney(cn.appliedToInvoice, 107.5); equalMoney(cn.creditedToClient, 0);
+    invoice = await request("GET", `/invoices/${invoice.id}`);
+    equalMoney(invoice.outstanding, 967.5);
+    const notePl = await request("GET", `/reports/pl?clientId=${client.id}&costBasis=actual_paid`);
+    equalMoney(notePl.revenue.totalRevenue, 900); equalMoney(notePl.revenue.totalVatCollected, 67.5);
+    const noteVat = await request("GET", "/reports/vat-summary");
+    equalMoney(noteVat.totals.totalSubtotal, vatBefore.totals.totalSubtotal + 900);
+    equalMoney(noteVat.totals.totalVat, vatBefore.totals.totalVat + 67.5);
+    const note = noteVat.creditNotes.find(row => row.id === cn.id);
+    assert(note); equalMoney(note.netAmount, 100); equalMoney(note.vatAmount, 7.5);
+    assertUnchangedCash(await snapshot(bank.id), cashBefore);
+    checkpoint("ACCT-004 live nonzero VAT credit note", { invoiceId: invoice.id, creditNoteId: cn.id,
+      creditNoteNumber: cn.creditNoteNumber, netRevenue: 900, vatRetained: 67.5, outstanding: 967.5, cashUnchanged: true });
+    const writtenOff = await request("POST", `/invoices/${invoice.id}/write-off`, {}, 201);
+    expenseId = writtenOff.overheadExpenseId;
+    equalMoney(writtenOff.writtenOffAmount, 967.5);
+    checkpoint("ACCT-005 live write-off created", { invoiceId: invoice.id, overheadExpenseId: expenseId, writtenOffAmount: 967.5 });
+    await request("POST", `/invoices/${invoice.id}/write-off`, {}, 400);
+    await request("POST", `/overhead-expenses/${expenseId}/payments`, { amount: 1, paymentMethod: "bank", bankId: bank.id,
+      reference: "E2E-ACCT-STEP3-REFUSED-NONCASH" }, 409);
+    const evidence = (await request("GET", "/overhead-expenses")).expenses.find(row => row.id === expenseId);
+    assert(evidence, "Write-off evidence missing from scoped expense list");
+    assert.equal(evidence.status, "non_cash"); equalMoney(evidence.balance, 0); equalMoney(evidence.totalPaid, 0);
+    invoice = await request("GET", `/invoices/${invoice.id}`);
+  }
+  assert.equal(invoice.status, "written_off");
+  equalMoney(invoice.writtenOffAmount, 967.5); equalMoney(invoice.outstanding, 0); equalMoney(invoice.totalPaid, 107.5);
+  assert.equal(invoice.creditNotes.length, 1); equalMoney(invoice.creditNotes[0].amount, 107.5);
+  const clientPl = await request("GET", `/reports/pl?clientId=${client.id}&costBasis=actual_paid`);
+  equalMoney(clientPl.revenue.totalRevenue, 900); equalMoney(clientPl.revenue.totalVatCollected, 67.5);
+  equalMoney(clientPl.adjustments.totalBadDebts, 967.5); equalMoney(clientPl.netProfit, -67.5);
+  assert.equal(clientPl.adjustments.badDebts.filter(row => row.invoiceId === invoice.id).length, 1);
+  assert.equal(clientPl.adjustments.undatedBadDebts.includes(invoice.id), false);
+  const ar = await request("GET", "/invoices/accounts-receivable");
+  equalMoney(ar.clients.find(row => row.clientId === client.id)?.outstanding ?? 0, 0);
+  const vat = await request("GET", "/reports/vat-summary");
+  const tracking = await request("GET", "/reports/vat-liability");
+  const pl = await request("GET", "/reports/pl?costBasis=actual_paid");
+  const comparison = await request("GET", "/reports/branch-comparison");
+  const currentBranch = comparison.rows.find(row => row.branchId === selected.id);
+  assert(currentBranch);
+  if (!inspectOnly) {
+    equalMoney(pl.revenue.totalRevenue, plBefore.revenue.totalRevenue + 900);
+    equalMoney(pl.adjustments.totalBadDebts, plBefore.adjustments.totalBadDebts + 967.5);
+    equalMoney(pl.overheads.total, plBefore.overheads.total);
+    equalMoney(pl.netProfit, plBefore.netProfit - 67.5);
+    equalMoney(vat.totals.totalVat, vatBefore.totals.totalVat + 67.5);
+    equalMoney(tracking.currentQuarter.vatCollected, trackingBefore.currentQuarter.vatCollected + 67.5);
+    equalMoney(currentBranch.revenue, branchBefore.revenue + 900);
+    equalMoney(currentBranch.badDebts, branchBefore.badDebts + 967.5);
+    equalMoney(currentBranch.netProfit, branchBefore.netProfit - 67.5);
+    equalMoney(currentBranch.outstandingReceivables, branchBefore.outstandingReceivables);
+  }
+  assertUnchangedCash(await snapshot(bank.id), cashBefore);
+  const audit = await request("GET", `/invoices/${invoice.id}/audit-log`);
+  assert.equal(audit.filter(row => row.action === "written_off").length, 1);
+  checkpoint(inspectOnly ? "ACCT-005 retained fixture read-only reconciliation" : "ACCT-005 live cross-module reconciliation and duplicate refusal", { clientId: client.id, containerId,
+    invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, overheadExpenseId: expenseId,
+    writtenOffAmount: invoice.writtenOffAmount, outstanding: 0, settlement: invoice.totalPaid,
+    clientNetRevenue: 900, clientVat: 67.5, clientResult: -67.5,
+    branchRevenue: currentBranch.revenue, branchBadDebts: currentBranch.badDebts, branchNetProfit: currentBranch.netProfit,
+    bankBalance: cashBefore.bankBalance, cashUnchanged: true, preservedForAudit: true });
+}
+
 try {
   const login = await request("POST", "/auth/login", credential);
   credential.password = undefined;
@@ -69,7 +173,9 @@ try {
   const clients = await request("GET", "/clients");
   const existing = clients.filter(row => row.name === label);
   assert(existing.length <= 1, "Duplicate acceptance clients already exist");
-  if (inspectOnly) {
+  if (adjustmentsOnly) {
+    await adjustmentAcceptance(selected, bank, existing);
+  } else if (inspectOnly) {
     assert.equal(existing.length, 1, "Acceptance fixture missing");
     const client = await request("GET", `/clients/${existing[0].id}`);
     const deposits = await request("GET", `/clients/${client.id}/deposits`);

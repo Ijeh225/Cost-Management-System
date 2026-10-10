@@ -1,5 +1,13 @@
 # Accounting Remediation and Feature Plan
 
+Current 2026-10-10 01:26 WAT: Steps1-3 complete within correction scope.
+Step3 ACCT-004/005 deployed and controlled live write acceptance PASS;
+invoice16/note2/evidence10 retained. Nonzero VAT split, audited remaining loss,
+unchanged cash and refusal guards verified, with matching live finance views.
+Earlier pending release/live lines below are historical. Steps4/5 ACCT-006/007
+remain OPEN/proposed; do not start new accounting functionality without authority.
+
+
 Current 2026-10-10 01:00 WAT: Step 3 a50c321 committed/pushed and exact
 Railway deployment47eb5a30 SUCCESS/healthy. Existing-note read-only finance
 reconciliation PASS; live write-off/nonzero-VAT mutation acceptance pending.

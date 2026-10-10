@@ -2,6 +2,46 @@
 
 ## Current Work Register - Authoritative as of 2026-10-10
 
+### Accounting Step 3 Live Write Acceptance Passed - 2026-10-10 01:26 WAT
+
+- ACCT-004/005 CLOSED / LIVE ACCEPTED within their correction scope. Existing
+  dummy-data authority was sufficient; earlier read-only stop was unnecessary.
+- Ran guarded Step3 acceptance once, exit0. Retained Lagos client11, container35
+  ACCT2610101, invoice16 INV-202610-002 (subtotal1,000/VAT75/total1,075),
+  credit note2 CN-202610-002 (107.50) and Bad Debt evidence10 (967.50).
+- Note reduces net revenue100/VAT7.50; write-off removes remaining AR967.50
+  and records one audited non-cash loss without further revenue/VAT reduction.
+  Repeat write-off HTTP400, attempted evidence payment HTTP409; no payment created.
+- Invoice Written Off, settlement107.50 non-cash, outstanding0; client P&L
+  revenue900/VAT67.50/loss967.50/net -67.50. Lagos revenue4,200/loss967.50/
+  net2,232.50; branch AR unchanged1,400. Paid overhead unchanged.
+- Bank3 remains1,599; scoped Ledger net1,500 and Cash Flow closing1,500 unchanged.
+  Consolidated Dashboard/P&L revenue4,201/cost701/gross3,500/overhead15,710,302/
+  loss967.50/net -15,707,769.50. VAT print net4,201/VAT67.50/total4,268.50.
+- Fresh owner UI verifies invoice, disabled non-cash overhead controls, Dashboard,
+  P&L, VAT and Branch Comparison print. Branch print loss967.50/net2,232.50
+  Lagos; consolidated net -15,707,769.50, other branches unchanged. Local screenshot
+  acct-step3-live-writeoff-20261010.png retained, owner left on invoice16.
+  Existing protected tag/history and old cash fixture preserved.
+  Test script/records only changed this turn; no runtime fix/migration needed.
+- Detailed evidence: ACCOUNTING_ADJUSTMENTS_2026-10-10.md. Commit/push records
+  closes this test milestone; ACCT-006 classification and ACCT-007 aging remain
+  OPEN, not implemented. No repeat of live writes required for these closures.
+  Existing presentation/config observations and absent full GL remain separate.
+
+
+### Accounting Step 3 Live Write Acceptance In Progress - 2026-10-10 01:20 WAT
+
+- User questioned the remaining write-off acceptance. Earlier dummy-data authority
+  already permits this bounded test; permanent audit evidence is not a blocker.
+- Production 42cc801 deployment 7568d611-d564-4c88-9063-fca23b76ad3b SUCCESS verified.
+  Reuse existing guarded acceptance script, not a duplicate test framework.
+- One new labelled Lagos dummy invoice: subtotal1,000/VAT75; credit note107.50
+  then remaining overdue write-off967.50. Verify reports, VAT retained67.50,
+  AR zero, unchanged cash/bank, duplicate refusal and non-cash payment refusal.
+- IN PROGRESS, no live pass claimed. Existing cash fixtures/checkpoints retained.
+
+
 ### Accounting Step 3 Deployed - 2026-10-10 01:00 WAT
 
 - Runtime code/records commit a50c321c1b3b9f9725c8ee952dd2bb8d54abccfa

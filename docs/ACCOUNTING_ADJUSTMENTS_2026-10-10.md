@@ -1,5 +1,57 @@
 # Credit Note and Bad Debt Corrections
 
+## Current Live Acceptance - 2026-10-10 01:26 WAT
+
+ACCT-004/005 CLOSED / LIVE ACCEPTED within their correction scope. Production
+42cc801 deployment7568d611-d564-4c88-9063-fca23b76ad3b SUCCESS includes runtime
+a50c321. Existing guarded utility Step3 mode ran once, exit0. No runtime edits
+needed this turn. Earlier pending/local-only statements below are historical.
+
+| Retained dummy record | Value |
+| --- | --- |
+| Branch/client | Lagos2 / client11 E2E-ACCT-20261010 Non-cash Adjustment QA |
+| Job/container | 35 / ACCT2610101 / B/L E2E-ACCT-STEP3-20261010 |
+| Invoice | 16 / INV-202610-002 / due2026-10-09 |
+| Invoice face | Net1,000 + VAT75 =1,075 |
+| Credit note | 2 / CN-202610-002 / gross107.50 =net100 + VAT7.50 |
+| Write-off evidence | 10 / Bad Debt967.50 / non_cash / balance0 / paid0 |
+| Final invoice | written_off / non-cash settlement107.50 / outstanding0 |
+
+Verified API assertions: note leaves client net revenue900/VAT67.50; write-off
+adds remaining967.50 loss once, client result -67.50. Active AR0; original VAT
+not relieved; paid overhead unchanged. One written_off audit event. Repeat
+write-off400; attempted evidence payment409, no payment record or cash movement.
+
+Before/after scoped cash is identical: bank3 balance1,599; Financial Ledger
+entries17/in3,004/out1,504/net1,500; Cash Flow in3,003/out1,503/closing1,500.
+Difference1 in gross flow populations is the existing internal transfer,
+not a new adjustment entry; net agrees. No external transfer or message sent.
+
+Lagos revenue3,300->4,200; bad debts0->967.50; net2,300->2,232.50;
+AR stays1,400 and paid overhead300. Consolidated Dashboard/P&L revenue4,201,
+costs701/gross3,500/paid overhead15,710,302/loss967.50/net -15,707,769.50.
+VAT Summary net4,201/VAT67.50/gross4,268.50; Q4 taxable1,200/VAT67.50.
+
+Fresh owner browser confirms written-off banner/outstanding0, retained note,
+non-payable overhead evidence (Add Money disabled, no Pay Now/Schedule control),
+Financial Dashboard and P&L print same loss/net, VAT print original1,075 plus
+separate -107.50 note. Original invoice amounts/history and cash fixture15 kept.
+Branch Comparison print verifies Lagos loss967.50/net2,232.50/AR1,400 and
+unchanged other branches. Screenshot evidence is local
+acct-step3-live-writeoff-20261010.png; no credentials/cookies in the repository.
+
+Only new acceptance helper/records changed. Protected tag/backup untouched.
+Twelve isolated cases retain concurrency/period/access evidence; this live run
+does not re-certify the entire app or tax filing. CSV export and all visual
+breakpoints were not re-run. Historical VAT filing heading/branch footer display
+observations remain separately noted, not calculation failures in this test.
+
+Resume inspection using existing fixture only: --adjustments --inspect-only
+with explicit --confirm=LIVE-ACCT-STEP3-20261010 and stdin credentials. Do not
+rerun creation or delete the immutable loss to make a test repeatable.
+Next proposed work: ACCT-006 standalone classifications and ACCT-007 aging.
+
+
 Current release 2026-10-10 01:00 WAT: a50c321c1b3b9f9725c8ee952dd2bb8d54abccfa
 committed/pushed; deployment47eb5a30-30e0-4892-82a7-a5797a094287 SUCCESS.
 Provider/public healthcheck PASS. Existing CN700 gives net revenue3,301,
