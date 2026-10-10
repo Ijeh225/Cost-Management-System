@@ -2,6 +2,34 @@
 
 ## Current Work Register - Authoritative as of 2026-10-10
 
+### Final Reversal Follow-Up PASS / Inactive Release Finishing - 2026-10-10 22:30 WAT
+
+- New cancelled-reversal replacement, original exact reversal and migration
+  repeatability3/3 PASS in113.49s (20not-selected). Combined evidence now covers
+  all23 distinct foundation cases across full20 and focused3/5/3 runs, not one
+  full23 run. Run-owned schema/tunnel removed; isolated source baselines unchanged.
+- Latest unit270PASS/3prior skips in71.57s, complete typechecks/web/API build and
+  inactive internal bundle no-connection/write smoke PASS. Fresh full existing
+  cash43/43 PASS retained; final follow-up changes native-only code, not cash writers.
+- Initial6c7ee61 deployment a3d90e70-8dc2-4eaf-94dd-8f33bf8e5828 SUCCESS.
+  Read-only post-release archive checksum/62-table financial baseline unchanged;
+  accounting schema and posting switches false. No source record or grant changed.
+- Publish final small native reversal follow-up, then verify its exact deployment
+  and health/baselines. 6A professional approval, fiscal/cutover settings and named
+  accounting grants remain pending. Steps7-12 not implemented or activated.
+
+### Final Review Follow-Up: Cancelled Reversal Retry - 2026-10-10 22:28 WAT
+
+- Published6c7ee61 inactive foundation; exact deploy a3d90e70 is in progress.
+  Both live switches false; no ledger/schema or financial fixture activated.
+- Source review found fixed reversal request key/index would strand a cancelled
+  draft reversal. Corrected attempts now retain the cancelled audit/link, use a
+  new deterministic key and preserve only one active reversal per original.
+- Migration upgrades the old index only in its own schema. New isolated case
+  covers index upgrade twice, concurrent replacement, final exact posted offset
+  and immutable cancelled history. Targeted acceptance/build are next; earlier
+  all22 evidence does not include this newly added23rd case yet.
+
 ### Step 6 Engineering Acceptance PASS / Inactive Publication Next - 2026-10-10 22:24 WAT
 
 - Duplicate review complete: one new native foundation reuses current canonical

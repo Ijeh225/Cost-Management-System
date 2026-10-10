@@ -1,4 +1,5 @@
 import { bigint, boolean, date, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { branchesTable } from "./schema/branches";
 import { usersTable } from "./schema/users";
 
@@ -36,7 +37,8 @@ export const accountingJournalsTable = pgTable("accounting_journals", {
   kind: text("kind").notNull(), reversalOf: integer("reversal_of"), status: text("status").notNull().default("draft"),
   preparedBy: integer("prepared_by").notNull().references(() => usersTable.id), postedBy: integer("posted_by").references(() => usersTable.id),
   postedAt: timestamp("posted_at", { withTimezone: true }), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, t => [uniqueIndex("accounting_journal_event").on(t.bookId, t.eventKey)]);
+}, t => [uniqueIndex("accounting_journal_event").on(t.bookId, t.eventKey),
+  uniqueIndex("accounting_one_active_reversal").on(t.reversalOf).where(sql`${t.reversalOf} IS NOT NULL AND ${t.status}<>'cancelled'`)]);
 export const accountingJournalLinesTable = pgTable("accounting_journal_lines", {
   id: serial("id").primaryKey(), bookId: integer("book_id").notNull().references(() => accountingBooksTable.id),
   journalId: integer("journal_id").notNull().references(() => accountingJournalsTable.id), accountId: integer("account_id").notNull().references(() => accountingAccountsTable.id),

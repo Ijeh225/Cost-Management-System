@@ -1,5 +1,27 @@
 # Accounting Foundation Architecture Decision
 
+## 2026-10-10 22:30 WAT - Reversal Follow-Up Accepted
+
+- Final targeted3/3 PASS in113.49s, including cancelled-attempt upgrade/retry and
+  exact posted offset with retained audit/history. All23distinct foundation controls
+  have PASS evidence across full/focused runs; no single uninterrupted full23run.
+- Final unit270PASS/3prior skips/typecheck/build/inactive bundle smoke PASS.
+  Full existing43/43 finance regression retained; latest changes native-only.
+- Initial6c7ee61 Railwaya3d90e70 SUCCESS. Read-only post-release archive/62-table
+  financial baseline unchanged; both flags false. Publish final small reversal
+  follow-up and verify exact release next. Professional approval and Step7 still pending.
+
+## 2026-10-10 22:28 WAT - Final Review Found Cancelled-Reversal Retry Edge
+
+- 6c7ee61 committed/pushed; inactive deployment a3d90e70 building/deploying.
+  No production activation or source money changes; both switches false.
+- Fixed an internal source-confirmed edge: cancelled reversal now retains its
+  audit/link, while a corrected attempt gets its own deterministic event key.
+  One active reversal per original still enforced; upgrade only touches own
+  schema index. Added23rd isolated case including concurrent retries.
+- Exact next targeted reversal/migration acceptance, final build, publish this
+  small follow-up and verify the final inactive deployment/baselines.
+
 ## 2026-10-10 22:24 WAT - Step 6 Engineering Accepted, Inactive Release Next
 
 - All22 distinct foundation controls PASS across full20/focused3/final5 runs;

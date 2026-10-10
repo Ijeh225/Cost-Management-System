@@ -59,7 +59,14 @@ CREATE TABLE IF NOT EXISTS accounting_journals (
  CHECK((kind='reversal')=(reversal_of IS NOT NULL)),
  CHECK(status<>'posted' OR (posted_by IS NOT NULL AND posted_by<>prepared_by AND posted_at IS NOT NULL))
 );
-CREATE UNIQUE INDEX IF NOT EXISTS accounting_one_reversal ON accounting_journals(reversal_of) WHERE reversal_of IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS accounting_one_active_reversal ON accounting_journals(reversal_of)
+ WHERE reversal_of IS NOT NULL AND status<>'cancelled';
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+   WHERE n.nspname=current_schema() AND c.relname='accounting_one_reversal' AND c.relkind='i') THEN
+   EXECUTE format('DROP INDEX %I.accounting_one_reversal',current_schema());
+ END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS accounting_journal_date ON accounting_journals(book_id,branch_id,accounting_date);
 CREATE TABLE IF NOT EXISTS accounting_journal_lines (
  id SERIAL PRIMARY KEY, book_id INTEGER NOT NULL, journal_id INTEGER NOT NULL, account_id INTEGER NOT NULL,

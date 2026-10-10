@@ -193,9 +193,13 @@ export class NativeAccounting {
       const original = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE id=$1 AND book_id=$2 AND branch_id=$3 AND status='posted' AND kind='manual'",
         [originalId, bookId, branchId])).rows[0];
       requireAccounting(original, "INVALID_REVERSAL", "Posted original in this book/branch required");
+      const active = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE reversal_of=$1 AND status<>'cancelled'", [originalId])).rows[0];
+      const attempts = (await client.query("SELECT count(*)::int n FROM accounting_journals WHERE reversal_of=$1", [originalId])).rows[0]!.n as number;
+      // A cancelled attempt remains immutable; a corrected draft gets a new event link.
+      const eventKey = active?.event_key ?? (attempts === 0 ? `reversal:${originalId}` : `reversal:${originalId}:retry:${attempts}`);
       const lines = (await client.query("SELECT * FROM accounting_journal_lines WHERE journal_id=$1 ORDER BY id", [originalId])).rows;
       return this.prepare(client, actorId, { bookId, branchId, currency: original.currency, accountingDate: date,
-        eventKey: `reversal:${originalId}`, narration: `Reversal of journal ${originalId}`, evidence: reason,
+        eventKey, narration: `Reversal of journal ${originalId}`, evidence: reason,
         lines: lines.map(l => ({ accountId: l.account_id, debit: minorToMoney(l.credit_minor), credit: minorToMoney(l.debit_minor), memo: l.memo })) }, originalId);
     });
   }

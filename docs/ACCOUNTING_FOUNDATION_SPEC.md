@@ -55,6 +55,10 @@ unclassified. Exact fiscal dates and chart details need professional review.
 - Posted headers, lines, links and audits cannot be edited/deleted. Reversal is
   a second journal with opposite lines, reason, link and independent approval;
   no deletion or rewriting of the original cash/source transaction.
+- A cancelled draft reversal keeps its original audit/event link. A corrected
+  replacement has a new deterministic attempt key; concurrency and a partial
+  unique index still permit only one draft/posted reversal for the original.
+  The migration upgrades the earlier index only in its own schema.
 - Explicit per-book/per-branch grants; canonical active profiles still required.
   Super Admin and general `finance.access` do not silently imply posting grants.
   Every journal has a different preparer and approver, including reversals.
@@ -73,7 +77,7 @@ unclassified. Exact fiscal dates and chart details need professional review.
 
 ## Phase 6F: Acceptance and Rollout Boundary
 
-Engineering acceptance2026-10-10 22:24 WAT:
+Engineering acceptance2026-10-10 22:30 WAT:
 
 | Phase | Implemented / verified | Approval or activation boundary |
 |---|---|---|
@@ -82,10 +86,11 @@ Engineering acceptance2026-10-10 22:24 WAT:
 | 6C | Exact atomic balanced/idempotent engine; immutable posted records, audits and linked reversals | No existing transaction writer calls it |
 | 6D | Non-overlapping periods, close/reopen audit, draft checks, post/close serialization | Source completeness is a reviewed attestation; automated adapters are Step7 |
 | 6E | Named branch grants, canonical profiles, independent approval, whole-book configuration scope | No production grants or permission changes |
-| 6F | All22distinct isolated cases across full20/focused3/final5; existing43/43; unit270PASS/3prior skips; typechecks/build/smoke PASS | Inactive publication verification next; no official accounting cutover |
+| 6F | All23distinct isolated cases across full20/focused3/5/3; existing43/43; unit270PASS/3prior skips; typechecks/build/smoke PASS | Initial inactive release verified; final native-only follow-up proof next; no official cutover |
 
-Not one uninterrupted full22 foundation run; final five-case rerun covers the
-changed permission/cancellation controls. Three ordinary unit skips predate this
+Not one uninterrupted full23 foundation run; final five-case rerun covers changed
+permissions and final three-case rerun covers cancelled-reversal replacement,
+exact original offset and migration repeatability. Three ordinary unit skips predate this
 foundation. Checkpoint `checkpoint-before-native-accounting-foundation-2026-10-10`
 is preserved remotely at `bec6dca8834d349f566b427fab4b3b0ed054e028`.
 Fresh private archive SHA256

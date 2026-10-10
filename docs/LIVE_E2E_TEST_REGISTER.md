@@ -2,6 +2,31 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-10
 
+### Final Foundation Reversal Acceptance PASS - 2026-10-10 22:30 WAT
+
+- Latest targeted3/3 PASS (20not-selected) in113.49s: repeat migration, exact
+  original reversal and corrected replacement after cancellation. New case proves
+  legacy index upgrade twice, concurrent request reuse, exact zero posted account
+  offset, retained3 source links, cancellation audit and immutable history.
+- Combined23distinct controls have PASS evidence across full20/focused3/5/3;
+  not one full23 run. Own schema/tunnel cleaned up, source baseline unchanged.
+- Final unit270PASS/3prior skips/typechecks/full build/inactive smoke PASS.
+  Fresh full existing finance43/43 PASS before this native-only follow-up retained.
+- Initial6c7ee61 exact Railwaya3d90e70 SUCCESS. Post-release production archive
+  checksum and62-table financial baseline unchanged/read-only PASS. No live native
+  posting, schema/grant seeding or new live fixtures. Final follow-up release proof next.
+
+### Foundation Review Follow-Up / New Reversal Case - 2026-10-10 22:28 WAT
+
+- Source-confirmed internal edge: cancelling a draft reversal stranded later
+  correction because the original event key/index allowed only one attempt.
+  Live posting remains off; not a failure observed in existing cash workflows.
+- Added immutable cancelled-attempt history plus deterministic replacement keys,
+  single-active-reversal index and schema-local upgrade. New23rd foundation
+  case targets repeat upgrade/concurrent replacement and exact posted offset.
+- Targeted rerun/build pending. Prior22distinct PASS, unit270/legacy43 retained
+  as timestamped evidence, not proof of this latest code change.
+
 ### Step 6 Final Engineering Acceptance PASS - 2026-10-10 22:24 WAT
 
 - Final foundation subset5/5 PASS,17not-selected in211.09s; tests cover pending

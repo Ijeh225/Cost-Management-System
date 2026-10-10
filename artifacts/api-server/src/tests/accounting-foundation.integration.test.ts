@@ -177,6 +177,26 @@ describe("Step6A-6F inactive native accounting foundation", () => {
     const request = input(f); request.lines[0]!.accountId = other.debit;
     await expect(service.prepareJournal(f.preparer, request)).rejects.toMatchObject({ code: "INVALID_ACCOUNT" });
   });
+  it("6C replaces a cancelled reversal without losing its audit or duplicating the posted offset", async () => {
+    const f = await fixture(); const original = await posted(f);
+    const first = await service.prepareReversal(f.book, f.branch, f.preparer, original.id, "2026-10-11", "Dummy reversal awaiting correction");
+    await service.cancelDraft(f.book, f.branch, f.preparer, first.id, "Wrong dummy reversal date; keep cancelled evidence");
+    await sql("CREATE UNIQUE INDEX accounting_one_reversal ON accounting_journals(reversal_of) WHERE reversal_of IS NOT NULL");
+    await ensureAccountingFoundationSchema(database as Pick<typeof pool, "connect">);
+    await ensureAccountingFoundationSchema(database as Pick<typeof pool, "connect">);
+    const replacements = await Promise.all([1, 2].map(() => service.prepareReversal(f.book, f.branch, f.preparer,
+      original.id, "2026-10-12", "Reviewed corrected dummy reversal")));
+    expect(replacements[0]!.id).not.toBe(first.id);
+    expect(replacements[0]!.id).toBe(replacements[1]!.id);
+    await service.approveAndPost(f.book, f.branch, f.approver, replacements[0]!.id, "Independent corrected reversal approval");
+    expect((await sql(`SELECT sum(l.debit_minor)-sum(l.credit_minor) balance FROM accounting_journal_lines l
+      JOIN accounting_journals j ON j.id=l.journal_id WHERE j.book_id=$1 AND j.status='posted' GROUP BY account_id`, [f.book])).rows.every(r => r.balance === "0")).toBe(true);
+    expect((await sql("SELECT status FROM accounting_journals WHERE id=$1", [first.id])).rows[0].status).toBe("cancelled");
+    expect((await sql("SELECT count(*)::int n FROM accounting_source_events WHERE book_id=$1", [f.book])).rows[0].n).toBe(3);
+    expect((await sql("SELECT count(*)::int n FROM accounting_audit WHERE journal_id=$1 AND action='cancelled'", [first.id])).rows[0].n).toBe(1);
+    await expect(sql("UPDATE accounting_journals SET status='draft' WHERE id=$1", [first.id])).rejects.toThrow("immutable");
+    await expect(service.prepareReversal(f.book, f.branch, f.preparer, original.id, "2026-10-13", "Another conflicting reversal")).rejects.toMatchObject({ code: "DUPLICATE_CONFLICT" });
+  });
   it("6D refuses close without source/reconciliation evidence or with pending drafts", async () => {
     const f = await fixture();
     await expect(service.changePeriod(f.book, f.owner, f.period, "close", { ...review, sourceCoverageComplete: false })).rejects.toMatchObject({ code: "CLOSE_REVIEW_REQUIRED" });

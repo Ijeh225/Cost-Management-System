@@ -2,8 +2,9 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
-Status updated2026-10-10 22:24 WAT: Step6 inactive engineering foundation built
-and accepted; code publication/deployment verification next. Steps7-12 not started.
+Status updated2026-10-10 22:30 WAT: Step6 inactive engineering foundation built
+and accepted; initial release verified, final reversal follow-up publication next.
+Steps7-12 not started.
 Accountant policy, named permissions and production cutover are not yet approved.
 The original21:17 roadmap below is preserved; current evidence appears at the end.
 
@@ -211,6 +212,13 @@ Exit: each module has documented implementation/deployment/live acceptance,
 unresolved exceptions remain explicit and the exact next action is recorded.
 
 ## Current Status / Exact Next Action
+
+2026-10-10 22:30 WAT: final reversal correction accepted3/3. All23distinct
+foundation cases covered across full20/focused3/5/3, not one full23run; latest
+unit270PASS/3prior skips/build/smoke PASS. Original full43/43 retained; final
+change is native-only. Initial6c7ee61/a3d90e70 inactive release SUCCESS, archive/
+62-table financial baseline unchanged, flags false. Final follow-up release proof
+next, then owner/accountant policy and named grants/cutover review before Step7.
 
 2026-10-10 22:24 WAT: all6A-6F technical scope implemented and engineering
 acceptance PASS; draft policy remains unsigned. Full20/focused3/final5 cover

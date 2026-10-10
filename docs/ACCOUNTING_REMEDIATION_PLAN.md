@@ -1,5 +1,12 @@
 # Accounting Remediation and Feature Plan
 
+Current2026-10-10 22:30 WAT: final native-only cancellation/reversal follow-up
+accepted3/3; all23distinct foundation cases covered across full/focused runs.
+Latest unit270PASS/3skips/typechecks/build/smoke, original full43/43 retained.
+Initial6c7ee61/a3d90e70 inactive release SUCCESS; production archive/62-table
+financial baseline unchanged, flags false. Final follow-up publication proof next.
+Professional policy/grants/cutover and separately authorised Step7 remain next.
+
 Current2026-10-10 22:24 WAT: Step6A-6F engineering acceptance PASS within
 inactive-foundation scope; all22distinct cases across full/focused runs, fresh
 existing43/43, unit270PASS/3prior skips/typechecks/build/smoke PASS. Protected
