@@ -27,8 +27,9 @@
   unavailable; old expense4 category unavailable for10,210,000 retained costs;
   P&L CSV downloaded-file retrieval unverified after browser timeout. No guessed
   historical repair, statutory certification, or full accounting suite claimed.
-- Exact stopping point: publish final closure records; no outstanding ACCT
-  implementation/deployment/live test within this scope. Part B remains unapproved.
+- Closure records8fc11f1 pushed/remote verified, clean checkout at02:45 WAT.
+  Exact stopping point: implementation/deployment/live acceptance and records
+  publication complete; no outstanding ACCT test within scope. Part B unapproved.
 
 ### Final Runtime and Print Acceptance - 2026-10-10 02:38 WAT
 

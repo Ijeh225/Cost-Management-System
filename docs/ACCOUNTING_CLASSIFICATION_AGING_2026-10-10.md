@@ -7,7 +7,8 @@ within management-report scope. Runtime92e59d1cccc0e83fff05639b0e3346e99cb3513e,
 exact Railwayd45f37a1-3488-4cb0-b096-a2ca64226af6 SUCCESS/healthz ok. Final print
 labels Over90days and correct branch recognition footer visually verified,
 figures unchanged. Prior pending label release note below is historical.
-Final records publication follows; Part B unapproved. Data-evidence exceptions
+Final closure records8fc11f1 pushed/remote verified02:45 WAT; Part B unapproved.
+Data-evidence exceptions
 and downloaded-file validation limits below are explicit, not hidden by closure.
 
 ## Scope and Protection - 2026-10-10 01:56 WAT

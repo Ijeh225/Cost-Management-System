@@ -30,8 +30,10 @@
   no inferred category. CSV downloaded-file content not verified due to browser
   retrieval timeout; not a confirmed export defect. Protection tags/archive
   checksum retained. See ACCOUNTING_CLASSIFICATION_AGING_2026-10-10.md.
-- Exact stopping point: implementation, controlled acceptance and UI/print done;
-  publish these final records. Do not repeat schedule12 or prior live fixtures.
+- Closure records8fc11f1 committed/pushed and exact remote master confirmed
+  2026-10-10 02:45 WAT, clean checkout. Exact stopping point: implementation,
+  deployment, controlled acceptance, UI/print and records publication complete.
+  Do not repeat schedule12 or prior live fixtures.
   Part B (native GL/Trial Balance/journals/Balance Sheet or integration) requires
   a separate owner/accountant decision and authorisation. No Part B started.
 

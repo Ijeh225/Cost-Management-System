@@ -21,7 +21,9 @@
 - Old501 purpose and missing expense4 metadata10,210,000 remain explicit evidence
   exceptions. CSV downloaded-file validation unverified after browser timeout,
   not an inferred export bug. Tags/archive checksum preserved; no fabricated data.
-- Exact next: commit/push final records, then no automatic repeat tests/new records.
+- Final closure records8fc11f1 pushed/remote verified, clean checkout02:45 WAT.
+  Exact stopping point: release/testing/records complete; no automatic repeat
+  tests/new records. Next substantive work requires new owner approval.
   Part B full accounting/native vs integration needs separate scope/accountant
   decision and authority; future provider config migration before2026-12-01 also
   separately recorded. No full GL/journals/Trial Balance/Balance Sheet implemented.
