@@ -19,6 +19,9 @@
 - Branch print verifies Lagos loss967.50/net2,232.50/AR1,400 and other branch
   isolation; consolidated net matches. Local screenshot retained, owner invoice16
   left open. Helper syntax and git diff whitespace checks PASS; no full suite rerun.
+- Publication01:29 WAT: test/records commit57e414d pushed, exact remote hash
+  verified and clean worktree. Existing deployed runtime passed this acceptance;
+  no claim of a subsequent records-only automatic deployment's completion.
 - Earlier twelve isolated cases retain rounding/concurrency/period/permission
   proof; this is bounded live acceptance, not a new full-suite or statutory pass.
   No external money, messages, deletions, historical edits or duplicate fixtures.

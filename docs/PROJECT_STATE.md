@@ -24,8 +24,11 @@
   acct-step3-live-writeoff-20261010.png retained, owner left on invoice16.
   Existing protected tag/history and old cash fixture preserved.
   Test script/records only changed this turn; no runtime fix/migration needed.
-- Detailed evidence: ACCOUNTING_ADJUSTMENTS_2026-10-10.md. Commit/push records
-  closes this test milestone; ACCT-006 classification and ACCT-007 aging remain
+- Publication01:29 WAT: acceptance helper/records commit57e414d committed/pushed;
+  exact origin/master hash verified, worktree clean, protected tag still cf29433.
+  This is a test/records update; existing deployed runtime already passed.
+- Detailed evidence: ACCOUNTING_ADJUSTMENTS_2026-10-10.md. Test milestone complete;
+  ACCT-006 classification and ACCT-007 aging remain
   OPEN, not implemented. No repeat of live writes required for these closures.
   Existing presentation/config observations and absent full GL remain separate.
 
