@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { PaymentClassificationNote } from "@/components/payment-classification-note";
 import { useGetDashboardStats, useGetProfitLoss, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks, useGetVatLiability, useGetBerthingOverview, useSendAlertDigest, type BerthingRow } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
@@ -641,6 +642,7 @@ function FinancialDashboardView({
           </div>
 
           <p className="text-xs text-muted-foreground">{data.adjustments?.policy}</p>
+          <PaymentClassificationNote data={data.paymentClassification} />
           {!!data.adjustments?.undatedBadDebts.length && <p className="text-sm text-destructive">Review required: {data.adjustments.undatedBadDebts.length} legacy write-offs lack an audited date and are excluded from dated loss totals.</p>}
           {!!data.adjustments?.legacyBadDebtPayments?.length && <p className="text-sm text-destructive">Review historical Bad Debt cash postings: {data.adjustments.legacyBadDebtPayments.length}. Cash history is retained; these are not also counted as paid overhead.</p>}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -931,12 +933,13 @@ export default function Dashboard() {
               </span>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 {[
                   { label: "Current", value: arData.aging.current,    color: "text-foreground",  bg: "bg-muted/40" },
-                  { label: "30d",     value: arData.aging.days1to30,  color: "text-amber-400",   bg: "bg-amber-500/10" },
-                  { label: "60d",     value: arData.aging.days31to60, color: "text-orange-400",  bg: "bg-orange-500/10" },
-                  { label: "90d+",    value: arData.aging.days61to90 + arData.aging.days90plus, color: "text-red-500", bg: "bg-red-500/15" },
+                  { label: "1-30 days", value: arData.aging.days1to30, color: "text-amber-400", bg: "bg-amber-500/10" },
+                  { label: "31-60 days", value: arData.aging.days31to60, color: "text-orange-400", bg: "bg-orange-500/10" },
+                  { label: "61-90 days", value: arData.aging.days61to90, color: "text-red-400", bg: "bg-red-500/10" },
+                  { label: "Over 90 days", value: arData.aging.days90plus, color: "text-red-500", bg: "bg-red-500/15" },
                 ].map(b => (
                   <div key={b.label} className={`rounded-lg p-3 ${b.bg} border border-border/20`}>
                     <div className="text-[10px] text-muted-foreground font-medium mb-1 truncate">{b.label}</div>

@@ -1,3 +1,5 @@
+import { financialDateKey, invoiceAging } from "./financial-reporting.js";
+
 export type InvoiceLifecycleStatus =
   | "draft"
   | "sent"
@@ -21,10 +23,8 @@ function isPastDue(dueDate: string | Date | null | undefined, now: Date) {
   if (!dueDate) return false;
   const due = new Date(dueDate);
   if (Number.isNaN(due.getTime())) return false;
-  due.setHours(0, 0, 0, 0);
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  return due < today;
+  const day = typeof dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dueDate) ? dueDate : financialDateKey(due);
+  return invoiceAging(day, now).daysOverdue > 0;
 }
 
 /**

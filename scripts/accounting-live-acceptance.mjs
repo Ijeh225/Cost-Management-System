@@ -2,10 +2,12 @@
 import assert from "node:assert/strict";
 
 const adjustmentsOnly = process.argv.includes("--adjustments");
-assert(process.argv.includes(adjustmentsOnly ? "--confirm=LIVE-ACCT-STEP3-20261010" : "--confirm=LIVE-ACCT-STEPS12-20261008"), "Explicit live test confirmation required");
+const classificationOnly = process.argv.includes("--classification");
+const staffAccessOnly = process.argv.includes("--staff-access");
+assert(process.argv.includes(classificationOnly ? "--confirm=LIVE-ACCT-STEPS45-20261010" : adjustmentsOnly ? "--confirm=LIVE-ACCT-STEP3-20261010" : "--confirm=LIVE-ACCT-STEPS12-20261008"), "Explicit live test confirmation required");
 const inspectOnly = process.argv.includes("--inspect-only");
 const base = "https://donclimaxmanagementapp.com/api";
-const label = adjustmentsOnly ? "E2E-ACCT-20261010 Non-cash Adjustment QA" : "E2E-ACCT-20261008 Cash Settlement QA";
+const label = classificationOnly ? "E2E-ACCT-20261010 Classification QA" : adjustmentsOnly ? "E2E-ACCT-20261010 Non-cash Adjustment QA" : "E2E-ACCT-20261008 Cash Settlement QA";
 const cookies = new Map();
 let branch = "all";
 let csrf;
@@ -151,11 +153,111 @@ async function adjustmentAcceptance(selected, bank, existing) {
     bankBalance: cashBefore.bankBalance, cashUnchanged: true, preservedForAudit: true });
 }
 
+async function classificationAcceptance(selected, bank) {
+  let review = await request("GET", "/payment-schedules/accounting-review");
+  const history = review.payments.filter(row => row.vendor !== label);
+  checkpoint("ACCT-006 historical evidence inspection", { payments: history.map(row => ({ paymentId: row.id, scheduleId: row.scheduleId,
+    amount: row.amount, vendor: row.vendor, description: row.description, reference: row.reference, notes: row.notes,
+    classification: row.classification, version: row.classificationVersion })) });
+  const schedules = (await request("GET", "/payment-schedules")).schedules.filter(row => row.vendorBeneficiary === label);
+  assert(schedules.length <= 1, "Duplicate classification fixture");
+  if (!inspectOnly) assert.equal(schedules.length, 0, "Existing classification fixture: inspect-only required; do not repeat cash writes");
+  const before = await snapshot(bank.id);
+  const plBefore = await request("GET", "/reports/pl?costBasis=actual_paid");
+  const arBefore = await request("GET", "/invoices/accounts-receivable");
+  const vatBefore = await request("GET", "/reports/vat-summary");
+  let schedule = schedules[0];
+  if (!inspectOnly) {
+    for (const payment of history) {
+      const detail = await request("GET", `/payment-schedules/${payment.scheduleId}`);
+      checkpoint("Historical schedule supporting records", { scheduleId: detail.id, description: detail.description,
+        documents: detail.documents.map(doc => ({ id: doc.id, name: doc.originalName })) });
+      if (payment.classification === "unclassified" && payment.classificationVersion === 0) {
+        await request("PATCH", `/payment-schedules/${payment.scheduleId}/payments/${payment.id}/classification`, {
+          classification: "unclassified", expectedVersion: 0,
+          classificationReason: payment.notes?.includes("Historical reconstruction")
+            ? "Historical NGN500 dummy schedule reviewed: reconstructed from original Paid event; reconciliation reference is not an original bank reference. Description says controlled test, not a real vendor payment, and no supporting documents exist. Expense/asset/advance/loan purpose is unsupported; retain unclassified and preserve cash history."
+            : "Historical NGN1 standalone dummy reconciliation test reviewed: recorded description and notes identify a system test, not expense/asset/advance/loan purpose. No supporting documents exist. Do not guess a financial classification; retain unclassified and preserve cash history.",
+        });
+      }
+    }
+    assertUnchangedCash(await snapshot(bank.id), before);
+    equalMoney((await request("GET", "/reports/pl?costBasis=actual_paid")).netProfit, plBefore.netProfit);
+    schedule = await request("POST", "/payment-schedules", { scheduleDate: new Date(Date.now() + 3600000).toISOString().slice(0,10),
+      vendorBeneficiary: label, description: "Six controlled NGN1 dummy payments: consumed stationery expense, equipment asset, recoverable supplier advance, loan principal, other non-expense and unknown purpose. No external transfer.",
+      amountRequested: 6, priority: "normal" }, 201);
+    checkpoint("Controlled classification schedule created", { scheduleId: schedule.id, branchId: selected.id, amount: 6 });
+    await request("PATCH", `/payment-schedules/${schedule.id}/approve`, { comment: "Owner-authorised dummy accounting acceptance only" });
+    const classifications = ["operating_expense", "asset", "advance", "loan_repayment", "other_non_expense", "unclassified"];
+    const evidence = ["Controlled consumed stationery purchase receipt scenario", "Controlled equipment acquisition invoice scenario", "Controlled recoverable supplier advance agreement scenario", "Controlled loan principal repayment statement scenario; no interest", "Controlled refundable security payment agreement scenario", "Controlled unknown-purpose payment; evidence absent"];
+    for (let i=0; i<classifications.length; i++) await request("PATCH", `/payment-schedules/${schedule.id}/pay`, {
+      amount: 1, paymentMethod: "bank", bankId: bank.id, reference: `E2E-ACCT45-${classifications[i]}`,
+      classification: classifications[i], expenseHead: classifications[i] === "operating_expense" ? "QA stationery" : undefined,
+      classificationReason: evidence[i], notes: evidence[i],
+    });
+    await request("PATCH", `/payment-schedules/${schedule.id}/complete`, { comment: "Six dummy facts retained for audit" });
+  } else assert(schedule, "Retained classification schedule missing");
+  let detail = await request("GET", `/payment-schedules/${schedule.id}`);
+  assert.equal(detail.payments.length, 6); equalMoney(detail.amountPaid, 6);
+  const cashAfter = await snapshot(bank.id);
+  if (!inspectOnly) {
+    equalMoney(cashAfter.bankBalance, before.bankBalance - 6);
+    equalMoney(cashAfter.bank.closingBalance, before.bank.closingBalance - 6);
+    equalMoney(cashAfter.ledger.summary.net, before.ledger.summary.net - 6);
+    equalMoney(cashAfter.cashflow.totals.closingBalance, before.cashflow.totals.closingBalance - 6);
+    const expense = detail.payments.find(row => row.classification === "operating_expense");
+    assert(expense);
+    const path = `/payment-schedules/${schedule.id}/payments/${expense.id}/classification`;
+    const changed = await request("PATCH", path, { expectedVersion: expense.classificationVersion, classification: "asset",
+      classificationReason: "Controlled correction test: acquisition scenario, no new payment" });
+    equalMoney((await request("GET", "/reports/pl?costBasis=actual_paid")).netProfit, plBefore.netProfit);
+    await request("PATCH", path, { expectedVersion: changed.classificationVersion, classification: "operating_expense",
+      expenseHead: "QA stationery", classificationReason: "Restore controlled consumed stationery receipt scenario after audited classification test" });
+    await request("PATCH", path, { expectedVersion: expense.classificationVersion, classification: "advance", classificationReason: "Stale review must not overwrite" }, 409);
+    assertUnchangedCash(await snapshot(bank.id), cashAfter);
+    detail = await request("GET", `/payment-schedules/${schedule.id}`);
+    assert.equal(detail.events.filter(row => row.type === "payment_classified").length, 2);
+    const overhead = (await request("GET", "/overhead-expenses")).expenses.find(row => row.category !== "Bad Debt" && row.totalPaid > 0);
+    if (overhead) await request("DELETE", `/overhead-expenses/${overhead.id}`, undefined, 409);
+  }
+  review = await request("GET", "/payment-schedules/accounting-review");
+  const own = review.payments.filter(row => row.scheduleId === schedule.id);
+  for (const category of ["operating_expense","asset","advance","loan_repayment","other_non_expense","unclassified"]) {
+    assert.equal(own.filter(row => row.classification === category).length, 1);
+  }
+  const pl = await request("GET", "/reports/pl?costBasis=actual_paid");
+  const comparison = await request("GET", "/reports/branch-comparison");
+  const row = comparison.rows.find(row => row.branchId === selected.id);
+  equalMoney(row.netProfit, pl.netProfit); equalMoney(row.overheads, pl.overheads.total);
+  if (!inspectOnly) { equalMoney(pl.netProfit, plBefore.netProfit - 1); equalMoney(pl.overheads.total, plBefore.overheads.total + 1); }
+  const ar = await request("GET", "/invoices/accounts-receivable");
+  const aging = await request("GET", "/reports/invoice-aging");
+  assert.deepEqual(ar.aging, arBefore.aging);
+  for (const [key, amount] of Object.entries(ar.aging)) equalMoney(aging.totals[key], Number(amount));
+  equalMoney((await request("GET", "/reports/vat-summary")).totals.totalVat, vatBefore.totals.totalVat);
+  checkpoint("ACCT-006 live category/cash/P&L reconciliation", { scheduleId: schedule.id, paymentIds: own.map(row => row.id),
+    bankBalance: cashAfter.bankBalance, ledgerNet: cashAfter.ledger.summary.net, cashflowClosing: cashAfter.cashflow.totals.closingBalance,
+    revenue: pl.revenue.totalRevenue, paidOverheads: pl.overheads.total, netProfit: pl.netProfit,
+    unclassifiedAmount: review.totals.unclassified, unclassifiedCount: review.unclassifiedCount, preservedForAudit: true });
+  checkpoint("ACCT-007 AR/print five-bucket reconciliation", { aging: ar.aging, grandTotal: aging.totals.grandTotal,
+    days61to90: aging.buckets.days61to90.map(row => ({ invoice: row.invoiceNumber, days: row.daysOverdue, outstanding: row.outstanding })),
+    days90plus: aging.buckets.days90plus.map(row => ({ invoice: row.invoiceNumber, days: row.daysOverdue, outstanding: row.outstanding })) });
+}
+
 try {
   const login = await request("POST", "/auth/login", credential);
   credential.password = undefined;
-  assert.equal(login.user?.role ?? login.role, "super_admin", "Owner Super Admin required");
+  if (!staffAccessOnly) assert.equal(login.user?.role ?? login.role, "super_admin", "Owner Super Admin required");
   csrf = (await request("GET", "/auth/csrf")).token;
+  if (staffAccessOnly) {
+    assert.notEqual(login.user?.role ?? login.role, "super_admin", "Use the existing controlled non-finance staff account");
+    await request("GET", "/payment-schedules/accounting-review", undefined, 403);
+    await request("GET", "/reports/pl?costBasis=actual_paid", undefined, 403);
+    await request("PATCH", "/payment-schedules/1/payments/1/classification", {
+      classification: "asset", expectedVersion: 0, classificationReason: "Unauthorised attempt must not post",
+    }, 403);
+    checkpoint("ACCT-006 separate non-finance staff restrictions", { reviewHTTP: 403, profitReportHTTP: 403, classificationHTTP: 403, noMutation: true });
+  } else {
   const ledger = await request("GET", "/reports/financial-ledger");
   const flow = await request("GET", "/reports/cashflow");
   const oldDeposits = ledger.entries.filter(row => row.source === "Client deposit" && Number(row.amount) === 50000000);
@@ -173,7 +275,9 @@ try {
   const clients = await request("GET", "/clients");
   const existing = clients.filter(row => row.name === label);
   assert(existing.length <= 1, "Duplicate acceptance clients already exist");
-  if (adjustmentsOnly) {
+  if (classificationOnly) {
+    await classificationAcceptance(selected, bank);
+  } else if (adjustmentsOnly) {
     await adjustmentAcceptance(selected, bank, existing);
   } else if (inspectOnly) {
     assert.equal(existing.length, 1, "Acceptance fixture missing");
@@ -265,6 +369,7 @@ try {
     assert(clientAR, "Controlled client missing from AR");
     equalMoney(clientAR.outstanding, 400);
     checkpoint("AR settlement retained", { outstanding: clientAR.outstanding });
+  }
   }
 } finally {
   credential.password = undefined;

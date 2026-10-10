@@ -1,5 +1,16 @@
 # Accounting Remediation and Feature Plan
 
+Current2026-10-10 02:19 WAT: all43 distinct isolated accounting cases have
+passing evidence across full/selective runs (42full passes, corrected duplicate
+staff fixture,2final focused passes). Unit248PASS/3skips/build PASS. ACCT-006/007
+local implementation verified; publish/deploy and controlled live proof next.
+
+Current2026-10-10 01:56 WAT: Steps4/5 ACCT-006/007 now authorised and implemented
+locally. New checkpoint/DB full-restore protection verified; unit247passed and
+typecheck/build PASS. Full isolated accounting suite, exact deployment and live
+acceptance still in progress. Historical501 not guessed as expense. See
+ACCOUNTING_CLASSIFICATION_AGING_2026-10-10.md. Older proposed lines are historical.
+
 Current 2026-10-10 01:26 WAT: Steps1-3 complete within correction scope.
 Step3 ACCT-004/005 deployed and controlled live write acceptance PASS;
 invoice16/note2/evidence10 retained. Nonzero VAT split, audited remaining loss,

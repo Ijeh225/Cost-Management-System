@@ -72,7 +72,30 @@ export type PaymentScheduleDocument = {
 export type PaymentScheduleDetail = PaymentSchedule & {
   events: PaymentScheduleEvent[];
   documents: PaymentScheduleDocument[];
+  payments: StandalonePayment[];
 };
+
+export type PaymentClassification = "unclassified" | "operating_expense" | "asset" | "advance" | "loan_repayment" | "other_non_expense";
+export type PaymentClassificationBody = { classification: PaymentClassification; expenseHead?: string | null; classificationReason?: string | null };
+export type StandalonePayment = PaymentClassificationBody & { id: number; scheduleId: number; branchId: number; amount: number;
+  paidAt: string; paymentMethod: string; bankId: number | null; reference: string | null; notes: string | null;
+  classifiedBy: number | null; classifiedAt: string | null; classificationVersion: number; vendor?: string; description?: string };
+export type PaymentClassificationSummary = { policy: string; unclassifiedCount: number; totals: Record<PaymentClassification, number>; missingOverheadSourceCount?: number };
+
+export function useGetPaymentAccountingReview() {
+  return useQuery<PaymentClassificationSummary & { payments: StandalonePayment[] }>({ queryKey: [QK, "accounting-review"],
+    queryFn: () => customFetch(`${QK}/accounting-review`) });
+}
+
+export function useClassifySchedulePayment() {
+  const qc = useQueryClient();
+  return useMutation<StandalonePayment, Error, { payment: StandalonePayment; data: PaymentClassificationBody }>({
+    mutationFn: ({ payment, data }) => customFetch(`${QK}/${payment.scheduleId}/payments/${payment.id}/classification`, {
+      method: "PATCH", body: JSON.stringify({ ...data, expectedVersion: payment.classificationVersion }),
+    }),
+    onSuccess: () => { qc.invalidateQueries(); },
+  });
+}
 
 export type PaymentSchedulesResponse = {
   schedules: PaymentSchedule[];
@@ -158,6 +181,7 @@ function useScheduleAction<TBody extends object>(action: string) {
       qc.invalidateQueries({ queryKey: [QK] });
       qc.invalidateQueries({ queryKey: [QK, variables.id] });
       qc.invalidateQueries({ queryKey: ["/api/overhead-expenses"] });
+      if (action === "pay") qc.invalidateQueries();
     },
   });
 }
@@ -175,7 +199,7 @@ export function useRejectPaymentSchedule() {
 }
 
 export function usePayPaymentSchedule() {
-  return useScheduleAction<{ amount: number; paymentMethod: "cash" | "bank"; bankId?: number | null; paidAt?: string; notes?: string; comment?: string }>("pay");
+  return useScheduleAction<Partial<PaymentClassificationBody> & { amount: number; paymentMethod: "cash" | "bank"; bankId?: number | null; paidAt?: string; notes?: string; comment?: string }>("pay");
 }
 
 export function useCompletePaymentSchedule() {

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
+import type { PaymentClassificationSummary } from "./payment-schedules";
 
 export type ClientStatementInvoice = {
   id: number;
@@ -143,6 +144,7 @@ export function useGetInvoiceAging(options?: { enabled?: boolean }) {
 }
 
 export type ProfitLossResponse = {
+  paymentClassification?: PaymentClassificationSummary;
   adjustments?: {
     policy: string;
     totalCreditNoteNet: number;
@@ -451,6 +453,7 @@ export type BranchComparisonRow = {
 };
 
 export type BranchComparisonResponse = {
+  paymentClassification?: PaymentClassificationSummary;
   legacyBadDebtPayments?: Array<{ paymentId: number; amount: number }>;
   adjustmentPolicy?: string;
   undatedBadDebts?: number[];

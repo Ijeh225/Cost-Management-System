@@ -5,6 +5,7 @@ import app from "../app";
 import { db, pool, branchesTable, usersTable, clientsTable, banksTable, invoicesTable, invoicePaymentsTable, clientDepositsTable, expensePaymentsTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { ensureInvoiceCashSettlementSchema } from "../lib/invoice-payment-reversal-schema";
+import { ensurePaymentClassificationSchema } from "../lib/payment-classification-schema";
 
 const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const branches: number[] = [];
@@ -56,6 +57,14 @@ async function fixture(credit = "0") {
   return { branch, client, bank, invoice };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
+function patch(f: Fixture, path: string, body: object) {
+  return agent.patch(`/api${path}`).set("X-Branch-Id", String(f.branch.id)).set("X-CSRF-Token", csrf).send(body);
+}
+async function standalone(f: Fixture, amount = 25) {
+  const result = await pool.query(`INSERT INTO payment_schedules(branch_id,schedule_date,vendor_beneficiary,description,amount_requested,amount_approved,status)
+    VALUES($1,now(),'ACCT evidence supplier','Controlled classification evidence',$2,$2,'approved') RETURNING id`, [f.branch.id, amount]);
+  return Number(result.rows[0].id);
+}
 function post(f: Fixture, path: string, body: object) {
   return agent.post(`/api${path}`).set("X-Branch-Id", String(f.branch.id)).set("X-CSRF-Token", csrf).send(body);
 }
@@ -78,6 +87,117 @@ async function assertCash(f: Fixture, amount: number) {
 }
 
 describe("accounting cash source regressions", () => {
+  it("ACCT-006 reviews a legacy standalone payment without creating another cash fact", async () => {
+    const f = await fixture();
+    const schedule = await pool.query(`INSERT INTO payment_schedules(branch_id,schedule_date,vendor_beneficiary,description,amount_requested,amount_approved,amount_paid,status)
+      VALUES($1,now(),'ACCT supplier','Documented office supplies',25,25,25,'paid') RETURNING id`, [f.branch.id]);
+    const id = schedule.rows[0].id;
+    const payment = await pool.query(`INSERT INTO payment_schedule_payments(branch_id,schedule_id,amount,payment_method,bank_id)
+      VALUES($1,$2,25,'bank',$3) RETURNING id`, [f.branch.id, id, f.bank.id]);
+    await assertCash(f, -25);
+    const reviewed = await agent.patch(`/api/payment-schedules/${id}/payments/${payment.rows[0].id}/classification`)
+      .set("X-Branch-Id", String(f.branch.id)).set("X-CSRF-Token", csrf)
+      .send({ expectedVersion: 0, classification: "operating_expense", expenseHead: "Office supplies", classificationReason: "Supplier receipt confirms consumed stationery" });
+    expect(reviewed.status, JSON.stringify(reviewed.body)).toBe(200);
+    expect((await get(f, "/reports/pl?costBasis=actual_paid")).body.overheads.total).toBe(25);
+    await assertCash(f, -25);
+  });
+
+  it("ACCT-007 agrees on five Lagos-calendar aging boundaries in AR and printable aging", async () => {
+    const f = await fixture();
+    const asOf = new Date(Date.now() + 3600000).toISOString().slice(0, 10);
+    const day = Date.parse(`${asOf}T00:00:00Z`);
+    for (const age of [0, 1, 30, 31, 60, 61, 90, 91]) {
+      await db.insert(invoicesTable).values({ branchId: f.branch.id, clientId: f.client.id,
+        invoiceNumber: `ACCT-aging-${suffix}-${age}`, status: "sent", subtotal: "10", total: "10",
+        dueDate: new Date(day - age * 86400000).toISOString().slice(0, 10) });
+    }
+    const ar = await get(f, "/invoices/accounts-receivable");
+    const print = await get(f, "/reports/invoice-aging");
+    expect(ar.status).toBe(200); expect(print.status).toBe(200);
+    expect(ar.body.aging).toEqual({ current: 1010, days1to30: 20, days31to60: 20, days61to90: 20, days90plus: 10 });
+    for (const [bucket, amount] of Object.entries(ar.body.aging)) expect(print.body.totals[bucket]).toBe(amount);
+  });
+
+  it.each(["asset", "advance", "loan_repayment", "other_non_expense", "unclassified"])("ACCT-006 keeps %s in cash but not profit expenses", async classification => {
+    const f = await fixture(); const id = await standalone(f);
+    expect((await patch(f, `/payment-schedules/${id}/pay`, { amount: 25, paymentMethod: "bank", bankId: f.bank.id,
+      classification, classificationReason: classification === "unclassified" ? undefined : "Controlled source agreement identifies non-expense use" })).status).toBe(200);
+    const review = await get(f, "/payment-schedules/accounting-review");
+    expect(review.body.totals[classification]).toBe(25);
+    expect(review.body.payments).toHaveLength(1);
+    const pl = await get(f, "/reports/pl?costBasis=actual_paid");
+    expect(pl.body.overheads.total).toBe(0); expect(pl.body.netProfit).toBe(1000);
+    expect(pl.body.paymentClassification.totals[classification]).toBe(25);
+    await assertCash(f, -25);
+  });
+
+  it("ACCT-006 recognises reviewed expenses once in their payment period across P&L and branch totals", async () => {
+    const f = await fixture(); const id = await standalone(f);
+    const pay = await patch(f, `/payment-schedules/${id}/pay`, { amount: 25, paymentMethod: "bank", bankId: f.bank.id,
+      paidAt: "2020-01-15", classification: "operating_expense", expenseHead: "Office supplies", classificationReason: "Consumed stationery receipt" });
+    expect(pay.status, JSON.stringify(pay.body)).toBe(200);
+    const pl = await get(f, "/reports/pl?costBasis=actual_paid");
+    expect(pl.body.overheads.total).toBe(25); expect(pl.body.overheads.byCategory["Standalone: Office supplies"]).toBe(25);
+    expect(pl.body.monthly.find((row: { month: string }) => row.month === "2020-01").overheads).toBe(25);
+    expect((await get(f, "/reports/pl?from=2021-01-01")).body.overheads.total).toBe(0);
+    expect((await get(f, `/reports/pl?clientId=${f.client.id}`)).body.netProfit).toBe(1000);
+    const comparison = await get(f, "/reports/branch-comparison");
+    expect(comparison.body.rows.find((row: { branchId: number }) => row.branchId === f.branch.id).netProfit).toBe(975);
+    expect((await pool.query("SELECT count(*) AS n FROM expense_payments WHERE branch_id=$1", [f.branch.id])).rows[0].n).toBe("0");
+    await assertCash(f, -25);
+  });
+
+  it("ACCT-006 refuses missing evidence, wrong scope and stale concurrent reviews without touching cash", async () => {
+    const f = await fixture(); const wrong = await fixture(); const id = await standalone(f);
+    for (const classification of ["operating_expense", "asset", "nonsense"]) {
+      expect((await patch(f, `/payment-schedules/${id}/pay`, { amount: 25, paymentMethod: "bank", bankId: f.bank.id, classification })).status).toBe(400);
+    }
+    expect((await patch(f, `/payment-schedules/${id}/pay`, { amount: 25, paymentMethod: "bank", bankId: f.bank.id })).status).toBe(200);
+    const payment = (await get(f, `/payment-schedules/${id}`)).body.payments[0];
+    const path = `/payment-schedules/${id}/payments/${payment.id}/classification`;
+    expect((await patch(f, path, { expectedVersion: 0, classification: "unclassified" })).status).toBe(400);
+    const body = { expectedVersion: 0, classification: "asset", classificationReason: "Equipment acquisition invoice" };
+    expect((await patch(wrong, path, body)).status).toBe(404);
+    expect((await get(wrong, "/payment-schedules/accounting-review")).body.payments).toHaveLength(0);
+    const results = await Promise.all([patch(f, path, body), patch(f, path, { ...body, classification: "advance", classificationReason: "Recoverable supplier advance agreement" })]);
+    expect(results.map(row => row.status).sort()).toEqual([200,409]);
+    const detail = await get(f, `/payment-schedules/${id}`);
+    expect(detail.body.events.filter((row: { type: string }) => row.type === "payment_classified")).toHaveLength(1);
+    const next = await patch(f, path, { expectedVersion: 1, classification: "operating_expense", expenseHead: "Supplies", classificationReason: "Updated actual receipt", amount: 500 });
+    expect(next.status).toBe(200); expect(next.body.amount).toBe(25);
+    expect((await get(f, "/reports/pl")).body.overheads.total).toBe(25);
+    await assertCash(f, -25);
+  });
+
+  it("ACCT-006 protects paid overhead metadata and keeps linked schedules out of standalone expenses", async () => {
+    const f = await fixture();
+    const expense = await post(f, "/overhead-expenses", { branchId: f.branch.id, category: "Rent", description: "Accounting evidence", amount: 25 });
+    expect(expense.status).toBe(201);
+    const id = await standalone(f);
+    await pool.query("UPDATE payment_schedules SET overhead_expense_id=$1 WHERE id=$2", [expense.body.id, id]);
+    expect((await patch(f, `/payment-schedules/${id}/pay`, { amount: 25, paymentMethod: "bank", bankId: f.bank.id })).status).toBe(200);
+    expect((await get(f, "/payment-schedules/accounting-review")).body.payments).toHaveLength(0);
+    expect((await get(f, "/reports/pl")).body.overheads.total).toBe(25);
+    expect((await patch(f, `/overhead-expenses/${expense.body.id}`, { category: "Equipment" })).status).toBe(409);
+    expect((await agent.delete(`/api/overhead-expenses/${expense.body.id}`).set("X-Branch-Id", String(f.branch.id)).set("X-CSRF-Token", csrf)).status).toBe(409);
+    await assertCash(f, -25);
+  });
+
+  it("ACCT-006 upgrades legacy facts idempotently without guessing or changing their amounts", async () => {
+    const connection = await pool.connect();
+    try {
+      await connection.query("BEGIN");
+      await connection.query("CREATE TEMP TABLE payment_schedule_payments (id integer PRIMARY KEY, amount numeric(18,2)) ON COMMIT DROP");
+      await connection.query("CREATE TEMP TABLE users (id integer PRIMARY KEY) ON COMMIT DROP");
+      await connection.query("INSERT INTO payment_schedule_payments VALUES(1,501)");
+      await ensurePaymentClassificationSchema(connection); await ensurePaymentClassificationSchema(connection);
+      expect((await connection.query("SELECT amount,classification,expense_head,classification_reason,classified_at,classification_version FROM payment_schedule_payments")).rows)
+        .toEqual([{ amount: "501.00", classification: "unclassified", expense_head: null, classification_reason: null, classified_at: null, classification_version: 0 }]);
+      await expect(connection.query("UPDATE payment_schedule_payments SET classification='operating_expense' WHERE id=1")).rejects.toMatchObject({ code: "23514" });
+    } finally { await connection.query("ROLLBACK"); connection.release(); }
+  });
+
   it("ACCT-004 reconciles proportional credit-note net and VAT in P&L and VAT Summary", async () => {
     const f = await fixture();
     await db.update(invoicesTable).set({ vatAmount: "75", total: "1075" }).where(eq(invoicesTable.id, f.invoice.id));
@@ -258,7 +378,7 @@ describe("accounting cash source regressions", () => {
       expect((await post(f, `/invoices/${f.invoice.id}/credit-note`, { amount: 10, reason: "Invalid lifecycle" })).status).toBe(400);
     }
     await db.update(invoicesTable).set({ status: "sent" }).where(eq(invoicesTable.id, f.invoice.id));
-    const email = `acct-staff-${suffix}@example.test`;
+    const email = `acct-staff-${suffix}-${f.branch.id}@example.test`;
     await db.insert(usersTable).values({ branchId: f.branch.id, name: "Non-finance adjustment QA", email,
       passwordHash: await bcrypt.hash(password, 10), role: "staff", authorityLevel: "staff", jobFunction: "operations",
       workspaceAccess: '["transire"]', accessProfileMigratedAt: new Date() });
@@ -519,6 +639,9 @@ describe("accounting cash source regressions", () => {
     ] as const) {
       expect((await staff.post(`/api${path}`).set("X-CSRF-Token", token).send(body)).status).toBe(403);
     }
+    expect((await staff.get("/api/payment-schedules/accounting-review")).status).toBe(403);
+    expect((await staff.patch("/api/payment-schedules/1/payments/1/classification").set("X-CSRF-Token", token)
+      .send({ classification: "asset", classificationReason: "Not authorised", expectedVersion: 0 })).status).toBe(403);
     expect(await db.select().from(invoicePaymentsTable).where(eq(invoicePaymentsTable.invoiceId, f.invoice.id))).toHaveLength(0);
     expect(Number((await db.select().from(clientsTable).where(eq(clientsTable.id, f.client.id)))[0].creditBalance)).toBe(100);
   });

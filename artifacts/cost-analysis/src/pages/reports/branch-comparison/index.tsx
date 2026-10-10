@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { PaymentClassificationNote } from "@/components/payment-classification-note";
 import { motion } from "framer-motion";
 import { Building2, Download, Loader2, AlertTriangle, TrendingUp, TrendingDown, ChevronUp, ChevronDown, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +73,13 @@ export default function BranchComparisonPage() {
         r.avgTurnaroundDays.toFixed(1),
         r.outstandingReceivables.toFixed(2),
       ].join(","));
+    }
+    if (data?.paymentClassification) {
+      const review = data.paymentClassification;
+      lines.push("");
+      lines.push(`"Accounting policy","${review.policy.replace(/"/g, '""')}"`);
+      lines.push(`"Unclassified standalone payments - excluded from P&L",${review.unclassifiedCount},${review.totals.unclassified.toFixed(2)}`);
+      lines.push(`"Missing overhead source/category - costs retained",${review.missingOverheadSourceCount ?? 0}`);
     }
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -161,6 +169,7 @@ export default function BranchComparisonPage() {
               <span className="font-medium text-foreground">Financial basis:</span> {data.financialBasis.summary}
             </p>
           )}
+          <PaymentClassificationNote data={data?.paymentClassification} />
           {!!data?.legacyBadDebtPayments?.length && <p className="text-sm text-destructive">Review {data.legacyBadDebtPayments.length} historical Bad Debt cash postings. Cash history is retained; these are excluded from paid overhead to avoid counting the loss twice.</p>}
           {totals && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">

@@ -4,6 +4,17 @@ export const roundMoney = (amount: number) => Math.round(amount * 100) / 100;
 
 export const financialDateKey = (date: Date) => new Date(date.getTime() + 3600000).toISOString().slice(0, 10);
 
+export type AgingBucket = "current" | "days1to30" | "days31to60" | "days61to90" | "days90plus";
+
+/** Due dates are calendar days, not elapsed 24-hour timestamps. Day 90 stays in 61-90. */
+export function invoiceAging(dueDate: string | null, now = new Date()): { daysOverdue: number; bucket: AgingBucket } {
+  const daysOverdue = dueDate && /^\d{4}-\d{2}-\d{2}$/.test(dueDate)
+    ? Math.max(0, Math.round((Date.parse(financialDateKey(now)) - Date.parse(dueDate)) / 86400000)) : 0;
+  const bucket = daysOverdue > 90 ? "days90plus" : daysOverdue > 60 ? "days61to90"
+    : daysOverdue > 30 ? "days31to60" : daysOverdue > 0 ? "days1to30" : "current";
+  return { daysOverdue, bucket };
+}
+
 /** Reports use Nigeria's business calendar, independently of server timezone. */
 export function financialDateBoundary(value: string, end = false) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return new Date(NaN);

@@ -20,6 +20,8 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-10-10 standalone payment classification and aging, in progress 01:40 WAT](2026-10-10-payment-classification-aging.md)
+
 - [2026-10-09/10 credit-note and bad-debt release deployed and live write accepted, updated 01:26 WAT](2026-10-09-credit-notes-bad-debts.md)
 
 - [2026-10-08 protected checkpoint, deployed cash fixes and live acceptance, updated 15:33 WAT](2026-10-08-accounting-feature-review.md)

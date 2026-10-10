@@ -7,6 +7,8 @@ import { randomBytes } from "node:crypto";
 const cli = process.env.RAILWAY_CLI_PATH;
 if (!cli) throw new Error("Set RAILWAY_CLI_PATH to the authenticated Railway CLI binary");
 const suite = process.env.RAILWAY_TEST_SUITE ?? "cap04";
+const cleanupRun = process.env.ACCOUNTING_CLEANUP_RUN;
+if (cleanupRun && (suite !== "accounting" || !/^\d{13}-[a-z0-9]+$/.test(cleanupRun))) throw new Error("Exact accounting run suffix required for isolated recovery");
 if (!["cap04", "cap02", "accounting"].includes(suite)) throw new Error("Unknown isolated test suite");
 const project = "30166120-54e6-4f58-86ed-18ab396913f1";
 const environment = "51a4f5a2-e7ae-443e-836f-095b2015f3cc";
@@ -48,16 +50,30 @@ try {
   await identity.connect();
   try {
     if ((await identity.query("SELECT current_database() AS name")).rows[0].name !== "cost_management_integration_test") throw new Error("Wrong test database identity");
+    if (cleanupRun) {
+      const ids = (await identity.query("SELECT id FROM branches WHERE name=$1 OR name LIKE $2", [`ACCT root ${cleanupRun}`, `ACCT case ${cleanupRun}-%`])).rows.map(row => row.id);
+      if (!ids.length) throw new Error("Specified interrupted run has no fixtures; refusing an ambiguous cleanup");
+      await identity.query("BEGIN");
+      try {
+        await identity.query("DELETE FROM invoice_payments WHERE branch_id=ANY($1) AND entry_type='reversal'", [ids]);
+        for (const table of ["invoice_payments", "invoice_audit_log", "credit_notes", "workflow_notifications", "ai_assistant_audit_logs", "expense_payments", "payment_schedule_events", "payment_schedules", "overhead_expenses", "client_deposits", "invoices", "clients", "banks", "users"]) {
+          await identity.query(`DELETE FROM ${table} WHERE branch_id=ANY($1)`, [ids]);
+        }
+        await identity.query("DELETE FROM branches WHERE id=ANY($1)", [ids]);
+        await identity.query("COMMIT");
+        console.log(`Verified interrupted accounting run ${cleanupRun} cleanup: ${ids.length} run-owned branches, no other namespaces touched`);
+      } catch (err) { await identity.query("ROLLBACK"); throw err; }
+    }
     if (suite === "accounting") beforeFixtures = (await identity.query(fixtureCountsSql)).rows[0];
   } finally { await identity.end(); }
   const args = suite === "accounting" ? [resolve(root, "artifacts/api-server/node_modules/vitest/vitest.mjs"), "run", "--config", "vitest.integration.config.ts", "src/tests/accounting-cash.integration.test.ts", "--reporter=verbose"]
     : suite === "cap02" ? [resolve(root, "artifacts/api-server/node_modules/vitest/vitest.mjs"), "run", "src/tests/document-readiness-api.test.ts", "--reporter=verbose", "--testTimeout=60000"]
     : [resolve(root, "artifacts/api-server/node_modules/tsx/dist/cli.mjs"), resolve(root, "scripts/cap04-postgres-check.ts")];
   if (suite === "accounting" && process.env.ACCOUNTING_TEST_FILTER) args.push("-t", process.env.ACCOUNTING_TEST_FILTER);
-  const run = spawnSync(process.execPath, args, {
+  const run = cleanupRun ? { status: 0, stdout: "", stderr: "" } : spawnSync(process.execPath, args, {
     cwd: suite !== "cap04" ? resolve(root, "artifacts/api-server") : root,
     env: { ...process.env, TEST_DATABASE_URL: url.href, JWT_SECRET: randomBytes(32).toString("hex"), NODE_ENV: "test", CAP02_NETWORK_TEST: suite === "cap02" ? "1" : "0" },
-    encoding: "utf8", timeout: suite === "accounting" ? 600000 : 180000, windowsHide: true,
+    encoding: "utf8", timeout: suite === "accounting" ? 1200000 : 180000, windowsHide: true,
   });
   // Print only known safe progress lines; errors may include a connection string.
   for (const line of (run.stdout ?? "").split(/\r?\n/)) if (/^(PASS:|Verified )/.test(line) || /Test Files|Tests |serializes simultaneous|prevents parallel replacement/.test(line)) console.log(line);
@@ -72,7 +88,7 @@ try {
     } finally { await cleanup.end(); }
   }
   if (run.status !== 0) throw new Error(`${suite.toUpperCase()} isolated PostgreSQL checks failed; no credentials logged`);
-  console.log(`PASS: ${suite.toUpperCase()} isolated network PostgreSQL checks`);
+  console.log(cleanupRun ? "PASS: isolated accounting run recovery; no regression tests executed" : `PASS: ${suite.toUpperCase()} isolated network PostgreSQL checks`);
 } finally {
   if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(tunnel.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
   else tunnel.kill("SIGTERM");

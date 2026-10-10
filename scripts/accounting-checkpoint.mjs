@@ -15,6 +15,8 @@ const app = "95352cd0-c586-4e39-a35e-fb3c23ad9e52";
 const archive = join(directory, "production-before-accounting.dump");
 const manifest = join(directory, "checkpoint-manifest.json");
 const verifyExisting = process.argv.includes("--verify-existing");
+const checkpoint = process.env.ACCOUNTING_CHECKPOINT_HASH ?? "cf29433d0f235aafa973ebd276bc5d2fea093f8c";
+assert(/^[a-f0-9]{40}$/.test(checkpoint), "A verified full Git checkpoint hash is required");
 if (verifyExisting) assert(existsSync(archive) && existsSync(manifest), "Existing checkpoint required for read-only verification");
 else assert(!existsSync(archive) && !existsSync(manifest), "Refusing to overwrite a checkpoint");
 
@@ -58,7 +60,7 @@ SELECT json_build_object('database',current_database(),'serverVersion',current_s
  'internalTransfers',(SELECT coalesce(sum(amount),0) FROM bank_transfers)),
  'invoicePaymentMethods',(SELECT json_agg(q) FROM (SELECT payment_method,count(*) rows,sum(amount) amount FROM invoice_payments GROUP BY payment_method) q),
  'legacyAllocationCandidates',(SELECT count(*) FROM invoice_payments WHERE notes ~ '^Applied from deposit #[0-9]+'),
- 'activeInvoiceSubtotal',(SELECT coalesce(sum(subtotal),0) FROM invoices WHERE status NOT IN ('draft','cancelled')));
+ 'activeInvoiceSubtotal',(SELECT coalesce(sum(subtotal),0) FROM invoices WHERE status NOT IN ('draft','cancelled')))::jsonb;
 COMMIT;`;
 const encodedSql = Buffer.from(sql).toString("base64");
 const snapshotOutput = ssh(`set -eu\nprintf '%s' '${encodedSql}' | base64 -d | psql -X -qAt -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$PGUSER" -d railway`);
@@ -73,7 +75,7 @@ if (verifyExisting) {
   console.log("Verified saved archive checksum and unchanged production financial baseline; read-only, no checkpoint overwritten");
   process.exit(0);
 }
-const remote = "/tmp/codex-accounting-checkpoint-cf29433-20261008.dump";
+const remote = `/tmp/codex-accounting-checkpoint-${checkpoint.slice(0, 7)}.dump`;
 const result = ssh(`set -eu\numask 077\ntest ! -e ${remote}\npg_dump -h 127.0.0.1 -U "$PGUSER" -d railway --format=custom --no-owner --no-acl --file=${remote}\npg_restore --list ${remote} >/dev/null\npg_restore --exit-on-error --file=/dev/null ${remote}\nprintf 'ARCHIVE_SHA256 '\nsha256sum ${remote}\nprintf 'ARCHIVE_BASE64\\n'\nbase64 -w 0 ${remote}\nprintf '\\n'`);
 const hash = result.match(/ARCHIVE_SHA256 ([a-f0-9]{64})/)[1];
 const payload = result.split("ARCHIVE_BASE64\n")[1]?.trim();
@@ -84,8 +86,8 @@ assert.equal(createHash("sha256").update(bytes).digest("hex"), hash, "Archive tr
 writeFileSync(archive, bytes, { flag: "wx" });
 assert.equal(createHash("sha256").update(readFileSync(archive)).digest("hex"), hash);
 writeFileSync(manifest, JSON.stringify({ createdAt: new Date().toISOString(), project, environment, service,
-  checkpoint: "cf29433d0f235aafa973ebd276bc5d2fea093f8c", archive: "production-before-accounting.dump",
+  checkpoint, archive: "production-before-accounting.dump",
   bytes: bytes.length, sha256: hash, verification: "custom archive list and full SQL extraction passed; SHA256 verified remotely and locally; full restore rehearsal pending",
   coverage: "database schema/data, not external document bucket contents or service secrets", baseline }, null, 2) + "\n", { flag: "wx" });
 ssh(`set -eu\ntest -f ${remote}\nrm -- ${remote}`);
-console.log(JSON.stringify({ checkpoint: "cf29433", archiveBytes: bytes.length, sha256: hash, baseline }, null, 2));
+console.log(JSON.stringify({ checkpoint: checkpoint.slice(0, 7), archiveBytes: bytes.length, sha256: hash, baseline }, null, 2));

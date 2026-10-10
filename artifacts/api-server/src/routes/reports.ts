@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { invoiceCashCondition } from "../lib/invoice-cash.js";
 import { loadInvoiceAdjustments } from "../lib/invoice-adjustments.js";
+import { loadStandalonePayments, summarizeStandalonePayments } from "../lib/payment-classification.js";
+import { invoiceAging } from "../lib/financial-reporting.js";
 import { db, containersTable, usersTable, shippingChargesTable, customsChargesTable, terminalChargesTable, deliveryChargesTable, operationsChargesTable, containerExtraChargesTable, invoicesTable, invoiceItemsTable, invoicePaymentsTable, clientsTable, clientDepositsTable, overheadExpensesTable, expensePaymentsTable, banksTable, containerExpensePaymentsTable, bankFundAdditionsTable, bankTransfersTable, creditNotesTable, branchesTable, dutyPaymentTransactionsTable, paymentSchedulePaymentsTable, paymentSchedulesTable, reportSubscriptionsTable, reportDeliveryLogsTable, type ShippingCharges, type CustomsCharges, type TerminalCharges, type DeliveryCharges, type OperationsCharges } from "@workspace/db";
 import { eq, gte, lte, lt, and, inArray, gt, ne, isNotNull, isNull, sql, desc, type SQL, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -1259,11 +1261,16 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
     let totalOverheads = 0;
     const overheadByCategory: Record<string, number> = {};
     const legacyBadDebtPayments = overheadRows.filter(row => row.category === "Bad Debt");
-    const cashOverheadRows = overheadRows.filter(row => row.category !== "Bad Debt");
+    const standalonePayments = await loadStandalonePayments({ branchId: branchScope.id, from: fromDate, to: toDate });
+    const paymentClassification = summarizeStandalonePayments(standalonePayments);
+    const cashOverheadRows = [...overheadRows.filter(row => row.category !== "Bad Debt"),
+      ...standalonePayments.filter(row => row.payment.classification === "operating_expense").map(({ payment }) => ({
+        id: payment.id, amount: payment.amount, paidAt: payment.paidAt, category: `Standalone: ${payment.expenseHead}`,
+      }))];
     for (const r of cashOverheadRows) {
       const amt = parseFloat(r.amount as string ?? "0");
       totalOverheads += amt;
-      const cat = r.category ?? "Other";
+      const cat = r.category?.trim() || "Unclassified overhead (missing source)";
       overheadByCategory[cat] = (overheadByCategory[cat] ?? 0) + amt;
     }
 
@@ -1321,6 +1328,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
       filters: { clientId: clientIdNum },
       costBasis: normalizedCostBasis,
       financialBasis: profitLossBasis(normalizedCostBasis),
+      paymentClassification: { ...paymentClassification, missingOverheadSourceCount: overheadRows.filter(row => !row.category?.trim()).length },
       adjustments: { policy: adjustments.policy, creditNotes: adjustments.creditNotes, badDebts: adjustments.badDebts,
         totalCreditNoteNet: roundMoney(adjustments.creditNotes.reduce((sum, note) => sum + note.netAmount, 0)),
         totalCreditNoteVat: roundMoney(adjustments.creditNotes.reduce((sum, note) => sum + note.vatAmount, 0)),
@@ -2162,17 +2170,7 @@ reportsRouter.get("/reports/invoice-aging", requireAuth, requireBranchMemberOrAb
       if (outstanding <= 0) continue;
 
       const dueDate = inv.dueDate ?? null;
-      let daysOverdue = 0;
-      let bucket: keyof typeof buckets = "current";
-
-      if (dueDate) {
-        const due = new Date(dueDate);
-        daysOverdue = Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysOverdue > 90) bucket = "days90plus";
-        else if (daysOverdue > 60) bucket = "days61to90";
-        else if (daysOverdue > 30) bucket = "days31to60";
-        else if (daysOverdue > 0) bucket = "days1to30";
-      }
+      const { daysOverdue, bucket } = invoiceAging(dueDate, now);
 
       const row: AgingRow = {
         id: inv.id,
@@ -2405,7 +2403,9 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
     for (const payment of dutyPayments) {
       addRecognizedCost(payment.containerId, payment.amount);
     }
-    const overheadsByBranch = sumByBranch(overheadPayments.filter(row => row.category !== "Bad Debt"));
+    const standalonePayments = await loadStandalonePayments({ from: fromDate, to: toDate });
+    const overheadsByBranch = sumByBranch([...overheadPayments.filter(row => row.category !== "Bad Debt"),
+      ...standalonePayments.filter(row => row.payment.classification === "operating_expense").map(row => row.payment)]);
     const adjustments = await loadInvoiceAdjustments({ from: fromDate, to: toDate });
     for (const note of adjustments.creditNotes) {
       revenueByBranch.set(note.branchId, (revenueByBranch.get(note.branchId) ?? 0) - note.netAmount);
@@ -2502,6 +2502,7 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       },
       generatedAt: new Date().toISOString(),
       adjustmentPolicy: adjustments.policy,
+      paymentClassification: { ...summarizeStandalonePayments(standalonePayments), missingOverheadSourceCount: overheadPayments.filter(row => !row.category?.trim()).length },
       undatedBadDebts: adjustments.undatedBadDebts,
       legacyBadDebtPayments: overheadPayments.filter(row => row.category === "Bad Debt").map(row => ({ paymentId: row.id, amount: Number(row.amount) })),
     });

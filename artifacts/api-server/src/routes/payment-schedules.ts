@@ -28,6 +28,7 @@ import { hasAuthority } from "../lib/authorization.js";
 import { deleteDocument, documentExists, getDocument, saveDocument } from "../lib/document-storage.js";
 import { exceedsApprovedPaymentBalance, exceedsOverheadPaymentBalance, isScheduleReadyToComplete } from "../lib/payment-rules.js";
 import { getPaymentScheduleBucket, startOfLocalDay } from "../lib/payment-schedule-buckets.js";
+import { loadStandalonePayments, summarizeStandalonePayments, parsePaymentClassification } from "../lib/payment-classification.js";
 
 export const paymentSchedulesRouter = Router();
 
@@ -393,6 +394,54 @@ paymentSchedulesRouter.post("/payment-schedules", requireAuth, async (req: AuthR
   }
 });
 
+paymentSchedulesRouter.get("/payment-schedules/accounting-review", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const rows = await loadStandalonePayments({ branchId: getBranchScope(req) });
+    return res.json({ ...summarizeStandalonePayments(rows), payments: rows.map(({ payment, vendor, description }) => ({
+      ...payment, amount: Number(payment.amount), vendor, description,
+    })) });
+  } catch (err) {
+    console.error("[payment-schedules] accounting review error", err);
+    return res.status(500).json({ error: "Failed to load accounting review" });
+  }
+});
+
+paymentSchedulesRouter.patch("/payment-schedules/:id/payments/:paymentId/classification", requireAuth, async (req: AuthRequest, res) => {
+  if (!canMarkPaid(req)) return res.status(403).json({ error: "Accounts access required" });
+  let classification: ReturnType<typeof parsePaymentClassification>;
+  try { classification = parsePaymentClassification(req.body); }
+  catch (err) { return res.status(400).json({ error: (err as Error).message }); }
+  if (typeof req.body.classification !== "string" || !classification.classificationReason) return res.status(400).json({ error: "An explicit category and review reason are required, including when retaining Unclassified" });
+  if (!Number.isInteger(req.body.expectedVersion) || req.body.expectedVersion < 0) return res.status(400).json({ error: "expectedVersion is required; reload the payment before reviewing" });
+  const id = Number(req.params.id), paymentId = Number(req.params.paymentId);
+  if (!Number.isInteger(id) || !Number.isInteger(paymentId)) return res.status(400).json({ error: "Invalid payment id" });
+  try {
+    const payment = await db.transaction(async tx => {
+      const [previous] = await tx.select().from(paymentSchedulePaymentsTable)
+        .where(and(eq(paymentSchedulePaymentsTable.id, paymentId), eq(paymentSchedulePaymentsTable.scheduleId, id))).for("update");
+      const scope = getBranchScope(req);
+      if (!previous || !userCanAccessBranch(req, previous.branchId) || (scope !== null && scope !== previous.branchId)) throw new Error("NOT_FOUND");
+      if (previous.classificationVersion !== req.body.expectedVersion) throw new Error("STALE_REVIEW");
+      const [updated] = await tx.update(paymentSchedulePaymentsTable).set({ ...classification,
+        classifiedBy: req.user!.id, classifiedAt: new Date(), classificationVersion: previous.classificationVersion + 1,
+      }).where(eq(paymentSchedulePaymentsTable.id, paymentId)).returning();
+      await tx.insert(paymentScheduleEventsTable).values({ branchId: previous.branchId, scheduleId: id,
+        type: "payment_classified", actorUserId: req.user!.id,
+        comment: JSON.stringify({ paymentId, previous: { classification: previous.classification, expenseHead: previous.expenseHead,
+          classificationReason: previous.classificationReason, version: previous.classificationVersion },
+          next: classification, version: updated.classificationVersion }),
+      });
+      return updated;
+    });
+    return res.json({ ...payment, amount: Number(payment.amount) });
+  } catch (err) {
+    if ((err as Error).message === "NOT_FOUND") return res.status(404).json({ error: "Payment not found in this branch" });
+    if ((err as Error).message === "STALE_REVIEW") return res.status(409).json({ error: "Payment review changed. Reload before saving again." });
+    console.error("[payment-schedules] classify error", err);
+    return res.status(500).json({ error: "Failed to classify payment" });
+  }
+});
+
 paymentSchedulesRouter.get("/payment-schedules/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
@@ -453,6 +502,8 @@ paymentSchedulesRouter.get("/payment-schedules/:id", requireAuth, async (req: Au
         createdAt: formatDate(e.createdAt)!,
       })),
       documents: documents.map((d) => ({ ...d, createdAt: formatDate(d.createdAt)! })),
+      payments: (await db.select().from(paymentSchedulePaymentsTable).where(eq(paymentSchedulePaymentsTable.scheduleId, id)))
+        .map(payment => ({ ...payment, amount: Number(payment.amount) })),
     });
   } catch (err) {
     console.error("[payment-schedules] detail error:", err);
@@ -533,6 +584,9 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/reject", requireAuth, async
 paymentSchedulesRouter.patch("/payment-schedules/:id/pay", requireAuth, async (req: AuthRequest, res) => {
   try {
     if (!canMarkPaid(req)) return res.status(403).json({ error: "Accounts access required" });
+    let classification: ReturnType<typeof parsePaymentClassification>;
+    try { classification = parsePaymentClassification(req.body); }
+    catch (err) { return res.status(400).json({ error: (err as Error).message }); }
     const id = Number(req.params.id);
     const amount = Number(req.body.amount);
     if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ error: "Payment amount must be greater than zero" });
@@ -596,6 +650,10 @@ paymentSchedulesRouter.patch("/payment-schedules/:id/pay", requireAuth, async (r
           notes: req.body.notes || req.body.comment || `Paid via payment schedule #${updatedSchedule.id}`,
           paidAt,
           recordedBy: req.user?.id ?? null,
+          ...classification,
+          classifiedBy: classification.classificationReason ? req.user!.id : null,
+          classifiedAt: classification.classificationReason ? new Date() : null,
+          classificationVersion: classification.classificationReason ? 1 : 0,
         });
       }
       await tx.insert(paymentScheduleEventsTable).values({

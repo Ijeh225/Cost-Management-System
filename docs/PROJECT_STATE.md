@@ -2,6 +2,91 @@
 
 ## Current Work Register - Authoritative as of 2026-10-10
 
+### Accounting Isolated Acceptance Complete - 2026-10-10 02:19 WAT
+
+- All43 distinct accounting regression cases have passing isolated evidence
+  across the completed full/selective runs. Full run42PASS/1fixture failure:
+  two permission fixtures reused the same email. Made that email branch-unique;
+  final evidence/concurrency and non-finance checks2PASS/41filtered. This is
+  combined acceptance, not a claim of one uninterrupted43PASS full-suite run.
+- Actual aging boundaries, categories, original paid-date recognition, cash
+  non-duplication, source retention, deposit/credit/VAT/write-off/concurrency,
+  active branch and role restrictions covered. Namespace counts restored and
+  private tunnel closed after both runs. Final unit248PASS/build PASS retained.
+- Protected code/verified backup retained. Runtime publication/deployment and
+  controlled live acceptance now next; no live success claim at this milestone.
+
+### Final Local Release Checks - 2026-10-10 02:16 WAT
+
+- Final current-source unit suite248PASS/3existing skips; full typecheck and
+  frontend/API Railway build PASS. Review requires an explicit category/reason
+  even when retaining Unclassified; the payment dialog resets between actions,
+  so a previous payment's category/evidence cannot silently carry forward.
+- Verified protected archive checksum and unchanged production financial
+  baseline again. Exact old deployment84ea03b is still active. Full43-case
+  isolated run continues; no release or live write acceptance claimed yet.
+
+### Historical Payment Evidence Reviewed - 2026-10-10 02:04 WAT
+
+- Read-only production source review: standalone payment1/schedule9/NGN1 is
+  explicitly a SCHED-001 dummy reconciliation test; payment2/schedule7/NGN500
+  is an owner-authorised historical reconstruction from Paid event22. Its
+  LEGACY-RECON reference is not an original bank reference. Neither has supporting
+  documents or an established expense/asset/advance/loan purpose. Keep both
+  unclassified; do not relabel as operating expense just because paid.
+- Three original overhead facts1/2/3 (200,000/10,000/10,000,000) reference missing
+  parent expense4. NGN10,210,000 metadata loss now source-confirmed, not merely
+  suspected blank narration. Costs/cash retained with explicit missing-source
+  label; new destructive deletion blocked. No fabricated recovery of old head.
+- Corrected migration isolated selective case PASS (1/42filtered), namespace
+  restored/tunnel closed. Full43-case rerun underway; no release/live pass yet.
+
+### Accounting Verification Continued - 2026-10-10 02:01 WAT
+
+- Final safe unit suite40files/248PASS/3existing network skips; final full
+  typecheck/frontend/API Railway build PASS. Invoice status now uses the same
+  Lagos calendar as AR/print, including the UTC/Nigeria midnight boundary.
+- First full isolated run hit600s process cap after29PASS and one failed TEMP
+  migration fixture (missing temporary users FK target). No production defect
+  inferred from the TEMP-table failure. Corrected fixture; runner cap1200s.
+- Process timeout prevented afterAll; recovered only exact interrupted suffix
+  1791593359136-1ps88ilb23z (32run-owned branches), namespace counts restored,
+  tunnel closed. Recovery was not a passing test suite. Re-test in progress.
+- New bounded live acceptance extends existing helper, not duplicate old writes.
+  Historical evidence inspection/review remains release-gated; no live writes yet.
+
+### ACCT-006/007 Protection and Implementation - 2026-10-10 01:50 WAT
+
+- New protected annotated tag checkpoint-before-payment-classification-aging-2026-10-10
+  targets84ea03b; old accounting checkpoint remains unchanged. Tag not yet pushed.
+- Private production pg_dump283,787bytes, SHA256
+  6fdfc8e68bc8d2e5d302b83e079e5fb21294b316092ffa15553c27373460b236;
+  archive/list inspection and complete isolated restore verified62tables and
+  captured financial baseline. Temporary restore database removed; live facts unchanged.
+- Added isolated reproductions: missing classification route HTTP404 confirmed;
+  existing AR/print buckets already separate (initial API boundary case passes),
+  Dashboard source combines61-90 and90+. Do not claim the APIs had combined buckets.
+- Implementing per-fact evidence/category/reviewer/version and transactional
+  schedule audit, finance-only review queue, source-dated P&L/branch recognition,
+  explicit unclassified/missing-source warnings, paid-overhead metadata protection,
+  shared Lagos-calendar aging and five Dashboard buckets. No duplicate cash facts.
+- Typecheck PASS. Full unit and isolated all-seven accounting regressions currently
+  running; no release/live success claimed yet. Historical501 not reclassified.
+
+### Accounting Steps 4/5 Authorised - 2026-10-10 01:40 WAT
+
+- User authorises ACCT-006 standalone classification, ACCT-007 aging, isolated
+  regression across all seven corrections, deployment and controlled live proof.
+- Prior ACCT-001..005 closures preserved. Clean master84ea03b verified.
+- Reuse immutable standalone payment facts and schedule event audit; no second
+  ledger, GL or automatic historical classification. Unsupported legacy entries
+  stay unclassified/review-required. Expense only affects management P&L after
+  supported category/head/evidence; asset/advance/loan/other non-expense do not.
+- Trace shared report sources and protect paid overhead metadata against deletion.
+  Additive migration and current backup/checkpoint verification before release.
+- IN PROGRESS; no code/test/deployment/live success claimed for these two fixes.
+
+
 ### Accounting Step 3 Live Write Acceptance Passed - 2026-10-10 01:26 WAT
 
 - ACCT-004/005 CLOSED / LIVE ACCEPTED within their correction scope. Existing

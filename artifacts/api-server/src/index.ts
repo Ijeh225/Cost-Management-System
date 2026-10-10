@@ -6,6 +6,7 @@ import { runScheduledReportDelivery } from "./lib/report-delivery";
 import { runScheduledAiProactiveBriefings } from "./lib/ai-proactive-intelligence";
 import { getDocumentStorageConfigurationError } from "./lib/document-storage";
 import { ensureInvoicePaymentReversalSchema, ensureInvoiceCashSettlementSchema } from "./lib/invoice-payment-reversal-schema";
+import { ensurePaymentClassificationSchema } from "./lib/payment-classification-schema";
 import { ensureShipmentSchema } from "./lib/shipment-schema";
 
 async function ensureMigrationsTable() {
@@ -788,6 +789,9 @@ async function runStartupMigrations() {
     });
     await runMigration("invoice_cash_settlements_v1", async () => {
       await ensureInvoiceCashSettlementSchema(pool);
+    });
+    await runMigration("standalone_payment_classification_v1", async () => {
+      await ensurePaymentClassificationSchema(pool);
     });
     await runMigration("ai_assistant_foundation_v1", async () => {
       await pool.query(`

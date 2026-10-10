@@ -1,4 +1,5 @@
-import { pgTable, serial, text, numeric, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, integer, timestamp, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { usersTable } from "./users";
 import { branchesTable } from "./branches";
 import { overheadExpensesTable } from "./overhead-expenses";
@@ -70,8 +71,18 @@ export const paymentSchedulePaymentsTable = pgTable("payment_schedule_payments",
   notes: text("notes"),
   paidAt: timestamp("paid_at").notNull().defaultNow(),
   recordedBy: integer("recorded_by").references(() => usersTable.id, { onDelete: "set null" }),
+  classification: text("classification").notNull().default("unclassified"),
+  expenseHead: text("expense_head"),
+  classificationReason: text("classification_reason"),
+  classifiedBy: integer("classified_by").references(() => usersTable.id, { onDelete: "set null" }),
+  classifiedAt: timestamp("classified_at"),
+  classificationVersion: integer("classification_version").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, table => [check("schedule_payment_classification_check", sql`
+  ${table.classification} IN ('unclassified','operating_expense','asset','advance','loan_repayment','other_non_expense')
+  AND (${table.classification}='unclassified' OR (coalesce(length(trim(${table.classificationReason})),0)>0 AND ${table.classifiedAt} IS NOT NULL))
+  AND (${table.classification}<>'operating_expense' OR coalesce(length(trim(${table.expenseHead})),0)>0)
+`)]);
 
 export const paymentScheduleDocumentsTable = pgTable("payment_schedule_documents", {
   id: serial("id").primaryKey(),

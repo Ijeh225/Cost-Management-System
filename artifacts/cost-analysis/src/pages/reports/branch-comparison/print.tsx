@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { PaymentClassificationNote } from "@/components/payment-classification-note";
+import type { PaymentClassificationSummary } from "@workspace/api-client-react";
 import { customFetch } from "@workspace/api-client-react";
 
 const fmt = (n: number) =>
@@ -24,6 +26,7 @@ type Row = {
 };
 
 type Response = {
+  paymentClassification?: PaymentClassificationSummary;
   period: { from: string | null; to: string | null };
   rows: Row[];
   totals: { containers: number; revenue: number; costs: number; grossProfit: number; overheads: number; badDebts?: number; netProfit: number; outstandingReceivables: number };
@@ -267,6 +270,7 @@ export default function BranchComparisonPrint() {
 
         <div className="section-heading">Net Profit Reconciliation</div>
         <p className="note">{data.adjustmentPolicy}</p>
+        <PaymentClassificationNote data={data.paymentClassification} />
         {!!data.legacyBadDebtPayments?.length && <p className="note">Review required: {data.legacyBadDebtPayments.length} historical Bad Debt cash postings remain in cash history but are excluded from paid overhead to avoid counting the loss twice.</p>}
         <table><thead><tr><th>Branch</th><th className="right">Gross Profit</th><th className="right">Paid Overhead</th><th className="right">Non-cash Bad Debt</th><th className="right">Net Profit</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row.branchId}><td>{row.branchName}</td><td className="right">{fmt(row.grossProfit)}</td><td className="right">{fmt(row.overheads)}</td><td className="right">{fmt(row.badDebts ?? 0)}</td><td className="right">{fmt(row.netProfit)}</td></tr>)}</tbody>

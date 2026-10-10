@@ -7,7 +7,7 @@ import { toE164Nigerian, sendWhatsAppTemplate, assertBranchWhatsAppSenderSupport
 import { getEffectiveInvoiceStatus, isInvoiceCollectable, isInvoiceEditable } from "../lib/invoice-status.js";
 import { getReversibleOverpaymentCredit } from "../lib/invoice-payment-reversal.js";
 import { settlementAmount, settlementRequestKey } from "../lib/invoice-cash.js";
-import { creditNoteSplit, financialDateKey } from "../lib/financial-reporting.js";
+import { creditNoteSplit, financialDateKey, invoiceAging } from "../lib/financial-reporting.js";
 
 const router = Router();
 
@@ -489,14 +489,7 @@ router.get("/invoices/accounts-receivable", requireAuth, async (req: AuthRequest
 
     function agingKey(dueDate: string | null, outstanding: number): keyof AgingBuckets | null {
       if (outstanding <= 0) return null;
-      if (!dueDate) return "current";
-      const due = new Date(dueDate);
-      const overdueDays = Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-      if (overdueDays <= 0) return "current";
-      if (overdueDays <= 30) return "days1to30";
-      if (overdueDays <= 60) return "days31to60";
-      if (overdueDays <= 90) return "days61to90";
-      return "days90plus";
+      return invoiceAging(dueDate, now).bucket;
     }
 
     for (const inv of rows) {

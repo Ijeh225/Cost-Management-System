@@ -1,4 +1,5 @@
 import { useGetProfitLoss, type ProfitLossResponse } from "@workspace/api-client-react";
+import { PaymentClassificationNote } from "@/components/payment-classification-note";
 
 const fmt = (n: number) =>
   "\u20a6" + Number(n).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -55,6 +56,13 @@ function downloadCsv(data: ProfitLossResponse, filename: string) {
   lines.push(`Revenue adjustments,Credit-note net reductions,${(data.adjustments?.totalCreditNoteNet ?? 0).toFixed(2)}`);
   lines.push(`Profit,Net Profit,${data.netProfit.toFixed(2)}`);
   lines.push(`Profit,Net Margin %,${data.netMarginPct.toFixed(2)}`);
+  if (data.paymentClassification) {
+    const review = data.paymentClassification;
+    lines.push(`Accounting policy,${esc(review.policy)}`);
+    lines.push(`Accounting review,Unclassified standalone cash excluded from P&L,${review.totals.unclassified.toFixed(2)}`);
+    lines.push(`Accounting review,Unclassified standalone payment count,${review.unclassifiedCount}`);
+    lines.push(`Accounting review,Missing overhead source/category count - costs retained,${review.missingOverheadSourceCount ?? 0}`);
+  }
   lines.push("");
   lines.push("Revenue by Client");
   lines.push("Client,Invoices,Revenue");
@@ -196,6 +204,7 @@ export default function ProfitLossPrint() {
             Revenue is recognised from <strong>issued invoices</strong> (net of VAT). Draft invoices are excluded.
             Net profit deducts <strong>actual paid branch overheads and separate non-cash bad debts</strong> from gross profit.
             <p>{data.adjustments?.policy}</p>
+            <PaymentClassificationNote data={data.paymentClassification} />
             {!!data.adjustments?.undatedBadDebts.length && <p>Review required: {data.adjustments.undatedBadDebts.length} legacy write-offs have no audited recognition date and are excluded from dated loss totals.</p>}
             {!!data.adjustments?.legacyBadDebtPayments?.length && <p>Review required: {data.adjustments.legacyBadDebtPayments.length} historical cash payments labelled Bad Debt remain in cash records but are excluded from overhead here to avoid double-counting non-cash losses. Review their classification and any required reversal.</p>}
             Financial Dashboard matches this Actual Paid P&amp;L. Operations Dashboard and Analytics retain their labelled budgeted estimates.

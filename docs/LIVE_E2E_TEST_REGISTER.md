@@ -2,6 +2,64 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-10
 
+### Accounting Isolated Acceptance Complete - 2026-10-10 02:19 WAT
+
+- All43 distinct cases passed across full/selective execution: full42PASS,
+  one duplicate-email fixture failure corrected; final evidence/concurrency
+  and separate staff2PASS/41filtered. Not a single full43PASS run claim.
+- No app defect inferred from fixture collision. Both runs restored namespace
+  counts and closed private tunnel. Unit248PASS/3existing skips/build PASS.
+- New ACCT-006/007 deployment and controlled live acceptance still pending.
+
+### Final Local Release Checks - 2026-10-10 02:16 WAT
+
+- Final unit248PASS/3existing skips and complete production build/typecheck PASS.
+  Explicit evidence required for reviews, including retaining unknown purpose;
+  separate payment forms reset classification/evidence rather than copying it.
+- Existing private archive checksum/unchanged financial baseline reverified.
+  Full43-case isolated run still in progress; old84ea03b remains deployed.
+
+### Historical Source Review - 2026-10-10 02:04 WAT
+
+- Production READ ONLY: payment1/schedule9/NGN1 dummy reconciliation; payment2/
+  schedule7/NGN500 reconstructed from Paid event22, not new cash. No supporting
+  docs or supported business-purpose classification. Both stay unclassified.
+- Orphan overhead facts1/2/3 reference missing expense4, total10,210,000. Loss of
+  source category/description proved; preserve cash/costs, label missing evidence.
+- Corrected legacy migration case1PASS/42filtered; cleanup counts/tunnel PASS.
+  Full43-case isolated rerun in progress; deployment/live checks still pending.
+
+### Accounting Verification Continued - 2026-10-10 02:01 WAT
+
+- Unit40files/248PASS/3existing skips; complete final Railway build/typecheck PASS.
+- First all-seven isolated run incomplete:29PASS, one failed migration test due
+  to TEMP FK target, process600s timeout before completion/afterAll. No suite pass.
+- Fixed TEMP users fixture and extended process cap1200s. Namespace-only recovery
+  of exact suffix1791593359136-1ps88ilb23z removed32run-owned branches; counts
+  restored and tunnel closed. Recovery output is not test acceptance.
+- Migration selective re-test, full regression, publication and live proof remain.
+
+### ACCT-006/007 Protection and Reproduction - 2026-10-10 01:50 WAT
+
+- Checkpoint84ea03b/new protected tag and verified private full DB backup/restore
+  PASS;62tables and financial baseline verified, temporary DB cleaned up.
+- Pre-fix isolated selective run: classification404 FAIL as expected; existing
+  AR/print five-bucket case PASS,32filtered cases not run. Dashboard61-90+90+
+  merge confirmed in source. Later pure tests exercise Lagos-midnight boundaries.
+- Additive migration, classification/review API/UI and cash-independent P&L
+  mapping implemented locally, current typecheck PASS. Unit/full isolated tests
+  running; deployment and new live checks still outstanding. No historical guess.
+
+### Accounting Steps 4/5 Authorised - 2026-10-10 01:40 WAT
+
+- ACCT-006/007 implementation, isolated all-seven regression and release/live
+  acceptance authorised. Prior closures/fixtures retained; no duplicate live writes.
+- Classify each standalone payment with supporting reason and auditable review;
+  existing501 cannot be guessed as overhead. Shared Lagos-calendar aging and
+  separate 61-90/90+ display to reconcile Dashboard/AR/print.
+- IN PROGRESS, no pass claimed. New session: SESSION_SUMMARIES/2026-10-10-payment-classification-aging.md.
+
+
 ### Accounting Step 3 Live Write Acceptance Passed - 2026-10-10 01:26 WAT
 
 - Guarded existing acceptance utility Step3 mode ran once, exit0. Client11/job35/

@@ -5,6 +5,8 @@ import { useBranchScope } from "@/components/layout/branch-provider";
 import { BranchChip } from "@/components/layout/branch-chip";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/format";
+import { AccountingReview, ClassificationFields } from "./accounting-review";
+import type { PaymentClassificationBody } from "@workspace/api-client-react";
 import {
   useAddPaymentScheduleComment,
   useApprovePaymentSchedule,
@@ -234,7 +236,7 @@ function ActionDialogView({
   action: ActionDialog;
   onClose: () => void;
   isPending: boolean;
-  onSubmit: (payload: { amount?: number; scheduleDate?: string; comment?: string; paymentMethod?: "cash" | "bank"; bankId?: number | null; paidAt?: string; notes?: string }) => void;
+  onSubmit: (payload: Partial<PaymentClassificationBody> & { amount?: number; scheduleDate?: string; comment?: string; paymentMethod?: "cash" | "bank"; bankId?: number | null; paidAt?: string; notes?: string }) => void;
 }) {
   const [amount, setAmount] = useState("");
   const [scheduleDate, setScheduleDate] = useState(todayInputValue());
@@ -243,6 +245,7 @@ function ActionDialogView({
   const [bankId, setBankId] = useState("");
   const [paidAt, setPaidAt] = useState(todayInputValue());
   const [notes, setNotes] = useState("");
+  const [classification, setClassification] = useState<PaymentClassificationBody>({ classification: "unclassified" });
   const { data: banks = [] } = useListBanks();
 
   if (!action) return null;
@@ -263,6 +266,7 @@ function ActionDialogView({
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     onSubmit({
+      ...(action.type === "pay" && !action.schedule.overheadExpenseId ? classification : {}),
       amount: needsAmount ? Number(amount) : undefined,
       scheduleDate: needsDate ? scheduleDate : undefined,
       comment: comment.trim() || undefined,
@@ -301,6 +305,7 @@ function ActionDialogView({
           )}
           {action.type === "pay" && (
             <>
+              {!action.schedule.overheadExpenseId && <ClassificationFields prefix="new-payment" value={classification} onChange={setClassification} />}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Payment Method</Label>
@@ -574,7 +579,7 @@ export default function PaymentSchedulesPage() {
     });
   };
 
-  const handleActionSubmit = (payload: { amount?: number; scheduleDate?: string; comment?: string; paymentMethod?: "cash" | "bank"; bankId?: number | null; paidAt?: string; notes?: string }) => {
+  const handleActionSubmit = (payload: Partial<PaymentClassificationBody> & { amount?: number; scheduleDate?: string; comment?: string; paymentMethod?: "cash" | "bank"; bankId?: number | null; paidAt?: string; notes?: string }) => {
     if (!action) return;
     const id = action.schedule.id;
     const options = {
@@ -599,6 +604,9 @@ export default function PaymentSchedulesPage() {
       id,
       data: {
         amount: payload.amount ?? 0,
+        classification: payload.classification,
+        expenseHead: payload.expenseHead,
+        classificationReason: payload.classificationReason,
         paymentMethod: payload.paymentMethod ?? "bank",
         bankId: payload.paymentMethod === "bank" ? payload.bankId ?? null : null,
         paidAt: payload.paidAt,
@@ -797,6 +805,7 @@ export default function PaymentSchedulesPage() {
           </CardContent>
         </Card>
 
+      <AccountingReview canReview={canAccountsPay} onOpenSchedule={setDetailId} />
       <CreateScheduleDialog open={createOpen} onOpenChange={setCreateOpen} onSubmit={handleCreate} isPending={createSchedule.isPending || createdUpload != null} />
       <ScheduleDetailDialog
         scheduleId={detailId}
@@ -805,7 +814,7 @@ export default function PaymentSchedulesPage() {
         canMdApprove={canMdApprove}
         canAccountsPay={canAccountsPay}
       />
-      <ActionDialogView action={action} onClose={() => setAction(null)} isPending={pendingAction} onSubmit={handleActionSubmit} />
+      <ActionDialogView key={action ? `${action.schedule.id}:${action.type}` : "closed"} action={action} onClose={() => setAction(null)} isPending={pendingAction} onSubmit={handleActionSubmit} />
     </div>
   );
 }

@@ -325,13 +325,23 @@ overheadExpensesRouter.patch("/overhead-expenses/:id", requireBranchAdminOrAbove
     if (description !== undefined) updates.description = description;
     if (amount !== undefined) updates.amount = String(amount);
     if (reference !== undefined) updates.reference = reference || null;
-    const [row] = await db.update(overheadExpensesTable).set(updates)
-      .where(eq(overheadExpensesTable.id, id)).returning();
+    const row = await db.transaction(async tx => {
+      const [locked] = await tx.select().from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id)).for("update");
+      if (!locked) return null;
+      const [payment] = await tx.select({ id: expensePaymentsTable.id }).from(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, id)).limit(1);
+      const [schedule] = await tx.select({ id: paymentSchedulesTable.id }).from(paymentSchedulesTable).where(eq(paymentSchedulesTable.overheadExpenseId, id)).limit(1);
+      const [topup] = await tx.select({ id: overheadExpenseTopupsTable.id }).from(overheadExpenseTopupsTable).where(eq(overheadExpenseTopupsTable.expenseId, id)).limit(1);
+      if ((payment || schedule || topup || locked.paidAt) && ["category", "description", "amount", "reference"].some(key =>
+        key in updates && String(updates[key] ?? "") !== String(locked[key as keyof typeof locked] ?? ""))) throw new Error("RETAIN_EXPENSE_HISTORY");
+      const [updated] = await tx.update(overheadExpensesTable).set(updates).where(eq(overheadExpensesTable.id, id)).returning();
+      return updated;
+    });
     if (!row) { res.status(404).json({ error: "Expense not found" }); return; }
     const [built] = await buildExpensesWithPayments([row]);
     return res.json(built);
   } catch (err) {
     console.error("PATCH /overhead-expenses/:id error:", err);
+    if ((err as Error).message === "RETAIN_EXPENSE_HISTORY") return res.status(409).json({ error: "Keep the source category and description for posted or scheduled expenses. Use documented top-ups for additional amounts." });
     return res.status(500).json({ error: "Server error" });
   }
 });
@@ -343,10 +353,19 @@ overheadExpensesRouter.delete("/overhead-expenses/:id", requireBranchAdminOrAbov
     const [existing] = await db.select({ branchId: overheadExpensesTable.branchId, category: overheadExpensesTable.category }).from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
     if (!existing || !userCanAccessBranch(_req, existing.branchId)) { res.status(404).json({ error: "Expense not found" }); return; }
     if (existing.category === "Bad Debt") return res.status(409).json({ error: "Retain invoice bad-debt evidence and audit history" });
-    await db.delete(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
+    await db.transaction(async tx => {
+      const [locked] = await tx.select().from(overheadExpensesTable).where(eq(overheadExpensesTable.id, id)).for("update");
+      if (!locked) return;
+      const [payment] = await tx.select({ id: expensePaymentsTable.id }).from(expensePaymentsTable).where(eq(expensePaymentsTable.expenseId, id)).limit(1);
+      const [schedule] = await tx.select({ id: paymentSchedulesTable.id }).from(paymentSchedulesTable).where(eq(paymentSchedulesTable.overheadExpenseId, id)).limit(1);
+      const [topup] = await tx.select({ id: overheadExpenseTopupsTable.id }).from(overheadExpenseTopupsTable).where(eq(overheadExpenseTopupsTable.expenseId, id)).limit(1);
+      if (payment || schedule || topup || locked.paidAt) throw new Error("RETAIN_EXPENSE_HISTORY");
+      await tx.delete(overheadExpensesTable).where(eq(overheadExpensesTable.id, id));
+    });
     return res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /overhead-expenses/:id error:", err);
+    if ((err as Error).message === "RETAIN_EXPENSE_HISTORY") return res.status(409).json({ error: "Cannot delete an expense with payment, schedule or top-up history; retain its accounting evidence." });
     return res.status(500).json({ error: "Server error" });
   }
 });

@@ -14,3 +14,5 @@ process.env.NODE_ENV = "test";
 const { pool } = await import("@workspace/db");
 const { ensureInvoicePaymentReversalSchema } = await import("../lib/invoice-payment-reversal-schema.js");
 await ensureInvoicePaymentReversalSchema(pool);
+const { ensurePaymentClassificationSchema } = await import("../lib/payment-classification-schema.js");
+await ensurePaymentClassificationSchema(pool);
