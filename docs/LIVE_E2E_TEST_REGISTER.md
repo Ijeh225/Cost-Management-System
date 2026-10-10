@@ -2,6 +2,24 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-10
 
+### Accounting Step 3 Deployment and Read-Only Acceptance - 2026-10-10 01:00 WAT
+
+- a50c321 committed/pushed, remote hash verified. Exact Railway deployment
+  47eb5a30-30e0-4892-82a7-a5797a094287 SUCCESS, provider/public healthcheck PASS.
+  Fresh owner browser reload verifies deployed Financial View, P&L print,
+  VAT Summary print, Branch Comparison print and preserved invoice #15.
+- Existing CN #1 (700) reduces all-time revenue4,001->3,301; Q4 taxable
+  1,000->300. P&L/Financial View/Branch totals: costs701, gross2,600,
+  overhead15,710,302, losses0, net -15,707,702. VAT Summary same net3,301.
+  Invoice settlement600/outstanding400/history retained; displayed bank #3
+  stays1,599. No live financial write or duplicate fixture created this turn.
+- ACCT-004 bounded existing zero-VAT note read-only check PASS, not a new
+  proportional nonzero-VAT mutation test. ACCT-005 live write-off NOT TESTED;
+  twelve isolated cases remain its mutation/concurrency proof, not live closure.
+- Remaining acceptance: controlled live write-off and nonzero-VAT note if requested.
+  Presentation observations retained for triage: legacy VAT filing header and
+  literal escape dash in branch print, not a newly reproduced calculation error.
+
 ### Accounting Step 3 Release Authorised - 2026-10-10 00:53 WAT
 
 - User explicitly authorised push/deploy after review of the recognition rules.
@@ -167,8 +185,8 @@ Five existing unit/mocked-HTTP files passed 16 tests; not a fresh DB concurrency
 | ACCT-002 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | Source-linked allocation/retry changes invoice balances but not Bank/Ledger/Cash Flow; reversal restores available deposit. Concurrency remains independently isolated-verified. |
 | ACCT-003 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | Credit note/client credit and their non-cash reversals do not create cash/current/opening movements; invoice/AR settlement remains accurate. |
 | ACCT-DEPLOY-001 | High | CLOSED / LIVE ACCEPTED 2026-10-08 | First release skipped new fields under old migration. New independently versioned additive migration applied; fields/index and authenticated finance reads verified. |
-| ACCT-004 | High | FIXED LOCALLY / ISOLATED VERIFIED; policy/release/live gates pending | Shared dated proportional net/VAT adjustments; cumulative/concurrent note limits, penny rounding, paid-invoice credit and Lagos periods verified. Original live failure not yet re-tested. |
-| ACCT-005 | High | FIXED LOCALLY / ISOLATED VERIFIED; policy/release/live gates pending | Audited non-cash loss once; outstanding-only write-off locks; immutable non-payable evidence; historical cash/dates flagged; due-today/settled refusal verified. No automatic VAT relief. Original live failure not yet re-tested. |
+| ACCT-004 | High | DEPLOYED / ISOLATED VERIFIED; existing-note live read-only PASS | a50c321 exact deployment SUCCESS; preserved CN700 reflected in Dashboard/P&L/VAT/Branch. Nonzero-VAT/new mutation live acceptance remains pending; isolated cases cover proportional rounding/date/concurrency. |
+| ACCT-005 | High | DEPLOYED / ISOLATED VERIFIED; live write-off acceptance pending | Audited non-cash loss once and non-payable evidence guards verified isolated. Live UI displays loss0; no new live write-off created and no live mutation pass claimed. |
 | ACCT-006 | High | OPEN classification gap; source and live population separation | NGN501 standalone schedule payments are in cash/bank/ledger, with no accounting head/P&L mapping. Do not presume they are all operating expenses; require classification/review. |
 | ACCT-007 | Medium | OPEN; live read-only and source confirmed | Dashboard combines 61-90 with 90+ and labels both 90d+. Existing invoice is 68 days overdue/AR 61-90, but Dashboard says 90d+. Totals unchanged. |
 

@@ -1,5 +1,14 @@
 # Credit Note and Bad Debt Corrections
 
+Current release 2026-10-10 01:00 WAT: a50c321c1b3b9f9725c8ee952dd2bb8d54abccfa
+committed/pushed; deployment47eb5a30-30e0-4892-82a7-a5797a094287 SUCCESS.
+Provider/public healthcheck PASS. Existing CN700 gives net revenue3,301,
+costs701/gross2,600/overhead15,710,302/loss0/net -15,707,702 matching live
+Financial View/P&L/Branch; VAT print same net and Q4 taxable300. Invoice #15
+600 settled/400 outstanding/history preserved; displayed bank balances unchanged.
+No new live posting. Nonzero-VAT/new-note and actual write-off live acceptance
+remain pending; isolated proof retained. Earlier local-only status below historical.
+
 Release update 2026-10-10 00:53 WAT: user explicitly instructed push/deploy
 after the local recognition-rules summary. Release of that management convention
 is authorised. Historical pending-policy/local status below records the earlier

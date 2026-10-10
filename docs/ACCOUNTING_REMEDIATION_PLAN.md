@@ -1,5 +1,11 @@
 # Accounting Remediation and Feature Plan
 
+Current 2026-10-10 01:00 WAT: Step 3 a50c321 committed/pushed and exact
+Railway deployment47eb5a30 SUCCESS/healthy. Existing-note read-only finance
+reconciliation PASS; live write-off/nonzero-VAT mutation acceptance pending.
+Recognition rules authorised for management-report release, not statutory tax
+certification. Twelve isolated cases and prior tests retained. Later steps proposed.
+
 Release authorisation 2026-10-10 00:53 WAT: user instructed push and deploy
 Step 3 after the local rules/status summary. Implemented management convention
 authorised for release; no statutory certification. Deployment in progress.

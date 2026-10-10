@@ -1,5 +1,27 @@
 # Credit Notes and Bad Debts
 
+## 2026-10-10 01:00 WAT - Deployed and Read-Only Live Checks
+
+- User-authorised runtime a50c321c1b3b9f9725c8ee952dd2bb8d54abccfa committed,
+  pushed and remote verified. Exact Railway production deployment
+  47eb5a30-30e0-4892-82a7-a5797a094287 SUCCESS; build/provider healthcheck,
+  public healthz and server startup verified. No new migration or historical edit.
+- Switched existing controlled staff browser session to supplied owner login for
+  finance inspection; credentials not saved. Owner remains signed in. Read-only
+  Financial View/P&L/VAT/Branch and retained invoice #15 inspected after reload.
+- Existing700 credit note now reflected in net revenue3,301 (was4,001);
+  costs701/gross2,600/overhead15,710,302/loss0/net -15,707,702 agree.
+  Invoice600 settled/400 outstanding and history preserved; displayed bank
+  balances unchanged. VAT Q4 taxable300, existing VAT0. No new live transaction.
+- ACCT-004 existing-note bounded acceptance PASS; nonzero-VAT/new-note live
+  mutation still untested. ACCT-005 deployed/isolated verified, live write-off
+  not exercised. Keep those evidence boundaries; do not mark both live closed.
+- Protected checkpoint cf29433 verified. Follow-up records commit/push records
+  release proof. Non-blocking VAT legacy filing header/branch escaped dash and
+  provider railway.toml deprecation warning retained for triage, not changed.
+- Exact next if requested: controlled live write-off/nonzero-VAT acceptance,
+  then later approved accounting steps. No need to repeat earlier cash writes.
+
 ## 2026-10-10 00:53 WAT - Push and Deployment Authorised
 
 - User instructed push and deploy following local completion/policy summary.

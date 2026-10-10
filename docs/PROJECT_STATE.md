@@ -2,6 +2,35 @@
 
 ## Current Work Register - Authoritative as of 2026-10-10
 
+### Accounting Step 3 Deployed - 2026-10-10 01:00 WAT
+
+- Runtime code/records commit a50c321c1b3b9f9725c8ee952dd2bb8d54abccfa
+  committed and pushed to origin/master; remote hash verified. Railway production
+  deployment 47eb5a30-30e0-4892-82a7-a5797a094287 SUCCESS for that exact commit.
+  Provider healthcheck succeeded; public /api/healthz returns status ok; startup
+  logs confirm server listening. No new Step 3 schema migration introduced.
+- Fresh owner login and browser reload confirm updated Financial View and
+  P&L/VAT Summary/Branch Comparison print. Existing CN #1,700 reduces all-time
+  net revenue from 4,001 to 3,301; actual costs701, overhead15,710,302,
+  non-cash losses0, gross2,600 and net -15,707,702 agree across finance views.
+  VAT taxable Q4 reduces1,000 to300, with zero VAT in existing dummy fixture.
+- Preserved invoice #15 total1,000, settlement600, outstanding400, CN700,
+  original history. Bank balances displayed unchanged (test bank #3 1,599).
+  No new live financial record, external payment, message, deletion or write-off.
+- ACCT-004 DEPLOYED / bounded existing-note read-only acceptance PASS;
+  nonzero-VAT and new-note mutation proof remain isolated evidence only.
+  ACCT-005 DEPLOYED / ISOLATED VERIFIED; actual new live write-off acceptance
+  remains pending. Do not equate zero-loss UI display with a live write-off pass.
+- Protected tag still resolves cf29433. Existing archives unchanged. Follow-up
+  records commit/push captures this release; code tests not repeated unnecessarily.
+- Non-blocking observations to triage: VAT print still has legacy "For FIRS
+  Filing" header despite review disclaimer; branch print footer renders literal
+  escape text for a dash. Provider warns existing railway.toml config support
+  ends 2026-12-01. No unrelated display/config migration performed this release.
+- Exact next if acceptance requested: bounded controlled live bad-debt test and
+  nonzero-VAT note proof, with explicit retained IDs and unchanged cash checks.
+  ACCT-006/007/full GL remain outside the completed Step 3 release.
+
 ### Accounting Step 3 Release Authorised - 2026-10-10 00:53 WAT
 
 - User explicitly instructed push and deploy after the local-fix/policy summary.
