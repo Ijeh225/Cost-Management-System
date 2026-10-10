@@ -2,6 +2,38 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-10
 
+### Live UI Follow-up - 2026-10-10 02:30 WAT
+
+- Financial View corrected totals/warnings PASS; Operations estimate source
+  omitted standalone expense1, now corrected locally using existing reader.
+- Extended isolated expense/reclassification/dashboard test1PASS/42filtered;
+  stats initially500 because isolated schema lacked CAP-01 shipment columns.
+  Reused production ensureShipmentSchema in test setup, no product workaround.
+  Cash unchanged; cleanup/tunnel/build PASS. Follow-up release still pending.
+- Queue all categories/reviewer/evidence and source audit timeline PASS. Required
+  evidence/head blocks empty submission; dialog labels/title/no Dialog warnings
+  verified without saved UI mutations. Mobile/print/final release proof next.
+
+### Classification Release and Live API Acceptance - 2026-10-10 02:24 WAT
+
+- Exact01e9de4/4900a0fc SUCCESS, /api/healthz ok, migration6fields/check PASS;
+  production original facts/totals remained unchanged before controlled writes.
+- Historical1/2 unknown with documented reasons/version1; dummy schedule12,
+  payments3..8 (6xNGN1) retained. Expense3->asset->expense audits2/stale409;
+  cash unchanged by review, paid overhead8 deletion409, no deletion occurred.
+- Bank3 1,593/Lagos Ledger+CF1,494; paidOH301/net2,231.50 matches branch P&L.
+  Unknown3/502 flagged, not expensed. AR1,400/VAT unchanged; aging61-90 1,000
+  (invoice004/day70), over90 0/current400, AR and print same five buckets.
+- Existing operations user403 review/P&L/classification, no write. Pairwise
+  isolated staff cases2PASS/41filtered, namespace restored/tunnel closed.
+- Browser UI/print acceptance underway; not yet final ACCT-006/007 closure.
+
+### Accounting Release Published - 2026-10-10 02:20 WAT
+
+- Runtime01e9de4 and protected84ea03b checkpoint tag pushed/remote verified.
+  Exact Railway4900a0fc BUILDING; migration/health and live acceptance pending.
+- Both separate staff cases rerunning together after duplicate fixture repair.
+
 ### Accounting Isolated Acceptance Complete - 2026-10-10 02:19 WAT
 
 - All43 distinct cases passed across full/selective execution: full42PASS,

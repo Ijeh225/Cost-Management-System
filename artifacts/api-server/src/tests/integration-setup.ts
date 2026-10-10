@@ -16,3 +16,5 @@ const { ensureInvoicePaymentReversalSchema } = await import("../lib/invoice-paym
 await ensureInvoicePaymentReversalSchema(pool);
 const { ensurePaymentClassificationSchema } = await import("../lib/payment-classification-schema.js");
 await ensurePaymentClassificationSchema(pool);
+const { ensureShipmentSchema } = await import("../lib/shipment-schema.js");
+await ensureShipmentSchema(pool);

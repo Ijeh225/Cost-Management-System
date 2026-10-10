@@ -849,7 +849,7 @@ export default function Dashboard() {
           isCurrency
           colorClass={netProfitAfterOverhead >= 0 ? "text-emerald-400" : "text-destructive"}
           branchLabel={branchLabel}
-          tooltip="Gross profit before overhead less actual paid overhead expense rows. Use the P&L Report for accrual reporting based on issued invoices."
+          tooltip="Budgeted gross profit less actual paid overhead and classified standalone operating expenses. Use Financial View or P&L for accrual reporting based on issued invoices."
         />
         <StatCard title="Total Invoiced"         value={stats.totalInvoiced ?? 0}     icon={ReceiptText} isCurrency branchLabel={branchLabel} />
         <StatCard title="Total Collected"        value={stats.totalCollected ?? 0}    icon={Wallet}      isCurrency colorClass="text-emerald-400" branchLabel={branchLabel} />

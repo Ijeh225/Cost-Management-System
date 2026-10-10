@@ -11,6 +11,7 @@ import { isContainerPhysicallyInTerminal, getDeliveryCounts } from "../lib/opera
 import { stageOwnerFieldFor, stageOwnerFor } from "../lib/department-stage-owners.js";
 import { hasAuthority, hasWorkspace } from "../lib/authorization.js";
 import { FINANCIAL_BASIS } from "../lib/financial-reporting.js";
+import { loadStandalonePayments } from "../lib/payment-classification.js";
 import { shipmentWriteError } from "../lib/shipment-schema.js";
 
 const router = Router();
@@ -2644,7 +2645,9 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
     const overheadPayments = _scope === null
       ? await db.select({ amount: expensePaymentsTable.amount }).from(expensePaymentsTable)
       : await db.select({ amount: expensePaymentsTable.amount }).from(expensePaymentsTable).where(eq(expensePaymentsTable.branchId, _scope));
-    const totalOverheadPaid = overheadPayments.reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0);
+    const standalonePayments = await loadStandalonePayments({ branchId: _scope });
+    const totalOverheadPaid = overheadPayments.reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0)
+      + standalonePayments.filter(row => row.payment.classification === "operating_expense").reduce((sum, row) => sum + Number(row.payment.amount), 0);
     const totalNetProfitAfterOverhead = totalGrossProfit - totalOverheadPaid;
 
     // Containers by status
@@ -2786,7 +2789,7 @@ router.get("/dashboard/stats", requireAuth, async (req: AuthRequest, res) => {
         revenue: FINANCIAL_BASIS.budgeted,
         containerCosts: FINANCIAL_BASIS.budgeted,
         overheads: FINANCIAL_BASIS.actual_paid,
-        summary: "Dashboard gross profit is a budgeted operational estimate. Net profit after overhead deducts actual paid overhead expense rows.",
+        summary: "Dashboard gross profit is a budgeted operational estimate. Net profit after overhead deducts actual paid overhead and classified standalone operating expenses.",
       },
       totalDutyNotPaid,
       totalInvoiced,

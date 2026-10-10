@@ -229,6 +229,9 @@ async function classificationAcceptance(selected, bank) {
   const comparison = await request("GET", "/reports/branch-comparison");
   const row = comparison.rows.find(row => row.branchId === selected.id);
   equalMoney(row.netProfit, pl.netProfit); equalMoney(row.overheads, pl.overheads.total);
+  const dashboard = await request("GET", "/dashboard/stats");
+  equalMoney(dashboard.totalOverheadPaid, pl.overheads.total);
+  equalMoney(dashboard.totalNetProfitAfterOverhead, dashboard.totalGrossProfit - pl.overheads.total);
   if (!inspectOnly) { equalMoney(pl.netProfit, plBefore.netProfit - 1); equalMoney(pl.overheads.total, plBefore.overheads.total + 1); }
   const ar = await request("GET", "/invoices/accounts-receivable");
   const aging = await request("GET", "/reports/invoice-aging");
@@ -239,6 +242,8 @@ async function classificationAcceptance(selected, bank) {
     bankBalance: cashAfter.bankBalance, ledgerNet: cashAfter.ledger.summary.net, cashflowClosing: cashAfter.cashflow.totals.closingBalance,
     revenue: pl.revenue.totalRevenue, paidOverheads: pl.overheads.total, netProfit: pl.netProfit,
     unclassifiedAmount: review.totals.unclassified, unclassifiedCount: review.unclassifiedCount, preservedForAudit: true });
+  checkpoint("Operational estimate uses the same paid overhead sources", { paidOverheads: dashboard.totalOverheadPaid,
+    budgetedGrossProfit: dashboard.totalGrossProfit, budgetedNetAfterOverhead: dashboard.totalNetProfitAfterOverhead });
   checkpoint("ACCT-007 AR/print five-bucket reconciliation", { aging: ar.aging, grandTotal: aging.totals.grandTotal,
     days61to90: aging.buckets.days61to90.map(row => ({ invoice: row.invoiceNumber, days: row.daysOverdue, outstanding: row.outstanding })),
     days90plus: aging.buckets.days90plus.map(row => ({ invoice: row.invoiceNumber, days: row.daysOverdue, outstanding: row.outstanding })) });

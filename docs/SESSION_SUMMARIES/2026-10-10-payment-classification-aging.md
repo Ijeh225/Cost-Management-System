@@ -1,5 +1,43 @@
 # Standalone Payment Classification and Aging
 
+## 2026-10-10 02:30 WAT - UI and Operational Estimate Follow-up
+
+- Fresh owner Finance View net -15,707,770.50/OH15,710,303 correct. Separate
+  Operations View still omitted standalone expense1; corrected original stats
+  source with shared reader, no new ledger/fact. Budgeted estimate stays distinct.
+- Isolated extended expense->asset stats/P&L/cash check1PASS/42filtered. First
+  attempt found missing prior CAP-01 shipment columns in isolated DB; setup now
+  reuses actual shipment migration. No production schema/records repair needed.
+  Namespace restored/tunnel closed; full build/typecheck PASS.
+- Queue/source timeline/audits/category/evidence/reviewer labels PASS; native
+  required reason/head blocks empty save, closed without mutation. No Dialog
+  accessibility warning. Next: follow-up runtime push/deploy and inspect-only
+  acceptance, final mobile/print checks, records publication.
+
+## 2026-10-10 02:24 WAT - Deployed and Live API Accepted
+
+- Exact01e9de4/4900a0fc SUCCESS, /api/healthz ok; six fields/check/migration
+  verified. Original financial baseline unchanged after migration, before writes.
+- Reviewed original501 with reasons, retaining unknown. Created only schedule12
+  NGN6/facts3..8; six categories paid1each, completed. Expense3->asset->expense
+  produces two audit events/stale409 and no cash change. Overhead8 delete409.
+- Bank3 1,593/Lagosledger+CF1,494/OH301/net2,231.50; PL=branch. Unknown502
+  three facts; AR1,400/VAT unchanged, current400/61-90 1,000/over90 0.
+- Existing non-finance operations account all three new/profit API checks403.
+  Pairwise isolated role fixtures2PASS/41filtered, cleanup/tunnel PASS.
+- Fresh owner browser verification next, then records publication. No repeated
+  old test fixtures, external transfers or messages; new facts retained for audit.
+- CLI reports railway.toml sunset2026-12-01; record future infra migration need,
+  do not change current working provider configuration within this scope.
+
+## 2026-10-10 02:20 WAT - Runtime Published
+
+- Commit01e9de4c16436de33fafbb7771a4fb9b04c444ff pushed/master remote verified.
+  Protected annotated checkpoint pushed/dereferenced84ea03b confirmed.
+- Exact deployment4900a0fc BUILDING; no live pass. Pairwise permission checks
+  running to verify the repaired fixture identities coexist. Next: migration/
+  health verification, guarded owner dummy acceptance, existing staff403 and UI.
+
 ## 2026-10-10 02:19 WAT - Isolated Acceptance Complete
 
 - Full43-case run completed in870.70s:42PASS, one duplicate test email failure

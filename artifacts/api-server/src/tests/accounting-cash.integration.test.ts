@@ -144,7 +144,18 @@ describe("accounting cash source regressions", () => {
     expect((await get(f, `/reports/pl?clientId=${f.client.id}`)).body.netProfit).toBe(1000);
     const comparison = await get(f, "/reports/branch-comparison");
     expect(comparison.body.rows.find((row: { branchId: number }) => row.branchId === f.branch.id).netProfit).toBe(975);
+    const stats = await get(f, "/dashboard/stats");
+    expect(stats.status).toBe(200); expect(stats.body.totalOverheadPaid).toBe(25);
+    expect(stats.body.totalNetProfitAfterOverhead).toBe(stats.body.totalGrossProfit - 25);
     expect((await pool.query("SELECT count(*) AS n FROM expense_payments WHERE branch_id=$1", [f.branch.id])).rows[0].n).toBe("0");
+    await assertCash(f, -25);
+    const detail = await get(f, `/payment-schedules/${id}`);
+    const fact = detail.body.payments[0];
+    expect((await patch(f, `/payment-schedules/${id}/payments/${fact.id}/classification`, {
+      classification: "asset", expectedVersion: fact.classificationVersion, classificationReason: "Controlled equipment acquisition correction",
+    })).status).toBe(200);
+    expect((await get(f, "/dashboard/stats")).body.totalOverheadPaid).toBe(0);
+    expect((await get(f, "/reports/pl?costBasis=actual_paid")).body.netProfit).toBe(1000);
     await assertCash(f, -25);
   });
 

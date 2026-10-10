@@ -2,6 +2,53 @@
 
 ## Current Work Register - Authoritative as of 2026-10-10
 
+### Live UI Follow-up Corrected Locally - 2026-10-10 02:30 WAT
+
+- Fresh owner UI confirms Finance View/P&L overhead15,710,303/net
+  -15,707,770.50 and unknown/missing-source warnings. Dashboard Operations View
+  still deducted15,710,302: its separate budgeted-estimate source omitted new
+  standalone expense1. Corrected existing stats source to use same classified
+  payment reader; no duplicate cash/expense row. Tooltip keeps estimate distinct.
+- Extended isolated expense case: operational overhead25, expense->asset makes
+  overhead0/P&L revenue profit restored, cash unchanged. First new stats check
+  exposed isolated DB missing old CAP-01 shipment columns, not a live defect.
+  Integration setup now reuses actual ensureShipmentSchema compatibility
+  migration. Focused1PASS/42filtered, cleanup/tunnel PASS, build/typecheck PASS.
+- Live queue shows all six categories/source evidence/reviewer/version; source
+  timeline exposes two before/after classification audits. Dialog title/labels
+  and required reason/head validation PASS without saving any UI edits; no
+  Dialog accessibility warnings captured. Follow-up publication/verification next.
+
+### Classification Release and Live API Acceptance - 2026-10-10 02:24 WAT
+
+- Exact01e9de4 Railway4900a0fc SUCCESS; actual public /api/healthz status ok.
+  Startup migration standalone_payment_classification_v1,6columns/check verified;
+  unchanged legacy2facts/501/default unknown and checkpoint baseline reverified.
+- Historical payments1/2 retained unknown with evidence-based reasons, reviewer,
+  version1 and existing schedule audits. No fabricated business purpose/cash edit.
+- One dummy Lagos schedule12 NGN6 completed, payment facts3..8 NGN1 each for all
+  six categories. Expense fact3 reclassified to asset/back with two audited
+  reviews; stale save409. Cash unchanged by review, overhead deletion8 refused409.
+- Bank3 1,599->1,593; Lagos Ledger/CF1,500->1,494; paid overhead300->301/net
+  2,232.50->2,231.50. Assets/advances/loan/other/unknown excluded from expenses.
+  Review-required3facts/502 includes original501 plus new unknown1. AR1,400/VAT
+  unchanged; AR/print current400/61-90 1,000/over90 0 (70-day invoice004).
+- Existing separate operations staff live403 for review, classification and P&L,
+  no mutation. Pairwise isolated permission fixtures2PASS/41filtered, namespace
+  restored/tunnel closed. Fresh owner UI/print acceptance still underway.
+- Non-blocking provider CLI warning: existing railway.toml works but provider
+  announces config-as-code sunset2026-12-01; future infrastructure migration is
+  separate unapproved work, not an ACCT release failure or a change made here.
+
+### Accounting Release Published - 2026-10-10 02:20 WAT
+
+- Runtime01e9de4c16436de33fafbb7771a4fb9b04c444ff committed/pushed to master;
+  exact remote hash verified. New protected annotated checkpoint also pushed,
+  dereferenced remote target84ea03b confirmed, old checkpoint unchanged.
+- Railway4900a0fc-c41e-4466-864e-43d9cfd79298 BUILDING that exact commit.
+  No deployment/live pass claimed yet. Pairwise permission fixture check also
+  running, to confirm both separate staff cases coexist after identity fix.
+
 ### Accounting Isolated Acceptance Complete - 2026-10-10 02:19 WAT
 
 - All43 distinct accounting regression cases have passing isolated evidence
