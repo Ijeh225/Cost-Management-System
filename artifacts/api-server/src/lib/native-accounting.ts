@@ -1,7 +1,10 @@
 import type { pool } from "@workspace/db";
 import { resolveAccessProfile } from "./authorization.js";
 import { ACCOUNTING_PERMISSIONS, accountingDate, journalHash, minorToMoney, normalizeJournal,
-  requireAccounting, requireAccountingEnabled, validatePolicy, type AccountingPermission, type JournalInput } from "./accounting-rules.js";
+  requireAccounting, requireAccountingEnabled, validatePolicy, moneyToMinor, type AccountingPermission, type JournalInput } from "./accounting-rules.js";
+import { financialDateKey } from "./financial-reporting.js";
+import { isInvoiceFinanciallyActive } from "./invoice-status.js";
+import { buildSettlementJournal, settlementEventKey, type AccountingSettlementRef, type SettlementMapping, type SettlementSource } from "./accounting-source-mapping.js";
 
 type Database = Pick<typeof pool, "connect">;
 async function connectClient(database: Database) { return database.connect(); }
@@ -11,7 +14,8 @@ interface JournalRow { id: number; book_id: number; branch_id: number; status: s
 interface ActorRow { id: number; branch_id: number; authority_level: string; job_function: string;
   workspace_access: string; access_profile_migrated_at: Date | null; is_active: boolean; }
 
-// No operational writer calls this service yet. Step7 will add approved source adapters.
+// No operational writer calls this service. Approved mappings can prepare internal
+// source drafts; deployment alone never activates or posts them.
 export class NativeAccounting {
   constructor(private database: Database) {}
 
@@ -160,8 +164,109 @@ export class NativeAccounting {
     return journal;
   }
   async prepareJournal(actorId: number, input: JournalInput) {
+    requireAccounting(!/^(source|opening):/.test(input.eventKey), "RESERVED_EVENT", "Source and opening identities require their dedicated reviewed workflow");
     normalizeJournal(input);
     return this.transaction(input.bookId, client => this.prepare(client, actorId, input));
+  }
+  private async settlementDraft(client: Client, bookId: number, branchId: number, actorId: number,
+    ref: AccountingSettlementRef, mapping: SettlementMapping, permission: "read" | "prepare") {
+    settlementEventKey(ref);
+    await this.permission(client, bookId, branchId, actorId, permission);
+    const book = (await client.query("SELECT * FROM accounting_books WHERE id=$1", [bookId])).rows[0];
+    requireAccounting(book?.status === "approved" && book.policy_version === mapping.policyVersion && book.currency === mapping.currency,
+      "BOOK_NOT_APPROVED", "Matching approved book currency and policy version required");
+    let source: SettlementSource;
+    if (ref.kind === "client_deposit") {
+      const row = (await client.query(`SELECT d.*,c.branch_id client_branch FROM client_deposits d
+        JOIN clients c ON c.id=d.client_id WHERE d.id=$1 AND d.branch_id=$2 FOR SHARE OF d,c`, [ref.id, branchId])).rows[0];
+      requireAccounting(row && row.client_branch === branchId, "NOT_FOUND", "Deposit not found in this branch");
+      requireAccounting(!row.notes?.includes("[VOIDED by wallet reset"), "SOURCE_REVIEW_REQUIRED", "Voided deposit needs explicit historical review");
+      source = { ...ref, branchId, clientId: row.client_id, amount: row.amount, bankId: row.bank_id,
+        paymentMethod: row.payment_method, accountingDate: financialDateKey(new Date(row.created_at)) };
+    } else {
+      const row = (await client.query(`SELECT p.*,i.client_id,i.status invoice_status,i.branch_id invoice_branch,i.total invoice_total,i.written_off_amount
+        FROM invoice_payments p JOIN invoices i ON i.id=p.invoice_id
+        WHERE p.id=$1 AND p.branch_id=$2 FOR SHARE OF p,i`, [ref.id, branchId])).rows[0];
+      requireAccounting(row && row.invoice_branch === branchId, "NOT_FOUND", "Invoice settlement not found in this branch");
+      requireAccounting(isInvoiceFinanciallyActive(row.invoice_status) && ["sent", "partial", "paid", "overdue"].includes(row.invoice_status),
+        "SOURCE_REVIEW_REQUIRED", "Unknown/draft/cancelled/written-off invoice history needs its own reviewed treatment");
+      const credits = (await client.query("SELECT id FROM credit_notes WHERE invoice_id=$1 AND status='active' FOR SHARE", [row.invoice_id])).rows;
+      const prior = (await client.query(`SELECT coalesce(sum(amount),0)::text amount FROM invoice_payments
+        WHERE invoice_id=$1 AND (paid_at,id)<=($2::timestamp,$3)`, [row.invoice_id, row.paid_at, row.id])).rows[0];
+      requireAccounting(credits.length === 0 && (!row.written_off_amount || moneyToMinor(row.written_off_amount) === 0n)
+        && moneyToMinor(prior.amount) <= moneyToMinor(row.invoice_total), "SOURCE_REVIEW_REQUIRED",
+      "Credit-note, write-off and excess-collection history requires its own reviewed mapping");
+      if (row.source_deposit_id !== null) {
+        const deposit = (await client.query("SELECT * FROM client_deposits WHERE id=$1 FOR SHARE", [row.source_deposit_id])).rows[0];
+        requireAccounting(deposit && deposit.branch_id === branchId && deposit.client_id === row.client_id
+          && !deposit.notes?.includes("[VOIDED by wallet reset") && new Date(deposit.created_at) <= new Date(row.paid_at),
+        "SOURCE_REVIEW_REQUIRED", "Matching non-voided, previously received client deposit required");
+        const allocated = (await client.query(`SELECT coalesce(sum(amount),0)::text amount FROM invoice_payments
+          WHERE source_deposit_id=$1 AND (paid_at,id)<=($2::timestamp,$3)`, [deposit.id, row.paid_at, row.id])).rows[0];
+        requireAccounting(moneyToMinor(allocated.amount) <= moneyToMinor(deposit.amount),
+          "SOURCE_REVIEW_REQUIRED", "Deposit allocation exceeds the received deposit");
+        const depositJournal = (await client.query(`SELECT status,payload_hash FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3`,
+          [bookId, branchId, settlementEventKey({ kind: "client_deposit", id: deposit.id })])).rows[0];
+        requireAccounting(depositJournal?.status === "posted", "DEPOSIT_NOT_POSTED", "Post the deposit receipt before its allocation; opening liabilities need a separate approved workflow");
+        const receipt = buildSettlementJournal(bookId, { kind: "client_deposit", id: deposit.id, branchId, clientId: deposit.client_id,
+          amount: deposit.amount, bankId: deposit.bank_id, paymentMethod: deposit.payment_method,
+          accountingDate: financialDateKey(new Date(deposit.created_at)) }, mapping);
+        requireAccounting(journalHash(normalizeJournal(receipt.input)) === depositJournal.payload_hash,
+          "SOURCE_CHANGED", "Deposit receipt evidence changed after posting; review before allocating");
+      }
+      if (row.entry_type === "reversal") {
+        const original = (await client.query("SELECT * FROM invoice_payments WHERE id=$1 FOR SHARE", [row.reversal_of_payment_id])).rows[0];
+        requireAccounting(original && original.entry_type === "payment" && original.branch_id === branchId
+          && original.invoice_id === row.invoice_id && original.amount === row.amount.slice(1)
+          && original.bank_id === row.bank_id && original.source_deposit_id === row.source_deposit_id
+          && original.payment_method === row.payment_method && new Date(original.paid_at) <= new Date(row.paid_at),
+        "INVALID_REVERSAL", "Matching original settlement and full dated reversal required");
+      }
+      source = { ...ref, branchId, clientId: row.client_id, amount: row.amount, bankId: row.bank_id,
+        sourceDepositId: row.source_deposit_id, reversalOfId: row.reversal_of_payment_id, entryType: row.entry_type,
+        paymentMethod: row.payment_method, accountingDate: financialDateKey(new Date(row.paid_at)) };
+    }
+    const customer = (await client.query("SELECT branch_id FROM clients WHERE id=$1 FOR SHARE", [source.clientId])).rows[0];
+    requireAccounting(customer?.branch_id === branchId, "SOURCE_REVIEW_REQUIRED", "Source customer must belong to this branch");
+    requireAccounting(source.accountingDate >= book.policy.cutoverDate, "BEFORE_CUTOVER", "Earlier source belongs to approved openings/import, not forward posting");
+    if (source.bankId !== null) {
+      const bank = (await client.query("SELECT branch_id FROM banks WHERE id=$1 FOR SHARE", [source.bankId])).rows[0];
+      requireAccounting(bank?.branch_id === branchId, "SOURCE_REVIEW_REQUIRED", "Source bank must belong to this branch");
+    }
+    const draft = buildSettlementJournal(bookId, source, mapping);
+    const accounts = (await client.query("SELECT id,category FROM accounting_accounts WHERE book_id=$1 AND active AND id=ANY($2::int[])",
+      [bookId, [draft.debitAccountId, draft.creditAccountId]])).rows;
+    const categories = new Map(accounts.map(row => [row.id, row.category]));
+    requireAccounting(categories.get(draft.debitAccountId) === (draft.allocation ? "liability" : "asset")
+      && categories.get(draft.creditAccountId) === (ref.kind === "client_deposit" ? "liability" : "asset"),
+    "INVALID_MAPPING", "Approved active asset/liability control accounts in this book required");
+    return { ...draft, source };
+  }
+  async previewSettlement(bookId: number, branchId: number, actorId: number, ref: AccountingSettlementRef, mapping: SettlementMapping) {
+    return this.transaction(bookId, client => this.settlementDraft(client, bookId, branchId, actorId, ref, mapping, "read"));
+  }
+  async prepareSettlement(bookId: number, branchId: number, actorId: number, ref: AccountingSettlementRef, mapping: SettlementMapping) {
+    return this.transaction(bookId, async client => {
+      const draft = await this.settlementDraft(client, bookId, branchId, actorId, ref, mapping, "prepare");
+      let originalId: number | null = null;
+      if (draft.reversal) {
+        const original = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3",
+          [bookId, branchId, settlementEventKey({ kind: "invoice_payment", id: draft.source.reversalOfId! })])).rows[0];
+        requireAccounting(original?.status === "posted", "ORIGINAL_NOT_POSTED", "Original source journal must be posted before its reversal");
+        const lines = (await client.query("SELECT account_id,debit_minor::text,credit_minor::text FROM accounting_journal_lines WHERE journal_id=$1 ORDER BY id", [original.id])).rows;
+        const normalized = normalizeJournal(draft.input);
+        requireAccounting(lines.length === normalized.lines.length && lines.every((line, index) => {
+          const reversed = normalized.lines[normalized.lines.length - 1 - index]!;
+          return line.account_id === reversed.accountId && line.debit_minor === reversed.creditMinor && line.credit_minor === reversed.debitMinor;
+        }), "INVALID_REVERSAL", "Source reversal must exactly offset the originally posted accounts");
+        const prior = (await client.query("SELECT event_key FROM accounting_journals WHERE reversal_of=$1 AND status<>'cancelled'", [original.id])).rows[0];
+        requireAccounting(!prior || prior.event_key === draft.input.eventKey, "ALREADY_REVERSED", "Original already has another linked accounting reversal");
+        originalId = original.id;
+      }
+      const journal = await this.prepare(client, actorId, draft.input, originalId);
+      requireAccounting(journal.status !== "cancelled", "SOURCE_CANCELLED", "Cancelled source draft requires reviewed correction, not a second posting");
+      return journal;
+    });
   }
   async approveAndPost(bookId: number, branchId: number, actorId: number, journalId: number, reason: string) {
     return this.transaction(bookId, async client => {
@@ -171,6 +276,13 @@ export class NativeAccounting {
       requireAccounting(journal && journal.prepared_by !== actorId, "SELF_APPROVAL", "A different authorised approver is required");
       if (journal.status === "posted") return journal;
       requireAccounting(journal.status === "draft", "JOURNAL_STATE", "Only draft journals can be posted");
+      if (journal.event_key.startsWith("source:")) {
+        const evidence = (await client.query("SELECT evidence FROM accounting_journals WHERE id=$1", [journalId])).rows[0];
+        const saved = JSON.parse(evidence.evidence);
+        const current = await this.settlementDraft(client, bookId, branchId, actorId, saved.source, saved.mapping, "read");
+        requireAccounting(journalHash(normalizeJournal(current.input)) === journal.payload_hash,
+          "SOURCE_CHANGED", "Source or mapping changed after preparation; do not post stale evidence");
+      }
       await this.audit(client, bookId, actorId, "posted", reason, branchId, journalId);
       return (await client.query<JournalRow>("UPDATE accounting_journals SET status='posted',posted_by=$2,posted_at=now() WHERE id=$1 RETURNING *", [journalId, actorId])).rows[0]!;
     });
@@ -193,6 +305,7 @@ export class NativeAccounting {
       const original = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE id=$1 AND book_id=$2 AND branch_id=$3 AND status='posted' AND kind='manual'",
         [originalId, bookId, branchId])).rows[0];
       requireAccounting(original, "INVALID_REVERSAL", "Posted original in this book/branch required");
+      requireAccounting(!original.event_key.startsWith("source:"), "SOURCE_REVIEW_REQUIRED", "Source settlements require a matching operational reversal, not an unrelated manual offset");
       const active = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE reversal_of=$1 AND status<>'cancelled'", [originalId])).rows[0];
       const attempts = (await client.query("SELECT count(*)::int n FROM accounting_journals WHERE reversal_of=$1", [originalId])).rows[0]!.n as number;
       // A cancelled attempt remains immutable; a corrected draft gets a new event link.

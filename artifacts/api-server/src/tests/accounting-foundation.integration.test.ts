@@ -4,6 +4,7 @@ import { pool } from "@workspace/db";
 import { ensureAccountingFoundationSchema } from "../lib/accounting-schema";
 import { NativeAccounting } from "../lib/native-accounting";
 import { ACCOUNTING_POLICY_KEYS, type JournalInput } from "../lib/accounting-rules";
+import { previewOpeningBalances } from "../lib/accounting-source-mapping";
 
 const schema = `acct_foundation_${Date.now()}_${randomBytes(4).toString("hex")}`;
 const previousEnabled = process.env.NATIVE_ACCOUNTING_ENABLED;
@@ -29,7 +30,136 @@ beforeAll(async () => {
   await sql(`CREATE TABLE branches(id SERIAL PRIMARY KEY,name TEXT NOT NULL);
     CREATE TABLE users(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL REFERENCES branches(id),name TEXT,
     authority_level TEXT,job_function TEXT,workspace_access TEXT,access_profile_migrated_at TIMESTAMPTZ,is_active BOOLEAN NOT NULL DEFAULT true)`);
+  await sql(`CREATE TABLE clients(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL);
+    CREATE TABLE banks(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL);
+    CREATE TABLE invoices(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL,client_id INTEGER,status TEXT NOT NULL,
+      total NUMERIC(15,2) NOT NULL,written_off_amount NUMERIC(15,2));
+    CREATE TABLE credit_notes(id SERIAL PRIMARY KEY,invoice_id INTEGER NOT NULL,status TEXT NOT NULL);
+    CREATE TABLE client_deposits(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL,client_id INTEGER NOT NULL,
+      amount NUMERIC(15,2) NOT NULL,bank_id INTEGER,payment_method TEXT NOT NULL,notes TEXT,created_at TIMESTAMP NOT NULL);
+    CREATE TABLE invoice_payments(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL,invoice_id INTEGER NOT NULL,
+      amount NUMERIC(15,2) NOT NULL,paid_at TIMESTAMP NOT NULL,bank_id INTEGER,payment_method TEXT NOT NULL,
+      source_deposit_id INTEGER,entry_type TEXT NOT NULL DEFAULT 'payment',reversal_of_payment_id INTEGER)`);
   await ensureAccountingFoundationSchema(database as Pick<typeof pool, "connect">);
+});
+
+async function settlementFixture() {
+  const f = await fixture();
+  const ar = await service.addAccount(f.book, f.branch, f.owner, "1100", "Dummy AR", "asset");
+  const client = (await sql("INSERT INTO clients(branch_id) VALUES($1) RETURNING id", [f.branch])).rows[0].id;
+  const bank = (await sql("INSERT INTO banks(branch_id) VALUES($1) RETURNING id", [f.branch])).rows[0].id;
+  const invoice = (await sql("INSERT INTO invoices(branch_id,client_id,status,total) VALUES($1,$2,'sent',100) RETURNING id", [f.branch, client])).rows[0].id;
+  const deposit = (await sql(`INSERT INTO client_deposits(branch_id,client_id,amount,bank_id,payment_method,created_at)
+    VALUES($1,$2,100,$3,'transfer','2026-10-10 10:00:00') RETURNING id`, [f.branch, client, bank])).rows[0].id;
+  const mapping = { currency: "NGN" as const, policyVersion: "isolated-only-v1", evidence: "Dummy reviewed source mapping; not production",
+    bankAccounts: { [String(bank)]: f.debit }, cashAccountId: f.debit, receivableAccountId: ar, depositLiabilityAccountId: f.credit };
+  return { ...f, ar, client, bank, invoice, deposit, mapping };
+}
+type SettlementFixture = Awaited<ReturnType<typeof settlementFixture>>;
+async function settlementPayment(f: SettlementFixture, amount = "30.00", method = "transfer", sourceDeposit: number | null = null,
+  original: number | null = null, date = "2026-10-10 11:00:00") {
+  return (await sql(`INSERT INTO invoice_payments(branch_id,invoice_id,amount,paid_at,bank_id,payment_method,source_deposit_id,entry_type,reversal_of_payment_id)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, [f.branch, f.invoice, amount, date,
+    method === "transfer" ? f.bank : null, method, sourceDeposit, original ? "reversal" : "payment", original])).rows[0].id as number;
+}
+async function postDeposit(f: SettlementFixture) {
+  const journal = await service.prepareSettlement(f.book, f.branch, f.preparer, { kind: "client_deposit", id: f.deposit }, f.mapping);
+  return service.approveAndPost(f.book, f.branch, f.approver, journal.id, "Dummy independent source approval");
+}
+describe("Step7 inactive source integration", () => {
+  it("previews without writes, posts one deposit and allocation without counting cash twice", async () => {
+    const f = await settlementFixture();
+    const snapshot = (await sql("SELECT row_to_json(d) data FROM client_deposits d WHERE id=$1", [f.deposit])).rows[0].data;
+    expect((await service.previewSettlement(f.book, f.branch, f.preparer, { kind: "client_deposit", id: f.deposit }, f.mapping)).cashMovement).toBe("100.00");
+    expect((await sql("SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1", [f.book])).rows[0].n).toBe(0);
+    const payment = await settlementPayment(f, "30.00", "deposit", f.deposit);
+    await expect(service.prepareSettlement(f.book, f.branch, f.preparer, { kind: "invoice_payment", id: payment }, f.mapping)).rejects.toMatchObject({ code: "DEPOSIT_NOT_POSTED" });
+    await postDeposit(f);
+    const allocation = await service.prepareSettlement(f.book, f.branch, f.preparer, { kind: "invoice_payment", id: payment }, f.mapping);
+    await service.approveAndPost(f.book, f.branch, f.approver, allocation.id, "Dummy allocation approval");
+    const balances = (await sql(`SELECT account_id,(sum(debit_minor)-sum(credit_minor))::text balance FROM accounting_journal_lines
+      WHERE book_id=$1 GROUP BY account_id`, [f.book])).rows;
+    expect(new Map(balances.map(r => [r.account_id, r.balance]))).toEqual(new Map([[f.debit,"10000"],[f.credit,"-7000"],[f.ar,"-3000"]]));
+    expect((await sql("SELECT row_to_json(d) data FROM client_deposits d WHERE id=$1", [f.deposit])).rows[0].data).toEqual(snapshot);
+  });
+  it("deduplicates concurrent source prepares/posts and refuses conflicting mappings", async () => {
+    const f = await settlementFixture(); const id = await settlementPayment(f);
+    const ref = { kind: "invoice_payment" as const, id };
+    const journals = await Promise.all(Array.from({length:4}, () => service.prepareSettlement(f.book, f.branch, f.preparer, ref, f.mapping)));
+    expect(new Set(journals.map(j => j.id)).size).toBe(1);
+    await Promise.all([1,2].map(() => service.approveAndPost(f.book,f.branch,f.approver,journals[0]!.id,"Dummy independent approval")));
+    expect((await sql("SELECT count(*)::int n FROM accounting_source_events WHERE book_id=$1",[f.book])).rows[0].n).toBe(1);
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,ref,{...f.mapping,evidence:"Changed approval"})).rejects.toMatchObject({code:"DUPLICATE_CONFLICT"});
+    await expect(service.prepareJournal(f.preparer,{...input(f),eventKey:`source:invoice_payment:${id}:v1`})).rejects.toMatchObject({code:"RESERVED_EVENT"});
+  });
+  it("posts linked cash reversal once and exactly offsets the original source accounts", async () => {
+    const f=await settlementFixture(); const id=await settlementPayment(f);
+    const original=await service.prepareSettlement(f.book,f.branch,f.preparer,{kind:"invoice_payment",id},f.mapping);
+    const reversalId=await settlementPayment(f,"-30.00","transfer",null,id,"2026-10-11 10:00:00");
+    const ref={kind:"invoice_payment" as const,id:reversalId};
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,ref,f.mapping)).rejects.toMatchObject({code:"ORIGINAL_NOT_POSTED"});
+    await service.approveAndPost(f.book,f.branch,f.approver,original.id,"Dummy original approval");
+    const reverse=await service.prepareSettlement(f.book,f.branch,f.preparer,ref,f.mapping);
+    await service.approveAndPost(f.book,f.branch,f.approver,reverse.id,"Dummy refund approval");
+    expect((await service.prepareSettlement(f.book,f.branch,f.preparer,ref,f.mapping)).id).toBe(reverse.id);
+    expect((await sql("SELECT sum(debit_minor)-sum(credit_minor) balance FROM accounting_journal_lines WHERE book_id=$1 GROUP BY account_id",[f.book])).rows.every(r=>r.balance==="0")).toBe(true);
+  });
+  it("refuses changed source evidence at approval without posting or auditing success", async () => {
+    const f=await settlementFixture(); const id=await settlementPayment(f);
+    const draft=await service.prepareSettlement(f.book,f.branch,f.preparer,{kind:"invoice_payment",id},f.mapping);
+    await sql("UPDATE invoice_payments SET amount=31 WHERE id=$1",[id]);
+    await expect(service.approveAndPost(f.book,f.branch,f.approver,draft.id,"Must refuse stale source")).rejects.toMatchObject({code:"SOURCE_CHANGED"});
+    expect((await sql("SELECT status FROM accounting_journals WHERE id=$1",[draft.id])).rows[0].status).toBe("draft");
+    expect((await sql("SELECT count(*)::int n FROM accounting_audit WHERE journal_id=$1 AND action='posted'",[draft.id])).rows[0].n).toBe(0);
+  });
+  it("preserves branch, grants, cutover, account category and period restrictions", async () => {
+    const f=await settlementFixture(); const ref={kind:"client_deposit" as const,id:f.deposit}; const other=await fixture();
+    await expect(service.previewSettlement(f.book,f.branch,f.operations,ref,f.mapping)).rejects.toMatchObject({code:"FORBIDDEN"});
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,ref,{...f.mapping,depositLiabilityAccountId:f.ar})).rejects.toMatchObject({code:"INVALID_MAPPING"});
+    await sql("UPDATE banks SET branch_id=$2 WHERE id=$1",[f.bank,other.branch]);
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,ref,f.mapping)).rejects.toMatchObject({code:"SOURCE_REVIEW_REQUIRED"});
+    await sql("UPDATE banks SET branch_id=$2 WHERE id=$1",[f.bank,f.branch]);
+    await sql("UPDATE client_deposits SET created_at='2026-09-30 10:00:00' WHERE id=$1",[f.deposit]);
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,ref,f.mapping)).rejects.toMatchObject({code:"BEFORE_CUTOVER"});
+    await sql("UPDATE client_deposits SET created_at='2026-10-10 10:00:00' WHERE id=$1",[f.deposit]);
+    await service.changePeriod(f.book,f.owner,f.period,"close",review);
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,ref,f.mapping)).rejects.toMatchObject({code:"PERIOD_CLOSED"});
+  });
+  it("refuses non-cash credits, cancelled invoices, excess collections and credit-note history", async () => {
+    const f=await settlementFixture(); const id=await settlementPayment(f,"30.00","credit"); const ref={kind:"invoice_payment" as const,id};
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,ref,f.mapping)).rejects.toMatchObject({code:"SOURCE_REVIEW_REQUIRED"});
+    await sql("UPDATE invoice_payments SET payment_method='transfer',bank_id=$2 WHERE id=$1",[id,f.bank]);
+    await sql("UPDATE invoices SET status='cancelled' WHERE id=$1",[f.invoice]);
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,ref,f.mapping)).rejects.toMatchObject({code:"SOURCE_REVIEW_REQUIRED"});
+    await sql("UPDATE invoices SET status='sent' WHERE id=$1",[f.invoice]);
+    await sql("UPDATE invoice_payments SET amount=101 WHERE id=$1",[id]);
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,ref,f.mapping)).rejects.toMatchObject({code:"SOURCE_REVIEW_REQUIRED"});
+    await sql("UPDATE invoice_payments SET amount=30 WHERE id=$1",[id]);
+    await sql("INSERT INTO credit_notes(invoice_id,status) VALUES($1,'active')",[f.invoice]);
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,ref,f.mapping)).rejects.toMatchObject({code:"SOURCE_REVIEW_REQUIRED"});
+  });
+  it("validates opening preview without persisting a guessed opening journal", async () => {
+    const f=await settlementFixture();
+    expect(previewOpeningBalances({bookId:f.book,branchId:f.branch,currency:"NGN",cutoverDate:"2026-10-01",policyVersion:"isolated-only-v1",
+      strategy:"opening_balances_forward",ownerEvidence:"Dummy owner",accountantEvidence:"Dummy professional review",
+      sourceCoverageEvidence:"Dummy reviewed reconciliation",lines:input(f).lines}).status).toBe("preview_only");
+    expect((await sql("SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1",[f.book])).rows[0].n).toBe(0);
+  });
+  it("reverses an allocation without bank movement and refuses a freehand source offset", async () => {
+    const f=await settlementFixture(); await postDeposit(f);
+    const id=await settlementPayment(f,"30.00","deposit",f.deposit);
+    const original=await service.prepareSettlement(f.book,f.branch,f.preparer,{kind:"invoice_payment",id},f.mapping);
+    await service.approveAndPost(f.book,f.branch,f.approver,original.id,"Dummy allocation review");
+    await expect(service.prepareReversal(f.book,f.branch,f.preparer,original.id,"2026-10-11","Manual source override")).rejects.toMatchObject({code:"SOURCE_REVIEW_REQUIRED"});
+    const reversedId=await settlementPayment(f,"-30.00","deposit",f.deposit,id,"2026-10-11 10:00:00");
+    const reversed=await service.prepareSettlement(f.book,f.branch,f.preparer,{kind:"invoice_payment",id:reversedId},f.mapping);
+    await service.approveAndPost(f.book,f.branch,f.approver,reversed.id,"Dummy allocation reversal review");
+    const balances=new Map((await sql("SELECT account_id,(sum(debit_minor)-sum(credit_minor))::text balance FROM accounting_journal_lines WHERE book_id=$1 GROUP BY account_id",[f.book])).rows.map(r=>[r.account_id,r.balance]));
+    expect(balances.get(f.debit)).toBe("10000"); expect(balances.get(f.credit)).toBe("-10000"); expect(balances.get(f.ar)).toBe("0");
+    await sql("UPDATE client_deposits SET amount=101 WHERE id=$1",[f.deposit]);
+    const next=await settlementPayment(f,"10.00","deposit",f.deposit,null,"2026-10-12 10:00:00");
+    await expect(service.prepareSettlement(f.book,f.branch,f.preparer,{kind:"invoice_payment",id:next},f.mapping)).rejects.toMatchObject({code:"SOURCE_CHANGED"});
+  });
 });
 afterAll(async () => {
   try {

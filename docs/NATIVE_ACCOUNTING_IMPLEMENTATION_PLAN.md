@@ -4,7 +4,10 @@ Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
 Status updated2026-10-10 22:35 WAT: Step6 inactive engineering foundation built,
 accepted and deployed/verified at40aec3d. Professional policy review remains next.
-Steps7-12 not started.
+Updated2026-10-11 02:15 WAT: Step7 STARTED; first deposit/invoice-settlement
+source family and opening validation accepted in isolation; publication in
+progress, inactive and not complete. Steps8-12 not started. Real6A approval
+remains outstanding.
 Accountant policy, named permissions and production cutover are not yet approved.
 The original21:17 roadmap below is preserved; current evidence appears at the end.
 
@@ -212,6 +215,60 @@ Exit: each module has documented implementation/deployment/live acceptance,
 unresolved exceptions remain explicit and the exact next action is recorded.
 
 ## Current Status / Exact Next Action
+
+2026-10-11 02:15 WAT: first Step7 family accepted, publication in progress.
+Full30/30 (23foundation+7initial source), final focused8/8 (23filtered),31
+distinct controls across runs. Final292unit/3prior skips/build/typechecks/
+inactive smoke PASS. Schema/baseline/tunnel cleanup PASS; flags remain false.
+Exact inactive deployment proof next. Afterward remaining mapping families,
+professional policy/openings approval and reconciliation, not full Step7 closure.
+
+2026-10-11 01:55 WAT: Step7 engineering authorised, first source family in
+isolated acceptance. This supersedes the earlier "Step7 not started" history.
+
+| Step6 phase | Verified current engineering scope | Not implied |
+| --- | --- | --- |
+| 6A | Draft rules/chart/spec and mandatory policy evidence gates exist | Actual professional sign-off remains outstanding |
+| 6B | Repeatable additive foundation; recorded protected checkpoint/private full restored backup | No production native schema creation or new backup claimed this turn |
+| 6C | Exact balanced atomic/idempotent immutable journals and linked reversals | No automatic source posting activated |
+| 6D | Period overlap/close/reopen and concurrency enforcement | No approved production fiscal calendar/cutover |
+| 6E | Canonical users/branch grants and independent approval | No new named production grants assigned |
+| 6F | Existing isolated foundation acceptance, fresh full rerun in progress | Inactive technical acceptance is not official-book acceptance |
+
+### Step7 First Source Family / Activation Boundary
+
+- Reuse NativeAccounting; `previewSettlement` reads source IDs under existing
+  branch/grant checks. `prepareSettlement` prepares, not posts; independent
+  authorised approval is required. No operational route automatically calls it.
+- Explicit policy-version mapping identifies asset bank/cash, asset AR and
+  deposit liability controls. No guessed account seed or standalone reclassification.
+- Original deposit: debit cash/bank, credit client-deposit liability. Linked
+  allocation: debit deposit liability, credit AR, ZERO new cash; receipt must
+  already be posted with unchanged evidence. Original money facts are untouched.
+- Invoice cash collection: debit cash/bank, credit AR. Stable identity is the
+  source type/ID, not B/L, invoice item or container count. No invoice/item join
+  fans out money. Retries cannot duplicate; changed payload/mapping is refused.
+- Only supported recorded cash methods with explicit bank/cash mapping. Credit,
+  credit_note, ambiguous/unlinked allocations, voided receipts, pre-cutover facts,
+  cancelled/draft/unknown/written-off invoices and excess-collection/active-credit-
+  note/write-off histories are refused for separately reviewed treatment.
+- Source reversal requires matching full negative operational payment, a posted
+  original journal and exactly reversed original accounts. Deposit reversal
+  restores liability/AR without changing bank. Freehand native source reversals
+  are refused; final approval rechecks authoritative source/mapping evidence.
+- `previewOpeningBalances` validates explicit balanced amounts, evidence and
+  forward-opening strategy only. It does NOT persist entries, query dated controls,
+  approve a book/chart, infer an equity plug or import current test balances.
+- Both schema/posting flags remain false. This is NOT full Step7, a public finance
+  UI or reconciled official receivables: issued invoice/revenue/tax mapping and
+  approved opening controls still have to establish AR before collections.
+- Remaining source families: credit notes/client credit/write-offs/recoveries;
+  duty/container disbursements; unpaid overhead/payment settlement; classified
+  standalone schedules; bank funding/transfers; asset/advance/loan/equity support.
+  Then approved source coverage, openings/import, control reconciliation and cutover.
+- Fresh code tag `checkpoint-before-accounting-step7-2026-10-11` at ec7a8f4
+  pushed. No existing protected tag/backup overwritten. New source tests and
+  final inactive release proof still pending at this timestamp.
 
 2026-10-10 22:35 WAT: Step6 inactive technical scope closed;40aec3d exact
 Railwayc687034c SUCCESS/healthz/deployed bundle smoke PASS. Both flags false;

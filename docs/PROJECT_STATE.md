@@ -2,6 +2,72 @@
 
 ## Current Work Register - Authoritative as of 2026-10-11
 
+### Step 7 First Family Accepted / Publication In Progress - 2026-10-11 02:15 WAT
+
+- Final isolated source8/8PASS (23foundation cases intentionally filtered out).
+  Earlier full30/30 passed all23foundation +7initial source cases. Combined31
+  distinct cases accepted across these runs, NOT a single final31-case run.
+  Final run covers source availability/dating, unchanged receipt, allocation
+  reversal without bank movement, no freehand offset, stale approval refusal,
+  retries/concurrency/conflicts, branches/grants/periods/cutover and non-cash
+  credit/excess/credit-note refusal. Schema/public isolated baseline/tunnel
+  cleanup PASS in both runs. No production dummy records or source writes.
+- Final unit292PASS/3existing skips (44files), complete build/typechecks and
+  inactive bundle smoke PASS. Native schema/posting flags remain false. Source
+  adapters and pure openings validator accepted as first partial Step7 family;
+  no official AR/opening/revenue recognition, source activation or new public UI.
+- Owner-authorised commit/push/deploy now in progress; fetched origin/master,
+  no divergence. Exact commit/provider/health/deployed smoke evidence next.
+
+### Step 6 Fresh Acceptance PASS / Final Step 7 Acceptance Running - 2026-10-11 02:08 WAT
+
+- Full isolated foundation run30/30PASS: all23existing Step6 controls plus
+  seven initial Step7 source cases. Run-owned schema removed, public isolated
+  invoice-payment/deposit/schedule-payment financial baseline guard passed,
+  authenticated SSH tunnel closed. No production schema or source changes.
+- Final source safeguards add allocation availability/dating, unchanged parent
+  receipt evidence, unknown-status refusal and dedicated operational source
+  reversal rather than freehand offsets. Final focused eight-case Step7 run
+  in progress; do not represent first30run as testing these final changes.
+- Final full units44files292PASS/3prior skips, final railway:build/typechecks
+  PASS. Inactive built-bundle smoke PASS: mapping/opening validation, disabled
+  preview/preparation gates, zero DB connections/writes. Both live accounting
+  flags checked false via authenticated provider CLI, credentials not logged.
+- Source publication still pending final focused acceptance. Step6 code/tests
+  are complete;6A professional sign-off remains outstanding. Step7 STARTED,
+  not complete or activated. Remaining mapping/cutover scope below unchanged.
+
+### Notification Deployed / Step 7 First Source Family In Progress - 2026-10-11 01:52 WAT
+
+- Notification functional ec7a8f42dc787038cf1e4aaf5f8bfe9c24781610 pushed.
+  Railway 3bde9bfc-b62c-4154-8574-80003183e4f9 ACTIVE/success; its source
+  link identifies that exact commit. Public healthz:ok. Owner-session All->Lagos
+  sidebar displays Loading branch notification count, not the old23, then17;
+  loaded bell83 versus All131. Cached Lagos->All shows its own23 immediately.
+  BRN-SCOPE-UI-002 closed for this bounded two-way badge/bell acceptance. Live
+  read/history mutations not repeated; prior local fixture coverage retained.
+- New protected checkpoint-before-accounting-step7-2026-10-11 at ec7a8f4 created
+  and pushed; older protected checkpoints untouched. No production data changed.
+- Duplicate check confirms existing Step6 engine, migration, periods, grants,
+  policy approval gates and 23 distinct isolated controls; reuse them. Six
+  technical phases already deployed inactive. Actual6A professional approval,
+  policy/cutover/openings/named production grants remain unconfirmed; no invented
+  sign-off or mandatory company hierarchy. Step6 is NOT approved live accounting.
+- Step7 starts with internal authoritative deposit/invoice-settlement adapters,
+  zero-cash linked deposit allocation, stable one-money-fact event identity,
+  exact reversal and source revalidation at independent approval. Credit-note,
+  write-off/excess-collection history is refused pending its dedicated mapping.
+  Opening balances have an evidence-based balanced preview only, no import or
+  guessed plug. No operational writer/API auto-posting hook or accounting flag
+  activation, production schema changes or source backfill.
+- New focused mapping units12PASS; full unit44files/292PASS/3existing skips;
+  complete railway:build PASS before final safeguards. Full isolated foundation
+  and seven new Step7 acceptance cases running; final verification/publication
+  pending. Remaining Step7 families are invoices/revenue/tax, credits/bad debts,
+  duty/disbursements, overhead, classified schedules, funding/transfers and
+  assets/advances/loans/equity, plus approved openings/cutover and reconciliation.
+- Session: docs/SESSION_SUMMARIES/2026-10-11-accounting-source-integration.md.
+
 ### Notification Release Authorised / Step 7 Engineering Authorised - 2026-10-11 01:34 WAT
 
 - Owner requests commit/push/deploy of completed notification correction and

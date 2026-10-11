@@ -2,6 +2,50 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-11
 
+### Final Step 7 Source Acceptance PASS / Release Pending - 2026-10-11 02:15 WAT
+
+- Final focused8/8PASS;23foundation tests intentionally filtered, not failures.
+  Earlier full30/30PASS included23foundation+7initial source cases.31distinct
+  cases accepted across full/focused runs, not one final31-run. Added final
+  allocation reversal/unchanged-parent receipt/freehand offset protections PASS.
+- Owned-schema cleanup and public isolated three-source baseline guard passed;
+  both authenticated test tunnels closed. No production fixtures/source writes.
+- Final44unitfiles292PASS/3existing skips; full build/typechecks/inactive bundle
+  smoke PASS. Exact inactive Step7 deployment/health/runtime smoke still pending.
+  Step7 remains partial: other source families/approved openings/reconciliation
+  and real6A sign-off still required before official source activation.
+
+### Step 6 Full Fresh PASS / Final Source Cases Running - 2026-10-11 02:08 WAT
+
+- Isolated PostgreSQL30/30PASS (23existing foundation +7initial Step7). Schema
+  and tunnel cleanup passed; public isolated financial baseline guard unchanged.
+  No live accounting writes. Final eight-case source run remains in progress,
+  covering the final parent-receipt/allocation reversal safeguards separately.
+- Final unit44files292PASS/3prior skips; final complete build/typechecks PASS;
+  local inactive-bundle smoke PASS, zero DB connections/writes. Production
+  schema/posting flags still false. No duplicate foundation or source register.
+- This is technical acceptance, not accountant approval/full Step7 coverage,
+  approved opening import or new live source posting. Exact release pending.
+
+### Notification Live Acceptance / Step 7 Isolated Acceptance Running - 2026-10-11 01:52 WAT
+
+- BRN-SCOPE-UI-002 bounded live PASS on ec7a8f4/Railway
+  3bde9bfc-b62c-4154-8574-80003183e4f9 successful, matching exact GitHub link,
+  public healthz:ok. Owner All->Lagos sidebar loads without old23 then17;
+  bell settles83 versus All131. Cached reverse switch shows own23, not17.
+  No live read/history writes or new records; those broader actions remain
+  covered by local scoped fixtures, not freshly claimed live production tests.
+- Step6 existing six technical phases/23distinct isolated checks reviewed,
+  not rebuilt. Real professional approval and live activation remain separate.
+- Step7 first source family is inactive engineering, not completed Step7 or
+  official source cutover. Deposit receipt/allocation/invoice collection and
+  linked reversal reuse the foundation; pure opening preview makes no writes.
+  No guessed classification for credit notes, write-offs or excess collections.
+- Mapping units12PASS/full44files292PASS/3existing skips; buildPASS before final
+  safeguards. Existing isolated PostgreSQL tunnel is running the full foundation
+  and seven new source controls in a run-owned schema; results pending. Public
+  isolated source baseline must remain unchanged and owned schema/tunnel removed.
+
 ### Release And Step 7 Work Authorised - 2026-10-11 01:34 WAT
 
 - Publish notification fix using prior local PASS evidence; deployment and fresh

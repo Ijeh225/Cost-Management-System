@@ -1,5 +1,16 @@
 # Branch-Switch Dashboard Display Fix
 
+## 2026-10-11 01:52 WAT - Notification Published And Live Accepted
+
+- ec7a8f42dc787038cf1e4aaf5f8bfe9c24781610 pushed; exact Railway
+  3bde9bfc-b62c-4154-8574-80003183e4f9 successful/ACTIVE with matching source
+  link; public healthz:ok. All->Lagos mobile sidebar loads without old23,
+  settles17/bell83; All bell131, cached reverse sidebar23. Bounded original
+  badge/bell defect closed. No live read/history/financial writes; retain local
+  fixture coverage separately. Earlier local-pending entries are historical.
+- Protected pre-Step7 tag at ec7a8f4 created/pushed; all older tags preserved.
+  Accounting continuation is recorded in 2026-10-11-accounting-source-integration.md.
+
 ## 2026-10-11 01:34 WAT - Publication And Step 7 Authorised
 
 - Owner requests completed fix be committed/pushed/deployed, checks all six

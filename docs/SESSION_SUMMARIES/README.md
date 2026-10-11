@@ -20,7 +20,9 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-10-11 dashboard accepted; notification publication and inactive Step7 authorised, updated 01:34 WAT](2026-10-11-branch-scope-display-fix.md)
+- [2026-10-11 foundation and first Step7 source acceptance passed; publishing inactive, updated 02:15 WAT](2026-10-11-accounting-source-integration.md)
+
+- [2026-10-11 notification deployed and bounded live badge acceptance passed, updated 01:52 WAT](2026-10-11-branch-scope-display-fix.md)
 
 - [2026-10-11 existing branch units fit stated scope; extra company hierarchy not required, refresh display defect logged, updated 00:42 WAT](2026-10-11-accounting-group-clarification.md)
 
