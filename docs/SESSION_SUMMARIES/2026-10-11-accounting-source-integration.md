@@ -1,5 +1,18 @@
 # Accounting Source Integration - Step 7
 
+## 2026-10-11 13:15 WAT - Remaining Connections Deployed Inactive
+
+- Committed/pushed fd5e13146cb1d40ed02e95cfaa17cd7b0c62a52d; exact
+  Railway2e7d718f-df0c-4041-8c97-b60fb9a876e8 SUCCESS. Public healthz:ok.
+  Official SSH inactive deployed bundle smoke PASS, zero DB connections/writes.
+- Both production native switches remain absent/defaultOFF. Checkpoint preserved;
+  isolated fixtures/tunnels cleaned, existing live figures/source records unchanged.
+- Remaining EXISTING Step7 source engineering complete within declared scope.
+  Real accountant approval, chart/scope/cutover/opening and historical attribution
+  still pending; no invented recovery/subledger or official books activation.
+- Resume next engineering Step8 public GL/Trial Balance only after owner directs;
+  no need to repeat accepted Step7 tests. Records-only publication follows.
+
 ## 2026-10-11 13:10 WAT - Remaining Supported Engineering Accepted
 
 - Final shared13/13 PASS (743s), verifies invoiceId/reassignment and all existing

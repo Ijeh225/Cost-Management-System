@@ -2,6 +2,24 @@
 
 ## Current Work Register - Authoritative as of 2026-10-11
 
+### Remaining Step 7 Deployed INACTIVE / Exact Resume Point - 2026-10-11 13:15 WAT
+
+- Functional fd5e13146cb1d40ed02e95cfaa17cd7b0c62a52d committed/pushed;
+  Railway2e7d718f-df0c-4041-8c97-b60fb9a876e8 SUCCESS with exact commitHash.
+  Live healthz:ok. Official SSH deployed settlement/invoice/operational/opening/
+  reconciliation inactive smoke PASS with zero DB connections/writes.
+- Both production native flags absent/defaultOFF, independently rechecked.
+  No production native schema, books, source edits or financial fixtures created.
+  Protected checkpoint-before-accounting-step7-2026-10-11 still points to ec7a8f4.
+- Supported Step7 engineering accepted/deployed:21 distinct isolated scenarios
+  across final runs plus final13 shared-source rerun;353units/3prior skips and
+  complete build/typechecks PASS. Records publication follows this functional proof.
+- Resume: await actual accountant approval and real chart/scope/cutover/opening
+  controls; do not repeat completed source tests or activate posting on dummy
+  evidence. Next engineering roadmap is Step8 General Ledger/Trial Balance UI,
+  not started or included here. Historical attribution and unsupported recovery/
+  subledgers remain disclosed limits in ACCOUNTING_SOURCE_CONNECTIONS.md.
+
 ### Remaining Step 7 Engineering Accepted / Publishing - 2026-10-11 13:10 WAT
 
 - All remaining EXISTING supported source adapters implemented in the same native

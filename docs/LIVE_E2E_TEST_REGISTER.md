@@ -2,6 +2,18 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-11
 
+### Remaining Step 7 Exact Deployment Acceptance - 2026-10-11 13:15 WAT
+
+- fd5e13146cb1d40ed02e95cfaa17cd7b0c62a52d deployed successfully as
+  Railway2e7d718f-df0c-4041-8c97-b60fb9a876e8; matching commitHash/SUCCESS
+  confirmed. Public healthz:ok; deployed SSH inactive bundle checks PASS for
+  settlement/invoice/operational/reviewed opening/reconciliation gates, zero DB.
+- Both native flags absent/defaultOFF. Isolated accepted21distinct Step7 cases,
+  final13shared regression,353unit/3prior skips and build evidence retained.
+- No live financial write/retest or official acceptance inferred: posting is
+  inactive pending real approved policy/cutover/opening/historical controls.
+  Next public accounting interfaces belong to Step8, not this completed scope.
+
 ### Remaining Step 7 Supported Engineering Acceptance PASS - 2026-10-11 13:10 WAT
 
 - Accepted21 distinct Step7 source/opening cases through final hardened5 and

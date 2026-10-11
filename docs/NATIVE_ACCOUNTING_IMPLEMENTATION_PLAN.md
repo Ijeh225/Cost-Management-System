@@ -2,6 +2,10 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
+Latest deployment2026-10-11 13:15 WAT: fd5e131 exact Railway
+2e7d718f-df0c-4041-8c97-b60fb9a876e8 SUCCESS; public health and deployed
+zero-DB inactive smoke PASS. Both live native switches remain OFF. Step7 existing
+supported engineering accepted/deployed; real professional/cutover gates pending.
 Latest2026-10-11 13:10 WAT: Step7 EXISTING supported-source engineering complete
 and accepted:21distinct source/opening scenarios plus final13shared regression,
 353unit PASS/3prior skips and full build. Inactive publication next. Actual
