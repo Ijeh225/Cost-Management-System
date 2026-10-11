@@ -4,10 +4,9 @@ Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
 Status updated2026-10-10 22:35 WAT: Step6 inactive engineering foundation built,
 accepted and deployed/verified at40aec3d. Professional policy review remains next.
-Updated2026-10-11 02:15 WAT: Step7 STARTED; first deposit/invoice-settlement
-source family and opening validation accepted in isolation; publication in
-progress, inactive and not complete. Steps8-12 not started. Real6A approval
-remains outstanding.
+Updated2026-10-11 02:23 WAT: Step7 STARTED; first deposit/invoice-settlement
+source family and opening validation accepted/deployed INACTIVE at5eee767,
+not complete. Steps8-12 not started. Real6A approval remains outstanding.
 Accountant policy, named permissions and production cutover are not yet approved.
 The original21:17 roadmap below is preserved; current evidence appears at the end.
 
@@ -215,6 +214,17 @@ Exit: each module has documented implementation/deployment/live acceptance,
 unresolved exceptions remain explicit and the exact next action is recorded.
 
 ## Current Status / Exact Next Action
+
+2026-10-11 02:23 WAT:5eee767 pushed; exact Railway
+b19f20c5-a54a-491b-8882-cb40845c0fe4 SUCCESS/matching commitHash; healthz:ok.
+Deployed inactive-bundle smoke PASS, zero DB connections/writes, both flags off.
+Full30 and final focused8 cover31distinct controls;292units/3prior skips/build
+PASS. Both isolated schemas/baseline guards/tunnels cleaned. No official source
+cutover, public UI, opening posting or production books/grants/schema created.
+Next issued-invoice/AR/revenue/tax mapping, then other Step7 source families and
+approved openings/reconciliation; real6A professional approval remains pending.
+Do not call Step7 fully complete or reactivate old Part A issues. Protected
+pre-Step7 ec7a8f4 tag and earlier verified DB/code checkpoints retained.
 
 2026-10-11 02:15 WAT: first Step7 family accepted, publication in progress.
 Full30/30 (23foundation+7initial source), final focused8/8 (23filtered),31

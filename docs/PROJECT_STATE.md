@@ -2,6 +2,36 @@
 
 ## Current Work Register - Authoritative as of 2026-10-11
 
+### Step 7 First Source Family Deployed Inactive - 2026-10-11 02:23 WAT
+
+- Functional5eee7675926d8d6e69308213d64d5b27e5fa2060 committed/pushed to
+  origin/master. Exact Railway b19f20c5-a54a-491b-8882-cb40845c0fe4 SUCCESS
+  with matching commitHash verified via authenticated provider CLI; public
+  healthz:ok. Deployed internal bundle smoke via official SSH PASS: deposit/
+  zero-cash allocation/opening preview, credit refusal and disabled source
+  preview/preparation gates; zero DB connections/writes. Both live schema and
+  posting switches remain inactive. No new public accounting screen/auto-poster.
+- Step6 engineering exists and fresh23foundation controls passed within full30;
+  real6A policy/chart/legal-book/calendar/cutover/named grants approval remains
+  unconfirmed, not replaced with dummy test approvals. No duplicate foundation.
+- Step7 STARTED/PARTIAL, first deposit/invoice-settlement family accepted and
+  deployed inactive. Final source8/8 and full30/30 together31distinct controls,
+  not one final31run; final292units/3existing skips, build/typechecks PASS.
+  Owned schema, public isolated baseline guards and both tunnel cleanup PASS.
+- Protected pre-Step7 code tag at ec7a8f4 and older code/DB checkpoints preserved.
+  Production financial sources, native schema/books/grants and opening balances
+  not created/modified. Existing dashboard/operational/financial calculations
+  untouched; notification ec7a8f4 live acceptance remains separately recorded.
+- Exact next engineering family: issued-invoice/AR/revenue/tax source mapping
+  behind the same explicit approved-policy boundary, then credit notes/bad debts,
+  duty/disbursements, overhead/schedules, funding/transfers and supported assets/
+  advances/loans/equity. Approved openings/import, source completeness and control
+  reconciliation must precede live activation. Do NOT start Steps8-12 or claim
+  official accounting/full Step7 complete. Current flags remain false.
+- Both authoritative registers, roadmap and timestamped session/index updated;
+  records-only publication follows functional release evidence. No extra tests
+  or duplicate live fixtures required merely to update documentation.
+
 ### Step 7 First Family Accepted / Publication In Progress - 2026-10-11 02:15 WAT
 
 - Final isolated source8/8PASS (23foundation cases intentionally filtered out).

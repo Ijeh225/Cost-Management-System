@@ -2,6 +2,26 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-11
 
+### Inactive Source Release Verified - 2026-10-11 02:23 WAT
+
+- Functional5eee7675926d8d6e69308213d64d5b27e5fa2060 pushed; Railway
+  b19f20c5-a54a-491b-8882-cb40845c0fe4 SUCCESS, exact commitHash match,
+  public healthz:ok. Official SSH deployed bundle smoke PASS with no database
+  connection/write: mapping/opening previews and fail-closed posting/preview
+  gates. Both production accounting switches inactive, no production source test.
+- Accepted31distinct cases across full30/30 (23foundation+7initial source)
+  and final focused8/8 (23filtered), NOT a final single31run. Final source run
+  covers receipt integrity, allocation/reversal, concurrency, stale approval,
+  forbidden/ambiguous mappings, source identity, branch/period/cutover controls.
+  Public isolated financial guard, owned-schema cleanup and tunnel closure PASS.
+- Full292unit/3prior skips (44files), build/typechecks/local/deployed inactive
+  smoke PASS. Source implementation accepted for FIRST Step7 FAMILY ONLY;
+  no official openings/revenue/GL/TB or complete source coverage claimed.
+- Outstanding: real6A professional policy approval; remaining Step7 mappings,
+  dated openings/import/reconciliation and separately authorised activation.
+  Notifications fix already deployed/bounded live-accepted at ec7a8f4; do not
+  reopen old closed Part A finance/CAP/role findings or repeat completed fixtures.
+
 ### Final Step 7 Source Acceptance PASS / Release Pending - 2026-10-11 02:15 WAT
 
 - Final focused8/8PASS;23foundation tests intentionally filtered, not failures.
