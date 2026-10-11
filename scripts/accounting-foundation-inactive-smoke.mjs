@@ -1,7 +1,7 @@
 // Safe deployed-bundle acceptance: no credentials, database connection or writes.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-const { NativeAccounting, accountingEnabled, buildSettlementJournal, previewOpeningBalances } =
+const { NativeAccounting, accountingEnabled, buildSettlementJournal, previewOpeningBalances, buildInvoiceJournal } =
   createRequire(import.meta.url)("../artifacts/api-server/dist/accounting-foundation.cjs");
 assert.equal(accountingEnabled(), false, "This smoke is for an INACTIVE release only");
 assert.notEqual(process.env.NATIVE_ACCOUNTING_SCHEMA_ENABLED, "true", "Live schema must remain inactive");
@@ -13,6 +13,11 @@ assert.equal(buildSettlementJournal(1, source, mapping).cashMovement, "100.00");
 assert.equal(buildSettlementJournal(1, { ...source, kind: "invoice_payment", id: 9, entryType: "payment",
   amount: "30.00", sourceDepositId: 4, paymentMethod: "deposit", bankId: null }, mapping).cashMovement, "0.00");
 assert.throws(() => buildSettlementJournal(1, { ...source, kind: "invoice_payment", entryType: "payment", paymentMethod: "credit" }, mapping));
+const invoiceMapping = { currency: "NGN", policyVersion: "smoke-only", evidence: "Dummy invoice review",
+  recognitionDate: "2026-10-11", recognitionEvidence: "Dummy date review", receivableAccountId: 110,
+  items: [{ itemId: 1, splits: [{ accountId: 400, amount: "100", treatment: "income", evidence: "Dummy fee" }] }] };
+assert.equal(buildInvoiceJournal(1, { kind: "invoice", id: 8, branchId: 2, clientId: 8, createdDate: "2026-10-11",
+  subtotal: "100", vatAmount: "0", total: "100", items: [{ id: 1, containerId: null, amount: "100" }] }, invoiceMapping).cashMovement, "0.00");
 assert.equal(previewOpeningBalances({ bookId: 1, branchId: 2, currency: "NGN", cutoverDate: "2026-10-11",
   policyVersion: "smoke-only", strategy: "opening_balances_forward", ownerEvidence: "Dummy owner",
   accountantEvidence: "Dummy accountant", sourceCoverageEvidence: "Dummy coverage", lines: [
@@ -22,5 +27,7 @@ let connections = 0;
 const engine = new NativeAccounting({ connect: async () => { connections++; throw new Error("Smoke must not connect"); } });
 for (const method of ["previewSettlement", "prepareSettlement"])
   await assert.rejects(() => engine[method](1, 2, 3, { kind: "client_deposit", id: 4 }, mapping), { code: "ACCOUNTING_DISABLED" });
+for (const method of ["previewInvoice", "prepareInvoice"])
+  await assert.rejects(() => engine[method](1, 2, 3, 8, invoiceMapping), { code: "ACCOUNTING_DISABLED" });
 assert.equal(connections, 0);
-console.log("PASS: deployed inactive accounting bundle, settlement/opening previews, posting gates; zero database connections/writes");
+console.log("PASS: deployed inactive accounting bundle, settlement/invoice/opening previews, posting gates; zero database connections/writes");

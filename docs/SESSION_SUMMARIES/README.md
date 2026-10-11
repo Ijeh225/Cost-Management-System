@@ -20,7 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-10-11 foundation checked; first Step7 source family accepted/deployed inactive, updated 02:23 WAT](2026-10-11-accounting-source-integration.md)
+- [2026-10-11 Step7 invoice recognition accepted; inactive publication in progress, updated 10:55 WAT](2026-10-11-accounting-source-integration.md)
 
 - [2026-10-11 notification deployed and bounded live badge acceptance passed, updated 01:52 WAT](2026-10-11-branch-scope-display-fix.md)
 

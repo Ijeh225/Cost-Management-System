@@ -114,6 +114,14 @@ Exit: Step6 foundation accepted, ready for explicit source mappings in Step7.
 
 ### Source Mapping Register
 
+2026-10-11 10:38 WAT: owner authorises further inactive engineering while awaiting
+accountant replies. Deposit/collection family already deployed. Issued-invoice
+recognition now implemented internally with explicit reviewed recognition date,
+item-level income/client-funds splits and recorded VAT; no mutable status/update
+timestamp used as an issue date. Source-ID deduplication and independent approval
+reuse the existing engine. New18units PASS; isolated source acceptance/build/full
+units and publication pending. This is not full Step7 or live source activation.
+
 | Existing source | Required accounting connection / control |
 | --- | --- |
 | Issued invoices and invoice items | Approved recognition date; customer receivable, earned revenue/tax or other supported treatment; exclude drafts/cancelled items |
@@ -214,6 +222,27 @@ Exit: each module has documented implementation/deployment/live acceptance,
 unresolved exceptions remain explicit and the exact next action is recorded.
 
 ## Current Status / Exact Next Action
+
+2026-10-11 10:55 WAT: final issued-invoice5/5PASS after canonical retry fix;
+earlier combined13/13PASS (5invoice+8settlement), prior23foundation not rerun.
+Both schema/public isolated baseline/tunnel cleanup PASS. Final311unit/3prior
+skips/build/typechecks/inactive smoke PASS. Publication/exact inactive provider
+proof next. Invoice recognition requires reviewed date, per-item income/client-
+funds split and recorded VAT; source status changes cannot duplicate recognition.
+Native variables absent/inactive; no official source activation or public UI.
+Next credit-note/client-credit/write-off/recovery mapping, other source families,
+approved dated openings/import and control reconciliation. Real6A approval still
+pending; protected pre-Step7 checkpoint retained. Step7 NOT fully complete.
+
+2026-10-11 10:43 WAT: continuing approved inactive Step7 engineering. Issued
+invoice adapter built,19focused units PASS; final fullunits/build/isolated
+invoice+settlement acceptance pending. Explicit date/evidence, income/client-
+funds splits and recorded VAT; no guessed issue date, source write or auto-post.
+Existing journal evidence4000character limit fails closed for oversized reviews;
+other pass-through/asset treatments require dedicated reviewed support. Production
+native variables absent (inactive defaults), no live activation. Next finish
+acceptance/publish inactive, then credits/bad debts and remaining source families,
+approved openings/reconciliation/cutover. Actual professional approval pending.
 
 2026-10-11 02:23 WAT:5eee767 pushed; exact Railway
 b19f20c5-a54a-491b-8882-cb40845c0fe4 SUCCESS/matching commitHash; healthz:ok.

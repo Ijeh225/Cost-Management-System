@@ -5,6 +5,7 @@ import { ACCOUNTING_PERMISSIONS, accountingDate, journalHash, minorToMoney, norm
 import { financialDateKey } from "./financial-reporting.js";
 import { isInvoiceFinanciallyActive } from "./invoice-status.js";
 import { buildSettlementJournal, settlementEventKey, type AccountingSettlementRef, type SettlementMapping, type SettlementSource } from "./accounting-source-mapping.js";
+import { buildInvoiceJournal, invoiceEventKey, type InvoiceAccountingMapping, type InvoiceAccountingSource } from "./accounting-invoice-mapping.js";
 
 type Database = Pick<typeof pool, "connect">;
 async function connectClient(database: Database) { return database.connect(); }
@@ -168,6 +169,53 @@ export class NativeAccounting {
     normalizeJournal(input);
     return this.transaction(input.bookId, client => this.prepare(client, actorId, input));
   }
+  private async invoiceDraft(client: Client, bookId: number, branchId: number, actorId: number,
+    invoiceId: number, mapping: InvoiceAccountingMapping, permission: "read" | "prepare") {
+    invoiceEventKey(invoiceId);
+    await this.permission(client, bookId, branchId, actorId, permission);
+    const book = (await client.query("SELECT * FROM accounting_books WHERE id=$1", [bookId])).rows[0];
+    requireAccounting(book?.status === "approved" && book.policy_version === mapping.policyVersion && book.currency === mapping.currency,
+      "BOOK_NOT_APPROVED", "Matching approved book currency and policy version required");
+    const row = (await client.query("SELECT * FROM invoices WHERE id=$1 AND branch_id=$2 FOR SHARE", [invoiceId, branchId])).rows[0];
+    requireAccounting(row, "NOT_FOUND", "Invoice not found in this branch");
+    requireAccounting(["sent", "partial", "paid", "overdue"].includes(row.status)
+      && (!row.written_off_amount || moneyToMinor(row.written_off_amount) === 0n),
+    "SOURCE_REVIEW_REQUIRED", "Only issued invoices without write-off history are supported by this mapping");
+    const customer = (await client.query("SELECT branch_id FROM clients WHERE id=$1 FOR SHARE", [row.client_id])).rows[0];
+    requireAccounting(customer?.branch_id === branchId, "SOURCE_REVIEW_REQUIRED", "Linked invoice customer must belong to this branch");
+    const credits = (await client.query("SELECT id FROM credit_notes WHERE invoice_id=$1 AND status='active' FOR SHARE", [invoiceId])).rows;
+    requireAccounting(credits.length === 0, "SOURCE_REVIEW_REQUIRED", "Credit-note history requires its own reviewed source mapping");
+    const items = (await client.query("SELECT id,branch_id,container_id,amount FROM invoice_items WHERE invoice_id=$1 ORDER BY id FOR SHARE", [invoiceId])).rows;
+    requireAccounting(items.every(item => item.branch_id === branchId), "SOURCE_REVIEW_REQUIRED", "Invoice items cannot cross branches");
+    const containerIds = [...new Set(items.flatMap(item => item.container_id === null ? [] : [item.container_id]))];
+    if (containerIds.length) {
+      const containers = (await client.query("SELECT id,branch_id FROM containers WHERE id=ANY($1::int[]) FOR SHARE", [containerIds])).rows;
+      requireAccounting(containers.length === containerIds.length && containers.every(container => container.branch_id === branchId),
+        "SOURCE_REVIEW_REQUIRED", "All linked invoice containers must belong to this branch");
+    }
+    const source: InvoiceAccountingSource = { kind: "invoice", id: invoiceId, branchId, clientId: row.client_id,
+      createdDate: financialDateKey(new Date(row.created_at)), subtotal: row.subtotal, vatAmount: row.vat_amount, total: row.total,
+      items: items.map(item => ({ id: item.id, containerId: item.container_id, amount: item.amount })) };
+    const draft = buildInvoiceJournal(bookId, source, mapping);
+    requireAccounting(draft.input.accountingDate >= book.policy.cutoverDate, "BEFORE_CUTOVER", "Earlier recognition requires approved openings/import");
+    const accounts = (await client.query("SELECT id,category FROM accounting_accounts WHERE book_id=$1 AND active AND id=ANY($2::int[])",
+      [bookId, [...draft.requiredCategories.keys()]])).rows;
+    const categories = new Map(accounts.map(account => [account.id, account.category]));
+    requireAccounting([...draft.requiredCategories].every(([id, category]) => categories.get(id) === category),
+      "INVALID_MAPPING", "Each reviewed AR, income, client-funds and tax account must be active and correctly classified in this book");
+    return { ...draft, source };
+  }
+  async previewInvoice(bookId: number, branchId: number, actorId: number, invoiceId: number, mapping: InvoiceAccountingMapping) {
+    return this.transaction(bookId, client => this.invoiceDraft(client, bookId, branchId, actorId, invoiceId, mapping, "read"));
+  }
+  async prepareInvoice(bookId: number, branchId: number, actorId: number, invoiceId: number, mapping: InvoiceAccountingMapping) {
+    return this.transaction(bookId, async client => {
+      const draft = await this.invoiceDraft(client, bookId, branchId, actorId, invoiceId, mapping, "prepare");
+      const journal = await this.prepare(client, actorId, draft.input);
+      requireAccounting(journal.status !== "cancelled", "SOURCE_CANCELLED", "Cancelled invoice draft requires reviewed correction, not a second posting");
+      return journal;
+    });
+  }
   private async settlementDraft(client: Client, bookId: number, branchId: number, actorId: number,
     ref: AccountingSettlementRef, mapping: SettlementMapping, permission: "read" | "prepare") {
     settlementEventKey(ref);
@@ -279,7 +327,9 @@ export class NativeAccounting {
       if (journal.event_key.startsWith("source:")) {
         const evidence = (await client.query("SELECT evidence FROM accounting_journals WHERE id=$1", [journalId])).rows[0];
         const saved = JSON.parse(evidence.evidence);
-        const current = await this.settlementDraft(client, bookId, branchId, actorId, saved.source, saved.mapping, "read");
+        const current = saved.source.kind === "invoice"
+          ? await this.invoiceDraft(client, bookId, branchId, actorId, saved.source.id, saved.mapping, "read")
+          : await this.settlementDraft(client, bookId, branchId, actorId, saved.source, saved.mapping, "read");
         requireAccounting(journalHash(normalizeJournal(current.input)) === journal.payload_hash,
           "SOURCE_CHANGED", "Source or mapping changed after preparation; do not post stale evidence");
       }

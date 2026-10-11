@@ -2,6 +2,62 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-11
 
+### Final Step 7 Invoice Acceptance PASS / Release Pending - 2026-10-11 10:55 WAT
+
+- Final5/5invoice cases PASS after object-key-order hardening;31other cases
+  filtered. Earlier combined13/13PASS =5invoice+8settlement;23prior foundation
+  cases deliberately not rerun this turn. Both owned-schema/public isolated
+  three-source baseline/tunnel cleanup checks PASS. No production dummy records.
+- Final311units/3prior skips (45files;19new mapping cases), full typechecks/build
+  and inactive rebuilt bundle smoke PASS. Acceptance includes multi-container/
+  shared-B/L invoice totals once, actual collection and zero-cash allocation,
+  independent approval/retry dedupe, source/category/branch/cutover/period refusals.
+- Publication/exact inactive deployment proof pending. Real6A professional rules,
+  remaining Step7 source families, approved openings/reconciliation/cutover not
+  complete. Existing source reports remain unchanged; no native official posting.
+
+### Combined Step 7 Source Acceptance PASS - 2026-10-11 10:49 WAT
+
+- Isolated13/13PASS:5new invoice +8existing deposit/collection controls.23prior
+  foundation cases deliberately filtered. Owned schema removed, public isolated
+  invoice-payment/deposit/schedule-payment baseline guards PASS, tunnel closed.
+- Invoice/AR/tax recognition once per source, no shared-B/L/item multiplication,
+  zero cash at issuance, actual receipt once and deposit allocation no second
+  receipt. Concurrent source/post retry and status-change dedupe, stale linkage,
+  cancelled drafts, unsupported credit/write-off history, branch/account/grant/
+  policy/cutover/period restrictions accepted. No production financial write test.
+- Final canonical object-key-order fix remains in focused5invoice acceptance;
+  combined run predates that delta. Final311unit/3prior skips/build/typechecks/
+  inactive local smoke PASS. Deployment/official accounting approval still pending.
+
+### Final Invoice Mapping Units / Build PASS - 2026-10-11 10:45 WAT
+
+- Final45unit files311PASS/3prior skips,19new mapping cases, full typechecks/
+  railway:build and rebuilt inactive bundle smoke PASS. Added equivalent object-
+  key ordering protection; no false retry conflict from rearranged JSON fields.
+  Smoke asserts invoice and settlement gates before any DB connection/write.
+- Combined13isolated source cases (8settlement+5invoice) still running; the
+  process imported code before final canonical key-order hardening, so a final
+  five-invoice run will confirm that delta. Do not claim final DB acceptance yet.
+- Production native variables absent/inactive defaults; no configuration changes.
+  Existing pre-Step7 checkpoint tag preserved. Publication remains pending.
+
+### Step 7 Issued-Invoice Mapping / Isolated Acceptance Running - 2026-10-11 10:38 WAT
+
+- Owner requests continuing Step7 while professional rules are pending. Existing
+  deposit/collection engine reused, no duplicate accounting register or live data.
+  Added internal issued-invoice preview/preparation and approval revalidation:
+  reviewed recognition date (source has no immutable issued date), exact per-item
+  income/client-funds splits, recorded tax control and source-ID deduplication.
+  Invoice creation/status/collections and existing live reports are untouched.
+- New18mapping units PASS: multi-container header once, zero cash at recognition,
+  exact decimals, split/tax evidence, canonical retries and disabled-before-connect.
+  Railway isolated Step7 source regressions running, full unit/build pending;
+  do not describe these as passed, deployed or a production financial write test.
+- No real policy/grant/opening approval inferred. Both production native switches
+  remain off. Next: accept isolated invoice+existing settlement controls, publish
+  inactive engineering only, then remaining Step7 families/reconciliation/cutover.
+
 ### Inactive Source Release Verified - 2026-10-11 02:23 WAT
 
 - Functional5eee7675926d8d6e69308213d64d5b27e5fa2060 pushed; Railway

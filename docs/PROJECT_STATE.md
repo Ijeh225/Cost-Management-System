@@ -2,6 +2,79 @@
 
 ## Current Work Register - Authoritative as of 2026-10-11
 
+### Step 7 Invoice Recognition Accepted / Publication In Progress - 2026-10-11 10:55 WAT
+
+- Final isolated5/5invoice PASS after canonical key-order delta;31other cases
+  intentionally filtered. Earlier combined13/13 exercised new5invoice and all
+  8existing settlement controls;23prior foundation controls not rerun this turn.
+  Both run-owned schemas removed, public isolated three-source baseline guards
+  unchanged, both authenticated test tunnels closed. No production data writes.
+- Final45unit files311PASS/3prior skips (19new mapping cases), full typechecks/
+  railway:build and rebuilt inactive bundle smoke PASS. One source-ID recognition,
+  exact AR/income or client-funds/recorded-VAT splits, no second cash on allocation,
+  concurrency, changed-source refusal and approval/branch/period checks accepted.
+- Native invoice mapping is internal/inactive; production native variables absent
+  (fail-closed defaults), no new schema/books/grants/openings/auto-posting or UI.
+  Existing financial sources/reports and protected pre-Step7 ec7a8f4 tag retained.
+- Commit/push/exact Railway/health/deployed smoke proof in progress. Step7 remains
+  partial, real6A accountant approval pending. Next source family is credit notes/
+  client credit/bad debts/recoveries using their existing operational sources;
+  existing ACCT004/005 cash/AR fixes remain closed, not duplicate work. Then duty/
+  disbursements, overhead/schedules, funding/transfers, supported assets/advances/
+  loans/equity, dated approved openings/import, completeness/reconciliation/cutover.
+- Limitations: review evidence above existing4000characters is refused; unsupported
+  asset/pass-through/legacy treatments need dedicated approved mappings. No guessed
+  source date, full Step7/GL/TB/official accounting or production acceptance claim.
+
+### Step 7 Invoice / Settlement Integration PASS - 2026-10-11 10:49 WAT
+
+- Combined isolated13/13PASS:5invoice recognition +8existing settlement cases;
+ 23prior Step6 cases intentionally filtered, not newly rerun or failed. Owned
+ schema cleanup, three public isolated cash-source baseline guards and test
+ tunnel closure PASS. No new live fixture, production schema or source posting.
+- One shared-B/L/two-container dummy invoice recognised once; recorded VAT/AR/
+ income, cash collection and deposit allocation reconcile without another cash
+ receipt. Concurrent prepares/posts deduplicated, changed source/review refused,
+ independent approval, branch/account/policy/date/period restrictions retained.
+- Final canonical object-key retry hardening occurred after combined run loaded
+ modules; final five-invoice run now underway for that delta. Final311unit/
+ 3existing skips/full build/typechecks/inactive rebuilt smoke PASS. Publication
+ remains pending final DB acceptance, not a live accounting activation.
+
+### Step 7 Invoice Adapter Implemented / Final Acceptance Pending - 2026-10-11 10:43 WAT
+
+- Added internal previewInvoice/prepareInvoice through the existing engine and
+  source revalidation at independent approval. Exact source invoice ID, header/
+  item reconciliation, own-branch client/containers and active book categories;
+  item splits aggregate once, even with several containers sharing one B/L.
+- Explicit supported income/client-funds liability splits and separate recorded
+  VAT control only. Other pass-through/asset/legacy treatments need separately
+  reviewed support; no accountant rule or 7.5% tax rate inferred. Recognition date
+  requires evidence and cannot predate source creation or approved cutover.
+  Source status/updated_at is not hashed as immutable recognition evidence;
+  later collection status changes do not generate another recognition journal.
+- New19pure mapping units PASS; earlier full310unit/3prior skips/build passed
+  before final canonical object-key retry hardening. Final full units/build and
+  isolated source run still pending. Source evidence exceeding existing4000
+  character journal limit is refused, not truncated or silently summarised.
+- Provider read verifies native posting/schema variables ABSENT, not true;
+  defaults are fail-closed. No production flag/schema/source/book/grant writes,
+  official openings or public accounting interface. Step7 remains partial.
+
+### Step 7 Issued-Invoice Family Authorised - 2026-10-11 10:29 WAT
+
+- Owner authorises continuing Step7 engineering while awaiting accountant reply.
+  Resume issued-invoice/AR/revenue/tax family, not duplicate deposits/collections,
+  a new ledger or Steps8-12. Clean restored master1d96879; preserve checkpoints.
+- Source review: invoice status issuance does not store an immutable issue date;
+  created_at is draft creation and updated_at can change on payments. Require
+  explicit reviewed recognition date/evidence, not infer it from either field.
+  Require per-item exact income/client-funds splits and explicit tax control,
+  not assume all-inclusive charges are all earned income or recalculate VAT.
+- Reuse current source/engine/approval/branch/period/idempotency controls. Keep
+  source writes, public auto-posting, native schema and activation off; no real
+  accountant approval/openings/grants inferred. Implementation/tests pending.
+
 ### Step 7 First Source Family Deployed Inactive - 2026-10-11 02:23 WAT
 
 - Functional5eee7675926d8d6e69308213d64d5b27e5fa2060 committed/pushed to
