@@ -2,6 +2,27 @@
 
 ## Current Work Register - Authoritative as of 2026-10-11
 
+### Step 7 Invoice Recognition Deployed Inactive - 2026-10-11 11:00 WAT
+
+- Functional d0d8c0ceb81f71c3ea82b749bdb5b85e41d814c3 committed/pushed.
+  Exact Railway f4ddb2b0-c713-4b0a-a6b8-0fc1e0149b86 SUCCESS with matching
+  commitHash verified through authenticated CLI. Public healthz:ok; official SSH
+  deployed bundle smoke PASS: invoice/settlement/opening pure checks and disabled
+  preview/preparation gates before any connection, zero DB connections/writes.
+- Final invoice5/5 and earlier combined13/13 accepted; final311unit/3prior
+  skips/build/typechecks PASS. Isolated schemas/baseline guards/tunnels cleaned.
+  Both production native switches inactive (variables absent, defaults off).
+  No live financial records, native schema/books/grants/openings or current UI/
+  report calculations changed. Protected pre-Step7 ec7a8f4 tag remains intact.
+- Step7 PARTIAL: deposits/collections and issued-invoice recognition engineering
+  now accepted/deployed inactive. Real6A professional policy approval still pending.
+  Exact next native source family: credit notes/client credit/bad debts/recoveries,
+  then remaining recorded source families and approved dated openings/import,
+  completeness/control reconciliation and separately authorised live cutover.
+- Both registers, roadmap and timestamped session/index updated. Records-only
+  publication follows this functional release proof; no duplicate test or live
+  invoice needed. Evidence-size/unsupported-treatment boundaries remain explicit.
+
 ### Step 7 Invoice Recognition Accepted / Publication In Progress - 2026-10-11 10:55 WAT
 
 - Final isolated5/5invoice PASS after canonical key-order delta;31other cases

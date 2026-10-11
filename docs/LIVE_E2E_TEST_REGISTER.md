@@ -2,6 +2,22 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-11
 
+### Exact Inactive Invoice Source Release Accepted - 2026-10-11 11:00 WAT
+
+- d0d8c0ceb81f71c3ea82b749bdb5b85e41d814c3 pushed; exact Railway
+  f4ddb2b0-c713-4b0a-a6b8-0fc1e0149b86 SUCCESS/matching commitHash verified.
+  Public healthz:ok, official SSH deployed native bundle smoke PASS: invoice/
+  settlement/opening previews and fail-closed gates, zero DB connections/writes.
+  Native schema/posting flags inactive; no production financial write scenario.
+- Final5invoice cases PASS after retry-order delta; earlier combined13source
+  cases PASS,23previous foundation controls not rerun this turn. Final311unit/
+  3prior skips/build/typechecks PASS; both isolated schemas/baseline guards and
+  tunnel closures PASS. No duplicate fixtures or source facts created in live app.
+- Acceptance is INACTIVE Step7 source engineering, not full Step7/official books.
+  Next source families, approved openings/reconciliation/cutover and real6A
+  accountant approval remain outstanding. Prior closed Part A/CAP findings stay
+  closed. Protected code/DB checkpoints preserved; records-only publication next.
+
 ### Final Step 7 Invoice Acceptance PASS / Release Pending - 2026-10-11 10:55 WAT
 
 - Final5/5invoice cases PASS after object-key-order hardening;31other cases

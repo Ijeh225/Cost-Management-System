@@ -223,6 +223,17 @@ unresolved exceptions remain explicit and the exact next action is recorded.
 
 ## Current Status / Exact Next Action
 
+2026-10-11 11:00 WAT: issued-invoice native mapping d0d8c0c pushed; exact
+Railway f4ddb2b0-c713-4b0a-a6b8-0fc1e0149b86 SUCCESS/commitHash match,
+healthz:ok, deployed inactive invoice/settlement/opening smoke PASS, zero DB
+connections/writes. Final5invoice and earlier13source tests PASS, final311unit/
+3prior skips/build/typechecks PASS; isolated schema/baseline/tunnel cleanup PASS.
+Native flags inactive; no official live accounting/source/schema/book/grant writes.
+Step7 partial, real6A approval outstanding. Next native credits/bad debts/
+recoveries, then remaining source families and approved dated openings/import,
+source completeness/control reconciliation and separately authorised activation.
+Existing protected checkpoints retained. Records-only publication follows proof.
+
 2026-10-11 10:55 WAT: final issued-invoice5/5PASS after canonical retry fix;
 earlier combined13/13PASS (5invoice+8settlement), prior23foundation not rerun.
 Both schema/public isolated baseline/tunnel cleanup PASS. Final311unit/3prior

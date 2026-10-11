@@ -1,5 +1,25 @@
 # Accounting Source Integration - Step 7
 
+## 2026-10-11 11:00 WAT - Issued-Invoice Family Deployed Inactive
+
+- Functional d0d8c0ceb81f71c3ea82b749bdb5b85e41d814c3 committed/pushed.
+  Railway f4ddb2b0-c713-4b0a-a6b8-0fc1e0149b86 SUCCESS, exact commitHash
+  verified via CLI. Public healthz:ok. Official SSH deployed-bundle smoke PASS
+  including invoice/settlement/opening checks and disabled gates before DB
+  connect: zero connections/writes. Production native switches remain inactive.
+- Final5invoice and earlier13source checks PASS; final311unit/3prior skips/
+  build/typechecks PASS. Both test schemas/public isolated baseline guards/
+  tunnels cleaned. No production source/schema/book/grant/opening/UI changes.
+- Existing deposit/collection first family reused, not rebuilt. Issued invoice
+  family uses explicit recognition date, reviewed per-item income/client-funds
+  splits and recorded VAT; no guessed tax/principal-agent rule. Official accountant
+  approval still pending, not replaced by isolated dummy approvals or deployment.
+- Step7 PARTIAL. Next credits/client-credit/write-offs/recoveries native mapping,
+  then other recorded source families, approved dated openings/import, complete
+  control reconciliation and separately authorised cutover. Steps8-12 not started.
+- Both registers, roadmap/index updated for records-only publication. Existing
+  protected tag/checkpoints retained. No repeated live test record or backfill.
+
 ## 2026-10-11 10:55 WAT - Final Invoice Acceptance / Publishing Inactive
 
 - Final5invoice cases PASS after canonical object-key retry fix,31other cases
