@@ -1,6 +1,101 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-10-10
+## Current Test and Defect Register - Authoritative as of 2026-10-11
+
+### BRN-SCOPE-UI-001 Release In Progress - 2026-10-11 01:02 WAT
+
+- Owner authorises commit/push/deploy; local regression evidence retained.
+  Exact Railway release/health/live branch-switch acceptance still pending.
+  No live test fixtures or financial changes required for this display fix.
+
+### BRN-SCOPE-UI-001 Local Regression PASS / Live Pending - 2026-10-11 00:59 WAT
+
+- Fix all eight dashboard data sources with branch-specific query identity and
+  matching explicit request scope; retain existing endpoint calculations and
+  permissions. No database/schema change or production data mutation.
+- Five focused cache/header tests PASS; full unit 42 files/275 PASS/3 prior skips;
+  complete railway:build/typechecks PASS. Local headless built-UI eight assertions
+  PASS: All->Lagos Operations, Lagos->All Finance, cached revisits, failed new
+  branch, loaded empty branch, rapid switches/late response, mobile, all eight
+  request-source headers. GET-only fixtures, no uncaught page errors or writes.
+- Existing Documentation/Invoice keyboard/responsive built-UI smoke PASS.
+  Test-only selector and rootDir import issues corrected before final acceptance.
+- Engineering acceptance only: no commit/push/deployment or fresh live acceptance
+  yet. Status implemented locally; bounded live re-test remains after exact
+  release verification. Other modules' cache behavior not claimed fixed/tested.
+
+### Branch Meaning Correction - 2026-10-11 00:42 WAT
+
+- Existing branch rows can be separate managed business units, including sister
+  companies or individual locations in the owner's operating model. No separate
+  group/company hierarchy requirement has been confirmed; absence is NOT a bug.
+- This supersedes the earlier company configuration capability-gap framing.
+  Existing scoped records/combined viewing retained; official policy mapping is
+  distinct. BRN-SCOPE-UI-001 remains unfixed. No new live test or source mutation.
+
+### Branch Positioning Read-Only Check - 2026-10-11 00:32 WAT
+
+- Inspected existing owner session: Branches, branch selector, User Management,
+  Branch Comparison, All Branches and Lagos dashboards. No duplicate fixtures,
+  source writes, role changes or new staff login/API negative test.
+- Branch list #1 Head Office/#2 test Lagos/#3 test Abuja; no Merit/Ace. All-time
+  financial dashboard matches comparison: Lagos4200-700-301-967.50=2231.50;
+  combined4201-701-15710303-967.50=-15707770.50. Operational counts settle
+  at10Lagos/17combined. This is bounded UI reconciliation, not all ledger balances
+  or statutory consolidation acceptance. Original All Branches Finance restored.
+
+| Issue | Priority | Evidence / cause | Correction required | Status |
+|---|---|---|---|---|
+| BRN-SCOPE-UI-001 | Medium | All->Lagos initially labels17containers and prior combined amounts as Lagos; settled count10. Lagos->All Finance initially labels4200revenue/2231.50net as combined; settled4201/-15707770.50. BranchProvider changes label and invalidates shared queries; original dashboard keys omitted scope. | Eight dashboard sources now key/bind requests to branch scope; unseen scopes load without old figures, cached revisits retain only own snapshot. | Fixed locally; 5 focused unit / 8 built-UI assertions and full build/suite PASS at 00:59 WAT. Commit/deployment/live acceptance pending. No persistent result mismatch or cross-role leakage proved. |
+
+- Operational model is flat branch scope, not company/group hierarchy. Generic
+  management overview exists but all-branch authority is Super Admin-only in
+  source. Absence of company parents is an architectural observation, not a
+  confirmed gap against the stated requirement (clarified00:42WAT). Prior
+  inactive accounting evidence remains unchanged.
+
+### Branch Requirement Clarified / No New Test - 2026-10-11 00:22 WAT
+
+- Owner confirms separate branch records and authorised overall management
+  visibility. Record as requirement, not newly tested branch/access acceptance.
+- No source mutations, fixtures, runtime changes, deployment checks or repeated
+  suites. Retain prior acceptance and unresolved official-policy decisions.
+
+### Group Naming Clarification / No New Test - 2026-10-11 00:16 WAT
+
+- Owner corrects Donclimax head-office name and describes Merit/Ace/future sister
+  companies. Recorded in policy draft; no new defect or verified legal mapping.
+- Prior inactive engineering acceptance unchanged. No live remapping, source
+  changes, test repetition, new fixtures, activation or provider check.
+
+### Partial Owner Policy Facts / No New Test - 2026-10-10 23:54 WAT
+
+- Group/location arrangement and all-inclusive commercial quoting recorded in
+  existing spec. Legal book scope, approved chart and year-end still unconfirmed;
+  proposed31December is not a verified setting. Not a new defect or tested policy.
+- No live data/schema/config change, repeated tests, fixtures or provider check.
+  Prior inactive engineering acceptance retained; no official source posting or
+  group consolidation acceptance claimed. Next clarify registrations/sign-off.
+
+### Business Clarification / Acceptance Unchanged - 2026-10-10 23:30 WAT
+
+- Explained pending business-policy questions; owner supplied no new policy facts
+  or approval. No new tests, live writes, duplicate fixtures or deployment checks.
+- Retain prior inactive engineering acceptance; official accounting activation
+  and source adapters remain pending approved business rules and authority.
+
+### Policy Review Only / No New Live Test - 2026-10-10 22:58 WAT
+
+- Expanded existing foundation specification into14-field plain-language review
+  with a conditional dummy journal example. Not a tested live job or approved
+  posting policy. Published engineering acceptance below remains unchanged.
+- No tests repeated, duplicate fixtures, new defect reproduction, source mutation,
+  production schema/grant/config change or provider/deployment check this turn.
+- Business/entity/charging/year-end/chart answers and professional sign-off
+  pending. Recorded NGN501/10,210,000 exceptions not reclassified or freshly
+  remeasured. Test data must not become unsupported official opening balances.
+- Next refine approved policy facts before separately authorised Step7 adapters;
+  no live journal/GL/TB/BS acceptance is claimed by this document review.
 
 ### Step 6 Inactive Production Release Verified - 2026-10-10 22:35 WAT
 

@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
+import { getBranchQueryOptions, type BranchQueryScope } from "./branch-query";
 
 export type BerthingRow = {
   id: number;
@@ -19,10 +20,11 @@ export type BerthingOverviewResponse = {
   branchScope: { id: number | null; name: string };
 };
 
-export function useGetBerthingOverview() {
+export function useGetBerthingOverview(scope?: BranchQueryScope) {
+  const { query, request } = getBranchQueryOptions(scope, ["analytics", "berthing"]);
   return useQuery<BerthingOverviewResponse>({
-    queryKey: ["analytics", "berthing"],
-    queryFn: () => customFetch("/api/analytics/berthing"),
+    ...query,
+    queryFn: ({ signal }) => customFetch("/api/analytics/berthing", { ...request, signal }),
     staleTime: 60_000,
   });
 }

@@ -1,5 +1,48 @@
 # Accounting Foundation Architecture Decision
 
+## 2026-10-10 23:54 WAT - Owner Explains Group And Pricing
+
+- Owner reports Donclimas Group: Donclimas/Merit Bonded Terminal in Lagos,
+  possibly another Donclimas in Amuwo, and Merit/Don/Ace Bonded in Onitsha.
+  Preserve names as reported, not verified legal names or complete branch map.
+- Confirmed combined job quotation includes clearing-related costs plus intended
+  margin. Separate legal company registrations still unknown; group membership
+  alone does not authorise one book, consolidated totals or intercompany mappings.
+- Owner unsure of year-end;31December tentative, not universally mandatory or
+  approved. Existing chart unknown. Explain residual job margin/overhead/net
+  profit and incurred unpaid costs rather than assume cash remainder is expense.
+- Existing spec refined, three records/index updated; no implementation, posting,
+  tests or activation. Local documentation work remains uncommitted/unpushed.
+- Exact next ask whether these are separate registrations or same-company
+  branches; then refine the draft for owner/accountant sign-off before Step7.
+
+## 2026-10-10 23:30 WAT - Three Business Questions Explained
+
+- User asks for detailed explanations, not implementation or approval: exact
+  registered identity/same-entity branches, separate fees versus all-inclusive
+  contracts, financial year-end and an existing approved chart of accounts.
+- Explain with illustrative amounts only. Charging method alone cannot decide
+  principal/agent treatment; accountant must assess the actual contracts.
+- Unknown/undecided answers are acceptable and remain proposals, not invented
+  approvals. No new tests, production changes or activation. Existing local
+  documentation changes preserved; clarification has not been committed/pushed.
+- Next owner supplies known facts, then refine the existing worksheet for sign-off.
+
+## 2026-10-10 22:58 WAT - Plain-Language Policy Review
+
+- User asks what next; current three records and clean Git checked. Exact next
+  is6A professional rule review before Step7, not another full live test.
+- User says proceed with next action. Expanded the existing spec, not a duplicate
+  document or accounting module:14unconfirmed fields, conditional client-funds/
+  service-fee example, named permissions, test-versus-official openings and audit
+  evidence. Official IFRS/ACCA sources checked; no tax rate/framework assumed.
+- Asked registered name/entity scope, client charging arrangement, year-end and
+  existing approved chart. Await facts; review authorisation is not policy approval.
+- All three records/index updated; docs-only, no new tests/live writes/provider
+  deployment check or application configuration changes. Prior acceptance retained.
+- Exact next record owner answers, refine same draft with accountant, then obtain
+  owner/accountant sign-off and explicit Step7 implementation authority.
+
 ## 2026-10-10 22:35 WAT - Inactive Foundation Release Verified
 
 - Functional commits6c7ee61/40aec3d pushed. Exact final deploymentc687034c

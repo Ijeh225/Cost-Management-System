@@ -20,7 +20,11 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-10-10 native foundation deployed inactive and verified; professional policy review next, updated 22:35 WAT](2026-10-10-accounting-foundation-decision.md)
+- [2026-10-11 branch-switch dashboard display fix verified locally; push/deploy authorised, release/live pending, updated 01:02 WAT](2026-10-11-branch-scope-display-fix.md)
+
+- [2026-10-11 existing branch units fit stated scope; extra company hierarchy not required, refresh display defect logged, updated 00:42 WAT](2026-10-11-accounting-group-clarification.md)
+
+- [2026-10-10 native foundation deployed inactive; group and pricing facts recorded, legal scope pending, updated 23:54 WAT](2026-10-10-accounting-foundation-decision.md)
 
 - [2026-10-10 standalone payment classification and aging deployed/live accepted; Part A closed, updated 02:44 WAT](2026-10-10-payment-classification-aging.md)
 

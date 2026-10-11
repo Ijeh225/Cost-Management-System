@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
+import { getBranchQueryOptions, type BranchQueryScope } from "./branch-query";
 import type { PaymentClassificationSummary } from "./payment-schedules";
 
 export type ClientStatementInvoice = {
@@ -208,16 +209,17 @@ export type ProfitLossResponse = {
   clients: Array<{ id: number; name: string }>;
 };
 
-export function useGetProfitLoss(params: { from?: string; to?: string; clientId?: string; costBasis?: string }) {
+export function useGetProfitLoss(params: { from?: string; to?: string; clientId?: string; costBasis?: string }, scope?: BranchQueryScope) {
+  const { query, request } = getBranchQueryOptions(scope, ["/api/reports/pl", params.from, params.to, params.clientId, params.costBasis]);
   return useQuery<ProfitLossResponse>({
-    queryKey: ["/api/reports/pl", params.from, params.to, params.clientId, params.costBasis],
-    queryFn: async () => {
+    ...query,
+    queryFn: async ({ signal }) => {
       const qs = new URLSearchParams();
       if (params.from) qs.set("from", params.from);
       if (params.to) qs.set("to", params.to);
       if (params.clientId && params.clientId !== "all") qs.set("clientId", params.clientId);
       if (params.costBasis === "actual_paid") qs.set("costBasis", "actual_paid");
-      return customFetch(`/api/reports/pl?${qs}`);
+      return customFetch(`/api/reports/pl?${qs}`, { ...request, signal });
     },
   });
 }
@@ -398,10 +400,11 @@ export type VatLiabilityResponse = {
   };
 };
 
-export function useGetVatLiability() {
+export function useGetVatLiability(scope?: BranchQueryScope) {
+  const { query, request } = getBranchQueryOptions(scope, ["/api/reports/vat-liability"]);
   return useQuery<VatLiabilityResponse>({
-    queryKey: ["/api/reports/vat-liability"],
-    queryFn: async () => customFetch("/api/reports/vat-liability"),
+    ...query,
+    queryFn: ({ signal }) => customFetch("/api/reports/vat-liability", { ...request, signal }),
   });
 }
 

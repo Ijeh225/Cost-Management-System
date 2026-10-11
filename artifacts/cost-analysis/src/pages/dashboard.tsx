@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { PaymentClassificationNote } from "@/components/payment-classification-note";
 import { useGetDashboardStats, useGetProfitLoss, useListContainers, useGetIntelligenceAlerts, useGetArLedger, useListBanks, useGetVatLiability, useGetBerthingOverview, useSendAlertDigest, type BerthingRow } from "@workspace/api-client-react";
+import { getBranchQueryOptions, getGetDashboardStatsQueryKey, getListContainersQueryKey, getGetIntelligenceAlertsQueryKey } from "@workspace/api-client-react";
 import { formatCurrency, formatNumber, getStatusColor, getStatusLabel } from "@/lib/format";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useBranchScope } from "@/components/layout/branch-provider";
@@ -76,7 +77,8 @@ type RawAlert = {
 };
 
 function AlertBeacon() {
-  const { data, isLoading } = useGetIntelligenceAlerts();
+  const { activeBranchId } = useBranchScope();
+  const { data, isLoading } = useGetIntelligenceAlerts(getBranchQueryOptions(activeBranchId, getGetIntelligenceAlertsQueryKey()));
   const rawAlerts: RawAlert[] = (data as any)?.alerts ?? [];
   const sendDigest = useSendAlertDigest();
 
@@ -280,7 +282,8 @@ function AlertBeacon() {
 }
 
 function BerthingWidget() {
-  const { data, isLoading } = useGetBerthingOverview();
+  const { activeBranchId } = useBranchScope();
+  const { data, isLoading } = useGetBerthingOverview(activeBranchId);
 
   if (isLoading) {
     return (
@@ -482,7 +485,8 @@ function DashboardScopeLabel() {
 }
 
 function BankBalanceBar() {
-  const { data: banks, isLoading } = useListBanks();
+  const { activeBranchId } = useBranchScope();
+  const { data: banks, isLoading } = useListBanks(activeBranchId);
   const activeBanks = (banks ?? []).filter((b: any) => b.isActive);
   if (isLoading) return (
     <div className="flex gap-3 overflow-x-auto pb-1">
@@ -526,7 +530,8 @@ function FinancialDashboardView({
   onToChange: (value: string) => void;
   branchLabel?: string;
 }) {
-  const { data, isLoading, isError } = useGetProfitLoss({ from, to, costBasis: "actual_paid" });
+  const { activeBranchId } = useBranchScope();
+  const { data, isLoading, isError } = useGetProfitLoss({ from, to, costBasis: "actual_paid" }, activeBranchId);
   const query = new URLSearchParams({ costBasis: "actual_paid" });
   if (from) query.set("from", from);
   if (to) query.set("to", to);
@@ -581,7 +586,7 @@ function FinancialDashboardView({
       </Card>
 
       {isLoading && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div role="status" aria-label="Loading branch financial figures" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((index) => (
             <Card key={index}><CardContent className="space-y-3 p-5"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-44" /></CardContent></Card>
           ))}
@@ -719,16 +724,17 @@ export default function Dashboard() {
   const [financialFrom, setFinancialFrom] = useState("");
   const [financialTo, setFinancialTo] = useState("");
 
-  const { data: stats, isLoading, isError } = useGetDashboardStats();
-  const { data: arData } = useGetArLedger();
-  const { data: vatLiability } = useGetVatLiability();
+  const { data: stats, isLoading, isError } = useGetDashboardStats(getBranchQueryOptions(activeBranchId, getGetDashboardStatsQueryKey()));
+  const { data: arData } = useGetArLedger(undefined, activeBranchId);
+  const { data: vatLiability } = useGetVatLiability(activeBranchId);
   const { data: recentData, isLoading: recentLoading } = useListContainers(
-    { page: 1, limit: 5 }
+    { page: 1, limit: 5 },
+    getBranchQueryOptions(activeBranchId, getListContainersQueryKey({ page: 1, limit: 5 }))
   );
 
   if (dashboardView === "operations" && isLoading) {
     return (
-      <div className="space-y-6">
+      <div role="status" aria-label="Loading branch dashboard" className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="border-border/40 bg-card/50">

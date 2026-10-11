@@ -3,6 +3,211 @@
 Prepared 2026-10-10, Africa/Lagos. Status: draft policy, inactive implementation.
 Owner selected native accounting. No accountant approval is implied.
 
+## Branch Units Are Sufficient For Stated Scope - 2026-10-11 00:42 WAT
+
+- Owner confirms the existing Branches concept already represents their separate
+  units. A row can represent Donclimax Head Office, Merit, Ace or a managed
+  location. The UI term does not force a geographic-only meaning.
+- Do not mandate a new group/company/branch hierarchy or label its absence a
+  defect. Existing branch ownership/access/combined reporting fits the stated
+  need. Company rollups across several locations are optional future requirements,
+  not approved implementation or current blocking defect.
+- Map existing units to the foundation's books through approved accounting scope;
+  this policy mapping is separate from adding a new operational company table.
+  Do not infer legal status, consolidation or account activation from branch names.
+- Reuse current controls. Only BRN-SCOPE-UI-001 is the newly observed display
+  defect; documentation clarification does not fix it or change live records.
+
+## Current App Fit Check - 2026-10-11 00:32 WAT
+
+- Fresh live/source inspection confirms existing flat branches and a working
+  generic All Branches management overview/Branch Comparison. It is incorrect
+  to describe ALL group visibility as missing. Branch rows have no company parent,
+  but this is not a confirmed feature gap or bug (clarified00:42WAT). Verified
+  accounting book mapping remains a policy decision. Merit/Ace not configured.
+- Cross-branch switching/comparison currently require Super Admin; ordinary
+  Admin/Branch Admin/Staff remain branch-scoped. Broader management delegation
+  would need separately approved access design, not blanket Super Admin grants.
+- Inactive foundation source already has accounting_books and book/branch
+  membership; reuse after approved mapping, not a second ledger. No native source
+  adapters/UI or official accounting activation verified/introduced in this review.
+- New BRN-SCOPE-UI-001 recorded: brief scope-label/cached-amount mismatch during
+  switching, with correct settled totals. Review only; no runtime fix performed.
+
+## Confirmed Branch Visibility Requirement - 2026-10-11 00:22 WAT
+
+- Owner states the app has been intended from the beginning to keep each branch
+  separate while management can access the overall branches. This confirms the
+  product requirement for branch-scoped records and authorised group visibility,
+  not proof of separate legal registrations or a new accounting implementation.
+- Retain branch ownership of jobs, invoices, costs, payments and reporting;
+  authorised management needs individual-branch and combined overview access.
+  Combined viewing must not duplicate shared source amounts or erase boundaries.
+- Reuse existing branch-scope/access architecture after duplicate-work review;
+  do not create another tenant/payment system or infer independent official
+  books per branch. Company/legal-book mapping and intercompany reporting still
+  need verified business facts and approved policies before accounting activation.
+- All-inclusive charging retained; fiscal year-end/chart/sign-off pending.
+  Clarification only: no runtime or live data changes authorised/performed here.
+
+## Corrected Group Relationship - 2026-10-11 00:16 WAT
+
+- Owner corrects the head-office name to Donclimax, superseding the earlier
+  Donclimas/Dunclermont wording. Merit and Ace, plus future additions, are
+  described as sister companies within the group, not merely branch names.
+- Proposed conceptual structure: group -> company -> branch/location. Keep
+  company ownership and reporting separate in the draft; do not conflate a shared
+  location, owner or head office with one legal accounting entity. Donclimax's
+  head-office role does not itself prove legal parent/subsidiary ownership.
+- Registered names, separate registrations, ownership/reporting scope and any
+  consolidation/intercompany rules still require confirmation. A combined
+  management overview is a proposed capability, not implemented consolidated
+  statutory accounts. Do not activate or remap existing branches/books here.
+- Existing all-inclusive pricing facts retained. Year-end/chart/sign-off remain
+  pending; this naming/relationship clarification is documentation only.
+
+## Owner Business Facts - 2026-10-10 23:54 WAT
+
+- Owner describes Donclimas Group with Donclimas and Merit Bonded Terminal in
+  Lagos, another Donclimas location possibly Amuwo, and Merit, Don and Ace Bonded
+  in Onitsha. These are owner-reported names/examples, not verified registered
+  spellings, legal entities or an exhaustive branch list. Group membership does
+  not establish that all businesses share a single legal entity/accounting book.
+- Confirmed commercial arrangement: one combined clearing quotation covering
+  terminal, shipping and other container/job charges plus the intended margin.
+  Refine the draft around this all-inclusive model; do not use the earlier
+  fee-only/client-funds teaching example as the confirmed default. Contract-based
+  principal/agent, tax and revenue-recognition decisions remain unapproved.
+- Owner's wording about what remains after payments is ambiguous: explain job
+  margin versus company overhead and net profit, not classify the remainder as
+  an expense or treat a bank balance as profit. Supported incurred unpaid costs
+  also matter; paid cash alone is not a complete accrual profit calculation.
+- Owner is unsure of the financial year-end and believes businesses end on
+  31December. Record31December as PROPOSED ONLY, not established/approved; annual
+  reporting does not universally require a calendar year-end. Existing approved
+  chart remains unknown, not confirmed absent.
+- Next clarify whether the named businesses are separately registered companies
+  or branches of one registration, and exact legal names. Refine this same draft
+  for owner/accountant sign-off; no Step7 implementation or activation authorised
+  by these business answers. No runtime/live records changed.
+
+## Plain-Language Review - 2026-10-10 22:58 WAT
+
+Review version: `6A-review-1`. This expands the existing worksheet, not another
+accounting implementation or an approved production policy. Architecture and
+technical controls are confirmed; business/accounting settings below are NOT
+approved. No live setting, source transaction or accounting switch changed.
+
+### What We Are Agreeing
+
+The app needs to distinguish money we hold, money customers owe, money we owe,
+income we have earned and costs belonging to the business. A bank receipt is not
+automatically profit. The proposed official books use accrual rules, while the
+existing budgeted/paid management reports retain their declared basis until an
+approved transition. The accountant must confirm the applicable reporting
+framework; citing IFRS guidance does not establish this company's eligibility
+or compliance.
+
+The draft20-account chart below is a starting list, not a complete signed chart.
+Existing bank and expense-head records should become linked subaccounts, not
+second payments. The accountant may require additional controls such as deferred
+service income, prepayments, receivable allowances or interbranch accounts.
+
+### Fourteen Policy Decisions
+
+Every formal policy row remains UNAPPROVED; partial owner business facts are
+recorded above. Suggested treatment is not a setting or approval.
+
+| Policy field | Plain-language meaning | Draft for review / information needed |
+|---|---|---|
+| `legalEntity` | Whose official accounts these are | Exact registered name, legal structure and reporting framework; do not substitute the app's display name |
+| `financialYearEnd` | When the annual accounting year finishes | Use the existing approved year-end, if any; do not assume31December |
+| `cutoverDate` | First date covered by the new official ledger | Select after opening reconciliation and separating test from official records; no date selected |
+| `revenueRecognition` | When the company's service fee becomes earned income | Tie recognition to supported performance/contract terms; an invoice date or operational stage alone is insufficient evidence |
+| `clientDeposits` | Money received before being earned or used for the client | Separate unearned fees/client money from income; receipt once, allocation or authorised use is not another receipt |
+| `passThroughCosts` | Duty, shipping, terminal and similar amounts paid in connection with a client job | Review each contract/service: client-funded liability settlement, recoverable company advance, or company-borne cost; do not classify all duty payments identically |
+| `vat` | Which amounts attract tax and how it is reported | Accountant confirms current applicable rules, registration, taxable components, recovery, dates and rounding; no rate/exemption assumed |
+| `unpaidExpenses` | Costs incurred before payment | Proposed accrual: recognise supported obligation once, then payment settles it; a schedule request/approval is not a cash movement |
+| `creditNotes` | Reductions/corrections to an invoice | Link original invoice and approved net/tax adjustment; applying credit is not cash; distinguish actual refunds |
+| `badDebts` | Amounts unlikely to be collected or written off | Approve impairment/allowance, write-off and recovery rules; reuse evidence and remaining exposure without inventing a bank expense |
+| `assetsAndAdvances` | Equipment, prepaid costs and money advanced to others | Use supported asset/advance balances; agree useful lives, depreciation, amortisation and settlement evidence |
+| `loansAndFunding` | Borrowed money and owner money put into the business | Identify capital versus loan; separate principal from interest; bank funding is not automatically sales |
+| `branchAccounting` | How branches fit into legal books | Proposed one book only for branches of the same legal entity, with branch reporting; separately approve interbranch balancing and other entities |
+| `openingBalances` | Verified starting assets, debts and capital | Prefer reviewed openings plus forward posting where history is incomplete; choose this OR an approved historical import, never both for the same transactions |
+
+Revenue recognition depends on fulfilment of the agreed service, not simply
+collection. The IFRS15 reference also distinguishes advance consideration from
+earned revenue. See [IFRS15 overview](https://www.ifrs.org/issued-standards/list-of-standards/ifrs-15-revenue-from-contracts-with-customers/)
+and [advance consideration, paragraph106](https://www.ifrs.org/content/dam/ifrs/publications/pdf-standards/english/2021/issued/part-a/ifrs-15-revenue-from-contracts-with-customers.pdf?bypass=on).
+
+For third-party services, gross versus fee-only revenue needs a principal/agent
+assessment of the particular contractual promise and control. Separate pricing,
+reimbursement or a job title does not settle that assessment. The software-reseller
+example illustrates the general framework, not this clearing business's conclusion:
+[IFRS principal/agent guidance](https://www.ifrs.org/news-and-events/updates/ifric/2022/ifric-update-april-2022/).
+
+Unpaid expenses and prepaid costs illustrate why cash paid and accounting expense
+can differ: [ACCA adjustment guidance](https://www.accaglobal.com/gb/en/student/exam-support-resources/fundamentals-exams-study-resources/f3/technical-articles/adjustments-financial-statements.html).
+
+### One Job, Explained With Dummy Figures
+
+Teaching assumptions ONLY: the approved contract assessment treats NGN90,000
+as client money for authorised disbursements and NGN10,000 as the company's fee.
+All service obligations are fulfilled before recognising that fee. No tax is
+modelled here; this is NOT an assertion of VAT exemption or an approved mapping.
+There are no company-borne expenses in this simplified example.
+
+| Event | Illustrative debit | Illustrative credit | What it means |
+|---|---|---|---|
+| Client pays NGN100,000 in advance | Bank100,000 | Client deposit/funds liability100,000 | Bank increases; this is not100,000 profit |
+| Authorised client disbursements paid90,000 | Client funds liability90,000 | Bank90,000 | Client money used; no second company cost under these assumptions |
+| Earned service fee invoiced10,000 | Receivable10,000 | Service revenue10,000 | Recognise only the company's earned fee |
+| Remaining deposit applied to that invoice10,000 | Client deposit liability10,000 | Receivable10,000 | Invoice settled; no new bank receipt |
+
+The scenario adds NGN10,000 to bank and NGN10,000 to profit, with no remaining
+client-funds liability or receivable. These are hypothetical movements, not live
+totals or an official opening balance. Different contractual/tax facts require
+different approved entries. Multiple containers on the same B/L do not multiply
+the shared invoice, collection or journal.
+
+### Permission and Opening-Balance Review
+
+- Name the people who may prepare, independently approve/post, reverse, configure,
+  read, close and reopen each book/branch. No names or grants are assigned here.
+- The current engine requires different preparer and approver for every journal.
+  If only one person is available, resolve staffing/review arrangements rather
+  than silently bypassing this control. General finance or Super Admin access
+  does not automatically grant accounting posting power.
+- Retain the owner's existing designation of these records as test data unless
+  explicitly corrected. Do not import test totals as official company balances,
+  silently delete them or declare all real openings zero. Official cutover needs
+  separately verified real opening evidence.
+- Obtain dated bank reconciliation, receivables, deposits/client funds, payables,
+  taxes, advances, assets, loans and equity evidence. Balance and source coverage
+  both need approval; a journal that balances can still contain wrong figures.
+- The recorded original NGN501 purpose exception and NGN10,210,000 missing
+  overhead metadata remain evidence exceptions. Do not guess account heads or
+  use a hidden balancing plug. These are recorded historical findings, not newly
+  checked live amounts in this review.
+
+### Decisions Requested / Approval Record
+
+Owner questions sent22:58WAT: registered business name/entity scope; separate
+fee/reimbursed costs versus all-inclusive or mixed contracts; year-end and any
+existing approved chart. Partial owner answers received23:54WAT are recorded
+above: group arrangement and all-inclusive charging; legal scope/chart remain
+unknown and31December is tentative. Do not mark agreement from silence or
+interpret business answers as accountant sign-off or Step7 activation.
+
+Before policy activation record: agreed values for all14fields, approved chart
+version, owner decision/date/evidence, accountant decision/date/evidence, named
+grants, dated reconciled openings and cutover coverage. Record unresolved decisions
+as unresolved, not as empty approved values. No signature/approval supplied yet.
+
+Exact next: collect those business facts, refine this same worksheet with the
+accountant, then obtain explicit Step7 implementation authority. No new runtime
+code, schema, UI, live accounting posting or repeat test suite in this review.
+
 ## Phase 6A: Approval Worksheet
 
 The versioned proposed chart is `native-draft-1` in accounting-rules.ts. It covers

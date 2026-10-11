@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
+import { getBranchQueryOptions, type BranchQueryScope } from "./branch-query";
 
 export type Bank = {
   id: number;
@@ -73,10 +74,11 @@ export type BankTransactionResponse = {
 export const BANKS_QUERY_KEY = ["/api/banks"];
 export const BANK_TRANSFERS_QUERY_KEY = ["/api/banks/transfers"];
 
-export function useListBanks() {
+export function useListBanks(scope?: BranchQueryScope) {
+  const { query, request } = getBranchQueryOptions(scope, BANKS_QUERY_KEY);
   return useQuery({
-    queryKey: BANKS_QUERY_KEY,
-    queryFn: () => customFetch<Bank[]>("/api/banks"),
+    ...query,
+    queryFn: ({ signal }) => customFetch<Bank[]>("/api/banks", { ...request, signal }),
   });
 }
 

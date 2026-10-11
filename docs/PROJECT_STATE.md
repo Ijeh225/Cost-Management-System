@@ -1,6 +1,153 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-10-10
+## Current Work Register - Authoritative as of 2026-10-11
+
+### BRN-SCOPE-UI-001 Release Authorised - 2026-10-11 01:02 WAT
+
+- Owner explicitly requests push/deploy. Git fetch confirms local master and
+  origin/master agree at7341c2a before committing. Include verified fix/tests and
+  existing uncommitted business-clarification records; preserve checkpoints.
+- Local acceptance below retained. No new accounting activation, record writes,
+  permissions, branch hierarchy or source-calculation changes. Next confirm the
+  exact pushed Railway release, health and bounded live branch-switch acceptance;
+  do not equate a push with a deployment or closed live defect.
+
+### BRN-SCOPE-UI-001 Fixed Locally / Release Pending - 2026-10-11 00:59 WAT
+
+- Owner authorises correction of confirmed branch-switch display defect. All
+  eight dashboard sources now use branch-specific cache keys and matching
+  captured request headers: stats/P&L/bank/AR/VAT/recent/alerts/berthing. An unseen
+  branch loads without previous-scope totals; cached revisits use that branch's
+  own snapshot. Late responses stay in their original branch cache.
+- Reuse generated query override support and current hooks; no generated-file
+  edits, calculation changes, branch hierarchy, permissions or database mutations.
+- Verification: 5 focused cache/header unit cases PASS; full unit suite 42 files,
+  275 PASS/3 prior skips; full railway:build (all typechecks/client/server) PASS.
+  Eight local built-UI assertions PASS including delayed switches, cached revisit,
+  failure, empty branch, rapid/late responses, mobile and eight-source headers.
+  Existing Documentation/Invoice keyboard/responsive smoke PASS. Local GET-only
+  fixtures; no live financial writes or new production records. Existing build
+  sourcemap/chunk-size warnings retained, not a new failure.
+- Initial test selector/import-boundary errors corrected in test harness; final
+  checks pass. No generated source edits or wider query-cache rewrite. Optional
+  scope keeps other callers and existing mutation invalidation prefixes intact.
+- Existing local docs preserved; not committed/pushed/deployed in this turn.
+  Exact next: commit/push approved changes, confirm exact Railway release, then
+  bounded live All->Lagos Operations and Lagos->All Finance acceptance. Do not
+  mark live defect closed yet. Separate accounting-policy review remains pending.
+- Session: docs/SESSION_SUMMARIES/2026-10-11-branch-scope-display-fix.md.
+
+### Branch Meaning Clarified / No Hierarchy Defect - 2026-10-11 00:42 WAT
+
+- Owner explains existing Branches already represent separately managed business
+  units. Clarification: a branch row can represent Head Office, Merit, Ace or a
+  particular location under the intended operating model; do not assume the word
+  branch means only a geographic office or requires an extra company layer.
+- Correct prior framing: absent company/group parent is an architectural
+  observation, NOT a confirmed defect or mandatory new feature. Existing separate
+  records and overall management viewing satisfy the stated product requirement.
+  Multi-location company rollups would be optional if separately requested.
+- Retain approved-policy/legal-book mapping review for official accounting, but
+  do not make a new company hierarchy a prerequisite for further planning.
+- BRN-SCOPE-UI-001 remains the actual newly observed display issue, unrelated to
+  hierarchy. No code, live records, permission changes or tests performed; docs
+  corrected locally. Reuse existing branch controls and do not duplicate work.
+
+### Live Branch Positioning Reviewed - 2026-10-11 00:32 WAT
+
+- Read-only UI/source review, not a new implementation. Live Branches lists
+  #1 Don Climax (Head Office), #2 E2E-20260901-Lagos and #3 E2E-20260901-Abuja,
+  all active. Merit/Ace are not configured there. Do not rename/create test rows.
+- Existing architecture is flat multi-branch: branch_id on users/jobs/clients/
+  invoices/banks/payment records; no operational company/group parent identifier.
+  Super Admin can select one/all branches and use Branch Comparison. Other
+  authority levels, including Admin, are pinned to their own branch by source
+  policy; no delegated multi-branch management role was found. No new staff login
+  penetration/access test performed. Canonical-profile status visible:7/7 active
+  migrated,0legacy paths,0profiles needing correction.
+- Fresh settled UI evidence: Lagos10containers, finance revenue4200/cost700/
+  overhead301/bad debt967.50/net2231.50. All Branches17containers, revenue4201/
+  cost701/overhead15710303/bad debt967.50/net-15707770.50. Both match the
+  corresponding comparison row/totals for the all-time actual-paid basis.
+- New Medium BRN-SCOPE-UI-001: new scope label briefly accompanies previous-scope
+  cached amounts during refresh, observed all->Lagos Operations and Lagos->all
+  Finance; settled results correct. Source keys omit branch scope and switcher
+  invalidates rather than isolates cache. No proven persistent leakage/posting
+  error. Fix only after approval; scope-safe query/loading/label binding needed.
+- Clarification supersedes earlier ambiguous notes: generic All Branches overview
+  ALREADY EXISTS; separate company hierarchy/legal consolidation does not.
+  Inactive foundation supports books with branch membership in source, but no
+  live journal/UI/adapters or company mapping activated. No fresh flag/provider
+  inspection this turn; retain prior deployment evidence rather than reassert it.
+- Restored original All Branches Financial dashboard after inspection; no live
+  records/settings/grants changed. Documentation only, local uncommitted changes
+  preserved. Next review this fit/gap and approved company/book mapping without
+  duplicating working branch controls; policy/chart/year-end sign-off still pending.
+
+### Branch Isolation And Management Visibility Confirmed - 2026-10-11 00:22 WAT
+
+- Owner confirms intended product behaviour: separate branch records with
+  authorised management access to individual branches and an overall view.
+- Reuse existing branch permissions/scope, not duplicate accounting or payment
+  functionality. Group viewing must preserve ownership and avoid double counting.
+- This is a business requirement, not fresh functional verification or proof of
+  legal company/book structure. No app changes, new tests or activation performed.
+- Next refine existing accounting draft around confirmed branch isolation and
+  all-inclusive charging; legal scope/chart/year-end and sign-off remain pending.
+
+### Group Relationship Corrected - 2026-10-11 00:16 WAT
+
+- Owner confirms Donclimax is the head office; Merit, Ace and future additions
+  are sister companies in the group. Supersedes earlier naming, not proof of
+  separate legal registrations or parent/subsidiary ownership.
+- Draft conceptual structure group/company/branch; company boundaries must not
+  be silently merged. Legal names, reporting scope and intercompany treatment
+  still await confirmation. Group overview remains proposed, not implemented.
+- Existing commercial pricing retained. Docs-only; no runtime/live data/tests,
+  book/branch remapping, deployment or activation. Next refine the same policy
+  draft with verified registrations/chart/year-end and owner/accountant sign-off.
+
+### Owner Business Arrangement Recorded - 2026-10-10 23:54 WAT
+
+- Owner describes Donclimas Group with multiple named businesses/locations in
+  Lagos/Onitsha (same spec records details); exact legal names and whether one
+  registration or separate companies remain unknown. Do not merge legal books.
+- All-inclusive client quotation confirmed commercially: job charges plus
+  intended margin. Gross/net revenue, recognition and tax need contract review;
+  the prior fee-only example is hypothetical, not this confirmed pricing default.
+- Explain margin less overhead versus profit, including incurred unpaid costs;
+  remaining cash is not automatically expense or profit.31December is proposed
+  only because owner is unsure; existing approved chart remains unknown.
+- Same worksheet refined; docs-only, no runtime/config/live writes/tests or new
+  deployment. Next clarify separate registrations, refine/sign off approved rules
+  and chart before separately authorised Step7 adapters or live activation.
+
+### Business Questions Clarified - 2026-10-10 23:30 WAT
+
+- Owner requests detailed explanation of entity scope, charging arrangements,
+  financial year-end and existing chart; this is not an answer or policy approval.
+- Registered identity, branch legal scope, pricing facts and fiscal/chart choices
+  remain unconfirmed. Pricing alone does not determine principal/agent treatment.
+- Documentation-only clarification; no runtime, live data, activation or tests
+  changed. Next remains owner facts, refined draft and professional sign-off.
+
+### Step 6A Plain-Language Policy Review Prepared - 2026-10-10 22:58 WAT
+
+- Owner authorises the recorded next action: review draft rules, not Step7 code
+  or live accounting activation. Expanded the SAME ACCOUNTING_FOUNDATION_SPEC.md
+  (`6A-review-1`); no duplicate feature/worksheet or roadmap renumbering.
+- Explained all14policy fields, conditional client-funds/fee example, gross/net
+  contractual assessment, accrual-versus-cash, named independent permissions and
+  evidence-based openings. Official IFRS/ACCA guidance linked; applicable framework
+  and Nigeria tax treatment remain accountant decisions, not assumed approvals.
+- Asked owner for exact registered business/entity scope, charging arrangements,
+  fiscal year-end and existing approved chart. Answers/sign-off pending. Keep
+  historical purpose/metadata exceptions and test-data exclusion explicit.
+- Documentation only; no runtime/config/schema/grant/source changes, new tests,
+  live provider verification or deployment this turn. Prior verified inactive
+  foundation release remains recorded evidence, not newly tested here.
+- Exact next: record answers and refine this worksheet; owner/accountant approval
+  and explicit Step7 authority before transaction adapters/opening activation.
 
 ### Step 6 Inactive Foundation Deployed / Technical Scope Closed - 2026-10-10 22:35 WAT
 
