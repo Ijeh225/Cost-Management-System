@@ -2,6 +2,31 @@
 
 ## Current Work Register - Authoritative as of 2026-10-11
 
+### BRN-SCOPE-UI-001 Deployed And Live Accepted - 2026-10-11 01:08 WAT
+
+- Functional commit3c2c1498380af2d5156e8f28213f9712f7fdb277 pushed to
+  origin/master. Exact Railway1764574f-a2e5-48aa-af1f-285df10e50cf reports
+  Deployment successful and its GitHub source link identifies this commit.
+  Post-release public /api/healthz returns status:ok. No manual redeploy needed.
+- Reloaded existing owner session onto new release. All->Lagos Operations shows
+  Loading branch dashboard without old17count or Head Office bank; settles at
+  10containers. Lagos finance4200revenue/2231.50net; Lagos->All first shows
+  Loading branch financial figures without Lagos amounts, then4201revenue/
+  -15707770.50net. Cached All->Lagos->All revisits show correct own-scope values.
+- BRN-SCOPE-UI-001 closed within tested dashboard scope. Slow/error/empty/mobile/
+  late-response local fixture evidence retained; do not claim those conditions
+  artificially induced live. No financial source writes, dummy records, roles,
+  config/activation, calculations or company hierarchy changed. Restored overall
+  Financial view. Existing protected checkpoint retained.
+- Separate Low BRN-SCOPE-UI-002 observed: sidebar Notifications badge briefly
+  shows prior scope's count (All23/Lagos17) while scope changes, then settles.
+  Source app-sidebar uses unscoped notifications cache key; not financial totals
+  or persistent mismatch, no cross-role leak proved. Record only; not fixed in
+  this release. Review shared notification scope separately before implementation.
+- Both registers/session/index updated for publication; next remaining accounting
+  action is existing owner/accountant policy/chart/year-end approval, not automatic
+  Step7 posting activation. A further notification-cache fix is separate work.
+
 ### BRN-SCOPE-UI-001 Release Authorised - 2026-10-11 01:02 WAT
 
 - Owner explicitly requests push/deploy. Git fetch confirms local master and

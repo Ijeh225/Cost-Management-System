@@ -2,6 +2,23 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-11
 
+### BRN-SCOPE-UI-001 Live Acceptance PASS - 2026-10-11 01:08 WAT
+
+- Pushed functional3c2c149; exact Railway1764574f-a2e5-48aa-af1f-285df10e50cf
+  successful with matching GitHub commit link. Public healthz:ok after release.
+- Fresh owner reload. Immediate All->Lagos Operations: accessible loading state,
+  no old17container card/Head Office bank. Loaded Lagos10containers. Immediate
+  Lagos->All Finance: accessible loading state, no previous4200/2231.50 values.
+  Loaded All4201revenue/-15707770.50net. Cached Lagos revisit correctly shows
+  4200/2231.50, and restored All shows4201/-15707770.50. Financial records
+  unchanged; no live fixtures/payment/setting/role mutations.
+- Closed BRN-SCOPE-UI-001 for dashboard sources. Bounded live acceptance only;
+  local slow/error/mobile/empty/late-response tests remain distinct evidence.
+- Separate Low BRN-SCOPE-UI-002: sidebar Notifications badge briefly retains old
+  count on switch (23All versus17Lagos); settled count correct. Shared unscoped
+  notification key in source. Not fixed here or proof of financial/cross-role
+  leakage. Review notification cache scope separately; no duplicate prior ID found.
+
 ### BRN-SCOPE-UI-001 Release In Progress - 2026-10-11 01:02 WAT
 
 - Owner authorises commit/push/deploy; local regression evidence retained.
@@ -46,7 +63,8 @@
 
 | Issue | Priority | Evidence / cause | Correction required | Status |
 |---|---|---|---|---|
-| BRN-SCOPE-UI-001 | Medium | All->Lagos initially labels17containers and prior combined amounts as Lagos; settled count10. Lagos->All Finance initially labels4200revenue/2231.50net as combined; settled4201/-15707770.50. BranchProvider changes label and invalidates shared queries; original dashboard keys omitted scope. | Eight dashboard sources now key/bind requests to branch scope; unseen scopes load without old figures, cached revisits retain only own snapshot. | Fixed locally; 5 focused unit / 8 built-UI assertions and full build/suite PASS at 00:59 WAT. Commit/deployment/live acceptance pending. No persistent result mismatch or cross-role leakage proved. |
+| BRN-SCOPE-UI-001 | Medium | All->Lagos initially labels17containers and prior combined amounts as Lagos; settled count10. Lagos->All Finance initially labels4200revenue/2231.50net as combined; settled4201/-15707770.50. BranchProvider changes label and invalidates shared queries; original dashboard keys omitted scope. | Eight dashboard sources now key/bind requests to branch scope; unseen scopes load without old figures, cached revisits retain only own snapshot. | CLOSED:3c2c149 pushed, Railway1764574f successful, bounded live re-test PASS at01:08WAT. Prior unit/build/local-UI PASS retained. No persistent mismatch or cross-role leakage proved. |
+| BRN-SCOPE-UI-002 | Low | During live acceptance sidebar badge temporarily shows All23 in Lagos or Lagos17 in All; settled count correct. Sidebar uses notifications key without branch identity. | Review branch binding/cache identity for shared notification consumers and mutations; do not broaden the completed dashboard calculation fix or duplicate notification features. | Confirmed transient badge display; recorded only, not implemented. No persistent/cross-role or financial error proved. |
 
 - Operational model is flat branch scope, not company/group hierarchy. Generic
   management overview exists but all-branch authority is Super Admin-only in

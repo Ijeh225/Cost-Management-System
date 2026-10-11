@@ -1,5 +1,24 @@
 # Branch-Switch Dashboard Display Fix
 
+## 2026-10-11 01:08 WAT - Published And Live Accepted
+
+- User requests push/deploy. Functional3c2c1498380af2d5156e8f28213f9712f7fdb277
+  pushed; exact Railway1764574f-a2e5-48aa-af1f-285df10e50cf successful with
+  matching source commit link. Public /api/healthz returns status:ok. Auto GitHub
+  deployment used, no extra manual deployment or config/permissions changes.
+- New live owner reload verifies All->Lagos Operations loading without old17count
+  or Head Office bank, then10count. Lagos->All Finance loads without prior4200/
+  2231.50; settles4201/-15707770.50. Correct branch-specific cached revisits.
+  Restore All Branches Finance. No financial writes, new test records or activation.
+- BRN-SCOPE-UI-001 closed for bounded dashboard acceptance. Local failure/delay/
+  empty/mobile/late-response coverage not represented as live induction tests.
+- New Low BRN-SCOPE-UI-002: notification sidebar badge briefly shows old23/17
+  count on switch; settled correct. Source shared notifications key remains
+  unscoped. Logged separately, not fixed, no persistent or cross-role leak proved.
+- Records/index updated for publication; previous policy review docs preserved.
+  Next separate notification-scope review if approved, plus existing accountant
+  policy/chart/year-end approval before Step7; no mandatory company hierarchy.
+
 ## 2026-10-11 01:02 WAT - Push And Deployment Authorised
 
 - Owner explicitly requests push/deploy. Fetched origin/master; no divergence

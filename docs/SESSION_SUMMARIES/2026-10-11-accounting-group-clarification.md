@@ -65,4 +65,3 @@
   Documentation changes remain local, not committed/pushed in this turn.
 - Exact next refine the existing policy draft using confirmed legal scope,
   chart/year-end and owner/accountant sign-off before authorised Step7 adapters.
-

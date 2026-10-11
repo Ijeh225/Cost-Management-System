@@ -20,7 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-10-11 branch-switch dashboard display fix verified locally; push/deploy authorised, release/live pending, updated 01:02 WAT](2026-10-11-branch-scope-display-fix.md)
+- [2026-10-11 dashboard branch-switch fix pushed/deployed/live accepted; separate notification badge issue logged, updated 01:08 WAT](2026-10-11-branch-scope-display-fix.md)
 
 - [2026-10-11 existing branch units fit stated scope; extra company hierarchy not required, refresh display defect logged, updated 00:42 WAT](2026-10-11-accounting-group-clarification.md)
 
