@@ -2,7 +2,21 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-11
 
-### Step 8 Final Engineering Acceptance PASS - 2026-10-11 22:28 WAT
+### Step 8 Exact Inactive Deployment Acceptance - 2026-10-11 22:30 WAT
+
+- Functional187703d6d003a408ec78dee67c908a18c275bde1 deployed as exact
+  Railwaycc0d733a-0941-423a-8a92-19dd5f8cb096 SUCCESS/matching commitHash.
+  Live healthz:ok; public unauthenticated /api/accounting/catalog returns401.
+- Official deployed SSH smoke PASS for exact GL/TB and OFF catalog/options/
+  report/journal/source/opening/reconciliation gates, zero native DB connections.
+  Both live native switches false/defaultOFF; no native production migration,
+  financial fixtures or source changes. Protected pre-Step8 remote tag verified.
+- Final5owned-DB/369unit/all build and built dummy browser/CSV/PDF checks retained.
+  No fresh authenticated live GL/TB figures or approved official-accounting
+  source/control completeness claimed while inactive. Real professional rules,
+  reviewed openings/cutover and later separately authorised activation pending.
+
+### Step 8 Final Engineering Acceptance PASS - 2026-10-11 22:26 WAT
 
 - Final5/5owned-schema DB PASS (373s,43prior cases filtered): posted opening/
   movement/reversal/running/closing, drafts/cancelled excluded, read-only journal/

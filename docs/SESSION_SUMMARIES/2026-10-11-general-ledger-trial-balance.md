@@ -1,6 +1,20 @@
 # Step 8 General Ledger and Trial Balance
 
-## 2026-10-11 22:28 WAT - Final Acceptance / Publication
+## 2026-10-11 22:30 WAT - Exact Inactive Deployment Verified
+
+- Functional187703d6d003a408ec78dee67c908a18c275bde1 pushed/deployed as
+  Railwaycc0d733a-0941-423a-8a92-19dd5f8cb096 exactSUCCESS. Healthz:ok,
+  unauthenticated catalog401 and deployed official SSH OFF/exactGLTB smoke PASS
+  with zero native DB connections/writes. Both native flags stay false/defaultOFF.
+- Protected pre-Step8 tag pushed, peeled ae10f54 remotely verified; older tags
+  untouched. No live financial records or new native schema/books changed.
+- Step8 read-only engineering complete. Await real chart/policy/book/cutover/
+  opening approvals before official activation. Next engineering Step9 requires
+  separate owner instruction; do not rebuild another ledger or repeat closed tests.
+- Both registers/plan/index updated with proof. Records-only publication next.
+  Corrected earlier acceptance timestamp22:28 -> actual22:26 (before commit22:27).
+
+## 2026-10-11 22:26 WAT - Final Acceptance / Publication
 
 - Final4Step8 database cases +1shared source-coverage regression5/5PASS,373s.
   Other43cases deliberately filtered; previous acceptance retained. Owned namespace,

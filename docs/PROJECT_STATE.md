@@ -2,7 +2,29 @@
 
 ## Current Work Register - Authoritative as of 2026-10-11
 
-### Step 8 Engineering Accepted / Publishing INACTIVE - 2026-10-11 22:28 WAT
+### Step 8 Deployed INACTIVE / Exact Resume Point - 2026-10-11 22:30 WAT
+
+- Functional187703d6d003a408ec78dee67c908a18c275bde1 committed/pushed.
+  Exact Railwaycc0d733a-0941-423a-8a92-19dd5f8cb096 SUCCESS with matching
+  commitHash verified. Public healthz:ok; unauthenticated catalog refused401.
+- Official SSH deployed updated native bundle smoke PASS: exact GL/TB and
+  catalog/options/report/journal disabled gates, previous source/opening gates,
+  zero native DB connections/writes. Both production native flags independently
+  confirmed false/defaultOFF. No production books/schema/source fixtures created.
+- Protected checkpoint-before-accounting-step8-2026-10-11 pushed and remote
+  peeled target verified ae10f546eda4d39ef6b205100f0b70ed6b850487, the prior
+  exact successful inactive release. All older checkpoints preserved.
+- Final5isolated/369unit/build/built-UI/CSV/printed-PDF acceptance retained.
+  This proves deployed INACTIVE engineering, not official source completeness,
+  accountant approval, opening reconciliation or fresh signed-in live GL figures.
+- Resume: Step8 engineering complete. Await actual approved policies/chart/book
+  scope/dated cutover/openings before separately authorised activation; Step9
+  manual journals/adjustments is the next engineering roadmap, not started here.
+  Use ACCOUNTING_REPORTS.md; do not repeat accepted tests or create duplicate data.
+- Publication records follow this functional proof. Acceptance entry timestamp
+  corrected to observed22:26 before functional commit22:27, not a new test result.
+
+### Step 8 Engineering Accepted / Publishing INACTIVE - 2026-10-11 22:26 WAT
 
 - General Ledger and Trial Balance engineering complete for read-only posted
   native books; existing cash/source views unchanged. Same engine and explicit

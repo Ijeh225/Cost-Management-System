@@ -2,7 +2,12 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
-Latest2026-10-11 22:28 WAT: Step8 read-only GL/TB engineering accepted:
+Latest2026-10-11 22:30 WAT: Step8 engineering accepted and functional187703d
+deployed as exactRailwaycc0d733a-0941-423a-8a92-19dd5f8cb096 SUCCESS.
+Public health/catalog401/deployed OFF exactGLTB zero-native-DB smoke PASS.
+Both live switches stay inactive; professional policies/cutover/openings pending.
+Protected pre-Step8 ae10f54 remote tag verified. Step9 remains not started.
+Latest2026-10-11 22:26 WAT: Step8 read-only GL/TB engineering accepted:
 4new isolated reports +1shared source case PASS;369units/3prior skips,
 full build/typechecks/inactive smoke and built dummy browser/CSV/two-page print
 PASS. Inactive publication next; no live financial posting or official approval.
