@@ -2,6 +2,16 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
+Latest2026-10-11 22:28 WAT: Step8 read-only GL/TB engineering accepted:
+4new isolated reports +1shared source case PASS;369units/3prior skips,
+full build/typechecks/inactive smoke and built dummy browser/CSV/two-page print
+PASS. Inactive publication next; no live financial posting or official approval.
+Step9 UI awaits separate owner instruction; real policy/opening/cutover still pending.
+Latest2026-10-11 22:25 WAT: Step8 GL/TB read-only reports implemented with
+exact balances, scoped grants, drilldown, CSV/print and source completeness limits.
+Final isolated/UI acceptance and inactive publication pending; see
+ACCOUNTING_REPORTS.md. Existing Step7 acceptance retained. Real accountant/cutover
+approval still outstanding; native live switches remain OFF. Step9 not started.
 Latest deployment2026-10-11 13:15 WAT: fd5e131 exact Railway
 2e7d718f-df0c-4041-8c97-b60fb9a876e8 SUCCESS; public health and deployed
 zero-DB inactive smoke PASS. Both live native switches remain OFF. Step7 existing

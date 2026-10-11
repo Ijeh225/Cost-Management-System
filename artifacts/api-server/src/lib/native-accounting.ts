@@ -11,6 +11,7 @@ import { readOperationalSource } from "./accounting-operational-sources.js";
 import { validateOperationalControls } from "./accounting-operational-controls.js";
 import { buildReviewedOpening, type ReviewedOpening } from "./accounting-reviewed-opening.js";
 import { sourceCoverage, type ReconciliationControl } from "./accounting-source-coverage.js";
+import { buildAccountingReport, validateReportFilter, type ReportFilter, type ReportAccount, type ReportLine } from "./accounting-reports.js";
 
 type Database = Pick<typeof pool, "connect">;
 async function connectClient(database: Database) { return database.connect(); }
@@ -25,11 +26,11 @@ interface ActorRow { id: number; branch_id: number; authority_level: string; job
 export class NativeAccounting {
   constructor(private database: Database) {}
 
-  private async transaction<T>(bookId: number | null, action: (client: Client) => Promise<T>): Promise<T> {
+  private async transaction<T>(bookId: number | null, action: (client: Client) => Promise<T>, snapshot = false): Promise<T> {
     requireAccountingEnabled();
     const client = await this.database.connect();
     try {
-      await client.query("BEGIN");
+      await client.query(snapshot ? "BEGIN ISOLATION LEVEL REPEATABLE READ" : "BEGIN");
       if (bookId !== null) await client.query("SELECT pg_advisory_xact_lock(804610,$1)", [bookId]);
       const result = await action(client);
       await client.query("COMMIT");
@@ -437,6 +438,10 @@ export class NativeAccounting {
     accountingDate(through);
     return this.transaction(bookId,async client=>{
       await this.permission(client,bookId,branchId,actorId,"read");
+      return this.coverage(client,bookId,branchId,actorId,through,controls);
+    });
+  }
+  private async coverage(client:Client,bookId:number,branchId:number,actorId:number,through:string,controls:ReconciliationControl[]) {
       const report=await sourceCoverage(client,bookId,branchId,through,controls);
       for(const item of report.sources.filter(s=>s.status==="posted")) {
         try {
@@ -450,7 +455,88 @@ export class NativeAccounting {
       }
       return {...report,complete:report.sources.every(s=>s.status==="posted" || s.status==="excluded")
         && report.controls.every(c=>c.difference==="0.00") && report.missingControls.length===0 && controls.length>0};
-    });
+  }
+
+  async reportCatalog(actorId:number,branchId:number|null) {
+    return this.transaction(null,async client=>{
+      const actor=await this.actor(client,actorId);
+      const books=(await client.query(`SELECT b.id,b.name,b.currency,b.policy_version AS "policyVersion",b.policy->>'cutoverDate' AS "cutoverDate",
+        bb.branch_id AS "branchId",br.name AS "branchName" FROM accounting_books b
+        JOIN accounting_book_branches bb ON bb.book_id=b.id JOIN branches br ON br.id=bb.branch_id
+        WHERE b.status='approved' AND ($2::int IS NULL OR bb.branch_id=$2)
+        AND (bb.branch_id=$3 OR $4) AND accounting_has_grant(b.id,bb.branch_id,$1,'read') ORDER BY b.id,bb.branch_id`,
+        [actorId,branchId,actor.branch_id,["admin","super_admin"].includes(actor.authority_level)])).rows;
+      return {status:"active" as const,books};
+    },true);
+  }
+  private async reportingScope(client:Client,bookId:number,branchId:number|null,actorId:number) {
+    requireAccounting(Number.isSafeInteger(bookId) && bookId>0 && (branchId===null || Number.isSafeInteger(branchId) && branchId>0),"INVALID_SCOPE","Valid book/branch required");
+    const book=(await client.query("SELECT id,name,currency,policy_version,policy FROM accounting_books WHERE id=$1 AND status='approved'",[bookId])).rows[0];
+    requireAccounting(book,"BOOK_NOT_APPROVED","Approved accounting book required");
+    const branches=(await client.query(`SELECT bb.branch_id id,b.name FROM accounting_book_branches bb JOIN branches b ON b.id=bb.branch_id
+      WHERE bb.book_id=$1 AND ($2::int IS NULL OR bb.branch_id=$2) ORDER BY bb.branch_id`,[bookId,branchId])).rows;
+    requireAccounting(branches.length>0,"INVALID_SCOPE","Branch is outside this book");
+    for(const branch of branches) await this.permission(client,bookId,branch.id,actorId,"read");
+    return {book,branches};
+  }
+  async reportOptions(bookId:number,branchId:number|null,actorId:number) {
+    return this.transaction(bookId,async client=>{
+      const scope=await this.reportingScope(client,bookId,branchId,actorId);
+      const accounts=(await client.query<ReportAccount>("SELECT id,code,name,category,active FROM accounting_accounts WHERE book_id=$1 ORDER BY code,id",[bookId])).rows;
+      const periods=(await client.query(`SELECT id,name,starts_on::text AS "from",ends_on::text AS "to",status FROM accounting_periods WHERE book_id=$1 ORDER BY starts_on,id`,[bookId])).rows;
+      return {book:{id:scope.book.id,name:scope.book.name,currency:scope.book.currency,cutoverDate:scope.book.policy.cutoverDate},branches:scope.branches,accounts,periods};
+    },true);
+  }
+  async accountingReport(bookId:number,branchId:number|null,actorId:number,kind:"general-ledger"|"trial-balance",filter:ReportFilter) {
+    validateReportFilter(filter);
+    requireAccounting(["general-ledger","trial-balance"].includes(kind),"INVALID_FILTER","Supported report kind required");
+    return this.transaction(bookId,async client=>{
+      const {book,branches}=await this.reportingScope(client,bookId,branchId,actorId);
+      requireAccounting(filter.from>=book.policy.cutoverDate,"PRE_CUTOVER","Report starts before approved accounting cutover");
+      if(filter.periodId) {
+        const period=(await client.query("SELECT starts_on::text,ends_on::text FROM accounting_periods WHERE book_id=$1 AND id=$2",[bookId,filter.periodId])).rows[0];
+        requireAccounting(period && filter.from>=period.starts_on && filter.to<=period.ends_on,"INVALID_PERIOD","Dates must fall within the selected book period");
+      }
+      const accounts=(await client.query<ReportAccount>("SELECT id,code,name,category,active FROM accounting_accounts WHERE book_id=$1 ORDER BY code,id",[bookId])).rows;
+      const lines=(await client.query<ReportLine>(`SELECT l.id,l.journal_id AS "journalId",l.account_id AS "accountId",j.branch_id AS "branchId",
+        j.accounting_date::text date,j.status,j.kind,j.event_key AS "eventKey",j.narration,l.memo,
+        l.debit_minor::text AS "debitMinor",l.credit_minor::text AS "creditMinor"
+        FROM accounting_journal_lines l JOIN accounting_journals j ON j.id=l.journal_id
+        WHERE j.book_id=$1 AND l.book_id=$1 AND j.branch_id=ANY($2::int[]) AND j.status='posted' AND j.accounting_date<=$3::date
+        ORDER BY j.accounting_date,j.id,l.id LIMIT 50001`,[bookId,branches.map(b=>b.id),filter.to])).rows;
+      requireAccounting(lines.length<=50000,"REPORT_TOO_LARGE","Report exceeds 50,000 posted lines; choose a narrower branch/book scope");
+      const report=buildAccountingReport(accounts,lines,filter,kind);
+      const coverage=[];
+      for(const branch of branches) {
+        const checked=await this.coverage(client,bookId,branch.id,actorId,filter.to,[]);
+        const exceptions=checked.sources.filter(s=>s.status!=="posted" && s.status!=="excluded");
+        const counts:Record<string,number>={}; for(const source of checked.sources) counts[source.status]=(counts[source.status]??0)+1;
+        coverage.push({branchId:branch.id,counts,exceptionCount:exceptions.length,exceptions:exceptions.slice(0,100),
+          exceptionsTruncated:exceptions.length>100,missingControlAccountIds:checked.missingControls,independentControlsVerified:false});
+      }
+      const warnings=["Posted native journals only; existing budgeted/cash reports are separate.",
+        "Debit/credit equality does not prove correct source coverage or independently reconciled control balances.",
+        "Independent dated account controls have not been supplied for this read-only view.",
+        "Inactive accounts with posted history are retained; zero-account visibility follows the selected filters."];
+      if(branchId!==null || filter.accountId) warnings.push("Filtered branch/account view is not legal-group consolidation; its balances are not guaranteed to match a whole-book trial balance.");
+      if(coverage.some(c=>c.exceptionCount>0)) warnings.push("Unposted, historical, stale or unclassified source exceptions remain; review the coverage register before relying on these figures.");
+      return {...report,book:{id:bookId,name:book.name,currency:book.currency,policyVersion:book.policy_version,cutoverDate:book.policy.cutoverDate},
+        branches,scope:branchId===null ? "whole_book" as const : "branch" as const,asOf:filter.to,generatedAt:new Date().toISOString(),warnings,coverage,
+        sourceCompletenessConfirmed:false,limit:50000,truncated:false};
+    },true);
+  }
+  async reportJournal(bookId:number,branchId:number|null,actorId:number,journalId:number) {
+    requireAccounting(Number.isSafeInteger(journalId) && journalId>0,"INVALID_FILTER","Valid journal ID required");
+    return this.transaction(bookId,async client=>{
+      const {branches}=await this.reportingScope(client,bookId,branchId,actorId);
+      const journal=(await client.query(`SELECT id,branch_id AS "branchId",accounting_date::text date,event_key AS "eventKey",kind,narration,evidence,
+        reversal_of AS "reversalOf",posted_at AS "postedAt",prepared_by AS "preparedBy",posted_by AS "postedBy"
+        FROM accounting_journals WHERE id=$1 AND book_id=$2 AND branch_id=ANY($3::int[]) AND status='posted'`,[journalId,bookId,branches.map(b=>b.id)])).rows[0];
+      requireAccounting(journal,"NOT_FOUND","Posted journal not found in this scope");
+      const lines=(await client.query(`SELECT a.code,a.name,l.memo,l.debit_minor::text debit,l.credit_minor::text credit FROM accounting_journal_lines l
+        JOIN accounting_accounts a ON a.id=l.account_id AND a.book_id=l.book_id WHERE l.journal_id=$1 AND l.book_id=$2 ORDER BY l.id`,[journalId,bookId])).rows;
+      return {...journal,lines:lines.map(l=>({...l,debit:minorToMoney(l.debit),credit:minorToMoney(l.credit)}))};
+    },true);
   }
   async approveAndPost(bookId: number, branchId: number, actorId: number, journalId: number, reason: string) {
     return this.transaction(bookId, async client => {

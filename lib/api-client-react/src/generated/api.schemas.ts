@@ -5,6 +5,203 @@
  * Cost Analysis Per Container API
  * OpenAPI spec version: 0.1.0
  */
+export interface AccountingBook {
+  id: number;
+  name: string;
+  currency: string;
+  cutoverDate: string;
+  policyVersion?: string;
+}
+
+export interface AccountingAccount {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  active: boolean;
+}
+
+export type AccountingCatalogStatus =
+  (typeof AccountingCatalogStatus)[keyof typeof AccountingCatalogStatus];
+
+export const AccountingCatalogStatus = {
+  active: "active",
+  inactive: "inactive",
+} as const;
+
+export type AccountingCatalogBooksItem = AccountingBook & {
+  branchId: number;
+  branchName: string;
+};
+
+export interface AccountingCatalog {
+  status: AccountingCatalogStatus;
+  message?: string;
+  books: AccountingCatalogBooksItem[];
+}
+
+export type AccountingOptionsBranchesItem = {
+  id: number;
+  name: string;
+};
+
+export type AccountingOptionsPeriodsItem = {
+  id: number;
+  name: string;
+  from: string;
+  to: string;
+  status: string;
+};
+
+export interface AccountingOptions {
+  book: AccountingBook;
+  branches: AccountingOptionsBranchesItem[];
+  accounts: AccountingAccount[];
+  periods: AccountingOptionsPeriodsItem[];
+}
+
+export interface AccountingSides {
+  debit: string;
+  credit: string;
+}
+
+export interface AccountingEntry {
+  id: number;
+  journalId: number;
+  branchId: number;
+  date: string;
+  kind: string;
+  eventKey: string;
+  narration: string;
+  memo: string;
+  debit: string;
+  credit: string;
+  balance: string;
+}
+
+export type AccountingReportKind =
+  (typeof AccountingReportKind)[keyof typeof AccountingReportKind];
+
+export const AccountingReportKind = {
+  "general-ledger": "general-ledger",
+  "trial-balance": "trial-balance",
+} as const;
+
+export type AccountingReportBasis =
+  (typeof AccountingReportBasis)[keyof typeof AccountingReportBasis];
+
+export const AccountingReportBasis = {
+  posted_double_entry: "posted_double_entry",
+} as const;
+
+export type AccountingReportBranchesItem = {
+  id: number;
+  name: string;
+};
+
+export type AccountingReportScope =
+  (typeof AccountingReportScope)[keyof typeof AccountingReportScope];
+
+export const AccountingReportScope = {
+  whole_book: "whole_book",
+  branch: "branch",
+} as const;
+
+export type AccountingReportFilter = {
+  from: string;
+  to: string;
+  accountId?: number;
+  periodId?: number;
+  includeZero: boolean;
+  includeInactive: boolean;
+};
+
+export type AccountingReportRowsItem = AccountingAccount & {
+  opening: string;
+  openingSides: AccountingSides;
+  debit: string;
+  credit: string;
+  closing: string;
+  closingSides: AccountingSides;
+  entries: AccountingEntry[];
+};
+
+export type AccountingReportTotals = {
+  openingDebit: string;
+  openingCredit: string;
+  debit: string;
+  credit: string;
+  closingDebit: string;
+  closingCredit: string;
+  openingDifference: string;
+  movementDifference: string;
+  closingDifference: string;
+};
+
+export type AccountingReportCoverageItemCounts = { [key: string]: number };
+
+export type AccountingReportCoverageItemExceptionsItem = {
+  eventKey: string;
+  kind: string;
+  id: number;
+  date: string;
+  status: string;
+  reason: string;
+};
+
+export type AccountingReportCoverageItem = {
+  branchId: number;
+  counts: AccountingReportCoverageItemCounts;
+  exceptionCount: number;
+  exceptionsTruncated: boolean;
+  independentControlsVerified: boolean;
+  missingControlAccountIds: number[];
+  exceptions: AccountingReportCoverageItemExceptionsItem[];
+};
+
+export interface AccountingReport {
+  kind: AccountingReportKind;
+  basis: AccountingReportBasis;
+  book: AccountingBook;
+  branches: AccountingReportBranchesItem[];
+  scope: AccountingReportScope;
+  asOf: string;
+  generatedAt: string;
+  sourceCompletenessConfirmed: boolean;
+  limit: number;
+  truncated: boolean;
+  balanced: boolean;
+  filter: AccountingReportFilter;
+  rows: AccountingReportRowsItem[];
+  totals: AccountingReportTotals;
+  warnings: string[];
+  coverage: AccountingReportCoverageItem[];
+}
+
+export type AccountingJournalLinesItem = {
+  code: string;
+  name: string;
+  memo: string;
+  debit: string;
+  credit: string;
+};
+
+export interface AccountingJournal {
+  id: number;
+  branchId: number;
+  date: string;
+  eventKey: string;
+  kind: string;
+  narration: string;
+  evidence: string;
+  /** @nullable */
+  reversalOf: number | null;
+  postedAt: string;
+  preparedBy: number;
+  postedBy: number;
+  lines: AccountingJournalLinesItem[];
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -1123,6 +1320,67 @@ export interface ReverseDutyPaymentRequest {
    */
   reason: string;
 }
+
+/**
+ * Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
+ */
+export type AccountingBranchParameter = string;
+
+export type GetAccountingCatalogParams = {
+  /**
+   * Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
+   */
+  branchId?: AccountingBranchParameter;
+};
+
+export type GetAccountingOptionsParams = {
+  /**
+   * Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
+   */
+  branchId?: AccountingBranchParameter;
+};
+
+export type GetNativeAccountingReportParams = {
+  /**
+   * Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
+   */
+  branchId?: AccountingBranchParameter;
+  from: string;
+  to: string;
+  /**
+   * @minimum 1
+   */
+  accountId?: number;
+  /**
+   * @minimum 1
+   */
+  periodId?: number;
+  includeZero?: GetNativeAccountingReportIncludeZero;
+  includeInactive?: GetNativeAccountingReportIncludeInactive;
+};
+
+export type GetNativeAccountingReportIncludeZero =
+  (typeof GetNativeAccountingReportIncludeZero)[keyof typeof GetNativeAccountingReportIncludeZero];
+
+export const GetNativeAccountingReportIncludeZero = {
+  true: "true",
+  false: "false",
+} as const;
+
+export type GetNativeAccountingReportIncludeInactive =
+  (typeof GetNativeAccountingReportIncludeInactive)[keyof typeof GetNativeAccountingReportIncludeInactive];
+
+export const GetNativeAccountingReportIncludeInactive = {
+  true: "true",
+  false: "false",
+} as const;
+
+export type GetAccountingJournalParams = {
+  /**
+   * Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
+   */
+  branchId?: AccountingBranchParameter;
+};
 
 export type ListContainersParams = {
   search?: string;

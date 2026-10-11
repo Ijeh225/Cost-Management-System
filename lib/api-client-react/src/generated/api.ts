@@ -17,6 +17,10 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AccountingCatalog,
+  AccountingJournal,
+  AccountingOptions,
+  AccountingReport,
   AnalyticsResponse,
   ApprovalQueueItem,
   AuditEntry,
@@ -43,9 +47,13 @@ import type {
   DutyPaymentTransactionListResponse,
   ErrorResponse,
   ExportContainersCSVParams,
+  GetAccountingCatalogParams,
+  GetAccountingJournalParams,
+  GetAccountingOptionsParams,
   GetContainerReportParams,
   GetCustomSectionsParams,
   GetDeliveryAnalyticsParams,
+  GetNativeAccountingReportParams,
   HealthStatus,
   IntelligenceResponse,
   JobOverviewResponse,
@@ -81,6 +89,487 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * @summary Approved native books visible through explicit read grants; inactive returns no books
+ */
+export const getGetAccountingCatalogUrl = (
+  params?: GetAccountingCatalogParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/catalog?${stringifiedParams}`
+    : `/api/accounting/catalog`;
+};
+
+export const getAccountingCatalog = async (
+  params?: GetAccountingCatalogParams,
+  options?: RequestInit,
+): Promise<AccountingCatalog> => {
+  return customFetch<AccountingCatalog>(getGetAccountingCatalogUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAccountingCatalogQueryKey = (
+  params?: GetAccountingCatalogParams,
+) => {
+  return [`/api/accounting/catalog`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAccountingCatalogQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccountingCatalog>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAccountingCatalogParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountingCatalog>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAccountingCatalogQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAccountingCatalog>>
+  > = ({ signal }) =>
+    getAccountingCatalog(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountingCatalog>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAccountingCatalogQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccountingCatalog>>
+>;
+export type GetAccountingCatalogQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Approved native books visible through explicit read grants; inactive returns no books
+ */
+
+export function useGetAccountingCatalog<
+  TData = Awaited<ReturnType<typeof getAccountingCatalog>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAccountingCatalogParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountingCatalog>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAccountingCatalogQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Chart and periods for an explicitly authorised approved book scope
+ */
+export const getGetAccountingOptionsUrl = (
+  bookId: number,
+  params?: GetAccountingOptionsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/options?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/options`;
+};
+
+export const getAccountingOptions = async (
+  bookId: number,
+  params?: GetAccountingOptionsParams,
+  options?: RequestInit,
+): Promise<AccountingOptions> => {
+  return customFetch<AccountingOptions>(
+    getGetAccountingOptionsUrl(bookId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAccountingOptionsQueryKey = (
+  bookId: number,
+  params?: GetAccountingOptionsParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/options`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAccountingOptionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccountingOptions>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params?: GetAccountingOptionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountingOptions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAccountingOptionsQueryKey(bookId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAccountingOptions>>
+  > = ({ signal }) =>
+    getAccountingOptions(bookId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountingOptions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAccountingOptionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccountingOptions>>
+>;
+export type GetAccountingOptionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Chart and periods for an explicitly authorised approved book scope
+ */
+
+export function useGetAccountingOptions<
+  TData = Awaited<ReturnType<typeof getAccountingOptions>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params?: GetAccountingOptionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountingOptions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAccountingOptionsQueryOptions(
+    bookId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Finance capability plus named native read grants are required. All scope means one whole book, never unrelated books. Period filters constrain movements, not earlier opening balances. Native accounting disabled returns 503. More than 50000 posted historical lines returns 413, never truncated financial totals. Source equality is not professional approval or independent control reconciliation.
+ * @summary Read-only posted General Ledger or Trial Balance; exact decimal strings
+ */
+export const getGetNativeAccountingReportUrl = (
+  bookId: number,
+  kind: "general-ledger" | "trial-balance",
+  params: GetNativeAccountingReportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/reports/${kind}?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/reports/${kind}`;
+};
+
+export const getNativeAccountingReport = async (
+  bookId: number,
+  kind: "general-ledger" | "trial-balance",
+  params: GetNativeAccountingReportParams,
+  options?: RequestInit,
+): Promise<AccountingReport> => {
+  return customFetch<AccountingReport>(
+    getGetNativeAccountingReportUrl(bookId, kind, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetNativeAccountingReportQueryKey = (
+  bookId: number,
+  kind: "general-ledger" | "trial-balance",
+  params?: GetNativeAccountingReportParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/reports/${kind}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetNativeAccountingReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getNativeAccountingReport>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  kind: "general-ledger" | "trial-balance",
+  params: GetNativeAccountingReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getNativeAccountingReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetNativeAccountingReportQueryKey(bookId, kind, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getNativeAccountingReport>>
+  > = ({ signal }) =>
+    getNativeAccountingReport(bookId, kind, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bookId && kind),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getNativeAccountingReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetNativeAccountingReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getNativeAccountingReport>>
+>;
+export type GetNativeAccountingReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Read-only posted General Ledger or Trial Balance; exact decimal strings
+ */
+
+export function useGetNativeAccountingReport<
+  TData = Awaited<ReturnType<typeof getNativeAccountingReport>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  kind: "general-ledger" | "trial-balance",
+  params: GetNativeAccountingReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getNativeAccountingReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetNativeAccountingReportQueryOptions(
+    bookId,
+    kind,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Read a scoped posted journal and its immutable source evidence
+ */
+export const getGetAccountingJournalUrl = (
+  bookId: number,
+  journalId: number,
+  params?: GetAccountingJournalParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/journals/${journalId}?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/journals/${journalId}`;
+};
+
+export const getAccountingJournal = async (
+  bookId: number,
+  journalId: number,
+  params?: GetAccountingJournalParams,
+  options?: RequestInit,
+): Promise<AccountingJournal> => {
+  return customFetch<AccountingJournal>(
+    getGetAccountingJournalUrl(bookId, journalId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAccountingJournalQueryKey = (
+  bookId: number,
+  journalId: number,
+  params?: GetAccountingJournalParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/journals/${journalId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAccountingJournalQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccountingJournal>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  journalId: number,
+  params?: GetAccountingJournalParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountingJournal>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetAccountingJournalQueryKey(bookId, journalId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAccountingJournal>>
+  > = ({ signal }) =>
+    getAccountingJournal(bookId, journalId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bookId && journalId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountingJournal>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAccountingJournalQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccountingJournal>>
+>;
+export type GetAccountingJournalQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Read a scoped posted journal and its immutable source evidence
+ */
+
+export function useGetAccountingJournal<
+  TData = Awaited<ReturnType<typeof getAccountingJournal>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  journalId: number,
+  params?: GetAccountingJournalParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountingJournal>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAccountingJournalQueryOptions(
+    bookId,
+    journalId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Health check

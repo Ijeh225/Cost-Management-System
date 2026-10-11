@@ -2,6 +2,46 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-11
 
+### Step 8 Final Engineering Acceptance PASS - 2026-10-11 22:28 WAT
+
+- Final5/5owned-schema DB PASS (373s,43prior cases filtered): posted opening/
+  movement/reversal/running/closing, drafts/cancelled excluded, read-only journal/
+  audit preservation, immutable posted accounts/unused visibility, pre-cutover/
+  unknown exceptions, whole-book all-grants/revocation, period/date/account scope,
+  closed-period reads, disabled-before-native-connection and shared source proof.
+  Schema/public11source guard/tunnel cleanup PASS; no production dummy records.
+- 48unit files369PASS/3prior skips; full build/typechecks/inactive local smoke PASS.
+  Final built-frontend loopback dummy GET smoke PASS for CSV/snapshot printing,
+  source/journal dialog, branch and refresh states, mobile, inactive/error and no
+  dialog warnings. Both rendered PDF pages reviewed; final coverage is not clipped.
+- Exact inactive deployment acceptance next. No live native financial write or
+  approved-accountant/control completeness inferred. Professional activation stays
+  gated; prior closed operational/accounting correction defects not reopened.
+
+### Step 8 Acceptance Milestone - 2026-10-11 22:25 WAT
+
+- 369unit/API/calculation PASS/3existing skips (48files), full build/typechecks
+  and updated local OFF smoke PASS, including exact GL/TB and zero connections.
+- Initial built-browser dummy GET smoke PASS for TB/CSV/journal/branch isolation,
+  same-scope refresh/mobile/OFF/error boundaries. Visual PDF inspection detected
+  scrolling-layout print clipping; corrected before publication. Final rerun and
+  rendered PDF review pending; this is not a live financial report pass.
+- Initial owned-schema report run3PASS/1invalidfixture. Existing immutable posted
+  account definition correctly blocked deactivation. Fixture corrected to assert
+  that protection and deactivate only unused account; no engine guard change.
+  Final4new report +1shared coverage cases running. No production financial writes.
+- Official accounting activation, independent control balances and professional
+  policy/opening/cutover approval remain outside this engineering acceptance.
+
+### Step 8 Read-only Accounting Reports Started - 2026-10-11 21:57 WAT
+
+- GL/TB engineering authorised; test exact balances, posted-only inclusion,
+  opening/date/period semantics, inactive/zero accounts, per-branch/book grants,
+  journal scope, CSV/print consistency and separate source coverage warnings.
+- Prior Step7 acceptance stays closed. No fresh live financial writes or posting
+  activation: test in owned isolated namespaces, deployed inactive checks later.
+- Implementation and all Step8 acceptance/publication are pending.
+
 ### Remaining Step 7 Exact Deployment Acceptance - 2026-10-11 13:15 WAT
 
 - fd5e13146cb1d40ed02e95cfaa17cd7b0c62a52d deployed successfully as

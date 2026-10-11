@@ -1,7 +1,7 @@
 // Safe deployed-bundle acceptance: no credentials, database connection or writes.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-const { NativeAccounting, accountingEnabled, buildSettlementJournal, previewOpeningBalances, buildInvoiceJournal, buildOperationalJournal, buildReviewedOpening } =
+const { NativeAccounting, accountingEnabled, buildSettlementJournal, previewOpeningBalances, buildInvoiceJournal, buildOperationalJournal, buildReviewedOpening, buildAccountingReport } =
   createRequire(import.meta.url)("../artifacts/api-server/dist/accounting-foundation.cjs");
 assert.equal(accountingEnabled(), false, "This smoke is for an INACTIVE release only");
 assert.notEqual(process.env.NATIVE_ACCOUNTING_SCHEMA_ENABLED, "true", "Live schema must remain inactive");
@@ -47,5 +47,19 @@ for(const method of ["previewOperational","prepareOperational"])
 for(const method of ["previewOpening","prepareOpening"])
   await assert.rejects(()=>engine[method](3,opening),{code:"ACCOUNTING_DISABLED"});
 await assert.rejects(()=>engine.reconcileSources(1,2,3,"2026-10-11",[]),{code:"ACCOUNTING_DISABLED"});
+const reportFilter={from:"2026-10-11",to:"2026-10-11",includeZero:true,includeInactive:false};
+await assert.rejects(()=>engine.reportCatalog(3,null),{code:"ACCOUNTING_DISABLED"});
+await assert.rejects(()=>engine.reportOptions(1,2,3),{code:"ACCOUNTING_DISABLED"});
+await assert.rejects(()=>engine.accountingReport(1,2,3,"trial-balance",reportFilter),{code:"ACCOUNTING_DISABLED"});
+await assert.rejects(()=>engine.reportJournal(1,2,3,4),{code:"ACCOUNTING_DISABLED"});
+const reportAccounts=[{id:101,code:"1000",name:"Dummy asset",category:"asset",active:true},
+  {id:210,code:"2100",name:"Dummy liability",category:"liability",active:true}];
+const reportLines=reportAccounts.map((account,index)=>({id:index+1,journalId:1,branchId:2,accountId:account.id,
+  date:"2026-10-11",status:"posted",kind:"opening",eventKey:"smoke:dummy",narration:"Dummy only",memo:null,
+  debitMinor:index===0?30n:0n,creditMinor:index===1?30n:0n}));
+const tb=buildAccountingReport(reportAccounts,reportLines,reportFilter,"trial-balance");
+const gl=buildAccountingReport(reportAccounts,reportLines,reportFilter,"general-ledger");
+assert.equal(tb.totals.debit,"0.30");assert.equal(tb.totals.credit,"0.30");assert.equal(tb.balanced,true);
+assert.deepEqual(tb.totals,gl.totals);
 assert.equal(connections, 0);
-console.log("PASS: deployed inactive accounting bundle, settlement/invoice/operational/reviewed opening previews, reconciliation/posting gates; zero database connections/writes");
+console.log("PASS: deployed inactive accounting bundle, settlement/invoice/operational/opening previews, exact GL/TB, report/reconciliation/posting gates; zero database connections/writes");

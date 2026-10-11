@@ -2,6 +2,61 @@
 
 ## Current Work Register - Authoritative as of 2026-10-11
 
+### Step 8 Engineering Accepted / Publishing INACTIVE - 2026-10-11 22:28 WAT
+
+- General Ledger and Trial Balance engineering complete for read-only posted
+  native books; existing cash/source views unchanged. Same engine and explicit
+  grants reused; no second ledger, new migration or source posting introduced.
+- Final owned-isolated run5/5PASS:4new report scenarios +1shared Step7 coverage
+  regression (373s,43deliberately filtered). Run-owned schema removed, eleven-source
+  public isolated preservation guard and tunnel closure PASS. No live financial
+  records touched. Posted account immutability retained and explicitly tested.
+- Final48unit files:369PASS/3prior skips; all typechecks/full railway build/local
+  OFF exact GL/TB zero-native-connection smoke PASS. Final built-browser dummy GET
+  tests PASS: scoped reports/CSV/drilldown/dialog, old-branch clearing, same-scope
+  refresh, mobile overflow, OFF/error states. Rendered two-page PDF now preserves
+  final source exception/amounts with app chrome omitted and legible print colours.
+- Documented procedures/50,000-line hard limit/100exception disclosure in
+  ACCOUNTING_REPORTS.md. Balance equality never asserts source completeness or
+  independent control approval. Tests are isolated/UI fixtures, not official live
+  book approval or live financial reconciliation. Exact inactive deployment next.
+- Production schema/posting remain OFF; actual accountant/chart/rules/cutover/
+  opening controls still pending. Next engineering roadmap: Step9 manual-journal
+  and adjustment UI through this engine, only after separate owner instruction.
+
+### Step 8 Implemented / Final Acceptance Running - 2026-10-11 22:25 WAT
+
+- Added read-only native General Ledger/Trial Balance APIs, finance pages and
+  navigation. Existing engine/read grants/posted journals reused; operational cash
+  ledger and source writers unchanged. Exact opening/movement/closing/running
+  balances, book/branch/date/period/account filters, source/journal drilldown,
+  matching CSV/print, explicit OFF/loading/error and coverage states implemented.
+- 48 unit files:369PASS/3prior skips; full typechecks/build and local deployed-bundle
+  OFF smoke PASS. Initial built-UI controls passed. Visual PDF inspection caught
+  scroll-ancestor clipping; corrected print layout/contrast and final UI/build
+  acceptance running. Accessible native-filter names corrected before publication.
+- Initial four new isolated cases:3PASS/1fixtureFAIL. Existing immutable-account
+  guard correctly refused fixture deactivation after posting; corrected fixture
+  asserts refusal, deactivates only unused account. Guard was not weakened. Final
+  four reports +one shared source-coverage regression running; no DB pass inferred.
+- ACCOUNTING_REPORTS.md documents use and limits. Native schema/posting remain OFF,
+  no production fixtures or official approval. Publication pending final acceptance.
+  Step9 manual journal UI and real professional cutover remain separate next work.
+
+### Step 8 General Ledger / Trial Balance Authorised - 2026-10-11 21:57 WAT
+
+- Owner requests Step8 implementation. Clean master ae10f54; accepted Step7
+  source connections and protected checkpoints retained. No new ledger writer.
+- Build read-only posted-journal GL/TB APIs/pages, account/date/period/branch
+  filters, exact decimal opening/movement/closing balances, journal/source
+  drilldown and matching CSV/print. Whole-book scope requires every branch grant;
+  do not consolidate different books or silently broaden the active branch.
+- Reuse native read grants and approved policy; balance equality is not source
+  completeness. Show historical/source exceptions separately. Production native
+  schema/posting remain OFF; accountant/cutover approval still outstanding.
+- Isolated calculation/API/DB and interface checks pending. No production
+  fixtures, historical classification, public posting or Step9 journal UI authorised.
+
 ### Remaining Step 7 Deployed INACTIVE / Exact Resume Point - 2026-10-11 13:15 WAT
 
 - Functional fd5e13146cb1d40ed02e95cfaa17cd7b0c62a52d committed/pushed;

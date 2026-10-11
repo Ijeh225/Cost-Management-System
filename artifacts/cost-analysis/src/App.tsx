@@ -66,6 +66,7 @@ import CreditNotePrintPage from "@/pages/credit-notes/print/[id]";
 import BranchesPage from "@/pages/branches/index";
 import BranchSettingsPage from "@/pages/branch-settings/index";
 import AiAssistantPage from "@/pages/ai-assistant/index";
+import NativeAccountingPage from "@/pages/accounting/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -324,6 +325,8 @@ function Router() {
               <Route path="/reports">
                 <FinanceGuard><ReportsPage /></FinanceGuard>
               </Route>
+              <Route path="/accounting/general-ledger"><FinanceGuard><NativeAccountingPage kind="general-ledger"/></FinanceGuard></Route>
+              <Route path="/accounting/trial-balance"><FinanceGuard><NativeAccountingPage kind="trial-balance"/></FinanceGuard></Route>
               <Route path="/reports/cashflow">
                 <FinanceGuard><CashFlowPage /></FinanceGuard>
               </Route>

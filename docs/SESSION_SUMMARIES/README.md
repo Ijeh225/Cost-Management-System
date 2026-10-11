@@ -20,6 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
+- [2026-10-11 Step8 GL/Trial Balance accepted; inactive publication next, updated 22:28 WAT](2026-10-11-general-ledger-trial-balance.md)
 - [2026-10-11 remaining supported Step7 connections accepted and deployed inactive at fd5e131; exact resume point, updated 13:15 WAT](2026-10-11-accounting-source-integration.md)
 
 - [2026-10-11 notification deployed and bounded live badge acceptance passed, updated 01:52 WAT](2026-10-11-branch-scope-display-fix.md)

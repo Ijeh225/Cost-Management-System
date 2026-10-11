@@ -521,15 +521,18 @@ afterAll(async () => {
   }
 });
 const policy = Object.fromEntries(ACCOUNTING_POLICY_KEYS.map(k => [k, k === "cutoverDate" ? "2026-10-01" : k === "financialYearEnd" ? "12-31" : `Isolated reviewed ${k}; not production approval`]));
-async function fixture(approved = true) {
+async function fixture(approved = true, multiBranch = false) {
   const branch = (await sql("INSERT INTO branches(name) VALUES('Isolated native book branch') RETURNING id")).rows[0].id as number;
+  const secondBranch = multiBranch ? (await sql("INSERT INTO branches(name) VALUES('Isolated second reporting branch') RETURNING id")).rows[0].id as number : undefined;
   const actors = (await sql(`INSERT INTO users(branch_id,name,authority_level,job_function,workspace_access,access_profile_migrated_at)
     VALUES($1,'Owner','super_admin','general_staff','[]',now()),($1,'Preparer','staff','accounts','["accounts"]',now()),
       ($1,'Approver','staff','accounts','["accounts"]',now()),($1,'Operations','staff','operations','["shipping"]',now()) RETURNING id`, [branch])).rows;
   const [owner, preparer, approver, operations] = actors.map(a => Number(a.id));
-  const book = await service.createDraftBook(owner!, "Isolated reviewed draft", "NGN", [branch]);
+  const book = await service.createDraftBook(owner!, "Isolated reviewed draft", "NGN", secondBranch ? [branch,secondBranch] : [branch]);
   await sql(`INSERT INTO accounting_grants(book_id,branch_id,user_id,permission,evidence,granted_by)
     SELECT $1,$2,$3,p,'Isolated owner-approved permission fixture',$3 FROM unnest(ARRAY['read','configure','prepare','post','reverse','close','reopen']) p`, [book, branch, owner]);
+  if(secondBranch) await sql(`INSERT INTO accounting_grants(book_id,branch_id,user_id,permission,evidence,granted_by)
+    SELECT $1,$2,$3,p,'Isolated all-branch owner grant',$3 FROM unnest(ARRAY['read','configure','prepare','post','reverse','close','reopen']) p`,[book,secondBranch,owner]);
   for (const [user, permissions] of [[preparer, ["read", "prepare", "reverse"]], [approver, ["read", "post"]]] as const) {
     await sql(`INSERT INTO accounting_grants(book_id,branch_id,user_id,permission,evidence,granted_by)
       SELECT $1,$2,$3,p,'Isolated approved grant',$4 FROM unnest($5::text[]) p`, [book, branch, user, owner, permissions]);
@@ -538,9 +541,81 @@ async function fixture(approved = true) {
   const credit = await service.addAccount(book, branch, owner!, "2100", "Isolated deposit liability", "liability");
   const period = await service.createPeriod(book, branch, owner!, "October", "2026-10-01", "2026-10-31");
   if (approved) await service.approveBook(book, branch, owner!, { policy, version: "isolated-only-v1", ownerEvidence: "Dummy owner approval", accountantEvidence: "Dummy professional review; TEST ONLY" });
-  return { book, branch, owner: owner!, preparer: preparer!, approver: approver!, operations: operations!, debit, credit, period };
+  return { book, branch, secondBranch, owner: owner!, preparer: preparer!, approver: approver!, operations: operations!, debit, credit, period };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
+describe("Step8 posted General Ledger and Trial Balance",()=>{
+  const filters={from:"2026-10-10",to:"2026-10-11",includeZero:true,includeInactive:false};
+  async function postAmount(f:Fixture,amount:string,date:string) {
+    const j=await service.prepareJournal(f.preparer,{...input(f,randomBytes(5).toString("hex"),amount),accountingDate:date});
+    await service.approveAndPost(f.book,f.branch,f.approver,j.id,"Isolated independent report fixture");return j;
+  }
+  it("reconciles opening, movements, reversal, running and closing balances read-only",async()=>{
+    const f=await fixture();await postAmount(f,"100","2026-10-02");const j=await postAmount(f,"25","2026-10-10");
+    const reversal=await service.prepareReversal(f.book,f.branch,f.preparer,j.id,"2026-10-11","Dummy report reversal");
+    await service.approveAndPost(f.book,f.branch,f.approver,reversal.id,"Dummy independent reversal");
+    const draft=await service.prepareJournal(f.preparer,input(f,"report-draft","999"));
+    const canceled=await service.prepareJournal(f.preparer,input(f,"report-canceled","1000"));await service.cancelDraft(f.book,f.branch,f.preparer,canceled.id,"Dummy canceled report fixture");
+    const before=(await sql("SELECT (SELECT count(*) FROM accounting_audit WHERE book_id=$1) audit,(SELECT count(*) FROM accounting_journals WHERE book_id=$1) journals",[f.book])).rows[0];
+    const gl=await service.accountingReport(f.book,f.branch,f.preparer,"general-ledger",filters);
+    const tb=await service.accountingReport(f.book,f.branch,f.preparer,"trial-balance",filters);
+    expect(gl.rows.find(a=>a.id===f.debit)).toMatchObject({opening:"100.00",debit:"25.00",credit:"25.00",closing:"100.00"});
+    expect(gl.rows.find(a=>a.id===f.debit)!.entries.map(e=>e.balance)).toEqual(["125.00","100.00"]);
+    expect(gl.totals).toEqual(tb.totals);expect(tb.balanced).toBe(true);expect(tb.sourceCompletenessConfirmed).toBe(false);
+    expect(gl.totals).toMatchObject({openingDebit:"100.00",openingCredit:"100.00",debit:"50.00",credit:"50.00",closingDebit:"100.00",closingCredit:"100.00"});
+    expect((await service.reportJournal(f.book,f.branch,f.preparer,reversal.id)).reversalOf).toBe(j.id);
+    await expect(service.reportJournal(f.book,f.branch,f.preparer,draft.id)).rejects.toMatchObject({code:"NOT_FOUND"});
+    const after=(await sql("SELECT (SELECT count(*) FROM accounting_audit WHERE book_id=$1) audit,(SELECT count(*) FROM accounting_journals WHERE book_id=$1) journals",[f.book])).rows[0];expect(after).toEqual(before);
+  },180000);
+  it("retains posted balances, explicit zero rules and historical/unknown source warnings",async()=>{
+    const f=await fixture();await postAmount(f,"0.30","2026-10-10");
+    const unused=await service.addAccount(f.book,f.branch,f.owner,"4000","Dummy unused income","income");
+    const inactive=await service.addAccount(f.book,f.branch,f.owner,"5000","Dummy unused inactive","expense");
+    await expect(sql("UPDATE accounting_accounts SET active=false WHERE id=$1",[f.credit])).rejects.toThrow("Posted account definition is immutable");
+    await sql("UPDATE accounting_accounts SET active=false WHERE id=$1",[inactive]);
+    const client=(await sql("INSERT INTO clients(branch_id) VALUES($1) RETURNING id",[f.branch])).rows[0].id;
+    await sql("INSERT INTO invoices(branch_id,client_id,status,total,created_at) VALUES($1,$2,'sent',10,'2026-09-01')",[f.branch,client]);
+    const sched=(await sql("INSERT INTO payment_schedules(branch_id,amount_approved,status) VALUES($1,5,'paid') RETURNING id",[f.branch])).rows[0].id;
+    await sql("INSERT INTO payment_schedule_payments(branch_id,schedule_id,amount,payment_method,paid_at) VALUES($1,$2,5,'cash','2026-10-10')",[f.branch,sched]);
+    const tb=await service.accountingReport(f.book,f.branch,f.preparer,"trial-balance",filters);
+    expect(tb.rows.map(a=>a.id)).toContain(f.credit);expect(tb.rows.map(a=>a.id)).toContain(unused);expect(tb.rows.map(a=>a.id)).not.toContain(inactive);
+    expect(tb.coverage[0]).toMatchObject({exceptionCount:2,counts:{pre_cutover:1,review_required:1},independentControlsVerified:false});
+    expect(tb.warnings.some(w=>w.includes("exceptions"))).toBe(true);expect(tb.balanced).toBe(true);
+    const all=await service.accountingReport(f.book,f.branch,f.preparer,"trial-balance",{...filters,includeInactive:true});expect(all.rows.map(a=>a.id)).toContain(inactive);
+    const nonzero=await service.accountingReport(f.book,f.branch,f.preparer,"trial-balance",{...filters,includeZero:false});expect(nonzero.rows.map(a=>a.id)).toEqual([f.debit,f.credit]);
+  },180000);
+  it("requires every book grant for All, rejects unapproved/foreign scopes and revoked staff",async()=>{
+    const f=await fixture(true,true);await postAmount(f,"10","2026-10-10");
+    const whole=await service.accountingReport(f.book,null,f.owner,"trial-balance",filters);expect(whole.branches.map(b=>b.id)).toEqual([f.branch,f.secondBranch]);
+    await expect(service.accountingReport(f.book,null,f.preparer,"trial-balance",filters)).rejects.toMatchObject({code:"FORBIDDEN"});
+    await service.revokeAccess(f.book,f.secondBranch!,f.owner,f.owner,"read","Dummy all-scope report refusal");
+    await expect(service.reportOptions(f.book,null,f.owner)).rejects.toMatchObject({code:"FORBIDDEN"});
+    expect((await service.reportCatalog(f.owner,null)).books.filter(b=>b.id===f.book).map(b=>b.branchId)).toEqual([f.branch]);
+    await expect(service.reportOptions(f.book,f.branch+999999,f.owner)).rejects.toMatchObject({code:"INVALID_SCOPE"});
+    await expect(service.accountingReport(f.book,f.branch,f.operations,"trial-balance",filters)).rejects.toMatchObject({code:"FORBIDDEN"});
+    await service.revokeAccess(f.book,f.branch,f.owner,f.preparer,"read","Dummy staff report grant revoked");
+    await expect(service.reportOptions(f.book,f.branch,f.preparer)).rejects.toMatchObject({code:"FORBIDDEN"});
+    const unapproved=await fixture(false);await expect(service.reportOptions(unapproved.book,unapproved.branch,unapproved.owner)).rejects.toMatchObject({code:"BOOK_NOT_APPROVED"});
+  },240000);
+  it("enforces date/period/account boundaries, allows closed-period reads and remains inactive before connection",async()=>{
+    const f=await fixture();await postAmount(f,"0.01","2026-10-10");
+    const options=await service.reportOptions(f.book,f.branch,f.preparer);expect(options.periods[0]).toMatchObject({id:f.period,from:"2026-10-01",to:"2026-10-31"});
+    await expect(service.accountingReport(f.book,f.branch,f.preparer,"trial-balance",{...filters,from:"2026-09-30"})).rejects.toMatchObject({code:"PRE_CUTOVER"});
+    await expect(service.accountingReport(f.book,f.branch,f.preparer,"trial-balance",{...filters,to:"2026-11-01",periodId:f.period})).rejects.toMatchObject({code:"INVALID_PERIOD"});
+    await expect(service.accountingReport(f.book,f.branch,f.preparer,"trial-balance",{...filters,periodId:999999})).rejects.toMatchObject({code:"INVALID_PERIOD"});
+    await expect(service.accountingReport(f.book,f.branch,f.preparer,"trial-balance",{...filters,accountId:999999})).rejects.toMatchObject({code:"NOT_FOUND"});
+    await service.changePeriod(f.book,f.owner,f.period,"close",{evidence:"Dummy isolated report controls",sourceCoverageComplete:true,reconciled:true,unresolvedMappings:0});
+    expect((await service.accountingReport(f.book,f.branch,f.preparer,"trial-balance",{...filters,periodId:f.period})).totals.debit).toBe("0.01");
+    delete process.env.NATIVE_ACCOUNTING_ENABLED;
+    let connections=0;const inactiveEngine=new NativeAccounting({connect:async()=>{connections++;throw new Error("Disabled reports must not connect");}} as Pick<typeof pool,"connect">);
+    try {
+      await expect(inactiveEngine.reportCatalog(f.owner,null)).rejects.toMatchObject({code:"ACCOUNTING_DISABLED"});
+      await expect(inactiveEngine.accountingReport(f.book,f.branch,f.owner,"trial-balance",filters)).rejects.toMatchObject({code:"ACCOUNTING_DISABLED"});
+      await expect(inactiveEngine.reportOptions(f.book,f.branch,f.owner)).rejects.toMatchObject({code:"ACCOUNTING_DISABLED"});
+      await expect(inactiveEngine.reportJournal(f.book,f.branch,f.owner,1)).rejects.toMatchObject({code:"ACCOUNTING_DISABLED"});expect(connections).toBe(0);
+    } finally{process.env.NATIVE_ACCOUNTING_ENABLED="true";}
+  },180000);
+});
 function input(f: Fixture, key = randomBytes(8).toString("hex"), amount = "0.30"): JournalInput {
   return { bookId: f.book, branchId: f.branch, currency: "NGN", accountingDate: "2026-10-10", eventKey: `manual:qa:${key}`,
     narration: "Isolated controlled journal", evidence: "Dummy voucher; no cash/source mutation", lines: [

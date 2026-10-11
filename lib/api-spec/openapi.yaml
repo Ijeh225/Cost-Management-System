@@ -19,6 +19,70 @@ tags:
     description: Container charges
 
 paths:
+  /accounting/catalog:
+    get:
+      operationId: getAccountingCatalog
+      tags: [accounting]
+      summary: Approved native books visible through explicit read grants; inactive returns no books
+      parameters:
+        - $ref: '#/components/parameters/AccountingBranch'
+      responses:
+        '200':
+          description: Scoped catalog or inactive status; no posting is performed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountingCatalog' }
+  /accounting/books/{bookId}/options:
+    get:
+      operationId: getAccountingOptions
+      tags: [accounting]
+      summary: Chart and periods for an explicitly authorised approved book scope
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/AccountingBranch'
+      responses:
+        '200':
+          description: Approved chart and periods
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountingOptions' }
+  /accounting/books/{bookId}/reports/{kind}:
+    get:
+      operationId: getNativeAccountingReport
+      tags: [accounting]
+      summary: Read-only posted General Ledger or Trial Balance; exact decimal strings
+      description: Finance capability plus named native read grants are required. All scope means one whole book, never unrelated books. Period filters constrain movements, not earlier opening balances. Native accounting disabled returns 503. More than 50000 posted historical lines returns 413, never truncated financial totals. Source equality is not professional approval or independent control reconciliation.
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/AccountingBranch'
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [general-ledger, trial-balance] } }
+        - { name: from, in: query, required: true, schema: { type: string } }
+        - { name: to, in: query, required: true, schema: { type: string } }
+        - { name: accountId, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: periodId, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: includeZero, in: query, schema: { type: string, enum: ['true', 'false'], default: 'true' } }
+        - { name: includeInactive, in: query, schema: { type: string, enum: ['true', 'false'], default: 'false' } }
+      responses:
+        '200':
+          description: Same report snapshot used for screen, CSV and print; source coverage disclosed separately
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountingReport' }
+  /accounting/books/{bookId}/journals/{journalId}:
+    get:
+      operationId: getAccountingJournal
+      tags: [accounting]
+      summary: Read a scoped posted journal and its immutable source evidence
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/AccountingBranch'
+        - { name: journalId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Posted journal; draft or cross-scope journals are not returned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountingJournal' }
   /healthz:
     get:
       operationId: healthCheck
@@ -1200,7 +1264,203 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
 components:
+  parameters:
+    AccountingBookId: { name: bookId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    AccountingBranch:
+      name: branchId
+      in: query
+      description: Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
+      schema: { type: string }
   schemas:
+    AccountingBook:
+      type: object
+      required: [id, name, currency, cutoverDate]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        currency: { type: string }
+        cutoverDate: { type: string }
+        policyVersion: { type: string }
+    AccountingAccount:
+      type: object
+      required: [id, code, name, category, active]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        category: { type: string }
+        active: { type: boolean }
+    AccountingCatalog:
+      type: object
+      required: [status, books]
+      properties:
+        status: { type: string, enum: [active, inactive] }
+        message: { type: string }
+        books:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/AccountingBook'
+              - type: object
+                required: [branchId, branchName]
+                properties:
+                  branchId: { type: integer }
+                  branchName: { type: string }
+    AccountingOptions:
+      type: object
+      required: [book, branches, accounts, periods]
+      properties:
+        book: { $ref: '#/components/schemas/AccountingBook' }
+        branches:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties: { id: { type: integer }, name: { type: string } }
+        accounts:
+          type: array
+          items: { $ref: '#/components/schemas/AccountingAccount' }
+        periods:
+          type: array
+          items:
+            type: object
+            required: [id, name, from, to, status]
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              from: { type: string }
+              to: { type: string }
+              status: { type: string }
+    AccountingSides:
+      type: object
+      required: [debit, credit]
+      properties: { debit: { type: string }, credit: { type: string } }
+    AccountingEntry:
+      type: object
+      required: [id, journalId, branchId, date, kind, eventKey, narration, memo, debit, credit, balance]
+      properties:
+        id: { type: integer }
+        journalId: { type: integer }
+        branchId: { type: integer }
+        date: { type: string }
+        kind: { type: string }
+        eventKey: { type: string }
+        narration: { type: string }
+        memo: { type: string }
+        debit: { type: string }
+        credit: { type: string }
+        balance: { type: string }
+    AccountingReport:
+      type: object
+      required: [kind, basis, filter, book, branches, scope, asOf, generatedAt, rows, totals, balanced, warnings, coverage, sourceCompletenessConfirmed, limit, truncated]
+      properties:
+        kind: { type: string, enum: [general-ledger, trial-balance] }
+        basis: { type: string, enum: [posted_double_entry] }
+        book: { $ref: '#/components/schemas/AccountingBook' }
+        branches:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties: { id: { type: integer }, name: { type: string } }
+        scope: { type: string, enum: [whole_book, branch] }
+        asOf: { type: string }
+        generatedAt: { type: string }
+        sourceCompletenessConfirmed: { type: boolean, enum: [false] }
+        limit: { type: integer }
+        truncated: { type: boolean, enum: [false] }
+        balanced: { type: boolean }
+        filter:
+          type: object
+          required: [from, to, includeZero, includeInactive]
+          properties:
+            from: { type: string }
+            to: { type: string }
+            accountId: { type: integer }
+            periodId: { type: integer }
+            includeZero: { type: boolean }
+            includeInactive: { type: boolean }
+        rows:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/AccountingAccount'
+              - type: object
+                required: [opening, openingSides, debit, credit, closing, closingSides, entries]
+                properties:
+                  opening: { type: string }
+                  openingSides: { $ref: '#/components/schemas/AccountingSides' }
+                  debit: { type: string }
+                  credit: { type: string }
+                  closing: { type: string }
+                  closingSides: { $ref: '#/components/schemas/AccountingSides' }
+                  entries:
+                    type: array
+                    items: { $ref: '#/components/schemas/AccountingEntry' }
+        totals:
+          type: object
+          required: [openingDebit, openingCredit, debit, credit, closingDebit, closingCredit, openingDifference, movementDifference, closingDifference]
+          properties:
+            openingDebit: { type: string }
+            openingCredit: { type: string }
+            debit: { type: string }
+            credit: { type: string }
+            closingDebit: { type: string }
+            closingCredit: { type: string }
+            openingDifference: { type: string }
+            movementDifference: { type: string }
+            closingDifference: { type: string }
+        warnings: { type: array, items: { type: string } }
+        coverage:
+          type: array
+          items:
+            type: object
+            required: [branchId, counts, exceptionCount, exceptions, exceptionsTruncated, missingControlAccountIds, independentControlsVerified]
+            properties:
+              branchId: { type: integer }
+              counts: { type: object, additionalProperties: { type: integer } }
+              exceptionCount: { type: integer }
+              exceptionsTruncated: { type: boolean }
+              independentControlsVerified: { type: boolean, enum: [false] }
+              missingControlAccountIds: { type: array, items: { type: integer } }
+              exceptions:
+                type: array
+                items:
+                  type: object
+                  required: [eventKey, kind, id, date, status, reason]
+                  properties:
+                    eventKey: { type: string }
+                    kind: { type: string }
+                    id: { type: integer }
+                    date: { type: string }
+                    status: { type: string }
+                    reason: { type: string }
+    AccountingJournal:
+      type: object
+      required: [id, branchId, date, eventKey, kind, narration, evidence, reversalOf, postedAt, preparedBy, postedBy, lines]
+      properties:
+        id: { type: integer }
+        branchId: { type: integer }
+        date: { type: string }
+        eventKey: { type: string }
+        kind: { type: string }
+        narration: { type: string }
+        evidence: { type: string }
+        reversalOf: { type: [integer, 'null'] }
+        postedAt: { type: string }
+        preparedBy: { type: integer }
+        postedBy: { type: integer }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [code, name, memo, debit, credit]
+            properties:
+              code: { type: string }
+              name: { type: string }
+              memo: { type: string }
+              debit: { type: string }
+              credit: { type: string }
     HealthStatus:
       type: object
       properties:

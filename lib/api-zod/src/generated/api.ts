@@ -8,6 +8,269 @@
 import * as zod from "zod";
 
 /**
+ * @summary Approved native books visible through explicit read grants; inactive returns no books
+ */
+export const GetAccountingCatalogQueryParams = zod.object({
+  branchId: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book",
+    ),
+});
+
+export const GetAccountingCatalogResponse = zod.object({
+  status: zod.enum(["active", "inactive"]),
+  message: zod.string().optional(),
+  books: zod.array(
+    zod
+      .object({
+        id: zod.number(),
+        name: zod.string(),
+        currency: zod.string(),
+        cutoverDate: zod.string(),
+        policyVersion: zod.string().optional(),
+      })
+      .and(
+        zod.object({
+          branchId: zod.number(),
+          branchName: zod.string(),
+        }),
+      ),
+  ),
+});
+
+/**
+ * @summary Chart and periods for an explicitly authorised approved book scope
+ */
+
+export const GetAccountingOptionsParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const GetAccountingOptionsQueryParams = zod.object({
+  branchId: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book",
+    ),
+});
+
+export const GetAccountingOptionsResponse = zod.object({
+  book: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    currency: zod.string(),
+    cutoverDate: zod.string(),
+    policyVersion: zod.string().optional(),
+  }),
+  branches: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+    }),
+  ),
+  accounts: zod.array(
+    zod.object({
+      id: zod.number(),
+      code: zod.string(),
+      name: zod.string(),
+      category: zod.string(),
+      active: zod.boolean(),
+    }),
+  ),
+  periods: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      from: zod.string(),
+      to: zod.string(),
+      status: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * Finance capability plus named native read grants are required. All scope means one whole book, never unrelated books. Period filters constrain movements, not earlier opening balances. Native accounting disabled returns 503. More than 50000 posted historical lines returns 413, never truncated financial totals. Source equality is not professional approval or independent control reconciliation.
+ * @summary Read-only posted General Ledger or Trial Balance; exact decimal strings
+ */
+
+export const GetNativeAccountingReportParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  kind: zod.enum(["general-ledger", "trial-balance"]),
+});
+
+export const getNativeAccountingReportQueryIncludeZeroDefault = `true`;
+export const getNativeAccountingReportQueryIncludeInactiveDefault = `false`;
+
+export const GetNativeAccountingReportQueryParams = zod.object({
+  branchId: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book",
+    ),
+  from: zod.coerce.string(),
+  to: zod.coerce.string(),
+  accountId: zod.coerce.number().min(1).optional(),
+  periodId: zod.coerce.number().min(1).optional(),
+  includeZero: zod
+    .enum(["true", "false"])
+    .default(getNativeAccountingReportQueryIncludeZeroDefault),
+  includeInactive: zod
+    .enum(["true", "false"])
+    .default(getNativeAccountingReportQueryIncludeInactiveDefault),
+});
+
+export const GetNativeAccountingReportResponse = zod.object({
+  kind: zod.enum(["general-ledger", "trial-balance"]),
+  basis: zod.enum(["posted_double_entry"]),
+  book: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    currency: zod.string(),
+    cutoverDate: zod.string(),
+    policyVersion: zod.string().optional(),
+  }),
+  branches: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+    }),
+  ),
+  scope: zod.enum(["whole_book", "branch"]),
+  asOf: zod.string(),
+  generatedAt: zod.string(),
+  sourceCompletenessConfirmed: zod.literal(false),
+  limit: zod.number(),
+  truncated: zod.literal(false),
+  balanced: zod.boolean(),
+  filter: zod.object({
+    from: zod.string(),
+    to: zod.string(),
+    accountId: zod.number().optional(),
+    periodId: zod.number().optional(),
+    includeZero: zod.boolean(),
+    includeInactive: zod.boolean(),
+  }),
+  rows: zod.array(
+    zod
+      .object({
+        id: zod.number(),
+        code: zod.string(),
+        name: zod.string(),
+        category: zod.string(),
+        active: zod.boolean(),
+      })
+      .and(
+        zod.object({
+          opening: zod.string(),
+          openingSides: zod.object({
+            debit: zod.string(),
+            credit: zod.string(),
+          }),
+          debit: zod.string(),
+          credit: zod.string(),
+          closing: zod.string(),
+          closingSides: zod.object({
+            debit: zod.string(),
+            credit: zod.string(),
+          }),
+          entries: zod.array(
+            zod.object({
+              id: zod.number(),
+              journalId: zod.number(),
+              branchId: zod.number(),
+              date: zod.string(),
+              kind: zod.string(),
+              eventKey: zod.string(),
+              narration: zod.string(),
+              memo: zod.string(),
+              debit: zod.string(),
+              credit: zod.string(),
+              balance: zod.string(),
+            }),
+          ),
+        }),
+      ),
+  ),
+  totals: zod.object({
+    openingDebit: zod.string(),
+    openingCredit: zod.string(),
+    debit: zod.string(),
+    credit: zod.string(),
+    closingDebit: zod.string(),
+    closingCredit: zod.string(),
+    openingDifference: zod.string(),
+    movementDifference: zod.string(),
+    closingDifference: zod.string(),
+  }),
+  warnings: zod.array(zod.string()),
+  coverage: zod.array(
+    zod.object({
+      branchId: zod.number(),
+      counts: zod.record(zod.string(), zod.number()),
+      exceptionCount: zod.number(),
+      exceptionsTruncated: zod.boolean(),
+      independentControlsVerified: zod.literal(false),
+      missingControlAccountIds: zod.array(zod.number()),
+      exceptions: zod.array(
+        zod.object({
+          eventKey: zod.string(),
+          kind: zod.string(),
+          id: zod.number(),
+          date: zod.string(),
+          status: zod.string(),
+          reason: zod.string(),
+        }),
+      ),
+    }),
+  ),
+});
+
+/**
+ * @summary Read a scoped posted journal and its immutable source evidence
+ */
+
+export const GetAccountingJournalParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  journalId: zod.coerce.number().min(1),
+});
+
+export const GetAccountingJournalQueryParams = zod.object({
+  branchId: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book",
+    ),
+});
+
+export const GetAccountingJournalResponse = zod.object({
+  id: zod.number(),
+  branchId: zod.number(),
+  date: zod.string(),
+  eventKey: zod.string(),
+  kind: zod.string(),
+  narration: zod.string(),
+  evidence: zod.string(),
+  reversalOf: zod.number().nullable(),
+  postedAt: zod.string(),
+  preparedBy: zod.number(),
+  postedBy: zod.number(),
+  lines: zod.array(
+    zod.object({
+      code: zod.string(),
+      name: zod.string(),
+      memo: zod.string(),
+      debit: zod.string(),
+      credit: zod.string(),
+    }),
+  ),
+});
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
