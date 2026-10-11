@@ -1,5 +1,73 @@
 # Accounting Source Integration - Step 7
 
+## 2026-10-11 13:10 WAT - Remaining Supported Engineering Accepted
+
+- Final shared13/13 PASS (743s), verifies invoiceId/reassignment and all existing
+  settlement/recognition rules on frozen final code. Combined accepted21distinct
+  Step7 scenarios: six operational, two opening, five invoice, eight settlement.
+  Isolated namespace/eleven-source public baseline/tunnel cleanup PASS.
+- Final46unit files353PASS/3prior skips; full railway typechecks/build and local
+  rebuilt inactive smoke PASS. Publishing all current scoped work and records.
+- Existing sources/engine reused, no second ledger or source writer. Native live
+  schema/posting OFF, no production dummy records or guessed classifications.
+- Real accountant approval, dated actual openings/cutover, historical exceptions
+  and later Steps8-12 public accounting tools remain explicitly outstanding.
+
+## 2026-10-11 12:59 WAT - Corrected Acceptance / Final Trace Check
+
+- Recovered final16/16 PASS evidence after context compaction: corrected overhead,
+  two opening cases and13existing source cases. Combined with five hardened
+  source cases, all21 Step7 scenarios accepted; isolated guard/cleanup PASS.
+- Last trace payload now includes real invoiceId and strips caller ref extras.
+  Added same-client receipt reassignment refusal; final13shared cases running
+  against this final delta. Do not repeat completed operational/opening cases.
+- Final353unit/3prior skips/full build/inactive local smoke PASS. Publication
+  still pending final shared regression. Production posting/schema flags OFF.
+- No fabricated historical treatment, approval, opening or new public module.
+
+## 2026-10-11 12:36 WAT - Hardened Source Acceptance / SQL Correction
+
+- Final5source cases PASS; overhead failed on duplicate paid_at output alias in
+  ORDER BY. Corrected to p.paid_at,p.id; no deployed/production data impact.
+- Owned schema/eleven-source public isolated baseline/tunnel cleanup verified.
+  Final overhead+2opening+13existing invoice/settlement cases now running.
+- Final352unit/3prior skips/typechecks/build/inactive local smoke PASS. New test
+  fixture client_funds enum corrected to existing liability; not an app defect.
+- No professional approval, official opening, public UI, historical guessing or
+  activation. Publication follows final acceptance, not the initial partial pass.
+
+
+## 2026-10-11 12:27 WAT - Initial Database Acceptance / Final Checks
+
+- Initial8/8new source/opening cases PASS;36older cases intentionally filtered.
+  Owned schema/public isolated cash guard/tunnel cleanup passed. No live changes.
+- Final safeguards added after initial import: funded loan/capital/asset basis,
+  UTC timestamp normalization, original AR/source proof, stale credit origins,
+  backdated post-write-off collection refusal and opening/legacy overlap refusal.
+- Final6operational cases running; then2opening+13shared-source regressions and
+  final build/units/publication. Initial352unit/3prior skips/build/inactive smoke PASS.
+- Added internal source procedure and explicit limits; no fake historical figures,
+  public accounting UI, professional sign-off, recovery/asset schedules or activation.
+- Actual policy, cutover/date controls and historical attribution remain pending.
+
+
+## 2026-10-11 12:06 WAT - Remaining Connections Implemented / Testing
+
+- Owner authorises remaining Step7 in one sustained effort, not another source
+  family only. Current dc9b0e4 and protected ec7a8f4 checkpoint preserved.
+- Added remaining existing operational adapters, reviewed opening preparation
+  and source/control reconciliation using the same inactive engine. No public
+  route/UI/source writer or live native books/flags/openings created.
+- Explicit reviewed treatment for bank funding, duties/pass-throughs and recorded
+  standalone classification; unknown historical amounts/head records stay exceptions.
+- Credit corrections are non-cash and original-account bounded; write-off must
+  equal unpaid posted AR. Overhead source is header less top-ups; bill payment
+  settles payable, overhead-linked schedule cannot duplicate standalone cash.
+- Initial41new pure cases/typecheck PASS; eight owned-schema tests and shared
+  invoice/settlement regression, final full build/tests/publication are next.
+- Actual professional approval and dated live cutover remain pending, not guessed.
+
+
 ## 2026-10-11 11:00 WAT - Issued-Invoice Family Deployed Inactive
 
 - Functional d0d8c0ceb81f71c3ea82b749bdb5b85e41d814c3 committed/pushed.

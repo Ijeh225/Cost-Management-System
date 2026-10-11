@@ -2,6 +2,109 @@
 
 ## Current Work Register - Authoritative as of 2026-10-11
 
+### Remaining Step 7 Engineering Accepted / Publishing - 2026-10-11 13:10 WAT
+
+- All remaining EXISTING supported source adapters implemented in the same native
+  engine: credit notes/client credit/reversals/write-offs; duty/reversal/container
+  payments; overhead/base/top-up/direct and scheduled settlement; five classified
+  standalone categories; explicitly reviewed funding/transfers. Added reviewed
+  opening preparation and scoped source/control reconciliation, not another ledger.
+- Accepted21 Step7 scenarios across hardened5 +corrected16 runs. Final shared13
+  rerun PASS (743s;31 intentionally filtered) verifies final invoice-link evidence,
+  stale facts, deduplication, reversal, independent approval, branch/period/cutover
+  and no duplicated cash. All owned-schema/public11source guards/tunnels cleaned.
+- Final46unit files:353PASS/3prior skips; full railway build/typechecks and inactive
+  local zero-connection smoke PASS. Checkpoint ec7a8f4 preserved. Publishing next.
+- Engineering complete for EXISTING supported Step7 scope only. Official posting
+  and native schema stay OFF. Real accountant approval, chart/book scope, dated
+  cutover/opening controls and historical501/missing-head exceptions remain pending.
+  Public accounting screens/reports and unsupported subledgers (Steps8-12) not built.
+
+### Corrected Source Acceptance / Final Invoice-Link Check - 2026-10-11 12:59 WAT
+
+- Corrected overhead +2 reviewed opening +13 shared invoice/settlement cases
+  PASS (16/16;28 deliberately filtered,942s). Together with five hardened
+  operational PASS, all21 supported Step7 scenarios have current acceptance.
+  Owned namespaces/public eleven-source baseline/tunnel cleanup verified.
+- Final evidence now retains linked invoice ID for settlement sources and strips
+  caller reference extras. Moving a payment to another invoice for the same
+  client must invalidate its draft. Final13 shared-source cases are running on
+  this last trace-field change; do not substitute the earlier16 run for it.
+- Final46unit files:353PASS/3prior skips, full railway build/typechecks and
+  rebuilt inactive zero-connection smoke PASS. VAT evidence decimals normalized.
+- Publication pending this final shared regression. No live accounting flags,
+  source records, books or balances changed. Actual accountant-approved policy,
+  dated cutover/openings and historical attribution remain separate gates.
+
+### Final Source Run: Five PASS / Overhead Query Corrected - 2026-10-11 12:36 WAT
+
+- Hardened five operational cases PASS: duty/container/banks, classified payments/
+  loan/asset basis, credit use/reversal, write-off and source/control reconciliation.
+  One overhead case failed on ambiguous ORDER BY paid_at after UTC aliasing;
+  qualified the original table columns. No live app data or release was affected.
+- Owned schema and eleven-source public isolated preservation guard cleaned;
+  authenticated tunnel closed. Final overhead +2opening +13existing invoice/
+  settlement regression now running. Do not call that run passed yet.
+- Final352units/3prior skips PASS. Corrected a test-only invoice treatment enum
+  (liability, not client_funds); full typecheck/build and inactive local smoke PASS.
+- Publication still pending final DB acceptance. Native production flags remain
+  inactive and actual professional policy/cutover remains outstanding.
+
+### Initial Remaining Source Acceptance PASS / Final Safeguards - 2026-10-11 12:27 WAT
+
+- Initial eight new owned-schema cases PASS (767s); public isolated cash-source
+  guard, schema cleanup and tunnel closure PASS. This run imported code before
+  final loan-balance/timezone/source-origin checks, so it is not final acceptance.
+- Final six operational cases running with posted-balance proof for loan/capital
+  reductions and asset recoveries, explicit UTC source timestamps/Lagos dates,
+  original AR/account/source proof, direct plus scheduled bill settlement and
+  broader eleven-source preservation guards. Openings/shared-source regression next.
+- 352unit PASS/3prior skips, full build/typechecks and rebuilt inactive smoke PASS;
+  new late-opening/legacy-invoice refusal still needs final checks. No production
+  DB/source/flags change. Added ACCOUNTING_SOURCE_CONNECTIONS.md procedure/limits.
+- Reviewed openings cannot be used to re-recognize old invoices through a guessed
+  later date. Historical invoice/client/deposit attribution, actual dated cutover,
+  professional policy and unknown legacy heads still require real approved review.
+- Step7 supported-source engineering implemented, acceptance/publication pending;
+  full official source completeness/cutover is NOT claimed. Steps8-12 not started.
+
+### Remaining Step 7 Internal Connections / Acceptance Running - 2026-10-11 12:06 WAT
+
+- Implemented remaining existing-source adapters: credit notes/client credit,
+  stored audited write-offs, duty/reversal, container costs, overhead/base/top-up/
+  expense payment, classified standalone payments, reviewed bank funding and
+  transfers. Existing engine/identities reused; no second ledger/source writer.
+- Reviewed opening preparation reuses preview validator, requires exact dated
+  controls for every line and blocks forward journals until opening is posted.
+  Added scoped source inventory and independent account-control differences;
+  missing/stale/unclassified/pre-cutover records remain explicit exceptions.
+- Issued invoice retries now retain previously posted original recognition after
+  subsequent adjustments. Unposted adjusted historical invoices still refused.
+  Write-off matches reconciled unpaid AR; duplicate Bad Debt payable refused.
+  No fabricated cash/recovery/asset schedule or historical classification.
+- Initial 41 new pure cases and API typecheck PASS. Owned-schema isolated
+  acceptance is starting; full regression/build/publication/deployed proof pending.
+  Production native posting/schema remain OFF; no live source/flags/books changed.
+- Step7 is engineering-in-progress, not official cutover. Accountant approval,
+  reviewed actual cutover/openings and historical exceptions remain separate gates.
+
+### Remaining Step 7 Engineering Authorised - 2026-10-11 11:44 WAT
+
+- Owner requests remaining Step7 implementation, not another duplicate ledger.
+  Clean restored master dc9b0e4; invoice and deposit/collection families deployed
+  inactive. Continue all existing operational source families, reviewed opening
+  preparation and coverage/control reconciliation. Keep production flags off.
+- Source review: credit-note invoice adjustments are not receipts; overhead-linked
+  schedules write expense_payments only. Overhead header includes top-ups, so base
+  recognition must subtract separately dated top-ups. Bad Debt overhead is invoice
+  write-off evidence, not another payable. Bank funding has no stored purpose;
+  require explicit classification. No prose-derived amounts or invented recovery.
+- Existing source IDs, dates, classifications, independent approval, branches and
+  atomic native engine remain authoritative. Missing historical heads, unclassified
+  payments and unsupported recovery/asset schedules remain disclosed exceptions;
+  no accountant approval, opening figure, new official book or activation inferred.
+- Implementation/test/publication pending. Preserve current and older checkpoints.
+
 ### Step 7 Invoice Recognition Deployed Inactive - 2026-10-11 11:00 WAT
 
 - Functional d0d8c0ceb81f71c3ea82b749bdb5b85e41d814c3 committed/pushed.

@@ -2,6 +2,64 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-11
 
+### Remaining Step 7 Supported Engineering Acceptance PASS - 2026-10-11 13:10 WAT
+
+- Accepted21 distinct Step7 source/opening cases through final hardened5 and
+  corrected16 runs. Final shared13 rerun PASS (743s;31filtered), including the
+  last same-client invoice reassignment check. No claim that all44foundation
+  cases ran fresh together;23prior foundation cases retain previous acceptance.
+- Final46unit files:353PASS/3prior skips, full typecheck/build and rebuilt inactive
+  zero-DB smoke PASS. SQL alias failure fixed before publication; isolated
+  run-owned schemas/public11source guard/SSH tunnel cleanup all verified.
+- Publishing inactive engineering. No live financial write or production schema
+  migration performed. Actual professional approval/cutover/legacy controls and
+  later public General Ledger/Trial Balance interfaces remain outside this pass.
+
+### Corrected Sixteen PASS / Final Trace Regression - 2026-10-11 12:59 WAT
+
+- Corrected overhead +2opening +13shared cases PASS:16/16,28filtered,942s.
+  The five other hardened operational cases already PASS. Namespace cleanup,
+  public isolated eleven-source preservation and SSH tunnel closure verified.
+- Final353unit/3prior skips and all build/typecheck/inactive smoke checks PASS.
+  Last settlement payload adds invoice identity; final13 shared cases now run
+  to verify same-client invoice reassignment is rejected. Publication pending.
+- No financial fixtures in production. These are isolated internal-engine
+  tests, not live official posting approval or proof of public accounting UI.
+
+### Hardened Five PASS / Final Overhead Regression - 2026-10-11 12:36 WAT
+
+- Final operational run5PASS/1FAIL/38filtered. Failure was SQL ORDER BY paid_at
+  ambiguity in new overhead UTC alias reader; corrected with qualified input
+  columns before publication. Owned schema/public11source guard/tunnel cleaned.
+- Final overhead+2openings+13shared source cases running. Initial8case PASS is
+  not substituted for this corrected-code acceptance. No live fixtures created.
+- Final352units/3prior skips/full build/typechecks/inactive zero-DB smoke PASS;
+  one test-only treatment enum corrected. Publication/deployed proof pending.
+
+### Initial Eight Remaining Source Cases PASS / Final Run - 2026-10-11 12:27 WAT
+
+- Eight new cases PASS,36old cases filtered; initial schema/public isolated
+  cash-source baseline/tunnel cleanup verified. Final six operational cases now
+  rerunning because new balance/origin/timezone safeguards followed initial import.
+- New final tests include UTC23:30 -> next Lagos date, funded loan/capital
+  reductions, asset recovery, direct and scheduled overhead, changed prior cash
+  refusal at write-off, broader eleven-source preservation. No live write records.
+- Shared13invoice/settlement and2opening cases still pending final run. Full352
+  units/3prior skips/build/typechecks/inactive zero-DB smoke passed before final
+  legacy/opening delta; final build/unit acceptance and publication remain next.
+
+### Remaining Step 7 Acceptance Started - 2026-10-11 12:06 WAT
+
+- 41 new calculation/opening-review cases and API typecheck PASS. Added eight
+  owned-schema database cases for remaining sources/openings; not yet passed.
+- Includes duty reversal and bank transfers without artificial income, overhead
+  top-ups/payment dedupe, five standalone classifications, non-cash credit excess/
+  application/reversal, exact write-off, stale facts/control coverage and cutover.
+- Prior settlement/invoice integration will be rerun because shared approval
+  dispatch changed. No duplicate live fixtures or official posting activation.
+- Publication/deployment acceptance pending; real policy/opening approval is not
+  replaced by dummy isolated evidence. Prior closed application defects stay closed.
+
 ### Exact Inactive Invoice Source Release Accepted - 2026-10-11 11:00 WAT
 
 - d0d8c0ceb81f71c3ea82b749bdb5b85e41d814c3 pushed; exact Railway

@@ -6,6 +6,11 @@ import { financialDateKey } from "./financial-reporting.js";
 import { isInvoiceFinanciallyActive } from "./invoice-status.js";
 import { buildSettlementJournal, settlementEventKey, type AccountingSettlementRef, type SettlementMapping, type SettlementSource } from "./accounting-source-mapping.js";
 import { buildInvoiceJournal, invoiceEventKey, type InvoiceAccountingMapping, type InvoiceAccountingSource } from "./accounting-invoice-mapping.js";
+import { buildOperationalJournal, OPERATIONAL_SOURCE_KINDS, type OperationalMapping, type OperationalRef } from "./accounting-operational-mapping.js";
+import { readOperationalSource } from "./accounting-operational-sources.js";
+import { validateOperationalControls } from "./accounting-operational-controls.js";
+import { buildReviewedOpening, type ReviewedOpening } from "./accounting-reviewed-opening.js";
+import { sourceCoverage, type ReconciliationControl } from "./accounting-source-coverage.js";
 
 type Database = Pick<typeof pool, "connect">;
 async function connectClient(database: Database) { return database.connect(); }
@@ -144,6 +149,11 @@ export class NativeAccounting {
         && existing.kind === (reversalOf === null ? "manual" : "reversal"), "DUPLICATE_CONFLICT", "Event key already exists with different payload or preparer");
       return existing;
     }
+    if(!input.eventKey.startsWith("opening:")) {
+      const pending=(await client.query("SELECT id FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key LIKE 'opening:%' AND status='draft' LIMIT 1",
+        [input.bookId,input.branchId])).rows[0];
+      requireAccounting(!pending,"CUTOVER_CONFLICT","Post the reviewed opening before forward journals");
+    }
     const book = (await client.query("SELECT * FROM accounting_books WHERE id=$1", [input.bookId])).rows[0];
     requireAccounting(book?.status === "approved" && book.currency === input.currency && input.accountingDate >= book.policy.cutoverDate,
       "BOOK_NOT_APPROVED", "Approved matching currency, policy and cutover required");
@@ -176,15 +186,17 @@ export class NativeAccounting {
     const book = (await client.query("SELECT * FROM accounting_books WHERE id=$1", [bookId])).rows[0];
     requireAccounting(book?.status === "approved" && book.policy_version === mapping.policyVersion && book.currency === mapping.currency,
       "BOOK_NOT_APPROVED", "Matching approved book currency and policy version required");
-    const row = (await client.query("SELECT * FROM invoices WHERE id=$1 AND branch_id=$2 FOR SHARE", [invoiceId, branchId])).rows[0];
+    const row = (await client.query("SELECT *,created_at AT TIME ZONE 'UTC' AS created_at FROM invoices WHERE id=$1 AND branch_id=$2 FOR SHARE", [invoiceId, branchId])).rows[0];
     requireAccounting(row, "NOT_FOUND", "Invoice not found in this branch");
-    requireAccounting(["sent", "partial", "paid", "overdue"].includes(row.status)
-      && (!row.written_off_amount || moneyToMinor(row.written_off_amount) === 0n),
-    "SOURCE_REVIEW_REQUIRED", "Only issued invoices without write-off history are supported by this mapping");
+    const originalPosted=(await client.query("SELECT status FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3",
+      [bookId,branchId,invoiceEventKey(invoiceId)])).rows[0]?.status === "posted";
+    requireAccounting(["sent", "partial", "paid", "overdue",...(originalPosted ? ["written_off"] : [])].includes(row.status)
+      && (originalPosted || !row.written_off_amount || moneyToMinor(row.written_off_amount) === 0n),
+    "SOURCE_REVIEW_REQUIRED", "Adjusted historical invoices need previously posted original recognition; do not reconstruct it from guesses");
     const customer = (await client.query("SELECT branch_id FROM clients WHERE id=$1 FOR SHARE", [row.client_id])).rows[0];
     requireAccounting(customer?.branch_id === branchId, "SOURCE_REVIEW_REQUIRED", "Linked invoice customer must belong to this branch");
     const credits = (await client.query("SELECT id FROM credit_notes WHERE invoice_id=$1 AND status='active' FOR SHARE", [invoiceId])).rows;
-    requireAccounting(credits.length === 0, "SOURCE_REVIEW_REQUIRED", "Credit-note history requires its own reviewed source mapping");
+    requireAccounting(credits.length === 0 || originalPosted, "SOURCE_REVIEW_REQUIRED", "Credit-note history requires previously posted original recognition");
     const items = (await client.query("SELECT id,branch_id,container_id,amount FROM invoice_items WHERE invoice_id=$1 ORDER BY id FOR SHARE", [invoiceId])).rows;
     requireAccounting(items.every(item => item.branch_id === branchId), "SOURCE_REVIEW_REQUIRED", "Invoice items cannot cross branches");
     const containerIds = [...new Set(items.flatMap(item => item.container_id === null ? [] : [item.container_id]))];
@@ -198,6 +210,11 @@ export class NativeAccounting {
       items: items.map(item => ({ id: item.id, containerId: item.container_id, amount: item.amount })) };
     const draft = buildInvoiceJournal(bookId, source, mapping);
     requireAccounting(draft.input.accountingDate >= book.policy.cutoverDate, "BEFORE_CUTOVER", "Earlier recognition requires approved openings/import");
+    if(source.createdDate<book.policy.cutoverDate && !originalPosted) {
+      const opening=(await client.query("SELECT id FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key LIKE 'opening:%' AND status='posted'",
+        [bookId,branchId])).rows[0];
+      requireAccounting(!opening,"CUTOVER_CONFLICT","Legacy invoice may already be in openings; invoice-specific dated coverage is required before recognizing it again");
+    }
     const accounts = (await client.query("SELECT id,category FROM accounting_accounts WHERE book_id=$1 AND active AND id=ANY($2::int[])",
       [bookId, [...draft.requiredCategories.keys()]])).rows;
     const categories = new Map(accounts.map(account => [account.id, account.category]));
@@ -225,32 +242,52 @@ export class NativeAccounting {
       "BOOK_NOT_APPROVED", "Matching approved book currency and policy version required");
     let source: SettlementSource;
     if (ref.kind === "client_deposit") {
-      const row = (await client.query(`SELECT d.*,c.branch_id client_branch FROM client_deposits d
+      const row = (await client.query(`SELECT d.*,d.created_at AT TIME ZONE 'UTC' AS created_at,c.branch_id client_branch FROM client_deposits d
         JOIN clients c ON c.id=d.client_id WHERE d.id=$1 AND d.branch_id=$2 FOR SHARE OF d,c`, [ref.id, branchId])).rows[0];
       requireAccounting(row && row.client_branch === branchId, "NOT_FOUND", "Deposit not found in this branch");
       requireAccounting(!row.notes?.includes("[VOIDED by wallet reset"), "SOURCE_REVIEW_REQUIRED", "Voided deposit needs explicit historical review");
-      source = { ...ref, branchId, clientId: row.client_id, amount: row.amount, bankId: row.bank_id,
+      source = { kind:ref.kind,id:ref.id, branchId, clientId: row.client_id, amount: row.amount, bankId: row.bank_id,
         paymentMethod: row.payment_method, accountingDate: financialDateKey(new Date(row.created_at)) };
     } else {
-      const row = (await client.query(`SELECT p.*,i.client_id,i.status invoice_status,i.branch_id invoice_branch,i.total invoice_total,i.written_off_amount
+      const row = (await client.query(`SELECT p.*,p.paid_at AT TIME ZONE 'UTC' AS paid_at,i.client_id,i.status invoice_status,i.branch_id invoice_branch,i.total invoice_total,i.written_off_amount
         FROM invoice_payments p JOIN invoices i ON i.id=p.invoice_id
         WHERE p.id=$1 AND p.branch_id=$2 FOR SHARE OF p,i`, [ref.id, branchId])).rows[0];
       requireAccounting(row && row.invoice_branch === branchId, "NOT_FOUND", "Invoice settlement not found in this branch");
-      requireAccounting(isInvoiceFinanciallyActive(row.invoice_status) && ["sent", "partial", "paid", "overdue"].includes(row.invoice_status),
+      const originalInvoice=(await client.query("SELECT status,evidence,payload_hash FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3",
+        [bookId,branchId,invoiceEventKey(row.invoice_id)])).rows[0];
+      const originalPosted=originalInvoice?.status === "posted";
+      if(originalPosted) {
+        const saved=JSON.parse(originalInvoice.evidence);
+        requireAccounting(mapping.receivableAccountId===saved.mapping.receivableAccountId,"INVALID_MAPPING","Collections must settle the originally recognized AR control");
+        const current=await this.invoiceDraft(client,bookId,branchId,actorId,row.invoice_id,saved.mapping,"read");
+        requireAccounting(journalHash(normalizeJournal(current.input))===originalInvoice.payload_hash,"SOURCE_CHANGED","Invoice facts changed after recognition");
+      }
+      requireAccounting((isInvoiceFinanciallyActive(row.invoice_status) || originalPosted && row.invoice_status==="written_off")
+        && ["sent", "partial", "paid", "overdue",...(originalPosted ? ["written_off"] : [])].includes(row.invoice_status),
         "SOURCE_REVIEW_REQUIRED", "Unknown/draft/cancelled/written-off invoice history needs its own reviewed treatment");
+      if(row.invoice_status==="written_off") {
+        const audit=(await client.query("SELECT created_at AT TIME ZONE 'UTC' AS created_at FROM invoice_audit_log WHERE invoice_id=$1 AND action='written_off' ORDER BY id",[row.invoice_id])).rows;
+        requireAccounting(audit.length===1 && new Date(row.paid_at)<=new Date(audit[0].created_at),
+          "SOURCE_REVIEW_REQUIRED","Historical pre-write-off settlement only; unimplemented bad-debt recovery is not an ordinary collection");
+        const postedWriteoff=(await client.query("SELECT id FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND status='posted' AND event_key IN (SELECT 'source:invoice_writeoff:'||id||':v1' FROM invoice_audit_log WHERE invoice_id=$3 AND action='written_off')",
+          [bookId,branchId,row.invoice_id])).rows[0];
+        const postedPayment=(await client.query("SELECT id FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3 AND status='posted'",
+          [bookId,branchId,settlementEventKey(ref)])).rows[0];
+        requireAccounting(!postedWriteoff || postedPayment,"SOURCE_REVIEW_REQUIRED","Do not add backdated collections after an already posted write-off");
+      }
       const credits = (await client.query("SELECT id FROM credit_notes WHERE invoice_id=$1 AND status='active' FOR SHARE", [row.invoice_id])).rows;
       const prior = (await client.query(`SELECT coalesce(sum(amount),0)::text amount FROM invoice_payments
-        WHERE invoice_id=$1 AND (paid_at,id)<=($2::timestamp,$3)`, [row.invoice_id, row.paid_at, row.id])).rows[0];
-      requireAccounting(credits.length === 0 && (!row.written_off_amount || moneyToMinor(row.written_off_amount) === 0n)
+        WHERE invoice_id=$1 AND (paid_at,id)<=($2::timestamptz AT TIME ZONE 'UTC',$3)`, [row.invoice_id, row.paid_at, row.id])).rows[0];
+      requireAccounting((originalPosted || credits.length === 0 && (!row.written_off_amount || moneyToMinor(row.written_off_amount) === 0n))
         && moneyToMinor(prior.amount) <= moneyToMinor(row.invoice_total), "SOURCE_REVIEW_REQUIRED",
       "Credit-note, write-off and excess-collection history requires its own reviewed mapping");
       if (row.source_deposit_id !== null) {
-        const deposit = (await client.query("SELECT * FROM client_deposits WHERE id=$1 FOR SHARE", [row.source_deposit_id])).rows[0];
+        const deposit = (await client.query("SELECT *,created_at AT TIME ZONE 'UTC' AS created_at FROM client_deposits WHERE id=$1 FOR SHARE", [row.source_deposit_id])).rows[0];
         requireAccounting(deposit && deposit.branch_id === branchId && deposit.client_id === row.client_id
           && !deposit.notes?.includes("[VOIDED by wallet reset") && new Date(deposit.created_at) <= new Date(row.paid_at),
         "SOURCE_REVIEW_REQUIRED", "Matching non-voided, previously received client deposit required");
         const allocated = (await client.query(`SELECT coalesce(sum(amount),0)::text amount FROM invoice_payments
-          WHERE source_deposit_id=$1 AND (paid_at,id)<=($2::timestamp,$3)`, [deposit.id, row.paid_at, row.id])).rows[0];
+          WHERE source_deposit_id=$1 AND (paid_at,id)<=($2::timestamptz AT TIME ZONE 'UTC',$3)`, [deposit.id, row.paid_at, row.id])).rows[0];
         requireAccounting(moneyToMinor(allocated.amount) <= moneyToMinor(deposit.amount),
           "SOURCE_REVIEW_REQUIRED", "Deposit allocation exceeds the received deposit");
         const depositJournal = (await client.query(`SELECT status,payload_hash FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3`,
@@ -263,14 +300,14 @@ export class NativeAccounting {
           "SOURCE_CHANGED", "Deposit receipt evidence changed after posting; review before allocating");
       }
       if (row.entry_type === "reversal") {
-        const original = (await client.query("SELECT * FROM invoice_payments WHERE id=$1 FOR SHARE", [row.reversal_of_payment_id])).rows[0];
+        const original = (await client.query("SELECT *,paid_at AT TIME ZONE 'UTC' AS paid_at FROM invoice_payments WHERE id=$1 FOR SHARE", [row.reversal_of_payment_id])).rows[0];
         requireAccounting(original && original.entry_type === "payment" && original.branch_id === branchId
           && original.invoice_id === row.invoice_id && original.amount === row.amount.slice(1)
           && original.bank_id === row.bank_id && original.source_deposit_id === row.source_deposit_id
           && original.payment_method === row.payment_method && new Date(original.paid_at) <= new Date(row.paid_at),
         "INVALID_REVERSAL", "Matching original settlement and full dated reversal required");
       }
-      source = { ...ref, branchId, clientId: row.client_id, amount: row.amount, bankId: row.bank_id,
+      source = { kind:ref.kind,id:ref.id, branchId, clientId: row.client_id, invoiceId: row.invoice_id, amount: row.amount, bankId: row.bank_id,
         sourceDepositId: row.source_deposit_id, reversalOfId: row.reversal_of_payment_id, entryType: row.entry_type,
         paymentMethod: row.payment_method, accountingDate: financialDateKey(new Date(row.paid_at)) };
     }
@@ -316,6 +353,105 @@ export class NativeAccounting {
       return journal;
     });
   }
+  private async operationalDraft(client:Client,bookId:number,branchId:number,actorId:number,
+    ref:OperationalRef,mapping:OperationalMapping,permission:"read"|"prepare") {
+    await this.permission(client,bookId,branchId,actorId,permission);
+    const book=(await client.query("SELECT * FROM accounting_books WHERE id=$1",[bookId])).rows[0];
+    requireAccounting(book?.status==="approved" && book.policy_version===mapping.policyVersion && book.currency===mapping.currency,
+      "BOOK_NOT_APPROVED","Matching approved currency/policy required");
+    const source=await readOperationalSource(client,branchId,ref);
+    const draft=buildOperationalJournal(bookId,source,mapping);
+    requireAccounting(draft.input.accountingDate>=book.policy.cutoverDate,"BEFORE_CUTOVER","Earlier sources need reviewed openings/import");
+    const accounts=(await client.query("SELECT id,category FROM accounting_accounts WHERE book_id=$1 AND active AND id=ANY($2::int[])",
+      [bookId,[...draft.requiredCategories.keys()]])).rows;
+    const categories=new Map(accounts.map(a=>[a.id,a.category]));
+    requireAccounting([...draft.requiredCategories].every(([id,category])=>categories.get(id)===category),"INVALID_MAPPING","Active correctly classified own-book accounts required");
+    if(source.invoiceId) {
+      const original=(await client.query("SELECT evidence,payload_hash,status FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3",
+        [bookId,branchId,invoiceEventKey(source.invoiceId)])).rows[0];
+      requireAccounting(original?.status==="posted","SOURCE_NOT_POSTED","Original invoice recognition must already be posted");
+      const saved=JSON.parse(original.evidence);
+      const current=await this.invoiceDraft(client,bookId,branchId,actorId,source.invoiceId,saved.mapping,"read");
+      requireAccounting(journalHash(normalizeJournal(current.input))===original.payload_hash,"SOURCE_CHANGED","Original invoice facts changed after recognition");
+      const earlier=(await client.query(`SELECT j.evidence,j.payload_hash FROM accounting_journals j
+        WHERE j.book_id=$1 AND j.branch_id=$2 AND j.status='posted' AND j.event_key<>$3 AND
+        (j.event_key IN (SELECT 'source:invoice_payment:'||id||':v1' FROM invoice_payments WHERE invoice_id=$4 AND paid_at<=$5::timestamp)
+         OR j.event_key IN (SELECT 'source:credit_note:'||id||':v1' FROM credit_notes WHERE invoice_id=$4 AND created_at<=$5::timestamp))`,
+        [bookId,branchId,draft.input.eventKey,source.invoiceId,source.facts.recordedAt])).rows;
+      for(const row of earlier) {
+        const posted=JSON.parse(row.evidence);
+        if(OPERATIONAL_SOURCE_KINDS.includes(posted.source.kind)) {
+          const current=buildOperationalJournal(bookId,await readOperationalSource(client,branchId,posted.source),posted.mapping);
+          requireAccounting(journalHash(normalizeJournal(current.input))===row.payload_hash,"SOURCE_CHANGED","Earlier adjustment facts changed after posting");
+        } else {
+          const current=await this.settlementDraft(client,bookId,branchId,actorId,posted.source,posted.mapping,"read");
+          requireAccounting(journalHash(normalizeJournal(current.input))===row.payload_hash,"SOURCE_CHANGED","Earlier collection facts changed after posting");
+        }
+      }
+    }
+    const originalId=await validateOperationalControls(client,bookId,branchId,draft);
+    return {...draft,originalId};
+  }
+  async previewOperational(bookId:number,branchId:number,actorId:number,ref:OperationalRef,mapping:OperationalMapping) {
+    return this.transaction(bookId,client=>this.operationalDraft(client,bookId,branchId,actorId,ref,mapping,"read"));
+  }
+  async prepareOperational(bookId:number,branchId:number,actorId:number,ref:OperationalRef,mapping:OperationalMapping) {
+    return this.transaction(bookId,async client=>{
+      const draft=await this.operationalDraft(client,bookId,branchId,actorId,ref,mapping,"prepare");
+      const journal=await this.prepare(client,actorId,draft.input,draft.originalId);
+      requireAccounting(journal.status!=="cancelled","SOURCE_CANCELLED","Cancelled source requires reviewed correction, not duplicate posting");
+      return journal;
+    });
+  }
+  private async openingDraft(client:Client,actorId:number,review:ReviewedOpening,permission:"read"|"prepare") {
+    await this.permission(client,review.bookId,review.branchId,actorId,permission);
+    const draft=buildReviewedOpening(review);
+    const book=(await client.query("SELECT * FROM accounting_books WHERE id=$1",[review.bookId])).rows[0];
+    requireAccounting(book?.status==="approved" && book.currency===review.currency && book.policy_version===review.policyVersion
+      && book.policy.cutoverDate===review.cutoverDate,"BOOK_NOT_APPROVED","Opening must match approved book/cutover");
+    const accounts=(await client.query("SELECT id FROM accounting_accounts WHERE book_id=$1 AND active AND id=ANY($2::int[])",
+      [review.bookId,review.lines.map(l=>l.accountId)])).rows;
+    requireAccounting(new Set(accounts.map(a=>a.id)).size===new Set(review.lines.map(l=>l.accountId)).size,"INVALID_MAPPING","Active own-book opening accounts required");
+    const existing=(await client.query("SELECT status,payload_hash FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3",
+      [review.bookId,review.branchId,draft.input.eventKey])).rows[0];
+    if(existing?.status==="posted") {
+      requireAccounting(existing.payload_hash===journalHash(normalizeJournal(draft.input)),"DUPLICATE_CONFLICT","Posted opening is immutable"); return draft;
+    }
+    const overlap=(await client.query("SELECT id FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key<>$3 AND status<>'cancelled' LIMIT 1",
+      [review.bookId,review.branchId,draft.input.eventKey])).rows[0];
+    requireAccounting(!overlap,"CUTOVER_CONFLICT","Prepare/post the opening before forward journals; no mixed historical import");
+    return draft;
+  }
+  async previewOpening(actorId:number,review:ReviewedOpening) {
+    return this.transaction(review.bookId,client=>this.openingDraft(client,actorId,review,"read"));
+  }
+  async prepareOpening(actorId:number,review:ReviewedOpening) {
+    return this.transaction(review.bookId,async client=>{
+      const draft=await this.openingDraft(client,actorId,review,"prepare");
+      const journal=await this.prepare(client,actorId,draft.input);
+      requireAccounting(journal.status!=="cancelled","SOURCE_CANCELLED","Cancelled opening requires reviewed correction");
+      return journal;
+    });
+  }
+  async reconcileSources(bookId:number,branchId:number,actorId:number,through:string,controls:ReconciliationControl[]) {
+    accountingDate(through);
+    return this.transaction(bookId,async client=>{
+      await this.permission(client,bookId,branchId,actorId,"read");
+      const report=await sourceCoverage(client,bookId,branchId,through,controls);
+      for(const item of report.sources.filter(s=>s.status==="posted")) {
+        try {
+          const journal=(await client.query("SELECT evidence,payload_hash FROM accounting_journals WHERE book_id=$1 AND event_key=$2",[bookId,item.eventKey])).rows[0];
+          const saved=JSON.parse(journal.evidence);
+          const draft=saved.source.kind==="invoice" ? await this.invoiceDraft(client,bookId,branchId,actorId,saved.source.id,saved.mapping,"read")
+            : OPERATIONAL_SOURCE_KINDS.includes(saved.source.kind) ? await this.operationalDraft(client,bookId,branchId,actorId,saved.source,saved.mapping,"read")
+              : await this.settlementDraft(client,bookId,branchId,actorId,saved.source,saved.mapping,"read");
+          requireAccounting(journalHash(normalizeJournal(draft.input))===journal.payload_hash,"SOURCE_CHANGED","Posted evidence differs from current source");
+        } catch(error) { item.status="stale"; item.reason=error instanceof Error ? error.message : "Source revalidation failed"; }
+      }
+      return {...report,complete:report.sources.every(s=>s.status==="posted" || s.status==="excluded")
+        && report.controls.every(c=>c.difference==="0.00") && report.missingControls.length===0 && controls.length>0};
+    });
+  }
   async approveAndPost(bookId: number, branchId: number, actorId: number, journalId: number, reason: string) {
     return this.transaction(bookId, async client => {
       await this.permission(client, bookId, branchId, actorId, "post");
@@ -329,9 +465,16 @@ export class NativeAccounting {
         const saved = JSON.parse(evidence.evidence);
         const current = saved.source.kind === "invoice"
           ? await this.invoiceDraft(client, bookId, branchId, actorId, saved.source.id, saved.mapping, "read")
-          : await this.settlementDraft(client, bookId, branchId, actorId, saved.source, saved.mapping, "read");
+          : OPERATIONAL_SOURCE_KINDS.includes(saved.source.kind)
+            ? await this.operationalDraft(client,bookId,branchId,actorId,saved.source,saved.mapping,"read")
+            : await this.settlementDraft(client, bookId, branchId, actorId, saved.source, saved.mapping, "read");
         requireAccounting(journalHash(normalizeJournal(current.input)) === journal.payload_hash,
           "SOURCE_CHANGED", "Source or mapping changed after preparation; do not post stale evidence");
+      }
+      if(journal.event_key.startsWith("opening:")) {
+        const saved=JSON.parse((await client.query("SELECT evidence FROM accounting_journals WHERE id=$1",[journalId])).rows[0].evidence);
+        const current=await this.openingDraft(client,actorId,saved.review,"read");
+        requireAccounting(journalHash(normalizeJournal(current.input))===journal.payload_hash,"SOURCE_CHANGED","Opening review changed after preparation");
       }
       await this.audit(client, bookId, actorId, "posted", reason, branchId, journalId);
       return (await client.query<JournalRow>("UPDATE accounting_journals SET status='posted',posted_by=$2,posted_at=now() WHERE id=$1 RETURNING *", [journalId, actorId])).rows[0]!;

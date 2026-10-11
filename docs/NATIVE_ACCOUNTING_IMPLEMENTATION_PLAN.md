@@ -2,6 +2,12 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
+Latest2026-10-11 13:10 WAT: Step7 EXISTING supported-source engineering complete
+and accepted:21distinct source/opening scenarios plus final13shared regression,
+353unit PASS/3prior skips and full build. Inactive publication next. Actual
+professional policy, dated opening/cutover and legacy attribution remain pending;
+do not equate engineering acceptance with official live accounting activation.
+Public General Ledger/Trial Balance and later Steps8-12 remain not started.
 Status updated2026-10-10 22:35 WAT: Step6 inactive engineering foundation built,
 accepted and deployed/verified at40aec3d. Professional policy review remains next.
 Updated2026-10-11 02:23 WAT: Step7 STARTED; first deposit/invoice-settlement
@@ -9,6 +15,13 @@ source family and opening validation accepted/deployed INACTIVE at5eee767,
 not complete. Steps8-12 not started. Real6A approval remains outstanding.
 Accountant policy, named permissions and production cutover are not yet approved.
 The original21:17 roadmap below is preserved; current evidence appears at the end.
+
+Updated2026-10-11 12:27 WAT: all remaining existing NGN source families,
+reviewed opening preparation and scoped source/control reconciliation implemented
+internally. Initial eight new DB cases PASS; final hardened source/opening/shared
+regression acceptance and inactive publication pending. See
+ACCOUNTING_SOURCE_CONNECTIONS.md. Actual policy, dated openings, legacy attribution
+and official cutover remain unapproved; no unrecorded subledger is invented.
 
 ## Roadmap Identity and Scope
 

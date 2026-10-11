@@ -2,7 +2,7 @@ import { accountingDate, minorToMoney, moneyToMinor, normalizeJournal, requireAc
 
 export type AccountingSettlementRef = { kind: "client_deposit" | "invoice_payment"; id: number };
 export interface SettlementSource extends AccountingSettlementRef {
-  branchId: number; clientId: number; accountingDate: string; amount: string;
+  branchId: number; clientId: number; invoiceId?: number; accountingDate: string; amount: string;
   paymentMethod: string; bankId: number | null; sourceDepositId?: number | null;
   reversalOfId?: number | null; entryType?: string;
 }
