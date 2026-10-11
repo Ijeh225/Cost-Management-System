@@ -2,6 +2,62 @@
 
 ## Current Work Register - Authoritative as of 2026-10-11
 
+### Notification Release Authorised / Step 7 Engineering Authorised - 2026-10-11 01:34 WAT
+
+- Owner requests commit/push/deploy of completed notification correction and
+  checks all Step6 phases before starting Step7. Step6 technical implementation
+  6A draft and6B-6F accepted/deployed inactive at40aec3d; professional approval
+  remains unconfirmed, not a missing duplicate engine or automatically approved
+  chart/year/cutover. Preserve existing branch units; no mandatory company layer.
+- Publish verified BRN-SCOPE-UI-002 first; confirm exact release/health and bounded
+  live switching. Then start Step7 source mapping/opening preparation with the
+  same engine and isolated tests. No guessed historic classification, official
+  opening figures, policy approvals or production posting activation authorised
+  by a generic implementation request. Keep both accounting flags unchanged.
+- Work in progress; new source adapters and new deployment not yet verified.
+
+### BRN-SCOPE-UI-002 Fixed Locally / Live Pending - 2026-10-11 01:32 WAT
+
+- Reused the existing branch-query helper, not duplicate notification endpoints.
+  System, workflow and history caches now include active branch identity and
+  requests carry the same captured X-Branch-Id. Applied to sidebar, bell and
+  Notifications page, including all five read/viewed mutation hooks. Existing
+  backend access policy and prefix invalidation are unchanged.
+- An unseen branch displays a loading indicator rather than the prior branch's
+  count. The bell waits for both count sources and distinguishes request failure
+  from an empty result. Cached revisits use only their own branch snapshot; late
+  responses cannot overwrite another branch's cache. History/list animation
+  boundaries reset on scope change to remove departing branch rows immediately.
+- Verification PASS: five new hook cache/header/cancellation/read/invalidation
+  tests; full API unit suite 43 files/280 PASS/3 existing skips; complete
+  railway:build/typechecks/client/server plus rebuilt final client PASS. Eight
+  local built-UI groups cover delayed/cached/rapid switching, scoped reads,
+  history, failure versus empty, mobile and explicit headers/no render errors.
+  Existing eight dashboard groups and Documentation/Invoice keyboard/responsive
+  smoke PASS. Initial test-only module-context and incomplete dashboard-fixture
+  errors corrected; no corresponding live defect claimed. Known build warnings
+  unchanged. Browser reads are mock fixtures, not production notification writes.
+- No database/schema, financial source, accounting activation, permissions,
+  configuration or live records changed. Protected checkpoints preserved.
+- Working tree only: not committed, pushed or deployed for this notification
+  fix. BRN-SCOPE-UI-002 stays live-pending; do not mark it closed. Exact next:
+  publish the approved fix, confirm its exact Railway source/release and health,
+  then bounded owner All/Lagos/Head Office badge, bell and history acceptance.
+  Separate existing accountant policy/chart/year-end approval remains pending.
+- Both registers and session/index updated. Session:
+  docs/SESSION_SUMMARIES/2026-10-11-branch-scope-display-fix.md.
+
+### BRN-SCOPE-UI-002 Fix Authorised - 2026-10-11 01:17 WAT
+
+- Owner requests notification badge correction. Clean master9b5ef58; resume
+  recorded separate Low defect, not a duplicate dashboard or notification feature.
+- Reuse existing branch-query helper for system/workflow/history queries and
+  read/viewed mutations across sidebar, bell and Notifications page. Requests and
+  cache must share captured branch; preserve invalidation prefixes and backend
+  access rules. Hide previous-scope counts/items while a new scope loads.
+- Implementation/local acceptance in progress; no live write, deployment or new
+  acceptance claimed. No accounting/financial data, schema or permissions change.
+
 ### BRN-SCOPE-UI-001 Deployed And Live Accepted - 2026-10-11 01:08 WAT
 
 - Functional commit3c2c1498380af2d5156e8f28213f9712f7fdb277 pushed to

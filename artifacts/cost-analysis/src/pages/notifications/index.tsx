@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/components/layout/auth-provider";
+import { useBranchScope } from "@/components/layout/branch-provider";
 import {
   useGetNotifications,
   useMarkAllNotificationsRead,
@@ -290,7 +291,8 @@ function NotificationRow({ notif }: { notif: Notification }) {
   const cfg = ALERT_CONFIG[notif.type] ?? ALERT_CONFIG.low_margin;
   const sev = SEVERITY_CONFIG[notif.severity] ?? SEVERITY_CONFIG.info;
   const Icon = cfg.icon;
-  const markRead = useMarkNotificationRead();
+  const { activeBranchId } = useBranchScope();
+  const markRead = useMarkNotificationRead(activeBranchId);
   const [, navigate] = useLocation();
   const { isSecurityUser } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
@@ -360,7 +362,8 @@ function NotificationRow({ notif }: { notif: Notification }) {
 function WorkflowEventRow({ notif }: { notif: WorkflowNotification }) {
   const cfg = WORKFLOW_TYPE_CONFIG[notif.type] ?? WORKFLOW_TYPE_CONFIG.stage_complete;
   const Icon = cfg.icon;
-  const markRead = useMarkWorkflowNotificationRead();
+  const { activeBranchId } = useBranchScope();
+  const markRead = useMarkWorkflowNotificationRead(activeBranchId);
   const [, navigate] = useLocation();
   const { isSecurityUser } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
@@ -507,6 +510,7 @@ function AlertHistoryRow({ item }: { item: AlertHistoryItem }) {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function NotificationsPage() {
+  const { activeBranchId } = useBranchScope();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -520,17 +524,17 @@ export default function NotificationsPage() {
 
   const { data, isLoading, refetch, isFetching } = useGetNotifications({
     query: { refetchInterval: 30_000 },
-  });
+  }, activeBranchId);
   const { data: wfData, isLoading: wfLoading, refetch: wfRefetch, isFetching: wfFetching } = useGetWorkflowNotifications({
     query: { refetchInterval: 30_000 },
-  });
+  }, activeBranchId);
   const { data: historyData, isLoading: historyLoading, refetch: historyRefetch, isFetching: historyFetching } = useGetAlertHistory({
     query: { refetchInterval: 60_000 },
-  });
+  }, activeBranchId);
 
-  const markAll         = useMarkAllNotificationsRead();
-  const markViewed      = useMarkNotificationsViewed();
-  const markAllWorkflow = useMarkAllWorkflowNotificationsRead();
+  const markAll         = useMarkAllNotificationsRead(activeBranchId);
+  const markViewed      = useMarkNotificationsViewed(activeBranchId);
+  const markAllWorkflow = useMarkAllWorkflowNotificationsRead(activeBranchId);
 
   useEffect(() => { markViewed.mutate(); }, []);
 
@@ -747,7 +751,7 @@ export default function NotificationsPage() {
                   </Button>
                 </div>
               ) : (
-                <AnimatePresence>
+                <AnimatePresence key={activeBranchId}>
                   {filtered.map(a => <AlertHistoryRow key={a.alertKey} item={a} />)}
                 </AnimatePresence>
               )}
@@ -804,7 +808,7 @@ export default function NotificationsPage() {
                 )}
               </div>
             ) : (
-              <AnimatePresence>
+              <AnimatePresence key={activeBranchId}>
                 {tab === "system"
                   ? filteredSystem.map(n   => <NotificationRow   key={n.alertKey} notif={n} />)
                   : filteredWorkflow.map(n => <WorkflowEventRow  key={n.id}       notif={n} />)

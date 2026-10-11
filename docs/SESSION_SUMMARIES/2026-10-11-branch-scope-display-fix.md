@@ -1,5 +1,42 @@
 # Branch-Switch Dashboard Display Fix
 
+## 2026-10-11 01:34 WAT - Publication And Step 7 Authorised
+
+- Owner requests completed fix be committed/pushed/deployed, checks all six
+  Step6 phases and authorises starting Step7. Current roadmap confirms inactive
+  Step6 engineering already accepted/deployed, with real policy/chart/cutover/
+  opening/named grants approval still pending. Do not implement a duplicate.
+- Publish notification fix first and verify release/live acceptance; then begin
+  inactive Step7 source/opening engineering in same ledger with isolated tests.
+  Generic authority does not fabricate accountant approvals/official balances
+  or enable production flags. Both registers updated; implementation in progress.
+
+## 2026-10-11 01:32 WAT - Notification Scope Fixed Locally
+
+- Owner asks to fix the notification-badge delay (BRN-SCOPE-UI-002). Started
+  clean master9b5ef58, reused existing branch-query helper rather than duplicate
+  endpoints. All three shared sources (system/workflow/history) and five read/
+  viewed mutations now capture branch scope in keys/headers across sidebar,
+  bell and Notifications page. Existing access rules/invalidation unchanged.
+- New branch shows loading, not the previous count; combined bell waits for
+  both sources and reports failure distinctly. Own cached branch snapshots and
+  late-response isolation retained. Scope-keyed list/history animations remove
+  old rows immediately. No wider notification redesign/calculation change.
+- PASS: five hook cases; full API units43files/280PASS/3existing skips; full
+  railway:build/typechecks and final client build. Eight new built-UI groups
+  cover delay/cache/read/history/rapid/failure-empty/mobile/headers-render.
+  Existing dashboard eight groups and Documentation/Invoice smoke PASS.
+  Initial ESM provider-context and missing dashboard-fixture fields corrected
+  in harness, not claimed as live defects. Existing build warnings retained.
+- All browser network writes were mock notification read actions, not live
+  production writes. UI mark-viewed fixture deliberately does not change reads;
+  captured mutation hook covered separately. No DB/schema, finance, role,
+  config or accounting activation changes; checkpoints preserved.
+- Registers/index updated. New notification fix remains uncommitted/unpushed/
+  undeployed; no new live acceptance claimed. Exact next is approved publication,
+  exact Railway release/source/health confirmation and bounded branch badge/
+  bell/history acceptance. Existing accountant policy/chart approval separate.
+
 ## 2026-10-11 01:08 WAT - Published And Live Accepted
 
 - User requests push/deploy. Functional3c2c1498380af2d5156e8f28213f9712f7fdb277

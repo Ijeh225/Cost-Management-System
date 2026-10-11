@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
+import { getBranchQueryOptions, type BranchQueryScope } from "./branch-query";
 
 export type Notification = {
   alertKey: string;
@@ -80,10 +81,11 @@ function toWorkflowQuery(params?: WorkflowNotificationFilters) {
 
 export function useGetNotifications<T = NotificationsResponse>(options?: {
   query?: { refetchInterval?: number; enabled?: boolean };
-}) {
+}, scope?: BranchQueryScope) {
+  const { query, request } = getBranchQueryOptions(scope, NOTIFICATIONS_KEY);
   return useQuery<T>({
-    queryKey: NOTIFICATIONS_KEY,
-    queryFn: () => customFetch<T>("/api/notifications"),
+    ...query,
+    queryFn: ({ signal }) => customFetch<T>("/api/notifications", { ...request, signal }),
     ...(options?.query ?? {}),
   });
 }
@@ -91,52 +93,58 @@ export function useGetNotifications<T = NotificationsResponse>(options?: {
 export function useGetWorkflowNotifications(options?: {
   params?: WorkflowNotificationFilters;
   query?: { refetchInterval?: number; enabled?: boolean };
-}) {
+}, scope?: BranchQueryScope) {
+  const { query, request } = getBranchQueryOptions(scope, [...WORKFLOW_NOTIFICATIONS_KEY, options?.params ?? {}]);
   return useQuery<WorkflowNotificationsResponse>({
-    queryKey: [...WORKFLOW_NOTIFICATIONS_KEY, options?.params ?? {}],
-    queryFn: () => customFetch<WorkflowNotificationsResponse>(`/api/workflow-notifications${toWorkflowQuery(options?.params)}`),
+    ...query,
+    queryFn: ({ signal }) => customFetch<WorkflowNotificationsResponse>(`/api/workflow-notifications${toWorkflowQuery(options?.params)}`, { ...request, signal }),
     ...(options?.query ?? {}),
   });
 }
 
-export function useMarkWorkflowNotificationRead() {
+export function useMarkWorkflowNotificationRead(scope?: BranchQueryScope) {
   const qc = useQueryClient();
+  const { request } = getBranchQueryOptions(scope, WORKFLOW_NOTIFICATIONS_KEY);
   return useMutation<{ success: boolean }, Error, { id: number }>({
     mutationFn: ({ id }) =>
-      customFetch(`/api/workflow-notifications/${id}/read`, { method: "POST" }),
+      customFetch(`/api/workflow-notifications/${id}/read`, { ...request, method: "POST" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: WORKFLOW_NOTIFICATIONS_KEY });
     },
   });
 }
 
-export function useMarkAllWorkflowNotificationsRead() {
+export function useMarkAllWorkflowNotificationsRead(scope?: BranchQueryScope) {
   const qc = useQueryClient();
+  const { request } = getBranchQueryOptions(scope, WORKFLOW_NOTIFICATIONS_KEY);
   return useMutation<{ success: boolean }, Error, void>({
     mutationFn: () =>
-      customFetch("/api/workflow-notifications/read-all", { method: "POST" }),
+      customFetch("/api/workflow-notifications/read-all", { ...request, method: "POST" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: WORKFLOW_NOTIFICATIONS_KEY });
     },
   });
 }
 
-export function useMarkNotificationsViewed() {
+export function useMarkNotificationsViewed(scope?: BranchQueryScope) {
   const qc = useQueryClient();
+  const { request } = getBranchQueryOptions(scope, NOTIFICATIONS_KEY);
   return useMutation<{ success: boolean }, Error, void>({
     mutationFn: () =>
-      customFetch("/api/notifications/mark-viewed", { method: "POST" }),
+      customFetch("/api/notifications/mark-viewed", { ...request, method: "POST" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
     },
   });
 }
 
-export function useMarkNotificationRead() {
+export function useMarkNotificationRead(scope?: BranchQueryScope) {
   const qc = useQueryClient();
+  const { request } = getBranchQueryOptions(scope, NOTIFICATIONS_KEY);
   return useMutation<{ success: boolean }, Error, { alertKey: string }>({
     mutationFn: ({ alertKey }) =>
       customFetch(`/api/notifications/${encodeURIComponent(alertKey)}/read`, {
+        ...request,
         method: "POST",
       }),
     onSuccess: () => {
@@ -147,19 +155,21 @@ export function useMarkNotificationRead() {
 
 export function useGetAlertHistory(options?: {
   query?: { refetchInterval?: number; enabled?: boolean };
-}) {
+}, scope?: BranchQueryScope) {
+  const { query, request } = getBranchQueryOptions(scope, ["notifications", "history"]);
   return useQuery<AlertHistoryResponse>({
-    queryKey: ["notifications", "history"],
-    queryFn: () => customFetch<AlertHistoryResponse>("/api/notifications/history"),
+    ...query,
+    queryFn: ({ signal }) => customFetch<AlertHistoryResponse>("/api/notifications/history", { ...request, signal }),
     ...(options?.query ?? {}),
   });
 }
 
-export function useMarkAllNotificationsRead() {
+export function useMarkAllNotificationsRead(scope?: BranchQueryScope) {
   const qc = useQueryClient();
+  const { request } = getBranchQueryOptions(scope, NOTIFICATIONS_KEY);
   return useMutation<{ success: boolean }, Error, void>({
     mutationFn: () =>
-      customFetch("/api/notifications/read-all", { method: "POST" }),
+      customFetch("/api/notifications/read-all", { ...request, method: "POST" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
     },

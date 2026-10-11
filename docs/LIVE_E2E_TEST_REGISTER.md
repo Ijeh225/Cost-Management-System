@@ -2,6 +2,39 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-11
 
+### Release And Step 7 Work Authorised - 2026-10-11 01:34 WAT
+
+- Publish notification fix using prior local PASS evidence; deployment and fresh
+  live badge/bell/history acceptance pending. No new production records needed.
+- Step6 23distinct isolated controls/deployed inactive technical acceptance
+  retained; policy sign-off not inferred. Start Step7 inactive source/opening
+  engineering and controlled isolated tests, not an official cutover/backfill.
+
+### BRN-SCOPE-UI-002 Local Regression PASS / Live Pending - 2026-10-11 01:32 WAT
+
+- Branch-bound query/cache and captured request scope now cover system alerts,
+  workflow events and alert history in sidebar, bell and Notifications page.
+  All five read/viewed hooks capture the selected branch; existing endpoint
+  permissions and invalidation prefixes retained. No duplicate functionality.
+- Five focused tests PASS: distinct all/branch/filter keys, explicit headers
+  despite different local storage, cancellation, captured read/viewed writes
+  through CSRF, sibling/history invalidation and optional-call compatibility.
+  Full API unit suite 43 files/280 PASS/3 prior skips. Full railway:build and
+  final client rebuild PASS with existing sourcemap/chunk-size warnings only.
+- Local built-UI eight groups PASS: slow All->Lagos without old/partial count;
+  cached all/head-office/Lagos identity; single workflow plus all-read refresh
+  preserving other-branch unread records; history/workflow rows drop on scope
+  switch; rapid switching/late response; empty versus failed branch; mobile;
+  explicit three-source headers/allowed read writes only/no render errors.
+  Existing dashboard eight groups and Documentation/Invoice smoke also PASS.
+- Test harness ESM-context and incomplete dashboard-fixture errors corrected,
+  not logged as application defects. mark-viewed is intentionally a no-op in
+  the UI fixture to isolate explicit read tests; the hook request is tested.
+  This is not fresh deployed acceptance or an isolated database write test.
+- Local only, uncommitted/unpushed/undeployed. No live read-state, financial,
+  schema, role or configuration writes. BRN-SCOPE-UI-002 remains awaiting exact
+  release confirmation and live All/Lagos/Head Office badge/bell/history check.
+
 ### BRN-SCOPE-UI-001 Live Acceptance PASS - 2026-10-11 01:08 WAT
 
 - Pushed functional3c2c149; exact Railway1764574f-a2e5-48aa-af1f-285df10e50cf
@@ -64,7 +97,7 @@
 | Issue | Priority | Evidence / cause | Correction required | Status |
 |---|---|---|---|---|
 | BRN-SCOPE-UI-001 | Medium | All->Lagos initially labels17containers and prior combined amounts as Lagos; settled count10. Lagos->All Finance initially labels4200revenue/2231.50net as combined; settled4201/-15707770.50. BranchProvider changes label and invalidates shared queries; original dashboard keys omitted scope. | Eight dashboard sources now key/bind requests to branch scope; unseen scopes load without old figures, cached revisits retain only own snapshot. | CLOSED:3c2c149 pushed, Railway1764574f successful, bounded live re-test PASS at01:08WAT. Prior unit/build/local-UI PASS retained. No persistent mismatch or cross-role leakage proved. |
-| BRN-SCOPE-UI-002 | Low | During live acceptance sidebar badge temporarily shows All23 in Lagos or Lagos17 in All; settled count correct. Sidebar uses notifications key without branch identity. | Review branch binding/cache identity for shared notification consumers and mutations; do not broaden the completed dashboard calculation fix or duplicate notification features. | Confirmed transient badge display; recorded only, not implemented. No persistent/cross-role or financial error proved. |
+| BRN-SCOPE-UI-002 | Low | During prior live acceptance sidebar badge temporarily showed All23 in Lagos or Lagos17 in All; settled count correct. Shared notifications cache lacked branch identity. | Existing helper now scopes sidebar/bell/page system, workflow and history queries plus read/viewed hooks; loading and animation boundaries prevent prior-scope display. | Fixed locally 2026-10-11 01:32 WAT; focused/full-unit/build/browser regression PASS. Commit/push/deployment and bounded live re-test pending. No persistent/cross-role or financial error proved. |
 
 - Operational model is flat branch scope, not company/group hierarchy. Generic
   management overview exists but all-branch authority is Super Admin-only in

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
+import { useBranchScope } from "./branch-provider";
 import {
   useGetWorkflowNotifications,
   useMarkAllWorkflowNotificationsRead,
@@ -95,23 +96,26 @@ function playBeep(ctx: AudioContext) {
 
 export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boolean }) {
   const POLL = 30_000;
+  const { activeBranchId } = useBranchScope();
 
-  const { data: workflowData } = useGetWorkflowNotifications({
+  const { data: workflowData, isLoading: workflowLoading, isError: workflowError } = useGetWorkflowNotifications({
     query: { refetchInterval: POLL, enabled: isAuthenticated },
-  });
-  const { data: classicData } = useGetNotifications({
+  }, activeBranchId);
+  const { data: classicData, isLoading: classicLoading, isError: classicError } = useGetNotifications({
     query: { refetchInterval: POLL, enabled: isAuthenticated },
-  });
+  }, activeBranchId);
 
-  const markAllWorkflow  = useMarkAllWorkflowNotificationsRead();
-  const markOneWorkflow  = useMarkWorkflowNotificationRead();
-  const markAllClassic   = useMarkAllNotificationsRead();
+  const markAllWorkflow  = useMarkAllWorkflowNotificationsRead(activeBranchId);
+  const markOneWorkflow  = useMarkWorkflowNotificationRead(activeBranchId);
+  const markAllClassic   = useMarkAllNotificationsRead(activeBranchId);
 
   const notifications: WorkflowNotification[] = workflowData?.notifications ?? [];
   const workflowUnread: number = workflowData?.unreadCount ?? 0;
   const classicUnread: number  = (classicData as any)?.unreadCount ?? 0;
   const totalUnread = workflowUnread + classicUnread;
-  const hasUnread = totalUnread > 0;
+  const isLoading = workflowLoading || classicLoading;
+  const isError = workflowError || classicError;
+  const hasUnread = !isLoading && !isError && totalUnread > 0;
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const beepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -191,7 +195,7 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative h-9 w-9 p-0 rounded-full">
+        <Button variant="ghost" size="sm" aria-busy={isLoading} aria-label={isLoading ? "Notifications loading" : isError ? "Notifications unavailable" : `Notifications, ${totalUnread} unread`} className="relative h-9 w-9 p-0 rounded-full">
           <Bell className={`w-4 h-4 ${hasUnread ? "text-primary" : "text-muted-foreground"}`} />
           {hasUnread && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white leading-none">
@@ -205,7 +209,7 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
           <span className="flex items-center gap-2">
             <Bell className="w-3.5 h-3.5 text-muted-foreground" />
             Alerts &amp; Notifications
-            {totalUnread > 0 && (
+            {hasUnread && (
               <span className="text-[10px] bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none font-bold">
                 {totalUnread}
               </span>
@@ -216,6 +220,13 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
           </Link>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+
+        {isLoading ? (
+          <div role="status" className="py-6 text-center text-xs text-muted-foreground">Loading branch notifications...</div>
+        ) : isError ? (
+          <div role="alert" className="py-6 text-center text-xs text-muted-foreground">Notifications could not be loaded.</div>
+        ) : (
+          <div key={activeBranchId}>
 
         {/* Classic system alerts */}
         {classicUnread > 0 && (
@@ -304,6 +315,8 @@ export function NotificationBeepBell({ isAuthenticated }: { isAuthenticated: boo
               Mark all as read
             </DropdownMenuItem>
           </>
+        )}
+          </div>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

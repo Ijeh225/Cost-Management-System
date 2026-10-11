@@ -32,10 +32,12 @@ type NavItem = {
   url: string;
   icon: React.ElementType;
   badge?: number;
+  badgeLoading?: boolean;
   match?: "exact" | "prefix";
 };
 
-function NotificationsBadge({ count }: { count: number }) {
+function NotificationsBadge({ count, isLoading }: { count: number; isLoading?: boolean }) {
+  if (isLoading) return <span role="status" aria-label="Loading branch notification count" className="ml-auto h-5 w-5 rounded-full bg-primary/10 animate-pulse" />;
   if (count === 0) return null;
   return (
     <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary/20 px-1.5 text-[10px] font-semibold text-primary border border-primary/30">
@@ -62,9 +64,9 @@ export function AppSidebar() {
     ?? branches.find(b => b.id === user?.branchId)?.name
     ?? (user?.branchId ? `Branch ${user.branchId}` : "");
 
-  const { data: notifData } = useGetNotifications<NotificationsResponse>({
+  const { data: notifData, isLoading: notificationsLoading } = useGetNotifications<NotificationsResponse>({
     query: { refetchInterval: 60_000, enabled: !!isAuthenticated },
-  });
+  }, activeBranchId);
   const unreadCount: number = notifData?.unreadCount ?? 0;
 
   const staffCanUpload = !isAdmin && !isDepartmentUser && (user?.canUpload ?? false);
@@ -84,7 +86,7 @@ export function AppSidebar() {
     ...(canAccessFinance ? [{ title: "Accounts Receivable", url: "/accounts-receivable", icon: BookOpen }] : []),
     ...(canAccessFinance ? [{ title: "Payment Schedule", url: "/payment-schedules", icon: CalendarClock }] : []),
     { title: "My Tasks",        url: "/my-tasks",       icon: ListTodo         },
-    { title: "Notifications",   url: "/notifications",  icon: Bell, badge: unreadCount },
+    { title: "Notifications",   url: "/notifications",  icon: Bell, badge: unreadCount, badgeLoading: notificationsLoading },
     ...(staffCanUpload ? [{ title: "Upload Data", url: "/containers/upload", icon: UploadCloud }] : []),
   ];
 
@@ -197,7 +199,7 @@ export function AppSidebar() {
                         </div>
                         <span className="flex-1">{item.title}</span>
                         {(item as any).badge != null && (
-                          <NotificationsBadge count={(item as any).badge} />
+                          <NotificationsBadge count={(item as any).badge} isLoading={item.badgeLoading} />
                         )}
                       </Link>
                     </SidebarMenuButton>
