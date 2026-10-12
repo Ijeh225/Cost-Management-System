@@ -2,6 +2,19 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-12
 
+### Step 9 Exact Inactive Deployment PASS - 2026-10-12 18:18 WAT
+
+- Functional710f58e exact Railway85a1facf-8e6b-40eb-82c9-4e6fb7bd3a76
+  SUCCESS/matching commitHash. Post-success public health:ok; unauthenticated
+  manual API401. Official deployed SSH smoke PASS, including all6manual methods
+  and existing engine/report OFF gates, zero DB connections/writes. Both live
+  native flags independently false/defaultOFF. No production schema/source writes.
+- Final9owned-DB cases/390unit/API/full build/built dummy browser acceptance
+  retained. No open Step9 engineering failure. Official real-book/live manual
+  posting acceptance awaits actual professional controls and separate activation.
+- Pre-Step9 remote checkpoint verified at578a43d and retained. Step10 remains
+  not started; exact resume point is the accepted inactive Step9 release.
+
 ### Step 9 Final Controlled Acceptance PASS - 2026-10-12 18:07 WAT
 
 - Final isolated9/9PASS/45filtered,736s:6manual cases and3shared invoice, GL/TB

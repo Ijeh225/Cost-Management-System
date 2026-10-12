@@ -20,7 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-10-12 Step9 engineering accepted: final9isolated/390unit and built UI PASS, inactive publication next, 18:07 WAT](2026-10-12-manual-journals.md)
+- [2026-10-12 Step9 engineering complete, exact710f58e inactive release verified; final9isolated/390unit/UI PASS; Step10 next, 18:18 WAT](2026-10-12-manual-journals.md)
 
 - [2026-10-11 Step8 GL/Trial Balance accepted/deployed inactive at 187703d; exact resume point, updated 22:30 WAT](2026-10-11-general-ledger-trial-balance.md)
 - [2026-10-11 remaining supported Step7 connections accepted and deployed inactive at fd5e131; exact resume point, updated 13:15 WAT](2026-10-11-accounting-source-integration.md)

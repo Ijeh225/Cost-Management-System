@@ -1,5 +1,19 @@
 # Step 9 Manual Journals and Adjustments
 
+## 2026-10-12 18:18 WAT - Exact Release Verified / Resume Point
+
+- Functional710f58e committed/pushed; Railway85a1facf-8e6b-40eb-82c9-4e6fb7bd3a76
+  SUCCESS at the exact hash. After success health:ok, manual unauthenticated401,
+  official deployed SSH updated native bundle smoke PASS with zero native DB
+  connections/writes. Both live native switches false/defaultOFF rechecked.
+- Step9 engineering complete with final9owned isolated/390unit/API/build/dummy
+  browser checks accepted. Protected tag retained; live source records untouched.
+- Actual accountant/chart/policy/openings/cutover remain outstanding; not official
+  activation or a live manual financial posting test. Retained calculation/file
+  references are evidence inputs, not new automatic asset/loan/payroll engines.
+- Next roadmap Step10 Balance Sheet/Management Accounts awaits owner instruction.
+  This session's exact state/proof is published in a follow-up records commit.
+
 ## 2026-10-12 18:07 WAT - Engineering Accepted / Inactive Publication Next
 
 - Final9owned isolated DB cases PASS/45filtered in736s:6new plus shared invoice,

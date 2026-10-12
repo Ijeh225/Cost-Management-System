@@ -2,6 +2,27 @@
 
 ## Current Work Register - Authoritative as of 2026-10-12
 
+### Step 9 Deployed INACTIVE / Exact Resume Point - 2026-10-12 18:18 WAT
+
+- Functional710f58e9c79e046b3a996c75420399b1681fa74d committed/pushed;
+  exact Railway85a1facf-8e6b-40eb-82c9-4e6fb7bd3a76 SUCCESS with matching
+  commitHash verified. Post-success live healthz:ok and unauthenticated manual
+  API refused401. Official SSH updated deployed native bundle smoke PASS for
+  manual/review/reversal, prior source/opening/GL/TB/report gates: zero native
+  DB connections/writes. Both production native switches false/defaultOFF.
+- Final9isolated/390unit/API/build/built dummy desktop/mobile/GLTB acceptance
+  retained; the earlier namespace regression is corrected and covered. No live
+  native migration, official book, dummy finance record or source mutation created.
+- Protected pre-Step9 tag remains at578a43d; older checkpoints preserved. Real
+  accountant/policy/chart/book/cutover/reconciled opening approval still outstanding.
+  Evidence/calculation schedules are reviewed inputs, not automatic asset/payroll
+  engines or proof of accounting completeness. Native activation not authorised.
+- Resume: Step9 engineering complete and inactive deployed. Step10 Balance Sheet
+  and Management Accounts is the next engineering roadmap, not started. Obtain
+  actual professional approvals before separately authorised official activation.
+  Do not repeat accepted tests or create duplicate fixtures. This proof is saved
+  in the records publication commit following the functional release.
+
 ### Step 9 Engineering Accepted / Publishing INACTIVE - 2026-10-12 18:07 WAT
 
 - Final owned Railway isolated run9/9PASS in736s:6new manual scenarios plus

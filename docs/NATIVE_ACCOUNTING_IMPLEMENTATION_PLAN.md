@@ -2,6 +2,11 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
+Latest2026-10-12 18:18 WAT: Step9 engineering COMPLETE and functional710f58e
+deployed as exactRailway85a1facf-8e6b-40eb-82c9-4e6fb7bd3a76 SUCCESS. Live
+health/manual401/deployed updated zero-DB OFF smoke PASS. Both switches inactive.
+Final9isolated/390unit/API/build/dummy UI acceptance retained. Step10 is next,
+not started; actual professional rules/chart/opening/cutover approval pending.
 Latest2026-10-12 18:07 WAT: Step9 engineering accepted. Final9isolated cases PASS
 (6manual+3shared),390unit/API PASS/3prior skips, full build/typechecks/OFF and
 dummy built browser acceptance PASS. Inactive commit/push/deployment next; actual
