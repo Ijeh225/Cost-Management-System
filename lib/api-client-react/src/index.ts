@@ -27,3 +27,4 @@ export * from "./stage-notes";
 export * from "./payment-schedules";
 export * from "./accounting";
 export * from "./accounting-report-format";
+export * from "./accounting-manual";

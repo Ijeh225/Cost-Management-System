@@ -52,6 +52,9 @@ await assert.rejects(()=>engine.reportCatalog(3,null),{code:"ACCOUNTING_DISABLED
 await assert.rejects(()=>engine.reportOptions(1,2,3),{code:"ACCOUNTING_DISABLED"});
 await assert.rejects(()=>engine.accountingReport(1,2,3,"trial-balance",reportFilter),{code:"ACCOUNTING_DISABLED"});
 await assert.rejects(()=>engine.reportJournal(1,2,3,4),{code:"ACCOUNTING_DISABLED"});
+for(const run of [()=>engine.manualWorkspace(1,2,3),()=>engine.manualDetails(1,2,3,4),()=>engine.prepareManual(1,2,3,{}),
+  ()=>engine.reviewManualAccounts(1,3,{}),()=>engine.manualAction(1,2,3,4,"post","Dummy"),()=>engine.prepareManualReversal(1,2,3,4,"2026-10-12","Dummy")])
+  await assert.rejects(run,{code:"ACCOUNTING_DISABLED"});
 const reportAccounts=[{id:101,code:"1000",name:"Dummy asset",category:"asset",active:true},
   {id:210,code:"2100",name:"Dummy liability",category:"liability",active:true}];
 const reportLines=reportAccounts.map((account,index)=>({id:index+1,journalId:1,branchId:2,accountId:account.id,
@@ -62,4 +65,4 @@ const gl=buildAccountingReport(reportAccounts,reportLines,reportFilter,"general-
 assert.equal(tb.totals.debit,"0.30");assert.equal(tb.totals.credit,"0.30");assert.equal(tb.balanced,true);
 assert.deepEqual(tb.totals,gl.totals);
 assert.equal(connections, 0);
-console.log("PASS: deployed inactive accounting bundle, settlement/invoice/operational/opening previews, exact GL/TB, report/reconciliation/posting gates; zero database connections/writes");
+console.log("PASS: deployed inactive accounting bundle, settlement/invoice/operational/opening previews, exact GL/TB, manual journal/review/reversal and report/reconciliation/posting gates; zero database connections/writes");

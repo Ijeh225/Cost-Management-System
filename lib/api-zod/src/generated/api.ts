@@ -8,6 +8,225 @@
 import * as zod from "zod";
 
 /**
+ * @summary Scoped manual adjustment queue, approved account protection and named permissions
+ */
+
+export const GetManualAccountingWorkspaceParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const GetManualAccountingWorkspaceQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const GetManualAccountingWorkspaceResponse = zod.object({
+  book: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    currency: zod.string(),
+    cutoverDate: zod.string(),
+  }),
+  branchId: zod.number(),
+  permissions: zod.array(zod.string()),
+  accounts: zod.array(
+    zod.object({
+      id: zod.number(),
+      code: zod.string(),
+      name: zod.string(),
+      category: zod.string(),
+      active: zod.boolean(),
+      role: zod
+        .union([
+          zod.literal("adjustment"),
+          zod.literal("protected"),
+          zod.literal(null),
+        ])
+        .nullable(),
+    }),
+  ),
+  accountReviewComplete: zod.boolean(),
+  journals: zod.array(
+    zod.object({
+      id: zod.number(),
+      date: zod.string(),
+      narration: zod.string(),
+      state: zod.enum([
+        "draft",
+        "submitted",
+        "rejected",
+        "cancelled",
+        "posted",
+      ]),
+      evidence: zod.string(),
+      preparedBy: zod.number(),
+      postedBy: zod.number().nullish(),
+      reversalOf: zod.number().nullish(),
+      replacesJournalId: zod.number().nullish(),
+    }),
+  ),
+  truncated: zod.boolean(),
+});
+
+/**
+ * @summary Prepare or atomically revise an immutable evidence-backed manual draft; never posts
+ */
+
+export const PrepareManualAccountingJournalParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const PrepareManualAccountingJournalQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const PrepareManualAccountingJournalBody = zod.object({
+  requestId: zod.string(),
+  accountingDate: zod.string(),
+  narration: zod.string(),
+  evidence: zod.string(),
+  adjustmentType: zod.enum([
+    "accrual",
+    "depreciation",
+    "prepayment",
+    "reclassification",
+    "correction",
+  ]),
+  calculationEvidence: zod.string(),
+  evidenceReferences: zod.array(zod.string()),
+  replacesJournalId: zod.number().optional(),
+  lines: zod.array(
+    zod.object({
+      accountId: zod.number(),
+      debit: zod.string().describe("Non-negative exact decimal string"),
+      credit: zod.string().describe("Non-negative exact decimal string"),
+      memo: zod.string().optional(),
+    }),
+  ),
+});
+
+export const PrepareManualAccountingJournalResponse = zod.object({
+  id: zod.number(),
+});
+
+/**
+ * @summary Original scoped journal version, evidence references, lines and immutable audit
+ */
+
+export const GetManualAccountingJournalParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  journalId: zod.coerce.number().min(1),
+});
+
+export const GetManualAccountingJournalQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const GetManualAccountingJournalResponse = zod
+  .object({
+    id: zod.number(),
+    date: zod.string(),
+    narration: zod.string(),
+    state: zod.enum(["draft", "submitted", "rejected", "cancelled", "posted"]),
+    evidence: zod.string(),
+    preparedBy: zod.number(),
+    postedBy: zod.number().nullish(),
+    reversalOf: zod.number().nullish(),
+    replacesJournalId: zod.number().nullish(),
+  })
+  .and(
+    zod.object({
+      currency: zod.string(),
+      lines: zod.array(
+        zod.object({
+          accountId: zod.number(),
+          debit: zod.string().describe("Non-negative exact decimal string"),
+          credit: zod.string().describe("Non-negative exact decimal string"),
+          memo: zod.string().optional(),
+        }),
+      ),
+      audit: zod.array(
+        zod.object({
+          actorId: zod.number(),
+          action: zod.string(),
+          reason: zod.string(),
+          createdAt: zod.string(),
+        }),
+      ),
+    }),
+  );
+
+/**
+ * @summary Submit, independently reject/approve and post, or cancel a manual draft with audit evidence
+ */
+
+export const ActOnManualAccountingJournalParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  journalId: zod.coerce.number().min(1),
+});
+
+export const ActOnManualAccountingJournalQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const ActOnManualAccountingJournalBody = zod.object({
+  action: zod.enum(["submit", "reject", "post", "cancel"]),
+  reason: zod.string(),
+});
+
+export const ActOnManualAccountingJournalResponse = zod.object({
+  id: zod.number(),
+});
+
+/**
+ * @summary Prepare exact linked full reversal for separate independent review; never reverses source records
+ */
+
+export const ReverseManualAccountingJournalParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  journalId: zod.coerce.number().min(1),
+});
+
+export const ReverseManualAccountingJournalQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const ReverseManualAccountingJournalBody = zod.object({
+  date: zod.string(),
+  reason: zod.string(),
+});
+
+export const ReverseManualAccountingJournalResponse = zod.object({
+  id: zod.number(),
+});
+
+/**
+ * @summary Actual owner/accountant review classifies whole-book controls; immutable classifications
+ */
+
+export const ReviewManualAccountingAccountsParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const ReviewManualAccountingAccountsQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const ReviewManualAccountingAccountsBody = zod.object({
+  ownerEvidence: zod.string(),
+  accountantEvidence: zod.string(),
+  accounts: zod.array(
+    zod.object({
+      accountId: zod.number(),
+      role: zod.enum(["adjustment", "protected"]),
+    }),
+  ),
+});
+
+export const ReviewManualAccountingAccountsResponse = zod.object({
+  reviewed: zod.boolean(),
+});
+
+/**
  * @summary Approved native books visible through explicit read grants; inactive returns no books
  */
 export const GetAccountingCatalogQueryParams = zod.object({

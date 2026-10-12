@@ -8,6 +8,7 @@ import { previewOpeningBalances } from "../lib/accounting-source-mapping";
 import type { InvoiceAccountingMapping } from "../lib/accounting-invoice-mapping";
 import type { OperationalMapping,OperationalRef } from "../lib/accounting-operational-mapping";
 import type { ReviewedOpening } from "../lib/accounting-reviewed-opening";
+import type { ManualAdjustment } from "../lib/accounting-manual";
 
 const schema = `acct_foundation_${Date.now()}_${randomBytes(4).toString("hex")}`;
 const previousEnabled = process.env.NATIVE_ACCOUNTING_ENABLED;
@@ -544,6 +545,121 @@ async function fixture(approved = true, multiBranch = false) {
   return { book, branch, secondBranch, owner: owner!, preparer: preparer!, approver: approver!, operations: operations!, debit, credit, period };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
+async function manualFixture(reviewed=true,multiBranch=false) {
+  const f=await fixture(true,multiBranch);
+  const expense=await service.addAccount(f.book,f.branch,f.owner,"6200","Dummy reviewed depreciation expense","expense");
+  const contra=await service.addAccount(f.book,f.branch,f.owner,"1390","Dummy accumulated depreciation","asset");
+  const review={ownerEvidence:"Dummy only owner approval",accountantEvidence:"Dummy only chart review; not professional approval",
+    accounts:[{accountId:f.debit,role:"protected" as const},{accountId:f.credit,role:"protected" as const},
+      {accountId:expense,role:"adjustment" as const},{accountId:contra,role:"adjustment" as const}]};
+  if(reviewed)await service.reviewManualAccounts(f.book,f.owner,review);
+  const input:ManualAdjustment={requestId:`test_${randomBytes(8).toString("hex")}`,accountingDate:"2026-10-12",narration:"Dummy reviewed depreciation",
+    evidence:"Dummy approved adjustment purpose",adjustmentType:"depreciation",calculationEvidence:"Dummy asset schedule v1: 12 x 0.01; not production",
+    evidenceReferences:["Dummy asset schedule v1"],lines:[{accountId:expense,debit:"0.12",credit:"0"},{accountId:contra,debit:"0",credit:"0.12"}]};
+  return {...f,expense,contra,review,input};
+}
+describe("Step9 controlled manual journal workflow",()=>{
+  it("posts reviewed manual adjustments once and linked reversals reconcile GL and TB without source writes",async()=>{
+    const f=await manualFixture();
+    const drafts=await Promise.all([1,2].map(()=>service.prepareManual(f.book,f.branch,f.preparer,f.input)));
+    expect(drafts[0]!.id).toBe(drafts[1]!.id);const id=drafts[0]!.id;
+    await expect(service.approveAndPost(f.book,f.branch,f.approver,id,"Dummy review")).rejects.toMatchObject({code:"REVIEW_REQUIRED"});
+    await Promise.all([1,2].map(()=>service.manualAction(f.book,f.branch,f.preparer,id,"submit","Dummy verified schedule")));
+    await expect(service.manualAction(f.book,f.branch,f.preparer,id,"post","Dummy self approval")).rejects.toMatchObject({code:"FORBIDDEN"});
+    await Promise.all([1,2].map(()=>service.manualAction(f.book,f.branch,f.approver,id,"post","Dummy independent exact review")));
+    const details=await service.manualDetails(f.book,f.branch,f.preparer,id);
+    expect(details.state).toBe("posted");expect(details.audit.filter((a:{action:string})=>a.action==="posted")).toHaveLength(1);expect(details.audit.filter((a:{action:string})=>a.action==="manual_submitted")).toHaveLength(1);
+    const filter={from:"2026-10-01",to:"2026-10-31",includeZero:true,includeInactive:false};
+    const tb=await service.accountingReport(f.book,f.branch,f.preparer,"trial-balance",filter);expect(tb.totals.debit).toBe("0.12");expect(tb.totals.credit).toBe("0.12");
+    const reversals=await Promise.all([1,2].map(()=>service.prepareManualReversal(f.book,f.branch,f.preparer,id,"2026-10-13","Dummy full reversal")));
+    expect(reversals[0]!.id).toBe(reversals[1]!.id);const reversal=reversals[0]!.id;
+    await service.manualAction(f.book,f.branch,f.preparer,reversal,"submit","Dummy reversal review requested");
+    await service.manualAction(f.book,f.branch,f.approver,reversal,"post","Dummy independent reversal review");
+    expect((await service.manualDetails(f.book,f.branch,f.preparer,reversal)).reversalOf).toBe(id);
+    const gl=await service.accountingReport(f.book,f.branch,f.preparer,"general-ledger",filter);
+    expect(gl.totals.closingDifference).toBe("0.00");expect(gl.rows.every(a=>a.closing==="0.00")).toBe(true);
+    await expect(sql("UPDATE accounting_journals SET narration='silently changed' WHERE id=$1",[id])).rejects.toThrow(/immutable/);
+  });
+  it("retains rejected and revised versions atomically and prevents stale revision/rejection duplicates",async()=>{
+    const f=await manualFixture(),draft=await service.prepareManual(f.book,f.branch,f.preparer,f.input);
+    await service.manualAction(f.book,f.branch,f.preparer,draft.id,"submit","Dummy submission");
+    const changed={...f.input,requestId:`revision_${randomBytes(6).toString("hex")}`,replacesJournalId:draft.id,narration:"Dummy corrected schedule"};
+    await expect(service.prepareManual(f.book,f.branch,f.preparer,changed)).rejects.toMatchObject({code:"JOURNAL_STATE"});
+    await Promise.all([1,2].map(()=>service.manualAction(f.book,f.branch,f.approver,draft.id,"reject","Dummy missing support")));
+    expect((await service.manualDetails(f.book,f.branch,f.preparer,draft.id)).audit.filter((a:{action:string})=>a.action==="manual_rejected")).toHaveLength(1);
+    await expect(service.prepareManual(f.book,f.branch,f.preparer,{...changed,accountingDate:"2026-11-01"})).rejects.toMatchObject({code:"PERIOD_CLOSED"});
+    expect((await service.manualDetails(f.book,f.branch,f.preparer,draft.id)).state).toBe("rejected");
+    await expect(service.manualAction(f.book,f.branch,f.preparer,draft.id,"submit","Dummy resubmit unchanged")).rejects.toMatchObject({code:"JOURNAL_STATE"});
+    const revision=await service.prepareManual(f.book,f.branch,f.preparer,changed);
+    expect((await service.manualDetails(f.book,f.branch,f.preparer,draft.id)).state).toBe("cancelled");
+    expect((await service.manualDetails(f.book,f.branch,f.preparer,revision.id)).replacesJournalId).toBe(draft.id);
+    expect((await service.prepareManual(f.book,f.branch,f.preparer,changed)).id).toBe(revision.id);
+    await expect(service.prepareManual(f.book,f.branch,f.preparer,{...changed,narration:"different payload"})).rejects.toMatchObject({code:"DUPLICATE_CONFLICT"});
+    await expect(service.prepareManual(f.book,f.branch,f.preparer,{...changed,requestId:"another_revision_123"})).rejects.toMatchObject({code:"JOURNAL_STATE"});
+    await expect(sql("UPDATE accounting_journal_lines SET memo='tampered' WHERE journal_id=$1",[revision.id])).rejects.toThrow(/immutable revision/);
+    await expect(sql("DELETE FROM accounting_manual_workflow WHERE journal_id=$1",[revision.id])).rejects.toThrow(/immutable/);
+    await service.manualAction(f.book,f.branch,f.preparer,revision.id,"cancel","Dummy no longer needed");
+    expect((await balances(f)).size).toBe(0);
+  });
+  it("blocks unreviewed/protected charts and preserves immutable owner/accountant classification evidence",async()=>{
+    const f=await manualFixture(false);
+    await expect(service.prepareManual(f.book,f.branch,f.preparer,f.input)).rejects.toMatchObject({code:"ACCOUNT_REVIEW_REQUIRED"});
+    await expect(service.reviewManualAccounts(f.book,f.owner,{...f.review,accounts:f.review.accounts.slice(0,2)})).rejects.toMatchObject({code:"ACCOUNT_REVIEW_REQUIRED"});
+    await expect(service.reviewManualAccounts(f.book,f.owner,{...f.review,accountantEvidence:""})).rejects.toMatchObject({code:"EVIDENCE_REQUIRED"});
+    await expect(service.reviewManualAccounts(f.book,f.preparer,f.review)).rejects.toMatchObject({code:"FORBIDDEN"});
+    await service.reviewManualAccounts(f.book,f.owner,f.review);
+    await expect(service.prepareManual(f.book,f.branch,f.preparer,{...f.input,lines:[{accountId:f.debit,debit:"0.12",credit:"0"},f.input.lines[1]!]})).rejects.toMatchObject({code:"PROTECTED_ACCOUNT"});
+    await expect(service.reviewManualAccounts(f.book,f.owner,{...f.review,accounts:f.review.accounts.map(a=>({...a,role:"adjustment" as const}))})).rejects.toMatchObject({code:"ACCOUNT_REVIEW_REQUIRED"});
+    await expect(sql("UPDATE accounting_manual_account_rules SET role='adjustment' WHERE book_id=$1",[f.book])).rejects.toThrow(/immutable/);
+    const newAccount=await service.addAccount(f.book,f.branch,f.owner,"9999","New unreviewed dummy account","expense");
+    await expect(service.prepareManual(f.book,f.branch,f.preparer,f.input)).rejects.toMatchObject({code:"ACCOUNT_REVIEW_REQUIRED"});
+    await service.reviewManualAccounts(f.book,f.owner,{...f.review,accounts:[...f.review.accounts,{accountId:newAccount,role:"protected"}]});
+    await service.prepareManual(f.book,f.branch,f.preparer,f.input);
+  });
+  it("enforces branch/book/grant/current actor and closed periods with no failed-action audit side effects",async()=>{
+    const f=await manualFixture(true,true),draft=await service.prepareManual(f.book,f.branch,f.preparer,f.input);
+    await expect(service.manualDetails(f.book,f.secondBranch!,f.preparer,draft.id)).rejects.toMatchObject({code:"FORBIDDEN"});
+    await expect(service.manualWorkspace(f.book,f.branch,f.operations)).rejects.toMatchObject({code:"FORBIDDEN"});
+    await service.manualAction(f.book,f.branch,f.preparer,draft.id,"submit","Dummy submission");
+    const before=(await sql("SELECT count(*)::int n FROM accounting_audit WHERE book_id=$1",[f.book])).rows[0].n;
+    await service.revokeAccess(f.book,f.branch,f.owner,f.approver,"post","Dummy revocation");
+    await expect(service.manualAction(f.book,f.branch,f.approver,draft.id,"post","Dummy unauthorized")).rejects.toMatchObject({code:"FORBIDDEN"});
+    expect((await sql("SELECT count(*)::int n FROM accounting_audit WHERE book_id=$1",[f.book])).rows[0].n).toBe(before+1);
+    await service.grantAccess(f.book,f.branch,f.owner,f.approver,"post","Dummy restored grant");
+    await service.manualAction(f.book,f.branch,f.approver,draft.id,"post","Dummy independent review");
+    await service.changePeriod(f.book,f.owner,f.period,"close",{evidence:"Dummy independent test controls",sourceCoverageComplete:true,reconciled:true,unresolvedMappings:0});
+    await expect(service.prepareManual(f.book,f.branch,f.preparer,{...f.input,requestId:"closed_period_123"})).rejects.toMatchObject({code:"PERIOD_CLOSED"});
+    await expect(service.prepareManualReversal(f.book,f.branch,f.preparer,draft.id,"2026-10-13","Dummy closed date")).rejects.toMatchObject({code:"PERIOD_CLOSED"});
+    expect((await service.manualDetails(f.book,f.branch,f.preparer,draft.id)).state).toBe("posted");
+  });
+  it("refuses source and opening bypass and audits a cancelled reversal retry separately",async()=>{
+    const f=await settlementFixture(),source=await postDeposit(f);
+    const rules=(await sql("SELECT id FROM accounting_accounts WHERE book_id=$1",[f.book])).rows.map(a=>({accountId:a.id,role:"protected" as const}));
+    await expect(service.reviewManualAccounts(f.book,f.owner,{ownerEvidence:"Dummy",accountantEvidence:"Dummy",accounts:rules.map(a=>({...a,role:"adjustment" as const}))})).rejects.toMatchObject({code:"PROTECTED_ACCOUNT"});
+    await expect(service.prepareManualReversal(f.book,f.branch,f.preparer,source.id,"2026-10-13","Dummy offset")).rejects.toMatchObject({code:"INVALID_REVERSAL"});
+    const m=await manualFixture(),draft=await service.prepareManual(m.book,m.branch,m.preparer,m.input);
+    await service.manualAction(m.book,m.branch,m.preparer,draft.id,"submit","Dummy submission");await service.manualAction(m.book,m.branch,m.approver,draft.id,"post","Dummy review");
+    const r=await service.prepareManualReversal(m.book,m.branch,m.preparer,draft.id,"2026-10-13","Dummy incorrect date");
+    await service.manualAction(m.book,m.branch,m.preparer,r.id,"cancel","Dummy reversal date correction");
+    const retry=await service.prepareManualReversal(m.book,m.branch,m.preparer,draft.id,"2026-10-14","Dummy corrected date");
+    expect(retry.id).not.toBe(r.id);expect((await service.manualDetails(m.book,m.branch,m.preparer,r.id)).state).toBe("cancelled");
+    const revise={...m.input,requestId:"reverse_edit_123",replacesJournalId:retry.id};
+    await expect(service.prepareManual(m.book,m.branch,m.preparer,revise)).rejects.toMatchObject({code:"JOURNAL_STATE"});
+  });
+  it("upgrades schema idempotently and fails all new native operations before connecting while OFF",async()=>{
+    await ensureAccountingFoundationSchema(database as Pick<typeof pool,"connect">);
+    const f=await manualFixture();await service.prepareManual(f.book,f.branch,f.preparer,f.input);
+    await ensureAccountingFoundationSchema(database as Pick<typeof pool,"connect">);
+    expect((await service.manualWorkspace(f.book,f.branch,f.preparer)).journals).toHaveLength(1);
+    process.env.NATIVE_ACCOUNTING_ENABLED="false";
+    try {
+      const inactive=new NativeAccounting({connect:async()=>{throw new Error("MUST NOT CONNECT");}} as Pick<typeof pool,"connect">);
+      for(const run of [()=>inactive.manualWorkspace(1,2,3),()=>inactive.manualDetails(1,2,3,4),()=>inactive.prepareManual(1,2,3,f.input),
+        ()=>inactive.reviewManualAccounts(1,3,f.review),()=>inactive.manualAction(1,2,3,4,"post","Dummy"),()=>inactive.prepareManualReversal(1,2,3,4,"2026-10-13","Dummy")])
+        await expect(run()).rejects.toMatchObject({code:"ACCOUNTING_DISABLED"});
+    }finally{process.env.NATIVE_ACCOUNTING_ENABLED="true";}
+  });
+});
 describe("Step8 posted General Ledger and Trial Balance",()=>{
   const filters={from:"2026-10-10",to:"2026-10-11",includeZero:true,includeInactive:false};
   async function postAmount(f:Fixture,amount:string,date:string) {

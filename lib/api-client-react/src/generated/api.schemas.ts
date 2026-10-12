@@ -5,6 +5,159 @@
  * Cost Analysis Per Container API
  * OpenAPI spec version: 0.1.0
  */
+export interface ManualAccountingLine {
+  accountId: number;
+  /** Non-negative exact decimal string */
+  debit: string;
+  /** Non-negative exact decimal string */
+  credit: string;
+  memo?: string;
+}
+
+export type ManualAccountingRequestAdjustmentType =
+  (typeof ManualAccountingRequestAdjustmentType)[keyof typeof ManualAccountingRequestAdjustmentType];
+
+export const ManualAccountingRequestAdjustmentType = {
+  accrual: "accrual",
+  depreciation: "depreciation",
+  prepayment: "prepayment",
+  reclassification: "reclassification",
+  correction: "correction",
+} as const;
+
+export interface ManualAccountingRequest {
+  requestId: string;
+  accountingDate: string;
+  narration: string;
+  evidence: string;
+  adjustmentType: ManualAccountingRequestAdjustmentType;
+  calculationEvidence: string;
+  evidenceReferences: string[];
+  replacesJournalId?: number;
+  lines: ManualAccountingLine[];
+}
+
+export interface ManualAccountingResult {
+  id: number;
+}
+
+export type ManualAccountingActionAction =
+  (typeof ManualAccountingActionAction)[keyof typeof ManualAccountingActionAction];
+
+export const ManualAccountingActionAction = {
+  submit: "submit",
+  reject: "reject",
+  post: "post",
+  cancel: "cancel",
+} as const;
+
+export interface ManualAccountingAction {
+  action: ManualAccountingActionAction;
+  reason: string;
+}
+
+export interface ManualAccountingReversal {
+  date: string;
+  reason: string;
+}
+
+export type ManualAccountingAccountReviewAccountsItemRole =
+  (typeof ManualAccountingAccountReviewAccountsItemRole)[keyof typeof ManualAccountingAccountReviewAccountsItemRole];
+
+export const ManualAccountingAccountReviewAccountsItemRole = {
+  adjustment: "adjustment",
+  protected: "protected",
+} as const;
+
+export type ManualAccountingAccountReviewAccountsItem = {
+  accountId: number;
+  role: ManualAccountingAccountReviewAccountsItemRole;
+};
+
+export interface ManualAccountingAccountReview {
+  ownerEvidence: string;
+  accountantEvidence: string;
+  accounts: ManualAccountingAccountReviewAccountsItem[];
+}
+
+export type ManualAccountingEntryState =
+  (typeof ManualAccountingEntryState)[keyof typeof ManualAccountingEntryState];
+
+export const ManualAccountingEntryState = {
+  draft: "draft",
+  submitted: "submitted",
+  rejected: "rejected",
+  cancelled: "cancelled",
+  posted: "posted",
+} as const;
+
+export interface ManualAccountingEntry {
+  id: number;
+  date: string;
+  narration: string;
+  state: ManualAccountingEntryState;
+  evidence: string;
+  preparedBy: number;
+  /** @nullable */
+  postedBy?: number | null;
+  /** @nullable */
+  reversalOf?: number | null;
+  /** @nullable */
+  replacesJournalId?: number | null;
+}
+
+export type ManualAccountingJournalAuditItem = {
+  actorId: number;
+  action: string;
+  reason: string;
+  createdAt: string;
+};
+
+export type ManualAccountingJournal = ManualAccountingEntry & {
+  currency: string;
+  lines: ManualAccountingLine[];
+  audit: ManualAccountingJournalAuditItem[];
+};
+
+export type ManualAccountingWorkspaceBook = {
+  id: number;
+  name: string;
+  currency: string;
+  cutoverDate: string;
+};
+
+/**
+ * @nullable
+ */
+export type ManualAccountingWorkspaceAccountsItemRole =
+  | (typeof ManualAccountingWorkspaceAccountsItemRole)[keyof typeof ManualAccountingWorkspaceAccountsItemRole]
+  | null;
+
+export const ManualAccountingWorkspaceAccountsItemRole = {
+  adjustment: "adjustment",
+  protected: "protected",
+} as const;
+
+export type ManualAccountingWorkspaceAccountsItem = {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  active: boolean;
+  /** @nullable */
+  role: ManualAccountingWorkspaceAccountsItemRole;
+};
+
+export interface ManualAccountingWorkspace {
+  book: ManualAccountingWorkspaceBook;
+  branchId: number;
+  permissions: string[];
+  accounts: ManualAccountingWorkspaceAccountsItem[];
+  accountReviewComplete: boolean;
+  journals: ManualAccountingEntry[];
+  truncated: boolean;
+}
+
 export interface AccountingBook {
   id: number;
   name: string;
@@ -1321,10 +1474,58 @@ export interface ReverseDutyPaymentRequest {
   reason: string;
 }
 
+export type ManualAccountingBranchParameter = number;
+
 /**
  * Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
  */
 export type AccountingBranchParameter = string;
+
+export type GetManualAccountingWorkspaceParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PrepareManualAccountingJournalParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type GetManualAccountingJournalParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type ActOnManualAccountingJournalParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type ReverseManualAccountingJournalParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type ReviewManualAccountingAccountsParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type ReviewManualAccountingAccounts200 = {
+  reviewed: boolean;
+};
 
 export type GetAccountingCatalogParams = {
   /**

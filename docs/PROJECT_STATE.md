@@ -1,6 +1,87 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-10-11
+## Current Work Register - Authoritative as of 2026-10-12
+
+### Step 9 Engineering Accepted / Publishing INACTIVE - 2026-10-12 18:07 WAT
+
+- Final owned Railway isolated run9/9PASS in736s:6new manual scenarios plus
+  existing invoice/source recognition, posted GL/TB and legacy concurrent-engine
+  regressions.45deliberately filtered prior cases. Owned schema/source-preservation
+  assertions and isolated tunnel closure passed. Namespace compatibility is resolved.
+- Full50unit/API files390PASS/3existing skips; complete typechecks/Railway build,
+  rebuilt OFF zero-DB smoke, manual built dummy workflow/mobile accessibility and
+  shared GL/TB/CSV/print checks PASS. No live financial write or actual approval
+  implied by isolated or dummy browser fixtures.
+- Manual workflow reuses the existing engine: evidence-backed drafts, immutable
+  linked revisions, submission/rejection, independent posting, exact full reversals,
+  chart/control protection and scoped permissions. Procedures and limits are in
+  ACCOUNTING_MANUAL_JOURNALS.md. Source/opening controls remain separate.
+- Pre-Step9 protected remote checkpoint retained at578a43d. Actual professional
+  policy/chart/cutover/opening approval remains outstanding; production switches
+  stay OFF. Commit/push then exact inactive deployment/health/SSH proof next.
+
+### Step 9 Final Local Checks PASS / Database Gate Pending - 2026-10-12 18:05 WAT
+
+- After the identity compatibility correction, full50unit files390PASS/3existing
+  skips. Rebuilt native inactive smoke PASS, including all manual methods with
+  zero DB connections/writes; final built manual desktop/mobile dummy browser
+  workflow PASS. Earlier full typecheck/build and read-only GL/TB UI pass retained.
+- Final9selected isolated DB cases are running; no acceptance inferred from a
+  quiet buffered runner. Functional commit/push/inactive deployment still pending.
+
+### Step 9 Compatibility Regression Corrected / Rechecking - 2026-10-12 17:54 WAT
+
+- Final8selected DB run:6manual+1shared invoice case PASS;1older GL fixture failed
+  because new manual reservation collided with legitimate older manual:* engine
+  identities. Corrected NEW workflow to reserved adjustment:* prefix; preserved
+  previous manual:* and immutable identities, rather than changing old fixtures
+  or weakening their protections. New SQL workflow guard matches new prefix.
+- Failed run namespace/public11source guard/tunnel cleanup passed. No publication
+  or production changes. Final6manual+shared GL/source/legacy concurrency rerun
+  and rebuild pending; current engineering acceptance not claimed complete yet.
+
+### Step 9 Interface / Regression Milestone - 2026-10-12 17:51 WAT
+
+- Final390unit/API PASS/3prior skips (50files), full typecheck/build and final
+  built-bundle OFF smoke PASS. Built manual dummy-GET/POST browser checks PASS:
+  draft/stable retry/submission/different reviewer posting/evidence/audit, protected
+  account exclusion, branch clearing/same-scope refresh, desktop/mobile bounded
+  dialog, inactive/error states. Desktop/mobile screenshots visually inspected.
+- Existing built read-only GL/TB/CSV/drilldown/print browser regression PASS.
+  No browser or dialog accessibility warnings. Tests are loopback dummy fixtures,
+  not a signed-in production financial posting test. Final8isolated tests pending.
+- Pre-Step9 protected tag pushed; remote peeled target578a43d verified. Both
+  production native flags false/defaultOFF rechecked. All older tags preserved.
+- Publication pending final DB acceptance; no production native migration/data.
+
+### Step 9 Manual Journals Authorised - 2026-10-12 17:15 WAT
+
+- Owner requests Step9. Clean restored master578a43d confirmed; accepted Step8
+  engine, read-only GL/TB and protected checkpoints retained. No duplicate ledger.
+- Extend the same engine with evidence-backed adjustments, reviewed account
+  protection, draft revision history, submission, independent review/posting and
+  exact linked reversals. Source subledgers and reviewed openings remain separate.
+- Official native accounting/schema stay OFF. Real accountant/chart/cutover/
+  opening approvals remain outstanding; engineering is not official activation.
+- Implementation, isolated/API/UI acceptance and inactive publication pending.
+  No live financial fixtures or repeated completed live tests authorised/needed.
+
+### Step 9 Implementation / Acceptance Running - 2026-10-12 17:44 WAT
+
+- Added manual preparation/revision/review/independent posting/full reversal to
+  existing engine, immutable SQL workflow/account-protection guards, strict scoped
+  CSRF/finance APIs, regenerated contracts, accessible responsive queue/form/dialogs.
+  No second ledger; source/opening workflows and official OFF boundary retained.
+- Initial6/6 isolated cases PASS (481s;48 intentionally filtered), namespace/public
+  source preservation/tunnel cleanup passed. 390unit/API PASS/3prior skips; full
+  typechecks/build/local inactive zero-DB smoke PASS. Initial API fixtures omitted
+  CSRF, corrected fixtures rather than weakening authentication. Browser check
+  caught ambiguous native-select labels, corrected; final built UI pending.
+- Final6manual +2shared source/report DB regressions running, including added
+  failed-revision rollback assertion. Publication pending final acceptance.
+- ACCOUNTING_MANUAL_JOURNALS.md records procedures, actual review requirements,
+  retained reference (not new upload) evidence and approved schedule inputs, not
+  automated asset/payroll engines. Real approvals/cutover/activation still pending.
 
 ### Step 8 Deployed INACTIVE / Exact Resume Point - 2026-10-11 22:30 WAT
 

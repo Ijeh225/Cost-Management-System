@@ -21,6 +21,7 @@ import type {
   AccountingJournal,
   AccountingOptions,
   AccountingReport,
+  ActOnManualAccountingJournalParams,
   AnalyticsResponse,
   ApprovalQueueItem,
   AuditEntry,
@@ -53,6 +54,8 @@ import type {
   GetContainerReportParams,
   GetCustomSectionsParams,
   GetDeliveryAnalyticsParams,
+  GetManualAccountingJournalParams,
+  GetManualAccountingWorkspaceParams,
   GetNativeAccountingReportParams,
   HealthStatus,
   IntelligenceResponse,
@@ -62,11 +65,22 @@ import type {
   LockContainerRequest,
   LoginRequest,
   LoginResponse,
+  ManualAccountingAccountReview,
+  ManualAccountingAction,
+  ManualAccountingJournal,
+  ManualAccountingRequest,
+  ManualAccountingResult,
+  ManualAccountingReversal,
+  ManualAccountingWorkspace,
   MessageResponse,
   MyTasksResponse,
+  PrepareManualAccountingJournalParams,
   RecordDutyPaymentRequest,
   RejectSectionRequest,
   ReverseDutyPaymentRequest,
+  ReverseManualAccountingJournalParams,
+  ReviewManualAccountingAccounts200,
+  ReviewManualAccountingAccountsParams,
   SaveCustomFieldValuesRequest,
   SectionApproval,
   ShipmentOverview,
@@ -89,6 +103,791 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * @summary Scoped manual adjustment queue, approved account protection and named permissions
+ */
+export const getGetManualAccountingWorkspaceUrl = (
+  bookId: number,
+  params: GetManualAccountingWorkspaceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/manual?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/manual`;
+};
+
+export const getManualAccountingWorkspace = async (
+  bookId: number,
+  params: GetManualAccountingWorkspaceParams,
+  options?: RequestInit,
+): Promise<ManualAccountingWorkspace> => {
+  return customFetch<ManualAccountingWorkspace>(
+    getGetManualAccountingWorkspaceUrl(bookId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetManualAccountingWorkspaceQueryKey = (
+  bookId: number,
+  params?: GetManualAccountingWorkspaceParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/manual`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetManualAccountingWorkspaceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getManualAccountingWorkspace>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetManualAccountingWorkspaceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getManualAccountingWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetManualAccountingWorkspaceQueryKey(bookId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getManualAccountingWorkspace>>
+  > = ({ signal }) =>
+    getManualAccountingWorkspace(bookId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getManualAccountingWorkspace>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetManualAccountingWorkspaceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getManualAccountingWorkspace>>
+>;
+export type GetManualAccountingWorkspaceQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Scoped manual adjustment queue, approved account protection and named permissions
+ */
+
+export function useGetManualAccountingWorkspace<
+  TData = Awaited<ReturnType<typeof getManualAccountingWorkspace>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetManualAccountingWorkspaceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getManualAccountingWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetManualAccountingWorkspaceQueryOptions(
+    bookId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Prepare or atomically revise an immutable evidence-backed manual draft; never posts
+ */
+export const getPrepareManualAccountingJournalUrl = (
+  bookId: number,
+  params: PrepareManualAccountingJournalParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/manual?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/manual`;
+};
+
+export const prepareManualAccountingJournal = async (
+  bookId: number,
+  manualAccountingRequest: ManualAccountingRequest,
+  params: PrepareManualAccountingJournalParams,
+  options?: RequestInit,
+): Promise<ManualAccountingResult> => {
+  return customFetch<ManualAccountingResult>(
+    getPrepareManualAccountingJournalUrl(bookId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(manualAccountingRequest),
+    },
+  );
+};
+
+export const getPrepareManualAccountingJournalMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareManualAccountingJournal>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<ManualAccountingRequest>;
+      params: PrepareManualAccountingJournalParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof prepareManualAccountingJournal>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<ManualAccountingRequest>;
+    params: PrepareManualAccountingJournalParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["prepareManualAccountingJournal"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof prepareManualAccountingJournal>>,
+    {
+      bookId: number;
+      data: BodyType<ManualAccountingRequest>;
+      params: PrepareManualAccountingJournalParams;
+    }
+  > = (props) => {
+    const { bookId, data, params } = props ?? {};
+
+    return prepareManualAccountingJournal(bookId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PrepareManualAccountingJournalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof prepareManualAccountingJournal>>
+>;
+export type PrepareManualAccountingJournalMutationBody =
+  BodyType<ManualAccountingRequest>;
+export type PrepareManualAccountingJournalMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Prepare or atomically revise an immutable evidence-backed manual draft; never posts
+ */
+export const usePrepareManualAccountingJournal = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareManualAccountingJournal>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<ManualAccountingRequest>;
+      params: PrepareManualAccountingJournalParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof prepareManualAccountingJournal>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<ManualAccountingRequest>;
+    params: PrepareManualAccountingJournalParams;
+  },
+  TContext
+> => {
+  return useMutation(getPrepareManualAccountingJournalMutationOptions(options));
+};
+
+/**
+ * @summary Original scoped journal version, evidence references, lines and immutable audit
+ */
+export const getGetManualAccountingJournalUrl = (
+  bookId: number,
+  journalId: number,
+  params: GetManualAccountingJournalParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/manual/${journalId}?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/manual/${journalId}`;
+};
+
+export const getManualAccountingJournal = async (
+  bookId: number,
+  journalId: number,
+  params: GetManualAccountingJournalParams,
+  options?: RequestInit,
+): Promise<ManualAccountingJournal> => {
+  return customFetch<ManualAccountingJournal>(
+    getGetManualAccountingJournalUrl(bookId, journalId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetManualAccountingJournalQueryKey = (
+  bookId: number,
+  journalId: number,
+  params?: GetManualAccountingJournalParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/manual/${journalId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetManualAccountingJournalQueryOptions = <
+  TData = Awaited<ReturnType<typeof getManualAccountingJournal>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  journalId: number,
+  params: GetManualAccountingJournalParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getManualAccountingJournal>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetManualAccountingJournalQueryKey(bookId, journalId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getManualAccountingJournal>>
+  > = ({ signal }) =>
+    getManualAccountingJournal(bookId, journalId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bookId && journalId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getManualAccountingJournal>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetManualAccountingJournalQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getManualAccountingJournal>>
+>;
+export type GetManualAccountingJournalQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Original scoped journal version, evidence references, lines and immutable audit
+ */
+
+export function useGetManualAccountingJournal<
+  TData = Awaited<ReturnType<typeof getManualAccountingJournal>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  journalId: number,
+  params: GetManualAccountingJournalParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getManualAccountingJournal>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetManualAccountingJournalQueryOptions(
+    bookId,
+    journalId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit, independently reject/approve and post, or cancel a manual draft with audit evidence
+ */
+export const getActOnManualAccountingJournalUrl = (
+  bookId: number,
+  journalId: number,
+  params: ActOnManualAccountingJournalParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/manual/${journalId}/action?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/manual/${journalId}/action`;
+};
+
+export const actOnManualAccountingJournal = async (
+  bookId: number,
+  journalId: number,
+  manualAccountingAction: ManualAccountingAction,
+  params: ActOnManualAccountingJournalParams,
+  options?: RequestInit,
+): Promise<ManualAccountingResult> => {
+  return customFetch<ManualAccountingResult>(
+    getActOnManualAccountingJournalUrl(bookId, journalId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(manualAccountingAction),
+    },
+  );
+};
+
+export const getActOnManualAccountingJournalMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actOnManualAccountingJournal>>,
+    TError,
+    {
+      bookId: number;
+      journalId: number;
+      data: BodyType<ManualAccountingAction>;
+      params: ActOnManualAccountingJournalParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof actOnManualAccountingJournal>>,
+  TError,
+  {
+    bookId: number;
+    journalId: number;
+    data: BodyType<ManualAccountingAction>;
+    params: ActOnManualAccountingJournalParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["actOnManualAccountingJournal"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof actOnManualAccountingJournal>>,
+    {
+      bookId: number;
+      journalId: number;
+      data: BodyType<ManualAccountingAction>;
+      params: ActOnManualAccountingJournalParams;
+    }
+  > = (props) => {
+    const { bookId, journalId, data, params } = props ?? {};
+
+    return actOnManualAccountingJournal(
+      bookId,
+      journalId,
+      data,
+      params,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ActOnManualAccountingJournalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof actOnManualAccountingJournal>>
+>;
+export type ActOnManualAccountingJournalMutationBody =
+  BodyType<ManualAccountingAction>;
+export type ActOnManualAccountingJournalMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit, independently reject/approve and post, or cancel a manual draft with audit evidence
+ */
+export const useActOnManualAccountingJournal = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actOnManualAccountingJournal>>,
+    TError,
+    {
+      bookId: number;
+      journalId: number;
+      data: BodyType<ManualAccountingAction>;
+      params: ActOnManualAccountingJournalParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof actOnManualAccountingJournal>>,
+  TError,
+  {
+    bookId: number;
+    journalId: number;
+    data: BodyType<ManualAccountingAction>;
+    params: ActOnManualAccountingJournalParams;
+  },
+  TContext
+> => {
+  return useMutation(getActOnManualAccountingJournalMutationOptions(options));
+};
+
+/**
+ * @summary Prepare exact linked full reversal for separate independent review; never reverses source records
+ */
+export const getReverseManualAccountingJournalUrl = (
+  bookId: number,
+  journalId: number,
+  params: ReverseManualAccountingJournalParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/manual/${journalId}/reversal?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/manual/${journalId}/reversal`;
+};
+
+export const reverseManualAccountingJournal = async (
+  bookId: number,
+  journalId: number,
+  manualAccountingReversal: ManualAccountingReversal,
+  params: ReverseManualAccountingJournalParams,
+  options?: RequestInit,
+): Promise<ManualAccountingResult> => {
+  return customFetch<ManualAccountingResult>(
+    getReverseManualAccountingJournalUrl(bookId, journalId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(manualAccountingReversal),
+    },
+  );
+};
+
+export const getReverseManualAccountingJournalMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reverseManualAccountingJournal>>,
+    TError,
+    {
+      bookId: number;
+      journalId: number;
+      data: BodyType<ManualAccountingReversal>;
+      params: ReverseManualAccountingJournalParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reverseManualAccountingJournal>>,
+  TError,
+  {
+    bookId: number;
+    journalId: number;
+    data: BodyType<ManualAccountingReversal>;
+    params: ReverseManualAccountingJournalParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["reverseManualAccountingJournal"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reverseManualAccountingJournal>>,
+    {
+      bookId: number;
+      journalId: number;
+      data: BodyType<ManualAccountingReversal>;
+      params: ReverseManualAccountingJournalParams;
+    }
+  > = (props) => {
+    const { bookId, journalId, data, params } = props ?? {};
+
+    return reverseManualAccountingJournal(
+      bookId,
+      journalId,
+      data,
+      params,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReverseManualAccountingJournalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reverseManualAccountingJournal>>
+>;
+export type ReverseManualAccountingJournalMutationBody =
+  BodyType<ManualAccountingReversal>;
+export type ReverseManualAccountingJournalMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Prepare exact linked full reversal for separate independent review; never reverses source records
+ */
+export const useReverseManualAccountingJournal = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reverseManualAccountingJournal>>,
+    TError,
+    {
+      bookId: number;
+      journalId: number;
+      data: BodyType<ManualAccountingReversal>;
+      params: ReverseManualAccountingJournalParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reverseManualAccountingJournal>>,
+  TError,
+  {
+    bookId: number;
+    journalId: number;
+    data: BodyType<ManualAccountingReversal>;
+    params: ReverseManualAccountingJournalParams;
+  },
+  TContext
+> => {
+  return useMutation(getReverseManualAccountingJournalMutationOptions(options));
+};
+
+/**
+ * @summary Actual owner/accountant review classifies whole-book controls; immutable classifications
+ */
+export const getReviewManualAccountingAccountsUrl = (
+  bookId: number,
+  params: ReviewManualAccountingAccountsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/manual/accounts/review?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/manual/accounts/review`;
+};
+
+export const reviewManualAccountingAccounts = async (
+  bookId: number,
+  manualAccountingAccountReview: ManualAccountingAccountReview,
+  params: ReviewManualAccountingAccountsParams,
+  options?: RequestInit,
+): Promise<ReviewManualAccountingAccounts200> => {
+  return customFetch<ReviewManualAccountingAccounts200>(
+    getReviewManualAccountingAccountsUrl(bookId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(manualAccountingAccountReview),
+    },
+  );
+};
+
+export const getReviewManualAccountingAccountsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviewManualAccountingAccounts>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<ManualAccountingAccountReview>;
+      params: ReviewManualAccountingAccountsParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reviewManualAccountingAccounts>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<ManualAccountingAccountReview>;
+    params: ReviewManualAccountingAccountsParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["reviewManualAccountingAccounts"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reviewManualAccountingAccounts>>,
+    {
+      bookId: number;
+      data: BodyType<ManualAccountingAccountReview>;
+      params: ReviewManualAccountingAccountsParams;
+    }
+  > = (props) => {
+    const { bookId, data, params } = props ?? {};
+
+    return reviewManualAccountingAccounts(bookId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReviewManualAccountingAccountsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reviewManualAccountingAccounts>>
+>;
+export type ReviewManualAccountingAccountsMutationBody =
+  BodyType<ManualAccountingAccountReview>;
+export type ReviewManualAccountingAccountsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Actual owner/accountant review classifies whole-book controls; immutable classifications
+ */
+export const useReviewManualAccountingAccounts = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviewManualAccountingAccounts>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<ManualAccountingAccountReview>;
+      params: ReviewManualAccountingAccountsParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reviewManualAccountingAccounts>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<ManualAccountingAccountReview>;
+    params: ReviewManualAccountingAccountsParams;
+  },
+  TContext
+> => {
+  return useMutation(getReviewManualAccountingAccountsMutationOptions(options));
+};
 
 /**
  * @summary Approved native books visible through explicit read grants; inactive returns no books

@@ -106,6 +106,56 @@ LANGUAGE sql STABLE SET search_path FROM CURRENT AS $$
  AND (a.branch_id=br OR a.authority_level IN ('super_admin','admin')))
 $$;
 
+CREATE TABLE IF NOT EXISTS accounting_manual_account_rules (
+ book_id INTEGER NOT NULL REFERENCES accounting_books(id), account_id INTEGER NOT NULL,
+ role TEXT NOT NULL CHECK(role IN ('adjustment','protected')), policy_version TEXT NOT NULL,
+ evidence TEXT NOT NULL CHECK(length(trim(evidence)) BETWEEN 1 AND 4000), approved_by INTEGER NOT NULL REFERENCES users(id),
+ PRIMARY KEY(book_id,account_id), FOREIGN KEY(account_id,book_id) REFERENCES accounting_accounts(id,book_id)
+);
+CREATE TABLE IF NOT EXISTS accounting_manual_workflow (
+ journal_id INTEGER PRIMARY KEY, book_id INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'draft' CHECK(state IN ('draft','submitted','rejected')),
+ replaces_journal_id INTEGER UNIQUE REFERENCES accounting_journals(id),
+ FOREIGN KEY(journal_id,book_id) REFERENCES accounting_journals(id,book_id)
+);
+CREATE OR REPLACE FUNCTION accounting_manual_guard() RETURNS TRIGGER LANGUAGE plpgsql SET search_path FROM CURRENT AS $$
+DECLARE j accounting_journals%ROWTYPE; a accounting_audit%ROWTYPE;
+BEGIN
+ IF TG_OP='DELETE' THEN RAISE EXCEPTION 'Manual review history is immutable'; END IF;
+ PERFORM pg_advisory_xact_lock(804610,NEW.book_id);
+ IF TG_TABLE_NAME='accounting_manual_account_rules' THEN
+   IF TG_OP<>'INSERT' THEN RAISE EXCEPTION 'Approved account protection is immutable'; END IF;
+   IF NOT EXISTS(SELECT 1 FROM accounting_books WHERE id=NEW.book_id AND status='approved' AND policy_version=NEW.policy_version)
+   OR NOT EXISTS(SELECT 1 FROM users WHERE id=NEW.approved_by AND authority_level='super_admin')
+   OR EXISTS(SELECT 1 FROM accounting_book_branches b WHERE b.book_id=NEW.book_id AND NOT accounting_has_grant(b.book_id,b.branch_id,NEW.approved_by,'configure'))
+   OR NOT EXISTS(SELECT 1 FROM accounting_audit WHERE book_id=NEW.book_id AND actor_id=NEW.approved_by AND action='manual_accounts_reviewed' AND xmin::text=pg_current_xact_id()::text)
+   THEN RAISE EXCEPTION 'Documented owner/accountant account protection review required'; END IF;
+ ELSE
+   SELECT * INTO j FROM accounting_journals WHERE id=NEW.journal_id AND book_id=NEW.book_id FOR UPDATE;
+   IF j.status IS DISTINCT FROM 'draft' OR (j.event_key NOT LIKE 'adjustment:%' AND j.kind<>'reversal') THEN RAISE EXCEPTION 'Manual draft required'; END IF;
+   IF TG_OP='INSERT' THEN
+     IF NEW.state<>'draft' THEN RAISE EXCEPTION 'New manual workflow must be draft'; END IF;
+     IF NEW.replaces_journal_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM accounting_journals o JOIN accounting_manual_workflow w ON w.journal_id=o.id
+       WHERE o.id=NEW.replaces_journal_id AND o.book_id=j.book_id AND o.branch_id=j.branch_id AND o.status='cancelled' AND o.prepared_by=j.prepared_by AND o.kind='manual')
+     THEN RAISE EXCEPTION 'Revision requires matching retained cancelled manual original'; END IF;
+     IF j.kind='reversal' AND NOT EXISTS(SELECT 1 FROM accounting_manual_workflow WHERE journal_id=j.reversal_of)
+     THEN RAISE EXCEPTION 'Manual reversal cannot bypass source or opening workflow'; END IF;
+     IF NOT EXISTS(SELECT 1 FROM accounting_audit WHERE journal_id=j.id AND actor_id=j.prepared_by AND action='prepared' AND xmin::text=pg_current_xact_id()::text)
+     THEN RAISE EXCEPTION 'Atomic prepared journal evidence required'; END IF;
+   ELSE
+     IF NEW.book_id<>OLD.book_id OR NEW.journal_id<>OLD.journal_id OR NEW.replaces_journal_id IS DISTINCT FROM OLD.replaces_journal_id
+     THEN RAISE EXCEPTION 'Manual workflow identity is immutable'; END IF;
+     IF OLD.state='draft' AND NEW.state='submitted' THEN
+       SELECT * INTO a FROM accounting_audit WHERE journal_id=j.id AND action='manual_submitted' AND xmin::text=pg_current_xact_id()::text ORDER BY id DESC LIMIT 1;
+       IF a.actor_id IS DISTINCT FROM j.prepared_by OR NOT accounting_has_grant(j.book_id,j.branch_id,a.actor_id,'prepare') THEN RAISE EXCEPTION 'Preparer submission required'; END IF;
+     ELSIF OLD.state='submitted' AND NEW.state='rejected' THEN
+       SELECT * INTO a FROM accounting_audit WHERE journal_id=j.id AND action='manual_rejected' AND xmin::text=pg_current_xact_id()::text ORDER BY id DESC LIMIT 1;
+       IF a.actor_id IS NULL OR a.actor_id=j.prepared_by OR NOT accounting_has_grant(j.book_id,j.branch_id,a.actor_id,'post') THEN RAISE EXCEPTION 'Independent rejection required'; END IF;
+     ELSE RAISE EXCEPTION 'Invalid manual workflow transition'; END IF;
+   END IF;
+ END IF;
+ RETURN NEW;
+END $$;
+
 CREATE OR REPLACE FUNCTION accounting_guard() RETURNS TRIGGER LANGUAGE plpgsql SET search_path FROM CURRENT AS $$
 DECLARE b INTEGER; j accounting_journals%ROWTYPE; approval accounting_audit%ROWTYPE; review JSONB;
 BEGIN
@@ -117,6 +167,7 @@ BEGIN
  IF TG_TABLE_NAME='accounting_journal_lines' THEN
    SELECT * INTO j FROM accounting_journals WHERE id=CASE WHEN TG_OP='DELETE' THEN OLD.journal_id ELSE NEW.journal_id END FOR UPDATE;
    IF j.status<>'draft' THEN RAISE EXCEPTION 'Final journal lines are immutable'; END IF;
+   IF EXISTS(SELECT 1 FROM accounting_manual_workflow WHERE journal_id=j.id) THEN RAISE EXCEPTION 'Reviewed manual payload requires a new immutable revision'; END IF;
    IF TG_OP='UPDATE' AND NEW.journal_id<>OLD.journal_id THEN RAISE EXCEPTION 'Journal line link is immutable'; END IF;
  END IF;
  IF TG_TABLE_NAME='accounting_accounts' AND TG_OP<>'INSERT' THEN
@@ -190,6 +241,9 @@ BEGIN
  IF NEW.status='posted' AND (TG_OP='INSERT' OR NOT accounting_has_grant(NEW.book_id,NEW.branch_id,NEW.posted_by,'post')) THEN
    RAISE EXCEPTION 'Independent posting grant required';
  END IF;
+ IF NEW.status='posted' AND EXISTS(SELECT 1 FROM accounting_manual_workflow WHERE journal_id=NEW.id AND state<>'submitted') THEN
+   RAISE EXCEPTION 'Manual submission required before independent posting';
+ END IF;
  RETURN NEW;
 END $$;
 
@@ -202,6 +256,10 @@ BEGIN
    SELECT * INTO j FROM accounting_journals WHERE id=NEW.journal_id;
  END IF;
  IF j.status='posted' THEN
+   IF EXISTS(SELECT 1 FROM accounting_manual_workflow WHERE journal_id=j.id) AND (
+     EXISTS(SELECT 1 FROM accounting_accounts a LEFT JOIN accounting_manual_account_rules r ON r.account_id=a.id AND r.book_id=a.book_id WHERE a.book_id=j.book_id AND r.account_id IS NULL)
+     OR EXISTS(SELECT 1 FROM accounting_journal_lines l LEFT JOIN accounting_manual_account_rules r ON r.account_id=l.account_id AND r.book_id=l.book_id
+       WHERE l.journal_id=j.id AND r.role IS DISTINCT FROM 'adjustment')) THEN RAISE EXCEPTION 'Reviewed non-control accounts required'; END IF;
    SELECT count(*),coalesce(sum(debit_minor),0),coalesce(sum(credit_minor),0) INTO n,d,c FROM accounting_journal_lines WHERE journal_id=j.id;
    IF n<2 OR d<>c OR d=0 THEN RAISE EXCEPTION 'Posted journal must balance with at least two nonzero lines'; END IF;
    IF EXISTS(SELECT 1 FROM accounting_journal_lines l JOIN accounting_accounts a ON a.id=l.account_id WHERE l.journal_id=j.id AND NOT a.active)
@@ -227,6 +285,11 @@ BEGIN
 END $$;
 
 DO $$ DECLARE t TEXT; BEGIN
+ FOREACH t IN ARRAY ARRAY['accounting_manual_account_rules','accounting_manual_workflow'] LOOP
+   IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=t::regclass AND tgname='accounting_manual_guard') THEN
+     EXECUTE format('CREATE TRIGGER accounting_manual_guard BEFORE INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION accounting_manual_guard()',t);
+   END IF;
+ END LOOP;
  FOREACH t IN ARRAY ARRAY['accounting_book_branches','accounting_accounts','accounting_periods','accounting_grants','accounting_journal_lines','accounting_source_events','accounting_audit'] LOOP
    IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=t::regclass AND tgname='accounting_guard') THEN
      EXECUTE format('CREATE TRIGGER accounting_guard BEFORE INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION accounting_guard()',t);

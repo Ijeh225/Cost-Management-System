@@ -2,6 +2,18 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
+Latest2026-10-12 18:07 WAT: Step9 engineering accepted. Final9isolated cases PASS
+(6manual+3shared),390unit/API PASS/3prior skips, full build/typechecks/OFF and
+dummy built browser acceptance PASS. Inactive commit/push/deployment next; actual
+professional rules/chart/cutover/openings remain unapproved. Step10 not started.
+Latest2026-10-12 18:05 WAT: Step9 local390unit/API and built manual/OFF browser
+checks PASS after adjustment:* identity compatibility correction. Final9owned
+DB regressions running; publication pending. Earlier dated entries are historical.
+Latest2026-10-12 17:44 WAT: Step9 manual workflow implemented through the SAME
+engine; initial6isolated/390unit/API/build/OFF smoke accepted. Final built UI and
+6manual+2shared DB checks running, publication pending. See
+ACCOUNTING_MANUAL_JOURNALS.md for reviewed schedule/control protections and limits.
+Actual official rules/chart/cutover/opening approval still required; switches OFF.
 Latest2026-10-11 22:30 WAT: Step8 engineering accepted and functional187703d
 deployed as exactRailwaycc0d733a-0941-423a-8a92-19dd5f8cb096 SUCCESS.
 Public health/catalog401/deployed OFF exactGLTB zero-native-DB smoke PASS.

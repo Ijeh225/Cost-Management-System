@@ -1,6 +1,73 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-10-11
+## Current Test and Defect Register - Authoritative as of 2026-10-12
+
+### Step 9 Final Controlled Acceptance PASS - 2026-10-12 18:07 WAT
+
+- Final isolated9/9PASS/45filtered,736s:6manual cases and3shared invoice, GL/TB
+  and prior-engine concurrency regressions. Preserved owned namespace/public
+  source assertions and closed isolated tunnel. Earlier identity conflict fixed
+  using adjustment:* without rewriting legacy manual:* identities or fixtures.
+- Full390unit/API PASS/3prior skips (50files), full typechecks/build, built native
+  OFF zero-DB smoke, manual dummy desktop/mobile/accessibility/stable retry and
+  shared report browser regression PASS. Failed validation/revision rollback,
+  rejected version retention, exact reversal, protected controls and grants covered.
+- Native production remains OFF; approved real books and live adjustment posting
+  are NOT tested/activated. Exact inactive deployment confirmation follows push.
+
+### Step 9 Post-Correction Local Acceptance - 2026-10-12 18:05 WAT
+
+- Full50unit files390PASS/3prior skips after adjustment:* correction. Rebuilt
+  native OFF zero-connection smoke and manual built loopback desktop/mobile
+  workflow smoke PASS. Nine isolated DB cases pending; production native OFF.
+- No live manual accounting writes or official approval implied. Publication
+  waits for final owned database acceptance and preservation/cleanup evidence.
+
+### Step 9 Namespace Compatibility Finding - 2026-10-12 17:54 WAT
+
+- Expanded run7PASS/1FAIL/46filtered: all6manual scenarios and shared invoice
+  integration passed; older GL fixture surfaced a regression in newly reserved
+  manual:* event IDs. New reviewed workflow now uses adjustment:*; old engine
+  identities/fixtures preserved. Controlled final9case rerun pending.
+- Namespace/public11source guard and tunnel cleanup passed even on failure.
+  No release pushed/deployed yet; native production still OFF, no live records.
+
+### Step 9 Interface and Build Verification PASS - 2026-10-12 17:51 WAT
+
+- Final50unit files390PASS/3prior skips, full typechecks/build and local rebuilt
+  native OFF zero-connection smoke PASS. Manual dummy-only browser workflow PASS
+  for stable response retry, own submission/no self approval, separate reviewer
+  posting, evidence/audit, control exclusion, branch isolation/refresh/OFF/errors,
+  mobile dialog viewport bounds and accessibility. Screenshots visually reviewed.
+- Prior built GL/TB/CSV/printed snapshot UI regression PASS; no live book totals
+  or live accounting mutation implied. Final8owned DB cases still running.
+- Production native flags independently false/defaultOFF; pre-Step9 remote tag
+  protected at578a43d. Inactive deployment confirmation still pending publication.
+
+### Step 9 Controlled Engineering Verification Started - 2026-10-12 17:15 WAT
+
+- Test the existing engine's manual workflow: exact balanced amounts, evidence,
+  reviewed control-account restrictions, immutable revisions, submission/rejection,
+  independent posting, duplicate/concurrent retries, reversals and GL/TB integration.
+- Verify named grants, book/branch boundaries, stale state and closed periods;
+  blocked actions must leave no audit/financial side effects. Add inactive zero-DB
+  and desktop/mobile interface checks. Isolated fixtures only, no production books.
+- Tests and deployment pending. Step8 acceptance remains closed; official native
+  accounting inactive until separately approved rules/openings/cutover.
+
+### Step 9 Initial Acceptance - 2026-10-12 17:44 WAT
+
+- Initial6owned DB scenarios PASS: exact manual/reversal GLTB, duplicate prepare/
+  submit/post/reject, rejection/revision retention, protected/unreviewed controls,
+  branch/grants/revocation/closed period, source bypass refusal, inactive gates and
+  repeatable schema. 481s;48 prior scenarios filtered. Owned schema cleanup,
+  eleven public isolated source aggregates and tunnel closure passed.
+- Unit/API390PASS/3prior skips, typechecks/full build/local inactive zero-DB smoke
+  PASS. Initial5API fixture failures were missing CSRF; fixed fixture, not auth.
+- Built UI found ambiguous select labels; explicit accessible names added. Final
+  browser test and6manual+2shared isolated source/report cases still running.
+- No fresh official/live financial acceptance or production write inferred. OFF
+  deployment/publication still pending. Current real accounting approvals required.
 
 ### Step 8 Exact Inactive Deployment Acceptance - 2026-10-11 22:30 WAT
 

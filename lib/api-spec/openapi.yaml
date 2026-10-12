@@ -19,6 +19,116 @@ tags:
     description: Container charges
 
 paths:
+  /accounting/books/{bookId}/manual:
+    get:
+      operationId: getManualAccountingWorkspace
+      tags: [accounting]
+      summary: Scoped manual adjustment queue, approved account protection and named permissions
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+      responses:
+        '200':
+          description: One branch; first 200 entries with explicit truncation warning; inactive returns 503
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualAccountingWorkspace' }
+    post:
+      operationId: prepareManualAccountingJournal
+      tags: [accounting]
+      summary: Prepare or atomically revise an immutable evidence-backed manual draft; never posts
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ManualAccountingRequest' }
+      responses:
+        '200':
+          description: Same request identity retries return the same journal; changed payload conflicts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualAccountingResult' }
+  /accounting/books/{bookId}/manual/{journalId}:
+    get:
+      operationId: getManualAccountingJournal
+      tags: [accounting]
+      summary: Original scoped journal version, evidence references, lines and immutable audit
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+        - $ref: '#/components/parameters/ManualAccountingJournalId'
+      responses:
+        '200':
+          description: Draft, submitted, rejected, cancelled or posted manual journal version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualAccountingJournal' }
+  /accounting/books/{bookId}/manual/{journalId}/action:
+    post:
+      operationId: actOnManualAccountingJournal
+      tags: [accounting]
+      summary: Submit, independently reject/approve and post, or cancel a manual draft with audit evidence
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+        - $ref: '#/components/parameters/ManualAccountingJournalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ManualAccountingAction' }
+      responses:
+        '200':
+          description: Atomic same-engine transition, independent grant required; no silent posted edits
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualAccountingResult' }
+  /accounting/books/{bookId}/manual/{journalId}/reversal:
+    post:
+      operationId: reverseManualAccountingJournal
+      tags: [accounting]
+      summary: Prepare exact linked full reversal for separate independent review; never reverses source records
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+        - $ref: '#/components/parameters/ManualAccountingJournalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ManualAccountingReversal' }
+      responses:
+        '200':
+          description: Exactly one active reversal, preserving original date, accounts and evidence
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualAccountingResult' }
+  /accounting/books/{bookId}/manual/accounts/review:
+    post:
+      operationId: reviewManualAccountingAccounts
+      tags: [accounting]
+      summary: Actual owner/accountant review classifies whole-book controls; immutable classifications
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ManualAccountingAccountReview' }
+      responses:
+        '200':
+          description: Owner plus configure grants in every book branch required; no automatic approval
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reviewed]
+                properties:
+                  reviewed: { type: boolean }
   /accounting/catalog:
     get:
       operationId: getAccountingCatalog
@@ -1265,6 +1375,8 @@ paths:
 
 components:
   parameters:
+    ManualAccountingBranch: { name: branchId, in: query, required: true, schema: { type: integer, minimum: 1 } }
+    ManualAccountingJournalId: { name: journalId, in: path, required: true, schema: { type: integer, minimum: 1 } }
     AccountingBookId: { name: bookId, in: path, required: true, schema: { type: integer, minimum: 1 } }
     AccountingBranch:
       name: branchId
@@ -1272,6 +1384,118 @@ components:
       description: Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
       schema: { type: string }
   schemas:
+    ManualAccountingLine:
+      type: object
+      required: [accountId, debit, credit]
+      properties:
+        accountId: { type: integer }
+        debit: { type: string, description: Non-negative exact decimal string }
+        credit: { type: string, description: Non-negative exact decimal string }
+        memo: { type: string }
+    ManualAccountingRequest:
+      type: object
+      required: [requestId, accountingDate, narration, evidence, adjustmentType, calculationEvidence, evidenceReferences, lines]
+      properties:
+        requestId: { type: string }
+        accountingDate: { type: string }
+        narration: { type: string }
+        evidence: { type: string }
+        adjustmentType: { type: string, enum: [accrual, depreciation, prepayment, reclassification, correction] }
+        calculationEvidence: { type: string }
+        evidenceReferences: { type: array, items: { type: string } }
+        replacesJournalId: { type: integer }
+        lines: { type: array, items: { $ref: '#/components/schemas/ManualAccountingLine' } }
+    ManualAccountingResult:
+      type: object
+      required: [id]
+      properties:
+        id: { type: integer }
+    ManualAccountingAction:
+      type: object
+      required: [action, reason]
+      properties:
+        action: { type: string, enum: [submit, reject, post, cancel] }
+        reason: { type: string }
+    ManualAccountingReversal:
+      type: object
+      required: [date, reason]
+      properties:
+        date: { type: string }
+        reason: { type: string }
+    ManualAccountingAccountReview:
+      type: object
+      required: [ownerEvidence, accountantEvidence, accounts]
+      properties:
+        ownerEvidence: { type: string }
+        accountantEvidence: { type: string }
+        accounts:
+          type: array
+          items:
+            type: object
+            required: [accountId, role]
+            properties:
+              accountId: { type: integer }
+              role: { type: string, enum: [adjustment, protected] }
+    ManualAccountingEntry:
+      type: object
+      required: [id, date, narration, state, evidence, preparedBy]
+      properties:
+        id: { type: integer }
+        date: { type: string }
+        narration: { type: string }
+        state: { type: string, enum: [draft, submitted, rejected, cancelled, posted] }
+        evidence: { type: string }
+        preparedBy: { type: integer }
+        postedBy: { type: [integer, 'null'] }
+        reversalOf: { type: [integer, 'null'] }
+        replacesJournalId: { type: [integer, 'null'] }
+    ManualAccountingJournal:
+      allOf:
+        - $ref: '#/components/schemas/ManualAccountingEntry'
+        - type: object
+          required: [currency, lines, audit]
+          properties:
+            currency: { type: string }
+            lines: { type: array, items: { $ref: '#/components/schemas/ManualAccountingLine' } }
+            audit:
+              type: array
+              items:
+                type: object
+                required: [actorId, action, reason, createdAt]
+                properties:
+                  actorId: { type: integer }
+                  action: { type: string }
+                  reason: { type: string }
+                  createdAt: { type: string }
+    ManualAccountingWorkspace:
+      type: object
+      required: [book, branchId, permissions, accounts, accountReviewComplete, journals, truncated]
+      properties:
+        book:
+          type: object
+          required: [id, name, currency, cutoverDate]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            currency: { type: string }
+            cutoverDate: { type: string }
+        branchId: { type: integer }
+        permissions: { type: array, items: { type: string } }
+        accounts:
+          type: array
+          items:
+            type: object
+            required: [id, code, name, category, active, role]
+            properties:
+              id: { type: integer }
+              code: { type: string }
+              name: { type: string }
+              category: { type: string }
+              active: { type: boolean }
+              role: { type: [string, 'null'], enum: [adjustment, protected, null] }
+        accountReviewComplete: { type: boolean }
+        journals: { type: array, items: { $ref: '#/components/schemas/ManualAccountingEntry' } }
+        truncated: { type: boolean }
     AccountingBook:
       type: object
       required: [id, name, currency, cutoverDate]

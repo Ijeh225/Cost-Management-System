@@ -12,6 +12,7 @@ import { validateOperationalControls } from "./accounting-operational-controls.j
 import { buildReviewedOpening, type ReviewedOpening } from "./accounting-reviewed-opening.js";
 import { sourceCoverage, type ReconciliationControl } from "./accounting-source-coverage.js";
 import { buildAccountingReport, validateReportFilter, type ReportFilter, type ReportAccount, type ReportLine } from "./accounting-reports.js";
+import { manualInput, mappedControlAccounts, type ManualAdjustment } from "./accounting-manual.js";
 
 type Database = Pick<typeof pool, "connect">;
 async function connectClient(database: Database) { return database.connect(); }
@@ -144,6 +145,11 @@ export class NativeAccounting {
     const normalized = normalizeJournal(input); const hash = journalHash(normalized);
     await this.permission(client, input.bookId, input.branchId, actorId, "prepare");
     if (reversalOf !== null) await this.permission(client, input.bookId, input.branchId, actorId, "reverse");
+    if(input.eventKey.startsWith("source:")) {
+      const controls=mappedControlAccounts(JSON.parse(input.evidence).mapping);
+      const unsafe=(await client.query("SELECT account_id FROM accounting_manual_account_rules WHERE book_id=$1 AND role='adjustment' AND account_id=ANY($2::int[])",[input.bookId,controls])).rows;
+      requireAccounting(unsafe.length===0,"PROTECTED_ACCOUNT","A source control account cannot be classified for freehand adjustments");
+    }
     const existing = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE book_id=$1 AND event_key=$2", [input.bookId, normalized.eventKey])).rows[0];
     if (existing) {
       requireAccounting(existing.payload_hash === hash && existing.prepared_by === actorId
@@ -176,7 +182,7 @@ export class NativeAccounting {
     return journal;
   }
   async prepareJournal(actorId: number, input: JournalInput) {
-    requireAccounting(!/^(source|opening):/.test(input.eventKey), "RESERVED_EVENT", "Source and opening identities require their dedicated reviewed workflow");
+    requireAccounting(!/^(source|opening|adjustment):/.test(input.eventKey), "RESERVED_EVENT", "Source, opening and reviewed-adjustment identities require their dedicated workflow");
     normalizeJournal(input);
     return this.transaction(input.bookId, client => this.prepare(client, actorId, input));
   }
@@ -538,14 +544,20 @@ export class NativeAccounting {
       return {...journal,lines:lines.map(l=>({...l,debit:minorToMoney(l.debit),credit:minorToMoney(l.credit)}))};
     },true);
   }
-  async approveAndPost(bookId: number, branchId: number, actorId: number, journalId: number, reason: string) {
+  async approveAndPost(bookId: number, branchId: number, actorId: number, journalId: number, reason: string, manualOnly=false) {
     return this.transaction(bookId, async client => {
       await this.permission(client, bookId, branchId, actorId, "post");
       const journal = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE id=$1 AND book_id=$2 AND branch_id=$3 FOR UPDATE",
         [journalId, bookId, branchId])).rows[0];
       requireAccounting(journal && journal.prepared_by !== actorId, "SELF_APPROVAL", "A different authorised approver is required");
+      const workflow=(await client.query("SELECT state FROM accounting_manual_workflow WHERE journal_id=$1",[journalId])).rows[0];
+      requireAccounting(!manualOnly || workflow,"NOT_FOUND","Manual workflow journal required");
       if (journal.status === "posted") return journal;
       requireAccounting(journal.status === "draft", "JOURNAL_STATE", "Only draft journals can be posted");
+      if(workflow) {
+        requireAccounting(workflow.state==="submitted","REVIEW_REQUIRED","Submit this exact version before independent approval/posting");
+        await this.manualAccounts(client,bookId,journalId);
+      }
       if (journal.event_key.startsWith("source:")) {
         const evidence = (await client.query("SELECT evidence FROM accounting_journals WHERE id=$1", [journalId])).rows[0];
         const saved = JSON.parse(evidence.evidence);
@@ -572,6 +584,8 @@ export class NativeAccounting {
       const journal = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE id=$1 AND book_id=$2 AND branch_id=$3 FOR UPDATE",
         [journalId, bookId, branchId])).rows[0];
       requireAccounting(journal?.status === "draft", "JOURNAL_STATE", "Only a draft can be cancelled");
+      const review=(await client.query("SELECT state FROM accounting_manual_workflow WHERE journal_id=$1",[journalId])).rows[0];
+      requireAccounting(!review || ["draft","rejected"].includes(review.state),"JOURNAL_STATE","Submitted manual versions require independent review before cancellation");
       if (journal.prepared_by !== actorId) await this.permission(client, bookId, branchId, actorId, "configure");
       await client.query("UPDATE accounting_journals SET status='cancelled' WHERE id=$1", [journalId]);
       await this.audit(client, bookId, actorId, "cancelled", reason, branchId, journalId);
@@ -585,6 +599,11 @@ export class NativeAccounting {
         [originalId, bookId, branchId])).rows[0];
       requireAccounting(original, "INVALID_REVERSAL", "Posted original in this book/branch required");
       requireAccounting(!original.event_key.startsWith("source:"), "SOURCE_REVIEW_REQUIRED", "Source settlements require a matching operational reversal, not an unrelated manual offset");
+      return this.reversalDraft(client,bookId,branchId,actorId,original,date,reason);
+    });
+  }
+  private async reversalDraft(client:Client,bookId:number,branchId:number,actorId:number,original:JournalRow,date:string,reason:string) {
+      const originalId=original.id;
       const active = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE reversal_of=$1 AND status<>'cancelled'", [originalId])).rows[0];
       const attempts = (await client.query("SELECT count(*)::int n FROM accounting_journals WHERE reversal_of=$1", [originalId])).rows[0]!.n as number;
       // A cancelled attempt remains immutable; a corrected draft gets a new event link.
@@ -593,7 +612,6 @@ export class NativeAccounting {
       return this.prepare(client, actorId, { bookId, branchId, currency: original.currency, accountingDate: date,
         eventKey, narration: `Reversal of journal ${originalId}`, evidence: reason,
         lines: lines.map(l => ({ accountId: l.account_id, debit: minorToMoney(l.credit_minor), credit: minorToMoney(l.debit_minor), memo: l.memo })) }, originalId);
-    });
   }
   async changePeriod(bookId: number, actorId: number, periodId: number, action: "close" | "reopen", review: {
     evidence: string; sourceCoverageComplete: boolean; reconciled: boolean; unresolvedMappings: number;
@@ -623,6 +641,127 @@ export class NativeAccounting {
       requireAccounting(journal, "NOT_FOUND", "Journal not found in this scope");
       const lines = (await client.query<{ account_id: number; debit_minor: string; credit_minor: string; memo: string }>("SELECT account_id,debit_minor::text,credit_minor::text,memo FROM accounting_journal_lines WHERE journal_id=$1 ORDER BY id", [journalId])).rows;
       return { ...journal, lines: lines.map(l => ({ accountId: l.account_id, debit: minorToMoney(l.debit_minor), credit: minorToMoney(l.credit_minor), memo: l.memo })) };
+    });
+  }
+
+  private async manualAccounts(client:Client,bookId:number,journalId?:number,accountIds?:number[]) {
+    const unreviewed=(await client.query(`SELECT a.id FROM accounting_accounts a LEFT JOIN accounting_manual_account_rules r
+      ON r.book_id=a.book_id AND r.account_id=a.id WHERE a.book_id=$1 AND r.account_id IS NULL LIMIT 1`,[bookId])).rows;
+    requireAccounting(unreviewed.length===0,"ACCOUNT_REVIEW_REQUIRED","Review the entire chart: bank, customer, supplier and tax controls are protected, never inferred from names");
+    const ids=accountIds??(await client.query("SELECT account_id FROM accounting_journal_lines WHERE journal_id=$1",[journalId])).rows.map(l=>l.account_id);
+    const approved=(await client.query(`SELECT a.id FROM accounting_accounts a JOIN accounting_manual_account_rules r ON r.account_id=a.id AND r.book_id=a.book_id
+      JOIN accounting_books b ON b.id=a.book_id WHERE a.book_id=$1 AND a.active AND r.role='adjustment' AND r.policy_version=b.policy_version AND a.id=ANY($2::int[])`,[bookId,ids])).rows;
+    requireAccounting(new Set(approved.map(a=>a.id)).size===new Set(ids).size,"PROTECTED_ACCOUNT","Only explicitly reviewed active non-control adjustment accounts may be used; use source workflows for control accounts");
+  }
+  async reviewManualAccounts(bookId:number,actorId:number,review:{ownerEvidence:string;accountantEvidence:string;accounts:{accountId:number;role:"adjustment"|"protected"}[]}) {
+    return this.transaction(bookId,async client=>{
+      await this.bookPermission(client,bookId,actorId,"configure");
+      requireAccounting((await this.actor(client,actorId)).authority_level==="super_admin","FORBIDDEN","Owner and accountant review required");
+      const book=(await client.query("SELECT status,policy_version FROM accounting_books WHERE id=$1",[bookId])).rows[0];
+      requireAccounting(book?.status==="approved","BOOK_NOT_APPROVED","Approved book required");
+      const accounts=(await client.query("SELECT id FROM accounting_accounts WHERE book_id=$1 ORDER BY id",[bookId])).rows;
+      requireAccounting(review.accounts.length===accounts.length && new Set(review.accounts.map(a=>a.accountId)).size===accounts.length
+        && accounts.every(a=>review.accounts.some(r=>r.accountId===a.id && ["adjustment","protected"].includes(r.role))),"ACCOUNT_REVIEW_REQUIRED","Explicit complete chart classification required");
+      requireAccounting(typeof review.ownerEvidence==="string" && review.ownerEvidence.trim().length>0 && review.ownerEvidence.length<=1000
+        && typeof review.accountantEvidence==="string" && review.accountantEvidence.trim().length>0 && review.accountantEvidence.length<=1000,"EVIDENCE_REQUIRED","Actual owner and accountant evidence required, not a default approval");
+      const sources=(await client.query("SELECT evidence FROM accounting_journals WHERE book_id=$1 AND event_key LIKE 'source:%'",[bookId])).rows;
+      const controls=new Set(sources.flatMap(s=>mappedControlAccounts(JSON.parse(s.evidence).mapping)));
+      requireAccounting(review.accounts.every(a=>!controls.has(a.accountId) || a.role==="protected"),"PROTECTED_ACCOUNT","Known source control accounts must remain protected");
+      const saved=(await client.query("SELECT account_id,role FROM accounting_manual_account_rules WHERE book_id=$1",[bookId])).rows;
+      requireAccounting(saved.every(a=>review.accounts.some(r=>r.accountId===a.account_id && r.role===a.role)),"ACCOUNT_REVIEW_REQUIRED","Existing approved classifications cannot be silently changed");
+      const evidence=JSON.stringify({ownerEvidence:review.ownerEvidence,accountantEvidence:review.accountantEvidence,accounts:review.accounts});
+      await this.audit(client,bookId,actorId,"manual_accounts_reviewed",JSON.stringify({ownerEvidence:review.ownerEvidence,accountantEvidence:review.accountantEvidence}));
+      for(const rule of review.accounts.filter(a=>!saved.some(s=>s.account_id===a.accountId)))
+        await client.query("INSERT INTO accounting_manual_account_rules(book_id,account_id,role,policy_version,evidence,approved_by) VALUES($1,$2,$3,$4,$5,$6)",
+          [bookId,rule.accountId,rule.role,book.policy_version,evidence.length<=4000 ? evidence : JSON.stringify({ownerEvidence:review.ownerEvidence,accountantEvidence:review.accountantEvidence}),actorId]);
+      return {reviewed:true};
+    });
+  }
+  async manualWorkspace(bookId:number,branchId:number,actorId:number) {
+    return this.transaction(bookId,async client=>{
+      const scope=await this.reportingScope(client,bookId,branchId,actorId);
+      const permissions:string[]=[];
+      for(const p of ["configure","prepare","post","reverse"] as const)
+        if((await client.query("SELECT accounting_has_grant($1,$2,$3,$4) allowed",[bookId,branchId,actorId,p])).rows[0]?.allowed) permissions.push(p);
+      const accounts=(await client.query(`SELECT a.id,a.code,a.name,a.category,a.active,r.role FROM accounting_accounts a
+        LEFT JOIN accounting_manual_account_rules r ON r.account_id=a.id AND r.book_id=a.book_id WHERE a.book_id=$1 ORDER BY a.code`,[bookId])).rows;
+      const journals=(await client.query(`SELECT j.id,j.accounting_date::text AS date,j.narration,j.prepared_by AS "preparedBy",j.posted_by AS "postedBy",j.reversal_of AS "reversalOf",
+        CASE WHEN j.status='draft' THEN w.state ELSE j.status END AS state,w.replaces_journal_id AS "replacesJournalId",j.evidence
+        FROM accounting_journals j JOIN accounting_manual_workflow w ON w.journal_id=j.id
+        WHERE j.book_id=$1 AND j.branch_id=$2 ORDER BY j.id DESC LIMIT 201`,[bookId,branchId])).rows;
+      return {book:{id:bookId,name:scope.book.name,currency:scope.book.currency,cutoverDate:scope.book.policy.cutoverDate},branchId,permissions,accounts,
+        accountReviewComplete:accounts.length>0 && accounts.every(a=>a.role!==null),journals:journals.slice(0,200),truncated:journals.length>200};
+    },true);
+  }
+  async manualDetails(bookId:number,branchId:number,actorId:number,journalId:number) {
+    return this.transaction(bookId,async client=>{
+      await this.reportingScope(client,bookId,branchId,actorId);
+      const journal=(await client.query(`SELECT j.id,j.accounting_date::text AS date,j.narration,j.currency,j.evidence,j.prepared_by AS "preparedBy",j.posted_by AS "postedBy",
+        j.reversal_of AS "reversalOf",CASE WHEN j.status='draft' THEN w.state ELSE j.status END AS state,w.replaces_journal_id AS "replacesJournalId"
+        FROM accounting_journals j JOIN accounting_manual_workflow w ON w.journal_id=j.id WHERE j.id=$1 AND j.book_id=$2 AND j.branch_id=$3`,[journalId,bookId,branchId])).rows[0];
+      requireAccounting(journal,"NOT_FOUND","Manual journal not found in this scope");
+      const lines=(await client.query("SELECT account_id AS \"accountId\",debit_minor::text,credit_minor::text,memo FROM accounting_journal_lines WHERE journal_id=$1 ORDER BY id",[journalId])).rows;
+      const audit=(await client.query("SELECT actor_id AS \"actorId\",action,reason,created_at AS \"createdAt\" FROM accounting_audit WHERE journal_id=$1 ORDER BY id",[journalId])).rows;
+      return {...journal,lines:lines.map(l=>({accountId:l.accountId,debit:minorToMoney(l.debit_minor),credit:minorToMoney(l.credit_minor),memo:l.memo})),audit};
+    },true);
+  }
+  async prepareManual(bookId:number,branchId:number,actorId:number,request:ManualAdjustment) {
+    return this.transaction(bookId,async client=>{
+      await this.reportingScope(client,bookId,branchId,actorId);
+      const book=(await client.query("SELECT currency FROM accounting_books WHERE id=$1",[bookId])).rows[0];
+      const input=manualInput(bookId,branchId,book.currency,request);
+      await this.manualAccounts(client,bookId,undefined,request.lines.map(l=>l.accountId));
+      const existing=(await client.query("SELECT id FROM accounting_journals WHERE book_id=$1 AND event_key=$2",[bookId,input.eventKey])).rows[0];
+      if(existing) return this.prepare(client,actorId,input);
+      if(request.replacesJournalId) {
+        const original=(await client.query(`SELECT j.status,j.prepared_by,j.kind,w.state FROM accounting_journals j JOIN accounting_manual_workflow w ON w.journal_id=j.id
+          WHERE j.id=$1 AND j.book_id=$2 AND j.branch_id=$3 FOR UPDATE OF j,w`,[request.replacesJournalId,bookId,branchId])).rows[0];
+        requireAccounting(original?.status==="draft" && original.kind==="manual" && ["draft","rejected"].includes(original.state) && original.prepared_by===actorId,"JOURNAL_STATE","Only your original draft/rejected version can be revised; reversals, submitted and posted versions cannot change");
+        await this.permission(client,bookId,branchId,actorId,"prepare");
+        await client.query("UPDATE accounting_journals SET status='cancelled' WHERE id=$1",[request.replacesJournalId]);
+        await this.audit(client,bookId,actorId,"cancelled",`Superseded by reviewed request ${request.requestId}`,branchId,request.replacesJournalId);
+      }
+      const journal=await this.prepare(client,actorId,input);
+      await client.query("INSERT INTO accounting_manual_workflow(journal_id,book_id,replaces_journal_id) VALUES($1,$2,$3)",[journal.id,bookId,request.replacesJournalId??null]);
+      return journal;
+    });
+  }
+  async manualAction(bookId:number,branchId:number,actorId:number,journalId:number,action:"submit"|"reject"|"post"|"cancel",reason:string) {
+    requireAccounting(["submit","reject","post","cancel"].includes(action),"INVALID_REQUEST","Supported manual workflow action required");
+    if(action==="post") return this.approveAndPost(bookId,branchId,actorId,journalId,reason,true);
+    return this.transaction(bookId,async client=>{
+      await this.reportingScope(client,bookId,branchId,actorId);
+      await this.permission(client,bookId,branchId,actorId,action==="reject" ? "post" : "prepare");
+      const journal=(await client.query(`SELECT j.*,w.state FROM accounting_journals j JOIN accounting_manual_workflow w ON w.journal_id=j.id
+        WHERE j.id=$1 AND j.book_id=$2 AND j.branch_id=$3 FOR UPDATE OF j,w`,[journalId,bookId,branchId])).rows[0];
+      requireAccounting(journal,"NOT_FOUND","Manual workflow required");
+      requireAccounting(action==="reject" ? journal.prepared_by!==actorId : journal.prepared_by===actorId,"SELF_APPROVAL","Independent reviewer / original preparer required");
+      if(action==="cancel" && journal.status==="cancelled" || action==="submit" && journal.status==="draft" && journal.state==="submitted"
+        || action==="reject" && journal.status==="draft" && journal.state==="rejected") return {id:journalId};
+      requireAccounting(journal.status==="draft" && (action==="reject" ? journal.state==="submitted" : ["draft","rejected"].includes(journal.state)),"JOURNAL_STATE","Journal is not in the required review state");
+      if(action==="submit") {
+        requireAccounting(journal.state==="draft","JOURNAL_STATE","Revise rejected journals into a new draft before submission");
+        await this.manualAccounts(client,bookId,journalId);
+      }
+      await this.audit(client,bookId,actorId,action==="cancel" ? "cancelled" : action==="submit" ? "manual_submitted" : "manual_rejected",reason,branchId,journalId);
+      if(action==="cancel") await client.query("UPDATE accounting_journals SET status='cancelled' WHERE id=$1",[journalId]);
+      else await client.query("UPDATE accounting_manual_workflow SET state=$2 WHERE journal_id=$1",[journalId,action==="submit" ? "submitted" : "rejected"]);
+      return {id:journalId};
+    });
+  }
+  async prepareManualReversal(bookId:number,branchId:number,actorId:number,originalId:number,date:string,reason:string) {
+    accountingDate(date);
+    return this.transaction(bookId,async client=>{
+      await this.reportingScope(client,bookId,branchId,actorId);
+      await this.permission(client,bookId,branchId,actorId,"reverse");
+      const original=(await client.query(`SELECT j.* FROM accounting_journals j JOIN accounting_manual_workflow w ON w.journal_id=j.id
+        WHERE j.id=$1 AND j.book_id=$2 AND j.branch_id=$3 AND j.status='posted' AND j.kind='manual'`,[originalId,bookId,branchId])).rows[0];
+      requireAccounting(original,"INVALID_REVERSAL","Only a posted original manual adjustment can be reversed here; source and opening entries use dedicated workflows");
+      await this.manualAccounts(client,bookId,originalId);
+      const journal=await this.reversalDraft(client,bookId,branchId,actorId,original,date,reason);
+      if(!(await client.query("SELECT journal_id FROM accounting_manual_workflow WHERE journal_id=$1",[journal.id])).rowCount)
+        await client.query("INSERT INTO accounting_manual_workflow(journal_id,book_id) VALUES($1,$2)",[journal.id,bookId]);
+      return journal;
     });
   }
 }
