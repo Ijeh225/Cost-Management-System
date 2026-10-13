@@ -1,6 +1,38 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-10-12
+## Current Test and Defect Register - Authoritative as of 2026-10-13
+
+### Opening Setup Controlled Acceptance Authorised - 2026-10-13 16:36 WAT
+
+- Test complete chart/zeros, exact balance, dates/scope/current grants, distinct
+  reviewer, rejection/correction retention, idempotency/concurrency, mandatory
+  initial readiness and matching GL/TB. Use owned isolated/dummy browser fixtures.
+- Owner confirms staff not launched and existing figures test-only. Future cleanup
+  not performed/implemented; no live deletion, source rewrite or native activation.
+- New opening work pending. Earlier Step9 acceptance retained; VAT/Step10 separate.
+
+### Setup Verification Sequence Proposed - 2026-10-13 16:09 WAT
+
+- Proposed, NOT performed: isolated opening-entry/reviewer/readiness acceptance,
+  typed VAT/purchase treatment and direct-cost mappings, then Step10 report
+  reconciliation. Reuse existing engine acceptance; no duplicate live fixtures.
+- Real date/chart/balances/tax evidence required for activation, not for controlled
+  isolated development. Owner asked next steps only; no code or live data changed.
+
+### Accounting Policy Source Review / Verification Still Pending - 2026-10-13 16:03 WAT
+
+- Recorded four owner requirements in ACCOUNTING_POLICY_REQUIREMENTS_2026-10-13.md.
+  Source inspection, NOT new live write acceptance: reviewed opening/cutover
+  engine exists; public opening setup/whole-chart-zero completeness/mandatory
+  verified first-posting gate and typed VAT/purchase-tax treatment remain required.
+- These are new setup/policy requirements, not reproduced production defects;
+  do not renumber/reopen accepted ACCT-001..007 or Steps6-9 engineering tests.
+- No balances, flags, source rows or test fixtures changed. Step9 acceptance
+  retained. Future controlled checks must cover approved expense heads, taxable/
+  zero-rated/exempt and inclusive VAT, recovery rules, opening permissions/current
+  reviewer/readiness/duplicates/date/scope and no historic cash double counting.
+- Exact go-live date, all-GL/bank opening schedule and actual tax/approval evidence
+  still outstanding. No legal exemption or fresh live financial totals verified.
 
 ### Step 9 Exact Inactive Deployment PASS - 2026-10-12 18:18 WAT
 

@@ -2,6 +2,13 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
+Latest2026-10-13 16:03 WAT: four owner policy requirements recorded in
+ACCOUNTING_POLICY_REQUIREMENTS_2026-10-13.md. Direct expense treatment specified;
+service exemption stated but professional basis needed, applicable costVAT7.5%
+and typed tax categories required. Exact application go-live/openings outstanding.
+Reuse reviewed opening engine; public opening setup/mandatory verified readiness
+and structured VAT extension gaps identified. Documentation only, no activation
+or Step10 implementation. Earlier Step9 inactive engineering acceptance retained.
 Latest2026-10-12 18:18 WAT: Step9 engineering COMPLETE and functional710f58e
 deployed as exactRailway85a1facf-8e6b-40eb-82c9-4e6fb7bd3a76 SUCCESS. Live
 health/manual401/deployed updated zero-DB OFF smoke PASS. Both switches inactive.

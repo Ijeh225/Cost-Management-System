@@ -1,6 +1,61 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-10-12
+## Current Work Register - Authoritative as of 2026-10-13
+
+### Opening Setup Authorised / Test-Only Launch Boundary - 2026-10-13 16:36 WAT
+
+- Owner authorises building opening entry/verification; accounts personnel will
+  provide figures. Owner confirms all current records remain test data and staff
+  launch has not occurred. Real commencement date is a future explicit decision,
+  not any earlier deployment/test date. No official balances supplied or guessed.
+- Future clearing of test records is a separate backed-up launch operation,
+  not an instruction to delete now. Preserve owner access, configuration, code,
+  checkpoints and evidence; no blanket production deletion implemented here.
+- Scope now: approved book/branch Opening Balances UI/API through existing engine,
+  complete account/zero evidence, independent verification, immutable corrections
+  and mandatory readiness before forward native posting. Zero setup must not
+  manufacture a financial journal. Structured VAT and Step10 remain separate.
+- Preserve current documentation updates, create verified pre-work checkpoint,
+  implement and accept isolated/API/UI controls, publish INACTIVE with exact proof.
+  No production schema/flags or official financial writes authorised this turn.
+
+### Recommended Setup Prerequisites / Next Action - 2026-10-13 16:09 WAT
+
+- Owner asks next action, not implementation. Recommend first extending the
+  existing opening engine with authorised entry, independent verification and
+  mandatory readiness UI/API; then structured VAT and explicit direct-cost mapping.
+- Building/testing these controls may proceed when instructed while Head of
+  Accounts prepares actual dated balances. Actual chart/date/tax approvals remain
+  activation gates; no fabricated approvals, dates or production fixtures.
+- Step10 Balance Sheet/Management Accounts remains the next reporting roadmap;
+  these setup prerequisites do not renumber completed Steps6-9. Verify setup and
+  reports with isolated fixtures before real opening approval/authorised activation.
+- Documentation-only proposed sequence recorded; no implementation, new tests,
+  commit/push/deployment or official activation performed in this discussion.
+
+### Owner Accounting Requirements / Setup Gaps Recorded - 2026-10-13 16:03 WAT
+
+- Owner directs duty/shipping/terminal direct expenses, services stated exempt,
+  applicable taxable cost VAT7.5%, separate taxable/zero-rated/exempt classifications,
+  official application go-live commencement and Head of Accounts' all-GL/bank
+  openings entered/verified by authorised personnel before live accounting.
+- These are recorded business requirements, not professional exemption evidence
+  or complete book/chart/cutover approval. Exact YYYY-MM-DD go-live and dated
+  balances not supplied. Do not assume today/deployment or replay existing test data.
+- Source review: existing opening preview/preparation/independent posting and
+  cutover engine reusable. Public opening setup screen/API and mandatory reviewed
+  initialisation before first forward posting absent. Pending-opening/late-opening
+  guards alone do not satisfy that stronger requirement. No duplicate engine needed.
+- Invoice rate/amount and output-VAT mapping exist, but no typed transaction
+  taxable/zero-rated/exempt classification or complete purchase VAT treatment.
+  Explicit source/expense-head mapping and tax recovery/cost rules require approval.
+- Official Act checked for taxable7.5%, exempt/zero distinctions and conditional
+  input credit; company-specific exemption not verified. See
+  ACCOUNTING_POLICY_REQUIREMENTS_2026-10-13.md for sources, gaps and next actions.
+- Documentation only: no code/production data/schema/flags changed or new live
+  tests performed. Step9 accepted engineering retained; actual accounting remains
+  inactive per last verified release. Step10 not started. Await missing date,
+  opening schedule/professional evidence and implementation/activation instruction.
 
 ### Step 9 Deployed INACTIVE / Exact Resume Point - 2026-10-12 18:18 WAT
 
