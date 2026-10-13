@@ -22,6 +22,7 @@ import type {
   AccountingOptions,
   AccountingReport,
   ActOnManualAccountingJournalParams,
+  ActOnOpeningSetupParams,
   AnalyticsResponse,
   ApprovalQueueItem,
   AuditEntry,
@@ -57,6 +58,8 @@ import type {
   GetManualAccountingJournalParams,
   GetManualAccountingWorkspaceParams,
   GetNativeAccountingReportParams,
+  GetOpeningSetupVersionParams,
+  GetOpeningSetupWorkspaceParams,
   HealthStatus,
   IntelligenceResponse,
   JobOverviewResponse,
@@ -74,7 +77,15 @@ import type {
   ManualAccountingWorkspace,
   MessageResponse,
   MyTasksResponse,
+  OpeningSetupAction,
+  OpeningSetupDetails,
+  OpeningSetupPreview,
+  OpeningSetupRequest,
+  OpeningSetupResult,
+  OpeningSetupWorkspace,
   PrepareManualAccountingJournalParams,
+  PrepareOpeningSetupParams,
+  PreviewOpeningSetupParams,
   RecordDutyPaymentRequest,
   RejectSectionRequest,
   ReverseDutyPaymentRequest,
@@ -103,6 +114,610 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export const getGetOpeningSetupWorkspaceUrl = (
+  bookId: number,
+  params: GetOpeningSetupWorkspaceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/opening-balances?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/opening-balances`;
+};
+
+export const getOpeningSetupWorkspace = async (
+  bookId: number,
+  params: GetOpeningSetupWorkspaceParams,
+  options?: RequestInit,
+): Promise<OpeningSetupWorkspace> => {
+  return customFetch<OpeningSetupWorkspace>(
+    getGetOpeningSetupWorkspaceUrl(bookId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetOpeningSetupWorkspaceQueryKey = (
+  bookId: number,
+  params?: GetOpeningSetupWorkspaceParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/opening-balances`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetOpeningSetupWorkspaceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOpeningSetupWorkspace>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetOpeningSetupWorkspaceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOpeningSetupWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetOpeningSetupWorkspaceQueryKey(bookId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getOpeningSetupWorkspace>>
+  > = ({ signal }) =>
+    getOpeningSetupWorkspace(bookId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOpeningSetupWorkspace>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOpeningSetupWorkspaceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOpeningSetupWorkspace>>
+>;
+export type GetOpeningSetupWorkspaceQueryError = ErrorType<unknown>;
+
+export function useGetOpeningSetupWorkspace<
+  TData = Awaited<ReturnType<typeof getOpeningSetupWorkspace>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetOpeningSetupWorkspaceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOpeningSetupWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOpeningSetupWorkspaceQueryOptions(
+    bookId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPrepareOpeningSetupUrl = (
+  bookId: number,
+  params: PrepareOpeningSetupParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/opening-balances?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/opening-balances`;
+};
+
+export const prepareOpeningSetup = async (
+  bookId: number,
+  openingSetupRequest: OpeningSetupRequest,
+  params: PrepareOpeningSetupParams,
+  options?: RequestInit,
+): Promise<OpeningSetupResult> => {
+  return customFetch<OpeningSetupResult>(
+    getPrepareOpeningSetupUrl(bookId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(openingSetupRequest),
+    },
+  );
+};
+
+export const getPrepareOpeningSetupMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareOpeningSetup>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<OpeningSetupRequest>;
+      params: PrepareOpeningSetupParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof prepareOpeningSetup>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<OpeningSetupRequest>;
+    params: PrepareOpeningSetupParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["prepareOpeningSetup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof prepareOpeningSetup>>,
+    {
+      bookId: number;
+      data: BodyType<OpeningSetupRequest>;
+      params: PrepareOpeningSetupParams;
+    }
+  > = (props) => {
+    const { bookId, data, params } = props ?? {};
+
+    return prepareOpeningSetup(bookId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PrepareOpeningSetupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof prepareOpeningSetup>>
+>;
+export type PrepareOpeningSetupMutationBody = BodyType<OpeningSetupRequest>;
+export type PrepareOpeningSetupMutationError = ErrorType<unknown>;
+
+export const usePrepareOpeningSetup = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareOpeningSetup>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<OpeningSetupRequest>;
+      params: PrepareOpeningSetupParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof prepareOpeningSetup>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<OpeningSetupRequest>;
+    params: PrepareOpeningSetupParams;
+  },
+  TContext
+> => {
+  return useMutation(getPrepareOpeningSetupMutationOptions(options));
+};
+
+export const getPreviewOpeningSetupUrl = (
+  bookId: number,
+  params: PreviewOpeningSetupParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/opening-balances/preview?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/opening-balances/preview`;
+};
+
+export const previewOpeningSetup = async (
+  bookId: number,
+  openingSetupRequest: OpeningSetupRequest,
+  params: PreviewOpeningSetupParams,
+  options?: RequestInit,
+): Promise<OpeningSetupPreview> => {
+  return customFetch<OpeningSetupPreview>(
+    getPreviewOpeningSetupUrl(bookId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(openingSetupRequest),
+    },
+  );
+};
+
+export const getPreviewOpeningSetupMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewOpeningSetup>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<OpeningSetupRequest>;
+      params: PreviewOpeningSetupParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewOpeningSetup>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<OpeningSetupRequest>;
+    params: PreviewOpeningSetupParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["previewOpeningSetup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewOpeningSetup>>,
+    {
+      bookId: number;
+      data: BodyType<OpeningSetupRequest>;
+      params: PreviewOpeningSetupParams;
+    }
+  > = (props) => {
+    const { bookId, data, params } = props ?? {};
+
+    return previewOpeningSetup(bookId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreviewOpeningSetupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewOpeningSetup>>
+>;
+export type PreviewOpeningSetupMutationBody = BodyType<OpeningSetupRequest>;
+export type PreviewOpeningSetupMutationError = ErrorType<unknown>;
+
+export const usePreviewOpeningSetup = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewOpeningSetup>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<OpeningSetupRequest>;
+      params: PreviewOpeningSetupParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof previewOpeningSetup>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<OpeningSetupRequest>;
+    params: PreviewOpeningSetupParams;
+  },
+  TContext
+> => {
+  return useMutation(getPreviewOpeningSetupMutationOptions(options));
+};
+
+export const getGetOpeningSetupVersionUrl = (
+  bookId: number,
+  openingId: number,
+  params: GetOpeningSetupVersionParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/opening-balances/${openingId}?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/opening-balances/${openingId}`;
+};
+
+export const getOpeningSetupVersion = async (
+  bookId: number,
+  openingId: number,
+  params: GetOpeningSetupVersionParams,
+  options?: RequestInit,
+): Promise<OpeningSetupDetails> => {
+  return customFetch<OpeningSetupDetails>(
+    getGetOpeningSetupVersionUrl(bookId, openingId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetOpeningSetupVersionQueryKey = (
+  bookId: number,
+  openingId: number,
+  params?: GetOpeningSetupVersionParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/opening-balances/${openingId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetOpeningSetupVersionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOpeningSetupVersion>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  openingId: number,
+  params: GetOpeningSetupVersionParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOpeningSetupVersion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetOpeningSetupVersionQueryKey(bookId, openingId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getOpeningSetupVersion>>
+  > = ({ signal }) =>
+    getOpeningSetupVersion(bookId, openingId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bookId && openingId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOpeningSetupVersion>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOpeningSetupVersionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOpeningSetupVersion>>
+>;
+export type GetOpeningSetupVersionQueryError = ErrorType<unknown>;
+
+export function useGetOpeningSetupVersion<
+  TData = Awaited<ReturnType<typeof getOpeningSetupVersion>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  openingId: number,
+  params: GetOpeningSetupVersionParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOpeningSetupVersion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOpeningSetupVersionQueryOptions(
+    bookId,
+    openingId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getActOnOpeningSetupUrl = (
+  bookId: number,
+  openingId: number,
+  params: ActOnOpeningSetupParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/opening-balances/${openingId}/action?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/opening-balances/${openingId}/action`;
+};
+
+export const actOnOpeningSetup = async (
+  bookId: number,
+  openingId: number,
+  openingSetupAction: OpeningSetupAction,
+  params: ActOnOpeningSetupParams,
+  options?: RequestInit,
+): Promise<OpeningSetupResult> => {
+  return customFetch<OpeningSetupResult>(
+    getActOnOpeningSetupUrl(bookId, openingId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(openingSetupAction),
+    },
+  );
+};
+
+export const getActOnOpeningSetupMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actOnOpeningSetup>>,
+    TError,
+    {
+      bookId: number;
+      openingId: number;
+      data: BodyType<OpeningSetupAction>;
+      params: ActOnOpeningSetupParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof actOnOpeningSetup>>,
+  TError,
+  {
+    bookId: number;
+    openingId: number;
+    data: BodyType<OpeningSetupAction>;
+    params: ActOnOpeningSetupParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["actOnOpeningSetup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof actOnOpeningSetup>>,
+    {
+      bookId: number;
+      openingId: number;
+      data: BodyType<OpeningSetupAction>;
+      params: ActOnOpeningSetupParams;
+    }
+  > = (props) => {
+    const { bookId, openingId, data, params } = props ?? {};
+
+    return actOnOpeningSetup(bookId, openingId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ActOnOpeningSetupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof actOnOpeningSetup>>
+>;
+export type ActOnOpeningSetupMutationBody = BodyType<OpeningSetupAction>;
+export type ActOnOpeningSetupMutationError = ErrorType<unknown>;
+
+export const useActOnOpeningSetup = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actOnOpeningSetup>>,
+    TError,
+    {
+      bookId: number;
+      openingId: number;
+      data: BodyType<OpeningSetupAction>;
+      params: ActOnOpeningSetupParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof actOnOpeningSetup>>,
+  TError,
+  {
+    bookId: number;
+    openingId: number;
+    data: BodyType<OpeningSetupAction>;
+    params: ActOnOpeningSetupParams;
+  },
+  TContext
+> => {
+  return useMutation(getActOnOpeningSetupMutationOptions(options));
+};
 
 /**
  * @summary Scoped manual adjustment queue, approved account protection and named permissions

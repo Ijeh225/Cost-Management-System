@@ -68,6 +68,7 @@ import BranchSettingsPage from "@/pages/branch-settings/index";
 import AiAssistantPage from "@/pages/ai-assistant/index";
 import NativeAccountingPage from "@/pages/accounting/index";
 import ManualAccountingPage from "@/pages/accounting/manual";
+import OpeningBalancesPage from "@/pages/accounting/openings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -329,6 +330,7 @@ function Router() {
               <Route path="/accounting/general-ledger"><FinanceGuard><NativeAccountingPage kind="general-ledger"/></FinanceGuard></Route>
               <Route path="/accounting/trial-balance"><FinanceGuard><NativeAccountingPage kind="trial-balance"/></FinanceGuard></Route>
               <Route path="/accounting/manual-journals"><FinanceGuard><ManualAccountingPage/></FinanceGuard></Route>
+              <Route path="/accounting/opening-balances"><FinanceGuard><OpeningBalancesPage/></FinanceGuard></Route>
               <Route path="/reports/cashflow">
                 <FinanceGuard><CashFlowPage /></FinanceGuard>
               </Route>

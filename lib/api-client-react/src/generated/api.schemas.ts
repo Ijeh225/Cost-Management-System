@@ -5,6 +5,144 @@
  * Cost Analysis Per Container API
  * OpenAPI spec version: 0.1.0
  */
+export interface OpeningSetupResult {
+  id: number;
+}
+
+export interface OpeningSetupBalance {
+  /** @minimum 1 */
+  accountId: number;
+  /** Exact nonnegative decimal string */
+  debit: string;
+  /** Exact nonnegative decimal string */
+  credit: string;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  evidence: string;
+}
+
+export interface OpeningSetupRequest {
+  /** @pattern ^[a-zA-Z0-9_-]{8,80}$ */
+  requestId: string;
+  cutoverDate: string;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  policyVersion: string;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  ownerEvidence: string;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  accountantEvidence: string;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  sourceCoverageEvidence: string;
+  /**
+   * @minItems 1
+   * @maxItems 200
+   */
+  balances: OpeningSetupBalance[];
+}
+
+export type OpeningSetupActionAction =
+  (typeof OpeningSetupActionAction)[keyof typeof OpeningSetupActionAction];
+
+export const OpeningSetupActionAction = {
+  verify: "verify",
+  reject: "reject",
+  cancel: "cancel",
+} as const;
+
+export interface OpeningSetupAction {
+  action: OpeningSetupActionAction;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  reason: string;
+}
+
+export interface OpeningSetupPreview {
+  debitTotal: string;
+  creditTotal: string;
+  zero: boolean;
+  accountCount: number;
+}
+
+export interface OpeningSetupAccount {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  active: boolean;
+}
+
+export type OpeningSetupVersionState =
+  (typeof OpeningSetupVersionState)[keyof typeof OpeningSetupVersionState];
+
+export const OpeningSetupVersionState = {
+  pending: "pending",
+  verified: "verified",
+  rejected: "rejected",
+  cancelled: "cancelled",
+} as const;
+
+export interface OpeningSetupVersion {
+  id: number;
+  state: OpeningSetupVersionState;
+  preparedBy: number;
+  /** @nullable */
+  reviewedBy: number | null;
+  /** @nullable */
+  journalId: number | null;
+  createdAt?: string;
+}
+
+export type OpeningSetupWorkspaceBook = {
+  id: number;
+  name: string;
+  currency: string;
+  cutoverDate: string;
+  policyVersion: string;
+};
+
+export interface OpeningSetupWorkspace {
+  book: OpeningSetupWorkspaceBook;
+  branchId: number;
+  permissions: string[];
+  accounts: OpeningSetupAccount[];
+  ready: boolean;
+  versions: OpeningSetupVersion[];
+  truncated: boolean;
+}
+
+export type OpeningSetupDetailsPayload = {
+  request: OpeningSetupRequest;
+  chart: OpeningSetupAccount[];
+};
+
+export type OpeningSetupDetailsAuditItem = {
+  actorId: number;
+  action: string;
+  reason: string;
+  createdAt: string;
+};
+
+export type OpeningSetupDetails = OpeningSetupVersion & {
+  payload: OpeningSetupDetailsPayload;
+  audit: OpeningSetupDetailsAuditItem[];
+};
+
 export interface ManualAccountingLine {
   accountId: number;
   /** Non-negative exact decimal string */
@@ -1480,6 +1618,41 @@ export type ManualAccountingBranchParameter = number;
  * Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
  */
 export type AccountingBranchParameter = string;
+
+export type GetOpeningSetupWorkspaceParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PrepareOpeningSetupParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PreviewOpeningSetupParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type GetOpeningSetupVersionParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type ActOnOpeningSetupParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
 
 export type GetManualAccountingWorkspaceParams = {
   /**

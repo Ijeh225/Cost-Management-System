@@ -7,6 +7,302 @@
  */
 import * as zod from "zod";
 
+export const GetOpeningSetupWorkspaceParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const GetOpeningSetupWorkspaceQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const GetOpeningSetupWorkspaceResponse = zod.object({
+  book: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    currency: zod.string(),
+    cutoverDate: zod.date(),
+    policyVersion: zod.string(),
+  }),
+  branchId: zod.number(),
+  permissions: zod.array(zod.string()),
+  accounts: zod.array(
+    zod.object({
+      id: zod.number(),
+      code: zod.string(),
+      name: zod.string(),
+      category: zod.string(),
+      active: zod.boolean(),
+    }),
+  ),
+  ready: zod.boolean(),
+  versions: zod.array(
+    zod.object({
+      id: zod.number(),
+      state: zod.enum(["pending", "verified", "rejected", "cancelled"]),
+      preparedBy: zod.number(),
+      reviewedBy: zod.number().nullable(),
+      journalId: zod.number().nullable(),
+      createdAt: zod.date().optional(),
+    }),
+  ),
+  truncated: zod.boolean(),
+});
+
+export const PrepareOpeningSetupParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const PrepareOpeningSetupQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const prepareOpeningSetupBodyRequestIdRegExp = new RegExp(
+  "^[a-zA-Z0-9_-]{8,80}$",
+);
+export const prepareOpeningSetupBodyPolicyVersionMax = 500;
+
+export const prepareOpeningSetupBodyOwnerEvidenceMax = 500;
+
+export const prepareOpeningSetupBodyAccountantEvidenceMax = 500;
+
+export const prepareOpeningSetupBodySourceCoverageEvidenceMax = 500;
+
+export const prepareOpeningSetupBodyBalancesItemEvidenceMax = 500;
+
+export const prepareOpeningSetupBodyBalancesMax = 200;
+
+export const PrepareOpeningSetupBody = zod.object({
+  requestId: zod.string().regex(prepareOpeningSetupBodyRequestIdRegExp),
+  cutoverDate: zod.date(),
+  policyVersion: zod
+    .string()
+    .min(1)
+    .max(prepareOpeningSetupBodyPolicyVersionMax),
+  ownerEvidence: zod
+    .string()
+    .min(1)
+    .max(prepareOpeningSetupBodyOwnerEvidenceMax),
+  accountantEvidence: zod
+    .string()
+    .min(1)
+    .max(prepareOpeningSetupBodyAccountantEvidenceMax),
+  sourceCoverageEvidence: zod
+    .string()
+    .min(1)
+    .max(prepareOpeningSetupBodySourceCoverageEvidenceMax),
+  balances: zod
+    .array(
+      zod.object({
+        accountId: zod.number().min(1),
+        debit: zod.string().describe("Exact nonnegative decimal string"),
+        credit: zod.string().describe("Exact nonnegative decimal string"),
+        evidence: zod
+          .string()
+          .min(1)
+          .max(prepareOpeningSetupBodyBalancesItemEvidenceMax),
+      }),
+    )
+    .min(1)
+    .max(prepareOpeningSetupBodyBalancesMax),
+});
+
+export const PrepareOpeningSetupResponse = zod.object({
+  id: zod.number(),
+});
+
+export const PreviewOpeningSetupParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const PreviewOpeningSetupQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const previewOpeningSetupBodyRequestIdRegExp = new RegExp(
+  "^[a-zA-Z0-9_-]{8,80}$",
+);
+export const previewOpeningSetupBodyPolicyVersionMax = 500;
+
+export const previewOpeningSetupBodyOwnerEvidenceMax = 500;
+
+export const previewOpeningSetupBodyAccountantEvidenceMax = 500;
+
+export const previewOpeningSetupBodySourceCoverageEvidenceMax = 500;
+
+export const previewOpeningSetupBodyBalancesItemEvidenceMax = 500;
+
+export const previewOpeningSetupBodyBalancesMax = 200;
+
+export const PreviewOpeningSetupBody = zod.object({
+  requestId: zod.string().regex(previewOpeningSetupBodyRequestIdRegExp),
+  cutoverDate: zod.date(),
+  policyVersion: zod
+    .string()
+    .min(1)
+    .max(previewOpeningSetupBodyPolicyVersionMax),
+  ownerEvidence: zod
+    .string()
+    .min(1)
+    .max(previewOpeningSetupBodyOwnerEvidenceMax),
+  accountantEvidence: zod
+    .string()
+    .min(1)
+    .max(previewOpeningSetupBodyAccountantEvidenceMax),
+  sourceCoverageEvidence: zod
+    .string()
+    .min(1)
+    .max(previewOpeningSetupBodySourceCoverageEvidenceMax),
+  balances: zod
+    .array(
+      zod.object({
+        accountId: zod.number().min(1),
+        debit: zod.string().describe("Exact nonnegative decimal string"),
+        credit: zod.string().describe("Exact nonnegative decimal string"),
+        evidence: zod
+          .string()
+          .min(1)
+          .max(previewOpeningSetupBodyBalancesItemEvidenceMax),
+      }),
+    )
+    .min(1)
+    .max(previewOpeningSetupBodyBalancesMax),
+});
+
+export const PreviewOpeningSetupResponse = zod.object({
+  debitTotal: zod.string(),
+  creditTotal: zod.string(),
+  zero: zod.boolean(),
+  accountCount: zod.number(),
+});
+
+export const GetOpeningSetupVersionParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  openingId: zod.coerce.number().min(1),
+});
+
+export const GetOpeningSetupVersionQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const getOpeningSetupVersionResponseTwoPayloadRequestRequestIdRegExp =
+  new RegExp("^[a-zA-Z0-9_-]{8,80}$");
+export const getOpeningSetupVersionResponseTwoPayloadRequestPolicyVersionMax = 500;
+
+export const getOpeningSetupVersionResponseTwoPayloadRequestOwnerEvidenceMax = 500;
+
+export const getOpeningSetupVersionResponseTwoPayloadRequestAccountantEvidenceMax = 500;
+
+export const getOpeningSetupVersionResponseTwoPayloadRequestSourceCoverageEvidenceMax = 500;
+
+export const getOpeningSetupVersionResponseTwoPayloadRequestBalancesItemEvidenceMax = 500;
+
+export const getOpeningSetupVersionResponseTwoPayloadRequestBalancesMax = 200;
+
+export const GetOpeningSetupVersionResponse = zod
+  .object({
+    id: zod.number(),
+    state: zod.enum(["pending", "verified", "rejected", "cancelled"]),
+    preparedBy: zod.number(),
+    reviewedBy: zod.number().nullable(),
+    journalId: zod.number().nullable(),
+    createdAt: zod.date().optional(),
+  })
+  .and(
+    zod.object({
+      payload: zod.object({
+        request: zod.object({
+          requestId: zod
+            .string()
+            .regex(
+              getOpeningSetupVersionResponseTwoPayloadRequestRequestIdRegExp,
+            ),
+          cutoverDate: zod.date(),
+          policyVersion: zod
+            .string()
+            .min(1)
+            .max(
+              getOpeningSetupVersionResponseTwoPayloadRequestPolicyVersionMax,
+            ),
+          ownerEvidence: zod
+            .string()
+            .min(1)
+            .max(
+              getOpeningSetupVersionResponseTwoPayloadRequestOwnerEvidenceMax,
+            ),
+          accountantEvidence: zod
+            .string()
+            .min(1)
+            .max(
+              getOpeningSetupVersionResponseTwoPayloadRequestAccountantEvidenceMax,
+            ),
+          sourceCoverageEvidence: zod
+            .string()
+            .min(1)
+            .max(
+              getOpeningSetupVersionResponseTwoPayloadRequestSourceCoverageEvidenceMax,
+            ),
+          balances: zod
+            .array(
+              zod.object({
+                accountId: zod.number().min(1),
+                debit: zod
+                  .string()
+                  .describe("Exact nonnegative decimal string"),
+                credit: zod
+                  .string()
+                  .describe("Exact nonnegative decimal string"),
+                evidence: zod
+                  .string()
+                  .min(1)
+                  .max(
+                    getOpeningSetupVersionResponseTwoPayloadRequestBalancesItemEvidenceMax,
+                  ),
+              }),
+            )
+            .min(1)
+            .max(getOpeningSetupVersionResponseTwoPayloadRequestBalancesMax),
+        }),
+        chart: zod.array(
+          zod.object({
+            id: zod.number(),
+            code: zod.string(),
+            name: zod.string(),
+            category: zod.string(),
+            active: zod.boolean(),
+          }),
+        ),
+      }),
+      audit: zod.array(
+        zod.object({
+          actorId: zod.number(),
+          action: zod.string(),
+          reason: zod.string(),
+          createdAt: zod.date(),
+        }),
+      ),
+    }),
+  );
+
+export const ActOnOpeningSetupParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  openingId: zod.coerce.number().min(1),
+});
+
+export const ActOnOpeningSetupQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const actOnOpeningSetupBodyReasonMax = 2000;
+
+export const ActOnOpeningSetupBody = zod.object({
+  action: zod.enum(["verify", "reject", "cancel"]),
+  reason: zod.string().min(1).max(actOnOpeningSetupBodyReasonMax),
+});
+
+export const ActOnOpeningSetupResponse = zod.object({
+  id: zod.number(),
+});
+
 /**
  * @summary Scoped manual adjustment queue, approved account protection and named permissions
  */

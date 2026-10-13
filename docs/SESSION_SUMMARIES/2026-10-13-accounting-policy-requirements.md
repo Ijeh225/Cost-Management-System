@@ -1,5 +1,51 @@
 # Owner Accounting Requirements and Setup Gaps
 
+## 2026-10-13 18:05 WAT - Accepted / Publishing Inactive Opening System
+
+- Opening entry/independent verification/readiness engineering complete. Final8DB
+  PASS709s +focused2PASS159s =9distinct accepted scenarios; not10distinct. Full
+  405unit/API/3prior skips, typechecks/build/OFF smoke and built opening/manual/
+  report browser acceptance PASS; screenshots reviewed, no live financial writes.
+- Focused attempt had a tunnel drop after legacy case passed; exact own namespace
+  acct_foundation_1791909394105_c1d3d386 inspected/matched run time and removed,
+  public11sources unchanged through cleanup. Fresh focused rerun/cleanup PASS.
+- Test helper async child drains tunnel streams and supports exact safe namespace
+  recovery; network root cause not conclusively established. No retries inside
+  financial transactions or weakened app controls used to hide interruption.
+- Protected89a3b1b checkpoint preserved. Live flags false; original app data kept.
+  Clean launch/reset remains separate, with reviewed backups/retained owner access.
+- Next publish exact inactive code and health/auth/SSH proof then records; future
+  VAT/direct-cost configuration and Step10 separate. Real professional setup and
+  approved real openings still needed, not guessed from current test records.
+
+## 2026-10-13 17:29 WAT - Local Acceptance / Final Database Controls
+
+- Final405unit/API/3skips, full build/typechecks and local OFF smoke PASS.
+  Built opening entry/preview/explicit zero/retry/independent verification/scope/
+  refresh/stale-chart/mobile/accessibility/OFF/error PASS, screenshots inspected.
+  Existing manual/GLTB/CSV/print browser checks retained. Dummy/isolated only.
+- Corrected8DB run7PASS/1timeout (old manual case120s), allowed240s for that
+  expanded case only; current final8running. SQL completeness/amount/policy
+  verification strengthened and raw forward-readiness bypass assertion added.
+- Audited old unposted draft cancellation remains possible before initialisation;
+  new controlled legacy case simulates pre-migration draft in owned shadow schema
+  only. Focused final proof pending after running suite. No live trigger/data reset.
+- Next accept all final DB results, update records and publish inactive exact
+  code release. No official launch date/balances/approval or activation inferred.
+
+## 2026-10-13 17:07 WAT - Built / Initial Verification Finding Corrected
+
+- Opening entry/API/review/readiness built using existing exact engine; all-chart
+  explicit zeros, immutable versions/audit and zero initialisation without journal.
+- Checkpoint89a3b1b remote protected/verified. Initial404units PASS/3prior skips;
+  initial build typing issues corrected. Initial8DB run1PASS/7FAIL exposed JSONB
+  field-order mismatch; canonical stableEvidence hashing fixed and tested at unit
+  level, final8DB rerun active. No production code push before acceptance.
+- Initial failed tunnel closed. Final units/build/local OFF and built loopback
+  desktop/mobile acceptance pending. Official native flags stay OFF; no live data
+  deletion/figures/schema. Future clean launch remains a separately backed-up task.
+- Exact next accept final results and publish inactive; VAT/Step10 not started.
+
 ## 2026-10-13 16:36 WAT - Opening System Authorised / Future Clean Launch
 
 - Explained opening balances as verified assets/liabilities/equity already held

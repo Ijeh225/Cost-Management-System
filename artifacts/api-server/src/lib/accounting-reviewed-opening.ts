@@ -2,6 +2,7 @@ import { minorToMoney, moneyToMinor, normalizeJournal, requireAccounting } from 
 import { previewOpeningBalances, type OpeningBalanceReview } from "./accounting-source-mapping.js";
 import { stableEvidence } from "./accounting-operational-mapping.js";
 export interface ReviewedOpening extends OpeningBalanceReview {
+  requestId?: string;
   controls:{accountId:number;debit:string;credit:string;evidence:string}[];
 }
 export function buildReviewedOpening(review:ReviewedOpening) {
@@ -22,7 +23,9 @@ export function buildReviewedOpening(review:ReviewedOpening) {
   const canonical={...review,controls:review.controls.map(c=>({...c,debit:minorToMoney(moneyToMinor(c.debit)),credit:minorToMoney(moneyToMinor(c.credit))}))
     .sort((a,b)=>a.accountId-b.accountId),lines:review.lines.map(l=>({...l,debit:minorToMoney(moneyToMinor(l.debit)),credit:minorToMoney(moneyToMinor(l.credit))}))
     .sort((a,b)=>a.accountId-b.accountId || a.debit.localeCompare(b.debit) || a.credit.localeCompare(b.credit) || (a.memo??"").localeCompare(b.memo??""))};
-  const input={...preview.input,narration:"Reviewed opening balances",evidence:stableEvidence({review:canonical}),lines:canonical.lines};
+  if (review.requestId !== undefined) requireAccounting(/^[a-zA-Z0-9_-]{8,80}$/.test(review.requestId),"INVALID_REQUEST","Valid opening setup identity required");
+  const input={...preview.input,eventKey:review.requestId ? `opening:branch:${review.branchId}:setup:${review.requestId}` : preview.input.eventKey,
+    narration:"Reviewed opening balances",evidence:stableEvidence({review:canonical}),lines:canonical.lines};
   normalizeJournal(input);
   return {...preview,input,status:"reviewed_draft" as const};
 }

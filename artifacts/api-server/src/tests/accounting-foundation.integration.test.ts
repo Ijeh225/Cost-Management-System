@@ -36,6 +36,7 @@ const baselineSql = `SELECT jsonb_build_object('invoicePayments',(SELECT count(*
 let baseline: unknown;
 beforeAll(async () => {
   expect((await pool.query("SELECT current_database() name")).rows[0].name).toBe("cost_management_integration_test");
+  console.info(`Owned foundation namespace: ${schema}`);
   baseline = (await pool.query(baselineSql)).rows[0].baseline;
   process.env.NATIVE_ACCOUNTING_ENABLED = "true";
   await pool.query(`CREATE SCHEMA "${schema}"`);
@@ -296,16 +297,17 @@ describe("Step7 remaining operational source integration",()=>{
 });
 describe("Step7 reviewed opening integration",()=>{
   it("previews and posts one independently reviewed opening before forward entries, without inventing balances",async()=>{
-    const f=await fixture();
+    const f=await fixture(true,false,false);
     const opening:ReviewedOpening={bookId:f.book,branchId:f.branch,currency:"NGN",cutoverDate:"2026-10-01",policyVersion:"isolated-only-v1",
-      strategy:"opening_balances_forward",ownerEvidence:"Dummy owner",accountantEvidence:"Dummy professional; TEST ONLY",sourceCoverageEvidence:"Dummy bank/deposit controls",
+      strategy:"opening_balances_forward",requestId:"existing_opening_123",ownerEvidence:"Dummy owner",accountantEvidence:"Dummy professional; TEST ONLY",sourceCoverageEvidence:"Dummy bank/deposit controls",
       lines:[{accountId:f.debit,debit:"100",credit:"0"},{accountId:f.credit,debit:"0",credit:"100"}],
       controls:[{accountId:f.debit,debit:"100",credit:"0",evidence:"Dummy bank statement"},{accountId:f.credit,debit:"0",credit:"100",evidence:"Dummy deposits control"}]};
     expect((await service.previewOpening(f.preparer,opening)).status).toBe("reviewed_draft");
     expect((await sql("SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1",[f.book])).rows[0].n).toBe(0);
     const drafts=await Promise.all([1,2].map(()=>service.prepareOpening(f.preparer,opening))); expect(drafts[0]!.id).toBe(drafts[1]!.id);
+    const setup=await service.prepareOpeningSetup(f.book,f.branch,f.preparer,await setupRequest(f,true,"existing_opening_123"));
     await expect(service.prepareJournal(f.preparer,input(f))).rejects.toMatchObject({code:"CUTOVER_CONFLICT"});
-    await service.approveAndPost(f.book,f.branch,f.approver,drafts[0]!.id,"Dummy reviewed opening approval");
+    await service.openingAction(f.book,f.branch,f.approver,setup.id,"verify","Dummy reviewed opening approval");
     const client=(await sql("INSERT INTO clients(branch_id) VALUES($1) RETURNING id",[f.branch])).rows[0].id;
     const legacy=(await sql("INSERT INTO invoices(branch_id,client_id,status,total,subtotal,created_at) VALUES($1,$2,'sent',10,10,'2026-09-30 10:00:00') RETURNING id",[f.branch,client])).rows[0].id;
     const item=(await sql("INSERT INTO invoice_items(invoice_id,branch_id,amount) VALUES($1,$2,10) RETURNING id",[legacy,f.branch])).rows[0].id;
@@ -522,7 +524,7 @@ afterAll(async () => {
   }
 });
 const policy = Object.fromEntries(ACCOUNTING_POLICY_KEYS.map(k => [k, k === "cutoverDate" ? "2026-10-01" : k === "financialYearEnd" ? "12-31" : `Isolated reviewed ${k}; not production approval`]));
-async function fixture(approved = true, multiBranch = false) {
+async function fixture(approved = true, multiBranch = false, initialise = true) {
   const branch = (await sql("INSERT INTO branches(name) VALUES('Isolated native book branch') RETURNING id")).rows[0].id as number;
   const secondBranch = multiBranch ? (await sql("INSERT INTO branches(name) VALUES('Isolated second reporting branch') RETURNING id")).rows[0].id as number : undefined;
   const actors = (await sql(`INSERT INTO users(branch_id,name,authority_level,job_function,workspace_access,access_profile_migrated_at)
@@ -542,9 +544,103 @@ async function fixture(approved = true, multiBranch = false) {
   const credit = await service.addAccount(book, branch, owner!, "2100", "Isolated deposit liability", "liability");
   const period = await service.createPeriod(book, branch, owner!, "October", "2026-10-01", "2026-10-31");
   if (approved) await service.approveBook(book, branch, owner!, { policy, version: "isolated-only-v1", ownerEvidence: "Dummy owner approval", accountantEvidence: "Dummy professional review; TEST ONLY" });
-  return { book, branch, secondBranch, owner: owner!, preparer: preparer!, approver: approver!, operations: operations!, debit, credit, period };
+  const result={ book, branch, secondBranch, owner: owner!, preparer: preparer!, approver: approver!, operations: operations!, debit, credit, period };
+  if(approved && initialise) {
+    const draft=await service.prepareOpeningSetup(book,branch,preparer!,await setupRequest(result));
+    await service.openingAction(book,branch,approver!,draft.id,"verify","Dummy independently reviewed all-zero start; no real balances");
+  }
+  return result;
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
+async function setupRequest(f:{book:number;branch:number},positive=false,key=randomBytes(8).toString("hex")) {
+  const accounts=(await sql("SELECT id FROM accounting_accounts WHERE book_id=$1 ORDER BY id",[f.book])).rows;
+  return {requestId:key,cutoverDate:"2026-10-01",policyVersion:"isolated-only-v1",ownerEvidence:"Dummy owner",
+    accountantEvidence:"Dummy professional; TEST ONLY",sourceCoverageEvidence:"Dummy bank/deposit controls",
+    balances:accounts.map((a,i)=>({accountId:a.id as number,debit:positive&&i===0?"100":"0",credit:positive&&i===1?"100":"0",evidence:i===0?"Dummy bank statement":i===1?"Dummy deposits control":"Explicit reviewed dummy zero"}))};
+}
+describe("OpeningSetup controlled readiness",()=>{
+  it("allows audited cancellation of a legacy draft without bypassing new preparation/posting readiness",async()=>{
+    const f=await fixture(true,false,false);
+    // Owned shadow schema only: reproduce a draft from before the readiness migration.
+    await sql('ALTER TABLE accounting_journals DISABLE TRIGGER accounting_journal_guard');
+    let journal:number;
+    try {journal=(await sql(`INSERT INTO accounting_journals(book_id,branch_id,period_id,currency,accounting_date,event_key,payload_hash,narration,evidence,kind,prepared_by)
+      VALUES($1,$2,$3,'NGN','2026-10-10','manual:legacy-pending',$4,'Dummy legacy draft','Dummy','manual',$5) RETURNING id`,[f.book,f.branch,f.period,'a'.repeat(64),f.preparer])).rows[0].id;}
+    finally {await sql('ALTER TABLE accounting_journals ENABLE TRIGGER accounting_journal_guard');}
+    await expect(service.approveAndPost(f.book,f.branch,f.approver,journal!,'Dummy refusal')).rejects.toMatchObject({code:'OPENING_REQUIRED'});
+    await service.cancelDraft(f.book,f.branch,f.preparer,journal!,'Dummy approved legacy cleanup');
+    expect((await sql('SELECT status FROM accounting_journals WHERE id=$1',[journal!])).rows[0].status).toBe('cancelled');
+    const d=await service.prepareOpeningSetup(f.book,f.branch,f.preparer,await setupRequest(f));
+    await service.openingAction(f.book,f.branch,f.approver,d.id,'verify','Dummy clean full-chart zero review');
+  },180000);
+  it("requires complete independent openings and posts exact balances once into GL/TB",async()=>{
+    const f=await fixture(true,false,false);
+    await service.addAccount(f.book,f.branch,f.owner,"5000","Dummy zero expense","expense");
+    await expect(service.prepareJournal(f.preparer,input(f))).rejects.toMatchObject({code:"OPENING_REQUIRED"});
+    await expect(sql(`INSERT INTO accounting_journals(book_id,branch_id,period_id,currency,accounting_date,event_key,payload_hash,narration,evidence,kind,prepared_by)
+      VALUES($1,$2,$3,'NGN','2026-10-10','manual:direct-bypass',$4,'Dummy bypass','Dummy','manual',$5)`,[f.book,f.branch,f.period,'a'.repeat(64),f.preparer])).rejects.toThrow('Verified opening setup');
+    const request=await setupRequest(f,true);
+    expect((await service.previewOpeningSetup(f.book,f.branch,f.preparer,request)).accountCount).toBe(3);
+    expect((await sql("SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1",[f.book])).rows[0].n).toBe(0);
+    await expect(service.prepareOpeningSetup(f.book,f.branch,f.preparer,{...request,balances:request.balances.slice(0,2)})).rejects.toMatchObject({code:"OPENING_INCOMPLETE"});
+    const results=await Promise.all([1,2].map(()=>service.prepareOpeningSetup(f.book,f.branch,f.preparer,request)));
+    expect(results[0].id).toBe(results[1].id);
+    await expect(service.openingAction(f.book,f.branch,f.preparer,results[0].id,"verify","Dummy self review")).rejects.toMatchObject({code:"FORBIDDEN"});
+    await service.grantAccess(f.book,f.branch,f.owner,f.preparer,"post","Dummy self-approval refusal check");
+    await expect(service.openingAction(f.book,f.branch,f.preparer,results[0].id,"verify","Dummy self review")).rejects.toMatchObject({code:"SELF_APPROVAL"});
+    await Promise.all([1,2].map(()=>service.openingAction(f.book,f.branch,f.approver,results[0].id,"verify","Dummy independent review")));
+    expect((await service.openingWorkspace(f.book,f.branch,f.preparer)).ready).toBe(true);
+    const details=await service.openingDetails(f.book,f.branch,f.preparer,results[0].id);
+    expect(details.audit.filter(a=>a.action==='opening_verified')).toHaveLength(1);
+    expect(await balances(f)).toEqual(new Map([[f.debit,"10000"],[f.credit,"-10000"]]));
+    await posted(f);
+    const tb=await service.accountingReport(f.book,f.branch,f.preparer,'trial-balance',{from:'2026-10-01',to:'2026-10-10',includeZero:true,includeInactive:false});
+    expect(tb.balanced).toBe(true);expect(tb.totals.closingDebit).toBe('100.30');
+    await expect(service.prepareOpeningSetup(f.book,f.branch,f.preparer,{...request,requestId:'new_ready_123'})).rejects.toMatchObject({code:'OPENING_STATE'});
+    await expect(service.prepareOpeningSetup(f.book,f.branch,f.preparer,{...request,ownerEvidence:'Changed'})).rejects.toMatchObject({code:'DUPLICATE_CONFLICT'});
+  },240000);
+  it("verifies explicit zero balances without fake journals and keeps branches isolated",async()=>{
+    const f=await fixture(true,true,false),r=await setupRequest(f);
+    const d=await service.prepareOpeningSetup(f.book,f.branch,f.preparer,r);
+    await service.openingAction(f.book,f.branch,f.approver,d.id,'verify','Dummy full-chart verified zeros');
+    expect((await sql("SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1",[f.book])).rows[0].n).toBe(0);
+    expect((await service.openingDetails(f.book,f.branch,f.preparer,d.id)).journalId).toBeNull();
+    await expect(service.prepareJournal(f.owner,{...input(f),branchId:f.secondBranch!})).rejects.toMatchObject({code:'OPENING_REQUIRED'});
+    await expect(service.openingDetails(f.book,f.secondBranch!,f.owner,d.id)).rejects.toMatchObject({code:'NOT_FOUND'});
+    await posted(f);
+    await expect(sql("DELETE FROM accounting_opening_setup WHERE id=$1",[d.id])).rejects.toThrow('immutable');
+    await expect(sql("UPDATE accounting_opening_setup SET payload='{}'::jsonb WHERE id=$1",[d.id])).rejects.toThrow();
+  },180000);
+  it("retains rejected/corrected versions and refuses stale charts or direct ready forgery",async()=>{
+    const f=await fixture(true,false,false),request=await setupRequest(f,true),d=await service.prepareOpeningSetup(f.book,f.branch,f.preparer,request);
+    await expect(sql("UPDATE accounting_opening_setup SET state='verified',reviewed_by=$2,reviewed_at=now() WHERE id=$1",[d.id,f.approver])).rejects.toThrow('audit');
+    await service.addAccount(f.book,f.branch,f.owner,'4000','Dummy additional account','income');
+    await expect(service.openingAction(f.book,f.branch,f.approver,d.id,'verify','Dummy stale review')).rejects.toMatchObject({code:'OPENING_INCOMPLETE'});
+    await service.revokeAccess(f.book,f.branch,f.owner,f.preparer,'prepare','Dummy departed preparer');
+    await service.openingAction(f.book,f.branch,f.approver,d.id,'reject','Dummy chart correction');
+    const old=await service.openingDetails(f.book,f.branch,f.approver,d.id);
+    expect(old.state).toBe('rejected');expect(old.audit.some(a=>a.actorId===f.approver&&a.action==='opening_rejected')).toBe(true);
+    await service.grantAccess(f.book,f.branch,f.owner,f.preparer,'prepare','Dummy grant restored');
+    const next=await service.prepareOpeningSetup(f.book,f.branch,f.preparer,await setupRequest(f,true));
+    expect(next.id).not.toBe(d.id);await service.openingAction(f.book,f.branch,f.approver,next.id,'verify','Dummy corrected independent review');
+    expect((await service.openingDetails(f.book,f.branch,f.preparer,d.id)).payload.request.balances).toHaveLength(2);
+    expect((await sql("SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1 AND status='posted'",[f.book])).rows[0].n).toBe(1);
+  },240000);
+  it("requires current finance grants/open periods and gates new methods before connection while OFF",async()=>{
+    const f=await fixture(true,false,false),r=await setupRequest(f);
+    await expect(service.prepareOpeningSetup(f.book,f.branch,f.operations,r)).rejects.toMatchObject({code:'FORBIDDEN'});
+    await expect(service.prepareOpeningSetup(f.book,f.branch,f.preparer,{...r,cutoverDate:'2026-10-02'})).rejects.toMatchObject({code:'BOOK_NOT_APPROVED'});
+    await service.changePeriod(f.book,f.owner,f.period,'close',{evidence:'Dummy period review',sourceCoverageComplete:true,reconciled:true,unresolvedMappings:0});
+    await expect(service.prepareOpeningSetup(f.book,f.branch,f.preparer,r)).rejects.toMatchObject({code:'PERIOD_CLOSED'});
+    process.env.NATIVE_ACCOUNTING_ENABLED='false';
+    try {
+      const off=new NativeAccounting({connect:async()=>{throw new Error('MUST NOT CONNECT');}} as Pick<typeof pool,'connect'>);
+      for(const run of [()=>off.openingWorkspace(1,2,3),()=>off.openingDetails(1,2,3,4),()=>off.previewOpeningSetup(1,2,3,r),()=>off.prepareOpeningSetup(1,2,3,r),()=>off.openingAction(1,2,3,4,'verify','Dummy')])
+        await expect(run()).rejects.toMatchObject({code:'ACCOUNTING_DISABLED'});
+    }finally{process.env.NATIVE_ACCOUNTING_ENABLED='true';}
+    await ensureAccountingFoundationSchema(database as Pick<typeof pool,'connect'>);
+  },180000);
+});
 async function manualFixture(reviewed=true,multiBranch=false) {
   const f=await fixture(true,multiBranch);
   const expense=await service.addAccount(f.book,f.branch,f.owner,"6200","Dummy reviewed depreciation expense","expense");
@@ -579,7 +675,7 @@ describe("Step9 controlled manual journal workflow",()=>{
     const gl=await service.accountingReport(f.book,f.branch,f.preparer,"general-ledger",filter);
     expect(gl.totals.closingDifference).toBe("0.00");expect(gl.rows.every(a=>a.closing==="0.00")).toBe(true);
     await expect(sql("UPDATE accounting_journals SET narration='silently changed' WHERE id=$1",[id])).rejects.toThrow(/immutable/);
-  });
+  },240000);
   it("retains rejected and revised versions atomically and prevents stale revision/rejection duplicates",async()=>{
     const f=await manualFixture(),draft=await service.prepareManual(f.book,f.branch,f.preparer,f.input);
     await service.manualAction(f.book,f.branch,f.preparer,draft.id,"submit","Dummy submission");

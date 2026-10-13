@@ -4,8 +4,17 @@ export {
   GetAccountingOptionsParams,
   GetNativeAccountingReportParams,
   GetAccountingJournalParams,
-  GetManualAccountingWorkspaceParams,GetManualAccountingJournalParams,PrepareManualAccountingJournalParams,
-  ActOnManualAccountingJournalParams,ReverseManualAccountingJournalParams,ReviewManualAccountingAccountsParams,
+  GetManualAccountingWorkspaceParams,
+  GetManualAccountingJournalParams,
+  PrepareManualAccountingJournalParams,
+  ActOnManualAccountingJournalParams,
+  ReverseManualAccountingJournalParams,
+  ReviewManualAccountingAccountsParams,
+  GetOpeningSetupWorkspaceParams,
+  GetOpeningSetupVersionParams,
+  PrepareOpeningSetupParams,
+  PreviewOpeningSetupParams,
+  ActOnOpeningSetupParams,
 } from "./generated/api";
 export * from "./generated/types";
 export type {
@@ -20,4 +29,9 @@ export type {
   ActOnManualAccountingJournalParams as ActOnManualAccountingJournalQuery,
   ReverseManualAccountingJournalParams as ReverseManualAccountingJournalQuery,
   ReviewManualAccountingAccountsParams as ReviewManualAccountingAccountsQuery,
+  GetOpeningSetupWorkspaceParams as GetOpeningSetupWorkspaceQuery,
+  GetOpeningSetupVersionParams as GetOpeningSetupVersionQuery,
+  PrepareOpeningSetupParams as PrepareOpeningSetupQuery,
+  PreviewOpeningSetupParams as PreviewOpeningSetupQuery,
+  ActOnOpeningSetupParams as ActOnOpeningSetupQuery,
 } from "./generated/types";

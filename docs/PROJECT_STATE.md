@@ -2,6 +2,68 @@
 
 ## Current Work Register - Authoritative as of 2026-10-13
 
+### Opening Setup Engineering Accepted / Publishing INACTIVE - 2026-10-13 18:05 WAT
+
+- Opening Balances UI/API and universal native prepare/post readiness engineering
+  accepted. Existing exact opening engine reused; full chart/explicit zeros,
+  independent decisions, immutable corrections/audit, branch/date/current grants,
+  no fake zero journal, legacy unposted cancellation and SQL protections covered.
+- Final8owned DB cases PASS709s (4new+4shared opening/invoice/manual/GLTB);
+  focused2PASS159s covers extra legacy cancellation plus forward/GLTB readiness.
+  Nine DISTINCT accepted scenarios total; focused overlap is not an extra case.
+  One initial focused tunnel drop prevented teardown. Exact own namespace
+  acct_foundation_1791909394105_c1d3d386 recovered after identity/time inspection;
+  public11source aggregates unchanged through cleanup. Fresh focused rerun and
+  owned schema/tunnel cleanup PASS. No production test fixtures or trigger changes.
+- Harness now drains tunnel streams during asynchronous tests and has strictly
+  scoped namespace inspect/recovery options; interruption root cause not proven.
+  405unit/API PASS/3prior skips,52files; all typechecks/build/OFF zero-DB smoke,
+  final opening/mobile/chart-refresh/accessibility and shared manual/report browser
+  checks PASS. Test screenshots inspected; browser writes dummy loopback only.
+- Protected pre-work remote89a3b1b tag retained; production flags independently
+  false/defaultOFF. No official date/balances/approval or live activation inferred.
+  Existing live test data not deleted or changed. Future clean launch separate.
+- ACCOUNTING_OPENING_SETUP.md records operation/limits and native-only readiness:
+  existing operational cash/bank/source writers unchanged; native openings do not
+  automatically initialise operational bank or customer/supplier subledger records.
+- Next functional commit/push/exact inactive deployment/health/SSH proof, then
+  records publication. Subsequent setup work VAT/direct-cost mappings; Step10 not
+  started. Actual chart/book/date/grants/tax/opening controls still required for launch.
+
+### Opening Setup Local Acceptance / Final Database Gate - 2026-10-13 17:29 WAT
+
+- 405unit/API PASS/3prior skips (52files), full typechecks/build/local rebuilt OFF
+  smoke PASS. Built loopback opening preview/stable retry/explicit zeros/independent
+  verification/branch clearing/refresh/chart-change form guard/mobile dialogs/OFF/
+  errors PASS; desktop/mobile screenshots inspected. Existing manual and GL/TB/
+  CSV/print browser regressions PASS. No production accounting inputs implied.
+- Corrected8DB rerun7PASS/1timeout: all4new opening cases and shared opening,
+  invoice and GL/TB passed; expanded manual regression exceeded old120s budget.
+  Raised only that case to240s, not engine guards. Final8case rerun running with
+  stronger SQL completeness/amount/policy checks and raw readiness refusal.
+- Readiness blocks forward prepare/post, not audited legacy-draft cancellation.
+  Added a controlled shadow-schema legacy cancellation regression; focused final
+  verification pending after the running suite. No live reset or trigger disabling.
+- No functional code push/activation yet. Five-new-case/database acceptance and
+  inactive exact deployment remain publication gates; actual future launch separate.
+
+### Opening Setup Built / Acceptance Corrections Running - 2026-10-13 17:07 WAT
+
+- Added complete-chart explicit balances/zero evidence, scoped API and entry/
+  inspection/reviewer UI, immutable setup decisions and atomic exact opening posting
+  through the existing engine. Verified-zero setup creates no financial journal.
+  Native forward preparation/posting now requires a verified branch initialization;
+  existing cash/operational writers remain unchanged and official switches stay OFF.
+- Pre-work89a3b1b protected remote tag checkpoint-before-opening-setup-2026-10-13
+  pushed and peeled target verified. Existing checkpoints and live records preserved.
+- Initial404unit/API PASS/3prior skips. Build exposed command-union and public
+  detail typing errors, corrected. Initial8owned DB run1PASS/7FAIL found JSONB
+  key-order hash mismatch, not changed figures. Reused stableEvidence canonical
+  serialization; added exact round-trip regression instead of weakening checks.
+  Failed-run tunnel closed; no publication before final acceptance.
+- Final build, owned8DB rerun, updated units and built browser acceptance pending.
+  No live balance entry, test-data clearing, VAT implementation or Step10 started.
+
 ### Opening Setup Authorised / Test-Only Launch Boundary - 2026-10-13 16:36 WAT
 
 - Owner authorises building opening entry/verification; accounts personnel will

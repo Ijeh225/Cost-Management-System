@@ -92,6 +92,91 @@ CREATE TABLE IF NOT EXISTS accounting_audit (
  FOREIGN KEY(book_id,branch_id) REFERENCES accounting_book_branches(book_id,branch_id)
 );
 
+CREATE TABLE IF NOT EXISTS accounting_opening_setup (
+ id SERIAL PRIMARY KEY, book_id INTEGER NOT NULL, branch_id INTEGER NOT NULL,
+ request_key TEXT NOT NULL, payload_hash TEXT NOT NULL CHECK(payload_hash ~ '^[a-f0-9]{64}$'), payload JSONB NOT NULL,
+ prepared_by INTEGER NOT NULL REFERENCES users(id), reviewed_by INTEGER REFERENCES users(id),
+ journal_id INTEGER REFERENCES accounting_journals(id),
+ state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','verified','rejected','cancelled')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(), reviewed_at TIMESTAMPTZ,
+ FOREIGN KEY(book_id,branch_id) REFERENCES accounting_book_branches(book_id,branch_id),
+ UNIQUE(book_id,branch_id,request_key), UNIQUE(journal_id),
+ CHECK(state<>'verified' OR (reviewed_by IS NOT NULL AND reviewed_by<>prepared_by AND reviewed_at IS NOT NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS accounting_one_current_opening_setup ON accounting_opening_setup(book_id,branch_id)
+ WHERE state IN ('pending','verified');
+ALTER TABLE accounting_audit ADD COLUMN IF NOT EXISTS opening_setup_id INTEGER REFERENCES accounting_opening_setup(id);
+
+CREATE OR REPLACE FUNCTION accounting_opening_guard() RETURNS TRIGGER LANGUAGE plpgsql SET search_path FROM CURRENT AS $$
+DECLARE a accounting_audit%ROWTYPE;
+BEGIN
+ IF TG_OP='DELETE' THEN RAISE EXCEPTION 'Opening setup history is immutable'; END IF;
+ PERFORM pg_advisory_xact_lock(804610,NEW.book_id);
+ IF jsonb_typeof(NEW.payload->'chart') IS DISTINCT FROM 'array' OR jsonb_typeof(NEW.payload->'request'->'balances') IS DISTINCT FROM 'array'
+ OR jsonb_array_length(NEW.payload->'chart') NOT BETWEEN 1 AND 200
+ OR jsonb_array_length(NEW.payload->'request'->'balances')<>jsonb_array_length(NEW.payload->'chart')
+ THEN RAISE EXCEPTION 'Complete opening chart and explicit balances required'; END IF;
+ IF TG_OP='INSERT' THEN
+   IF NEW.state<>'pending' OR NEW.reviewed_by IS NOT NULL OR NOT accounting_has_grant(NEW.book_id,NEW.branch_id,NEW.prepared_by,'prepare')
+   THEN RAISE EXCEPTION 'Authorised pending opening preparation required'; END IF;
+   IF NEW.journal_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM accounting_journals WHERE id=NEW.journal_id AND book_id=NEW.book_id
+     AND branch_id=NEW.branch_id AND prepared_by=NEW.prepared_by AND status='draft' AND event_key LIKE 'opening:%')
+   THEN RAISE EXCEPTION 'Matching opening draft required'; END IF;
+ ELSE
+   IF OLD.state<>'pending' OR (to_jsonb(NEW)-ARRAY['state','reviewed_by','reviewed_at'])<>(to_jsonb(OLD)-ARRAY['state','reviewed_by','reviewed_at'])
+   THEN RAISE EXCEPTION 'Opening payload/final version is immutable'; END IF;
+   SELECT * INTO a FROM accounting_audit WHERE opening_setup_id=NEW.id AND action='opening_'||NEW.state
+     AND xmin::text=pg_current_xact_id()::text ORDER BY id DESC LIMIT 1;
+   IF a.id IS NULL OR a.actor_id IS DISTINCT FROM NEW.reviewed_by THEN RAISE EXCEPTION 'Atomic opening decision audit required'; END IF;
+   IF NEW.state='cancelled' THEN
+     IF NEW.reviewed_by<>NEW.prepared_by OR NOT accounting_has_grant(NEW.book_id,NEW.branch_id,NEW.reviewed_by,'prepare')
+     THEN RAISE EXCEPTION 'Original opening preparer cancellation required'; END IF;
+   ELSIF NEW.state IN ('verified','rejected') THEN
+     IF NEW.reviewed_by=NEW.prepared_by OR NOT accounting_has_grant(NEW.book_id,NEW.branch_id,NEW.reviewed_by,'post')
+     THEN RAISE EXCEPTION 'Independent opening reviewer required'; END IF;
+   ELSE RAISE EXCEPTION 'Invalid opening transition'; END IF;
+   IF NEW.state='verified' THEN
+     IF NOT EXISTS(SELECT 1 FROM accounting_books b JOIN accounting_periods p ON p.book_id=b.id
+       WHERE b.id=NEW.book_id AND b.status='approved' AND b.policy_version=NEW.payload->'request'->>'policyVersion'
+       AND b.policy->>'cutoverDate'=NEW.payload->'request'->>'cutoverDate' AND p.status='open'
+       AND (b.policy->>'cutoverDate')::date BETWEEN p.starts_on AND p.ends_on)
+     THEN RAISE EXCEPTION 'Approved opening policy/date/open period required'; END IF;
+     IF (SELECT count(DISTINCT b->>'accountId') FROM jsonb_array_elements(NEW.payload->'request'->'balances') b)<>jsonb_array_length(NEW.payload->'chart')
+     OR EXISTS(SELECT 1 FROM jsonb_array_elements(NEW.payload->'request'->'balances') b
+       WHERE b->>'debit' !~ '^(0|[1-9][0-9]*)([.][0-9]{1,2})?$' OR b->>'credit' !~ '^(0|[1-9][0-9]*)([.][0-9]{1,2})?$'
+       OR coalesce(length(trim(b->>'evidence')),0)=0 OR ((b->>'debit')::numeric<>0 AND (b->>'credit')::numeric<>0))
+     OR EXISTS((SELECT id FROM accounting_accounts WHERE book_id=NEW.book_id EXCEPT SELECT (b->>'accountId')::int FROM jsonb_array_elements(NEW.payload->'request'->'balances') b)
+       UNION ALL (SELECT (b->>'accountId')::int FROM jsonb_array_elements(NEW.payload->'request'->'balances') b EXCEPT SELECT id FROM accounting_accounts WHERE book_id=NEW.book_id))
+     THEN RAISE EXCEPTION 'Every opening account requires one exact supported balance'; END IF;
+     IF NEW.journal_id IS NOT NULL AND EXISTS(
+       (SELECT account_id,debit_minor::numeric,credit_minor::numeric FROM accounting_journal_lines WHERE journal_id=NEW.journal_id
+        EXCEPT SELECT (b->>'accountId')::int,(b->>'debit')::numeric*100,(b->>'credit')::numeric*100 FROM jsonb_array_elements(NEW.payload->'request'->'balances') b
+          WHERE (b->>'debit')::numeric<>0 OR (b->>'credit')::numeric<>0)
+       UNION ALL
+       (SELECT (b->>'accountId')::int,(b->>'debit')::numeric*100,(b->>'credit')::numeric*100 FROM jsonb_array_elements(NEW.payload->'request'->'balances') b
+          WHERE (b->>'debit')::numeric<>0 OR (b->>'credit')::numeric<>0
+        EXCEPT SELECT account_id,debit_minor::numeric,credit_minor::numeric FROM accounting_journal_lines WHERE journal_id=NEW.journal_id))
+     THEN RAISE EXCEPTION 'Posted opening must exactly match the complete schedule'; END IF;
+   END IF;
+   IF NEW.state='verified' AND NEW.journal_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM accounting_journals WHERE id=NEW.journal_id
+     AND book_id=NEW.book_id AND branch_id=NEW.branch_id AND status='posted' AND event_key LIKE 'opening:%')
+   THEN RAISE EXCEPTION 'Posted matching opening journal required'; END IF;
+   IF NEW.state='verified' AND NEW.journal_id IS NULL AND EXISTS(SELECT 1 FROM jsonb_array_elements(NEW.payload->'request'->'balances') b
+     WHERE (b->>'debit')::numeric<>0 OR (b->>'credit')::numeric<>0)
+   THEN RAISE EXCEPTION 'Nonzero opening cannot be marked ready without posting'; END IF;
+   IF NEW.state='verified' AND EXISTS(
+     (SELECT id,code,name,category,active FROM accounting_accounts WHERE book_id=NEW.book_id
+      EXCEPT SELECT id,code,name,category,active FROM jsonb_to_recordset(NEW.payload->'chart') x(id int,code text,name text,category text,active boolean))
+     UNION ALL
+     (SELECT id,code,name,category,active FROM jsonb_to_recordset(NEW.payload->'chart') x(id int,code text,name text,category text,active boolean)
+      EXCEPT SELECT id,code,name,category,active FROM accounting_accounts WHERE book_id=NEW.book_id))
+   THEN RAISE EXCEPTION 'Opening chart changed before verification'; END IF;
+   IF NEW.state IN ('rejected','cancelled') AND NEW.journal_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM accounting_journals WHERE id=NEW.journal_id AND status='cancelled')
+   THEN RAISE EXCEPTION 'Rejected opening draft must be cancelled atomically'; END IF;
+ END IF;
+ RETURN NEW;
+END $$;
+
 CREATE OR REPLACE FUNCTION accounting_has_grant(b INTEGER, br INTEGER, u INTEGER, p TEXT) RETURNS BOOLEAN
 LANGUAGE sql STABLE SET search_path FROM CURRENT AS $$
  SELECT EXISTS(SELECT 1 FROM accounting_grants g JOIN users a ON a.id=g.user_id
@@ -232,6 +317,9 @@ BEGIN
  IF b.status<>'approved' OR NEW.currency<>b.currency OR p.status<>'open' OR NEW.accounting_date NOT BETWEEN p.starts_on AND p.ends_on
  OR NEW.accounting_date<(b.policy->>'cutoverDate')::date THEN RAISE EXCEPTION 'Unapproved book, currency, cutover or closed/out-of-range period'; END IF;
  IF TG_OP='INSERT' AND NOT accounting_has_grant(NEW.book_id,NEW.branch_id,NEW.prepared_by,'prepare') THEN RAISE EXCEPTION 'Prepare grant required'; END IF;
+ IF NEW.event_key NOT LIKE 'opening:%' AND (TG_OP='INSERT' OR NEW.status='posted') AND NOT EXISTS(SELECT 1 FROM accounting_opening_setup s
+   WHERE s.book_id=NEW.book_id AND s.branch_id=NEW.branch_id AND s.state='verified')
+ THEN RAISE EXCEPTION 'Verified opening setup required before forward accounting'; END IF;
  IF NEW.kind='reversal' THEN
    SELECT * INTO original FROM accounting_journals WHERE id=NEW.reversal_of;
    IF original.status IS DISTINCT FROM 'posted' OR original.kind='reversal' OR original.book_id<>NEW.book_id OR original.branch_id<>NEW.branch_id
@@ -277,14 +365,20 @@ BEGIN
  END IF;
  IF j.status='cancelled' THEN
    SELECT actor_id INTO actor FROM accounting_audit WHERE journal_id=j.id AND book_id=j.book_id AND action='cancelled' ORDER BY id DESC LIMIT 1;
-   IF actor IS NULL OR NOT accounting_has_grant(j.book_id,j.branch_id,actor,'prepare')
-     OR (actor<>j.prepared_by AND NOT accounting_has_grant(j.book_id,j.branch_id,actor,'configure'))
+   IF (actor IS NULL OR NOT accounting_has_grant(j.book_id,j.branch_id,actor,'prepare')
+     OR (actor<>j.prepared_by AND NOT accounting_has_grant(j.book_id,j.branch_id,actor,'configure')))
+     AND NOT EXISTS(SELECT 1 FROM accounting_opening_setup s JOIN accounting_audit a ON a.opening_setup_id=s.id
+       WHERE s.journal_id=j.id AND s.state='rejected' AND a.action='opening_rejected' AND a.actor_id=actor
+       AND a.xmin::text=pg_current_xact_id()::text AND accounting_has_grant(j.book_id,j.branch_id,actor,'post'))
    THEN RAISE EXCEPTION 'Draft cancellation requires preparer or configured reviewer and immutable audit'; END IF;
  END IF;
  RETURN NULL;
 END $$;
 
 DO $$ DECLARE t TEXT; BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='accounting_opening_setup'::regclass AND tgname='accounting_opening_guard') THEN
+   CREATE TRIGGER accounting_opening_guard BEFORE INSERT OR UPDATE OR DELETE ON accounting_opening_setup FOR EACH ROW EXECUTE FUNCTION accounting_opening_guard();
+ END IF;
  FOREACH t IN ARRAY ARRAY['accounting_manual_account_rules','accounting_manual_workflow'] LOOP
    IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=t::regclass AND tgname='accounting_manual_guard') THEN
      EXECUTE format('CREATE TRIGGER accounting_manual_guard BEFORE INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION accounting_manual_guard()',t);

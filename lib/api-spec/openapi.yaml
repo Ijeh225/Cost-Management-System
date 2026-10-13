@@ -19,6 +19,87 @@ tags:
     description: Container charges
 
 paths:
+  /accounting/books/{bookId}/opening-balances:
+    get:
+      operationId: getOpeningSetupWorkspace
+      tags: [accounting]
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+      responses:
+        '200':
+          description: Complete scoped chart and immutable opening history; inactive returns 503
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningSetupWorkspace' }
+    post:
+      operationId: prepareOpeningSetup
+      tags: [accounting]
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OpeningSetupRequest' }
+      responses:
+        '200':
+          description: Stable pending version only; never independently verifies or activates accounting
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningSetupResult' }
+  /accounting/books/{bookId}/opening-balances/preview:
+    post:
+      operationId: previewOpeningSetup
+      tags: [accounting]
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OpeningSetupRequest' }
+      responses:
+        '200':
+          description: Exact validated totals; no writes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningSetupPreview' }
+  /accounting/books/{bookId}/opening-balances/{openingId}:
+    get:
+      operationId: getOpeningSetupVersion
+      tags: [accounting]
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+        - { name: openingId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Retained account evidence, original chart and decision audit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningSetupDetails' }
+  /accounting/books/{bookId}/opening-balances/{openingId}/action:
+    post:
+      operationId: actOnOpeningSetup
+      tags: [accounting]
+      parameters:
+        - $ref: '#/components/parameters/AccountingBookId'
+        - $ref: '#/components/parameters/ManualAccountingBranch'
+        - { name: openingId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OpeningSetupAction' }
+      responses:
+        '200':
+          description: Independent verification/rejection or original-preparer cancellation; idempotent decision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningSetupResult' }
   /accounting/books/{bookId}/manual:
     get:
       operationId: getManualAccountingWorkspace
@@ -1384,6 +1465,108 @@ components:
       description: Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
       schema: { type: string }
   schemas:
+    OpeningSetupResult:
+      type: object
+      required: [id]
+      properties:
+        id: { type: integer }
+    OpeningSetupBalance:
+      type: object
+      required: [accountId, debit, credit, evidence]
+      properties:
+        accountId: { type: integer, minimum: 1 }
+        debit: { type: string, description: Exact nonnegative decimal string }
+        credit: { type: string, description: Exact nonnegative decimal string }
+        evidence: { type: string, minLength: 1, maxLength: 500 }
+    OpeningSetupRequest:
+      type: object
+      required: [requestId, cutoverDate, policyVersion, ownerEvidence, accountantEvidence, sourceCoverageEvidence, balances]
+      properties:
+        requestId: { type: string, pattern: '^[a-zA-Z0-9_-]{8,80}$' }
+        cutoverDate: { type: string, format: date }
+        policyVersion: { type: string, minLength: 1, maxLength: 500 }
+        ownerEvidence: { type: string, minLength: 1, maxLength: 500 }
+        accountantEvidence: { type: string, minLength: 1, maxLength: 500 }
+        sourceCoverageEvidence: { type: string, minLength: 1, maxLength: 500 }
+        balances:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/OpeningSetupBalance' }
+    OpeningSetupAction:
+      type: object
+      required: [action, reason]
+      properties:
+        action: { type: string, enum: [verify, reject, cancel] }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+    OpeningSetupPreview:
+      type: object
+      required: [debitTotal, creditTotal, zero, accountCount]
+      properties:
+        debitTotal: { type: string }
+        creditTotal: { type: string }
+        zero: { type: boolean }
+        accountCount: { type: integer }
+    OpeningSetupAccount:
+      type: object
+      required: [id, code, name, category, active]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        category: { type: string }
+        active: { type: boolean }
+    OpeningSetupVersion:
+      type: object
+      required: [id, state, preparedBy, reviewedBy, journalId]
+      properties:
+        id: { type: integer }
+        state: { type: string, enum: [pending, verified, rejected, cancelled] }
+        preparedBy: { type: integer }
+        reviewedBy: { type: [integer, 'null'] }
+        journalId: { type: [integer, 'null'] }
+        createdAt: { type: string, format: date-time }
+    OpeningSetupWorkspace:
+      type: object
+      required: [book, branchId, permissions, accounts, ready, versions, truncated]
+      properties:
+        book:
+          type: object
+          required: [id, name, currency, cutoverDate, policyVersion]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            currency: { type: string }
+            cutoverDate: { type: string, format: date }
+            policyVersion: { type: string }
+        branchId: { type: integer }
+        permissions: { type: array, items: { type: string } }
+        accounts: { type: array, items: { $ref: '#/components/schemas/OpeningSetupAccount' } }
+        ready: { type: boolean }
+        versions: { type: array, items: { $ref: '#/components/schemas/OpeningSetupVersion' } }
+        truncated: { type: boolean }
+    OpeningSetupDetails:
+      allOf:
+        - $ref: '#/components/schemas/OpeningSetupVersion'
+        - type: object
+          required: [payload, audit]
+          properties:
+            payload:
+              type: object
+              required: [request, chart]
+              properties:
+                request: { $ref: '#/components/schemas/OpeningSetupRequest' }
+                chart: { type: array, items: { $ref: '#/components/schemas/OpeningSetupAccount' } }
+            audit:
+              type: array
+              items:
+                type: object
+                required: [actorId, action, reason, createdAt]
+                properties:
+                  actorId: { type: integer }
+                  action: { type: string }
+                  reason: { type: string }
+                  createdAt: { type: string, format: date-time }
     ManualAccountingLine:
       type: object
       required: [accountId, debit, credit]

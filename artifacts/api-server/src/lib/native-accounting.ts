@@ -13,6 +13,7 @@ import { buildReviewedOpening, type ReviewedOpening } from "./accounting-reviewe
 import { sourceCoverage, type ReconciliationControl } from "./accounting-source-coverage.js";
 import { buildAccountingReport, validateReportFilter, type ReportFilter, type ReportAccount, type ReportLine } from "./accounting-reports.js";
 import { manualInput, mappedControlAccounts, type ManualAdjustment } from "./accounting-manual.js";
+import { buildOpeningSetup, type OpeningSetupRequest, type OpeningAccount } from "./accounting-opening-setup.js";
 
 type Database = Pick<typeof pool, "connect">;
 async function connectClient(database: Database) { return database.connect(); }
@@ -21,6 +22,10 @@ interface JournalRow { id: number; book_id: number; branch_id: number; status: s
   currency: string; kind: string; event_key: string; payload_hash: string; }
 interface ActorRow { id: number; branch_id: number; authority_level: string; job_function: string;
   workspace_access: string; access_profile_migrated_at: Date | null; is_active: boolean; }
+interface OpeningVersionRow {
+  id:number; state:"pending"|"verified"|"rejected"|"cancelled"; preparedBy:number; reviewedBy:number|null; journalId:number|null;
+  payload:ReturnType<typeof buildOpeningSetup>["payload"];
+}
 
 // No operational writer calls this service. Approved mappings can prepare internal
 // source drafts; deployment alone never activates or posts them.
@@ -60,10 +65,10 @@ export class NativeAccounting {
     for (const branch of branches) await this.permission(client, bookId, branch.branch_id, actorId, permission);
   }
   private async audit(client: Client, bookId: number, actorId: number, action: string, reason: string,
-    branchId: number | null = null, journalId: number | null = null, periodId: number | null = null) {
+    branchId: number | null = null, journalId: number | null = null, periodId: number | null = null, openingId: number | null = null) {
     requireAccounting(typeof reason === "string" && reason.trim().length > 0 && reason.length <= 4000, "EVIDENCE_REQUIRED", "Audit evidence/reason is required");
-    await client.query(`INSERT INTO accounting_audit(book_id,branch_id,actor_id,journal_id,period_id,action,reason)
-      VALUES($1,$2,$3,$4,$5,$6,$7)`, [bookId, branchId, actorId, journalId, periodId, action, reason.trim()]);
+    await client.query(`INSERT INTO accounting_audit(book_id,branch_id,actor_id,journal_id,period_id,action,reason,opening_setup_id)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [bookId, branchId, actorId, journalId, periodId, action, reason.trim(), openingId]);
   }
   async createDraftBook(actorId: number, name: string, currency: string, branchIds: number[]) {
     requireAccounting(typeof name === "string" && name.trim().length > 0 && name.length <= 200 && /^[A-Z]{3}$/.test(currency), "INVALID_BOOK", "Book name and currency required");
@@ -160,6 +165,7 @@ export class NativeAccounting {
       const pending=(await client.query("SELECT id FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key LIKE 'opening:%' AND status='draft' LIMIT 1",
         [input.bookId,input.branchId])).rows[0];
       requireAccounting(!pending,"CUTOVER_CONFLICT","Post the reviewed opening before forward journals");
+      await this.openingReady(client,input.bookId,input.branchId);
     }
     const book = (await client.query("SELECT * FROM accounting_books WHERE id=$1", [input.bookId])).rows[0];
     requireAccounting(book?.status === "approved" && book.currency === input.currency && input.accountingDate >= book.policy.cutoverDate,
@@ -433,12 +439,13 @@ export class NativeAccounting {
     return this.transaction(review.bookId,client=>this.openingDraft(client,actorId,review,"read"));
   }
   async prepareOpening(actorId:number,review:ReviewedOpening) {
-    return this.transaction(review.bookId,async client=>{
+    return this.transaction(review.bookId,client=>this.prepareOpeningDraft(client,actorId,review));
+  }
+  private async prepareOpeningDraft(client:Client,actorId:number,review:ReviewedOpening) {
       const draft=await this.openingDraft(client,actorId,review,"prepare");
       const journal=await this.prepare(client,actorId,draft.input);
       requireAccounting(journal.status!=="cancelled","SOURCE_CANCELLED","Cancelled opening requires reviewed correction");
       return journal;
-    });
   }
   async reconcileSources(bookId:number,branchId:number,actorId:number,through:string,controls:ReconciliationControl[]) {
     accountingDate(through);
@@ -545,7 +552,9 @@ export class NativeAccounting {
     },true);
   }
   async approveAndPost(bookId: number, branchId: number, actorId: number, journalId: number, reason: string, manualOnly=false) {
-    return this.transaction(bookId, async client => {
+    return this.transaction(bookId, client => this.postJournal(client,bookId,branchId,actorId,journalId,reason,manualOnly));
+  }
+  private async postJournal(client:Client,bookId:number,branchId:number,actorId:number,journalId:number,reason:string,manualOnly=false) {
       await this.permission(client, bookId, branchId, actorId, "post");
       const journal = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE id=$1 AND book_id=$2 AND branch_id=$3 FOR UPDATE",
         [journalId, bookId, branchId])).rows[0];
@@ -554,6 +563,7 @@ export class NativeAccounting {
       requireAccounting(!manualOnly || workflow,"NOT_FOUND","Manual workflow journal required");
       if (journal.status === "posted") return journal;
       requireAccounting(journal.status === "draft", "JOURNAL_STATE", "Only draft journals can be posted");
+      if(!journal.event_key.startsWith("opening:")) await this.openingReady(client,bookId,branchId);
       if(workflow) {
         requireAccounting(workflow.state==="submitted","REVIEW_REQUIRED","Submit this exact version before independent approval/posting");
         await this.manualAccounts(client,bookId,journalId);
@@ -576,7 +586,6 @@ export class NativeAccounting {
       }
       await this.audit(client, bookId, actorId, "posted", reason, branchId, journalId);
       return (await client.query<JournalRow>("UPDATE accounting_journals SET status='posted',posted_by=$2,posted_at=now() WHERE id=$1 RETURNING *", [journalId, actorId])).rows[0]!;
-    });
   }
   async cancelDraft(bookId: number, branchId: number, actorId: number, journalId: number, reason: string) {
     return this.transaction(bookId, async client => {
@@ -641,6 +650,105 @@ export class NativeAccounting {
       requireAccounting(journal, "NOT_FOUND", "Journal not found in this scope");
       const lines = (await client.query<{ account_id: number; debit_minor: string; credit_minor: string; memo: string }>("SELECT account_id,debit_minor::text,credit_minor::text,memo FROM accounting_journal_lines WHERE journal_id=$1 ORDER BY id", [journalId])).rows;
       return { ...journal, lines: lines.map(l => ({ accountId: l.account_id, debit: minorToMoney(l.debit_minor), credit: minorToMoney(l.credit_minor), memo: l.memo })) };
+    });
+  }
+
+  private async openingReady(client:Client,bookId:number,branchId:number) {
+    requireAccounting((await client.query("SELECT id FROM accounting_opening_setup WHERE book_id=$1 AND branch_id=$2 AND state='verified'",[bookId,branchId])).rowCount,
+      "OPENING_REQUIRED","Independently verify all opening balances before forward accounting transactions");
+  }
+  private async openingChart(client:Client,bookId:number):Promise<OpeningAccount[]> {
+    return (await client.query<OpeningAccount>("SELECT id,code,name,category,active FROM accounting_accounts WHERE book_id=$1 ORDER BY id",[bookId])).rows;
+  }
+  private async openingSetupDraft(client:Client,bookId:number,branchId:number,actorId:number,request:OpeningSetupRequest) {
+    const scope=await this.reportingScope(client,bookId,branchId,actorId);
+    const draft=buildOpeningSetup(bookId,branchId,scope.book.currency,request,await this.openingChart(client,bookId));
+    const book=(await client.query("SELECT policy_version FROM accounting_books WHERE id=$1",[bookId])).rows[0];
+    requireAccounting(request.cutoverDate===scope.book.policy.cutoverDate && request.policyVersion===book.policy_version,
+      "BOOK_NOT_APPROVED","Opening date and version must match the approved book, not today's date");
+    requireAccounting((await client.query("SELECT id FROM accounting_periods WHERE book_id=$1 AND status='open' AND $2::date BETWEEN starts_on AND ends_on",[bookId,request.cutoverDate])).rowCount,
+      "PERIOD_CLOSED","Opening date requires an open accounting period");
+    if(draft.review) await this.openingDraft(client,actorId,draft.review,"read");
+    else requireAccounting(!(await client.query("SELECT id FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND status<>'cancelled' LIMIT 1",[bookId,branchId])).rowCount,
+      "CUTOVER_CONFLICT","Zero initialisation cannot replace recorded financial entries");
+    return draft;
+  }
+  async openingWorkspace(bookId:number,branchId:number,actorId:number) {
+    return this.transaction(bookId,async client=>{
+      const scope=await this.reportingScope(client,bookId,branchId,actorId);
+      const version=(await client.query("SELECT policy_version FROM accounting_books WHERE id=$1",[bookId])).rows[0].policy_version;
+      const permissions:string[]=[];
+      for(const p of ["prepare","post"] as const)
+        if((await client.query("SELECT accounting_has_grant($1,$2,$3,$4) allowed",[bookId,branchId,actorId,p])).rows[0]?.allowed) permissions.push(p);
+      const versions=(await client.query(`SELECT id,state,prepared_by AS "preparedBy",reviewed_by AS "reviewedBy",journal_id AS "journalId",
+        created_at AS "createdAt" FROM accounting_opening_setup WHERE book_id=$1 AND branch_id=$2 ORDER BY id DESC LIMIT 201`,[bookId,branchId])).rows;
+      const ready=!!(await client.query("SELECT id FROM accounting_opening_setup WHERE book_id=$1 AND branch_id=$2 AND state='verified'",[bookId,branchId])).rowCount;
+      return {book:{id:bookId,name:scope.book.name,currency:scope.book.currency,cutoverDate:scope.book.policy.cutoverDate,policyVersion:version},branchId,
+        permissions,accounts:await this.openingChart(client,bookId),ready,versions:versions.slice(0,200),truncated:versions.length>200};
+    },true);
+  }
+  async openingDetails(bookId:number,branchId:number,actorId:number,id:number) {
+    return this.transaction(bookId,async client=>{
+      await this.reportingScope(client,bookId,branchId,actorId);
+      const row=(await client.query<OpeningVersionRow>(`SELECT id,state,prepared_by AS "preparedBy",reviewed_by AS "reviewedBy",journal_id AS "journalId",payload
+        FROM accounting_opening_setup WHERE id=$1 AND book_id=$2 AND branch_id=$3`,[id,bookId,branchId])).rows[0];
+      requireAccounting(row,"NOT_FOUND","Opening version not found in this scope");
+      const audit=(await client.query<{actorId:number;action:string;reason:string;createdAt:Date}>(`SELECT actor_id AS "actorId",action,reason,created_at AS "createdAt" FROM accounting_audit
+        WHERE opening_setup_id=$1 ORDER BY id`,[id])).rows;
+      return {...row,audit};
+    },true);
+  }
+  async previewOpeningSetup(bookId:number,branchId:number,actorId:number,request:OpeningSetupRequest) {
+    return this.transaction(bookId,async client=>{
+      const draft=await this.openingSetupDraft(client,bookId,branchId,actorId,request);
+      return {debitTotal:draft.debitTotal,creditTotal:draft.creditTotal,zero:draft.zero,accountCount:draft.payload.chart.length};
+    },true);
+  }
+  async prepareOpeningSetup(bookId:number,branchId:number,actorId:number,request:OpeningSetupRequest) {
+    return this.transaction(bookId,async client=>{
+      await this.permission(client,bookId,branchId,actorId,"prepare");
+      await this.reportingScope(client,bookId,branchId,actorId);
+      const existing=(await client.query("SELECT * FROM accounting_opening_setup WHERE book_id=$1 AND branch_id=$2 AND request_key=$3",[bookId,branchId,request.requestId])).rows[0];
+      if(existing) {
+        const saved=buildOpeningSetup(bookId,branchId,existing.payload.review?.currency??(await client.query("SELECT currency FROM accounting_books WHERE id=$1",[bookId])).rows[0].currency,
+          request,existing.payload.chart);
+        requireAccounting(existing.prepared_by===actorId && existing.payload_hash===saved.hash,"DUPLICATE_CONFLICT","Opening identity belongs to a different payload or preparer");
+        return {id:existing.id};
+      }
+      requireAccounting(!(await client.query("SELECT id FROM accounting_opening_setup WHERE book_id=$1 AND branch_id=$2 AND state IN ('pending','verified')",[bookId,branchId])).rowCount,
+        "OPENING_STATE","Review/cancel the pending version; verified openings cannot be overwritten");
+      const draft=await this.openingSetupDraft(client,bookId,branchId,actorId,request);
+      const journal=draft.review ? await this.prepareOpeningDraft(client,actorId,draft.review) : null;
+      const row=(await client.query(`INSERT INTO accounting_opening_setup(book_id,branch_id,request_key,payload_hash,payload,prepared_by,journal_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,[bookId,branchId,request.requestId,draft.hash,JSON.stringify(draft.payload),actorId,journal?.id??null])).rows[0];
+      await this.audit(client,bookId,actorId,"opening_prepared",draft.zero ? "Explicit full-chart zero opening submitted; no journal created" : "Complete opening submitted for independent verification",branchId,journal?.id??null,null,row.id);
+      return {id:row.id};
+    });
+  }
+  async openingAction(bookId:number,branchId:number,actorId:number,id:number,action:"verify"|"reject"|"cancel",reason:string) {
+    requireAccounting(["verify","reject","cancel"].includes(action),"INVALID_REQUEST","Valid opening action required");
+    return this.transaction(bookId,async client=>{
+      await this.reportingScope(client,bookId,branchId,actorId);
+      await this.permission(client,bookId,branchId,actorId,action==="cancel" ? "prepare" : "post");
+      const row=(await client.query("SELECT * FROM accounting_opening_setup WHERE id=$1 AND book_id=$2 AND branch_id=$3 FOR UPDATE",[id,bookId,branchId])).rows[0];
+      requireAccounting(row,"NOT_FOUND","Opening version not found in this scope");
+      requireAccounting(action==="cancel" ? row.prepared_by===actorId : row.prepared_by!==actorId,"SELF_APPROVAL","Original preparer cancellation or independent verification required");
+      const state=action==="verify" ? "verified" : action==="reject" ? "rejected" : "cancelled";
+      if(row.state===state) return {id};
+      requireAccounting(row.state==="pending","OPENING_STATE","Only pending openings accept a decision");
+      if(action==="verify") {
+        const draft=await this.openingSetupDraft(client,bookId,branchId,actorId,row.payload.request);
+        requireAccounting(draft.hash===row.payload_hash,"SOURCE_CHANGED","Chart or opening evidence changed; cancel/reject and prepare a reviewed replacement");
+        if(row.journal_id) await this.postJournal(client,bookId,branchId,actorId,row.journal_id,reason);
+      }
+      await this.audit(client,bookId,actorId,`opening_${state}`,reason,branchId,row.journal_id,null,id);
+      if(action!=="verify" && row.journal_id) {
+        await this.audit(client,bookId,actorId,"cancelled",`Opening ${state}: ${reason}`,branchId,row.journal_id);
+        requireAccounting((await client.query("UPDATE accounting_journals SET status='cancelled' WHERE id=$1 AND status='draft'",[row.journal_id])).rowCount,
+          "OPENING_STATE","Posted opening journal cannot be rejected or cancelled");
+      }
+      await client.query("UPDATE accounting_opening_setup SET state=$2,reviewed_by=$3,reviewed_at=now() WHERE id=$1",[id,state,actorId]);
+      return {id};
     });
   }
 

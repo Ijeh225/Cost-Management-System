@@ -2,6 +2,48 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-13
 
+### Opening Setup Final Controlled Acceptance PASS - 2026-10-13 18:05 WAT
+
+- Final8DB PASS709s/50filtered and focused2PASS159s/57filtered:9distinct scenarios
+  (5opening controls+4shared opening/source/manual/GLTB). Includes direct SQL
+  readiness refusal, exact posted schedule, explicit-zero no-journal, rejected
+  version preservation/current reviewer after preparer revocation, and legacy
+  cancellation without opening-readiness bypass. Native/source/money guards retained.
+- Focused first attempt lost tunnel after legacy case passed, so owned teardown
+  incomplete. Verified exact failed-run namespace/time, removed only that schema;
+  public11source preservation during recovery PASS. Final fresh focused run and
+  schema/tunnel cleanup PASS. No production/source/actual-role mutations.
+- Final405unit/API PASS/3existing skips,52files; full build/typechecks/OFF zero-DB
+  smoke, built opening stable retry/preview/independent reviewer/explicit-zero/
+  changed-chart/refresh/scope/mobile/accessible dialogs/OFF/errors and shared
+  manual/GLTB/CSV/print browser checks PASS. Screenshots visually inspected.
+- Accounting remains INACTIVE; no official live opening figures or launch test
+  claimed. Exact deployment proof pending push; future live reset is separate.
+
+### Opening Setup Local PASS / Shared Timeout Retest - 2026-10-13 17:29 WAT
+
+- Final405units PASS/3existing skips,52files; typechecks/build/OFF smoke and built
+  opening/manual/report browser checks PASS. Opening form retains existing figures
+  on refresh, blocks incomplete changed charts, starts added accounts blank, and
+  independent reviewer/dialog/mobile checks passed. Screenshots visually reviewed.
+- DB7PASS/1timeout after canonical hash fix:4new plus opening/invoice/GLTB shared
+  passed; old manual case120s timeout corrected with case-only240s allowance.
+  Current8rerun running. No guard weakened, final acceptance not inferred yet.
+- Added raw-SQL readiness refusal and owned legacy-draft cancellation control;
+  focused post-change DB proof pending. Test trigger changes only in owned shadow
+  schema, never production. Live flags false; no production figures/schema/reset.
+
+### Opening Setup Initial Acceptance / Canonical Hash Correction - 2026-10-13 17:07 WAT
+
+- Initial404unit/API PASS/3existing skips. Initial8isolated cases1PASS/7FAIL:
+  stored JSONB key ordering caused unchanged opening evidence to fail its hash
+  comparison. Fixed using existing stableEvidence; new unit regression covers
+  reversed key order after storage. Type errors also corrected, rebuild pending.
+- Owned failed-run tunnel closed; no production changes/publishing. Eight-case
+  DB rerun and updated unit/build/dummy desktop/mobile acceptance still pending.
+- Complete zeros/current grants/independent decisions/readiness/source and GL/TB
+  controls remain required. No official approval, launch or fresh live acceptance.
+
 ### Opening Setup Controlled Acceptance Authorised - 2026-10-13 16:36 WAT
 
 - Test complete chart/zeros, exact balance, dates/scope/current grants, distinct

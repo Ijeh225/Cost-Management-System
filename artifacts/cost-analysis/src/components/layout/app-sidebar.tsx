@@ -87,7 +87,8 @@ export function AppSidebar() {
     ...(canAccessFinance ? [{ title: "Payment Schedule", url: "/payment-schedules", icon: CalendarClock }] : []),
     ...(canAccessFinance ? [{ title: "General Ledger", url: "/accounting/general-ledger", icon: BookOpen },
       { title: "Trial Balance", url: "/accounting/trial-balance", icon: BarChart2 },
-      { title: "Manual Journals", url: "/accounting/manual-journals", icon: BookOpen }] : []),
+      { title: "Manual Journals", url: "/accounting/manual-journals", icon: BookOpen },
+      { title: "Opening Balances", url: "/accounting/opening-balances", icon: BookOpen }] : []),
     { title: "My Tasks",        url: "/my-tasks",       icon: ListTodo         },
     { title: "Notifications",   url: "/notifications",  icon: Bell, badge: unreadCount, badgeLoading: notificationsLoading },
     ...(staffCanUpload ? [{ title: "Upload Data", url: "/containers/upload", icon: UploadCloud }] : []),
@@ -140,7 +141,8 @@ export function AppSidebar() {
   const navItems = isDepartmentUser ? deptNav : mainNav;
   if (isDepartmentUser && canAccessFinance) deptNav.push({title:"General Ledger",url:"/accounting/general-ledger",icon:BookOpen},
     {title:"Trial Balance",url:"/accounting/trial-balance",icon:BarChart2},
-    {title:"Manual Journals",url:"/accounting/manual-journals",icon:BookOpen});
+    {title:"Manual Journals",url:"/accounting/manual-journals",icon:BookOpen},
+    {title:"Opening Balances",url:"/accounting/opening-balances",icon:BookOpen});
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" className="border-r border-border/50">

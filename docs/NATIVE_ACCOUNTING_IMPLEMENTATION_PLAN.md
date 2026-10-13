@@ -2,6 +2,13 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
+Latest2026-10-13 18:05 WAT: opening setup prerequisite engineering accepted;
+9distinct owned DB cases,405unit/API/3prior skips, build/typechecks/OFF smoke and
+built opening/manual/report browser checks PASS. Existing engine reused; complete
+chart/zero evidence, independent immutable verification and mandatory NATIVE
+forward readiness added. See ACCOUNTING_OPENING_SETUP.md for limits/source-boundary.
+Inactive publication next; actual book/chart/date/grants/openings/approval remain
+launch prerequisites. VAT/direct-cost setup and Step10 not started by this task.
 Latest2026-10-13 16:03 WAT: four owner policy requirements recorded in
 ACCOUNTING_POLICY_REQUIREMENTS_2026-10-13.md. Direct expense treatment specified;
 service exemption stated but professional basis needed, applicable costVAT7.5%

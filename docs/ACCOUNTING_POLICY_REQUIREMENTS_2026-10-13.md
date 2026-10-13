@@ -1,5 +1,14 @@
 # Accounting Policy Requirements
 
+Implementation update2026-10-13 18:05 WAT: authorised opening UI/API/verification
+and mandatory native readiness are now built/accepted, inactive publication next.
+The source-status table below preserves the earlier16:03 review, not current
+absence of those opening controls. See ACCOUNTING_OPENING_SETUP.md and PROJECT_STATE.
+Owner clarifies staff launch has not occurred; all current figures are test data.
+Actual go-live is still a future explicit date and any test-data clearance is a
+separate backed-up launch operation, not performed here. VAT/direct-cost setup
+and Step10 remain separate; no professional exemption or real balances inferred.
+
 Recorded: 2026-10-13 16:03 WAT (Africa/Lagos).
 Authority: owner's four requirements in this session; not a recorded professional
 tax opinion, completed chart approval, opening review or activation instruction.

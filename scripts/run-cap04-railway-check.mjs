@@ -8,6 +8,10 @@ const cli = process.env.RAILWAY_CLI_PATH;
 if (!cli) throw new Error("Set RAILWAY_CLI_PATH to the authenticated Railway CLI binary");
 const suite = process.env.RAILWAY_TEST_SUITE ?? "cap04";
 const cleanupRun = process.env.ACCOUNTING_CLEANUP_RUN;
+const inspectFoundation = process.env.ACCOUNTING_FOUNDATION_INSPECT === "1";
+const cleanupFoundation = process.env.ACCOUNTING_FOUNDATION_CLEANUP_SCHEMA;
+if ((inspectFoundation || cleanupFoundation) && suite !== "foundation") throw new Error("Foundation recovery requires foundation suite");
+if (cleanupFoundation && !/^acct_foundation_[0-9]{13}_[a-f0-9]{8}$/.test(cleanupFoundation)) throw new Error("Exact owned foundation namespace required");
 if (cleanupRun && (suite !== "accounting" || !/^\d{13}-[a-z0-9]+$/.test(cleanupRun))) throw new Error("Exact accounting run suffix required for isolated recovery");
 if (!["cap04", "cap02", "accounting", "foundation"].includes(suite)) throw new Error("Unknown isolated test suite");
 const project = "30166120-54e6-4f58-86ed-18ab396913f1";
@@ -50,6 +54,26 @@ try {
   await identity.connect();
   try {
     if ((await identity.query("SELECT current_database() AS name")).rows[0].name !== "cost_management_integration_test") throw new Error("Wrong test database identity");
+    if (inspectFoundation) {
+      const schemas=(await identity.query("SELECT nspname FROM pg_namespace WHERE nspname LIKE 'acct_foundation_%' ORDER BY nspname")).rows;
+      console.log("Owned foundation namespace inspection: "+JSON.stringify(schemas.map(s=>({name:s.nspname,runTime:/^acct_foundation_([0-9]{13})_[a-f0-9]{8}$/.test(s.nspname)?new Date(Number(s.nspname.split('_')[2])).toISOString():null}))));
+    }
+    if (cleanupFoundation) {
+      if (!(await identity.query("SELECT 1 FROM pg_namespace WHERE nspname=$1",[cleanupFoundation])).rowCount) throw new Error("Exact recovery namespace does not exist");
+      const guardSql=`SELECT jsonb_build_object('invoicePayments',(SELECT count(*) FROM public.invoice_payments),
+        'deposits',(SELECT coalesce(sum(amount),0) FROM public.client_deposits),'payments',(SELECT coalesce(sum(amount),0) FROM public.payment_schedule_payments),
+        'duties',(SELECT coalesce(sum(amount),0) FROM public.duty_payment_transactions),'containerCosts',(SELECT coalesce(sum(amount),0) FROM public.container_expense_payments),
+        'overheads',(SELECT coalesce(sum(amount),0) FROM public.overhead_expenses),'topups',(SELECT coalesce(sum(amount),0) FROM public.overhead_expense_topups),
+        'billPayments',(SELECT coalesce(sum(amount),0) FROM public.expense_payments),'funding',(SELECT coalesce(sum(amount),0) FROM public.bank_fund_additions),
+        'transfers',(SELECT coalesce(sum(amount),0) FROM public.bank_transfers),'creditNotes',(SELECT coalesce(sum(amount),0) FROM public.credit_notes)) baseline`;
+      await identity.query("BEGIN");
+      try {
+        const before=(await identity.query(guardSql)).rows[0].baseline;
+        await identity.query(`DROP SCHEMA "${cleanupFoundation}" CASCADE`);
+        if (JSON.stringify((await identity.query(guardSql)).rows[0].baseline)!==JSON.stringify(before)) throw new Error("Recovery changed public source aggregates");
+        await identity.query("COMMIT");console.log(`Verified exact interrupted foundation namespace ${cleanupFoundation} removed; public11sources unchanged`);
+      } catch(error) { await identity.query("ROLLBACK"); throw error; }
+    }
     if (cleanupRun) {
       const ids = (await identity.query("SELECT id FROM branches WHERE name=$1 OR name LIKE $2", [`ACCT root ${cleanupRun}`, `ACCT case ${cleanupRun}-%`])).rows.map(row => row.id);
       if (!ids.length) throw new Error("Specified interrupted run has no fixtures; refusing an ambiguous cleanup");
@@ -71,10 +95,22 @@ try {
     : [resolve(root, "artifacts/api-server/node_modules/tsx/dist/cli.mjs"), resolve(root, "scripts/cap04-postgres-check.ts")];
   if (suite === "accounting" && process.env.ACCOUNTING_TEST_FILTER) args.push("-t", process.env.ACCOUNTING_TEST_FILTER);
   if (suite === "foundation" && process.env.ACCOUNTING_FOUNDATION_TEST_FILTER) args.push("-t", process.env.ACCOUNTING_FOUNDATION_TEST_FILTER);
-  const run = cleanupRun ? { status: 0, stdout: "", stderr: "" } : spawnSync(process.execPath, args, {
-    cwd: suite !== "cap04" ? resolve(root, "artifacts/api-server") : root,
-    env: { ...process.env, TEST_DATABASE_URL: url.href, JWT_SECRET: randomBytes(32).toString("hex"), NODE_ENV: "test", CAP02_NETWORK_TEST: suite === "cap02" ? "1" : "0" },
-    encoding: "utf8", timeout: ["accounting", "foundation"].includes(suite) ? 1200000 : 180000, windowsHide: true,
+  const recoveryOnly=cleanupRun || inspectFoundation || cleanupFoundation;
+  // Keep draining the tunnel while tests run; a synchronous child blocks those streams.
+  const run = recoveryOnly ? { status: 0, stdout: "", stderr: "" } : await new Promise(resolveRun => {
+    const child=spawn(process.execPath,args,{
+      cwd:suite!=="cap04"?resolve(root,"artifacts/api-server"):root,
+      env:{...process.env,TEST_DATABASE_URL:url.href,JWT_SECRET:randomBytes(32).toString("hex"),NODE_ENV:"test",CAP02_NETWORK_TEST:suite==="cap02"?"1":"0"},
+      stdio:["ignore","pipe","pipe"],windowsHide:true,
+    });
+    let stdout="",stderr="";
+    child.stdout.on("data",chunk=>{stdout+=chunk.toString();});child.stderr.on("data",chunk=>{stderr+=chunk.toString();});
+    const timer=setTimeout(()=>{
+      if(process.platform==="win32"&&child.pid)spawnSync("taskkill",["/PID",String(child.pid),"/T","/F"],{stdio:"ignore",windowsHide:true});
+      else child.kill("SIGTERM");
+    },["accounting","foundation"].includes(suite)?1200000:180000);
+    child.once("error",()=>{clearTimeout(timer);resolveRun({status:1,stdout,stderr:"Unable to start isolated test child"});});
+    child.once("close",status=>{clearTimeout(timer);resolveRun({status:status??1,stdout,stderr});});
   });
   // Print only known safe progress lines; errors may include a connection string.
   for (const line of (run.stdout ?? "").split(/\r?\n/)) if (/^(PASS:|Verified )/.test(line) || /Test Files|Tests |serializes simultaneous|prevents parallel replacement/.test(line)) console.log(line);
@@ -89,7 +125,7 @@ try {
     } finally { await cleanup.end(); }
   }
   if (run.status !== 0) throw new Error(`${suite.toUpperCase()} isolated PostgreSQL checks failed; no credentials logged`);
-  console.log(cleanupRun ? "PASS: isolated accounting run recovery; no regression tests executed" : `PASS: ${suite.toUpperCase()} isolated network PostgreSQL checks`);
+  console.log(recoveryOnly ? "PASS: isolated namespace inspection/recovery; no regression tests executed" : `PASS: ${suite.toUpperCase()} isolated network PostgreSQL checks`);
 } finally {
   if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(tunnel.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
   else tunnel.kill("SIGTERM");
