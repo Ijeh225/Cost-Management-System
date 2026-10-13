@@ -1,5 +1,11 @@
 # Accounting Policy Requirements
 
+Release2026-10-13 19:46 WAT: VAT/direct expense configuration engineering accepted
+and functional d8722c5 exact Railway8bf3da50-b5e2-457d-ac81-181020b70193 SUCCESS.
+Live health/auth and updated deployed OFF smoke PASS. Actual company approvals,
+head choices and figures remain outstanding; no production configuration or tax
+decision silently entered. Opening acceptance retained; Step10 still next.
+
 Acceptance update2026-10-13 19:38 WAT: structured VAT/direct expense setup,
 source review and posted reconciliation accepted in11distinct owned DB cases,
 419unit/API and built UI tests. Publishing inactive next; actual company tax

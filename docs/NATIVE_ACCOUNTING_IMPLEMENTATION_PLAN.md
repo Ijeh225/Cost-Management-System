@@ -1,5 +1,12 @@
 # Native Accounting Implementation Plan
 
+Release2026-10-13 19:46 WAT: VAT/direct expense configuration engineering complete
+and exact d8722c5 inactive deployment SUCCESS (8bf3da50-b5e2-457d-ac81-181020b70193).
+Health/auth/new deployed OFF proof PASS; original records and flags preserved.
+11distinct DB/419unit/API/built UI accepted. Actual company setup and tax/opening
+approvals remain separate. Step10 Balance Sheet/Management Accounts is next, not
+started. Current PROJECT_STATE overrides the historical snapshots below.
+
 Acceptance2026-10-13 19:38 WAT: VAT/direct expense engineering complete;
 11distinct DB/419unit/API/built UI/full build accepted. Publishing inactive next.
 Opening/Steps6-9 retained. Actual company configuration/approval/cutover remains

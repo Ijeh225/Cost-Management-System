@@ -2,6 +2,20 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-13
 
+### VAT / Direct Expense Exact Inactive Deployment PASS - 2026-10-13 19:46 WAT
+
+- Functional d8722c5 exact Railway8bf3da50-b5e2-457d-ac81-181020b70193 SUCCESS
+  at matching full hash. Post-success health200:ok and unauthenticated setup401.
+  Official SSH updated deployed VAT/direct/source/register and prior native OFF
+  smoke PASS; zero native connections/writes. Both production switches defaultOFF.
+- Final11distinct owned DB/419units/API/3prior skips/full build and built new/shared
+  browser/mobile tests PASS. Source aggregates preserved; namespaces []/tunnel closed.
+- No signed-in official VAT/source posting/live configuration/real tax return or
+  company-specific reconciliation claimed while inactive. Those need separately
+  approved real setup and activation; they are not failed engineering tests.
+- Existing app records/checkpoints retained; no new open defect from this task.
+  Step10 reporting remains unimplemented. Records publication follows.
+
 ### VAT / Direct Expense Controlled Acceptance PASS - 2026-10-13 19:38 WAT
 
 - Final10DB PASS1147s/55filtered + focused1PASS115s/65filtered =11distinct accepted

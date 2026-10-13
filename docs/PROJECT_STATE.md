@@ -2,6 +2,27 @@
 
 ## Current Work Register - Authoritative as of 2026-10-13
 
+### VAT / Direct Expenses Deployed INACTIVE / Exact Resume - 2026-10-13 19:46 WAT
+
+- Functional d8722c5b3da14a9ebd4eada0ef4edc2f0e92a260 committed/pushed; exact
+  Railway8bf3da50-b5e2-457d-ac81-181020b70193 SUCCESS/matching hash observed.
+  Post-success health200:ok, unauthenticated tax configuration API401. Official
+  SSH NEW deployed VAT/source/register and prior native OFF smoke PASS, zero
+  native DB connections/writes. Production switches remain unset/defaultOFF.
+- Final11distinct isolated DB/419unit/API/3prior skips/build/typechecks and built
+  new/shared UI acceptance retained. Owned namespaces [] and test tunnel closed;
+  public11source aggregates unchanged. No production schema, configuration, figures
+  or professional exemption approval seeded. Existing app records not modified.
+- Configuration feature is engineering complete, not company-specific live setup.
+  Operating instructions: ACCOUNTING_VAT_DIRECT_EXPENSE_SETUP.md. Approved real
+  chart/head choices, book/date/grants, tax basis/recovery, verified opening figures
+  and operational bank/AR/AP/deposit reconciliation precede separate activation.
+- Exact next: Step10 Balance Sheet/Management Accounts implementation on instruction,
+  alongside actual accounting setup approvals. No new confirmed defect left by this
+  task; legacy operational invoice forms/cash reports deliberately unchanged. Future
+  test-data clearance is separate and backed up. All earlier checkpoints retained.
+- Publish this exact release evidence in records commit; no further code change.
+
 ### VAT / Direct Expense Engineering Accepted / Publishing Inactive - 2026-10-13 19:38 WAT
 
 - Configuration/source review/posted register engineering complete. Final10DB

@@ -20,7 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-10-13 opening setup accepted/deployed inactive; VAT/direct expenses engineering accepted,11distinct DB/419unit/API/UI PASS; inactive publication next, 19:38 WAT](2026-10-13-accounting-policy-requirements.md)
+- [2026-10-13 opening setup retained; VAT/direct expenses accepted and exact d8722c5 deployed inactive,11distinct DB/419unit/API/UI PASS; Step10/real approvals next, 19:46 WAT](2026-10-13-accounting-policy-requirements.md)
 
 - [2026-10-12 Step9 engineering complete, exact710f58e inactive release verified; final9isolated/390unit/UI PASS; Step10 next, 18:18 WAT](2026-10-12-manual-journals.md)
 

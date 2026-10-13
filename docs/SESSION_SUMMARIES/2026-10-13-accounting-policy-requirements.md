@@ -1,5 +1,19 @@
 # Owner Accounting Requirements and Setup Gaps
 
+## 2026-10-13 19:46 WAT - Exact VAT / Direct Expense Release Verified
+
+- Functional d8722c5 committed/pushed; Railway8bf3da50-b5e2-457d-ac81-181020b70193
+  SUCCESS/matching full hash. Live health200:ok, unauthenticated tax API401 and
+  official SSH NEW deployed tax/native OFF smoke PASS, zero native connections/writes.
+- Final11distinct DB/419unit/API/3prior skips/full build/new and shared built UI
+  acceptance retained. Namespace []/closed tunnel/public11source preservation PASS.
+- Feature engineering complete/deployed inactive, not actual company tax approval
+  or real setup. Production defaultOFF and original records/checkpoints preserved.
+  No duplicate ledger/source cash, guessed historical VAT or automatic activation.
+- Next Step10 on instruction plus real chart/book/date/grants/exemption/recovery/
+  openings/operational reconciliation approvals. Future clean launch separate.
+  Both registers and operator/policy/plan/index updated; publish exact proof next.
+
 ## 2026-10-13 19:38 WAT - VAT / Direct Expense Accepted; Publishing Next
 
 - Final10DB PASS1147s + focused1PASS115s =11distinct tests (7new+4shared), not
