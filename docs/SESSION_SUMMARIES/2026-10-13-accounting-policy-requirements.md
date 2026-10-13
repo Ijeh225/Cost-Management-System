@@ -1,5 +1,56 @@
 # Owner Accounting Requirements and Setup Gaps
 
+## 2026-10-13 19:38 WAT - VAT / Direct Expense Accepted; Publishing Next
+
+- Final10DB PASS1147s + focused1PASS115s =11distinct tests (7new+4shared), not
+  duplicate executions counted as new cases. All money/source/review/SQL/history/
+  scope controls and shared invoice/opening/manual/GLTB accepted after first-run fixes.
+- Final419unit/API/3prior skips, complete build/typechecks/OFF smoke, built new
+  setup/payment/invoice classification/register and shared opening/manual/report
+  CSV/print/mobile/accessibility PASS; screenshots inspected.
+- Namespace inspection []/tunnel closed and11publicsource aggregates unchanged.
+  Protected remote checkpoint retained. Production current flags defaultOFF and
+  old deployed OFF smoke independently verified; no original record mutation.
+- Next functional commit/push/exact inactive deployment/health/auth/new bundle proof,
+  then publish release records. Actual approvals/chart/date/openings/operational
+  reconciliation and Step10 remain separate; no hidden legacy VAT/form rewrite.
+
+## 2026-10-13 19:22 WAT - Local Acceptance Passed / Final DB In Progress
+
+- Final419units/API/3prior skips, complete typechecks/build and OFF smoke PASS.
+  Built configuration/source/register, stable response retry, independent actions,
+  scope/refresh/error/mobile checks PASS; new screenshots inspected. Explicit mobile
+  dialog bounds now asserted after catching an initial clipped capture.
+- Existing opening/manual/GLTB CSV/print browser acceptance retained. All dummy-only.
+- First DB4PASS/2FAIL found canonical invoice-rule ordering and stale test config
+  selection; corrected, no relaxed guard. Final6new+4shared cases running on final
+  backend. Plain unrelated journal evidence remains excluded from VAT/register reads.
+- Next final DB result/cleanup, records/functional commit/push and exact inactive
+  deployment/health/deployed bundle verification. No live activation/data deletion.
+
+## 2026-10-13 19:12 WAT - VAT / Direct Expense Built; Acceptance Active
+
+- Reused engine/source identities; setup versions and independent decisions,
+  three direct heads, typed codes, exact supplier gross/net/recovery and item VAT
+  reconciliation built. Existing recorded totals are never silently rewritten.
+- Added source preview/draft inspection/independent posting and posted VAT register;
+  credit notes aggregate their reviewed reductions, no guessed mixed-code split.
+- Initial419units/3prior skips and build/typechecks PASS. Six owned DB tests and
+  built loopback desktop/mobile checks active; latest hardening final rerun pending.
+- No push or live native activation yet. Original app records/checkpoints retained;
+  future launch/date/balances/legal basis and Step10 remain separate.
+
+## 2026-10-13 18:40 WAT - VAT / Direct Expense Work Authorised
+
+- Status clarification: basic invoice VAT and generic expense adapters exist;
+  complete structured tax and approved separate cost heads are not yet configured.
+- Owner now authorises completing both, checking duplication, proper tests,
+  updating records and committing/pushing/deploying. Clean e7e4c24 verified.
+- Extend existing native engine with reviewed versioned configuration, explicit
+  transaction tax evidence and posted VAT reconciliation. No duplicate cash/source
+  facts, guessed historical VAT, professional exemption or live activation.
+- Implementation/acceptance/publication pending; Step10 separate. Real flags OFF.
+
 ## 2026-10-13 18:16 WAT - Exact Inactive Opening Release Verified
 
 - Functional9d2d070 committed/pushed; Railway6acdcd78-6a60-4816-950e-f2e84cbf4c9d

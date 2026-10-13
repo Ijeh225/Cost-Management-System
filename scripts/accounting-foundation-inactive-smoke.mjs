@@ -1,7 +1,7 @@
 // Safe deployed-bundle acceptance: no credentials, database connection or writes.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-const { NativeAccounting, accountingEnabled, buildSettlementJournal, previewOpeningBalances, buildInvoiceJournal, buildOperationalJournal, buildReviewedOpening, buildAccountingReport } =
+const { NativeAccounting, accountingEnabled, buildSettlementJournal, previewOpeningBalances, buildInvoiceJournal, buildOperationalJournal, buildReviewedOpening, buildAccountingReport,calculateVat } =
   createRequire(import.meta.url)("../artifacts/api-server/dist/accounting-foundation.cjs");
 assert.equal(accountingEnabled(), false, "This smoke is for an INACTIVE release only");
 assert.notEqual(process.env.NATIVE_ACCOUNTING_SCHEMA_ENABLED, "true", "Live schema must remain inactive");
@@ -38,6 +38,11 @@ const opening={bookId:1,branchId:2,currency:"NGN",cutoverDate:"2026-10-11",polic
 assert.equal(buildReviewedOpening(opening).status,"reviewed_draft");
 let connections = 0;
 const engine = new NativeAccounting({ connect: async () => { connections++; throw new Error("Smoke must not connect"); } });
+assert.equal(calculateVat("107.50","inclusive",{code:"DUMMY",name:"Dummy",treatment:"taxable",rate:"7.5",recoverablePercent:"40",basisEvidence:"Dummy approved basis"}).recoverable,"3.00");
+for(const run of [()=>engine.taxWorkspace(1,2,3),()=>engine.prepareTaxConfiguration(1,2,3,{}),()=>engine.taxConfigurationAction(1,2,3,4,"approve","Dummy"),
+  ()=>engine.configuredSource(1,2,3,"invoice",4),()=>engine.configuredJournal(1,2,3,4),()=>engine.reviewConfiguredSource(1,2,3,{kind:"duty_reversal",id:4,evidence:"Dummy"}),
+  ()=>engine.postConfiguredSource(1,2,3,4,"Dummy"),()=>engine.taxRegister(1,2,3,"2026-10-01","2026-10-13")])
+  await assert.rejects(run,{code:"ACCOUNTING_DISABLED"});
 for(const run of [()=>engine.openingWorkspace(1,2,3),()=>engine.openingDetails(1,2,3,4),()=>engine.previewOpeningSetup(1,2,3,{}),
   ()=>engine.prepareOpeningSetup(1,2,3,{}),()=>engine.openingAction(1,2,3,4,"verify","Dummy")])
   await assert.rejects(run,{code:"ACCOUNTING_DISABLED"});
@@ -68,4 +73,4 @@ const gl=buildAccountingReport(reportAccounts,reportLines,reportFilter,"general-
 assert.equal(tb.totals.debit,"0.30");assert.equal(tb.totals.credit,"0.30");assert.equal(tb.balanced,true);
 assert.deepEqual(tb.totals,gl.totals);
 assert.equal(connections, 0);
-console.log("PASS: deployed inactive accounting bundle, opening setup/verification, settlement/invoice/operational/opening previews, exact GL/TB, manual journal/review/reversal and report/reconciliation/posting gates; zero database connections/writes");
+console.log("PASS: deployed inactive accounting bundle, VAT/direct expense configuration and source review/register, opening setup/verification, settlement/invoice/operational/opening previews, exact GL/TB, manual journal/review/reversal and report/reconciliation/posting gates; zero database connections/writes");

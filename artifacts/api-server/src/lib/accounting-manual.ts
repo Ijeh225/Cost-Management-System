@@ -25,6 +25,7 @@ export function manualInput(bookId:number,branchId:number,currency:string,reques
 }
 export function mappedControlAccounts(mapping:Record<string,unknown>):number[] {
   const keys=["cashAccountId","receivableAccountId","depositLiabilityAccountId","controlAccountId","vatAccountId"];
-  return [...new Set([...keys.map(k=>mapping[k]),...Object.values((mapping.bankAccounts??{}) as Record<string,unknown>)])]
+  return [...new Set([...keys.map(k=>mapping[k]),(mapping.purchaseTax as {inputVatAccountId?:number}|undefined)?.inputVatAccountId,
+    ...Object.values((mapping.bankAccounts??{}) as Record<string,unknown>)])]
     .filter((id):id is number=>Number.isSafeInteger(id) && (id as number)>0);
 }

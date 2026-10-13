@@ -9,6 +9,7 @@ import type { InvoiceAccountingMapping } from "../lib/accounting-invoice-mapping
 import type { OperationalMapping,OperationalRef } from "../lib/accounting-operational-mapping";
 import type { ReviewedOpening } from "../lib/accounting-reviewed-opening";
 import type { ManualAdjustment } from "../lib/accounting-manual";
+import type { TaxConfiguration } from "../lib/accounting-tax";
 
 const schema = `acct_foundation_${Date.now()}_${randomBytes(4).toString("hex")}`;
 const previousEnabled = process.env.NATIVE_ACCOUNTING_ENABLED;
@@ -142,6 +143,150 @@ async function standalone(f:OperationalFixture,classification="operating_expense
     VALUES($1,$2,$3,$4,'transfer','2026-10-10 14:00:00',$5,'Dummy voucher','2026-10-10 14:01:00',1,'Dummy expense head') RETURNING id`,
     [f.branch,schedule,amount,bank,classification])).rows[0].id as number;
 }
+async function taxFixture() {
+  const f=await operationalFixture();
+  const input=await service.addAccount(f.book,f.branch,f.owner,"1400","Dummy input VAT","asset"),output=await service.addAccount(f.book,f.branch,f.owner,"2200","Dummy output VAT","liability");
+  const shipping=await service.addAccount(f.book,f.branch,f.owner,"5010","Dummy shipping expense","expense"),terminal=await service.addAccount(f.book,f.branch,f.owner,"5020","Dummy terminal expense","expense");
+  await service.grantAccess(f.book,f.branch,f.owner,f.approver,"configure","Dummy independent configuration reviewer");
+  const request:TaxConfiguration={requestId:randomBytes(8).toString('hex'),policyVersion:"isolated-only-v1",effectiveFrom:"2026-10-01",ownerEvidence:"Dummy owner policy",accountantEvidence:"Dummy accountant policy",
+    inputVatAccountId:input,outputVatAccountId:output,dutyAccountId:f.expense,shippingAccountId:shipping,terminalAccountId:terminal,
+    codes:[{code:"STD",name:"Dummy taxable recoverable",treatment:"taxable",rate:"7.5",recoverablePercent:"100",basisEvidence:"Dummy approved taxable/recovery basis"},
+      {code:"COST",name:"Dummy taxable in cost",treatment:"taxable",rate:"7.5",recoverablePercent:"0",basisEvidence:"Dummy cost basis"},
+      {code:"MIXED",name:"Dummy 40 percent",treatment:"taxable",rate:"7.5",recoverablePercent:"40",basisEvidence:"Dummy apportionment"},
+      {code:"EXEMPT",name:"Dummy exempt",treatment:"exempt",rate:"0",recoverablePercent:"0",basisEvidence:"Dummy exemption review; NOT legal advice"},
+      {code:"ZERO",name:"Dummy zero-rated",treatment:"zero_rated",rate:"0",recoverablePercent:"0",basisEvidence:"Dummy zero basis"}]};
+  return {...f,input,output,shipping,terminal,request};
+}
+async function approveTax(f:Awaited<ReturnType<typeof taxFixture>>,request=f.request) {
+  const version=await service.prepareTaxConfiguration(f.book,f.branch,f.owner,request);
+  await service.taxConfigurationAction(f.book,f.branch,f.approver,version.id,"approve","Dummy independent full configuration review");return version.id as number;
+}
+async function taxPayment(f:Awaited<ReturnType<typeof taxFixture>>,section:string|null=null,amount="107.50",date="2026-10-10 12:00:00") {
+  return section===null?(await sql(`INSERT INTO duty_payment_transactions(branch_id,container_id,bank_id,amount,payment_method,paid_at,entry_type)
+    VALUES($1,$2,$3,$4,'transfer',$5,'payment') RETURNING id`,[f.branch,f.container,f.bank,amount,date])).rows[0].id as number:
+    (await sql(`INSERT INTO container_expense_payments(branch_id,container_id,bank_id,amount,payment_method,paid_at,section)
+    VALUES($1,$2,$3,$4,'transfer',$5,$6) RETURNING id`,[f.branch,f.container,f.bank,amount,date,section])).rows[0].id as number;
+}
+describe("VAT/direct expense configuration integration",()=>{
+  it("protects configured tax controls and repeats the migration without mutation or cross-scope audit links",async()=>{
+    const f=await taxFixture(),cfg=await approveTax(f);
+    const snapshot=(await sql('SELECT payload,payload_hash,state FROM accounting_tax_configurations WHERE id=$1',[cfg])).rows[0];
+    await ensureAccountingFoundationSchema(database as Pick<typeof pool,'connect'>);
+    expect((await sql('SELECT payload,payload_hash,state FROM accounting_tax_configurations WHERE id=$1',[cfg])).rows[0]).toEqual(snapshot);
+    const chart=(await sql('SELECT id FROM accounting_accounts WHERE book_id=$1',[f.book])).rows;
+    await expect(service.reviewManualAccounts(f.book,f.owner,{ownerEvidence:'Dummy',accountantEvidence:'Dummy',accounts:chart.map(a=>({accountId:a.id,role:a.id===f.input?'adjustment':'protected'}))})).rejects.toMatchObject({code:'PROTECTED_ACCOUNT'});
+    const client=await database.connect();
+    try{await client.query('BEGIN');await client.query("INSERT INTO accounting_audit(book_id,branch_id,actor_id,action,reason) VALUES($1,$2,$3,'manual_accounts_reviewed','Dummy raw protected-account probe')",[f.book,f.branch,f.owner]);
+      await expect(client.query("INSERT INTO accounting_manual_account_rules(book_id,account_id,role,policy_version,evidence,approved_by) VALUES($1,$2,'adjustment','isolated-only-v1','Dummy',$3)",[f.book,f.input,f.owner])).rejects.toThrow('Configured tax controls');
+    }finally{await client.query('ROLLBACK');client.release();}
+    const other=await fixture();
+    await expect(sql("INSERT INTO accounting_audit(book_id,branch_id,actor_id,action,reason,tax_configuration_id) VALUES($1,$2,$3,'bad_tax_scope','Dummy forbidden audit',$4)",[other.book,other.branch,other.owner,cfg])).rejects.toThrow('exact configuration scope');
+    await service.reviewManualAccounts(f.book,f.owner,{ownerEvidence:'Dummy owner',accountantEvidence:'Dummy accountant',accounts:chart.map(a=>({accountId:a.id,role:'protected'}))});
+    expect((await sql("SELECT role FROM accounting_manual_account_rules WHERE book_id=$1 AND account_id=$2",[f.book,f.input])).rows[0].role).toBe('protected');
+  },240000);
+  it("retains independent immutable configuration and serializes duplicate approval with SQL guards",async()=>{
+    const f=await taxFixture();
+    const prepared=await Promise.all([1,2].map(()=>service.prepareTaxConfiguration(f.book,f.branch,f.owner,f.request)));
+    expect(prepared[0]!.id).toBe(prepared[1]!.id);
+    await expect(service.taxConfigurationAction(f.book,f.branch,f.owner,prepared[0]!.id,"approve","Self review")).rejects.toMatchObject({code:"SELF_APPROVAL"});
+    await expect(service.prepareTaxConfiguration(f.book,f.branch,f.owner,{...f.request,ownerEvidence:"Changed"})).rejects.toMatchObject({code:"DUPLICATE_CONFLICT"});
+    await expect(sql("UPDATE accounting_tax_configurations SET state='approved',reviewed_by=$2,decision_reason='SQL attempt',approved_at=now() WHERE id=$1",[prepared[0]!.id,f.approver])).rejects.toThrow("audit");
+    await Promise.all([1,2].map(()=>service.taxConfigurationAction(f.book,f.branch,f.approver,prepared[0]!.id,"approve","Dummy independent review")));
+    expect((await service.taxWorkspace(f.book,f.branch,f.approver)).versions[0].state).toBe("approved");
+    expect((await sql("SELECT count(*)::int n FROM accounting_audit WHERE tax_configuration_id=$1 AND action='tax_configuration_approved'",[prepared[0]!.id])).rows[0].n).toBe(1);
+    await expect(sql("UPDATE accounting_tax_configurations SET payload=jsonb_set(payload,'{dutyAccountId}',to_jsonb($2::int)) WHERE id=$1",[prepared[0]!.id,f.shipping])).rejects.toThrow("Immutable");
+    await expect(sql("DELETE FROM accounting_tax_configurations WHERE id=$1",[prepared[0]!.id])).rejects.toThrow("cannot be deleted");
+    await expect(service.prepareTaxConfiguration(f.book,f.branch,f.operations,f.request)).rejects.toMatchObject({code:"FORBIDDEN"});
+    await expect(service.prepareTaxConfiguration(f.book,f.branch,f.owner,{...f.request,requestId:randomBytes(8).toString('hex'),inputVatAccountId:f.expense})).rejects.toMatchObject({code:"INVALID_MAPPING"});
+  },180000);
+  it("posts three direct heads with exact recoverable/nonrecoverable splits and unchanged source cash",async()=>{
+    const f=await taxFixture(),cfg=await approveTax(f);
+    for(const [section,head,code,expense,tax] of [[null,f.expense,'STD','10000','750'],['shipping',f.shipping,'COST','10750','0'],['terminal',f.terminal,'MIXED','10450','300']] as const) {
+      const id=await taxPayment(f,section),kind=section===null?'duty_payment':'container_payment';
+      const before=(await sql(`SELECT row_to_json(p) data FROM ${section===null?'duty_payment_transactions':'container_expense_payments'} p WHERE id=$1`,[id])).rows[0].data;
+      const request={kind,id,evidence:"Dummy supplier tax voucher",configurationId:cfg,taxCode:code,basis:'inclusive' as const,taxAmount:'107.50',settlementAccountId:f.debit} as const;
+      const preview=await service.reviewConfiguredSource(f.book,f.branch,f.preparer,request);expect(preview.kind).toBe('preview');if(preview.kind==='preview')expect(preview.cashMovement).toBe('-107.50');
+      const prepared=await Promise.all([1,2].map(()=>service.reviewConfiguredSource(f.book,f.branch,f.preparer,request,true)));
+      expect(prepared[0]!.kind).toBe('prepared');if(prepared[0]!.kind!=='prepared')throw Error('missing draft');const journal=prepared[0]!.id;
+      expect((await sql("SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1 AND event_key=$2",[f.book,`source:${kind}:${id}:v1`])).rows[0].n).toBe(1);
+      await service.postConfiguredSource(f.book,f.branch,f.approver,journal,'Dummy independent supplier review');
+      const values=await balances(f);expect(values.get(head)).toBe(expense);
+      expect((await sql("SELECT coalesce(sum(debit_minor),0)::text d FROM accounting_journal_lines WHERE journal_id=$1 AND account_id=$2",[journal,f.input])).rows[0].d).toBe(tax);
+      expect((await sql(`SELECT row_to_json(p) data FROM ${section===null?'duty_payment_transactions':'container_expense_payments'} p WHERE id=$1`,[id])).rows[0].data).toEqual(before);
+    }
+    const values=await balances(f);expect(values.get(f.debit)).toBe('-32250');expect(values.get(f.input)).toBe('1050');
+    const report=await service.taxRegister(f.book,f.branch,f.preparer,'2026-10-01','2026-10-13');
+    expect(report.unclassified).toBe(0);expect(report.totals).toMatchObject({netPurchases:'300.00',purchaseVat:'22.50',recoverable:'10.50',nonRecoverable:'12.00'});
+    const tb=await service.accountingReport(f.book,f.branch,f.preparer,'trial-balance',{from:'2026-10-01',to:'2026-10-13',includeZero:true,includeInactive:false});expect(tb.balanced).toBe(true);
+    const wrong=await taxPayment(f,'shipping');await expect(service.reviewConfiguredSource(f.book,f.branch,f.preparer,{kind:'container_payment',id:wrong,evidence:'Dummy',configurationId:cfg,taxCode:'STD',basis:'exclusive',taxAmount:'107.50',settlementAccountId:f.debit})).rejects.toMatchObject({code:'TAX_SOURCE_MISMATCH'});
+  },240000);
+  it("reuses original duty VAT/head on a later reversal instead of newer configuration",async()=>{
+    const f=await taxFixture(),cfg=await approveTax(f),id=await taxPayment(f),request={kind:'duty_payment' as const,id,evidence:'Dummy',configurationId:cfg,taxCode:'STD',basis:'exclusive' as const,taxAmount:'100',settlementAccountId:f.debit};
+    const d=await service.reviewConfiguredSource(f.book,f.branch,f.preparer,request,true);if(d.kind!=='prepared')throw Error('draft missing');await service.postConfiguredSource(f.book,f.branch,f.approver,d.id,'Dummy independent approval');
+    await approveTax(f,{...f.request,requestId:randomBytes(8).toString('hex'),effectiveFrom:'2026-10-11',codes:f.request.codes.map(c=>c.treatment==='taxable'?{...c,rate:'10',recoverablePercent:'0'}:c)});
+    const reverse=(await sql(`INSERT INTO duty_payment_transactions(branch_id,container_id,bank_id,amount,payment_method,paid_at,entry_type,reversal_of_transaction_id)
+      VALUES($1,$2,$3,-107.50,'transfer','2026-10-12 12:00:00','reversal',$4) RETURNING id`,[f.branch,f.container,f.bank,id])).rows[0].id;
+    const reversal=await service.reviewConfiguredSource(f.book,f.branch,f.preparer,{kind:'duty_reversal',id:reverse,evidence:'Dummy recorded full reversal'},true);if(reversal.kind!=='prepared')throw Error('reverse missing');
+    await service.postConfiguredSource(f.book,f.branch,f.approver,reversal.id,'Dummy independent reversal');
+    const result=await service.taxRegister(f.book,f.branch,f.preparer,'2026-10-01','2026-10-13');expect(result.totals.recoverable).toBe('0.00');expect(result.totals.purchaseVat).toBe('0.00');expect(result.rows[1]!.configurationId).toBe(cfg);
+    expect([...(await balances(f)).values()].every(v=>v==='0')).toBe(true);
+  },240000);
+  it("reconciles mixed invoice classifications and credit-note VAT with no second cash event",async()=>{
+    const f=await taxFixture(),cfg=await approveTax(f),ar=await service.addAccount(f.book,f.branch,f.owner,'1100','Dummy AR','asset'),income=await service.addAccount(f.book,f.branch,f.owner,'4000','Dummy service revenue','income');
+    const customer=(await sql('INSERT INTO clients(branch_id) VALUES($1) RETURNING id',[f.branch])).rows[0].id;
+    const inv=(await sql("INSERT INTO invoices(branch_id,client_id,status,subtotal,vat_amount,total) VALUES($1,$2,'sent',100,4.50,104.50) RETURNING id",[f.branch,customer])).rows[0].id;
+    const items=(await sql('INSERT INTO invoice_items(invoice_id,branch_id,amount) VALUES($1,$2,60),($1,$2,40) RETURNING id',[inv,f.branch])).rows;
+    const request={kind:'invoice' as const,id:inv,evidence:'Dummy issued bundled service review',configurationId:cfg,taxCode:'STD',recognitionDate:'2026-10-10',receivableAccountId:ar,incomeAccountId:income,items:[{itemId:items[0].id,code:'STD'},{itemId:items[1].id,code:'EXEMPT'}]};
+    const draft=await service.reviewConfiguredSource(f.book,f.branch,f.preparer,request,true);if(draft.kind!=='prepared')throw Error('missing');await service.postConfiguredSource(f.book,f.branch,f.approver,draft.id,'Dummy independently matched invoice VAT');
+    const note=(await sql("INSERT INTO credit_notes(invoice_id,status,branch_id,amount,credit_note_number,reason) VALUES($1,'active',$2,10.45,'DUMMY-TAX-CN','Dummy reduction') RETURNING id",[inv,f.branch])).rows[0].id;
+    await sql("INSERT INTO invoice_payments(branch_id,invoice_id,amount,paid_at,payment_method,reference) VALUES($1,$2,10.45,'2026-10-10 12:00:00','credit_note','DUMMY-TAX-CN')",[f.branch,inv]);
+    await postOperational(f,{kind:'credit_note',id:note},{currency:'NGN',policyVersion:f.request.policyVersion,evidence:'Dummy note',effect:'credit_note',receivableAccountId:ar,clientCreditAccountId:f.credit,
+      reductions:[{accountId:income,amount:'10',category:'income',evidence:'Dummy original net reduction'}],vatAccountId:f.output,vatReduction:'0.45',vatEvidence:'Dummy original recorded VAT reduction'});
+    const register=await service.taxRegister(f.book,f.branch,f.preparer,'2026-10-01','2026-10-13');expect(register.totals.outputVat).toBe('4.05');expect(register.totals.netSales).toBe('90.00');expect(register.unclassified).toBe(0);
+    const values=await balances(f);expect(values.get(f.output)).toBe('-405');expect(values.has(f.debit)).toBe(false);
+    const second=(await sql("INSERT INTO invoices(branch_id,client_id,status,subtotal,vat_amount,total) VALUES($1,$2,'sent',100,0,100) RETURNING id",[f.branch,customer])).rows[0].id;
+    await sql('INSERT INTO invoice_items(invoice_id,branch_id,amount) VALUES($1,$2,100)',[second,f.branch]);
+    await expect(service.reviewConfiguredSource(f.book,f.branch,f.preparer,{...request,id:second,items:undefined,taxCode:'STD'})).rejects.toMatchObject({code:'TAX_SOURCE_MISMATCH'});
+    const zero=await service.reviewConfiguredSource(f.book,f.branch,f.preparer,{...request,id:second,items:undefined,taxCode:'ZERO'},true);if(zero.kind!=='prepared')throw Error('zero missing');await service.postConfiguredSource(f.book,f.branch,f.approver,zero.id,'Dummy zero rated review');
+    expect((await service.taxRegister(f.book,f.branch,f.preparer,'2026-10-01','2026-10-13')).rows.some(r=>r.treatment==='zero_rated')).toBe(true);
+  },240000);
+  it("blocks stale draft rules, wrong heads, scope leaks and unreviewed configured source adapters",async()=>{
+    const f=await taxFixture(),cfg=await approveTax(f),id=await taxPayment(f);
+    await expect(service.previewOperational(f.book,f.branch,f.preparer,{kind:'duty_payment',id},f.mapping)).rejects.toMatchObject({code:'TAX_REVIEW_REQUIRED'});
+    const request={kind:'duty_payment' as const,id,evidence:'Dummy',configurationId:cfg,taxCode:'STD',basis:'inclusive' as const,taxAmount:'107.50',settlementAccountId:f.debit};
+    const draft=await service.reviewConfiguredSource(f.book,f.branch,f.preparer,request,true);if(draft.kind!=='prepared')throw Error('missing');
+    const replacement=await approveTax(f,{...f.request,requestId:randomBytes(8).toString('hex'),effectiveFrom:'2026-10-10'});
+    await expect(service.postConfiguredSource(f.book,f.branch,f.approver,draft.id,'Refuse stale applicable version')).rejects.toMatchObject({code:'TAX_CONFIGURATION_CHANGED'});
+    await expect(service.reviewConfiguredSource(f.book,f.branch,f.operations,request)).rejects.toMatchObject({code:'FORBIDDEN'});
+    await expect(service.reviewConfiguredSource(f.book,f.branch,f.preparer,{...request,configurationId:replacement,settlementAccountId:f.input})).rejects.toMatchObject({code:'INVALID_MAPPING'});
+    const other=await taxFixture();await expect(service.configuredSource(f.book,f.branch,f.preparer,'duty_payment',await taxPayment(other))).rejects.toMatchObject({code:'NOT_FOUND'});
+    await service.revokeAccess(f.book,f.branch,f.owner,f.approver,'configure','Dummy revocation');
+    const next=await service.prepareTaxConfiguration(f.book,f.branch,f.owner,{...f.request,requestId:randomBytes(8).toString('hex'),effectiveFrom:'2026-10-11'});
+    await expect(service.taxConfigurationAction(f.book,f.branch,f.approver,next.id,'approve','Revoked review')).rejects.toMatchObject({code:'FORBIDDEN'});
+  },240000);
+  it("refuses retroactive configuration, preserves rejected versions and fails OFF before connection",async()=>{
+    const f=await taxFixture(),cfg=await approveTax(f),id=await taxPayment(f);
+    const draft=await service.reviewConfiguredSource(f.book,f.branch,f.preparer,{kind:'duty_payment',id,evidence:'Dummy',configurationId:cfg,taxCode:'EXEMPT',basis:'inclusive',taxAmount:'107.50',settlementAccountId:f.debit},true);
+    if(draft.kind!=='prepared')throw Error('missing');await service.postConfiguredSource(f.book,f.branch,f.approver,draft.id,'Dummy exempt duty evidence');
+    const next=await service.prepareTaxConfiguration(f.book,f.branch,f.owner,{...f.request,requestId:randomBytes(8).toString('hex'),effectiveFrom:'2026-10-10'});
+    await expect(service.taxConfigurationAction(f.book,f.branch,f.approver,next.id,'approve','No retroactive rewrite')).rejects.toMatchObject({code:'HISTORY_REVIEW_REQUIRED'});
+    await service.taxConfigurationAction(f.book,f.branch,f.approver,next.id,'reject','Dummy explicit historical conflict rejection');
+    expect((await service.taxWorkspace(f.book,f.branch,f.owner)).versions[0].state).toBe('rejected');
+    const ordinary=await service.prepareJournal(f.preparer,{...input(f),eventKey:`dummy_plain_${randomBytes(8).toString('hex')}`,evidence:'Plain-text evidence, not source JSON'});
+    await service.approveAndPost(f.book,f.branch,f.approver,ordinary.id,'Dummy normal journal');
+    expect((await service.taxWorkspace(f.book,f.branch,f.owner)).journals).toHaveLength(1);
+    expect((await service.taxRegister(f.book,f.branch,f.preparer,'2026-10-01','2026-10-13')).rows).toHaveLength(1);
+    await expect(service.configuredJournal(f.book,f.branch,f.preparer,ordinary.id)).rejects.toMatchObject({code:'NOT_FOUND'});
+    expect((await service.configuredJournal(f.book,f.branch,f.preparer,draft.id)).status).toBe('posted');
+    const old=process.env.NATIVE_ACCOUNTING_ENABLED;delete process.env.NATIVE_ACCOUNTING_ENABLED;
+    try{let connections=0;const off=new NativeAccounting({connect:async()=>{connections++;throw Error('Must not connect');}} as any);
+      for(const run of [()=>off.taxWorkspace(1,2,3),()=>off.prepareTaxConfiguration(1,2,3,f.request),()=>off.taxConfigurationAction(1,2,3,4,'approve','Dummy'),
+        ()=>off.configuredSource(1,2,3,'invoice',4),()=>off.reviewConfiguredSource(1,2,3,{kind:'duty_reversal',id:4,evidence:'Dummy'}),()=>off.postConfiguredSource(1,2,3,4,'Dummy'),()=>off.taxRegister(1,2,3,'2026-10-01','2026-10-13')])
+        await expect(run()).rejects.toMatchObject({code:'ACCOUNTING_DISABLED'});expect(connections).toBe(0);
+    }finally{process.env.NATIVE_ACCOUNTING_ENABLED=old;}
+  },240000);
+});
+
 describe("Step7 remaining operational source integration",()=>{
   it("posts duty reversal, container cost and bank movements once with zero source mutation",async()=>{
     const f=await operationalFixture();

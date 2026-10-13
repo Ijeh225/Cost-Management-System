@@ -88,7 +88,8 @@ export function AppSidebar() {
     ...(canAccessFinance ? [{ title: "General Ledger", url: "/accounting/general-ledger", icon: BookOpen },
       { title: "Trial Balance", url: "/accounting/trial-balance", icon: BarChart2 },
       { title: "Manual Journals", url: "/accounting/manual-journals", icon: BookOpen },
-      { title: "Opening Balances", url: "/accounting/opening-balances", icon: BookOpen }] : []),
+      { title: "Opening Balances", url: "/accounting/opening-balances", icon: BookOpen },
+      { title: "VAT / Direct Expenses", url: "/accounting/tax-configuration", icon: BookOpen }] : []),
     { title: "My Tasks",        url: "/my-tasks",       icon: ListTodo         },
     { title: "Notifications",   url: "/notifications",  icon: Bell, badge: unreadCount, badgeLoading: notificationsLoading },
     ...(staffCanUpload ? [{ title: "Upload Data", url: "/containers/upload", icon: UploadCloud }] : []),
@@ -142,7 +143,8 @@ export function AppSidebar() {
   if (isDepartmentUser && canAccessFinance) deptNav.push({title:"General Ledger",url:"/accounting/general-ledger",icon:BookOpen},
     {title:"Trial Balance",url:"/accounting/trial-balance",icon:BarChart2},
     {title:"Manual Journals",url:"/accounting/manual-journals",icon:BookOpen},
-    {title:"Opening Balances",url:"/accounting/opening-balances",icon:BookOpen});
+    {title:"Opening Balances",url:"/accounting/opening-balances",icon:BookOpen},
+    {title:"VAT / Direct Expenses",url:"/accounting/tax-configuration",icon:BookOpen});
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" className="border-r border-border/50">

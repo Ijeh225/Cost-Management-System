@@ -15,6 +15,16 @@ export {
   PrepareOpeningSetupParams,
   PreviewOpeningSetupParams,
   ActOnOpeningSetupParams,
+  GetTaxConfigurationWorkspaceParams,
+  PrepareTaxConfigurationParams,
+  ActOnTaxConfigurationParams,
+  GetTaxSourceParams,
+  PreviewTaxSourceParams,
+  PrepareTaxSourceParams,
+  PostTaxSourceParams,
+  PostTaxSourceBody,
+  GetPostedTaxRegisterParams,
+  GetConfiguredTaxJournalParams,
 } from "./generated/api";
 export * from "./generated/types";
 export type {
@@ -34,4 +44,14 @@ export type {
   PrepareOpeningSetupParams as PrepareOpeningSetupQuery,
   PreviewOpeningSetupParams as PreviewOpeningSetupQuery,
   ActOnOpeningSetupParams as ActOnOpeningSetupQuery,
+  GetTaxConfigurationWorkspaceParams as GetTaxConfigurationWorkspaceQuery,
+  PrepareTaxConfigurationParams as PrepareTaxConfigurationQuery,
+  ActOnTaxConfigurationParams as ActOnTaxConfigurationQuery,
+  GetTaxSourceParams as GetTaxSourceQuery,
+  PreviewTaxSourceParams as PreviewTaxSourceQuery,
+  PrepareTaxSourceParams as PrepareTaxSourceQuery,
+  PostTaxSourceParams as PostTaxSourceQuery,
+  PostTaxSourceBody as PostTaxSourceRequestBody,
+  GetPostedTaxRegisterParams as GetPostedTaxRegisterQuery,
+  GetConfiguredTaxJournalParams as GetConfiguredTaxJournalQuery,
 } from "./generated/types";

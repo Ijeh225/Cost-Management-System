@@ -38,6 +38,19 @@ CREATE TABLE IF NOT EXISTS accounting_periods (
  starts_on DATE NOT NULL, ends_on DATE NOT NULL, status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed')),
  CHECK(starts_on<=ends_on), UNIQUE(id,book_id)
 );
+CREATE TABLE IF NOT EXISTS accounting_tax_configurations (
+ id SERIAL PRIMARY KEY, book_id INTEGER NOT NULL, branch_id INTEGER NOT NULL,
+ request_id TEXT NOT NULL CHECK(request_id ~ '^[a-zA-Z0-9_-]{8,80}$'), effective_from DATE NOT NULL,
+ policy_version TEXT NOT NULL, payload JSONB NOT NULL, payload_hash TEXT NOT NULL CHECK(payload_hash ~ '^[a-f0-9]{64}$'),
+ state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','approved','rejected','cancelled')),
+ prepared_by INTEGER NOT NULL REFERENCES users(id), reviewed_by INTEGER REFERENCES users(id),
+ decision_reason TEXT, approved_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ UNIQUE(book_id,branch_id,request_id), FOREIGN KEY(book_id,branch_id) REFERENCES accounting_book_branches(book_id,branch_id),
+ CHECK(state='pending' OR (reviewed_by IS NOT NULL AND length(trim(decision_reason))>0)),
+ CHECK(state<>'approved' OR (reviewed_by<>prepared_by AND approved_at IS NOT NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS accounting_tax_one_pending ON accounting_tax_configurations(book_id,branch_id) WHERE state='pending';
+CREATE UNIQUE INDEX IF NOT EXISTS accounting_tax_effective_version ON accounting_tax_configurations(book_id,branch_id,effective_from) WHERE state='approved';
 CREATE TABLE IF NOT EXISTS accounting_grants (
  book_id INTEGER NOT NULL, branch_id INTEGER NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id),
  permission TEXT NOT NULL CHECK(permission IN ('read','configure','prepare','post','reverse','close','reopen')),
@@ -106,6 +119,7 @@ CREATE TABLE IF NOT EXISTS accounting_opening_setup (
 CREATE UNIQUE INDEX IF NOT EXISTS accounting_one_current_opening_setup ON accounting_opening_setup(book_id,branch_id)
  WHERE state IN ('pending','verified');
 ALTER TABLE accounting_audit ADD COLUMN IF NOT EXISTS opening_setup_id INTEGER REFERENCES accounting_opening_setup(id);
+ALTER TABLE accounting_audit ADD COLUMN IF NOT EXISTS tax_configuration_id INTEGER REFERENCES accounting_tax_configurations(id);
 
 CREATE OR REPLACE FUNCTION accounting_opening_guard() RETURNS TRIGGER LANGUAGE plpgsql SET search_path FROM CURRENT AS $$
 DECLARE a accounting_audit%ROWTYPE;
@@ -214,6 +228,9 @@ BEGIN
    OR EXISTS(SELECT 1 FROM accounting_book_branches b WHERE b.book_id=NEW.book_id AND NOT accounting_has_grant(b.book_id,b.branch_id,NEW.approved_by,'configure'))
    OR NOT EXISTS(SELECT 1 FROM accounting_audit WHERE book_id=NEW.book_id AND actor_id=NEW.approved_by AND action='manual_accounts_reviewed' AND xmin::text=pg_current_xact_id()::text)
    THEN RAISE EXCEPTION 'Documented owner/accountant account protection review required'; END IF;
+   IF NEW.role='adjustment' AND EXISTS(SELECT 1 FROM accounting_tax_configurations WHERE book_id=NEW.book_id AND state='approved'
+     AND NEW.account_id IN ((payload->>'inputVatAccountId')::integer,(payload->>'outputVatAccountId')::integer))
+   THEN RAISE EXCEPTION 'Configured tax controls must remain protected'; END IF;
  ELSE
    SELECT * INTO j FROM accounting_journals WHERE id=NEW.journal_id AND book_id=NEW.book_id FOR UPDATE;
    IF j.status IS DISTINCT FROM 'draft' OR (j.event_key NOT LIKE 'adjustment:%' AND j.kind<>'reversal') THEN RAISE EXCEPTION 'Manual draft required'; END IF;
@@ -248,6 +265,11 @@ BEGIN
  PERFORM pg_advisory_xact_lock(804610,b);
  IF TG_OP='UPDATE' AND NEW.book_id<>OLD.book_id THEN RAISE EXCEPTION 'Accounting book is immutable'; END IF;
  IF TG_TABLE_NAME='accounting_audit' AND TG_OP<>'INSERT' THEN RAISE EXCEPTION 'Accounting audit is immutable'; END IF;
+ IF TG_TABLE_NAME='accounting_audit' THEN
+   IF NEW.tax_configuration_id IS NOT NULL AND NOT EXISTS(
+     SELECT 1 FROM accounting_tax_configurations WHERE id=NEW.tax_configuration_id AND book_id=NEW.book_id AND branch_id=NEW.branch_id)
+   THEN RAISE EXCEPTION 'Tax audit must link the exact configuration scope'; END IF;
+ END IF;
  IF TG_TABLE_NAME='accounting_source_events' AND TG_OP<>'INSERT' THEN RAISE EXCEPTION 'Accounting event link is immutable'; END IF;
  IF TG_TABLE_NAME='accounting_journal_lines' THEN
    SELECT * INTO j FROM accounting_journals WHERE id=CASE WHEN TG_OP='DELETE' THEN OLD.journal_id ELSE NEW.journal_id END FOR UPDATE;
@@ -375,7 +397,69 @@ BEGIN
  RETURN NULL;
 END $$;
 
+CREATE OR REPLACE FUNCTION accounting_tax_guard() RETURNS TRIGGER LANGUAGE plpgsql SET search_path FROM CURRENT AS $$
+DECLARE b accounting_books%ROWTYPE; c JSONB; pair RECORD;
+BEGIN
+ IF TG_OP='DELETE' THEN RAISE EXCEPTION 'Tax configuration history cannot be deleted'; END IF;
+ PERFORM pg_advisory_xact_lock(804610,NEW.book_id);
+ IF TG_OP='UPDATE' AND (OLD.state<>'pending' OR NEW.state='pending' OR
+   (to_jsonb(NEW)-ARRAY['state','reviewed_by','decision_reason','approved_at'])<>(to_jsonb(OLD)-ARRAY['state','reviewed_by','decision_reason','approved_at']))
+ THEN RAISE EXCEPTION 'Immutable configuration; submit a new version'; END IF;
+ SELECT * INTO b FROM accounting_books WHERE id=NEW.book_id;
+ IF b.status<>'approved' OR NEW.policy_version<>b.policy_version OR NEW.effective_from<(b.policy->>'cutoverDate')::date
+ OR NEW.payload->>'policyVersion' IS DISTINCT FROM NEW.policy_version OR NEW.payload->>'effectiveFrom' IS DISTINCT FROM NEW.effective_from::text
+ OR NEW.payload->>'requestId' IS DISTINCT FROM NEW.request_id THEN RAISE EXCEPTION 'Matching approved policy and effective date required'; END IF;
+ IF TG_OP='INSERT' THEN
+   IF NEW.state<>'pending' OR NEW.reviewed_by IS NOT NULL OR NEW.approved_at IS NOT NULL
+   OR NOT accounting_has_grant(NEW.book_id,NEW.branch_id,NEW.prepared_by,'configure') THEN RAISE EXCEPTION 'Configuration must start pending with current configure grant'; END IF;
+ ELSE
+   IF NOT accounting_has_grant(NEW.book_id,NEW.branch_id,NEW.reviewed_by,'configure') OR
+   (NEW.state='cancelled' AND NEW.reviewed_by<>NEW.prepared_by) OR (NEW.state IN ('approved','rejected') AND NEW.reviewed_by=NEW.prepared_by)
+   THEN RAISE EXCEPTION 'Independent current configuration reviewer required'; END IF;
+   IF NOT EXISTS(SELECT 1 FROM accounting_audit WHERE tax_configuration_id=NEW.id AND actor_id=NEW.reviewed_by
+     AND action='tax_configuration_'||NEW.state AND xmin::text=pg_current_xact_id()::text)
+   THEN RAISE EXCEPTION 'Configuration decision requires immutable same-transaction audit'; END IF;
+ END IF;
+ IF TG_OP='INSERT' OR NEW.state='approved' THEN
+   IF coalesce(length(trim(NEW.payload->>'ownerEvidence')),0)=0 OR coalesce(length(trim(NEW.payload->>'accountantEvidence')),0)=0
+   OR jsonb_typeof(NEW.payload->'codes') IS DISTINCT FROM 'array' OR jsonb_array_length(NEW.payload->'codes') NOT BETWEEN 3 AND 12
+   THEN RAISE EXCEPTION 'Documented tax rules required'; END IF;
+   FOR pair IN SELECT * FROM (VALUES ('inputVatAccountId','asset'),('outputVatAccountId','liability'),('dutyAccountId','expense'),('shippingAccountId','expense'),('terminalAccountId','expense')) v(key,category) LOOP
+     IF NOT EXISTS(SELECT 1 FROM accounting_accounts WHERE id=(NEW.payload->>pair.key)::integer AND book_id=NEW.book_id AND active AND category=pair.category)
+     THEN RAISE EXCEPTION 'Distinct active own-book VAT/direct expense accounts required'; END IF;
+   END LOOP;
+   IF (SELECT count(DISTINCT NEW.payload->>k) FROM unnest(ARRAY['inputVatAccountId','outputVatAccountId','dutyAccountId','shippingAccountId','terminalAccountId']) k)<>5
+   THEN RAISE EXCEPTION 'VAT/direct expense accounts must differ'; END IF;
+   IF EXISTS(SELECT 1 FROM accounting_manual_account_rules WHERE book_id=NEW.book_id AND role='adjustment'
+     AND account_id IN ((NEW.payload->>'inputVatAccountId')::integer,(NEW.payload->>'outputVatAccountId')::integer))
+   THEN RAISE EXCEPTION 'Tax controls cannot be freehand adjustment accounts'; END IF;
+   FOR c IN SELECT value FROM jsonb_array_elements(NEW.payload->'codes') LOOP
+     IF coalesce(c->>'treatment','') NOT IN ('taxable','zero_rated','exempt') OR coalesce(length(trim(c->>'basisEvidence')),0)=0
+     OR coalesce(c->>'code','') !~ '^[A-Z][A-Z0-9_-]{0,19}$' OR coalesce(length(trim(c->>'name')),0)=0
+     OR coalesce(c->>'rate','') !~ '^(0|[1-9][0-9]?|100)([.][0-9]{1,2})?$'
+     OR coalesce(c->>'recoverablePercent','') !~ '^(0|[1-9][0-9]?|100)([.][0-9]{1,2})?$'
+     OR (c->>'rate')::numeric NOT BETWEEN 0 AND 100 OR (c->>'recoverablePercent')::numeric NOT BETWEEN 0 AND 100
+     OR ((c->>'treatment'='taxable') IS DISTINCT FROM ((c->>'rate')::numeric>0))
+     OR (c->>'treatment'<>'taxable' AND (c->>'recoverablePercent')::numeric<>0)
+     THEN RAISE EXCEPTION 'Valid explicit rate, classification and recovery basis required'; END IF;
+   END LOOP;
+   IF (SELECT count(DISTINCT value->>'treatment') FROM jsonb_array_elements(NEW.payload->'codes'))<>3
+   OR (SELECT count(DISTINCT value->>'code') FROM jsonb_array_elements(NEW.payload->'codes'))<>jsonb_array_length(NEW.payload->'codes')
+   THEN RAISE EXCEPTION 'Distinct complete tax categories/codes required'; END IF;
+ END IF;
+ IF NEW.state='approved' THEN
+   IF EXISTS(SELECT 1 FROM accounting_tax_configurations WHERE book_id=NEW.book_id AND branch_id=NEW.branch_id AND state='approved' AND effective_from>=NEW.effective_from)
+   OR EXISTS(SELECT 1 FROM accounting_journals WHERE book_id=NEW.book_id AND branch_id=NEW.branch_id AND status='posted' AND accounting_date>=NEW.effective_from
+     AND (event_key LIKE 'source:invoice:%' OR event_key LIKE 'source:duty_payment:%' OR event_key LIKE 'source:container_payment:%'))
+   THEN RAISE EXCEPTION 'New configuration must not silently reclassify posted history or older versions'; END IF;
+ END IF;
+ RETURN NEW;
+END $$;
+
 DO $$ DECLARE t TEXT; BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='accounting_tax_configurations'::regclass AND tgname='accounting_tax_guard') THEN
+   CREATE TRIGGER accounting_tax_guard BEFORE INSERT OR UPDATE OR DELETE ON accounting_tax_configurations FOR EACH ROW EXECUTE FUNCTION accounting_tax_guard();
+ END IF;
  IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='accounting_opening_setup'::regclass AND tgname='accounting_opening_guard') THEN
    CREATE TRIGGER accounting_opening_guard BEFORE INSERT OR UPDATE OR DELETE ON accounting_opening_setup FOR EACH ROW EXECUTE FUNCTION accounting_opening_guard();
  END IF;

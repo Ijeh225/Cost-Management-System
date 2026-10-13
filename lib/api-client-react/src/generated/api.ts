@@ -23,6 +23,7 @@ import type {
   AccountingReport,
   ActOnManualAccountingJournalParams,
   ActOnOpeningSetupParams,
+  ActOnTaxConfigurationParams,
   AnalyticsResponse,
   ApprovalQueueItem,
   AuditEntry,
@@ -52,6 +53,7 @@ import type {
   GetAccountingCatalogParams,
   GetAccountingJournalParams,
   GetAccountingOptionsParams,
+  GetConfiguredTaxJournalParams,
   GetContainerReportParams,
   GetCustomSectionsParams,
   GetDeliveryAnalyticsParams,
@@ -60,6 +62,9 @@ import type {
   GetNativeAccountingReportParams,
   GetOpeningSetupVersionParams,
   GetOpeningSetupWorkspaceParams,
+  GetPostedTaxRegisterParams,
+  GetTaxConfigurationWorkspaceParams,
+  GetTaxSourceParams,
   HealthStatus,
   IntelligenceResponse,
   JobOverviewResponse,
@@ -83,9 +88,15 @@ import type {
   OpeningSetupRequest,
   OpeningSetupResult,
   OpeningSetupWorkspace,
+  PostTaxSourceBody,
+  PostTaxSourceParams,
+  PostedTaxRegister,
   PrepareManualAccountingJournalParams,
   PrepareOpeningSetupParams,
+  PrepareTaxConfigurationParams,
+  PrepareTaxSourceParams,
   PreviewOpeningSetupParams,
+  PreviewTaxSourceParams,
   RecordDutyPaymentRequest,
   RejectSectionRequest,
   ReverseDutyPaymentRequest,
@@ -95,6 +106,13 @@ import type {
   SaveCustomFieldValuesRequest,
   SectionApproval,
   ShipmentOverview,
+  TaxConfigurationAction,
+  TaxConfigurationRequest,
+  TaxConfigurationWorkspace,
+  TaxSource,
+  TaxSourceJournal,
+  TaxSourceRequest,
+  TaxSourceResult,
   TimelineEvent,
   UpdateContainerChargesRequest,
   UpdateContainerRequest,
@@ -114,6 +132,1062 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export const getGetTaxConfigurationWorkspaceUrl = (
+  bookId: number,
+  params: GetTaxConfigurationWorkspaceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/tax-configuration?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/tax-configuration`;
+};
+
+export const getTaxConfigurationWorkspace = async (
+  bookId: number,
+  params: GetTaxConfigurationWorkspaceParams,
+  options?: RequestInit,
+): Promise<TaxConfigurationWorkspace> => {
+  return customFetch<TaxConfigurationWorkspace>(
+    getGetTaxConfigurationWorkspaceUrl(bookId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetTaxConfigurationWorkspaceQueryKey = (
+  bookId: number,
+  params?: GetTaxConfigurationWorkspaceParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/tax-configuration`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetTaxConfigurationWorkspaceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTaxConfigurationWorkspace>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetTaxConfigurationWorkspaceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTaxConfigurationWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetTaxConfigurationWorkspaceQueryKey(bookId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTaxConfigurationWorkspace>>
+  > = ({ signal }) =>
+    getTaxConfigurationWorkspace(bookId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTaxConfigurationWorkspace>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTaxConfigurationWorkspaceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTaxConfigurationWorkspace>>
+>;
+export type GetTaxConfigurationWorkspaceQueryError = ErrorType<unknown>;
+
+export function useGetTaxConfigurationWorkspace<
+  TData = Awaited<ReturnType<typeof getTaxConfigurationWorkspace>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetTaxConfigurationWorkspaceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTaxConfigurationWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTaxConfigurationWorkspaceQueryOptions(
+    bookId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPrepareTaxConfigurationUrl = (
+  bookId: number,
+  params: PrepareTaxConfigurationParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/tax-configuration?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/tax-configuration`;
+};
+
+export const prepareTaxConfiguration = async (
+  bookId: number,
+  taxConfigurationRequest: TaxConfigurationRequest,
+  params: PrepareTaxConfigurationParams,
+  options?: RequestInit,
+): Promise<OpeningSetupResult> => {
+  return customFetch<OpeningSetupResult>(
+    getPrepareTaxConfigurationUrl(bookId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(taxConfigurationRequest),
+    },
+  );
+};
+
+export const getPrepareTaxConfigurationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareTaxConfiguration>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<TaxConfigurationRequest>;
+      params: PrepareTaxConfigurationParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof prepareTaxConfiguration>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<TaxConfigurationRequest>;
+    params: PrepareTaxConfigurationParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["prepareTaxConfiguration"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof prepareTaxConfiguration>>,
+    {
+      bookId: number;
+      data: BodyType<TaxConfigurationRequest>;
+      params: PrepareTaxConfigurationParams;
+    }
+  > = (props) => {
+    const { bookId, data, params } = props ?? {};
+
+    return prepareTaxConfiguration(bookId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PrepareTaxConfigurationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof prepareTaxConfiguration>>
+>;
+export type PrepareTaxConfigurationMutationBody =
+  BodyType<TaxConfigurationRequest>;
+export type PrepareTaxConfigurationMutationError = ErrorType<unknown>;
+
+export const usePrepareTaxConfiguration = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareTaxConfiguration>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<TaxConfigurationRequest>;
+      params: PrepareTaxConfigurationParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof prepareTaxConfiguration>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<TaxConfigurationRequest>;
+    params: PrepareTaxConfigurationParams;
+  },
+  TContext
+> => {
+  return useMutation(getPrepareTaxConfigurationMutationOptions(options));
+};
+
+export const getActOnTaxConfigurationUrl = (
+  bookId: number,
+  configurationId: number,
+  params: ActOnTaxConfigurationParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/tax-configuration/${configurationId}/action?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/tax-configuration/${configurationId}/action`;
+};
+
+export const actOnTaxConfiguration = async (
+  bookId: number,
+  configurationId: number,
+  taxConfigurationAction: TaxConfigurationAction,
+  params: ActOnTaxConfigurationParams,
+  options?: RequestInit,
+): Promise<OpeningSetupResult> => {
+  return customFetch<OpeningSetupResult>(
+    getActOnTaxConfigurationUrl(bookId, configurationId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(taxConfigurationAction),
+    },
+  );
+};
+
+export const getActOnTaxConfigurationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actOnTaxConfiguration>>,
+    TError,
+    {
+      bookId: number;
+      configurationId: number;
+      data: BodyType<TaxConfigurationAction>;
+      params: ActOnTaxConfigurationParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof actOnTaxConfiguration>>,
+  TError,
+  {
+    bookId: number;
+    configurationId: number;
+    data: BodyType<TaxConfigurationAction>;
+    params: ActOnTaxConfigurationParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["actOnTaxConfiguration"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof actOnTaxConfiguration>>,
+    {
+      bookId: number;
+      configurationId: number;
+      data: BodyType<TaxConfigurationAction>;
+      params: ActOnTaxConfigurationParams;
+    }
+  > = (props) => {
+    const { bookId, configurationId, data, params } = props ?? {};
+
+    return actOnTaxConfiguration(
+      bookId,
+      configurationId,
+      data,
+      params,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ActOnTaxConfigurationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof actOnTaxConfiguration>>
+>;
+export type ActOnTaxConfigurationMutationBody =
+  BodyType<TaxConfigurationAction>;
+export type ActOnTaxConfigurationMutationError = ErrorType<unknown>;
+
+export const useActOnTaxConfiguration = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actOnTaxConfiguration>>,
+    TError,
+    {
+      bookId: number;
+      configurationId: number;
+      data: BodyType<TaxConfigurationAction>;
+      params: ActOnTaxConfigurationParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof actOnTaxConfiguration>>,
+  TError,
+  {
+    bookId: number;
+    configurationId: number;
+    data: BodyType<TaxConfigurationAction>;
+    params: ActOnTaxConfigurationParams;
+  },
+  TContext
+> => {
+  return useMutation(getActOnTaxConfigurationMutationOptions(options));
+};
+
+export const getGetTaxSourceUrl = (
+  bookId: number,
+  kind: "invoice" | "duty_payment" | "container_payment",
+  sourceId: number,
+  params: GetTaxSourceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/tax-configuration/sources/${kind}/${sourceId}?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/tax-configuration/sources/${kind}/${sourceId}`;
+};
+
+export const getTaxSource = async (
+  bookId: number,
+  kind: "invoice" | "duty_payment" | "container_payment",
+  sourceId: number,
+  params: GetTaxSourceParams,
+  options?: RequestInit,
+): Promise<TaxSource> => {
+  return customFetch<TaxSource>(
+    getGetTaxSourceUrl(bookId, kind, sourceId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetTaxSourceQueryKey = (
+  bookId: number,
+  kind: "invoice" | "duty_payment" | "container_payment",
+  sourceId: number,
+  params?: GetTaxSourceParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/tax-configuration/sources/${kind}/${sourceId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetTaxSourceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTaxSource>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  kind: "invoice" | "duty_payment" | "container_payment",
+  sourceId: number,
+  params: GetTaxSourceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTaxSource>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetTaxSourceQueryKey(bookId, kind, sourceId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getTaxSource>>> = ({
+    signal,
+  }) =>
+    getTaxSource(bookId, kind, sourceId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bookId && kind && sourceId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTaxSource>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTaxSourceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTaxSource>>
+>;
+export type GetTaxSourceQueryError = ErrorType<unknown>;
+
+export function useGetTaxSource<
+  TData = Awaited<ReturnType<typeof getTaxSource>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  kind: "invoice" | "duty_payment" | "container_payment",
+  sourceId: number,
+  params: GetTaxSourceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTaxSource>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTaxSourceQueryOptions(
+    bookId,
+    kind,
+    sourceId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPreviewTaxSourceUrl = (
+  bookId: number,
+  params: PreviewTaxSourceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/tax-configuration/sources/preview?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/tax-configuration/sources/preview`;
+};
+
+export const previewTaxSource = async (
+  bookId: number,
+  taxSourceRequest: TaxSourceRequest,
+  params: PreviewTaxSourceParams,
+  options?: RequestInit,
+): Promise<TaxSourceResult> => {
+  return customFetch<TaxSourceResult>(getPreviewTaxSourceUrl(bookId, params), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(taxSourceRequest),
+  });
+};
+
+export const getPreviewTaxSourceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewTaxSource>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<TaxSourceRequest>;
+      params: PreviewTaxSourceParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewTaxSource>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<TaxSourceRequest>;
+    params: PreviewTaxSourceParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["previewTaxSource"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewTaxSource>>,
+    {
+      bookId: number;
+      data: BodyType<TaxSourceRequest>;
+      params: PreviewTaxSourceParams;
+    }
+  > = (props) => {
+    const { bookId, data, params } = props ?? {};
+
+    return previewTaxSource(bookId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreviewTaxSourceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewTaxSource>>
+>;
+export type PreviewTaxSourceMutationBody = BodyType<TaxSourceRequest>;
+export type PreviewTaxSourceMutationError = ErrorType<unknown>;
+
+export const usePreviewTaxSource = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewTaxSource>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<TaxSourceRequest>;
+      params: PreviewTaxSourceParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof previewTaxSource>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<TaxSourceRequest>;
+    params: PreviewTaxSourceParams;
+  },
+  TContext
+> => {
+  return useMutation(getPreviewTaxSourceMutationOptions(options));
+};
+
+export const getPrepareTaxSourceUrl = (
+  bookId: number,
+  params: PrepareTaxSourceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/tax-configuration/sources/prepare?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/tax-configuration/sources/prepare`;
+};
+
+export const prepareTaxSource = async (
+  bookId: number,
+  taxSourceRequest: TaxSourceRequest,
+  params: PrepareTaxSourceParams,
+  options?: RequestInit,
+): Promise<TaxSourceResult> => {
+  return customFetch<TaxSourceResult>(getPrepareTaxSourceUrl(bookId, params), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(taxSourceRequest),
+  });
+};
+
+export const getPrepareTaxSourceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareTaxSource>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<TaxSourceRequest>;
+      params: PrepareTaxSourceParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof prepareTaxSource>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<TaxSourceRequest>;
+    params: PrepareTaxSourceParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["prepareTaxSource"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof prepareTaxSource>>,
+    {
+      bookId: number;
+      data: BodyType<TaxSourceRequest>;
+      params: PrepareTaxSourceParams;
+    }
+  > = (props) => {
+    const { bookId, data, params } = props ?? {};
+
+    return prepareTaxSource(bookId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PrepareTaxSourceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof prepareTaxSource>>
+>;
+export type PrepareTaxSourceMutationBody = BodyType<TaxSourceRequest>;
+export type PrepareTaxSourceMutationError = ErrorType<unknown>;
+
+export const usePrepareTaxSource = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareTaxSource>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<TaxSourceRequest>;
+      params: PrepareTaxSourceParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof prepareTaxSource>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<TaxSourceRequest>;
+    params: PrepareTaxSourceParams;
+  },
+  TContext
+> => {
+  return useMutation(getPrepareTaxSourceMutationOptions(options));
+};
+
+export const getPostTaxSourceUrl = (
+  bookId: number,
+  journalId: number,
+  params: PostTaxSourceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/tax-configuration/journals/${journalId}/post?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/tax-configuration/journals/${journalId}/post`;
+};
+
+export const postTaxSource = async (
+  bookId: number,
+  journalId: number,
+  postTaxSourceBody: PostTaxSourceBody,
+  params: PostTaxSourceParams,
+  options?: RequestInit,
+): Promise<OpeningSetupResult> => {
+  return customFetch<OpeningSetupResult>(
+    getPostTaxSourceUrl(bookId, journalId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(postTaxSourceBody),
+    },
+  );
+};
+
+export const getPostTaxSourceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postTaxSource>>,
+    TError,
+    {
+      bookId: number;
+      journalId: number;
+      data: BodyType<PostTaxSourceBody>;
+      params: PostTaxSourceParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postTaxSource>>,
+  TError,
+  {
+    bookId: number;
+    journalId: number;
+    data: BodyType<PostTaxSourceBody>;
+    params: PostTaxSourceParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["postTaxSource"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postTaxSource>>,
+    {
+      bookId: number;
+      journalId: number;
+      data: BodyType<PostTaxSourceBody>;
+      params: PostTaxSourceParams;
+    }
+  > = (props) => {
+    const { bookId, journalId, data, params } = props ?? {};
+
+    return postTaxSource(bookId, journalId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostTaxSourceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postTaxSource>>
+>;
+export type PostTaxSourceMutationBody = BodyType<PostTaxSourceBody>;
+export type PostTaxSourceMutationError = ErrorType<unknown>;
+
+export const usePostTaxSource = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postTaxSource>>,
+    TError,
+    {
+      bookId: number;
+      journalId: number;
+      data: BodyType<PostTaxSourceBody>;
+      params: PostTaxSourceParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postTaxSource>>,
+  TError,
+  {
+    bookId: number;
+    journalId: number;
+    data: BodyType<PostTaxSourceBody>;
+    params: PostTaxSourceParams;
+  },
+  TContext
+> => {
+  return useMutation(getPostTaxSourceMutationOptions(options));
+};
+
+export const getGetConfiguredTaxJournalUrl = (
+  bookId: number,
+  journalId: number,
+  params: GetConfiguredTaxJournalParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/tax-configuration/journals/${journalId}?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/tax-configuration/journals/${journalId}`;
+};
+
+export const getConfiguredTaxJournal = async (
+  bookId: number,
+  journalId: number,
+  params: GetConfiguredTaxJournalParams,
+  options?: RequestInit,
+): Promise<TaxSourceJournal> => {
+  return customFetch<TaxSourceJournal>(
+    getGetConfiguredTaxJournalUrl(bookId, journalId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetConfiguredTaxJournalQueryKey = (
+  bookId: number,
+  journalId: number,
+  params?: GetConfiguredTaxJournalParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/tax-configuration/journals/${journalId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetConfiguredTaxJournalQueryOptions = <
+  TData = Awaited<ReturnType<typeof getConfiguredTaxJournal>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  journalId: number,
+  params: GetConfiguredTaxJournalParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getConfiguredTaxJournal>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetConfiguredTaxJournalQueryKey(bookId, journalId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getConfiguredTaxJournal>>
+  > = ({ signal }) =>
+    getConfiguredTaxJournal(bookId, journalId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bookId && journalId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getConfiguredTaxJournal>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetConfiguredTaxJournalQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getConfiguredTaxJournal>>
+>;
+export type GetConfiguredTaxJournalQueryError = ErrorType<unknown>;
+
+export function useGetConfiguredTaxJournal<
+  TData = Awaited<ReturnType<typeof getConfiguredTaxJournal>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  journalId: number,
+  params: GetConfiguredTaxJournalParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getConfiguredTaxJournal>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetConfiguredTaxJournalQueryOptions(
+    bookId,
+    journalId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetPostedTaxRegisterUrl = (
+  bookId: number,
+  params: GetPostedTaxRegisterParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/tax-configuration/register?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/tax-configuration/register`;
+};
+
+export const getPostedTaxRegister = async (
+  bookId: number,
+  params: GetPostedTaxRegisterParams,
+  options?: RequestInit,
+): Promise<PostedTaxRegister> => {
+  return customFetch<PostedTaxRegister>(
+    getGetPostedTaxRegisterUrl(bookId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPostedTaxRegisterQueryKey = (
+  bookId: number,
+  params?: GetPostedTaxRegisterParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/tax-configuration/register`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetPostedTaxRegisterQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPostedTaxRegister>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetPostedTaxRegisterParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPostedTaxRegister>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPostedTaxRegisterQueryKey(bookId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPostedTaxRegister>>
+  > = ({ signal }) =>
+    getPostedTaxRegister(bookId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPostedTaxRegister>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPostedTaxRegisterQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPostedTaxRegister>>
+>;
+export type GetPostedTaxRegisterQueryError = ErrorType<unknown>;
+
+export function useGetPostedTaxRegister<
+  TData = Awaited<ReturnType<typeof getPostedTaxRegister>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetPostedTaxRegisterParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPostedTaxRegister>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPostedTaxRegisterQueryOptions(
+    bookId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 export const getGetOpeningSetupWorkspaceUrl = (
   bookId: number,

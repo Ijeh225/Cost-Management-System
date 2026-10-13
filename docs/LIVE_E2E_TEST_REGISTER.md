@@ -2,6 +2,53 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-13
 
+### VAT / Direct Expense Controlled Acceptance PASS - 2026-10-13 19:38 WAT
+
+- Final10DB PASS1147s/55filtered + focused1PASS115s/65filtered =11distinct accepted
+  cases:7new setup/VAT/direct-source controls and4shared invoice/opening/manual/GLTB.
+  SQL tax-control protection, audit linkage, idempotent migration and zero source
+  mutation verified. Initial4PASS/2FAIL findings corrected and final rerun accepted.
+- Final419units/API PASS/3prior skips,54files; full typechecks/railway build/OFF smoke
+  PASS. Built new setup stable retry, independent configure/post, source gross/VAT
+  preview, exempt versus zero invoice item selections, posted register, branch
+  clearing, refresh/error/OFF, mobile/accessibility PASS. Shared opening/manual and
+  GLTB CSV/print UI PASS; screenshots inspected and mobile bounds asserted.
+- Public11source aggregates unchanged; owned namespaces [] and closed tunnel after
+  final inspection. No production fixtures/source writes, professional tax approval
+  or official activation inferred. Exact inactive publication is the remaining gate.
+
+### VAT / Direct Expense Final Local PASS / Ten DB Cases Running - 2026-10-13 19:22 WAT
+
+- Final419unit/API PASS/3prior skips, all typechecks/builds/OFF zero-DB gates PASS.
+  Built new setup/source/register and shared opening/manual/GLTB CSV/print checks
+  PASS. Mobile dialog viewport/scroll bounds and screenshots inspected, no clipping
+  or accessibility errors after explicit dropdown-label/child-width correction.
+- Initial6owned DB cases4PASS/2FAIL; fixed invoice rule-array ordering and outdated
+  test config selection. Final6new+4shared run active, not accepted until completed.
+  Added plain-text unrelated journal exclusion and configured draft inspection proof.
+- Original source data not changed; all UI writes dummy loopback and DB writes owned
+  isolated namespace only. No push/official native activation/live VAT write claimed.
+
+### VAT / Direct Expense Initial Local Acceptance - 2026-10-13 19:12 WAT
+
+- Initial419unit/API PASS/3existing skips and full typechecks/build PASS.
+  Six owned network DB cases and built dummy UI currently running; not accepted yet.
+- Review hardening includes rule-array order equivalence after storage, explicit
+  configured draft inspection (posted-report route intentionally remains posted
+  only), tax account protection, audit scope and avoiding JSON casts on unrelated
+  freeform journal evidence. Final complete reruns pending.
+- No new production source records, official VAT decision, activation or live
+  financial write acceptance claimed. Flags remain OFF pending publication proof.
+
+### VAT / Direct Expense Acceptance Planned - 2026-10-13 18:40 WAT
+
+- Authorised configuration implementation pending, not a passed live write test.
+  Check exact inclusive/exclusive VAT, exempt versus zero-rated, recoverable versus
+  cost VAT, duty/shipping/terminal heads, branch/date/access, independent approval,
+  immutable versions, duplicate source prevention, reversals and posted GL/TB/VAT.
+- Use owned isolated fixtures and built UI; preserve production records and OFF
+  flags. No second ledger or automatic source replay. Exact deployment proof required.
+
 ### Opening Setup Exact Inactive Deployment PASS - 2026-10-13 18:16 WAT
 
 - Functional9d2d070 exact Railway6acdcd78-6a60-4816-950e-f2e84cbf4c9d

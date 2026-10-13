@@ -19,6 +19,146 @@ tags:
     description: Container charges
 
 paths:
+  /accounting/books/{bookId}/tax-configuration:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+    get:
+      operationId: getTaxConfigurationWorkspace
+      responses:
+        '200':
+          description: Scoped configuration history and reviewed source journals
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaxConfigurationWorkspace' }
+    post:
+      operationId: prepareTaxConfiguration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaxConfigurationRequest' }
+      responses:
+        '200':
+          description: Pending immutable version, not activation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningSetupResult' }
+  /accounting/books/{bookId}/tax-configuration/{configurationId}/action:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+      - { name: configurationId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      operationId: actOnTaxConfiguration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaxConfigurationAction' }
+      responses:
+        '200':
+          description: Independently reviewed decision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningSetupResult' }
+  /accounting/books/{bookId}/tax-configuration/sources/{kind}/{sourceId}:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [invoice, duty_payment, container_payment] } }
+      - { name: sourceId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getTaxSource
+      responses:
+        '200':
+          description: Existing scoped source, never a new cash record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaxSource' }
+  /accounting/books/{bookId}/tax-configuration/sources/preview:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+    post:
+      operationId: previewTaxSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaxSourceRequest' }
+      responses:
+        '200':
+          description: Read-only reconciled journal preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaxSourceResult' }
+  /accounting/books/{bookId}/tax-configuration/sources/prepare:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+    post:
+      operationId: prepareTaxSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaxSourceRequest' }
+      responses:
+        '200':
+          description: Existing source identity prepared once for independent posting
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaxSourceResult' }
+  /accounting/books/{bookId}/tax-configuration/journals/{journalId}/post:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+      - $ref: '#/components/parameters/ManualAccountingJournalId'
+    post:
+      operationId: postTaxSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties: { reason: { type: string, minLength: 1, maxLength: 2000 } }
+      responses:
+        '200':
+          description: Independently posted source
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningSetupResult' }
+  /accounting/books/{bookId}/tax-configuration/journals/{journalId}:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+      - $ref: '#/components/parameters/ManualAccountingJournalId'
+    get:
+      operationId: getConfiguredTaxJournal
+      responses:
+        '200':
+          description: Immutable configured source journal including drafts for independent review
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaxSourceJournal' }
+  /accounting/books/{bookId}/tax-configuration/register:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+      - { name: from, in: query, required: true, schema: { type: string } }
+      - { name: to, in: query, required: true, schema: { type: string } }
+    get:
+      operationId: getPostedTaxRegister
+      responses:
+        '200':
+          description: Exact posted journal VAT register, not an official tax return
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostedTaxRegister' }
   /accounting/books/{bookId}/opening-balances:
     get:
       operationId: getOpeningSetupWorkspace
@@ -1465,6 +1605,214 @@ components:
       description: Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
       schema: { type: string }
   schemas:
+    AccountingTaxCode:
+      type: object
+      additionalProperties: false
+      required: [code, name, treatment, rate, recoverablePercent, basisEvidence]
+      properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_-]{0,19}$' }
+        name: { type: string, minLength: 1, maxLength: 300 }
+        treatment: { type: string, enum: [taxable, zero_rated, exempt] }
+        rate: { type: string }
+        recoverablePercent: { type: string }
+        basisEvidence: { type: string, minLength: 1, maxLength: 300 }
+    TaxConfigurationRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId, policyVersion, effectiveFrom, ownerEvidence, accountantEvidence, inputVatAccountId, outputVatAccountId, dutyAccountId, shippingAccountId, terminalAccountId, codes]
+      properties:
+        requestId: { type: string }
+        policyVersion: { type: string }
+        effectiveFrom: { type: string }
+        ownerEvidence: { type: string }
+        accountantEvidence: { type: string }
+        inputVatAccountId: { type: integer }
+        outputVatAccountId: { type: integer }
+        dutyAccountId: { type: integer }
+        shippingAccountId: { type: integer }
+        terminalAccountId: { type: integer }
+        codes: { type: array, minItems: 3, maxItems: 12, items: { $ref: '#/components/schemas/AccountingTaxCode' } }
+    TaxConfigurationAction:
+      type: object
+      additionalProperties: false
+      required: [action, reason]
+      properties:
+        action: { type: string, enum: [approve, reject, cancel] }
+        reason: { type: string }
+    TaxConfigurationVersion:
+      type: object
+      required: [id, state, effectiveFrom, preparedBy, reviewedBy, decisionReason, payload]
+      properties:
+        id: { type: integer }
+        state: { type: string, enum: [pending, approved, rejected, cancelled] }
+        effectiveFrom: { type: string }
+        preparedBy: { type: integer }
+        reviewedBy: { type: [integer, 'null'] }
+        decisionReason: { type: [string, 'null'] }
+        payload: { $ref: '#/components/schemas/TaxConfigurationRequest' }
+    TaxConfigurationWorkspace:
+      type: object
+      required: [book, branchId, permissions, accounts, versions, journals, truncated]
+      properties:
+        book:
+          type: object
+          required: [id, name, policyVersion, cutoverDate]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            policyVersion: { type: string }
+            cutoverDate: { type: string }
+        branchId: { type: integer }
+        permissions: { type: array, items: { type: string } }
+        accounts: { type: array, items: { $ref: '#/components/schemas/OpeningSetupAccount' } }
+        versions: { type: array, items: { $ref: '#/components/schemas/TaxConfigurationVersion' } }
+        journals:
+          type: array
+          items:
+            type: object
+            required: [id, status, preparedBy, eventKey, date]
+            properties:
+              id: { type: integer }
+              status: { type: string }
+              preparedBy: { type: integer }
+              eventKey: { type: string }
+              date: { type: string }
+        truncated: { type: boolean }
+    TaxSource:
+      type: object
+      required: [id, kind, status, total, items]
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [invoice, duty_payment, container_payment] }
+        status: { type: string }
+        subtotal: { type: string }
+        vat: { type: string }
+        total: { type: string }
+        date: { type: string }
+        section: { type: string }
+        bankId: { type: [integer, 'null'] }
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, amount]
+            properties: { id: { type: integer }, amount: { type: string } }
+    TaxSourceRequest:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, id, evidence]
+          properties:
+            kind: { type: string, enum: [duty_reversal] }
+            id: { type: integer }
+            evidence: { type: string }
+        - type: object
+          additionalProperties: false
+          required: [kind, id, evidence, configurationId, taxCode, basis, taxAmount, settlementAccountId]
+          properties:
+            kind: { type: string, enum: [duty_payment, container_payment] }
+            id: { type: integer }
+            evidence: { type: string }
+            configurationId: { type: integer }
+            taxCode: { type: string }
+            basis: { type: string, enum: [inclusive, exclusive] }
+            taxAmount: { type: string }
+            settlementAccountId: { type: integer }
+        - type: object
+          additionalProperties: false
+          required: [kind, id, evidence, configurationId, taxCode, recognitionDate, receivableAccountId, incomeAccountId]
+          properties:
+            kind: { type: string, enum: [invoice] }
+            id: { type: integer }
+            evidence: { type: string }
+            configurationId: { type: integer }
+            taxCode: { type: string }
+            recognitionDate: { type: string }
+            receivableAccountId: { type: integer }
+            incomeAccountId: { type: integer }
+            items:
+              type: array
+              items:
+                type: object
+                required: [itemId, code]
+                properties: { itemId: { type: integer }, code: { type: string } }
+    TaxSourceResult:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [preview, prepared] }
+        id: { type: integer }
+        cashMovement: { type: string }
+        input:
+          type: object
+          required: [accountingDate, eventKey, narration, evidence, lines]
+          properties:
+            accountingDate: { type: string }
+            eventKey: { type: string }
+            narration: { type: string }
+            evidence: { type: string }
+            lines:
+              type: array
+              items:
+                type: object
+                required: [accountId, debit, credit]
+                properties: { accountId: { type: integer }, debit: { type: string }, credit: { type: string } }
+    PostedTaxRegister:
+      type: object
+      required: [from, to, branchId, basis, rows, totals, unclassified, limitation]
+      properties:
+        from: { type: string }
+        to: { type: string }
+        branchId: { type: integer }
+        basis: { type: string }
+        unclassified: { type: integer }
+        limitation: { type: string }
+        totals:
+          type: object
+          required: [netPurchases, purchaseVat, recoverable, nonRecoverable, netSales, outputVat]
+          properties:
+            netPurchases: { type: string }
+            purchaseVat: { type: string }
+            recoverable: { type: string }
+            nonRecoverable: { type: string }
+            netSales: { type: string }
+            outputVat: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [journalId, date, sourceKind, sourceId, configurationId, code, treatment, net, vat, gross, recoverable, nonRecoverable, direction, reversal]
+            properties:
+              journalId: { type: integer }
+              date: { type: string }
+              sourceKind: { type: string }
+              sourceId: { type: integer }
+              configurationId: { type: integer }
+              code: { type: string }
+              treatment: { type: string }
+              net: { type: string }
+              vat: { type: string }
+              gross: { type: string }
+              recoverable: { type: string }
+              nonRecoverable: { type: string }
+              direction: { type: string, enum: [purchase, sale] }
+              reversal: { type: boolean }
+    TaxSourceJournal:
+      type: object
+      required: [id, status, date, narration, evidence, preparedBy, lines]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        date: { type: string }
+        narration: { type: string }
+        evidence: { type: string }
+        preparedBy: { type: integer }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [accountId, debit, credit, memo]
+            properties: { accountId: { type: integer }, debit: { type: string }, credit: { type: string }, memo: { type: string } }
     OpeningSetupResult:
       type: object
       required: [id]

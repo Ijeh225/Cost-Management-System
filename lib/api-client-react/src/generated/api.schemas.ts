@@ -5,6 +5,269 @@
  * Cost Analysis Per Container API
  * OpenAPI spec version: 0.1.0
  */
+export type AccountingTaxCodeTreatment =
+  (typeof AccountingTaxCodeTreatment)[keyof typeof AccountingTaxCodeTreatment];
+
+export const AccountingTaxCodeTreatment = {
+  taxable: "taxable",
+  zero_rated: "zero_rated",
+  exempt: "exempt",
+} as const;
+
+export interface AccountingTaxCode {
+  /** @pattern ^[A-Z][A-Z0-9_-]{0,19}$ */
+  code: string;
+  /**
+   * @minLength 1
+   * @maxLength 300
+   */
+  name: string;
+  treatment: AccountingTaxCodeTreatment;
+  rate: string;
+  recoverablePercent: string;
+  /**
+   * @minLength 1
+   * @maxLength 300
+   */
+  basisEvidence: string;
+}
+
+export interface TaxConfigurationRequest {
+  requestId: string;
+  policyVersion: string;
+  effectiveFrom: string;
+  ownerEvidence: string;
+  accountantEvidence: string;
+  inputVatAccountId: number;
+  outputVatAccountId: number;
+  dutyAccountId: number;
+  shippingAccountId: number;
+  terminalAccountId: number;
+  /**
+   * @minItems 3
+   * @maxItems 12
+   */
+  codes: AccountingTaxCode[];
+}
+
+export type TaxConfigurationActionAction =
+  (typeof TaxConfigurationActionAction)[keyof typeof TaxConfigurationActionAction];
+
+export const TaxConfigurationActionAction = {
+  approve: "approve",
+  reject: "reject",
+  cancel: "cancel",
+} as const;
+
+export interface TaxConfigurationAction {
+  action: TaxConfigurationActionAction;
+  reason: string;
+}
+
+export type TaxConfigurationVersionState =
+  (typeof TaxConfigurationVersionState)[keyof typeof TaxConfigurationVersionState];
+
+export const TaxConfigurationVersionState = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+  cancelled: "cancelled",
+} as const;
+
+export interface TaxConfigurationVersion {
+  id: number;
+  state: TaxConfigurationVersionState;
+  effectiveFrom: string;
+  preparedBy: number;
+  /** @nullable */
+  reviewedBy: number | null;
+  /** @nullable */
+  decisionReason: string | null;
+  payload: TaxConfigurationRequest;
+}
+
+export type TaxConfigurationWorkspaceBook = {
+  id: number;
+  name: string;
+  policyVersion: string;
+  cutoverDate: string;
+};
+
+export type TaxConfigurationWorkspaceJournalsItem = {
+  id: number;
+  status: string;
+  preparedBy: number;
+  eventKey: string;
+  date: string;
+};
+
+export interface OpeningSetupAccount {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  active: boolean;
+}
+
+export interface TaxConfigurationWorkspace {
+  book: TaxConfigurationWorkspaceBook;
+  branchId: number;
+  permissions: string[];
+  accounts: OpeningSetupAccount[];
+  versions: TaxConfigurationVersion[];
+  journals: TaxConfigurationWorkspaceJournalsItem[];
+  truncated: boolean;
+}
+
+export type TaxSourceKind = (typeof TaxSourceKind)[keyof typeof TaxSourceKind];
+
+export const TaxSourceKind = {
+  invoice: "invoice",
+  duty_payment: "duty_payment",
+  container_payment: "container_payment",
+} as const;
+
+export type TaxSourceItemsItem = {
+  id: number;
+  amount: string;
+};
+
+export interface TaxSource {
+  id: number;
+  kind: TaxSourceKind;
+  status: string;
+  subtotal?: string;
+  vat?: string;
+  total: string;
+  date?: string;
+  section?: string;
+  /** @nullable */
+  bankId?: number | null;
+  items: TaxSourceItemsItem[];
+}
+
+export type TaxSourceRequest =
+  | {
+      kind: "duty_reversal";
+      id: number;
+      evidence: string;
+    }
+  | {
+      kind: "duty_payment" | "container_payment";
+      id: number;
+      evidence: string;
+      configurationId: number;
+      taxCode: string;
+      basis: "inclusive" | "exclusive";
+      taxAmount: string;
+      settlementAccountId: number;
+    }
+  | {
+      kind: "invoice";
+      id: number;
+      evidence: string;
+      configurationId: number;
+      taxCode: string;
+      recognitionDate: string;
+      receivableAccountId: number;
+      incomeAccountId: number;
+      items?: {
+        itemId: number;
+        code: string;
+      }[];
+    };
+
+export type TaxSourceResultKind =
+  (typeof TaxSourceResultKind)[keyof typeof TaxSourceResultKind];
+
+export const TaxSourceResultKind = {
+  preview: "preview",
+  prepared: "prepared",
+} as const;
+
+export type TaxSourceResultInputLinesItem = {
+  accountId: number;
+  debit: string;
+  credit: string;
+};
+
+export type TaxSourceResultInput = {
+  accountingDate: string;
+  eventKey: string;
+  narration: string;
+  evidence: string;
+  lines: TaxSourceResultInputLinesItem[];
+};
+
+export interface TaxSourceResult {
+  kind: TaxSourceResultKind;
+  id?: number;
+  cashMovement?: string;
+  input?: TaxSourceResultInput;
+}
+
+export type PostedTaxRegisterTotals = {
+  netPurchases: string;
+  purchaseVat: string;
+  recoverable: string;
+  nonRecoverable: string;
+  netSales: string;
+  outputVat: string;
+};
+
+export type PostedTaxRegisterRowsItemDirection =
+  (typeof PostedTaxRegisterRowsItemDirection)[keyof typeof PostedTaxRegisterRowsItemDirection];
+
+export const PostedTaxRegisterRowsItemDirection = {
+  purchase: "purchase",
+  sale: "sale",
+} as const;
+
+export type PostedTaxRegisterRowsItem = {
+  journalId: number;
+  date: string;
+  sourceKind: string;
+  sourceId: number;
+  configurationId: number;
+  code: string;
+  treatment: string;
+  net: string;
+  vat: string;
+  gross: string;
+  recoverable: string;
+  nonRecoverable: string;
+  direction: PostedTaxRegisterRowsItemDirection;
+  reversal: boolean;
+};
+
+export interface PostedTaxRegister {
+  from: string;
+  to: string;
+  branchId: number;
+  basis: string;
+  unclassified: number;
+  limitation: string;
+  totals: PostedTaxRegisterTotals;
+  rows: PostedTaxRegisterRowsItem[];
+}
+
+export type TaxSourceJournalLinesItem = {
+  accountId: number;
+  debit: string;
+  credit: string;
+  memo: string;
+};
+
+export interface TaxSourceJournal {
+  id: number;
+  status: string;
+  date: string;
+  narration: string;
+  evidence: string;
+  preparedBy: number;
+  lines: TaxSourceJournalLinesItem[];
+}
+
 export interface OpeningSetupResult {
   id: number;
 }
@@ -77,14 +340,6 @@ export interface OpeningSetupPreview {
   creditTotal: string;
   zero: boolean;
   accountCount: number;
-}
-
-export interface OpeningSetupAccount {
-  id: number;
-  code: string;
-  name: string;
-  category: string;
-  active: boolean;
 }
 
 export type OpeningSetupVersionState =
@@ -1618,6 +1873,79 @@ export type ManualAccountingBranchParameter = number;
  * Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
  */
 export type AccountingBranchParameter = string;
+
+export type GetTaxConfigurationWorkspaceParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PrepareTaxConfigurationParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type ActOnTaxConfigurationParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type GetTaxSourceParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PreviewTaxSourceParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PrepareTaxSourceParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PostTaxSourceParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PostTaxSourceBody = {
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  reason: string;
+};
+
+export type GetConfiguredTaxJournalParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type GetPostedTaxRegisterParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+  from: string;
+  to: string;
+};
 
 export type GetOpeningSetupWorkspaceParams = {
   /**

@@ -2,6 +2,72 @@
 
 ## Current Work Register - Authoritative as of 2026-10-13
 
+### VAT / Direct Expense Engineering Accepted / Publishing Inactive - 2026-10-13 19:38 WAT
+
+- Configuration/source review/posted register engineering complete. Final10DB
+  PASS1147s plus focused1PASS115s =11distinct accepted cases (7new+4shared).
+  Includes SQL-protected tax heads, immutable decisions/audit scope, repeat-safe
+  upgrade, duplicate/concurrent requests, independent approval, correct three
+  expense heads, inclusive/exclusive/recovery splits, original-rule duty reversals,
+  mixed invoice/credit-note reconciliation, stale/retroactive/scope/access refusal,
+  existing openings/manual/invoice/GLTB. No weakened financial guard.
+- Final419unit/API PASS/3existing skips (54files), full typechecks/railway build,
+  updated native OFF zero-DB smoke, built new setup/payment and exempt/zero invoice
+  item preview/register plus existing opening/manual/GLTB CSV/print UI PASS.
+  Mobile dialog/table bounds and screenshots inspected. No live financial input.
+- Owned namespaces inspection [] and tunnel closure verified. Public11source
+  aggregates preserved in every DB run. Protected remote opening checkpoint kept;
+  existing production records untouched. Current production native switches remain
+  unset/defaultOFF; pre-publication old deployed OFF smoke PASS independently.
+- Next commit/push exact inactive functional release, verify Railway matching
+  success/health/auth/new deployed bundle, then publish exact release records.
+- Real chart/book/date/grants, tax approvals, verified openings and operational
+  bank/subledger reconciliation remain launch prerequisites. Legacy operational
+  VAT forms/cash reports are unchanged, not secretly reclassified by new setup.
+  Step10 Balance Sheet/Management Accounts remains next reporting work, not started.
+
+### VAT / Direct Expense Final Local PASS / Database Rerun - 2026-10-13 19:22 WAT
+
+- Final419unit/API PASS/3existing skips, complete typechecks and rebuilt UI/server
+  PASS; new native OFF smoke PASS with zero DB connections/writes.
+- Built VAT configuration/stable retry/independent approval and source posting,
+  preview invalidation, posted register, branch clearing, refresh/OFF/error and
+  desktop/mobile accessible dialogs PASS. Screenshots visually inspected; mobile
+  bounds explicitly asserted. Existing opening/manual/GLTB CSV/print UI PASS.
+- First owned DB run4PASS/2FAIL: canonical invoice rule ordering and stale test
+  configuration selection corrected, no weakened accounting guard. All6new cases
+  plus4shared invoice/opening/manual/GLTB regressions now running on final backend.
+- Final DB acceptance and commit/push/exact inactive deployment still pending.
+  Operator guide ACCOUNTING_VAT_DIRECT_EXPENSE_SETUP.md added; no live activation.
+
+### VAT / Direct Expense Built / Acceptance In Progress - 2026-10-13 19:12 WAT
+
+- Added one scoped setup workspace/API, immutable effective-dated configurations,
+  separate Duty/Shipping/Terminal heads, taxable/zero-rated/exempt codes, exact
+  inclusive/exclusive calculations and reviewed input recovery percentages.
+- Existing source adapters now verify applicable retained configuration, invoice
+  item VAT versus stored totals, gross cash conservation, configured heads and
+  original-rule duty reversal. Source identities/posting/opening/grants reused.
+- Posted VAT register checks journal tax lines and includes aggregate credit-note
+  reductions; mixed credit-note code apportionment is not invented. Legacy sources
+  are reported as unclassified, not retrospectively presumed exempt/taxable.
+- Initial419unit/API PASS/3prior skips, full build/typechecks PASS. Six owned DB
+  acceptance cases and built desktop/mobile UI in progress; latest hardening needs
+  final rerun. No push, live accounting activation or original data change yet.
+- Reports/operational bank/customer histories remain unchanged; Step10 separate.
+
+### VAT / Direct Expense Configuration Authorised - 2026-10-13 18:40 WAT
+
+- Owner authorises completing both configurations, duplicate-work review, tests,
+  records, commit/push and exact deployment verification. Clean e7e4c24 confirmed.
+- Reuse native source identities, posting/reversal, permissions, opening readiness
+  and reports. Add effective-dated independently approved tax/direct-cost settings,
+  explicit source tax review and posted VAT reconciliation, not a second ledger.
+- Keep real native flags OFF. No actual exemption, date, opening figure, historical
+  reclassification, test-data deletion or official activation inferred.
+- In progress: inspect/extend existing configuration and source adapters; acceptance
+  and publication pending. Step10 remains separate.
+
 ### Opening Setup Deployed INACTIVE / Exact Resume Point - 2026-10-13 18:16 WAT
 
 - Functional9d2d0701220152a0ec3ffde40696f5bdef171383 committed/pushed and

@@ -1,4 +1,5 @@
 import { accountingDate, moneyToMinor, minorToMoney, normalizeJournal, requireAccounting, type JournalInput } from "./accounting-rules.js";
+import { purchaseSplit, type PurchaseTaxMapping } from "./accounting-tax.js";
 
 export const OPERATIONAL_SOURCE_KINDS = ["credit_note", "client_credit_application", "invoice_writeoff", "duty_payment",
   "container_payment", "overhead", "overhead_topup", "expense_payment", "schedule_payment", "bank_funding", "bank_transfer"] as const;
@@ -23,6 +24,7 @@ export interface OperationalMapping {
   recognitionDate?: string; recognitionEvidence?: string;
   reductions?: { accountId: number; amount: string; category: "income" | "liability"; evidence: string }[];
   vatAccountId?: number; vatReduction?: string; vatEvidence?: string;
+  purchaseTax?: PurchaseTaxMapping;
 }
 export function operationalEventKey(ref: OperationalRef) {
   requireAccounting(OPERATIONAL_SOURCE_KINDS.includes(ref.kind) && Number.isSafeInteger(ref.id) && ref.id > 0,
@@ -44,6 +46,8 @@ export function buildOperationalJournal(bookId: number, source: OperationalSourc
   requireAccounting(mapping.currency === "NGN" && mapping.policyVersion?.trim() && mapping.evidence?.trim(),
     "MAPPING_REQUIRED", "Reviewed currency, policy version and account treatment required");
   const negative = source.amount.startsWith("-"); const amount = moneyToMinor(negative ? source.amount.slice(1) : source.amount);
+  requireAccounting(!mapping.purchaseTax || mapping.effect==="expense" && ["duty_payment","container_payment"].includes(source.kind),
+    "INVALID_TAX","Purchase VAT is supported only on explicitly reviewed direct payments, not a second expense on settlement");
   requireAccounting(amount > 0n && negative === Boolean(source.originalKey), "INVALID_SOURCE", "Positive fact or linked negative reversal required");
   const requiredCategories = new Map<number, AccountCategory>();
   const lines: JournalInput["lines"] = [];
@@ -116,7 +120,11 @@ export function buildOperationalJournal(bookId: number, source: OperationalSourc
       }
       category=mapping.effect==="expense" ? "expense" : mapping.effect==="loan_repayment" ? "liability" : mapping.effect==="other_non_expense" ? mapping.accountCategory! : "asset";
       requireAccounting(["asset","liability","equity","expense"].includes(category) && (mapping.effect!=="other_non_expense" || category!=="expense"),"INVALID_MAPPING","Supported non-income payment account required");
-      line(mapping.accountId,category,amount,0n);
+      if(mapping.purchaseTax) {
+        const split=purchaseSplit(mapping.purchaseTax,minorToMoney(amount));
+        line(mapping.accountId,category,moneyToMinor(split.net)+moneyToMinor(split.nonRecoverable),0n);
+        line(mapping.purchaseTax.inputVatAccountId,"asset",moneyToMinor(split.recoverable),0n);
+      } else line(mapping.accountId,category,amount,0n);
     }
     line(cashAccount(),"asset",0n,amount); cashMovement=-amount;
   }

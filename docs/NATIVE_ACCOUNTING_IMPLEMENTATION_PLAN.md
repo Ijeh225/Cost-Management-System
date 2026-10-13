@@ -1,5 +1,16 @@
 # Native Accounting Implementation Plan
 
+Acceptance2026-10-13 19:38 WAT: VAT/direct expense engineering complete;
+11distinct DB/419unit/API/built UI/full build accepted. Publishing inactive next.
+Opening/Steps6-9 retained. Actual company configuration/approval/cutover remains
+separately controlled. Step10 is next reporting work, not started by this task.
+
+Current setup update2026-10-13 19:22 WAT: VAT/direct expense configuration/source
+review and posted reconciliation built using existing engine. Final419units/API/UI
+passed; final10owned DB acceptance and exact inactive publication pending. Step10
+still separate. See PROJECT_STATE.md and ACCOUNTING_VAT_DIRECT_EXPENSE_SETUP.md;
+earlier "VAT/direct cost not started" snapshots below are historical.
+
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
 Latest2026-10-13 18:16 WAT: opening setup engineering complete and functional

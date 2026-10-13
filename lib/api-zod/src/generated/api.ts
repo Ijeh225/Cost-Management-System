@@ -7,6 +7,424 @@
  */
 import * as zod from "zod";
 
+export const GetTaxConfigurationWorkspaceParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const GetTaxConfigurationWorkspaceQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const getTaxConfigurationWorkspaceResponseVersionsItemPayloadCodesItemCodeRegExp =
+  new RegExp("^[A-Z][A-Z0-9_-]{0,19}$");
+export const getTaxConfigurationWorkspaceResponseVersionsItemPayloadCodesItemNameMax = 300;
+
+export const getTaxConfigurationWorkspaceResponseVersionsItemPayloadCodesItemBasisEvidenceMax = 300;
+
+export const getTaxConfigurationWorkspaceResponseVersionsItemPayloadCodesMin = 3;
+export const getTaxConfigurationWorkspaceResponseVersionsItemPayloadCodesMax = 12;
+
+export const GetTaxConfigurationWorkspaceResponse = zod.object({
+  book: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    policyVersion: zod.string(),
+    cutoverDate: zod.string(),
+  }),
+  branchId: zod.number(),
+  permissions: zod.array(zod.string()),
+  accounts: zod.array(
+    zod.object({
+      id: zod.number(),
+      code: zod.string(),
+      name: zod.string(),
+      category: zod.string(),
+      active: zod.boolean(),
+    }),
+  ),
+  versions: zod.array(
+    zod.object({
+      id: zod.number(),
+      state: zod.enum(["pending", "approved", "rejected", "cancelled"]),
+      effectiveFrom: zod.string(),
+      preparedBy: zod.number(),
+      reviewedBy: zod.number().nullable(),
+      decisionReason: zod.string().nullable(),
+      payload: zod.object({
+        requestId: zod.string(),
+        policyVersion: zod.string(),
+        effectiveFrom: zod.string(),
+        ownerEvidence: zod.string(),
+        accountantEvidence: zod.string(),
+        inputVatAccountId: zod.number(),
+        outputVatAccountId: zod.number(),
+        dutyAccountId: zod.number(),
+        shippingAccountId: zod.number(),
+        terminalAccountId: zod.number(),
+        codes: zod
+          .array(
+            zod.object({
+              code: zod
+                .string()
+                .regex(
+                  getTaxConfigurationWorkspaceResponseVersionsItemPayloadCodesItemCodeRegExp,
+                ),
+              name: zod
+                .string()
+                .min(1)
+                .max(
+                  getTaxConfigurationWorkspaceResponseVersionsItemPayloadCodesItemNameMax,
+                ),
+              treatment: zod.enum(["taxable", "zero_rated", "exempt"]),
+              rate: zod.string(),
+              recoverablePercent: zod.string(),
+              basisEvidence: zod
+                .string()
+                .min(1)
+                .max(
+                  getTaxConfigurationWorkspaceResponseVersionsItemPayloadCodesItemBasisEvidenceMax,
+                ),
+            }),
+          )
+          .min(getTaxConfigurationWorkspaceResponseVersionsItemPayloadCodesMin)
+          .max(getTaxConfigurationWorkspaceResponseVersionsItemPayloadCodesMax),
+      }),
+    }),
+  ),
+  journals: zod.array(
+    zod.object({
+      id: zod.number(),
+      status: zod.string(),
+      preparedBy: zod.number(),
+      eventKey: zod.string(),
+      date: zod.string(),
+    }),
+  ),
+  truncated: zod.boolean(),
+});
+
+export const PrepareTaxConfigurationParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const PrepareTaxConfigurationQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const prepareTaxConfigurationBodyCodesItemCodeRegExp = new RegExp(
+  "^[A-Z][A-Z0-9_-]{0,19}$",
+);
+export const prepareTaxConfigurationBodyCodesItemNameMax = 300;
+
+export const prepareTaxConfigurationBodyCodesItemBasisEvidenceMax = 300;
+
+export const prepareTaxConfigurationBodyCodesMin = 3;
+export const prepareTaxConfigurationBodyCodesMax = 12;
+
+export const PrepareTaxConfigurationBody = zod.object({
+  requestId: zod.string(),
+  policyVersion: zod.string(),
+  effectiveFrom: zod.string(),
+  ownerEvidence: zod.string(),
+  accountantEvidence: zod.string(),
+  inputVatAccountId: zod.number(),
+  outputVatAccountId: zod.number(),
+  dutyAccountId: zod.number(),
+  shippingAccountId: zod.number(),
+  terminalAccountId: zod.number(),
+  codes: zod
+    .array(
+      zod.object({
+        code: zod
+          .string()
+          .regex(prepareTaxConfigurationBodyCodesItemCodeRegExp),
+        name: zod
+          .string()
+          .min(1)
+          .max(prepareTaxConfigurationBodyCodesItemNameMax),
+        treatment: zod.enum(["taxable", "zero_rated", "exempt"]),
+        rate: zod.string(),
+        recoverablePercent: zod.string(),
+        basisEvidence: zod
+          .string()
+          .min(1)
+          .max(prepareTaxConfigurationBodyCodesItemBasisEvidenceMax),
+      }),
+    )
+    .min(prepareTaxConfigurationBodyCodesMin)
+    .max(prepareTaxConfigurationBodyCodesMax),
+});
+
+export const PrepareTaxConfigurationResponse = zod.object({
+  id: zod.number(),
+});
+
+export const ActOnTaxConfigurationParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  configurationId: zod.coerce.number().min(1),
+});
+
+export const ActOnTaxConfigurationQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const ActOnTaxConfigurationBody = zod.object({
+  action: zod.enum(["approve", "reject", "cancel"]),
+  reason: zod.string(),
+});
+
+export const ActOnTaxConfigurationResponse = zod.object({
+  id: zod.number(),
+});
+
+export const GetTaxSourceParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  kind: zod.enum(["invoice", "duty_payment", "container_payment"]),
+  sourceId: zod.coerce.number().min(1),
+});
+
+export const GetTaxSourceQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const GetTaxSourceResponse = zod.object({
+  id: zod.number(),
+  kind: zod.enum(["invoice", "duty_payment", "container_payment"]),
+  status: zod.string(),
+  subtotal: zod.string().optional(),
+  vat: zod.string().optional(),
+  total: zod.string(),
+  date: zod.string().optional(),
+  section: zod.string().optional(),
+  bankId: zod.number().nullish(),
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      amount: zod.string(),
+    }),
+  ),
+});
+
+export const PreviewTaxSourceParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const PreviewTaxSourceQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const PreviewTaxSourceBody = zod.union([
+  zod.object({
+    kind: zod.enum(["duty_reversal"]),
+    id: zod.number(),
+    evidence: zod.string(),
+  }),
+  zod.object({
+    kind: zod.enum(["duty_payment", "container_payment"]),
+    id: zod.number(),
+    evidence: zod.string(),
+    configurationId: zod.number(),
+    taxCode: zod.string(),
+    basis: zod.enum(["inclusive", "exclusive"]),
+    taxAmount: zod.string(),
+    settlementAccountId: zod.number(),
+  }),
+  zod.object({
+    kind: zod.enum(["invoice"]),
+    id: zod.number(),
+    evidence: zod.string(),
+    configurationId: zod.number(),
+    taxCode: zod.string(),
+    recognitionDate: zod.string(),
+    receivableAccountId: zod.number(),
+    incomeAccountId: zod.number(),
+    items: zod
+      .array(
+        zod.object({
+          itemId: zod.number(),
+          code: zod.string(),
+        }),
+      )
+      .optional(),
+  }),
+]);
+
+export const PreviewTaxSourceResponse = zod.object({
+  kind: zod.enum(["preview", "prepared"]),
+  id: zod.number().optional(),
+  cashMovement: zod.string().optional(),
+  input: zod
+    .object({
+      accountingDate: zod.string(),
+      eventKey: zod.string(),
+      narration: zod.string(),
+      evidence: zod.string(),
+      lines: zod.array(
+        zod.object({
+          accountId: zod.number(),
+          debit: zod.string(),
+          credit: zod.string(),
+        }),
+      ),
+    })
+    .optional(),
+});
+
+export const PrepareTaxSourceParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const PrepareTaxSourceQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const PrepareTaxSourceBody = zod.union([
+  zod.object({
+    kind: zod.enum(["duty_reversal"]),
+    id: zod.number(),
+    evidence: zod.string(),
+  }),
+  zod.object({
+    kind: zod.enum(["duty_payment", "container_payment"]),
+    id: zod.number(),
+    evidence: zod.string(),
+    configurationId: zod.number(),
+    taxCode: zod.string(),
+    basis: zod.enum(["inclusive", "exclusive"]),
+    taxAmount: zod.string(),
+    settlementAccountId: zod.number(),
+  }),
+  zod.object({
+    kind: zod.enum(["invoice"]),
+    id: zod.number(),
+    evidence: zod.string(),
+    configurationId: zod.number(),
+    taxCode: zod.string(),
+    recognitionDate: zod.string(),
+    receivableAccountId: zod.number(),
+    incomeAccountId: zod.number(),
+    items: zod
+      .array(
+        zod.object({
+          itemId: zod.number(),
+          code: zod.string(),
+        }),
+      )
+      .optional(),
+  }),
+]);
+
+export const PrepareTaxSourceResponse = zod.object({
+  kind: zod.enum(["preview", "prepared"]),
+  id: zod.number().optional(),
+  cashMovement: zod.string().optional(),
+  input: zod
+    .object({
+      accountingDate: zod.string(),
+      eventKey: zod.string(),
+      narration: zod.string(),
+      evidence: zod.string(),
+      lines: zod.array(
+        zod.object({
+          accountId: zod.number(),
+          debit: zod.string(),
+          credit: zod.string(),
+        }),
+      ),
+    })
+    .optional(),
+});
+
+export const PostTaxSourceParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  journalId: zod.coerce.number().min(1),
+});
+
+export const PostTaxSourceQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const postTaxSourceBodyReasonMax = 2000;
+
+export const PostTaxSourceBody = zod.object({
+  reason: zod.string().min(1).max(postTaxSourceBodyReasonMax),
+});
+
+export const PostTaxSourceResponse = zod.object({
+  id: zod.number(),
+});
+
+export const GetConfiguredTaxJournalParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  journalId: zod.coerce.number().min(1),
+});
+
+export const GetConfiguredTaxJournalQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const GetConfiguredTaxJournalResponse = zod.object({
+  id: zod.number(),
+  status: zod.string(),
+  date: zod.string(),
+  narration: zod.string(),
+  evidence: zod.string(),
+  preparedBy: zod.number(),
+  lines: zod.array(
+    zod.object({
+      accountId: zod.number(),
+      debit: zod.string(),
+      credit: zod.string(),
+      memo: zod.string(),
+    }),
+  ),
+});
+
+export const GetPostedTaxRegisterParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const GetPostedTaxRegisterQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+  from: zod.coerce.string(),
+  to: zod.coerce.string(),
+});
+
+export const GetPostedTaxRegisterResponse = zod.object({
+  from: zod.string(),
+  to: zod.string(),
+  branchId: zod.number(),
+  basis: zod.string(),
+  unclassified: zod.number(),
+  limitation: zod.string(),
+  totals: zod.object({
+    netPurchases: zod.string(),
+    purchaseVat: zod.string(),
+    recoverable: zod.string(),
+    nonRecoverable: zod.string(),
+    netSales: zod.string(),
+    outputVat: zod.string(),
+  }),
+  rows: zod.array(
+    zod.object({
+      journalId: zod.number(),
+      date: zod.string(),
+      sourceKind: zod.string(),
+      sourceId: zod.number(),
+      configurationId: zod.number(),
+      code: zod.string(),
+      treatment: zod.string(),
+      net: zod.string(),
+      vat: zod.string(),
+      gross: zod.string(),
+      recoverable: zod.string(),
+      nonRecoverable: zod.string(),
+      direction: zod.enum(["purchase", "sale"]),
+      reversal: zod.boolean(),
+    }),
+  ),
+});
+
 export const GetOpeningSetupWorkspaceParams = zod.object({
   bookId: zod.coerce.number().min(1),
 });

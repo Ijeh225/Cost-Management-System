@@ -14,18 +14,25 @@ import { sourceCoverage, type ReconciliationControl } from "./accounting-source-
 import { buildAccountingReport, validateReportFilter, type ReportFilter, type ReportAccount, type ReportLine } from "./accounting-reports.js";
 import { manualInput, mappedControlAccounts, type ManualAdjustment } from "./accounting-manual.js";
 import { buildOpeningSetup, type OpeningSetupRequest, type OpeningAccount } from "./accounting-opening-setup.js";
+import { createHash } from "node:crypto";
+import { stableEvidence } from "./accounting-operational-mapping.js";
+import { validateTaxConfiguration, sameTaxRule, directExpenseHead, type TaxConfiguration } from "./accounting-tax.js";
+import { buildTaxRegister, type TaxRegisterJournal } from "./accounting-tax-register.js";
 
 type Database = Pick<typeof pool, "connect">;
 async function connectClient(database: Database) { return database.connect(); }
 type Client = Awaited<ReturnType<typeof connectClient>>;
 interface JournalRow { id: number; book_id: number; branch_id: number; status: string; prepared_by: number;
-  currency: string; kind: string; event_key: string; payload_hash: string; }
+  currency: string; kind: string; event_key: string; payload_hash: string; accounting_date:string;evidence:string;narration:string; }
 interface ActorRow { id: number; branch_id: number; authority_level: string; job_function: string;
   workspace_access: string; access_profile_migrated_at: Date | null; is_active: boolean; }
 interface OpeningVersionRow {
   id:number; state:"pending"|"verified"|"rejected"|"cancelled"; preparedBy:number; reviewedBy:number|null; journalId:number|null;
   payload:ReturnType<typeof buildOpeningSetup>["payload"];
 }
+export type ConfiguredSourceRequest = {kind:"duty_reversal";id:number;evidence:string}
+  | {kind:"duty_payment"|"container_payment";id:number;evidence:string;configurationId:number;taxCode:string;basis:"inclusive"|"exclusive";taxAmount:string;settlementAccountId:number}
+  | {kind:"invoice";id:number;evidence:string;configurationId:number;taxCode:string;recognitionDate:string;receivableAccountId:number;incomeAccountId:number;items?:{itemId:number;code:string}[]};
 
 // No operational writer calls this service. Approved mappings can prepare internal
 // source drafts; deployment alone never activates or posts them.
@@ -65,10 +72,10 @@ export class NativeAccounting {
     for (const branch of branches) await this.permission(client, bookId, branch.branch_id, actorId, permission);
   }
   private async audit(client: Client, bookId: number, actorId: number, action: string, reason: string,
-    branchId: number | null = null, journalId: number | null = null, periodId: number | null = null, openingId: number | null = null) {
+    branchId: number | null = null, journalId: number | null = null, periodId: number | null = null, openingId: number | null = null, taxId:number|null=null) {
     requireAccounting(typeof reason === "string" && reason.trim().length > 0 && reason.length <= 4000, "EVIDENCE_REQUIRED", "Audit evidence/reason is required");
-    await client.query(`INSERT INTO accounting_audit(book_id,branch_id,actor_id,journal_id,period_id,action,reason,opening_setup_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [bookId, branchId, actorId, journalId, periodId, action, reason.trim(), openingId]);
+    await client.query(`INSERT INTO accounting_audit(book_id,branch_id,actor_id,journal_id,period_id,action,reason,opening_setup_id,tax_configuration_id)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [bookId, branchId, actorId, journalId, periodId, action, reason.trim(), openingId,taxId]);
   }
   async createDraftBook(actorId: number, name: string, currency: string, branchIds: number[]) {
     requireAccounting(typeof name === "string" && name.trim().length > 0 && name.length <= 200 && /^[A-Z]{3}$/.test(currency), "INVALID_BOOK", "Book name and currency required");
@@ -221,6 +228,15 @@ export class NativeAccounting {
     const source: InvoiceAccountingSource = { kind: "invoice", id: invoiceId, branchId, clientId: row.client_id,
       createdDate: financialDateKey(new Date(row.created_at)), subtotal: row.subtotal, vatAmount: row.vat_amount, total: row.total,
       items: items.map(item => ({ id: item.id, containerId: item.container_id, amount: item.amount })) };
+    const taxConfig=await this.applicableTax(client,bookId,branchId,mapping.recognitionDate);
+    if(mapping.tax || taxConfig && !originalPosted) {
+      requireAccounting(mapping.tax,"TAX_REVIEW_REQUIRED","Explicit invoice item tax classifications required under configured VAT policy");
+      const config=await this.retainedTax(client,bookId,branchId,mapping.tax.configurationId);
+      requireAccounting((originalPosted||taxConfig?.id===config.id) && config.effectiveFrom<=mapping.recognitionDate
+        && sameTaxRule(mapping.tax.rules,config.payload.codes),"TAX_CONFIGURATION_CHANGED","Use the applicable approved VAT rules; do not alter retained rules");
+      requireAccounting(mapping.receivableAccountId!==config.payload.inputVatAccountId,"INVALID_MAPPING","Receivables must not use the input VAT asset");
+      if(moneyToMinor(source.vatAmount)>0n)requireAccounting(mapping.vatAccountId===config.payload.outputVatAccountId,"INVALID_MAPPING","Use configured output VAT liability");
+    }
     const draft = buildInvoiceJournal(bookId, source, mapping);
     requireAccounting(draft.input.accountingDate >= book.policy.cutoverDate, "BEFORE_CUTOVER", "Earlier recognition requires approved openings/import");
     if(source.createdDate<book.policy.cutoverDate && !originalPosted) {
@@ -373,6 +389,28 @@ export class NativeAccounting {
     requireAccounting(book?.status==="approved" && book.policy_version===mapping.policyVersion && book.currency===mapping.currency,
       "BOOK_NOT_APPROVED","Matching approved currency/policy required");
     const source=await readOperationalSource(client,branchId,ref);
+    const alreadyPosted=(await client.query("SELECT status FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3",
+      [bookId,branchId,`source:${source.kind}:${source.id}:v1`])).rows[0]?.status==="posted";
+    const direct=source.kind==="duty_payment" || source.kind==="container_payment"&&["shipping","terminal"].includes(String(source.facts.section));
+    let originalConfiguration:number|undefined;
+    if(source.originalKey) {
+      const original=(await client.query("SELECT evidence FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3 AND status='posted'",
+        [bookId,branchId,source.originalKey])).rows[0];
+      if(original)originalConfiguration=JSON.parse(original.evidence).mapping.purchaseTax?.configurationId;
+    }
+    const taxConfig=direct?await this.applicableTax(client,bookId,branchId,source.accountingDate):null;
+    if(mapping.purchaseTax || direct && taxConfig && !alreadyPosted && !source.originalKey) {
+      requireAccounting(mapping.purchaseTax,"TAX_REVIEW_REQUIRED","Select explicit VAT treatment for this payment; never infer VAT from its narration");
+      const config=await this.retainedTax(client,bookId,branchId,mapping.purchaseTax.configurationId);
+      requireAccounting((alreadyPosted||originalConfiguration===config.id||taxConfig?.id===config.id)
+        && (source.originalKey||config.effectiveFrom<=source.accountingDate),"TAX_CONFIGURATION_CHANGED","Use the applicable VAT/direct expense configuration");
+      requireAccounting(mapping.effect==="expense" && mapping.accountId===config.payload[directExpenseHead(source.kind,source.facts.section)]
+        && mapping.purchaseTax.inputVatAccountId===config.payload.inputVatAccountId
+        && sameTaxRule(mapping.purchaseTax.rule,config.payload.codes.find(c=>c.code===mapping.purchaseTax?.code)),
+        "INVALID_MAPPING","Use exact configured Duty/Shipping/Terminal and input VAT rules");
+      requireAccounting(mapping.cashAccountId!==config.payload.inputVatAccountId && !Object.values(mapping.bankAccounts??{}).includes(config.payload.inputVatAccountId),
+        "INVALID_MAPPING","Input VAT must not masquerade as the cash/bank account");
+    }
     const draft=buildOperationalJournal(bookId,source,mapping);
     requireAccounting(draft.input.accountingDate>=book.policy.cutoverDate,"BEFORE_CUTOVER","Earlier sources need reviewed openings/import");
     const accounts=(await client.query("SELECT id,category FROM accounting_accounts WHERE book_id=$1 AND active AND id=ANY($2::int[])",
@@ -646,7 +684,7 @@ export class NativeAccounting {
   async readJournal(bookId: number, branchId: number, actorId: number, journalId: number) {
     return this.transaction(bookId, async client => {
       await this.permission(client, bookId, branchId, actorId, "read");
-      const journal = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE id=$1 AND book_id=$2 AND branch_id=$3", [journalId, bookId, branchId])).rows[0];
+      const journal = (await client.query<JournalRow>("SELECT *,accounting_date::text AS accounting_date FROM accounting_journals WHERE id=$1 AND book_id=$2 AND branch_id=$3", [journalId, bookId, branchId])).rows[0];
       requireAccounting(journal, "NOT_FOUND", "Journal not found in this scope");
       const lines = (await client.query<{ account_id: number; debit_minor: string; credit_minor: string; memo: string }>("SELECT account_id,debit_minor::text,credit_minor::text,memo FROM accounting_journal_lines WHERE journal_id=$1 ORDER BY id", [journalId])).rows;
       return { ...journal, lines: lines.map(l => ({ accountId: l.account_id, debit: minorToMoney(l.debit_minor), credit: minorToMoney(l.credit_minor), memo: l.memo })) };
@@ -752,6 +790,181 @@ export class NativeAccounting {
     });
   }
 
+  private async applicableTax(client:Client,bookId:number,branchId:number,date:string) {
+    accountingDate(date);
+    return (await client.query<{id:number}>(`SELECT id FROM accounting_tax_configurations WHERE book_id=$1 AND branch_id=$2
+      AND state='approved' AND effective_from<=$3::date ORDER BY effective_from DESC LIMIT 1`,[bookId,branchId,date])).rows[0]??null;
+  }
+  private async retainedTax(client:Client,bookId:number,branchId:number,id:number) {
+    const row=(await client.query<{id:number;effectiveFrom:string;payload:TaxConfiguration;hash:string}>(`SELECT id,effective_from::text AS "effectiveFrom",payload,payload_hash AS hash
+      FROM accounting_tax_configurations WHERE id=$1 AND book_id=$2 AND branch_id=$3 AND state='approved'`,[id,bookId,branchId])).rows[0];
+    requireAccounting(row,"TAX_CONFIGURATION_REQUIRED","Approved configuration required in this exact book and branch");
+    requireAccounting(row.hash===createHash("sha256").update(stableEvidence(row.payload)).digest("hex"),"SOURCE_CHANGED","Tax configuration evidence has changed");
+    return row;
+  }
+  private async checkedTax(client:Client,bookId:number,branchId:number,request:TaxConfiguration) {
+    const config=validateTaxConfiguration(request);
+    const book=(await client.query("SELECT * FROM accounting_books WHERE id=$1",[bookId])).rows[0];
+    requireAccounting(book?.status==="approved" && book.currency==="NGN" && book.policy_version===config.policyVersion
+      && config.effectiveFrom>=book.policy.cutoverDate,"BOOK_NOT_APPROVED","Approved NGN book, policy and cutover required");
+    const required=new Map([[config.inputVatAccountId,"asset"],[config.outputVatAccountId,"liability"],
+      [config.dutyAccountId,"expense"],[config.shippingAccountId,"expense"],[config.terminalAccountId,"expense"]]);
+    const accounts=(await client.query("SELECT id,category FROM accounting_accounts WHERE book_id=$1 AND active AND id=ANY($2::int[])",[bookId,[...required.keys()]])).rows;
+    requireAccounting(accounts.length===5 && accounts.every(a=>required.get(a.id)===a.category),"INVALID_MAPPING","Five distinct active own-book tax/direct expense heads required");
+    const unsafe=(await client.query("SELECT account_id FROM accounting_manual_account_rules WHERE book_id=$1 AND role='adjustment' AND account_id=ANY($2::int[])",
+      [bookId,[config.inputVatAccountId,config.outputVatAccountId]])).rows;
+    requireAccounting(unsafe.length===0,"PROTECTED_ACCOUNT","VAT controls cannot be unrestricted adjustment heads");
+    return config;
+  }
+  async taxWorkspace(bookId:number,branchId:number,actorId:number) {
+    return this.transaction(bookId,async client=>{
+      const scope=await this.reportingScope(client,bookId,branchId,actorId);
+      const permissions:string[]=[];
+      for(const p of ["configure","prepare","post","reverse"] as const)
+        if((await client.query("SELECT accounting_has_grant($1,$2,$3,$4) allowed",[bookId,branchId,actorId,p])).rows[0]?.allowed)permissions.push(p);
+      const versions=(await client.query(`SELECT id,state,effective_from::text AS "effectiveFrom",prepared_by AS "preparedBy",reviewed_by AS "reviewedBy",
+        decision_reason AS "decisionReason",payload FROM accounting_tax_configurations WHERE book_id=$1 AND branch_id=$2 ORDER BY id DESC LIMIT 201`,[bookId,branchId])).rows;
+      const journals=(await client.query(`SELECT id,status,prepared_by AS "preparedBy",event_key AS "eventKey",accounting_date::text AS date
+        FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND
+          CASE WHEN event_key LIKE 'source:%' THEN (evidence::jsonb->'mapping' ? 'tax' OR evidence::jsonb->'mapping' ? 'purchaseTax') ELSE false END
+        ORDER BY id DESC LIMIT 201`,[bookId,branchId])).rows;
+      return {book:{id:bookId,name:scope.book.name,policyVersion:scope.book.policy_version,cutoverDate:scope.book.policy.cutoverDate},branchId,
+        permissions,accounts:await this.openingChart(client,bookId),versions:versions.slice(0,200),journals:journals.slice(0,200),truncated:versions.length>200||journals.length>200};
+    },true);
+  }
+  async prepareTaxConfiguration(bookId:number,branchId:number,actorId:number,request:TaxConfiguration) {
+    return this.transaction(bookId,async client=>{
+      await this.permission(client,bookId,branchId,actorId,"configure");
+      const config=validateTaxConfiguration(request),hash=createHash("sha256").update(stableEvidence(config)).digest("hex");
+      const existing=(await client.query("SELECT * FROM accounting_tax_configurations WHERE book_id=$1 AND branch_id=$2 AND request_id=$3",[bookId,branchId,config.requestId])).rows[0];
+      if(existing) {
+        requireAccounting(existing.prepared_by===actorId && existing.payload_hash===hash,"DUPLICATE_CONFLICT","Configuration request already belongs to different evidence or preparer");
+        return {id:existing.id};
+      }
+      await this.checkedTax(client,bookId,branchId,config);
+      requireAccounting(!(await client.query("SELECT id FROM accounting_tax_configurations WHERE book_id=$1 AND branch_id=$2 AND state='pending'",[bookId,branchId])).rowCount,
+        "CONFIGURATION_STATE","Review or cancel the pending configuration before submitting another version");
+      const row=(await client.query(`INSERT INTO accounting_tax_configurations(book_id,branch_id,request_id,effective_from,policy_version,payload,payload_hash,prepared_by)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,[bookId,branchId,config.requestId,config.effectiveFrom,config.policyVersion,JSON.stringify(config),hash,actorId])).rows[0];
+      await this.audit(client,bookId,actorId,"tax_configuration_prepared","VAT/direct expense configuration submitted, not activated or posted",branchId,null,null,null,row.id);
+      return {id:row.id};
+    });
+  }
+  async taxConfigurationAction(bookId:number,branchId:number,actorId:number,id:number,action:"approve"|"reject"|"cancel",reason:string) {
+    requireAccounting(["approve","reject","cancel"].includes(action),"INVALID_REQUEST","Valid configuration decision required");
+    return this.transaction(bookId,async client=>{
+      await this.permission(client,bookId,branchId,actorId,"configure");
+      const row=(await client.query("SELECT * FROM accounting_tax_configurations WHERE id=$1 AND book_id=$2 AND branch_id=$3 FOR UPDATE",[id,bookId,branchId])).rows[0];
+      requireAccounting(row,"NOT_FOUND","Configuration not found in this scope");
+      requireAccounting(action==="cancel"?row.prepared_by===actorId:row.prepared_by!==actorId,"SELF_APPROVAL","Independent reviewer or original preparer cancellation required");
+      const state=action==="approve"?"approved":action==="reject"?"rejected":"cancelled";
+      if(row.state===state)return {id};
+      requireAccounting(row.state==="pending","CONFIGURATION_STATE","Final configurations are immutable; submit a new version");
+      if(state==="approved") {
+        const config=await this.checkedTax(client,bookId,branchId,row.payload);
+        requireAccounting(createHash("sha256").update(stableEvidence(config)).digest("hex")===row.payload_hash,"SOURCE_CHANGED","Configuration evidence changed");
+        requireAccounting(!(await client.query(`SELECT id FROM accounting_tax_configurations WHERE book_id=$1 AND branch_id=$2 AND state='approved' AND effective_from>=$3::date`,
+          [bookId,branchId,config.effectiveFrom])).rowCount,"CONFIGURATION_DATE","New versions must begin after prior approved versions");
+        requireAccounting(!(await client.query(`SELECT id FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND status='posted' AND accounting_date>=$3::date
+          AND (event_key LIKE 'source:invoice:%' OR event_key LIKE 'source:duty_payment:%' OR event_key LIKE 'source:container_payment:%') LIMIT 1`,[bookId,branchId,config.effectiveFrom])).rowCount,
+          "HISTORY_REVIEW_REQUIRED","Choose a future effective date; posted historical tax/expense classifications cannot be silently overwritten");
+      }
+      await this.audit(client,bookId,actorId,`tax_configuration_${state}`,reason,branchId,null,null,null,id);
+      await client.query("UPDATE accounting_tax_configurations SET state=$2,reviewed_by=$3,decision_reason=$4,approved_at=CASE WHEN $2='approved' THEN now() ELSE NULL END WHERE id=$1",[id,state,actorId,reason]);
+      return {id};
+    });
+  }
+  async configuredSource(bookId:number,branchId:number,actorId:number,kind:"invoice"|"duty_payment"|"container_payment",id:number) {
+    return this.transaction(bookId,async client=>{
+      await this.permission(client,bookId,branchId,actorId,"read");
+      if(kind==="invoice") {
+        const row=(await client.query("SELECT id,status,subtotal::text,vat_amount::text AS vat,total::text FROM invoices WHERE id=$1 AND branch_id=$2",[id,branchId])).rows[0];
+        requireAccounting(row,"NOT_FOUND","Invoice not found in this branch");
+        const items=(await client.query("SELECT id,amount::text FROM invoice_items WHERE invoice_id=$1 AND branch_id=$2 ORDER BY id",[id,branchId])).rows;
+        return {...row,kind,items};
+      }
+      const source=await readOperationalSource(client,branchId,{kind,id});
+      return {id,kind,status:source.originalKey?"reversal":"payment",total:source.amount,date:source.accountingDate,section:String(source.facts.section??""),bankId:source.bankId??null,items:[]};
+    },true);
+  }
+  private async configuredDraft(client:Client,bookId:number,branchId:number,actorId:number,request:ConfiguredSourceRequest) {
+    await this.permission(client,bookId,branchId,actorId,"read");
+    if(request.kind==="duty_reversal") {
+      const source=await readOperationalSource(client,branchId,{kind:"duty_payment",id:request.id});
+      requireAccounting(source.originalKey,"INVALID_REVERSAL","Use a recorded full duty reversal, not a new cash entry");
+      const original=(await client.query("SELECT evidence FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3 AND status='posted'",[bookId,branchId,source.originalKey])).rows[0];
+      requireAccounting(original,"ORIGINAL_NOT_POSTED","Post original reviewed duty first");
+      const mapping=JSON.parse(original.evidence).mapping as OperationalMapping;
+      requireAccounting(mapping.purchaseTax,"TAX_REVIEW_REQUIRED","Original needs retained structured tax evidence");
+      return this.operationalDraft(client,bookId,branchId,actorId,{kind:"duty_payment",id:request.id},mapping,"read");
+    }
+    const config=await this.retainedTax(client,bookId,branchId,request.configurationId);
+    const rule=config.payload.codes.find(c=>c.code===request.taxCode);
+    requireAccounting(rule,"INVALID_TAX","Select an approved VAT code, including explicit exempt or zero-rated");
+    if(request.kind==="invoice") {
+      const items=(await client.query("SELECT id,amount::text FROM invoice_items WHERE invoice_id=$1 AND branch_id=$2 ORDER BY id",[request.id,branchId])).rows;
+      const row=(await client.query("SELECT vat_amount::text FROM invoices WHERE id=$1 AND branch_id=$2",[request.id,branchId])).rows[0];
+      requireAccounting(row,"NOT_FOUND","Invoice not found in this branch");
+      const mapping:InvoiceAccountingMapping={currency:"NGN",policyVersion:config.payload.policyVersion,evidence:request.evidence,
+        recognitionDate:request.recognitionDate,recognitionEvidence:request.evidence,receivableAccountId:request.receivableAccountId,
+        ...(moneyToMinor(row.vat_amount)>0n?{vatAccountId:config.payload.outputVatAccountId,vatEvidence:request.evidence}:{}),
+        items:items.map(i=>({itemId:i.id,splits:[{accountId:request.incomeAccountId,amount:i.amount,treatment:"income",evidence:request.evidence}]})),
+        tax:{configurationId:config.id,evidence:request.evidence,rules:config.payload.codes,
+          items:request.items??items.map(i=>({itemId:i.id,code:request.taxCode}))}};
+      return this.invoiceDraft(client,bookId,branchId,actorId,request.id,mapping,"read");
+    }
+    const source=await readOperationalSource(client,branchId,{kind:request.kind,id:request.id});
+    requireAccounting(!source.originalKey,"INVALID_REVERSAL","Duty reversals must reuse original retained rules");
+    const mapping:OperationalMapping={currency:"NGN",policyVersion:config.payload.policyVersion,evidence:request.evidence,effect:"expense",
+      accountId:config.payload[directExpenseHead(source.kind,source.facts.section)],
+      ...(source.bankId===null?{cashAccountId:request.settlementAccountId}:{bankAccounts:{[String(source.bankId)]:request.settlementAccountId}}),
+      purchaseTax:{configurationId:config.id,code:rule.code,basis:request.basis,amount:request.taxAmount,evidence:request.evidence,
+        rule,inputVatAccountId:config.payload.inputVatAccountId}};
+    return this.operationalDraft(client,bookId,branchId,actorId,{kind:request.kind,id:request.id},mapping,"read");
+  }
+  async reviewConfiguredSource(bookId:number,branchId:number,actorId:number,request:ConfiguredSourceRequest,prepare=false) {
+    return this.transaction(bookId,async client=>{
+      const draft=await this.configuredDraft(client,bookId,branchId,actorId,request);
+      if(!prepare)return {kind:"preview" as const,input:draft.input,cashMovement:draft.cashMovement};
+      const journal=await this.prepare(client,actorId,draft.input,"originalId" in draft?draft.originalId:null);
+      requireAccounting(journal.status!=="cancelled","SOURCE_CANCELLED","Cancelled source cannot be posted again under a new configuration");
+      return {kind:"prepared" as const,id:journal.id};
+    });
+  }
+  async postConfiguredSource(bookId:number,branchId:number,actorId:number,id:number,reason:string) {
+    return this.transaction(bookId,async client=>{
+      const row=(await client.query("SELECT evidence,event_key FROM accounting_journals WHERE id=$1 AND book_id=$2 AND branch_id=$3",[id,bookId,branchId])).rows[0];
+      requireAccounting(row?.event_key.startsWith('source:'),"NOT_FOUND","Source draft not found in this scope");
+      const saved=JSON.parse(row.evidence);
+      requireAccounting(saved.mapping?.tax||saved.mapping?.purchaseTax,"NOT_FOUND","Only configured tax source drafts use this posting action");
+      return {id:(await this.postJournal(client,bookId,branchId,actorId,id,reason)).id};
+    });
+  }
+  async configuredJournal(bookId:number,branchId:number,actorId:number,id:number) {
+    const j=await this.readJournal(bookId,branchId,actorId,id);
+    requireAccounting(j.event_key.startsWith('source:'),"NOT_FOUND","Configured source journal required");
+    const saved=JSON.parse(j.evidence);
+    requireAccounting(saved.mapping?.tax||saved.mapping?.purchaseTax,"NOT_FOUND","Configured source journal required");
+    return {id:j.id,status:j.status,date:j.accounting_date,narration:j.narration,evidence:j.evidence,preparedBy:j.prepared_by,lines:j.lines};
+  }
+  async taxRegister(bookId:number,branchId:number,actorId:number,from:string,to:string) {
+    accountingDate(from);accountingDate(to);requireAccounting(from<=to,"INVALID_DATE","Ordered VAT report date range required");
+    return this.transaction(bookId,async client=>{
+      const scope=await this.reportingScope(client,bookId,branchId,actorId);
+      requireAccounting(from>=scope.book.policy.cutoverDate,"PRE_CUTOVER","VAT register starts at approved cutover");
+      const journals=(await client.query<TaxRegisterJournal>(`SELECT j.id,j.accounting_date::text date,j.evidence,j.kind,
+        (original.evidence::jsonb->'mapping'->'tax'->>'configurationId')::integer AS "originalConfigurationId",
+        jsonb_agg(jsonb_build_object('accountId',l.account_id,'debit',l.debit_minor::text,'credit',l.credit_minor::text) ORDER BY l.id) lines
+        FROM accounting_journals j JOIN accounting_journal_lines l ON l.journal_id=j.id
+        LEFT JOIN accounting_journals original ON original.book_id=j.book_id AND original.branch_id=j.branch_id AND original.status='posted'
+          AND original.event_key='source:invoice:'||(CASE WHEN j.event_key LIKE 'source:credit_note:%' THEN j.evidence::jsonb->'source'->>'invoiceId' ELSE NULL END)||':v1'
+        WHERE j.book_id=$1 AND j.branch_id=$2 AND j.status='posted' AND j.accounting_date BETWEEN $3::date AND $4::date
+          AND (j.event_key LIKE 'source:invoice:%' OR j.event_key LIKE 'source:duty_payment:%' OR j.event_key LIKE 'source:container_payment:%' OR j.event_key LIKE 'source:credit_note:%')
+        GROUP BY j.id,original.id ORDER BY j.accounting_date,j.id LIMIT 10001`,[bookId,branchId,from,to])).rows;
+      requireAccounting(journals.length<=10000,"REPORT_TOO_LARGE","Narrow the VAT range; never display truncated totals");
+      return {from,to,branchId,...buildTaxRegister(journals)};
+    },true);
+  }
   private async manualAccounts(client:Client,bookId:number,journalId?:number,accountIds?:number[]) {
     const unreviewed=(await client.query(`SELECT a.id FROM accounting_accounts a LEFT JOIN accounting_manual_account_rules r
       ON r.book_id=a.book_id AND r.account_id=a.id WHERE a.book_id=$1 AND r.account_id IS NULL LIMIT 1`,[bookId])).rows;
@@ -774,6 +987,8 @@ export class NativeAccounting {
         && typeof review.accountantEvidence==="string" && review.accountantEvidence.trim().length>0 && review.accountantEvidence.length<=1000,"EVIDENCE_REQUIRED","Actual owner and accountant evidence required, not a default approval");
       const sources=(await client.query("SELECT evidence FROM accounting_journals WHERE book_id=$1 AND event_key LIKE 'source:%'",[bookId])).rows;
       const controls=new Set(sources.flatMap(s=>mappedControlAccounts(JSON.parse(s.evidence).mapping)));
+      const configured=(await client.query("SELECT payload FROM accounting_tax_configurations WHERE book_id=$1 AND state='approved'",[bookId])).rows;
+      for(const c of configured){controls.add(c.payload.inputVatAccountId);controls.add(c.payload.outputVatAccountId);}
       requireAccounting(review.accounts.every(a=>!controls.has(a.accountId) || a.role==="protected"),"PROTECTED_ACCOUNT","Known source control accounts must remain protected");
       const saved=(await client.query("SELECT account_id,role FROM accounting_manual_account_rules WHERE book_id=$1",[bookId])).rows;
       requireAccounting(saved.every(a=>review.accounts.some(r=>r.accountId===a.account_id && r.role===a.role)),"ACCOUNT_REVIEW_REQUIRED","Existing approved classifications cannot be silently changed");

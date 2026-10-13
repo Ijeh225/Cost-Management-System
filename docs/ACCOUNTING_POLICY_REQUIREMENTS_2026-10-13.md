@@ -1,5 +1,16 @@
 # Accounting Policy Requirements
 
+Acceptance update2026-10-13 19:38 WAT: structured VAT/direct expense setup,
+source review and posted reconciliation accepted in11distinct owned DB cases,
+419unit/API and built UI tests. Publishing inactive next; actual company tax
+approval and figures remain distinct from engineering acceptance.
+
+Current update2026-10-13 19:22 WAT: structured VAT and separate direct-expense
+configuration/source review/register engineering built. Final419unit/API/UI checks
+passed; final10owned DB cases and publication pending. This supersedes the earlier
+"VAT not started" snapshots below; actual accountant approvals/launch remain open.
+Operating procedure: ACCOUNTING_VAT_DIRECT_EXPENSE_SETUP.md. No live data rewritten.
+
 Release update2026-10-13 18:16 WAT: opening setup complete and functional9d2d070
 verified deployed INACTIVE. Current records untouched; no real opening inputs,
 professional exemption approval or launch reset inferred. See current PROJECT_STATE.

@@ -1,4 +1,5 @@
 import { accountingDate, moneyToMinor, minorToMoney, normalizeJournal, requireAccounting, type JournalInput } from "./accounting-rules.js";
+import { calculateVat, invoiceTaxSchema, type InvoiceTaxMapping } from "./accounting-tax.js";
 
 export interface InvoiceAccountingSource {
   kind: "invoice"; id: number; branchId: number; clientId: number; createdDate: string;
@@ -10,6 +11,7 @@ export interface InvoiceAccountingMapping {
   recognitionDate: string; recognitionEvidence: string;
   receivableAccountId: number; vatAccountId?: number; vatEvidence?: string;
   items: { itemId: number; splits: { accountId: number; amount: string; treatment: "income" | "liability"; evidence: string }[] }[];
+  tax?: InvoiceTaxMapping;
 }
 export function invoiceEventKey(id: number) {
   requireAccounting(Number.isSafeInteger(id) && id > 0, "INVALID_SOURCE", "Positive invoice source ID required");
@@ -37,6 +39,18 @@ export function buildInvoiceJournal(bookId: number, source: InvoiceAccountingSou
   requireAccounting(Array.isArray(mapping.items) && mapping.items.length === source.items.length
     && new Set(mapping.items.map(i => i.itemId)).size === mapping.items.length,
   "MAPPING_REQUIRED", "Every item requires exactly one reviewed split definition");
+  if(mapping.tax) {
+    const tax=invoiceTaxSchema.parse({configurationId:mapping.tax.configurationId,evidence:mapping.tax.evidence,items:mapping.tax.items});
+    requireAccounting(tax.items.length===source.items.length && new Set(tax.items.map(i=>i.itemId)).size===source.items.length,
+      "INVALID_TAX","Every authoritative invoice item needs exactly one tax classification");
+    let expected=0n;
+    for(const item of source.items) {
+      const selection=tax.items.find(i=>i.itemId===item.id),rule=mapping.tax.rules.find(r=>r.code===selection?.code);
+      requireAccounting(rule,"INVALID_TAX","Every invoice item must use its approved tax code");
+      expected+=moneyToMinor(calculateVat(item.amount,"exclusive",rule).vat);
+    }
+    requireAccounting(expected===vat,"TAX_SOURCE_MISMATCH","Item VAT must match recorded invoice VAT exactly; correct source totals explicitly, never silently");
+  }
   const requiredCategories = new Map<number, "asset" | "income" | "liability">([[mapping.receivableAccountId, "asset"]]);
   const credits = new Map<number, bigint>();
   const addCredit = (account: number, amount: bigint, category: "income" | "liability") => {
@@ -74,7 +88,8 @@ export function buildInvoiceJournal(bookId: number, source: InvoiceAccountingSou
     items: [...source.items].sort((a, b) => a.id - b.id).map(i => ({ id: i.id, containerId: i.containerId, amount: minorToMoney(moneyToMinor(i.amount)) })) };
   const canonicalMapping = { currency: mapping.currency, policyVersion: mapping.policyVersion, evidence: mapping.evidence.trim(),
     recognitionDate: mapping.recognitionDate, recognitionEvidence: mapping.recognitionEvidence.trim(), receivableAccountId: mapping.receivableAccountId,
-    ...(vat > 0n ? { vatAccountId: mapping.vatAccountId, vatEvidence: mapping.vatEvidence!.trim() } : {}), items: canonicalItems };
+    ...(vat > 0n ? { vatAccountId: mapping.vatAccountId, vatEvidence: mapping.vatEvidence!.trim() } : {}), items: canonicalItems,
+    ...(mapping.tax ? {tax:{...mapping.tax,items:[...mapping.tax.items].sort((a,b)=>a.itemId-b.itemId),rules:[...mapping.tax.rules].sort((a,b)=>a.code.localeCompare(b.code))}} : {}) };
   const input: JournalInput = { bookId, branchId: source.branchId, currency: mapping.currency, accountingDate: mapping.recognitionDate,
     eventKey, narration: `Issued invoice #${source.id} - reviewed recognition`, evidence: JSON.stringify({ source: canonicalSource, mapping: canonicalMapping }),
     lines: [{ accountId: mapping.receivableAccountId, debit: minorToMoney(total), credit: "0" },
