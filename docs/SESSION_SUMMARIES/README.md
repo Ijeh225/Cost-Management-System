@@ -20,7 +20,7 @@ the authoritative project register; it does not replace it.
 
 ## Current Session
 
-- [2026-10-13 opening setup accepted:9distinct DB/405unit/UI PASS, safe interrupted namespace recovery verified; inactive publication next, 18:05 WAT](2026-10-13-accounting-policy-requirements.md)
+- [2026-10-13 opening setup complete/deployed inactive at9d2d070;9distinct DB/405unit/UI PASS; original data kept, future launch reset separate, 18:16 WAT](2026-10-13-accounting-policy-requirements.md)
 
 - [2026-10-12 Step9 engineering complete, exact710f58e inactive release verified; final9isolated/390unit/UI PASS; Step10 next, 18:18 WAT](2026-10-12-manual-journals.md)
 

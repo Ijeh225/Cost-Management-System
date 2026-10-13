@@ -2,6 +2,13 @@
 
 Recorded: 2026-10-10 21:17 WAT (Africa/Lagos).
 Owner decision: build official accounting INSIDE the existing application.
+Latest2026-10-13 18:16 WAT: opening setup engineering complete and functional
+9d2d070 deployed as exactRailway6acdcd78-6a60-4816-950e-f2e84cbf4c9d SUCCESS.
+Live health/opening401/deployed updated OFF zero-native-DB smoke PASS. Both switches
+inactive; existing records kept. Future staff launch and test-data clearance are
+separate. Actual chart/date/grants/professional/opening/source approvals required.
+Next VAT/direct-cost setup and Step10 remain not started. Older snapshots below
+are historical, not an instruction to repeat accepted opening/Step9 work.
 Latest2026-10-13 18:05 WAT: opening setup prerequisite engineering accepted;
 9distinct owned DB cases,405unit/API/3prior skips, build/typechecks/OFF smoke and
 built opening/manual/report browser checks PASS. Existing engine reused; complete

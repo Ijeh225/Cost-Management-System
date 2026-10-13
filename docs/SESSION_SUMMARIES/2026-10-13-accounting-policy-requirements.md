@@ -1,5 +1,23 @@
 # Owner Accounting Requirements and Setup Gaps
 
+## 2026-10-13 18:16 WAT - Exact Inactive Opening Release Verified
+
+- Functional9d2d070 committed/pushed; Railway6acdcd78-6a60-4816-950e-f2e84cbf4c9d
+  SUCCESS at exact hash. Post-success health:ok, opening APIunauthenticated401,
+  official SSH NEW deployed opening/native OFF smoke PASS, zero native DB writes/
+  connections. Both native switches false/defaultOFF rechecked. No production schema.
+- Nine distinct DB scenarios,405unit/API/3skips, full build and built UI checks
+  accepted. Residual isolated namespace inspection [] and closed tunnel verified.
+  Interrupted namespace recovery preserved11public source aggregates.
+- Real figures remain Head of Accounts' responsibility. Owner says current records
+  test-only/not staff-launched. No deletion or live financial fixtures. Future reset
+  separately backed up/reviewed; preserve owner/config/checkpoints/evidence.
+- Opening system engineering complete, deployed inactive. Pre-work89a3b1b tag
+  retained; operator manual added. Next VAT/direct-cost setup and Step10 only on
+  instruction, not done here. Actual chart/date/grants/professional approvals and
+  operational bank/subledger reconciliation required before real activation.
+- Both registers and this summary updated; publication proof is committed next.
+
 ## 2026-10-13 18:05 WAT - Accepted / Publishing Inactive Opening System
 
 - Opening entry/independent verification/readiness engineering complete. Final8DB

@@ -2,6 +2,19 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-13
 
+### Opening Setup Exact Inactive Deployment PASS - 2026-10-13 18:16 WAT
+
+- Functional9d2d070 exact Railway6acdcd78-6a60-4816-950e-f2e84cbf4c9d
+  SUCCESS/matching hash; post-success health:ok, opening unauthenticated401.
+  Official deployed updated opening/native bundle smoke PASS with zero native
+  DB connections/writes. Both native switches false/defaultOFF verified.
+- Nine distinct owned DB/405units/3existing skips/build/built dummy browser
+  acceptance retained. Isolated residual namespace inspection [] and tunnel closed;
+  recovery preserved11public source aggregates. Original production records untouched.
+- No signed-in live financial opening entry/real bank reconciliation/official
+  activation or launch cleanup claimed while inactive. Next VAT/direct-cost setup
+  and Step10 remain unimplemented; actual professional launch controls outstanding.
+
 ### Opening Setup Final Controlled Acceptance PASS - 2026-10-13 18:05 WAT
 
 - Final8DB PASS709s/50filtered and focused2PASS159s/57filtered:9distinct scenarios

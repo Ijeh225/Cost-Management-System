@@ -2,6 +2,30 @@
 
 ## Current Work Register - Authoritative as of 2026-10-13
 
+### Opening Setup Deployed INACTIVE / Exact Resume Point - 2026-10-13 18:16 WAT
+
+- Functional9d2d0701220152a0ec3ffde40696f5bdef171383 committed/pushed and
+  exact Railway6acdcd78-6a60-4816-950e-f2e84cbf4c9d SUCCESS/matching hash
+  verified. Post-success healthz:ok, unauthenticated opening API401. Official SSH
+  NEW deployed bundle opening setup/verification and prior native/source/manual/
+  GLTB OFF smoke PASS: zero native DB connections/writes. Both production flags
+  independently false/defaultOFF; no native schema, official books or figures seeded.
+- Nine distinct isolated DB/405unit/API/full build/built browser acceptance retained.
+  Final isolated namespace inspection [] and tunnel closure PASS after verified
+  targeted interrupted-run recovery. No production source/test data deleted or changed.
+- Protected checkpoint-before-opening-setup-2026-10-13 retained at89a3b1b;
+  older checkpoints preserved. Operator procedure: ACCOUNTING_OPENING_SETUP.md.
+  Actual book/chart/date/grants/openings/professional approvals remain prerequisites.
+- Owner confirms app not launched to staff: current records test-only. Accounts
+  personnel will enter real figures, not guessed by the agent. Future test-data
+  clearance is separate and backed-up; no blanket wipe or launch performed here.
+- Resume: opening entry/independent verification/native readiness engineering
+  complete and deployed inactive. Next authorised setup work may cover structured
+  VAT/direct-expense mappings, then Step10 Balance Sheet/Management Accounts.
+  Neither started in this task. Native readiness does not initialise operational
+  banks or detailed AR/AP/deposit histories; source controls must reconcile before
+  separately authorised real launch. Publication proof follows in records commit.
+
 ### Opening Setup Engineering Accepted / Publishing INACTIVE - 2026-10-13 18:05 WAT
 
 - Opening Balances UI/API and universal native prepare/post readiness engineering

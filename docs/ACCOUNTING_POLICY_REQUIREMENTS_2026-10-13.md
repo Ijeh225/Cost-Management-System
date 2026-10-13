@@ -1,5 +1,9 @@
 # Accounting Policy Requirements
 
+Release update2026-10-13 18:16 WAT: opening setup complete and functional9d2d070
+verified deployed INACTIVE. Current records untouched; no real opening inputs,
+professional exemption approval or launch reset inferred. See current PROJECT_STATE.
+
 Implementation update2026-10-13 18:05 WAT: authorised opening UI/API/verification
 and mandatory native readiness are now built/accepted, inactive publication next.
 The source-status table below preserves the earlier16:03 review, not current
