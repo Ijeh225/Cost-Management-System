@@ -1,6 +1,6 @@
 # Session Summaries
 
-- Current: [2026-10-14 Step11 Statement of Affairs](2026-10-14-step11-statement-of-affairs.md) - inactive publication authorised13:53 WAT;451unit/API +5distinct isolated DB/UI/print acceptance retained; exact deployment pending, official accounting OFF.
+- Current: [2026-10-14 Step11 Statement of Affairs](2026-10-14-step11-statement-of-affairs.md) - e112918 exact Railway ca724baa SUCCESS14:00 WAT; live health/auth/deployed Step11 OFF smoke PASS;451unit/API +5distinct isolated DB/UI/print acceptance retained, official accounting OFF.
 
 - Current: [2026-10-14 Step10 Management Accounts](2026-10-14-step10-management-accounts.md) - d183db0 exact inactive deployment SUCCESS13:00 WAT;11distinct DB/435unit/API/UI PASS; Step11/actual setup approvals next.
 

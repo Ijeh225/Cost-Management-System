@@ -1,5 +1,12 @@
 # Project State
 
+## 2026-10-14 14:00 WAT - Step 11 exact deployment SUCCESS / official accounting OFF
+- Functional commit `e1129183df8cffda72c45028fb2ad68d746ecbdd` committed/pushed to origin/master. Railway production release `ca724baa-63cb-4113-8e21-7d1b719114d3` observed SUCCESS at that exact full commit hash.
+- Post-success live health `/api/healthz`200 `{status:ok}`; unauthenticated Statement of Affairs workspace and version endpoints401 `{error:Not authenticated}`. Official Railway SSH executed the NEW deployed Step11 calculator/all4workflow OFF smoke plus existing foundation/report controls: PASS, zero native connections/writes.
+- Production `NATIVE_ACCOUNTING_ENABLED` and `NATIVE_ACCOUNTING_SCHEMA_ENABLED` still unset/defaultOFF, verified before and after deployment; actual current-runtime OFF assertions PASS. No flag change, official activation, live valuation/financial write, native posting or production test-data cleanup performed.
+- Step11 ENGINEERING COMPLETE AND DEPLOYED INACTIVE. Retained451unit/API PASS/3prior skips,5distinct isolated DB/build/typecheck/built dummy UI/CSV/print/mobile acceptance. Evidence-backed valuations are not automatic book reconciliation, group consolidation, complete statutory accounts or accountant certification.
+- All3project records/session index/plans now include functional release evidence; publish this records-only follow-up. Exact next is separately authorised Step12 final acceptance/rollout/training and actual approved book/chart/go-live/grants/tax recovery, complete verified openings and bank/AR/AP/deposit reconciliation before separate activation. Do not repeat accepted tests, create duplicate records, activate accounting or wipe data automatically. Earlier local/pending entries below are historical snapshots.
+
 ## 2026-10-14 13:53 WAT - Step 11 publication authorised / pending
 - User explicitly requested commit, push, exact successful deployment confirmation and updates to all3project records, keeping official accounting OFF.
 - Reviewed clean-origin Step11 change set/current records on master in restored checkout; diff checks and current built Step11/native OFF smoke PASS. Retained451unit/API +5distinct isolated DB/build/UI/CSV/print/mobile acceptance; no unnecessary repeated tests or duplicate test records.

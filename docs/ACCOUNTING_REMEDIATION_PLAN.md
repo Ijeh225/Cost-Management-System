@@ -1,5 +1,13 @@
 # Accounting Remediation and Feature Plan
 
+Current2026-10-14 14:00 WAT: Step11 Statement of Affairs inactive engineering
+accepted, committed/pushed as e112918 and exact Railway ca724baa SUCCESS at matching
+full hash. Live health/auth and actual deployed NEW Step11/all4workflow OFF smoke
+PASS; both native switches remain unset/defaultOFF, no native connections/writes.
+Accepted controlled test evidence retained. Next separately authorised Step12
+final acceptance/rollout/training, real approved setup/openings/reconciliation
+before explicit activation. Earlier local/unpublished snapshots are historical.
+
 Current2026-10-14 13:49 WAT: Steps6-10 inactive engineering/publication accepted
 as recorded in PROJECT_STATE; Step11 internal Statement of Affairs now complete
 and controlled-test accepted locally (451unit/API,5distinct isolated DB/UI/print).

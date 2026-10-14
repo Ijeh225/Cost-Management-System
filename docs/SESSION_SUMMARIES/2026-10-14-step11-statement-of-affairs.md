@@ -24,3 +24,10 @@
 - User requested commit, push and verified deployment of Step11; keep official accounting OFF and update3records.
 - Reviewed Step11 work/status/diff; local current built inactive smoke PASS. Production both native variables unset/defaultOFF before release.
 - Commit/push/auto-deployment now in progress. Exact release evidence and remote runtime health/auth/OFF checks still pending; no live financial write or activation.
+
+## 2026-10-14 14:00 WAT - Exact successful inactive release
+- Functional commit `e1129183df8cffda72c45028fb2ad68d746ecbdd` (Add reviewed Statement of Affairs workflow) pushed to origin/master. Auto-deployment `ca724baa-63cb-4113-8e21-7d1b719114d3` SUCCESS at matching full hash observed.
+- Live health200:ok; both unauthenticated new workspace/version endpoints401. Official Railway SSH NEW Step11 calculator and all4workflow methods/native foundation OFF smoke PASS, zero native DB connections/writes.
+- Both native production variables unset/defaultOFF before/after release; actual runtime OFF assertions passed. No official activation, schema enablement, financial write, new live valuation record or test-data wipe.
+- All3records/index/plans updated with confirmed evidence; publish this records-only follow-up and confirm its deployment too. Engineering acceptance retained451unit/API/3prior skips +5distinct isolated DB/build/UI/CSV/print/mobile checks.
+- Next separately authorised Step12 final acceptance/rollout/training, actual approvals/openings/reconciliation, then separate activation. Deployment is not accountant certification or confirmation of real financial completeness.
