@@ -2,6 +2,26 @@
 
 ## Current Work Register - Authoritative as of 2026-10-14
 
+### Step 10 Deployed INACTIVE / Exact Resume - 2026-10-14 13:00 WAT
+
+- Functional d183db03996f5469e2f01d33afa60bc84286134d committed/pushed; exact
+  Railway bba983ec-3e36-4962-90fb-ff0fe792ad3a SUCCESS at matching hash observed.
+  Post-success health200:ok, both unauthenticated new report routes401; official
+  SSH NEW deployed Step10/retained invoice terms/native OFF smoke PASS with ZERO
+  native DB connections/writes. Both production switches remain unset/defaultOFF.
+- Step10 ENGINEERING COMPLETE/deployed, not approval of actual company balances or
+  statutory statements. 11distinct isolated/435unit/API/3prior skips/full build/
+  typechecks/built new/shared UI/CSV/print/mobile acceptance retained. Test namespaces
+  []/tunnel closed; public11source baseline unchanged. Original records/checkpoints kept.
+- New due terms are captured for new invoices; old missing terms remain Undated.
+  Bill due/opening detail, unclassified cash and current budget/gross-net bases remain
+  explicit limitations in ACCOUNTING_STATEMENTS_MANAGEMENT_GUIDE.md, not guessed facts.
+- NEXT: Step11 Statement of Affairs on owner's instruction. In parallel, actual
+  book/chart/go-live date/grants/tax basis/recovery, independently verified openings
+  and bank/AR/AP/deposit reconciliation still precede separate official activation.
+  Do not repeat accepted Step10 tests, enable flags or clear test data automatically.
+- Publish these exact release records; no further functional change required.
+
 ### Step 10 Engineering Accepted / Publishing INACTIVE - 2026-10-14 12:51 WAT
 
 - Engineering complete: existing posted ledger/catalog/GLTB/read grants/coverage

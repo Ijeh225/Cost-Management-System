@@ -2,6 +2,21 @@
 
 ## Current Test and Defect Register - Authoritative as of 2026-10-14
 
+### Step 10 Exact Inactive Release PASS - 2026-10-14 13:00 WAT
+
+- Functional d183db0 exact Railway bba983ec-3e36-4962-90fb-ff0fe792ad3a SUCCESS at
+  matching full hash. Post-success health200:ok, new BS/management endpoints401
+  unauthenticated. Official SSH NEW deployed statements/retained due/native OFF
+  smoke PASS, zero native connections/writes; both production switches defaultOFF.
+- Retained11distinct DB/435unit/API/3prior skips/full build and built new/shared
+  report/dashboard/CSV/print/mobile acceptance PASS. Owned namespace[]/closed tunnel,
+  public11source preservation and protected checkpoint accepted. No new open defect.
+- NO signed-in official posting, native schema activation, real opening/balance/
+  due schedule reconciliation or professional certification claimed while inactive.
+  Missing legacy/bill terms, opening allocations, cash purpose and budget basis
+  limitations remain explicitly disclosed. Actual setup/activation is separate.
+- Next Step11 on instruction; publish release records, not more functional changes.
+
 ### Step 10 Controlled Acceptance PASS / Release Pending - 2026-10-14 12:51 WAT
 
 - 11DISTINCT owned DB cases PASS:3new BS/management/VAT/control +2retained/legacy

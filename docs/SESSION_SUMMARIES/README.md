@@ -1,6 +1,6 @@
 # Session Summaries
 
-- Current: [2026-10-14 Step10 Management Accounts](2026-10-14-step10-management-accounts.md) - engineering accepted 12:51 WAT;11distinct DB/435unit/API/UI PASS, publishing inactive; Step11/actual setup approvals next.
+- Current: [2026-10-14 Step10 Management Accounts](2026-10-14-step10-management-accounts.md) - d183db0 exact inactive deployment SUCCESS13:00 WAT;11distinct DB/435unit/API/UI PASS; Step11/actual setup approvals next.
 
 This folder is the concise conversation memory for the project. It supplements
 the authoritative project register; it does not replace it.

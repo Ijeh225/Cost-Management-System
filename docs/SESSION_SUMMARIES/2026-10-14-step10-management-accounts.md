@@ -1,5 +1,20 @@
 # Step 10 Balance Sheet and Management Accounts
 
+## 2026-10-14 13:00 WAT - Exact Step10 Inactive Deployment Verified
+
+- d183db03996f5469e2f01d33afa60bc84286134d committed/pushed; Railway
+  bba983ec-3e36-4962-90fb-ff0fe792ad3a SUCCESS at matching hash. Live health200:ok,
+  new unauthenticated report401s, official SSH NEW statements/due/native OFF smoke
+  PASS with zero native connections/writes. Production switches unset/defaultOFF.
+- Step10 engineering complete/deployed;11distinct DB/435unit/API/3prior skips/full
+  build/typechecks/new and shared built UI/CSV/print/mobile acceptance retained.
+  Namespace[]/tunnel closed, public11baseline preserved, original records/checkpoints kept.
+- No actual company/professional approval or live posting inferred. Guide records
+  legacy/bill due, unallocated openings/control, cash-purpose and budget-basis limits.
+- Next Step11 Statement of Affairs on instruction and actual chart/book/date/grants/
+  tax/opening/operational reconciliation approvals before separate activation.
+  Publish exact evidence records; no further code change or automatic cleanup.
+
 ## 2026-10-14 12:51 WAT - Engineering Accepted / Publishing Inactive
 
 - Step10 engineering complete on existing engine; BS/earnings, accrual P&L/unpaid/
