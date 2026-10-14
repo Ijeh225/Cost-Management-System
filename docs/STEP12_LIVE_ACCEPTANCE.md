@@ -1,6 +1,6 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-14 17:34 WAT. Status: IN PROGRESS, not staff-launch approval.
+Updated: 2026-10-14 19:39 WAT. Status: controlled source-review gap CLOSED; broader launch/print gates remain, not staff-launch approval.
 
 ## Scope and Protection
 
@@ -35,6 +35,7 @@ wipe the live app or restore the old archive over later test postings.
 | Native reports | GL/TB/BS/management API controls; actual staff GL drill-down, BS equation, management/UI and 390px TB accepted | Legacy operational reports have different dates/populations/bases |
 | Outputs | Actual final management CSV15300bytes, scope/warnings/profit230.50/cash10177.50 verified; prior14551byte snapshot retained; screenshot/mobile evidence retained | Live native print layout/PDF not verified |
 | Period restrictions | Empty future November period2 close/reopen audit, missing review and branch-only close refused, closed-date journal refused | Deployed-engine test; no false closure/certification of October |
+| Selected staff source review | Real preparer15/reviewer16 selected two new dummy own transfers3/4; preview/draft/submit/return1/correct3/post2and3(native35/36), retained correction history and same-record public retries, actual role403, mobile390px and exact lookup accepted | New live write UI case is own-bank transfer; other source adapters retain prior service/isolation acceptance, not an assertion of fresh UI writes for all eleven families |
 | Supporting modules | 29 live module/data endpoints returned200 with role negatives accepted | Availability is not complete UI/calculation acceptance of every module |
 
 ## Current Financial Proof
@@ -59,12 +60,15 @@ offsetting tiny cancellation control:
 | AR / AP / unapplied deposits | 0.00 / 0.00 / 0.00 |
 | Assets = capital10000 + profit230.50 | 10,230.50 |
 | Balance-sheet and profit-to-cash bridge differences | 0.00 |
-| Period debits = credits after native33/34 | 13,322.82 |
+| Historical period debits = credits before native35/36 | 13,322.82 |
 
 An independent deployed-source review matched all28 account controls before the
 additional offsetting penny control, with no new missing/draft/stale sources.
 The later recognition33/CN34 leaves all closing controls unchanged, independently
 confirmed by final source revalidation with all28 controls and32posted sources.
+After the selected source-review acceptance, two opposite own-bank postings35/36
+bring source coverage to34posted; all28 closing controls, profit/cash and bank5/6
+still match exactly. There are no pending draft/submitted reviews from this test.
 Historical
 31pre-cutover and3unclassified fixtures remain disclosed. Read-only report
 views do not persist that independent control checklist. Their completeness
@@ -91,7 +95,8 @@ warning must not be removed just because a trial balance balances.
    fixed asset, loan principal or recovery from its supporting voucher.
 7. Submit recognition/adjustments for a different named authorised reviewer.
    A manual journal cannot be used to bypass protected bank, AR/AP or tax heads.
-   Generic source workflows still need the staff interface listed below.
+   Generic sources now use the selected staff-review section in the existing
+   VAT/review page. Its controlled transfer UI test is accepted below.
 8. Use supported credit notes, receipt reversals and write-offs for corrections,
    with original source links and audit retained. Do not cancel a recognized
    invoice as a substitute for reversing its accounting effect.
@@ -111,7 +116,7 @@ warning must not be removed just because a trial balance balances.
 | STEP12-OPS-001 | High | Basic PUT could bypass final workflow prerequisites; shared guard deployed/live CLOSED |
 | STEP12-INV-001 | High | CLOSED: isolated/race tests, exact5dc9974/85a0e30d SUCCESS; truly unpaid20/native33 and retained18refusal PASS |
 | STEP12-INV-002 | Medium | CLOSED:483unit/API/build, exact57aa5c7/9cfa3c3a SUCCESS; same21detail/listzero outstanding/AR exclusion/original total retained PASS |
-| STEP12-SOURCE-UI-001 | High implementation gap | Generic receipts/deposits/overheads/schedules/bank native adapters lack ordinary staff review/post routes/workspace; service acceptance is not staff workflow acceptance |
+| STEP12-SOURCE-UI-001 | High implementation gap | CLOSED at6dc7df1/Railway824c31ee SUCCESS:490units/7HTTP/3realDB/build and real15/16 selected transfer submission/return/correction/independentpost/retry/role/mobile/exactlookup accepted |
 
 ## Exact Continuation and Launch Gates
 
@@ -121,13 +126,13 @@ warning must not be removed just because a trial balance balances.
   do not rerun the accepted resume or cancellation creation phases.
 - Do not rerun prior accounting/transactions/support/cancellation creation modes.
   They intentionally refuse existing fixtures or assert older snapshot figures.
-- Complete the ordinary staff source-review workflow using the existing engine,
-  named permissions, explicit mappings and independent approval. Neither raw SQL
-  posting nor an automatic poster is an acceptable substitute.
-- The owner was asked to choose selected-transaction review (recommended) or
-  automatic pending-review queue. Await that workflow decision; both options
-  require a different named reviewer before posting. No new interface is claimed
-  implemented merely because its underlying service tests passed.
+- Selected ordinary staff source review is now deployed/live accepted in the
+  existing VAT/review page using current builders and independent named approval.
+  No raw SQL financial posting or automatic poster substitutes for the UI test.
+- Do not recreate transfers3/4, reviews1/2/3 or native35/36. Review1 stays returned,
+  corrected3 links1, and each source has exactly one posted journal. Owner session
+  is restored and temporary390px viewport reset. Three historical unknown sources
+  still need actual evidence before any company launch/backfill, not guessed heads.
 - Complete remaining bounded browser/output checks, including live print layout
   when supported, and record what has not been covered. Do not send external
   emails/WhatsApp without a verified suitable test recipient.
@@ -138,3 +143,44 @@ warning must not be removed just because a trial balance balances.
 This document supplements `PROJECT_STATE.md`, `LIVE_E2E_TEST_REGISTER.md` and
 the dated session summary. The latest confirmed timestamped records take
 precedence over older interim milestones.
+
+## Selected Transaction Review Procedure
+
+1. Open VAT / Direct Expenses, select the approved accounting book and one
+   authorised branch. Recent transactions stay scoped to that branch; use exact
+   family/record ID lookup for older sources. A record created in another branch
+   cannot be selected by overriding the branch header.
+2. Select the existing source, not its parent container or schedule ID. For
+   example a standalone schedule uses its actual payment-row ID; a linked
+   overhead schedule uses the bill's expense-payment row, not a second payment.
+3. Choose the actual ledger heads and documented voucher/classification. The
+   system reads the amounts from the source; no arbitrary transaction amount is
+   entered. Overhead header totals can include top-ups: the balanced preview
+   separately recognises the original bill or selected incremental top-up.
+4. Preview the exact balanced entry and source evidence. Save an unposted review
+   draft, inspect it and submit with evidence. No native journal is created merely
+   by preview, draft or submission; original operational money remains untouched.
+5. A different named user with posting permission inspects the retained source
+   snapshot. Return for correction, or Approve and Post. Changed sources, revoked
+   grants, closed periods and self-approval are refused. A returned correction
+   creates a new retained version rather than overwriting the old evidence.
+6. Verify the resulting journal and applicable source/report balances. Posted
+   sources are read-only in this screen; repeated source preparations cannot post
+   money twice. Use existing linked reversal/credit procedures for corrections.
+
+| Source family | Explicit treatment and required dependency |
+| --- | --- |
+| Client deposit | Actual bank/cash asset against client-deposit liability |
+| Invoice cash/deposit settlement | Original AR and actual bank/cash or previously posted deposit liability; allocation is noncash |
+| Credit note | Reviewed original net-income/client-funds split plus any original recorded VAT; original invoice recognition required |
+| Client-credit application | Client-credit liability clears original AR without a cash receipt |
+| Invoice write-off | Stored write-off audit/amount against bad debt and original AR, never a duplicate overhead |
+| Overhead/top-up | Dated original/incremental obligation against payable; recognised source dependencies retained |
+| Expense payment | Settles previously recognised payable; does not create another expense |
+| Standalone schedule payment | Must match the stored reviewed expense/asset/advance/loan/other classification |
+| Bank funding | Explicit equity, loan, asset recovery, income or liability purpose; never inferred from narration |
+| Own-bank transfer | Separate actual source/destination bank heads; no aggregate cash or P&L change |
+
+Invoices and Duty/Shipping/Terminal VAT recognition retain the existing configured
+tax review controls above this new section. Native trial balance equality does
+not certify historical source completeness or actual company launch readiness.

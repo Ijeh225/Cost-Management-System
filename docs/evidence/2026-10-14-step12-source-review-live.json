@@ -1,0 +1,67 @@
+{
+  "time": "2026-10-14T18:32:49.397Z",
+  "state": "live_UI_and_API_verified",
+  "before": {
+    "bank5": 10152.5,
+    "bank6": 25,
+    "profit": "230.50",
+    "cash": "10177.50"
+  },
+  "created": [
+    {
+      "id": 3,
+      "reference": "STEP12-REVIEW-UI-OUT-20261014",
+      "fromBankId": 5,
+      "toBankId": 6,
+      "amount": 0.01
+    },
+    {
+      "id": 4,
+      "reference": "STEP12-REVIEW-UI-BACK-20261014",
+      "fromBankId": 6,
+      "toBankId": 5,
+      "amount": 0.01
+    }
+  ],
+  "results": [
+    {
+      "sourceId": 3,
+      "reviewId": 3,
+      "journalId": 36,
+      "states": [
+        {
+          "id": 3,
+          "state": "posted",
+          "replacesReviewId": 1
+        },
+        {
+          "id": 1,
+          "state": "returned",
+          "replacesReviewId": null
+        }
+      ],
+      "onePostedDecision": true
+    },
+    {
+      "sourceId": 4,
+      "reviewId": 2,
+      "journalId": 35,
+      "states": [
+        {
+          "id": 2,
+          "state": "posted",
+          "replacesReviewId": null
+        }
+      ],
+      "onePostedDecision": true
+    }
+  ],
+  "after": {
+    "bank5": 10152.5,
+    "bank6": 25,
+    "profit": "230.50",
+    "cash": "10177.50"
+  },
+  "actualRoleNegatives": true,
+  "method": "Actual browser preparer/reviewer initial decisions; helper verifies retained history/reports and public same-record idempotent retries. No programmatic initial native posting."
+}

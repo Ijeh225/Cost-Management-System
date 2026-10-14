@@ -1,0 +1,41 @@
+{
+  "time": "2026-10-14T18:39:43Z",
+  "release": "6dc7df1493d0591837ed8da90ac84b4b0e98e319",
+  "deployment": "824c31ee-cc52-40fc-950c-d11dadb3c98f",
+  "deploymentStatus": "SUCCESS",
+  "health": "ok",
+  "nativeEnabled": true,
+  "schemaEnabled": true,
+  "originalOwnerSessionRestored": true,
+  "preparerId": 15,
+  "reviewerId": 16,
+  "sourceIds": [3, 4],
+  "returnedReviewId": 1,
+  "correctedReviewId": 3,
+  "postedJournals": [35, 36],
+  "actualUi": {
+    "preview": true,
+    "saveDraft": true,
+    "submit": true,
+    "return": true,
+    "retainedCorrection": true,
+    "independentPost": true,
+    "postedReadOnly": true,
+    "exactLookup": true,
+    "preparerHasNoSelfPostControl": true
+  },
+  "mobile": {
+    "viewport": 390,
+    "documentWidth": 390,
+    "bodyWidth": 390,
+    "dialogClientWidth": 357,
+    "dialogScrollWidth": 357,
+    "overrideReset": true
+  },
+  "observedDialogWarnings": 0,
+  "screenshots": [
+    "tmp/step12-live/source-review-posted-live.png",
+    "tmp/step12-live/source-review-mobile-live.png"
+  ],
+  "boundary": "Real new write UI controls used own-bank transfer sources; prior other-family service and isolated acceptance is not a new UI write test of every family. Dummy internal records, no external transfer. Native ON TEST ONLY; actual company launch and print layout not certified."
+}

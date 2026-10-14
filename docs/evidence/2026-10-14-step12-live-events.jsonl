@@ -83,3 +83,6 @@
 {"time":"2026-10-14T16:32:35.879Z","check":"STEP12-INV-002 retained cancelled invoice shows zero outstanding without changing original total","pass":true,"invoiceId":21,"invoiceNumber":"INV-202610-006","total":0.01,"outstanding":0}
 {"time":"2026-10-14T16:32:37.566Z","check":"STEP12-INV-001 retained recognized invoices protected; normal cancelled record/list/AR consistent","pass":true,"recognizedInvoiceIds":[18,20],"cancelledInvoiceId":21}
 {"time":"2026-10-14T16:32:41.851Z","check":"Complete28-head review and both cancellation controls retain exact native totals","pass":true,"accounts":28,"profit":"230.50","bank5":10152.5,"bank6":25}
+{"time":"2026-10-14T18:16:51.781Z","pass":"New bounded staff-review dummy source created","id":3,"reference":"STEP12-REVIEW-UI-OUT-20261014","fromBankId":5,"toBankId":6,"amount":0.01}
+{"time":"2026-10-14T18:16:52.363Z","pass":"New bounded staff-review dummy source created","id":4,"reference":"STEP12-REVIEW-UI-BACK-20261014","fromBankId":6,"toBankId":5,"amount":0.01}
+{"time":"2026-10-14T18:32:49.397Z","pass":"Real staff review submission return correction independent posting and public idempotent retries accepted","sourceIds":[3,4],"returnedReviewId":1,"postedReviewIds":[2,3],"journalIds":[35,36],"bank5":10152.5,"bank6":25,"profit":"230.50","cash":"10177.50","actualRoleNegatives":true}
