@@ -6,6 +6,7 @@ import { requireAuth, requireBranchAdminOrAbove, requireFinanceAccess, AuthReque
 import { toE164Nigerian, sendWhatsAppTemplate, assertBranchWhatsAppSenderSupported } from "../lib/whatsapp.js";
 import { getEffectiveInvoiceStatus, isInvoiceCollectable, isInvoiceEditable } from "../lib/invoice-status.js";
 import { getReversibleOverpaymentCredit } from "../lib/invoice-payment-reversal.js";
+import { hasRetainedInvoiceJournal } from "../lib/invoice-native-cancellation.js";
 import { settlementAmount, settlementRequestKey } from "../lib/invoice-cash.js";
 import { creditNoteSplit, financialDateKey, invoiceAging } from "../lib/financial-reporting.js";
 
@@ -802,20 +803,18 @@ router.post("/invoices/:id/cancel", requireBranchAdminOrAbove, async (req: AuthR
     const invoiceId = parseInt(String(req.params.id), 10);
     if (isNaN(invoiceId)) return res.status(400).json({ error: "Invalid id" });
 
-    const [invoice] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
-    if (!invoice || !userCanAccessBranch(req, invoice.branchId)) return res.status(404).json({ error: "Invoice not found" });
-    if (invoice.status === "cancelled") return res.status(400).json({ error: "Invoice is already cancelled" });
-    if (!isInvoiceCollectable(invoice.status)) return res.status(400).json({ error: "This invoice cannot be cancelled" });
-
-    const payments = await db.select({ amount: invoicePaymentsTable.amount })
-      .from(invoicePaymentsTable)
-      .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
-    const totalPaid = payments.reduce((sum, payment) => sum + parseFloat(payment.amount ?? "0"), 0);
-    if (totalPaid > 0) {
-      return res.status(400).json({ error: "An invoice with recorded payments cannot be cancelled. Use a credit note or the normal correction workflow." });
-    }
-
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
+      const [invoice] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId)).for("update");
+      if (!invoice || !userCanAccessBranch(req, invoice.branchId)) return { code: 404, error: "Invoice not found" };
+      if (invoice.status === "cancelled") return { code: 400, error: "Invoice is already cancelled" };
+      if (!isInvoiceCollectable(invoice.status)) return { code: 400, error: "This invoice cannot be cancelled" };
+      if (await hasRetainedInvoiceJournal(tx, invoiceId)) {
+        return { code: 409, error: "This invoice has a retained native accounting draft or posting. Use a reviewed credit note/correction; cancel an unposted native draft before cancelling its invoice." };
+      }
+      const payments = await tx.select({ amount: invoicePaymentsTable.amount }).from(invoicePaymentsTable)
+        .where(eq(invoicePaymentsTable.invoiceId, invoiceId));
+      const totalPaid = payments.reduce((sum, payment) => sum + parseFloat(payment.amount ?? "0"), 0);
+      if (totalPaid > 0) return { code: 400, error: "An invoice with recorded payments cannot be cancelled. Use a credit note or the normal correction workflow." };
       await tx.update(invoicesTable)
         .set({ status: "cancelled", updatedAt: new Date() })
         .where(eq(invoicesTable.id, invoiceId));
@@ -826,8 +825,9 @@ router.post("/invoices/:id/cancel", requireBranchAdminOrAbove, async (req: AuthR
         performedBy: req.user?.id ?? null,
         branchId: invoice.branchId,
       });
+      return { code: 200 };
     });
-
+    if (result.error) return res.status(result.code).json({ error: result.error });
     return res.json({ success: true });
   } catch (err) {
     console.error(err);

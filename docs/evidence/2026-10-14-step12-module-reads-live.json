@@ -1,0 +1,403 @@
+{
+  "time": "2026-10-14T14:56:00.865Z",
+  "pass": "Separate real nonfinance/foreign sessions refused financial/native writes and reads; broad module data endpoints available",
+  "operationsId": 14,
+  "foreignId": 17,
+  "results": [
+    {
+      "path": "/dashboard/stats",
+      "status": 200,
+      "keys": [
+        "totalContainers",
+        "inProgress",
+        "completed",
+        "closed",
+        "totalCost",
+        "totalClearingCharges",
+        "totalGrossProfit",
+        "totalOverheadPaid",
+        "totalNetProfitAfterOverhead",
+        "financialBasis",
+        "totalDutyNotPaid",
+        "totalInvoiced",
+        "totalCollected",
+        "totalOutstanding",
+        "monthlyTrend",
+        "containersInTerminal",
+        "containersInTerminalList",
+        "containersByStatus",
+        "profitByCustomer",
+        "costByVessel",
+        "recentActivity",
+        "alerts",
+        "pendingApprovals",
+        "myPendingSections",
+        "mySections"
+      ]
+    },
+    {
+      "path": "/analytics",
+      "status": 200,
+      "keys": [
+        "summary",
+        "profitByCustomer",
+        "costBySection",
+        "profitByVessel",
+        "monthlyTrend",
+        "negativeProfitContainers",
+        "staffProductivity",
+        "financialBasis"
+      ],
+      "summary": {
+        "totalRevenue": 6500,
+        "totalCost": 607.5,
+        "grossProfit": 5892.5,
+        "profitMargin": 91,
+        "containerCount": 12
+      }
+    },
+    {
+      "path": "/analytics/deliveries",
+      "status": 200,
+      "keys": [
+        "count",
+        "totalRevenue",
+        "avgDays",
+        "items",
+        "branchScope"
+      ]
+    },
+    {
+      "path": "/analytics/turnaround",
+      "status": 200,
+      "keys": [
+        "avgClearanceDays",
+        "completedCount",
+        "totalCount",
+        "stageTurnaround",
+        "clearanceDistribution"
+      ]
+    },
+    {
+      "path": "/analytics/ar-summary",
+      "status": 200,
+      "keys": [
+        "totalInvoiced",
+        "totalCollected",
+        "outstanding",
+        "invoiceCount"
+      ]
+    },
+    {
+      "path": "/notifications",
+      "status": 200,
+      "keys": [
+        "notifications",
+        "unreadCount"
+      ]
+    },
+    {
+      "path": "/workflow-notifications",
+      "status": 200,
+      "keys": [
+        "notifications",
+        "unreadCount"
+      ]
+    },
+    {
+      "path": "/my-tasks",
+      "status": 200,
+      "keys": [
+        "assignedContainers",
+        "sectionApprovals",
+        "mySections",
+        "correctionTasks",
+        "dailyQueue",
+        "workDate",
+        "timeZone",
+        "asOf"
+      ]
+    },
+    {
+      "path": "/approvals",
+      "status": 200,
+      "keys": [
+        "0"
+      ],
+      "listCount": 1
+    },
+    {
+      "path": "/settings",
+      "status": 200,
+      "keys": [
+        "shipping",
+        "customs",
+        "terminal",
+        "delivery",
+        "operations",
+        "documentSections",
+        "aiAssistantGovernance",
+        "aiProactiveBriefingPreferences",
+        "verificationOfficerUserIds",
+        "verificationOfficerUserId",
+        "berthingOfficerUserIds",
+        "berthingOfficerUserId",
+        "hide__customs__dutyPaid",
+        "hide__customs__dutyNotPaid",
+        "digestLastSentAt",
+        "agingInactivityDays",
+        "agingDays1",
+        "agingDays2",
+        "agingDays3",
+        "notifyBeforeDueDays",
+        "agingEmailEnabled",
+        "agingEmailTo",
+        "digestFrequency",
+        "digestTime",
+        "emailAlertPreferences"
+      ]
+    },
+    {
+      "path": "/branches",
+      "status": 200,
+      "keys": [
+        "0",
+        "1",
+        "2"
+      ],
+      "listCount": 3
+    },
+    {
+      "path": "/users",
+      "status": 200,
+      "keys": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7"
+      ],
+      "listCount": 8
+    },
+    {
+      "path": "/containers/36/overview",
+      "status": 200,
+      "keys": [
+        "containerId",
+        "containerNumber",
+        "blNumber",
+        "clientId",
+        "customerName",
+        "branchId",
+        "workflowStage",
+        "physical",
+        "milestones",
+        "blockers",
+        "missingFinalPrerequisites",
+        "nextAction",
+        "unassignedMilestones",
+        "asOf",
+        "tasks",
+        "documents",
+        "approvals",
+        "finance"
+      ]
+    },
+    {
+      "path": "/containers/36/shipment",
+      "status": 200,
+      "keys": [
+        "shipmentId",
+        "blNumber",
+        "branchId",
+        "total",
+        "delivered",
+        "completed",
+        "containers"
+      ]
+    },
+    {
+      "path": "/containers/36/timeline",
+      "status": 200,
+      "keys": [],
+      "listCount": 0
+    },
+    {
+      "path": "/containers/gate-log",
+      "status": 200,
+      "keys": [
+        "entries",
+        "total"
+      ]
+    },
+    {
+      "path": "/containers/paar-status",
+      "status": 200,
+      "keys": [
+        "containers",
+        "total"
+      ]
+    },
+    {
+      "path": "/reports/containers",
+      "status": 200,
+      "keys": [
+        "containers",
+        "branchScope"
+      ]
+    },
+    {
+      "path": "/reports/client-statement?clientId=12",
+      "status": 200,
+      "keys": [
+        "client",
+        "period",
+        "branchScope",
+        "invoices",
+        "totals"
+      ]
+    },
+    {
+      "path": "/reports/vat-summary",
+      "status": 200,
+      "keys": [
+        "period",
+        "branchScope",
+        "invoices",
+        "creditNotes",
+        "adjustmentPolicy",
+        "totals"
+      ]
+    },
+    {
+      "path": "/reports/vat-liability",
+      "status": 200,
+      "keys": [
+        "currentQuarter",
+        "quarters",
+        "currentYearTotal",
+        "branchScope",
+        "adjustmentPolicy"
+      ]
+    },
+    {
+      "path": "/reports/pl?costBasis=actual_paid",
+      "status": 200,
+      "keys": [
+        "period",
+        "branchScope",
+        "filters",
+        "costBasis",
+        "financialBasis",
+        "paymentClassification",
+        "adjustments",
+        "revenue",
+        "costOfSales",
+        "grossProfit",
+        "grossMarginPct",
+        "overheads",
+        "netProfit",
+        "netMarginPct",
+        "containerCount",
+        "avgProfitPerContainer",
+        "monthly",
+        "clients"
+      ]
+    },
+    {
+      "path": "/reports/cashflow?from=2026-10-14&to=2026-10-14",
+      "status": 200,
+      "keys": [
+        "period",
+        "branchScope",
+        "filters",
+        "inflows",
+        "outflows",
+        "totals",
+        "breakdown",
+        "banks"
+      ]
+    },
+    {
+      "path": "/reports/financial-ledger?from=2026-10-14&to=2026-10-14",
+      "status": 200,
+      "keys": [
+        "branchScope",
+        "period",
+        "summary",
+        "entries",
+        "evidenceNote"
+      ],
+      "summary": {
+        "entries": 14,
+        "totalIn": 10832.5,
+        "totalOut": 635,
+        "net": 10197.5
+      }
+    },
+    {
+      "path": "/reports/invoice-aging",
+      "status": 200,
+      "keys": [
+        "generatedAt",
+        "branchScope",
+        "buckets",
+        "totals"
+      ]
+    },
+    {
+      "path": "/reports/disbursement-reconciliation",
+      "status": 200,
+      "keys": [
+        "period",
+        "branchScope",
+        "financialBasis",
+        "rows",
+        "aggregate"
+      ]
+    },
+    {
+      "path": "/reports/branch-comparison",
+      "status": 200,
+      "keys": [
+        "period",
+        "rows",
+        "totals",
+        "financialBasis",
+        "generatedAt",
+        "adjustmentPolicy",
+        "paymentClassification",
+        "undatedBadDebts",
+        "legacyBadDebtPayments"
+      ]
+    },
+    {
+      "path": "/reports/workflow-stage-ledger",
+      "status": 200,
+      "keys": [
+        "branchScope",
+        "generatedAt",
+        "stages",
+        "evidenceNote"
+      ]
+    },
+    {
+      "path": "/reports/financial-control-exceptions",
+      "status": 200,
+      "keys": [
+        "branchScope",
+        "period",
+        "summary",
+        "exceptions",
+        "evidenceNote"
+      ],
+      "summary": {
+        "needsReview": 0,
+        "missingBankAccount": 0
+      }
+    }
+  ]
+}

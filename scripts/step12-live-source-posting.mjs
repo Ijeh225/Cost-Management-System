@@ -14,6 +14,12 @@ export function postLiveSource(fixture,ref,mapping){
    const {fixture:f,ref,mapping}=data,book=(await pool.query('SELECT name FROM accounting_books WHERE id=$1',[f.bookId])).rows[0];
    assert(book.name.startsWith('STEP12 TEST ONLY'),'Only retained Step12 dummy book is writable');
    const engine=new NativeAccounting(pool),settlement=['invoice_payment','client_deposit'].includes(ref.kind);
+   if(ref.kind==='configured_journal'){
+    await engine.postConfiguredSource(f.bookId,2,f.reviewerId,ref.id,'Independent TEST ONLY configured source review; actual recorded facts');
+    await engine.postConfiguredSource(f.bookId,2,f.reviewerId,ref.id,'Independent TEST ONLY configured source review; actual recorded facts');
+    const read=await engine.readJournal(f.bookId,2,f.reviewerId,ref.id);assert.equal(read.status,'posted');
+    console.log(JSON.stringify({journalId:ref.id,status:read.status,method:'Actual deployed configured-source review service, not signed-in approval UI'}));return;
+   }
    const preview=settlement?await engine.previewSettlement(f.bookId,2,f.preparerId,ref,mapping):await engine.previewOperational(f.bookId,2,f.preparerId,ref,mapping);
    const before=(await pool.query('SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1 AND event_key=$2',[f.bookId,preview.input.eventKey])).rows[0].n;
    const prepare=()=>settlement?engine.prepareSettlement(f.bookId,2,f.preparerId,ref,mapping):engine.prepareOperational(f.bookId,2,f.preparerId,ref,mapping);

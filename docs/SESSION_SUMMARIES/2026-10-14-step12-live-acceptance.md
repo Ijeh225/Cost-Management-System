@@ -1,5 +1,28 @@
 # Step12 Live Acceptance
 
+## 2026-10-14 17:05 WAT - Focused guard ready to publish
+- Two distinct network cases accepted:119.35s old-risk/retained-state control, then61.29s suite actual cancellation/native-prepare row-lock race. Own schemas/public baseline/tunnels cleaned.480unit/API/3prior skips/build/typechecks/syntax/diff PASS.
+- Commit/push source guard and current helpers/evidence, await exact Railway SUCCESS, run ONLY cancel-native-retest. Reuses18/native21 and creates one unrecognized cancellation fixture, re-reviews added protected bank head; no financial adjustment/reversal needed. Step12 remains IN PROGRESS pending live guard/output/residual coverage.
+
+## 2026-10-14 17:03 WAT - Cancellation guard and native UI continuation
+- STEP12-INV-001 isolated-confirmed: operational cancellation can strand native recognition; live destructive cancellation not attempted. Focused cancel-route lock/retained-journal protection complete,9new route/guard tests within480PASS/3prior skips/build/typechecks. Isolated119.35s proof/cleanup PASS; new row-lock race running. Publish only after accepted race, then `cancel-native-retest` reuses18/native21 and creates ONE required unrecognized cancellation control, not another financial workflow.
+- Same helper re-reviews28chart heads, preserving four prior adjustment heads and protecting newbank28; TEST FIXTURE approval only. Current manualUI correctly refusespreparation pendingreview. All previous journals/figures untouched.
+- Live staffGLsource3/drilldown and BS13322.80balanced/assets10230.50 accepted; opening1review/explicitzeros and affairs1approved80.01/unknownbook caveats visiblyaccepted. Direct content-reader12/13/exact vendor14PASS; naturalquery44bounded, rawtextnotretained. Continue VATUI/latestmanagementsnapshot, publish records/release/livecancelretention. Full Step12 IN PROGRESS, native ON TEST ONLY.
+
+## 2026-10-14 16:46 WAT - Exact latest totals and continuation
+- Supplemental support accepted: overhead11 top-up5/payment12/native25-26; asset/recovery20/native27-28, loan/repayment50/native29-30, other recoverable0.01/native31-32. Current bank5=10152.50/bank6=25/aggregate10177.50, income900/expense669.50/profit230.50, AR/AP/deposit0, advance50/inputVAT3, BSdifference0. Do not rerun support/edge/create phases.
+- Deployed source reconcile28 independent controls all match, no new missing/draft/stale; historical31pre-cutover/3review-required remain disclosed, complete=false. Retained evidence source/support; raw AI transcript redacted. Text docs12/13 bytes/version/index/scope/retention accepted, AI metadata-only qualification requires content-query follow-up. Approval4/task5 API lifecycle accepted.
+- Print blockage already resolved by closing OUR temporary tab, user reply ok; no physical print/PDF/layout claim. Mobile reviewer16 TB390px PASS and override reset. Current financeTab2003695538 reviewer16 is bank-filtered GL10152.50; opened Journal3 read-only dialog, awaiting loaded proof. Keep official native ON for TEST ONLY rehearsal; Step12 IN PROGRESS, actual company approval/launch not fabricated.
+
+## 2026-10-14 16:17 WAT - Real browser/export proof and exact new edge IDs
+- Reviewer16 UI/native report accepted; CSV actualfile14551bytes/scope/timestamp/warnings/totals verified. Export observer timedout but file success independentlyverified; no duplicate export. Screenshot tmp/step12-live/management-live.png retained.
+- Edge38/invoice18/recognition21/payment23/native22/refund24/native23/CN4/native24 accepted; draft19deleted. Zero/Paid/Sent/refund/credit/duplicate controls restore bank10197.50/profit250.50. No rerun creation modes.
+- Browser print modal now blocks interaction/mobile check; async question asks owner Cancel/Escape only. Do not claim print/mobile PASS or overwrite this stopping point. Viewport override attempt may have applied, reset after unblocking. Continue API/source/approval verification and finish coverage/training/registers. All native gatesONTESTONLY; professional/company acceptance still not fabricated.
+
+## 2026-10-14 16:01 WAT - Third genuine defect closed, live tests continue
+-73296dc exact61673bc7 SUCCESS; retained37refuses all5alternatefinalstatusrequests409 and stayspending/unmodified. STEP12-OPS-001 CLOSED. Bank6/transfer2/native20retained, aggregate10197.50/profit250.50unchanged.
+- Operations14/foreign17auth/finance/scope negatives accepted,29module data endpoints200; no secrets/userprofiles/settingsvalues in final evidence. Not full UI/calculation certification. Reviewer browser refreshed after APIrotation; continue actual native/browser/output/mobile and remaining source/lifecycle tests without repeating accepted fixtures.
+
 ## 2026-10-14 15:52 WAT - Shared readiness patch ready and period controls
 -471units/3prior skips/full build/typechecks accepted,7new PUT guard tests. Publish and live retest37alone; no job36repeat. Test fixture type omission corrected before accepted build, not app bug.
 - Actual audited zero bank head28/1011 created; future period2empty close/reopen restricted/global grants/review/closed-date no-journal/audit accepted. Octoberleftopen, no false historical reconciliation attestation. Next bank transfer and source/output/role/UI coverage.

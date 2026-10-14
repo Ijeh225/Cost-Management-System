@@ -1,0 +1,18 @@
+{
+  "mode": "reconcile",
+  "bookId": 1,
+  "through": "2026-10-14",
+  "accountControls": 28,
+  "zeroControlDifferences": true,
+  "noMissingControls": true,
+  "noNewMissingDraftStaleSources": true,
+  "complete": false,
+  "statuses": {
+    "pre_cutover": 31,
+    "excluded": 11,
+    "posted": 30,
+    "review_required": 3
+  },
+  "limitation": "Historical pre-cutover and unclassified test sources remain disclosed; no real company certification",
+  "method": "Actual deployed source revalidation with independently expected fixture controls; report UI does not persist these controls"
+}

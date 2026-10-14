@@ -11,6 +11,9 @@ import type { ReviewedOpening } from "../lib/accounting-reviewed-opening";
 import type { ManualAdjustment } from "../lib/accounting-manual";
 import type { TaxConfiguration } from "../lib/accounting-tax";
 import type { AffairsRequest } from "../lib/accounting-affairs";
+import { hasRetainedInvoiceJournal } from "../lib/invoice-native-cancellation";
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 
 const schema = `acct_foundation_${Date.now()}_${randomBytes(4).toString("hex")}`;
 const previousEnabled = process.env.NATIVE_ACCOUNTING_ENABLED;
@@ -509,6 +512,49 @@ describe("Step7 reviewed opening integration",()=>{
 });
 
 describe("Step7 invoice recognition integration", () => {
+  it("serializes operational cancellation against a concurrent native invoice prepare",async()=>{
+    const f=await invoiceFixture(),locker=await database.connect();
+    const label=`${schema}_cancel_race`;
+    const concurrent=new NativeAccounting({connect:async()=>{const client=await database.connect();await client.query('SELECT set_config($1,$2,false)',['application_name',label]);return client;}});
+    let settled:Promise<unknown>|undefined;
+    try{
+      await locker.query('BEGIN');await locker.query('SELECT id FROM invoices WHERE id=$1 FOR UPDATE',[f.invoice]);
+      settled=concurrent.prepareInvoice(f.book,f.branch,f.preparer,f.invoice,f.invoiceMapping).then(()=>({code:'unexpected_prepare'}),error=>error);
+      let waiting=false;
+      for(let attempt=0;attempt<30&&!waiting;attempt++){
+        waiting=Boolean((await sql("SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'",[label])).rowCount);
+        if(!waiting)await new Promise(resolve=>setTimeout(resolve,100));
+      }
+      expect(waiting).toBe(true);
+      const executor={execute:async(query:SQL)=>{const q=new PgDialect().sqlToQuery(query);return locker.query(q.sql,q.params);}};
+      expect(await hasRetainedInvoiceJournal(executor,f.invoice)).toBe(false);
+      await locker.query("UPDATE invoices SET status='cancelled' WHERE id=$1",[f.invoice]);await locker.query('COMMIT');
+      expect(await settled).toMatchObject({code:'SOURCE_REVIEW_REQUIRED'});
+      expect((await sql("SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1",[f.book])).rows[0].n).toBe(0);
+    }finally{await locker.query('ROLLBACK');locker.release();if(settled)await settled;}
+  },180000);
+  it("protects cancelled invoice recognition from stranded native balances",async()=>{
+    const f=await invoiceFixture();
+    const executor={execute:async(query:SQL)=>{const q=new PgDialect().sqlToQuery(query);return sql(q.sql,q.params);}};
+    expect(await hasRetainedInvoiceJournal(executor,f.invoice)).toBe(false);
+    const draft=await service.prepareInvoice(f.book,f.branch,f.preparer,f.invoice,f.invoiceMapping);
+    expect(await hasRetainedInvoiceJournal(executor,f.invoice)).toBe(true);
+    await service.approveAndPost(f.book,f.branch,f.approver,draft.id,"Dummy independent invoice review");
+    const before=await balances(f);
+    // Characterise the previous operational-only cancellation, in this owned schema only.
+    await sql("UPDATE invoices SET status='cancelled' WHERE id=$1",[f.invoice]);
+    expect(await balances(f)).toEqual(before);
+    expect(before.get(f.ar)).toBe('10750');
+    expect(await hasRetainedInvoiceJournal(executor,f.invoice)).toBe(true);
+    await sql("UPDATE invoices SET status='sent' WHERE id=$1",[f.invoice]);
+    delete process.env.NATIVE_ACCOUNTING_ENABLED;
+    try{expect(await hasRetainedInvoiceJournal(executor,f.invoice)).toBe(true);}
+    finally{process.env.NATIVE_ACCOUNTING_ENABLED='true';}
+    const next=await invoiceFixture();
+    const unused=await service.prepareInvoice(next.book,next.branch,next.preparer,next.invoice,next.invoiceMapping);
+    await service.cancelDraft(next.book,next.branch,next.preparer,unused.id,"Dummy reviewed abandoned draft");
+    expect(await hasRetainedInvoiceJournal(executor,next.invoice)).toBe(false);
+  },180000);
   it("previews without writes and reconciles one multi-container recognition with cash and deposit allocation", async () => {
     const f=await invoiceFixture();
     const before=(await sql("SELECT row_to_json(i) data FROM invoices i WHERE id=$1",[f.invoice])).rows[0].data;

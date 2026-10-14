@@ -1,6 +1,6 @@
 # Session Summaries
 
-- Current: [2026-10-14 Step12 Live Acceptance](2026-10-14-step12-live-acceptance.md) - LIVE native gatesON; deposit correction deployed/live CLOSED, core/receipts/duty/VAT accepted. STEP12-OH-001 same-day payable control fix under test15:30 WAT; resume bill11/payment10, not duplicate fixtures. Full Step12 IN PROGRESS.
+- Current: [2026-10-14 Step12 Live Acceptance](2026-10-14-step12-live-acceptance.md) - LIVE native gatesON TEST ONLY; four confirmed defects deployed/live CLOSED. Supplemental sources and28independent controls accepted16:46 WAT: cash10177.50/profit230.50, jobs36closed/37pending/38edge. Actual native report/CSV/mobile evidence retained; print blocker resolved, print layout not accepted. Remaining UI/AI/lifecycle acceptance IN PROGRESS; no repeated creation phases.
 
 - Current: [2026-10-14 Step11 Statement of Affairs](2026-10-14-step11-statement-of-affairs.md) - functional e112918 and records c816352 deployments accepted; Step12 scope explained14:13 WAT, not started; official accounting OFF. Latest explanation notes local/uncommitted.
 

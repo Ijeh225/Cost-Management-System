@@ -1,0 +1,159 @@
+{
+  "results": [
+    {
+      "time": "2026-10-14T15:25:25.918Z",
+      "pass": "Live overhead top-up creates only incremental20 obligation",
+      "expenseId": 11,
+      "topupId": 5
+    },
+    {
+      "time": "2026-10-14T15:25:36.352Z",
+      "pass": "Live top-up settlement preserves original bill evidence and no duplicate expense",
+      "topupId": 5,
+      "paymentId": 12,
+      "topupJournal": 25,
+      "paymentJournal": 26
+    },
+    {
+      "time": "2026-10-14T15:25:36.769Z",
+      "pass": "Live supplemental classified schedule created",
+      "scheduleId": 16,
+      "classification": "asset",
+      "amount": 20
+    },
+    {
+      "time": "2026-10-14T15:25:38.204Z",
+      "pass": "Live supplemental payment saved",
+      "paymentId": 11,
+      "classification": "asset"
+    },
+    {
+      "time": "2026-10-14T15:25:43.439Z",
+      "pass": "Live dummy asset recovery recorded",
+      "fundingId": 4,
+      "classification": "asset",
+      "amount": 20
+    },
+    {
+      "time": "2026-10-14T15:25:48.254Z",
+      "pass": "Live supplemental classification/native treatment and funding/recovery preserve P&L",
+      "classification": "asset",
+      "paymentId": 11,
+      "journalId": 27
+    },
+    {
+      "time": "2026-10-14T15:25:48.848Z",
+      "pass": "Live dummy loan funding recorded",
+      "fundingId": 5,
+      "amount": 50
+    },
+    {
+      "time": "2026-10-14T15:25:53.904Z",
+      "pass": "Live supplemental classified schedule created",
+      "scheduleId": 17,
+      "classification": "loan_repayment",
+      "amount": 50
+    },
+    {
+      "time": "2026-10-14T15:25:55.897Z",
+      "pass": "Live supplemental payment saved",
+      "paymentId": 12,
+      "classification": "loan_repayment"
+    },
+    {
+      "time": "2026-10-14T15:26:01.183Z",
+      "pass": "Live supplemental classification/native treatment and funding/recovery preserve P&L",
+      "classification": "loan_repayment",
+      "paymentId": 12,
+      "journalId": 30
+    },
+    {
+      "time": "2026-10-14T15:26:01.770Z",
+      "pass": "Live supplemental classified schedule created",
+      "scheduleId": 18,
+      "classification": "other_non_expense",
+      "amount": 0.01
+    },
+    {
+      "time": "2026-10-14T15:26:03.229Z",
+      "pass": "Live supplemental payment saved",
+      "paymentId": 13,
+      "classification": "other_non_expense"
+    },
+    {
+      "time": "2026-10-14T15:26:08.387Z",
+      "pass": "Live dummy asset recovery recorded",
+      "fundingId": 6,
+      "classification": "other_non_expense",
+      "amount": 0.01
+    },
+    {
+      "time": "2026-10-14T15:26:13.201Z",
+      "pass": "Live supplemental classification/native treatment and funding/recovery preserve P&L",
+      "classification": "other_non_expense",
+      "paymentId": 13,
+      "journalId": 31
+    },
+    {
+      "time": "2026-10-14T15:26:13.807Z",
+      "pass": "Live section review submitted",
+      "containerId": 37,
+      "approvalId": 4
+    },
+    {
+      "time": "2026-10-14T15:26:17.313Z",
+      "pass": "Live rejection immediately returned by queue API, assigned correction, resubmit/approve and section locking",
+      "approvalId": 4,
+      "taskId": 5,
+      "containerId": 37,
+      "limitation": "API state verified; pending browser immediate-refresh UI observation"
+    },
+    {
+      "time": "2026-10-14T15:26:18.297Z",
+      "pass": "Live controlled text document uploaded",
+      "containerId": 37,
+      "documentId": 12,
+      "intelligenceStatus": "indexed"
+    },
+    {
+      "time": "2026-10-14T15:26:19.857Z",
+      "pass": "Live second document version uploaded",
+      "documentId": 13,
+      "previousId": 12,
+      "version": 2
+    },
+    {
+      "time": "2026-10-14T15:26:26.400Z",
+      "pass": "Live document question returns exact-version citations; content precision still requires verification",
+      "documentIds": [
+        12,
+        13
+      ],
+      "limitation": "Metadata listing is not a content-search accuracy pass; raw assistant transcript withheld",
+      "aiStatus": "answered",
+      "sessionId": 43,
+      "citations": [
+        {
+          "type": "document",
+          "id": 13
+        },
+        {
+          "type": "document",
+          "id": 12
+        }
+      ],
+      "qualifiedNegativeClaim": true
+    },
+    {
+      "time": "2026-10-14T15:26:29.256Z",
+      "pass": "Live supplemental sources/top-up reconcile, prior journals and noncash values preserved",
+      "bank5": 10152.5,
+      "bank6": 25,
+      "totalBank": 10177.5,
+      "profit": "230.50",
+      "receivable": "0.00",
+      "inputVat": "3.00",
+      "advance": "50.00"
+    }
+  ]
+}

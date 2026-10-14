@@ -1,0 +1,35 @@
+{
+  "time": "2026-10-14T14:54:39.529Z",
+  "pass": "Live own-bank transfer and cross-table duplicate reference controls, no extra income/expense/net cash",
+  "bankId": 6,
+  "transferId": 2,
+  "native": {
+    "source": {
+      "kind": "bank_transfer",
+      "id": 2
+    },
+    "journalId": 20,
+    "eventKey": "source:bank_transfer:2:v1",
+    "cashMovement": "0.00",
+    "lines": [
+      {
+        "accountId": 28,
+        "debit": "25.00",
+        "credit": "0.00",
+        "memo": ""
+      },
+      {
+        "accountId": 2,
+        "debit": "0.00",
+        "credit": "25.00",
+        "memo": ""
+      }
+    ],
+    "existedBefore": false,
+    "method": "deployed NativeAccounting service with named preparer/reviewer grants, not direct SQL posting or signed-in source-review UI"
+  },
+  "bank5": 10172.5,
+  "bank6": 25,
+  "totalBank": 10197.5,
+  "profit": "250.50"
+}

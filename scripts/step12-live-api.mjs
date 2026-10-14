@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile,appendFile,writeFile} from 'node:fs/promises';
 import {postLiveSource} from './step12-live-source-posting.mjs';
 const mode=process.argv[2]??'inspect';
-assert(['users','inspect','accounting','transactions','resume-deposit','expenses','resume-overhead','adjustments','operations'].includes(mode));
+assert(['users','inspect','accounting','transactions','resume-deposit','expenses','resume-overhead','adjustments','operations','bank-transfer','status-retest','read-checks','invoice-edges','support','ai-content-check','cancel-native-retest'].includes(mode));
 assert(process.argv.includes('--confirm=STEP12-LIVE-TEST-20261014'));
 let input='';for await(const chunk of process.stdin)input+=chunk;
 const credential=JSON.parse(input);input='';
@@ -11,12 +11,13 @@ const origin='https://donclimaxmanagementapp.com/api',branch='2';
 async function session(email,password){
  const cookies=new Map();let csrf;
  async function request(method,path,body,expected=200,scope=branch){
-  const headers={'Content-Type':'application/json','X-Branch-Id':scope};
+  const multipart=body instanceof FormData;
+  const headers={'X-Branch-Id':scope,...(multipart?{}:{'Content-Type':'application/json'})};
   if(cookies.size)headers.Cookie=[...cookies].map(([k,v])=>k+'='+v).join('; ');
   if(csrf)headers['X-CSRF-Token']=csrf;
-  const r=await fetch(origin+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(45000)});
+  const r=await fetch(origin+path,{method,headers,body:body===undefined?undefined:multipart?body:JSON.stringify(body),signal:AbortSignal.timeout(45000)});
   for(const c of r.headers.getSetCookie()){const pair=c.split(';')[0],at=pair.indexOf('=');cookies.set(pair.slice(0,at),pair.slice(at+1));}
-  const data=await r.json();
+  const data=r.headers.get('content-type')?.includes('application/json')?await r.json():{buffer:Buffer.from(await r.arrayBuffer()),mime:r.headers.get('content-type')};
   if(!(Array.isArray(expected)?expected.includes(r.status):r.status===expected)){console.error(JSON.stringify({method,path,status:r.status,error:data.error,code:data.code}));throw new Error('Unexpected HTTP acceptance result');}
   return data;
  }
@@ -367,6 +368,201 @@ else if(mode==='operations'){
   await record('Live assigned task retrieval/completion and retained history',{pass:true,taskId:task.id,queue:tasks});
   await writeFile('docs/evidence/2026-10-14-step12-operations-live.json',JSON.stringify({containerId:36,siblingId:37,results},null,2)+'\n',{flag:'wx'});
  }finally{for(const actor of[owner,finance])await actor.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='bank-transfer'){
+ const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8'));
+ const head=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-bank-chart.json','utf8'));
+ const owner=await session(credential.email,credential.password),reviewer=await session('step12.reviewer.20261014@donclimax.test',credential.testPassword);
+ try{
+  assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10197.50,'Inspect retained phase IDs before retry');
+  const bank=await owner.request('POST','/banks',{name:'STEP12 TEST ONLY second bank20261014',branchId:2},201);
+  await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify({time:new Date().toISOString(),pass:'Live controlled second bank created',bankId:bank.id,accountId:head.accountId})+'\n');
+  const body={fromBankId:5,toBankId:bank.id,amount:25,reference:'STEP12-QA-OWN-TRANSFER-20261014',narration:'TEST ONLY own bank transfer, not income/expense or external money'};
+  const transfer=await owner.request('POST','/banks/transfers',body,201);
+  await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify({time:new Date().toISOString(),pass:'Live own-bank transfer recorded',transferId:transfer.id,bankId:bank.id})+'\n');
+  await owner.request('POST','/banks/transfers',{...body,reference:' step12-qa-own-transfer-20261014 '},409);
+  await owner.request('POST',`/banks/${bank.id}/fund-additions`,{amount:25,reference:body.reference,narration:'Same reference across funding/transfer must be refused'},409);
+  const native=postLiveSource(f,{kind:'bank_transfer',id:transfer.id},{currency:'NGN',policyVersion:'step12-dummy-20261014-v1',evidence:'TEST ONLY reviewed own bank transfer with distinct GL subaccounts',effect:'transfer',bankAccounts:{5:f.accounts['1010'],[bank.id]:head.accountId}});
+  assert.equal(native.cashMovement,'0.00');
+  assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10172.50);assert.equal((await owner.request('GET',`/banks/${bank.id}/transactions`)).closingBalance,25);
+  const pack=await reviewer.request('GET','/accounting/books/1/reports/management-accounts?branchId=2&from=2026-10-14&to=2026-10-31');assert.equal(pack.statements.profitAndLoss.profit,'250.50');assert.equal(pack.statements.balanceSheet.difference,'0.00');
+  const result={time:new Date().toISOString(),pass:'Live own-bank transfer and cross-table duplicate reference controls, no extra income/expense/net cash',bankId:bank.id,transferId:transfer.id,native,bank5:10172.50,bank6:25,totalBank:10197.50,profit:'250.50'};
+  await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(result)+'\n');console.log(JSON.stringify(result));
+  await writeFile('docs/evidence/2026-10-14-step12-bank-live.json',JSON.stringify(result,null,2)+'\n',{flag:'wx'});
+ }finally{for(const actor of[owner,reviewer])await actor.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='status-retest'){
+ const owner=await session(credential.email,credential.password);
+ try{
+  assert.equal((await owner.request('GET','/containers/37')).container.status,'pending_verification');
+  for(const status of ['gate_in','examination','final_release','delivery','closed'])await owner.request('PUT','/containers/37',{status,vessel:'Must not partially save'},409);
+  const unchanged=(await owner.request('GET','/containers/37')).container;assert.equal(unchanged.status,'pending_verification');assert.notEqual(unchanged.vessel,'Must not partially save');
+  const result={time:new Date().toISOString(),pass:'STEP12-OPS-001 live all five alternate final-status requests refused with no partial metadata/status save',containerId:37,status:unchanged.status};
+  await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(result)+'\n');console.log(JSON.stringify(result));
+ }finally{await owner.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='read-checks'){
+ const owner=await session(credential.email,credential.password),operations=await session('e2e.operations.20260904@donclimax.test',credential.testPassword),foreign=await session('step12.foreign.20261014@donclimax.test',credential.testPassword),results=[];
+ try{
+  for(const path of ['/accounting/catalog','/reports/financial-ledger','/reports/pl','/invoices','/banks'])await operations.request('GET',path,undefined,403);
+  await operations.request('POST','/invoices/17/payments',{amount:1,paymentMethod:'cash'},403);
+  await foreign.request('GET','/containers/36',undefined,404,'3');await foreign.request('GET','/banks/5/transactions',undefined,403,'3');
+  for(const path of ['/dashboard/stats','/analytics','/analytics/deliveries','/analytics/turnaround','/analytics/ar-summary','/notifications','/workflow-notifications','/my-tasks','/approvals','/settings','/branches','/users','/containers/36/overview','/containers/36/shipment','/containers/36/timeline','/containers/gate-log','/containers/paar-status','/reports/containers','/reports/client-statement?clientId=12','/reports/vat-summary','/reports/vat-liability','/reports/pl?costBasis=actual_paid','/reports/cashflow?from=2026-10-14&to=2026-10-14','/reports/financial-ledger?from=2026-10-14&to=2026-10-14','/reports/invoice-aging','/reports/disbursement-reconciliation','/reports/branch-comparison','/reports/workflow-stage-ledger','/reports/financial-control-exceptions']){
+   const data=await owner.request('GET',path);
+   results.push({path,status:200,keys:Object.keys(data),...(Array.isArray(data)?{listCount:data.length}:{}),
+    ...(data.summary?{summary:Object.fromEntries(Object.entries(data.summary).filter(([,v])=>typeof v==='number'||typeof v==='boolean'))}:{})});
+  }
+  const result={time:new Date().toISOString(),pass:'Separate real nonfinance/foreign sessions refused financial/native writes and reads; broad module data endpoints available',operationsId:operations.user.id,foreignId:foreign.user.id,results};
+  await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify({...result,results:results.map(r=>({path:r.path,status:r.status}))})+'\n');console.log(JSON.stringify({...result,results:results.map(r=>({path:r.path,status:r.status}))}));
+  await writeFile('docs/evidence/2026-10-14-step12-module-reads-live.json',JSON.stringify(result,null,2)+'\n',{flag:'wx'});
+ }finally{for(const actor of[owner,operations,foreign])await actor.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='invoice-edges'){
+ const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8')),a=f.accounts;
+ const owner=await session(credential.email,credential.password),preparer=await session('step12.preparer.20261014@donclimax.test',credential.testPassword),results=[];
+ async function record(name,detail={}){const item={time:new Date().toISOString(),pass:name,...detail};results.push(item);await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(item)+'\n');console.log(JSON.stringify(item));}
+ try{
+  const jobs=await owner.request('GET','/containers?search=S12Q2610143');assert(!JSON.stringify(jobs).includes('S12Q2610143'),'Edge phase already started; inspect retained IDs');
+  const job=await owner.request('POST','/containers',{containerNumber:'S12Q2610143',blNumber:'STEP12-EDGE-BL-20261014',clientId:12,customerName:'STEP12 LIVE 20261014 Financial Workflow QA',branchId:2,command:'PTML',clearingCharges:0,declaration:'TEST ONLY zero-value and tiny reversible edge scenarios; no actual cargo'},201);
+  const invoice=await owner.request('POST','/invoices',{containerIds:[job.id],branchId:2,vatRate:0,dueDate:'2026-10-15',notes:'STEP12 TEST ONLY reversible invoice lifecycle edges'},201);
+  await record('Live controlled zero-value draft created',{containerId:job.id,invoiceId:invoice.id,invoiceNumber:invoice.invoiceNumber});
+  assert.equal(invoice.total,0);await owner.request('PATCH',`/invoices/${invoice.id}`,{status:'sent'},400);await owner.request('POST',`/invoices/${invoice.id}/payments`,{amount:0.01,paymentMethod:'cash'},400);
+  await owner.request('PATCH',`/invoices/${invoice.id}/items/${invoice.items[0].id}`,{amount:0.01,description:'TEST ONLY tiny additional service, not duplicate clearing charge'});
+  await owner.request('PATCH',`/invoices/${invoice.id}`,{status:'sent'});
+  const recognition=await preparer.request('POST','/accounting/books/1/tax-configuration/sources/prepare?branchId=2',{kind:'invoice',id:invoice.id,evidence:'TEST ONLY tiny reversible invoice recognition',configurationId:1,taxCode:'EXEMPT',recognitionDate:'2026-10-14',receivableAccountId:a['1100'],incomeAccountId:a['4000']});
+  postLiveSource(f,{kind:'configured_journal',id:recognition.id},{});
+  await owner.request('POST',`/invoices/${invoice.id}/payments`,{amount:0.01,paymentMethod:'transfer',bankId:5,reference:'STEP12-QA-TINY-COLLECT-20261014'},201);
+  let live=await owner.request('GET',`/invoices/${invoice.id}`);assert.equal(live.status,'paid');assert.equal(live.outstanding,0);const payment=live.payments.find(p=>p.reference==='STEP12-QA-TINY-COLLECT-20261014');
+  const mapping={currency:'NGN',policyVersion:'step12-dummy-20261014-v1',evidence:'TEST ONLY tiny collection and traceable refund',bankAccounts:{5:a['1010']},cashAccountId:a['1000'],receivableAccountId:a['1100'],depositLiabilityAccountId:a['2100']};
+  const receipt=postLiveSource(f,{kind:'invoice_payment',id:payment.id},mapping);
+  await record('Live positive draft/sent/paid lifecycle and exact penny cash receipt',{invoiceId:invoice.id,paymentId:payment.id,recognitionJournal:recognition.id,receiptJournal:receipt.journalId});
+  await owner.request('POST',`/invoices/${invoice.id}/payments/${payment.id}/reverse`,{reference:'STEP12-QA-TINY-REFUND-20261014',reason:'TEST ONLY traceable full receipt reversal'});
+  live=await owner.request('GET',`/invoices/${invoice.id}`);assert.equal(live.outstanding,0.01);assert.equal(live.status,'sent');const refund=live.payments.find(p=>p.reversalOfPaymentId===payment.id);assert(refund);
+  const reverse=postLiveSource(f,{kind:'invoice_payment',id:refund.id},mapping);assert.equal(reverse.cashMovement,'-0.01');
+  await owner.request('POST',`/invoices/${invoice.id}/payments/${payment.id}/reverse`,{reference:'STEP12-QA-TINY-RETRY',reason:'Duplicate refusal'},409);
+  const note=await owner.request('POST',`/invoices/${invoice.id}/credit-note`,{amount:0.01,reason:'TEST ONLY offset the tiny test service after refund'},201);
+  const credit=postLiveSource(f,{kind:'credit_note',id:note.id},{currency:'NGN',policyVersion:'step12-dummy-20261014-v1',evidence:'TEST ONLY reduce original tiny exempt service',effect:'credit_note',receivableAccountId:a['1100'],clientCreditAccountId:a['2100'],reductions:[{accountId:a['4000'],amount:'0.01',category:'income',evidence:'Full offset of original tiny test recognition'}]});assert.equal(credit.cashMovement,'0.00');
+  const cancelFixture=await owner.request('POST','/invoices',{containerIds:[job.id],vatRate:0,dueDate:'2026-10-15',notes:'STEP12 TEST ONLY cancelled-draft guard fixture'},201);
+  await owner.request('POST',`/invoices/${cancelFixture.id}/cancel`,{},400);
+  await owner.request('DELETE',`/invoices/${cancelFixture.id}`);
+  assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10172.50);
+  const pack=await preparer.request('GET','/accounting/books/1/reports/management-accounts?branchId=2&from=2026-10-14&to=2026-10-31');assert.equal(pack.statements.profitAndLoss.profit,'250.50');assert.equal(pack.statements.balanceSheet.difference,'0.00');
+  await record('Live receipt reversal/duplicate refusal, noncash service credit, unissued cancel refusal/draft delete and final totals restored',{invoiceId:invoice.id,paymentId:payment.id,refundId:refund.id,noteId:note.id,reverseJournal:reverse.journalId,creditJournal:credit.journalId,deletedDraftId:cancelFixture.id,bank5:10172.50,profit:'250.50'});
+  await writeFile('docs/evidence/2026-10-14-step12-invoice-edges-live.json',JSON.stringify({results},null,2)+'\n',{flag:'wx'});
+ }finally{for(const actor of[owner,preparer])await actor.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='cancel-native-retest'){
+ const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8')),a=f.accounts;
+ const owner=await session(credential.email,credential.password),results=[];
+ async function record(check,detail={}){const result={time:new Date().toISOString(),check,pass:true,...detail};results.push(result);await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(result)+'\n');console.log(JSON.stringify(result));}
+ try{
+  const before=await owner.request('GET','/invoices/18');assert.equal(before.payments.reduce((sum,p)=>sum+p.amount,0),0);
+  const denied=await owner.request('POST','/invoices/18/cancel',{},409);assert.match(denied.error,/native accounting/);
+  assert.equal((await owner.request('GET','/invoices/18')).status,before.status);
+  await record('STEP12-INV-001 cancellation refuses retained native recognition with net-zero collections',{invoiceId:18,nativeJournalId:21});
+  const list=await owner.request('GET','/invoices');assert(!JSON.stringify(list).includes('STEP12 TEST ONLY issued cancellation acceptance'),'Inspect existing cancellation fixture rather than duplicating it');
+  const fixture=await owner.request('POST','/invoices',{containerIds:[38],vatRate:0,dueDate:'2026-10-15',notes:'STEP12 TEST ONLY issued cancellation acceptance'},201);
+  await record('One required native-unrecognised cancellation fixture created',{invoiceId:fixture.id});
+  await owner.request('PATCH',`/invoices/${fixture.id}/items/${fixture.items[0].id}`,{amount:0.01,description:'TEST ONLY cancellable unrecognised service'});
+  await owner.request('PATCH',`/invoices/${fixture.id}`,{status:'sent'});
+  await owner.request('POST',`/invoices/${fixture.id}/cancel`,{});
+  const cancelled=await owner.request('GET',`/invoices/${fixture.id}`);assert.equal(cancelled.status,'cancelled');assert.equal(cancelled.outstanding,0);
+  await owner.request('POST',`/invoices/${fixture.id}/cancel`,{},400);
+  await record('Ordinary issued unpaid invoice without native recognition still cancels once and is not receivable',{invoiceId:fixture.id,invoiceNumber:fixture.invoiceNumber});
+  const workspace=await owner.request('GET','/accounting/books/1/manual?branchId=2');
+  if(!workspace.accountReviewComplete){
+   await owner.request('POST','/accounting/books/1/manual/accounts/review?branchId=2',{
+    ownerEvidence:'Owner authorised continued TEST ONLY review after adding second bank head',accountantEvidence:'TEST FIXTURE ONLY simulated complete chart review, NOT professional certification',
+    accounts:workspace.accounts.map(row=>({accountId:row.id,role:[a['6200'],a['1390'],a['6010'],a['2310']].includes(row.id)?'adjustment':'protected'}))});
+  }
+  const reviewed=await owner.request('GET','/accounting/books/1/manual?branchId=2');assert.equal(reviewed.accountReviewComplete,true);
+  await record('Second bank head remains protected and all28 chart roles are explicitly reviewed',{accounts:reviewed.accounts.length,financialWrite:false});
+  const pack=await owner.request('GET','/accounting/books/1/reports/management-accounts?branchId=2&from=2026-10-14&to=2026-10-14');
+  assert.equal(pack.statements.profitAndLoss.profit,'230.50');assert.equal(pack.statements.balanceSheet.difference,'0.00');
+  assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10152.50);
+  await record('Cancellation controls/review preserve all previously reconciled native figures',{profit:'230.50',bank5:10152.50,bank6:25});
+  await writeFile('docs/evidence/2026-10-14-step12-invoice-cancel-live.json',JSON.stringify({results},null,2)+'\n',{flag:'wx'});
+ }finally{await owner.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='ai-content-check'){
+ const owner=await session(credential.email,credential.password),results=[];
+ try{
+  const direct=await owner.request('POST','/ai-assistant/tools/document_search',{query:'training memo',containerId:37});
+  const ids=(direct.sources??direct.result?.sources??[]).filter(s=>s.type==='document').map(s=>s.id).sort((a,b)=>a-b);
+  assert.deepEqual(ids,[12,13]);
+  results.push({check:'Exact indexed-content reader',pass:true,documentIds:ids,method:'Real deployed approved document_search endpoint, retained versions'});
+  const answer=await owner.request('POST','/ai-assistant/ask',{question:'Find uploaded documents containing "training memo" for container S12Q2610142.'});
+  results.push({check:'Natural-language content routing',status:answer.status,sessionId:answer.sessionId,
+   citationIds:(answer.citations??[]).map(c=>({type:c.type,id:c.id})),
+   matchingContentReported:/training memo/i.test(answer.answer??'')&&!/not (?:specifically|explicitly|found)|no (?:matching|documents)/i.test(answer.answer??''),
+   limitation:'Phrase presence alone is not proof of correct tool selection; inspect source routing alongside direct content-reader result. No raw AI transcript retained.'});
+  const schedule=await owner.request('POST','/ai-assistant/tools/approved_payment_schedules',{query:'STEP12 TEST ONLY advance 20261014'});
+  const scheduleSources=schedule.sources??schedule.result?.sources??[];
+  results.push({check:'Exact vendor reader',sourceIds:scheduleSources.map(s=>({type:s.type,id:s.id})),recordCount:(schedule.records??schedule.result?.records??[]).length});
+  await writeFile('docs/evidence/2026-10-14-step12-ai-content-live.json',JSON.stringify({results},null,2)+'\n',{flag:'wx'});
+  for(const result of results){const event={time:new Date().toISOString(),...result};await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(event)+'\n');console.log(JSON.stringify(event));}
+ }finally{await owner.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='support'){
+ const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8')),a=f.accounts;
+ const owner=await session(credential.email,credential.password),preparer=await session('step12.preparer.20261014@donclimax.test',credential.testPassword),foreign=await session('step12.foreign.20261014@donclimax.test',credential.testPassword),results=[];
+ async function record(name,detail={}){const item={time:new Date().toISOString(),pass:name,...detail};results.push(item);await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(item)+'\n');console.log(JSON.stringify(item));}
+ const basic={currency:'NGN',policyVersion:'step12-dummy-20261014-v1',evidence:'TEST ONLY reviewed supplemental fixture',bankAccounts:{5:a['1010']},cashAccountId:a['1000']};
+ try{
+  const original=(await owner.request('GET','/overhead-expenses')).expenses.find(e=>e.id===11);assert.equal(original.topups.length,0,'Support phase already started; inspect retained source IDs');
+  const topupExpense=await owner.request('POST','/overhead-expenses/11/topups',{amount:20,description:'STEP12 TEST ONLY supported added supplier obligation'},201);assert.equal(topupExpense.amount,120);assert.equal(topupExpense.balance,20);const topup=topupExpense.topups[0];
+  await record('Live overhead top-up creates only incremental20 obligation',{expenseId:11,topupId:topup.id});
+  const ohMap={...basic,effect:'overhead',accountId:a['6000'],controlAccountId:a['2000'],recognitionDate:'2026-10-14',recognitionEvidence:'Dummy supplier obligation recognised today before settlement'};
+  const increment=postLiveSource(f,{kind:'overhead_topup',id:topup.id},ohMap);assert.equal(increment.cashMovement,'0.00');
+  const payment=await owner.request('POST','/overhead-expenses/11/payments',{amount:20,paymentMethod:'bank',bankId:5,notes:'STEP12 TEST ONLY top-up settlement'},201);
+  const paid=postLiveSource(f,{kind:'expense_payment',id:payment.payment.id},ohMap);
+  await record('Live top-up settlement preserves original bill evidence and no duplicate expense',{topupId:topup.id,paymentId:payment.payment.id,topupJournal:increment.journalId,paymentJournal:paid.journalId});
+  for(const [classification,amount,effect,accountId,recoveryEffect]of [['asset',20,'asset',a['1300'],'asset_funding'],['loan_repayment',50,'loan_repayment',a['2400'],'loan_funding'],['other_non_expense',0.01,'other_non_expense',a['1120'],'asset_funding']]){
+   if(classification==='loan_repayment'){
+    const funding=await owner.request('POST','/banks/5/fund-additions',{amount,reference:'STEP12-QA-DUMMY-LOAN-20261014',narration:'TEST ONLY dummy loan principal; no actual borrowing'},201);
+    await record('Live dummy loan funding recorded',{fundingId:funding.id,amount});
+    postLiveSource(f,{kind:'bank_funding',id:funding.id},{...basic,effect:'loan_funding',accountId});
+   }
+   const schedule=await preparer.request('POST','/payment-schedules',{scheduleDate:'2026-10-14',vendorBeneficiary:`STEP12 TEST ONLY ${classification} supplementary`,description:'Explicit fictional source voucher, no real purchase or transfer',amountRequested:amount,priority:'normal'},201);
+   await record('Live supplemental classified schedule created',{scheduleId:schedule.id,classification,amount});
+   await owner.request('PATCH',`/payment-schedules/${schedule.id}/approve`,{});
+   await preparer.request('PATCH',`/payment-schedules/${schedule.id}/pay`,{amount,paymentMethod:'bank',bankId:5,classification,classificationReason:'Explicit fictional voucher; matched asset or original dummy borrowing liability'});
+   const detail=await preparer.request('GET',`/payment-schedules/${schedule.id}`);assert.equal(detail.payments.length,1);const p=detail.payments[0];
+   await record('Live supplemental payment saved',{paymentId:p.id,classification});
+   const post=postLiveSource(f,{kind:'schedule_payment',id:p.id},{...basic,effect,accountId,...(classification==='other_non_expense'?{accountCategory:'asset'}:{})});
+   if(classification!=='loan_repayment'){
+    const recovery=await owner.request('POST','/banks/5/fund-additions',{amount,reference:`STEP12-QA-${classification}-RECOVERY-20261014`,narration:'TEST ONLY full recovery of the previously posted dummy asset, not income'},201);
+    await record('Live dummy asset recovery recorded',{fundingId:recovery.id,classification,amount});
+    postLiveSource(f,{kind:'bank_funding',id:recovery.id},{...basic,effect:recoveryEffect,accountId});
+   }
+   await record('Live supplemental classification/native treatment and funding/recovery preserve P&L',{classification,paymentId:p.id,journalId:post.journalId});
+  }
+  const submitted=await preparer.request('POST','/containers/37/sections/customs/submit',{});await record('Live section review submitted',{containerId:37,approvalId:submitted.id});
+  await preparer.request('POST','/containers/37/sections/customs/approve',{},403);
+  await owner.request('POST','/containers/37/sections/customs/reject',{reason:'STEP12 TEST ONLY controlled correction request'});
+  const rejected=(await owner.request('GET','/approvals')).find(p=>p.id===submitted.id);assert.equal(rejected.status,'rejected');
+  const queue=await preparer.request('GET','/my-tasks');const correction=queue.dailyQueue.find(t=>t.containerId===37&&t.title.startsWith('Resubmit Customs'));assert(correction);
+  await preparer.request('PATCH',`/containers/37/tasks/${correction.id}`,{status:'completed'});
+  await preparer.request('POST','/containers/37/sections/customs/submit',{});await owner.request('POST','/containers/37/sections/customs/approve',{});
+  await owner.request('PUT','/containers/37/charges',{section:'customs',customs:{duty:1},reason:'Locked edit must be refused'},403);
+  await record('Live rejection immediately returned by queue API, assigned correction, resubmit/approve and section locking',{approvalId:submitted.id,taskId:correction.id,containerId:37,limitation:'API state verified; pending browser immediate-refresh UI observation'});
+  const text='STEP12-DOC-20261014 TEST ONLY training memo\nB/L: STEP12-LIVE-BL-20261014\nContainer: S12Q2610142\nNo actual commercial, tax or cargo evidence.\n';
+  assert.equal((await owner.request('GET','/containers/37/documents')).length,0,'Document phase already started; inspect versions');
+  async function upload(content,name,previous){const data=new FormData();data.set('file',new Blob([content],{type:'text/plain'}),name);data.set('section','general');data.set('documentType','other');if(previous)data.set('previousVersionId',String(previous));return owner.request('POST','/containers/37/documents',data,201);}
+  const doc=await upload(text,'STEP12-DOC-20261014-v1.txt');await record('Live controlled text document uploaded',{containerId:37,documentId:doc.id,intelligenceStatus:doc.intelligence.status});assert.equal(doc.intelligence.status,'indexed');
+  const bytes=await owner.request('GET',`/documents/${doc.id}`);assert.equal(bytes.buffer.toString('utf8'),text);await foreign.request('GET',`/documents/${doc.id}`,undefined,404,'3');
+  const v2=await upload(text+'Version two: retained amendment.\n','STEP12-DOC-20261014-v2.txt',doc.id);await record('Live second document version uploaded',{documentId:v2.id,previousId:doc.id,version:v2.versionNumber});assert.equal(v2.versionNumber,2);
+  const list=await owner.request('GET','/containers/37/documents');assert.equal(list.length,2);assert(list.every(d=>d.retained));
+  await owner.request('DELETE',`/containers/37/documents/${doc.id}`,undefined,409);
+  const ai=await owner.request('POST','/ai-assistant/ask',{question:'Find document STEP12-DOC-20261014 training memo for container S12Q2610142.'});
+  await record('Live document question returns exact-version citations; content precision still requires verification',{
+   documentIds:[doc.id,v2.id],aiStatus:ai.status,sessionId:ai.sessionId,citations:ai.citations.map(c=>({type:c.type,id:c.id})),
+   qualifiedNegativeClaim:/not specifically listed/i.test(ai.answer),limitation:'Metadata listing is not a content-search accuracy pass; no raw assistant transcript retained'});
+  const pack=await preparer.request('GET','/accounting/books/1/reports/management-accounts?branchId=2&from=2026-10-14&to=2026-10-31');assert.equal(pack.statements.profitAndLoss.profit,'230.50');assert.equal(pack.statements.balanceSheet.difference,'0.00');
+  assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10152.50);
+  await record('Live supplemental sources/top-up reconcile, prior journals and noncash values preserved',{bank5:10152.50,bank6:25,totalBank:10177.50,profit:'230.50',receivable:'0.00',inputVat:'3.00',advance:'50.00'});
+  await writeFile('docs/evidence/2026-10-14-step12-support-live.json',JSON.stringify({results},null,2)+'\n',{flag:'wx'});
+ }finally{for(const actor of[owner,preparer,foreign])await actor.request('POST','/auth/logout',{},200,'all');}
 }
 else {
  const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8')),a=f.accounts;

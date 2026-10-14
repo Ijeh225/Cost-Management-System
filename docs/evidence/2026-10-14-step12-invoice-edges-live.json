@@ -1,0 +1,32 @@
+{
+  "results": [
+    {
+      "time": "2026-10-14T15:14:43.600Z",
+      "pass": "Live controlled zero-value draft created",
+      "containerId": 38,
+      "invoiceId": 18,
+      "invoiceNumber": "INV-202610-004"
+    },
+    {
+      "time": "2026-10-14T15:15:03.993Z",
+      "pass": "Live positive draft/sent/paid lifecycle and exact penny cash receipt",
+      "invoiceId": 18,
+      "paymentId": 23,
+      "recognitionJournal": 21,
+      "receiptJournal": 22
+    },
+    {
+      "time": "2026-10-14T15:15:20.057Z",
+      "pass": "Live receipt reversal/duplicate refusal, noncash service credit, unissued cancel refusal/draft delete and final totals restored",
+      "invoiceId": 18,
+      "paymentId": 23,
+      "refundId": 24,
+      "noteId": 4,
+      "reverseJournal": 23,
+      "creditJournal": 24,
+      "deletedDraftId": 19,
+      "bank5": 10172.5,
+      "profit": "250.50"
+    }
+  ]
+}

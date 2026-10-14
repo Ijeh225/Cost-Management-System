@@ -1,5 +1,31 @@
 # Live End-to-End Test Register
 
+## 2026-10-14 17:05 WAT - Cancellation concurrency accepted / deployment next
+- Actual isolated source prepare waits on row-locked invoice cancellation, then refuses SOURCE_REVIEW_REQUIRED with zero journal; race case PASS (61.29s suite), cleanup/tunnel verified. Retained native recognition protection/old-risk characterization separately PASS119.35s.480unit/API/3prior skips/full build/final typechecks PASS.
+- STEP12-INV-001 locally corrected, NOT live CLOSED yet. Publish and verify exact release; re-use18/native21 for refusal, one necessary unrecognized issued cancellation control for normal behavior, then verify current230.50profit/10177.50cash unchanged. Original fixture phases must not be repeated.
+
+## 2026-10-14 17:03 WAT - STEP12-INV-001 isolated-confirmed / focused guard verification
+- High STEP12-INV-001: source-confirmed unpaid cancellation changes operational status without checking native recognition; owned isolated fixture retains107.50AR/income after prior cancellation. Not reproduced destructively against production. Correction guards retained draft/posted source events within invoice-row-locked state/payment/audit transaction; missing native schema remains compatible, OFF cannot bypass retained postings.
+-480unit/API/3prior skips/full typechecks/build PASS including9new guard/actual cancel-route cases. One isolated119.35s characterization/protection case PASS with namespace/baseline/tunnel cleanup. Concurrent native preparation versus operational cancellation verification running; release/live same18retention409 and ordinary unrecognized cancellation pending. OPEN until exact release and live proof.
+- Browser PASS GL native3source/balanced10000/preparer15/poster16/evidence; BS13322.80debit=credit/assets/equity10230.50/difference0; opening1verifiedzero/audit, valuation1approved80.01/unknownbook/noGL effect. Manual28head review required following new bank head, a functioning guard rather than defect.
+- PASS direct document_search phrase on retained12/13 and exact vendor schedule14reader (one match). Natural query44cites correct versions/reportsphrase but tool-routing/contentprecision not certified. No raw assistant text retained.
+
+## 2026-10-14 16:46 WAT - Latest Step12 support, controls and browser evidence
+- PASS retained overhead11 top-up5/payment12/native25-26, asset20 purchase/recovery/native27-28, loan50 borrowing/repayment/native29-30, supported recoverable0.01/native31-32. Principal/recovery do not affect P&L. Current cash10177.50 (bank5=10152.50/bank6=25), income900/expense669.50/profit230.50, AR/AP/deposits0, advance50/inputVAT3, BSdifference0; earlier exported250.50 snapshot predates top-up.
+- PASS actual deployed source reconcile with28 independently expected controls: zero differences/missing controls, no new missing/draft/stale sources. Historical31pre-cutover/3review-required remain, complete=false; not actual company certification. Evidence `2026-10-14-step12-native-reconcile.json` and support JSON; raw settings/user values/AI transcript excluded.
+- PASS text documents12/13 versioning/indexing/exact downloaded bytes/foreign-scope404/retention409; approval4 rejected/resubmitted/approved/locked and correction task5 completed via API. AI metadata citations correct, qualified content claim NOT accepted as indexed-content accuracy; targeted follow-up pending.
+- PASS actual reviewer16 mobile Trial Balance390x844, document/body widths390 and contained table overflow; override reset. Bank General Ledger visually closes10152.50. Print modal cancelled by closing our temporary tab; no printer output/PDF or live print-layout PASS. Step12 continues from journal drill-down and remaining UI/AI/lifecycle controls, no repeated creations.
+
+## 2026-10-14 16:17 WAT - Signed-in report/CSV/penny refund acceptance; print/mobile incomplete
+- Actual finance16 UI native report matches bank/GL/TB/BS/P&L900income/649.50expense/250.50profit/10197.50cash. Real14551byte CSV retains exact figures/scope/timestamp/warnings. Observer timed out but local downloaded file proves export PASS; no repeat export or fabricated preview.
+- Job38/invoice18: zero draft send/pay refusal, tiny positive issue/Paid23/native22, originalrecognition21, refund24/native23/backSent/AR0.01, duplicate409, noncashCN4/native24 offsets revenue and receivable, final totals unchanged. Unissued cancel refused/draft19delete accepted. Cancelled issued/native-recognised edge is not covered by this scenario.
+- Live Print Snapshot modal blocks browser automation; no print/mobile PASS. Owner asked to cancel preview; continue API checks. Screenshot proof saved; reset any partial mobile viewport override afterward. Source completeness remains explicitly false for historical31pre-cutover/3unclassified fixtures; no actual statutory/book-completeness certification.
+
+## 2026-10-14 16:01 WAT - Alternate status live closure / bank-role-module data checks
+-73296dc/Railway61673bc7 SUCCESS; same37 PUT all5final statuses409 with no partial vessel/status write. STEP12-OPS-001 CLOSED.471unit/API/3prior skips/build/typechecks retained.
+- Bank6transfer2/native20 exactly25: bank5=10172.50/bank6=25/total10197.50, no income/expense/netcash; duplicate cross-table references409. Actual operations14 financial/native reads/writes403 and foreign17scope/container read404/administrativebank403 accepted.
+-29broader module endpoints200 with sanitized metadata/numeric-summary evidence. Availability/access checks are not full calculation/UI/control acceptance. Actual signed-in output/browser/mobile and remaining acceptance still IN PROGRESS; no system-wide PASS claim.
+
 ## 2026-10-14 15:52 WAT - STEP12-OPS-001 local correction PASS / period service live PASS
 -7real PUT route regressions plus471unit/API/3skips/build/typechecks PASS. Deploy/retest37final statuses pending; normal metadata editing and ready administrator navigation preserved.
 - Deployed native head1011/id28 created zero for second QA bank. Empty future period2 close/reopen grants/review/closed-write-negative/no-journal/exact audit PASS; October remainsOPEN. Evidence native-bank-chart/native-periods JSON; actual service tests, not UI or company-wide reconciled close.

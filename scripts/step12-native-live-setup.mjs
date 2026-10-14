@@ -5,7 +5,7 @@ import {writeFileSync} from 'node:fs';
 const cli=process.env.RAILWAY_CLI_PATH;
 assert(cli,'Authenticated Railway CLI required');
 const mode=process.argv[2]??'inspect';
-assert(['inspect','setup','bank-chart','periods'].includes(mode));
+assert(['inspect','setup','bank-chart','periods','reconcile'].includes(mode));
 if(mode!=='inspect')assert(process.argv.includes('--confirm=STEP12-LIVE-TEST-20261014'),'Explicit live fixture confirmation required');
 const remote=async(mode)=>{
  const assert=require('node:assert/strict'),{createRequire}=require('node:module');
@@ -30,8 +30,18 @@ const remote=async(mode)=>{
   assert(preparer&&reviewer&&preparer.id!==reviewer.id,'Two controlled independent API-created accounts required');
   const label='STEP12 TEST ONLY - 20261014 - NOT OFFICIAL COMPANY BOOKS';
   const old=(await pool.query('SELECT id,name FROM accounting_books WHERE name=$1',[label])).rows;
-  if(mode==='bank-chart'||mode==='periods'){
+  if(mode==='bank-chart'||mode==='periods'||mode==='reconcile'){
    assert.equal(old.length,1);assert.equal(old[0].id,1);const engine=new native.NativeAccounting(pool);
+   if(mode==='reconcile'){
+    const accounts=(await pool.query('SELECT id,code FROM accounting_accounts WHERE book_id=1 ORDER BY code')).rows;
+    const debit={'1010':'10152.50','1011':'25.00','1200':'50.00','1400':'3.00','5010':'107.50','5020':'107.50','5030':'104.50','6000':'150.00','6100':'200.00'},credit={'3000':'10000.00','4000':'900.00'};
+    const controls=accounts.map(r=>({accountId:r.id,debit:debit[r.code]??'0',credit:credit[r.code]??'0',evidence:'Independently expected TEST ONLY fixture amounts: recorded receipts, direct obligations, classified payments, recoveries, credit/writeoff; not old company/history controls'}));
+    const result=await engine.reconcileSources(1,2,preparer.id,'2026-10-14',controls);
+    assert(result.controls.every(c=>c.difference==='0.00'));assert.equal(result.missingControls.length,0);assert.equal(result.sources.filter(s=>s.status==='stale'||s.status==='missing'||s.status==='draft').length,0);
+    const statuses=Object.fromEntries([...new Set(result.sources.map(s=>s.status))].map(k=>[k,result.sources.filter(s=>s.status===k).length]));
+    assert.equal(result.complete,false,'Pre-cutover/test historical classifications must not be hidden');
+    console.log(JSON.stringify({mode,bookId:1,through:'2026-10-14',accountControls:controls.length,zeroControlDifferences:true,noMissingControls:true,noNewMissingDraftStaleSources:true,complete:false,statuses,limitation:'Historical pre-cutover and unclassified test sources remain disclosed; no real company certification',method:'Actual deployed source revalidation with independently expected fixture controls; report UI does not persist these controls'}));return;
+   }
    if(mode==='bank-chart'){
     const account=await engine.addAccount(1,2,owner.id,'1011','STEP12 TEST ONLY second own bank','asset');
     console.log(JSON.stringify({mode,bookId:1,accountId:account,code:'1011',warning:'New zero-balance bank head; original verified openings and posted journals unchanged'}));return;

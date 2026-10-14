@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "check": "Exact indexed-content reader",
+      "pass": true,
+      "documentIds": [
+        12,
+        13
+      ],
+      "method": "Real deployed approved document_search endpoint, retained versions"
+    },
+    {
+      "check": "Natural-language content routing",
+      "status": "answered",
+      "sessionId": 44,
+      "citationIds": [
+        {
+          "type": "document",
+          "id": 13
+        },
+        {
+          "type": "document",
+          "id": 12
+        }
+      ],
+      "matchingContentReported": true,
+      "limitation": "Phrase presence alone is not proof of correct tool selection; inspect source routing alongside direct content-reader result. No raw AI transcript retained."
+    },
+    {
+      "check": "Exact vendor reader",
+      "sourceIds": [
+        {
+          "type": "payment_schedule",
+          "id": 14
+        }
+      ],
+      "recordCount": 1
+    }
+  ]
+}
