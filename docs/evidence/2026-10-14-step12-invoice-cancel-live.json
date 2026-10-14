@@ -1,0 +1,37 @@
+{
+  "method": "Retained partial cancellation control resumed; no repeated fixture creations",
+  "recognizedInvoiceId": 20,
+  "recognitionJournalId": 33,
+  "creditNoteId": 5,
+  "creditJournalId": 34,
+  "results": [
+    {
+      "time": "2026-10-14T16:32:35.879Z",
+      "check": "STEP12-INV-002 retained cancelled invoice shows zero outstanding without changing original total",
+      "pass": true,
+      "invoiceId": 21,
+      "invoiceNumber": "INV-202610-006",
+      "total": 0.01,
+      "outstanding": 0
+    },
+    {
+      "time": "2026-10-14T16:32:37.566Z",
+      "check": "STEP12-INV-001 retained recognized invoices protected; normal cancelled record/list/AR consistent",
+      "pass": true,
+      "recognizedInvoiceIds": [
+        18,
+        20
+      ],
+      "cancelledInvoiceId": 21
+    },
+    {
+      "time": "2026-10-14T16:32:41.851Z",
+      "check": "Complete28-head review and both cancellation controls retain exact native totals",
+      "pass": true,
+      "accounts": 28,
+      "profit": "230.50",
+      "bank5": 10152.5,
+      "bank6": 25
+    }
+  ]
+}

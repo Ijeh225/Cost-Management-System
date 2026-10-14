@@ -19,6 +19,7 @@ async function session(email,password){
   for(const c of r.headers.getSetCookie()){const pair=c.split(';')[0],at=pair.indexOf('=');cookies.set(pair.slice(0,at),pair.slice(at+1));}
   const data=r.headers.get('content-type')?.includes('application/json')?await r.json():{buffer:Buffer.from(await r.arrayBuffer()),mime:r.headers.get('content-type')};
   if(!(Array.isArray(expected)?expected.includes(r.status):r.status===expected)){console.error(JSON.stringify({method,path,status:r.status,error:data.error,code:data.code}));throw new Error('Unexpected HTTP acceptance result');}
+  assert(r.headers.get('content-type')?.includes('application/json')||/^\/documents\/\d+$/.test(path),'Expected a JSON API response, not a website fallback');
   return data;
  }
  const login=await request('POST','/auth/login',{email,password},200,'all');
@@ -461,7 +462,7 @@ else if(mode==='resume-cancel'){
   await record('STEP12-INV-002 retained cancelled invoice shows zero outstanding without changing original total',{invoiceId:21,invoiceNumber:cancelled.invoiceNumber,total:cancelled.total,outstanding:cancelled.outstanding});
   for(const id of[18,20]){const rejected=await owner.request('POST',`/invoices/${id}/cancel`,{},409);assert.match(rejected.error,/native accounting/);}
   const list=await owner.request('GET','/invoices');assert.equal(list.find(i=>i.id===21).outstanding,0);
-  const ar=await owner.request('GET','/accounts-receivable');assert(ar.clients.every(c=>Array.isArray(c.unpaidInvoices)));assert(!ar.clients.some(c=>c.unpaidInvoices.some(i=>i.id===21)));
+  const ar=await owner.request('GET','/invoices/accounts-receivable');assert(ar.clients.every(c=>Array.isArray(c.unpaidInvoices)));assert(!ar.clients.some(c=>c.unpaidInvoices.some(i=>i.id===21)));
   await record('STEP12-INV-001 retained recognized invoices protected; normal cancelled record/list/AR consistent',{recognizedInvoiceIds:[18,20],cancelledInvoiceId:21});
   const workspace=await owner.request('GET','/accounting/books/1/manual?branchId=2');
   if(!workspace.accountReviewComplete)await owner.request('POST','/accounting/books/1/manual/accounts/review?branchId=2',{

@@ -5,7 +5,7 @@ import {writeFileSync} from 'node:fs';
 const cli=process.env.RAILWAY_CLI_PATH;
 assert(cli,'Authenticated Railway CLI required');
 const mode=process.argv[2]??'inspect';
-assert(['inspect','setup','bank-chart','periods','reconcile'].includes(mode));
+assert(['inspect','setup','bank-chart','periods','reconcile','reconcile-final'].includes(mode));
 if(mode!=='inspect')assert(process.argv.includes('--confirm=STEP12-LIVE-TEST-20261014'),'Explicit live fixture confirmation required');
 const remote=async(mode)=>{
  const assert=require('node:assert/strict'),{createRequire}=require('node:module');
@@ -30,9 +30,9 @@ const remote=async(mode)=>{
   assert(preparer&&reviewer&&preparer.id!==reviewer.id,'Two controlled independent API-created accounts required');
   const label='STEP12 TEST ONLY - 20261014 - NOT OFFICIAL COMPANY BOOKS';
   const old=(await pool.query('SELECT id,name FROM accounting_books WHERE name=$1',[label])).rows;
-  if(mode==='bank-chart'||mode==='periods'||mode==='reconcile'){
+  if(mode==='bank-chart'||mode==='periods'||mode==='reconcile'||mode==='reconcile-final'){
    assert.equal(old.length,1);assert.equal(old[0].id,1);const engine=new native.NativeAccounting(pool);
-   if(mode==='reconcile'){
+   if(mode==='reconcile'||mode==='reconcile-final'){
     const accounts=(await pool.query('SELECT id,code FROM accounting_accounts WHERE book_id=1 ORDER BY code')).rows;
     const debit={'1010':'10152.50','1011':'25.00','1200':'50.00','1400':'3.00','5010':'107.50','5020':'107.50','5030':'104.50','6000':'150.00','6100':'200.00'},credit={'3000':'10000.00','4000':'900.00'};
     const controls=accounts.map(r=>({accountId:r.id,debit:debit[r.code]??'0',credit:credit[r.code]??'0',evidence:'Independently expected TEST ONLY fixture amounts: recorded receipts, direct obligations, classified payments, recoveries, credit/writeoff; not old company/history controls'}));

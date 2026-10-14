@@ -1,0 +1,15 @@
+{
+  "recordedAt": "2026-10-14T16:25:50Z",
+  "method": "Actual signed-in reviewer16 browser controls and independently read downloaded CSV, not mocked pages",
+  "bookId": 1,
+  "branchId": 2,
+  "generalLedger": {"bankAccountId": 2, "closing": "10152.50", "journalDetail": 3, "debit": "10000.00", "credit": "10000.00", "preparer": 15, "poster": 16, "sourceEvidenceExpanded": true},
+  "opening": {"versionId": 1, "state": "verified", "explicitZeroLines": 27, "journalId": null, "auditVisible": true},
+  "affairs": {"versionId": 1, "state": "approved", "assets": "100.01", "liabilities": "20.00", "netAssets": "80.01", "unknownBookValueVisible": true, "separateFromLedger": true},
+  "vatRegister": {"from": "2026-10-14", "to": "2026-10-14", "nativeSegmentedDateEntry": true, "netPurchases": "300.00", "purchaseVat": "22.50", "recoverable": "3.00", "nonRecoverable": "19.50", "netSales": "900.00", "outputVat": "0.00", "signedDutyReversalVisible": true},
+  "management": {"snapshotAt": "2026-10-14T16:13:00.368Z", "debit": "13322.82", "credit": "13322.82", "income": "900.00", "expense": "669.50", "profit": "230.50", "cashMovement": "10177.50", "balanceSheetDifference": "0.00", "sourceCompletenessWarningRetained": true},
+  "responsive": {"trialBalance": {"viewportWidth": 390, "viewportHeight": 844, "documentWidth": 390, "bodyWidth": 390}, "management": {"viewportWidth": 390, "viewportHeight": 844, "documentWidth": 390, "bodyWidth": 390}, "viewportReset": true},
+  "csv": {"file": "management-accounts_1_2026-10-14_2026-10-14 (1).csv", "bytes": 15300, "downloadedAt": "2026-10-14T16:24:37Z", "profit": "230.50", "cash": "10177.50", "scopeTimestampPolicyAndWarnings": true, "sourceCompleteness": false},
+  "print": {"invoked": true, "agentCreatedBlockingTabClosed": true, "layoutOrSavedPdfAccepted": false},
+  "limitations": ["Not actual company books or professional certification", "Generic source posting acceptance used deployed service, not ordinary staff review UI", "Mobile proof is bounded to Trial Balance and Management Accounts", "Manual chart completeness correctly required re-review after new protected bank head"]
+}

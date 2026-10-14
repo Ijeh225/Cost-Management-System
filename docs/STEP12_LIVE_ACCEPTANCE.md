@@ -1,6 +1,6 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-14 17:20 WAT. Status: IN PROGRESS, not staff-launch approval.
+Updated: 2026-10-14 17:34 WAT. Status: IN PROGRESS, not staff-launch approval.
 
 ## Scope and Protection
 
@@ -22,7 +22,7 @@ wipe the live app or restore the old archive over later test postings.
 | --- | --- | --- |
 | Named accounting permissions | Actual preparer15/reviewer16/foreign17 and operations14 logins; self-post, nonfinance, foreign branch and missing grants refused | Not every future role or disabled-account lifecycle |
 | Opening balances | Complete explicit zero schedule1, independently verified by16; one decision, no zero journal; actual staff UI and audit accepted | Fictional starting balances, not company bank/customer/supplier confirmation |
-| Manual journals | Depreciation0.12 native1 plus independent linked reversal2; immutable history, zero net effect; staff queue accepted | Added bank head28 requires explicit full chart role review before further preparation |
+| Manual journals | Depreciation0.12 native1 plus independent linked reversal2; immutable history, zero net effect; staff queue accepted; added protected bank head28 explicitly re-reviewed | Actual company chart approval is not simulated QA review |
 | VAT/direct costs | Approved configuration1; taxable7.5, zero/exempt and recovery0/40/100 tests; original reversal retains original code; real UI register/date entry accepted | Hypothetical tax evidence, not legal VAT approval or official filing |
 | Invoice and collections | Invoice17/1000, cash20/400, deposit5/300 and noncash allocation21; native sources4-7 counted once | Generic receipt/deposit native postings exercised deployed service, not staff source-review UI |
 | Duty/container expenses | Duty8 and reversal9 offset; final duty10, shipping3 and terminal4; independent source journals8-12 | Each native source was reviewed and posted, not automatic legacy backfill |
@@ -33,7 +33,7 @@ wipe the live app or restore the old archive over later test postings.
 | Approval and tasks | Review4 rejection visible immediately in API, assigned correction task5, resubmit/approve/lock; task4 completed | Immediate browser rejection refresh not newly observed |
 | Documents and AI | Text versions12/13 retained/indexed/download bytes match; foreign retrieval404; explicit content query44 routes to document_search, exact vendor reader returns14 only | Not a new scan/PDF/OCR accuracy benchmark or every AI query |
 | Native reports | GL/TB/BS/management API controls; actual staff GL drill-down, BS equation, management/UI and 390px TB accepted | Legacy operational reports have different dates/populations/bases |
-| Outputs | Actual management CSV14551bytes, snapshot scope/warnings and prior totals verified; screenshot/mobile evidence retained | CSV predates overhead top-up; live native print layout/PDF not verified |
+| Outputs | Actual final management CSV15300bytes, scope/warnings/profit230.50/cash10177.50 verified; prior14551byte snapshot retained; screenshot/mobile evidence retained | Live native print layout/PDF not verified |
 | Period restrictions | Empty future November period2 close/reopen audit, missing review and branch-only close refused, closed-date journal refused | Deployed-engine test; no false closure/certification of October |
 | Supporting modules | 29 live module/data endpoints returned200 with role negatives accepted | Availability is not complete UI/calculation acceptance of every module |
 
@@ -63,7 +63,9 @@ offsetting tiny cancellation control:
 
 An independent deployed-source review matched all28 account controls before the
 additional offsetting penny control, with no new missing/draft/stale sources.
-The later recognition33/CN34 leaves all closing controls unchanged. Historical
+The later recognition33/CN34 leaves all closing controls unchanged, independently
+confirmed by final source revalidation with all28 controls and32posted sources.
+Historical
 31pre-cutover and3unclassified fixtures remain disclosed. Read-only report
 views do not persist that independent control checklist. Their completeness
 warning must not be removed just because a trial balance balances.
@@ -107,20 +109,25 @@ warning must not be removed just because a trial balance balances.
 | STEP12-DEPOSIT-001 | High | Real Bank Transfer label refused by native mapper; narrow alias fix deployed/live CLOSED |
 | STEP12-OH-001 | High | Same-day entered-later bill incorrectly rejected dated settlement; dependency-based fix deployed/live CLOSED |
 | STEP12-OPS-001 | High | Basic PUT could bypass final workflow prerequisites; shared guard deployed/live CLOSED |
-| STEP12-INV-001 | High | Cancellation could strand native recognition; isolated/race tests and exact5dc9974 deployment; real unpaid20/native33 refusal PASS |
-| STEP12-INV-002 | Medium | Cancelled21 still displays0.01 outstanding; formatter correction locally tested, release/live same-ID retest pending |
+| STEP12-INV-001 | High | CLOSED: isolated/race tests, exact5dc9974/85a0e30d SUCCESS; truly unpaid20/native33 and retained18refusal PASS |
+| STEP12-INV-002 | Medium | CLOSED:483unit/API/build, exact57aa5c7/9cfa3c3a SUCCESS; same21detail/listzero outstanding/AR exclusion/original total retained PASS |
 | STEP12-SOURCE-UI-001 | High implementation gap | Generic receipts/deposits/overheads/schedules/bank native adapters lack ordinary staff review/post routes/workspace; service acceptance is not staff workflow acceptance |
 
 ## Exact Continuation and Launch Gates
 
-- Publish the narrowly tested cancelled-display correction, verify exact Railway
-  success, then run `resume-cancel`. Reuse18/20/21/native33/34/CN5, finish review
-  of protected newbank28 and confirm unchanged230.50profit/10177.50cash.
+- Both invoice corrections are already deployed/live accepted. Final same-ID
+  resume created/posted nothing, completed protected bank28role review and
+  confirmed unchanged230.50profit/10177.50cash. Publish the final evidence records;
+  do not rerun the accepted resume or cancellation creation phases.
 - Do not rerun prior accounting/transactions/support/cancellation creation modes.
   They intentionally refuse existing fixtures or assert older snapshot figures.
 - Complete the ordinary staff source-review workflow using the existing engine,
   named permissions, explicit mappings and independent approval. Neither raw SQL
   posting nor an automatic poster is an acceptable substitute.
+- The owner was asked to choose selected-transaction review (recommended) or
+  automatic pending-review queue. Await that workflow decision; both options
+  require a different named reviewer before posting. No new interface is claimed
+  implemented merely because its underlying service tests passed.
 - Complete remaining bounded browser/output checks, including live print layout
   when supported, and record what has not been covered. Do not send external
   emails/WhatsApp without a verified suitable test recipient.

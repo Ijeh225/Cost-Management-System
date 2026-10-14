@@ -1,5 +1,14 @@
 # Step12 Live Acceptance
 
+## 2026-10-14 17:34 WAT - Exact stop and next action
+- Both newinvoice corrections live CLOSED:5dc9974/85a0e30d native retention and57aa5c7/9cfa3c3a cancelled display, bothSUCCESS. Same18/20guard409/21detail-listzero/ARexclusion/repeatrefusal/native230.50profit/10177.50cash PASS. Resume created/posted nothing;28headreview complete and reviewer16UI blockgone. Healthok/checkpointtagunchanged.
+- Initialresume readwrongARwebsitepathreturnedHTML; switchedactual/invoices/accounts-receivable, enforcedJSONforAPIexceptdocumentbytes; sameIDresumePASS, not productbug.483units/3priorskips/build/typechecks/2networkcontrols and final28control/CSV/mobile proofretained.
+- EXACT NEXT: publish these finalrecords/helpers/evidence, then await source-UIworkflowchoice askedasync: extendexistingmanualreviewscreen recommended or automaticpendingreviewqueue. Bothneedindependentapproval; existinggenericserviceproofisnotusableordinarystaffworkflow. Don'trestartanycreatephase. Printlayout/PDFtoolbound and actualcompanyapprovals/openings/launch remain distinct. FullStep12INPROGRESS/nativeONTESTONLY.
+
+## 2026-10-14 17:25 WAT - Current output/control closure and decision
+- Final source review28controls allmatch/no newmissing-draft-stale after33/34;32posted/31precutover/13excluded/3review-required remain disclosed. Fresh finalCSV15300bytes230.50profit/10177.50cash/scope/warnings; Management390px PASS/reset. Native-ui/final-reconcile proof retained, old14551byteCSVhistorical.
+-57aa5c7 functional display correction pushed, exact9cfa3c3a BUILDING. AwaitSUCCESS/runresume-cancel using21/18/20; no financial creates/posts. Source-UI completion requires workflowchoice: existing manual review screen recommended versus automaticreviewqueue, neither auto-posts. Await answer rather than pretending user-facing integration complete.
+
 ## 2026-10-14 17:22 WAT - Release-ready display correction and training evidence
 -483units/3prior skips/full build/typechecks/helper syntax/diff PASS. Publish STEP12-INV-002 formatter correction/current proof. Resume-cancel reuses21cancelled and18/20recognized, creates/posts nothing; finishes28head role review and exact totals.
 - Coverage/training/financial-control/issue matrix saved STEP12_LIVE_ACCEPTANCE.md. Actual finalmanagement screenshot shows13322.82bothsides/230.50profit/10177.50cash. Keep nativeONTESTONLY and preserve all records/checkpoints. Staff source-review gap/printlayout/company acceptance remain separate outstanding gates.

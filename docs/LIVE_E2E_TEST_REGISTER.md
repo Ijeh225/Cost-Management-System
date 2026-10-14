@@ -1,5 +1,14 @@
 # Live End-to-End Test Register
 
+## 2026-10-14 17:34 WAT - Invoice defects CLOSED through deployed same-record re-test
+- CLOSED STEP12-INV-001:5dc9974/85a0e30d SUCCESS, genuinely unpaid20/native33/refusal409 and reviewed CN5/native34 retained;18/20reconfirmed409. CLOSED STEP12-INV-002:57aa5c7/9cfa3c3a SUCCESS; same21/INV-202610-006cancelled/detail-list outstanding0/originaltotal0.01/ARexclusion/repeatrefusal accepted. Health200:ok.
+- Complete28head TEST ONLY role review/actual staffUI block removal accepted, protected controls/4adjustmentheads retained.230.50profit/10177.50cash/BSdifference0 unchanged; new evidence invoice-cancel-live JSON. No new fixture/posting in resume. Wrong AR UI path corrected to actual JSON API; failed read not new product defect, strict JSON guard added. All prior29data evidence contains JSON metadata.
+-483unit/API/3prior skips/full build/typechecks/two isolated controls accepted; final28source controls/CSV/mobile/source evidence retained. STEP12-SOURCE-UI-001 still OPEN as user-facing posting implementation gap, workflow-choice question awaiting response. Native ON TEST ONLY; live print-layout/company-launch certification not accepted. No blanket full module/staff readiness claim.
+
+## 2026-10-14 17:25 WAT - Final controls and current output proof
+- PASS actual deployed final source review all28controls/no differences/missing/new missing-draft-stale;32posted/31pre-cutover/13excluded/3review-required, complete=false. PASS real staff Management390px width/no page overflow/reset and current CSV15300bytes/profit230.50/cash10177.50/scope/warnings; previous CSV is retained historical snapshot. Native-ui-live/final-reconcile evidence added, no print-layout/PDF claim.
+-57aa5c7 pushed and exact9cfa3c3a BUILDING; same-ID21formatter/live resume pending SUCCESS. Source-UI design question presented; extension versus auto-review queue, both preserve independent posting. Full Step12 IN PROGRESS pending this implementation gap/output and real company launch gates.
+
 ## 2026-10-14 17:22 WAT - Final formatter suite accepted / retained re-test next
 -483unit/API PASS/3prior skips/61files, complete typechecks/build/helper syntax/diff PASS. STEP12-INV-002 cancelled-display fix release-ready, exact same21detail/list/AR/normal-repeat refusal and18/20native guard plus28head review next; run resume-cancel only.
 - Consolidated coverage/training in `docs/STEP12_LIVE_ACCEPTANCE.md`; actual scoped staff management screenshot13322.82balanced/230.50profit/10177.50cash retained. All method limitations and generic source-review gap explicit; no blanket system/staff-launch acceptance claimed.
