@@ -1,5 +1,9 @@
 # Live End-to-End Test Register
 
+## 2026-10-14 17:38 WAT - Published evidence and browser handback limitation
+-151772d final records/helpers pushed, Railwayda1e7217 BUILDING, not fresh SUCCESS. Functional57aa5c7/5dc9974 exact deployments/live corrections remain confirmed. All accepted tests/figures unchanged; no further financial writes or repeat fixture creations.
+- Actual reviewer16 manual UI after full28head role review removes incomplete-chart block, originalposted1/reversal2 immutable. Owner-session handback attempted, but Chrome extension UI blocks automation; logout/owner sign-in NOT confirmed. User asked to dismisspopup, then inspect actual current state before continuing. This is not an application finance defect or the old print modal.
+
 ## 2026-10-14 17:34 WAT - Invoice defects CLOSED through deployed same-record re-test
 - CLOSED STEP12-INV-001:5dc9974/85a0e30d SUCCESS, genuinely unpaid20/native33/refusal409 and reviewed CN5/native34 retained;18/20reconfirmed409. CLOSED STEP12-INV-002:57aa5c7/9cfa3c3a SUCCESS; same21/INV-202610-006cancelled/detail-list outstanding0/originaltotal0.01/ARexclusion/repeatrefusal accepted. Health200:ok.
 - Complete28head TEST ONLY role review/actual staffUI block removal accepted, protected controls/4adjustmentheads retained.230.50profit/10177.50cash/BSdifference0 unchanged; new evidence invoice-cancel-live JSON. No new fixture/posting in resume. Wrong AR UI path corrected to actual JSON API; failed read not new product defect, strict JSON guard added. All prior29data evidence contains JSON metadata.

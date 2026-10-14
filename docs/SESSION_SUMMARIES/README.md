@@ -1,6 +1,7 @@
 # Session Summaries
 
 - Current: [2026-10-14 Step12 Live Acceptance](2026-10-14-step12-live-acceptance.md) - native gatesON TEST ONLY; six confirmed defects deployed/live CLOSED, latest5dc9974/85a0e30d and57aa5c7/9cfa3c3a SUCCESS.483unit/API/3prior skips/build/two distinct network controls/final28controls/currentCSV/mobile PASS. Cash10177.50/profit230.50; no repeat fixture creation. Step12 IN PROGRESS: source-UIworkflow choice awaiting owner, print-layout/company acceptance remain. [Coverage and training](../STEP12_LIVE_ACCEPTANCE.md).
+- Browser handback17:38 WAT: Chrome extension popup blocks restoration of Owner login; user asked to dismiss it. Inspect fresh actual state after dismissal, do not repeat financial tests. Final evidence151772d pushed, documentation/helper-only deployment not yet confirmed.
 
 - Current: [2026-10-14 Step11 Statement of Affairs](2026-10-14-step11-statement-of-affairs.md) - functional e112918 and records c816352 deployments accepted; Step12 scope explained14:13 WAT, not started; official accounting OFF. Latest explanation notes local/uncommitted.
 
