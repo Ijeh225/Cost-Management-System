@@ -5,6 +5,266 @@
  * Cost Analysis Per Container API
  * OpenAPI spec version: 0.1.0
  */
+export type SourceReviewRefKind =
+  (typeof SourceReviewRefKind)[keyof typeof SourceReviewRefKind];
+
+export const SourceReviewRefKind = {
+  client_deposit: "client_deposit",
+  invoice_payment: "invoice_payment",
+  credit_note: "credit_note",
+  client_credit_application: "client_credit_application",
+  invoice_writeoff: "invoice_writeoff",
+  overhead: "overhead",
+  overhead_topup: "overhead_topup",
+  expense_payment: "expense_payment",
+  schedule_payment: "schedule_payment",
+  bank_funding: "bank_funding",
+  bank_transfer: "bank_transfer",
+} as const;
+
+export interface SourceReviewRef {
+  kind: SourceReviewRefKind;
+  /** @minimum 1 */
+  id: number;
+}
+
+export type SourceReviewMappingCurrency =
+  (typeof SourceReviewMappingCurrency)[keyof typeof SourceReviewMappingCurrency];
+
+export const SourceReviewMappingCurrency = {
+  NGN: "NGN",
+} as const;
+
+export type SourceReviewMappingEffect =
+  (typeof SourceReviewMappingEffect)[keyof typeof SourceReviewMappingEffect];
+
+export const SourceReviewMappingEffect = {
+  expense: "expense",
+  asset: "asset",
+  advance: "advance",
+  loan_repayment: "loan_repayment",
+  other_non_expense: "other_non_expense",
+  equity_funding: "equity_funding",
+  loan_funding: "loan_funding",
+  asset_funding: "asset_funding",
+  income_funding: "income_funding",
+  liability_funding: "liability_funding",
+  overhead: "overhead",
+  credit_note: "credit_note",
+  client_credit: "client_credit",
+  writeoff: "writeoff",
+  transfer: "transfer",
+} as const;
+
+export type SourceReviewMappingBankAccounts = { [key: string]: number };
+
+export type SourceReviewMappingAccountCategory =
+  (typeof SourceReviewMappingAccountCategory)[keyof typeof SourceReviewMappingAccountCategory];
+
+export const SourceReviewMappingAccountCategory = {
+  asset: "asset",
+  liability: "liability",
+  equity: "equity",
+  income: "income",
+  expense: "expense",
+} as const;
+
+export type SourceReviewMappingReductionsItemCategory =
+  (typeof SourceReviewMappingReductionsItemCategory)[keyof typeof SourceReviewMappingReductionsItemCategory];
+
+export const SourceReviewMappingReductionsItemCategory = {
+  income: "income",
+  liability: "liability",
+} as const;
+
+export type SourceReviewMappingReductionsItem = {
+  /** @minimum 1 */
+  accountId: number;
+  amount: string;
+  category: SourceReviewMappingReductionsItemCategory;
+  evidence: string;
+};
+
+export interface SourceReviewMapping {
+  currency: SourceReviewMappingCurrency;
+  /**
+   * @minLength 1
+   * @maxLength 300
+   */
+  policyVersion: string;
+  /**
+   * @minLength 1
+   * @maxLength 300
+   */
+  evidence: string;
+  effect?: SourceReviewMappingEffect;
+  bankAccounts?: SourceReviewMappingBankAccounts;
+  /** @minimum 1 */
+  cashAccountId?: number;
+  /** @minimum 1 */
+  receivableAccountId?: number;
+  /** @minimum 1 */
+  depositLiabilityAccountId?: number;
+  /** @minimum 1 */
+  accountId?: number;
+  accountCategory?: SourceReviewMappingAccountCategory;
+  /** @minimum 1 */
+  controlAccountId?: number;
+  /** @minimum 1 */
+  clientCreditAccountId?: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  recognitionDate?: string;
+  /**
+   * @minLength 1
+   * @maxLength 300
+   */
+  recognitionEvidence?: string;
+  /** @maxItems 50 */
+  reductions?: SourceReviewMappingReductionsItem[];
+  /** @minimum 1 */
+  vatAccountId?: number;
+  vatReduction?: string;
+  vatEvidence?: string;
+}
+
+export interface SourceReviewRequest {
+  /** @pattern ^[a-zA-Z0-9_-]{8,80}$ */
+  requestId: string;
+  source: SourceReviewRef;
+  mapping: SourceReviewMapping;
+  /** @minimum 1 */
+  replacesReviewId?: number;
+}
+
+export type SourceReviewActionAction =
+  (typeof SourceReviewActionAction)[keyof typeof SourceReviewActionAction];
+
+export const SourceReviewActionAction = {
+  submit: "submit",
+  return: "return",
+  post: "post",
+  cancel: "cancel",
+} as const;
+
+export interface SourceReviewAction {
+  action: SourceReviewActionAction;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  reason: string;
+}
+
+export type SourceReviewSummaryState =
+  (typeof SourceReviewSummaryState)[keyof typeof SourceReviewSummaryState];
+
+export const SourceReviewSummaryState = {
+  draft: "draft",
+  submitted: "submitted",
+  returned: "returned",
+  posted: "posted",
+  cancelled: "cancelled",
+} as const;
+
+export interface SourceReviewSummary {
+  id: number;
+  state: SourceReviewSummaryState;
+  source: SourceReviewRef;
+  date: string;
+  preparedBy: number;
+  /** @nullable */
+  reviewedBy: number | null;
+  /** @nullable */
+  journalId: number | null;
+  /** @nullable */
+  reason: string | null;
+  /** @nullable */
+  replacesReviewId: number | null;
+}
+
+export type SourceReviewPayloadInputLinesItem = {
+  accountId: number;
+  debit: string;
+  credit: string;
+};
+
+export type SourceReviewPayloadInput = {
+  bookId: number;
+  branchId: number;
+  currency: string;
+  accountingDate: string;
+  eventKey: string;
+  narration: string;
+  evidence: string;
+  lines: SourceReviewPayloadInputLinesItem[];
+};
+
+export interface SourceReviewPayload {
+  request: SourceReviewRequest;
+  cashMovement: string;
+  /** @nullable */
+  originalId: number | null;
+  input: SourceReviewPayloadInput;
+}
+
+export interface SourceReviewCandidate {
+  kind: string;
+  id: number;
+  /** @nullable */
+  amount: string | null;
+  date: string;
+  label: string;
+  bankIds: number[];
+  /** @nullable */
+  paymentMethod: string | null;
+  /** @nullable */
+  classification: string | null;
+  /** @nullable */
+  journalId: number | null;
+  /** @nullable */
+  journalStatus: string | null;
+}
+
+export type SourceReviewWorkspaceBook = {
+  id: number;
+  name: string;
+  policyVersion: string;
+  cutoverDate: string;
+};
+
+export interface OpeningSetupAccount {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  active: boolean;
+}
+
+export interface SourceReviewWorkspace {
+  book: SourceReviewWorkspaceBook;
+  branchId: number;
+  permissions: string[];
+  accounts: OpeningSetupAccount[];
+  sources: SourceReviewCandidate[];
+  reviews: SourceReviewSummary[];
+  truncated: boolean;
+}
+
+export type SourceReviewDetailsAuditItem = {
+  id: number;
+  action: string;
+  reason: string;
+  actorId: number;
+  /** @nullable */
+  actorName: string | null;
+  at: string;
+};
+
+export type SourceReviewDetails = SourceReviewSummary & {
+  payload: SourceReviewPayload;
+  audit: SourceReviewDetailsAuditItem[];
+};
+
 export type AffairsLineCategory =
   (typeof AffairsLineCategory)[keyof typeof AffairsLineCategory];
 
@@ -262,14 +522,6 @@ export type TaxConfigurationWorkspaceJournalsItem = {
   eventKey: string;
   date: string;
 };
-
-export interface OpeningSetupAccount {
-  id: number;
-  code: string;
-  name: string;
-  category: string;
-  active: boolean;
-}
 
 export interface TaxConfigurationWorkspace {
   book: TaxConfigurationWorkspaceBook;
@@ -2197,6 +2449,48 @@ export type ManualAccountingBranchParameter = number;
  * Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
  */
 export type AccountingBranchParameter = string;
+
+export type GetSourceReviewCandidateParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type GetSourceReviewWorkspaceParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PreviewSourceReviewParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PrepareSourceReviewParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type GetSourceReviewDetailsParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type ActOnSourceReviewParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
 
 export type GetAffairsWorkspaceParams = {
   /**

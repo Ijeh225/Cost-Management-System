@@ -24,6 +24,7 @@ import type {
   ActOnAffairsParams,
   ActOnManualAccountingJournalParams,
   ActOnOpeningSetupParams,
+  ActOnSourceReviewParams,
   ActOnTaxConfigurationParams,
   AffairsAction,
   AffairsDetails,
@@ -70,6 +71,9 @@ import type {
   GetOpeningSetupVersionParams,
   GetOpeningSetupWorkspaceParams,
   GetPostedTaxRegisterParams,
+  GetSourceReviewCandidateParams,
+  GetSourceReviewDetailsParams,
+  GetSourceReviewWorkspaceParams,
   GetTaxConfigurationWorkspaceParams,
   GetTaxSourceParams,
   HealthStatus,
@@ -101,9 +105,11 @@ import type {
   PrepareAffairsParams,
   PrepareManualAccountingJournalParams,
   PrepareOpeningSetupParams,
+  PrepareSourceReviewParams,
   PrepareTaxConfigurationParams,
   PrepareTaxSourceParams,
   PreviewOpeningSetupParams,
+  PreviewSourceReviewParams,
   PreviewTaxSourceParams,
   RecordDutyPaymentRequest,
   RejectSectionRequest,
@@ -114,6 +120,13 @@ import type {
   SaveCustomFieldValuesRequest,
   SectionApproval,
   ShipmentOverview,
+  SourceReviewAction,
+  SourceReviewCandidate,
+  SourceReviewDetails,
+  SourceReviewPayload,
+  SourceReviewRequest,
+  SourceReviewSummary,
+  SourceReviewWorkspace,
   TaxConfigurationAction,
   TaxConfigurationRequest,
   TaxConfigurationWorkspace,
@@ -140,6 +153,770 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export const getGetSourceReviewCandidateUrl = (
+  bookId: number,
+  kind:
+    | "client_deposit"
+    | "invoice_payment"
+    | "credit_note"
+    | "client_credit_application"
+    | "invoice_writeoff"
+    | "overhead"
+    | "overhead_topup"
+    | "expense_payment"
+    | "schedule_payment"
+    | "bank_funding"
+    | "bank_transfer",
+  sourceId: number,
+  params: GetSourceReviewCandidateParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/source-review/sources/${kind}/${sourceId}?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/source-review/sources/${kind}/${sourceId}`;
+};
+
+export const getSourceReviewCandidate = async (
+  bookId: number,
+  kind:
+    | "client_deposit"
+    | "invoice_payment"
+    | "credit_note"
+    | "client_credit_application"
+    | "invoice_writeoff"
+    | "overhead"
+    | "overhead_topup"
+    | "expense_payment"
+    | "schedule_payment"
+    | "bank_funding"
+    | "bank_transfer",
+  sourceId: number,
+  params: GetSourceReviewCandidateParams,
+  options?: RequestInit,
+): Promise<SourceReviewCandidate> => {
+  return customFetch<SourceReviewCandidate>(
+    getGetSourceReviewCandidateUrl(bookId, kind, sourceId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetSourceReviewCandidateQueryKey = (
+  bookId: number,
+  kind:
+    | "client_deposit"
+    | "invoice_payment"
+    | "credit_note"
+    | "client_credit_application"
+    | "invoice_writeoff"
+    | "overhead"
+    | "overhead_topup"
+    | "expense_payment"
+    | "schedule_payment"
+    | "bank_funding"
+    | "bank_transfer",
+  sourceId: number,
+  params?: GetSourceReviewCandidateParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/source-review/sources/${kind}/${sourceId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetSourceReviewCandidateQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSourceReviewCandidate>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  kind:
+    | "client_deposit"
+    | "invoice_payment"
+    | "credit_note"
+    | "client_credit_application"
+    | "invoice_writeoff"
+    | "overhead"
+    | "overhead_topup"
+    | "expense_payment"
+    | "schedule_payment"
+    | "bank_funding"
+    | "bank_transfer",
+  sourceId: number,
+  params: GetSourceReviewCandidateParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSourceReviewCandidate>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetSourceReviewCandidateQueryKey(bookId, kind, sourceId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSourceReviewCandidate>>
+  > = ({ signal }) =>
+    getSourceReviewCandidate(bookId, kind, sourceId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bookId && kind && sourceId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSourceReviewCandidate>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSourceReviewCandidateQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSourceReviewCandidate>>
+>;
+export type GetSourceReviewCandidateQueryError = ErrorType<unknown>;
+
+export function useGetSourceReviewCandidate<
+  TData = Awaited<ReturnType<typeof getSourceReviewCandidate>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  kind:
+    | "client_deposit"
+    | "invoice_payment"
+    | "credit_note"
+    | "client_credit_application"
+    | "invoice_writeoff"
+    | "overhead"
+    | "overhead_topup"
+    | "expense_payment"
+    | "schedule_payment"
+    | "bank_funding"
+    | "bank_transfer",
+  sourceId: number,
+  params: GetSourceReviewCandidateParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSourceReviewCandidate>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSourceReviewCandidateQueryOptions(
+    bookId,
+    kind,
+    sourceId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetSourceReviewWorkspaceUrl = (
+  bookId: number,
+  params: GetSourceReviewWorkspaceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/source-review?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/source-review`;
+};
+
+export const getSourceReviewWorkspace = async (
+  bookId: number,
+  params: GetSourceReviewWorkspaceParams,
+  options?: RequestInit,
+): Promise<SourceReviewWorkspace> => {
+  return customFetch<SourceReviewWorkspace>(
+    getGetSourceReviewWorkspaceUrl(bookId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetSourceReviewWorkspaceQueryKey = (
+  bookId: number,
+  params?: GetSourceReviewWorkspaceParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/source-review`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetSourceReviewWorkspaceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSourceReviewWorkspace>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetSourceReviewWorkspaceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSourceReviewWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetSourceReviewWorkspaceQueryKey(bookId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSourceReviewWorkspace>>
+  > = ({ signal }) =>
+    getSourceReviewWorkspace(bookId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSourceReviewWorkspace>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSourceReviewWorkspaceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSourceReviewWorkspace>>
+>;
+export type GetSourceReviewWorkspaceQueryError = ErrorType<unknown>;
+
+export function useGetSourceReviewWorkspace<
+  TData = Awaited<ReturnType<typeof getSourceReviewWorkspace>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetSourceReviewWorkspaceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSourceReviewWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSourceReviewWorkspaceQueryOptions(
+    bookId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPreviewSourceReviewUrl = (
+  bookId: number,
+  params: PreviewSourceReviewParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/source-review/preview?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/source-review/preview`;
+};
+
+export const previewSourceReview = async (
+  bookId: number,
+  sourceReviewRequest: SourceReviewRequest,
+  params: PreviewSourceReviewParams,
+  options?: RequestInit,
+): Promise<SourceReviewPayload> => {
+  return customFetch<SourceReviewPayload>(
+    getPreviewSourceReviewUrl(bookId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(sourceReviewRequest),
+    },
+  );
+};
+
+export const getPreviewSourceReviewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewSourceReview>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<SourceReviewRequest>;
+      params: PreviewSourceReviewParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewSourceReview>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<SourceReviewRequest>;
+    params: PreviewSourceReviewParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["previewSourceReview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewSourceReview>>,
+    {
+      bookId: number;
+      data: BodyType<SourceReviewRequest>;
+      params: PreviewSourceReviewParams;
+    }
+  > = (props) => {
+    const { bookId, data, params } = props ?? {};
+
+    return previewSourceReview(bookId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreviewSourceReviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewSourceReview>>
+>;
+export type PreviewSourceReviewMutationBody = BodyType<SourceReviewRequest>;
+export type PreviewSourceReviewMutationError = ErrorType<unknown>;
+
+export const usePreviewSourceReview = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewSourceReview>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<SourceReviewRequest>;
+      params: PreviewSourceReviewParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof previewSourceReview>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<SourceReviewRequest>;
+    params: PreviewSourceReviewParams;
+  },
+  TContext
+> => {
+  return useMutation(getPreviewSourceReviewMutationOptions(options));
+};
+
+export const getPrepareSourceReviewUrl = (
+  bookId: number,
+  params: PrepareSourceReviewParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/source-review/prepare?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/source-review/prepare`;
+};
+
+export const prepareSourceReview = async (
+  bookId: number,
+  sourceReviewRequest: SourceReviewRequest,
+  params: PrepareSourceReviewParams,
+  options?: RequestInit,
+): Promise<SourceReviewSummary> => {
+  return customFetch<SourceReviewSummary>(
+    getPrepareSourceReviewUrl(bookId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(sourceReviewRequest),
+    },
+  );
+};
+
+export const getPrepareSourceReviewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareSourceReview>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<SourceReviewRequest>;
+      params: PrepareSourceReviewParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof prepareSourceReview>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<SourceReviewRequest>;
+    params: PrepareSourceReviewParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["prepareSourceReview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof prepareSourceReview>>,
+    {
+      bookId: number;
+      data: BodyType<SourceReviewRequest>;
+      params: PrepareSourceReviewParams;
+    }
+  > = (props) => {
+    const { bookId, data, params } = props ?? {};
+
+    return prepareSourceReview(bookId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PrepareSourceReviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof prepareSourceReview>>
+>;
+export type PrepareSourceReviewMutationBody = BodyType<SourceReviewRequest>;
+export type PrepareSourceReviewMutationError = ErrorType<unknown>;
+
+export const usePrepareSourceReview = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareSourceReview>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<SourceReviewRequest>;
+      params: PrepareSourceReviewParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof prepareSourceReview>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<SourceReviewRequest>;
+    params: PrepareSourceReviewParams;
+  },
+  TContext
+> => {
+  return useMutation(getPrepareSourceReviewMutationOptions(options));
+};
+
+export const getGetSourceReviewDetailsUrl = (
+  bookId: number,
+  reviewId: number,
+  params: GetSourceReviewDetailsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/source-review/${reviewId}?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/source-review/${reviewId}`;
+};
+
+export const getSourceReviewDetails = async (
+  bookId: number,
+  reviewId: number,
+  params: GetSourceReviewDetailsParams,
+  options?: RequestInit,
+): Promise<SourceReviewDetails> => {
+  return customFetch<SourceReviewDetails>(
+    getGetSourceReviewDetailsUrl(bookId, reviewId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetSourceReviewDetailsQueryKey = (
+  bookId: number,
+  reviewId: number,
+  params?: GetSourceReviewDetailsParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/source-review/${reviewId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetSourceReviewDetailsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSourceReviewDetails>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  reviewId: number,
+  params: GetSourceReviewDetailsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSourceReviewDetails>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetSourceReviewDetailsQueryKey(bookId, reviewId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSourceReviewDetails>>
+  > = ({ signal }) =>
+    getSourceReviewDetails(bookId, reviewId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bookId && reviewId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSourceReviewDetails>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSourceReviewDetailsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSourceReviewDetails>>
+>;
+export type GetSourceReviewDetailsQueryError = ErrorType<unknown>;
+
+export function useGetSourceReviewDetails<
+  TData = Awaited<ReturnType<typeof getSourceReviewDetails>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  reviewId: number,
+  params: GetSourceReviewDetailsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSourceReviewDetails>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSourceReviewDetailsQueryOptions(
+    bookId,
+    reviewId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getActOnSourceReviewUrl = (
+  bookId: number,
+  reviewId: number,
+  params: ActOnSourceReviewParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/source-review/${reviewId}/action?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/source-review/${reviewId}/action`;
+};
+
+export const actOnSourceReview = async (
+  bookId: number,
+  reviewId: number,
+  sourceReviewAction: SourceReviewAction,
+  params: ActOnSourceReviewParams,
+  options?: RequestInit,
+): Promise<SourceReviewSummary> => {
+  return customFetch<SourceReviewSummary>(
+    getActOnSourceReviewUrl(bookId, reviewId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(sourceReviewAction),
+    },
+  );
+};
+
+export const getActOnSourceReviewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actOnSourceReview>>,
+    TError,
+    {
+      bookId: number;
+      reviewId: number;
+      data: BodyType<SourceReviewAction>;
+      params: ActOnSourceReviewParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof actOnSourceReview>>,
+  TError,
+  {
+    bookId: number;
+    reviewId: number;
+    data: BodyType<SourceReviewAction>;
+    params: ActOnSourceReviewParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["actOnSourceReview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof actOnSourceReview>>,
+    {
+      bookId: number;
+      reviewId: number;
+      data: BodyType<SourceReviewAction>;
+      params: ActOnSourceReviewParams;
+    }
+  > = (props) => {
+    const { bookId, reviewId, data, params } = props ?? {};
+
+    return actOnSourceReview(bookId, reviewId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ActOnSourceReviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof actOnSourceReview>>
+>;
+export type ActOnSourceReviewMutationBody = BodyType<SourceReviewAction>;
+export type ActOnSourceReviewMutationError = ErrorType<unknown>;
+
+export const useActOnSourceReview = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actOnSourceReview>>,
+    TError,
+    {
+      bookId: number;
+      reviewId: number;
+      data: BodyType<SourceReviewAction>;
+      params: ActOnSourceReviewParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof actOnSourceReview>>,
+  TError,
+  {
+    bookId: number;
+    reviewId: number;
+    data: BodyType<SourceReviewAction>;
+    params: ActOnSourceReviewParams;
+  },
+  TContext
+> => {
+  return useMutation(getActOnSourceReviewMutationOptions(options));
+};
 
 export const getGetAffairsWorkspaceUrl = (
   bookId: number,

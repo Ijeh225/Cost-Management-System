@@ -6,6 +6,7 @@ import { useAuth } from "@/components/layout/auth-provider";
 import { useBranchScope } from "@/components/layout/branch-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from "@/components/ui/dialog";
+import { SourceReviewWorkspace } from './source-review';
 const field="w-full min-w-0 rounded-lg border bg-background px-3 py-2 text-sm";
 const error=(e:unknown)=>e instanceof Error?e.message:"Unable to complete VAT/direct expense request";
 function Notice({children,bad=false}:{children:React.ReactNode;bad?:boolean}){return <div role={bad?"alert":"status"} className={`rounded-xl border p-4 text-sm ${bad?"border-destructive/30 bg-destructive/5":"bg-muted/30"}`}>{children}</div>;}
@@ -89,6 +90,7 @@ function Workspace({scope,userId}:{scope:AccountingScope;userId:number}) {
         {data?.permissions.includes('post')&&data.journals.some(j=>j.id===journalId&&j.status==='draft'&&j.preparedBy!==userId)&&<><label className="text-sm">Independent posting evidence<textarea aria-label="Independent posting evidence" className={field} maxLength={2000} value={reason} onChange={e=>setReason(e.target.value)}/></label><Button disabled={busy||journal.isFetching||!reason.trim()} onClick={()=>void run({kind:'post',id:journalId!,request:{reason}})}>Approve and Post Source</Button></>}
       </>}</>}{command.error&&<Notice bad>{error(command.error)}</Notice>}
     </DialogContent></Dialog>
+    <SourceReviewWorkspace scope={scope} userId={userId}/>
   </div>;
 }
 function Page({userId,activeBranchId}:{userId:number;activeBranchId:number|'all'}) {

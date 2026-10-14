@@ -22,6 +22,8 @@ import { buildTaxRegister, type TaxRegisterJournal } from "./accounting-tax-regi
 import { buildAccountingStatements, type StatementLine, type JobBudget } from "./accounting-statements.js";
 import type { AccountingReportKind } from "./accounting-reports.js";
 import { BUDGET_CHARGE_FIELDS } from "./calculations.js";
+import { sourceReviewRequestSchema, SOURCE_REVIEW_KINDS, type SourceReviewRequest, type SourceReviewPayload } from "./accounting-source-review.js";
+import { sourceCandidates } from './accounting-source-candidates.js';
 
 type Database = Pick<typeof pool, "connect">;
 async function connectClient(database: Database) { return database.connect(); }
@@ -76,10 +78,10 @@ export class NativeAccounting {
     for (const branch of branches) await this.permission(client, bookId, branch.branch_id, actorId, permission);
   }
   private async audit(client: Client, bookId: number, actorId: number, action: string, reason: string,
-    branchId: number | null = null, journalId: number | null = null, periodId: number | null = null, openingId: number | null = null, taxId:number|null=null) {
+    branchId: number | null = null, journalId: number | null = null, periodId: number | null = null, openingId: number | null = null, taxId:number|null=null, sourceReviewId:number|null=null) {
     requireAccounting(typeof reason === "string" && reason.trim().length > 0 && reason.length <= 4000, "EVIDENCE_REQUIRED", "Audit evidence/reason is required");
-    await client.query(`INSERT INTO accounting_audit(book_id,branch_id,actor_id,journal_id,period_id,action,reason,opening_setup_id,tax_configuration_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [bookId, branchId, actorId, journalId, periodId, action, reason.trim(), openingId,taxId]);
+    await client.query(`INSERT INTO accounting_audit(book_id,branch_id,actor_id,journal_id,period_id,action,reason,opening_setup_id,tax_configuration_id,source_review_id)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [bookId, branchId, actorId, journalId, periodId, action, reason.trim(), openingId,taxId,sourceReviewId]);
   }
   async createDraftBook(actorId: number, name: string, currency: string, branchIds: number[]) {
     requireAccounting(typeof name === "string" && name.trim().length > 0 && name.length <= 200 && /^[A-Z]{3}$/.test(currency), "INVALID_BOOK", "Book name and currency required");
@@ -369,8 +371,15 @@ export class NativeAccounting {
   async prepareSettlement(bookId: number, branchId: number, actorId: number, ref: AccountingSettlementRef, mapping: SettlementMapping) {
     return this.transaction(bookId, async client => {
       const draft = await this.settlementDraft(client, bookId, branchId, actorId, ref, mapping, "prepare");
-      let originalId: number | null = null;
-      if (draft.reversal) {
+      const originalId=await this.settlementOriginal(client,bookId,branchId,draft);
+      const journal = await this.prepare(client, actorId, draft.input, originalId);
+      requireAccounting(journal.status !== "cancelled", "SOURCE_CANCELLED", "Cancelled source draft requires reviewed correction, not a second posting");
+      return journal;
+    });
+  }
+  private async settlementOriginal(client:Client,bookId:number,branchId:number,draft:Awaited<ReturnType<NativeAccounting["settlementDraft"]>>) {
+      let originalId:number|null=null;
+      if(draft.reversal) {
         const original = (await client.query<JournalRow>("SELECT * FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3",
           [bookId, branchId, settlementEventKey({ kind: "invoice_payment", id: draft.source.reversalOfId! })])).rows[0];
         requireAccounting(original?.status === "posted", "ORIGINAL_NOT_POSTED", "Original source journal must be posted before its reversal");
@@ -384,10 +393,7 @@ export class NativeAccounting {
         requireAccounting(!prior || prior.event_key === draft.input.eventKey, "ALREADY_REVERSED", "Original already has another linked accounting reversal");
         originalId = original.id;
       }
-      const journal = await this.prepare(client, actorId, draft.input, originalId);
-      requireAccounting(journal.status !== "cancelled", "SOURCE_CANCELLED", "Cancelled source draft requires reviewed correction, not a second posting");
-      return journal;
-    });
+      return originalId;
   }
   private async operationalDraft(client:Client,bookId:number,branchId:number,actorId:number,
     ref:OperationalRef,mapping:OperationalMapping,permission:"read"|"prepare") {
@@ -710,6 +716,8 @@ export class NativeAccounting {
           "CLOSE_REVIEW_REQUIRED", "Documented source completeness, reconciliation and zero unresolved mappings required");
         const count = (await client.query("SELECT count(*)::int n FROM accounting_journals WHERE period_id=$1 AND status='draft'", [periodId])).rows[0]?.n;
         requireAccounting(count === 0, "DRAFTS_PENDING", "Unposted drafts prevent closing");
+        const pending=(await client.query("SELECT count(*)::int n FROM accounting_source_reviews WHERE period_id=$1 AND state IN ('draft','submitted')",[periodId])).rows[0]?.n;
+        requireAccounting(pending===0,"DRAFTS_PENDING","Pending transaction reviews prevent closing");
       }
       await this.audit(client, bookId, actorId, action === "close" ? "period_closed" : "period_reopened",
         JSON.stringify(review), null, null, periodId);
@@ -922,6 +930,129 @@ export class NativeAccounting {
       [bookId,[config.inputVatAccountId,config.outputVatAccountId]])).rows;
     requireAccounting(unsafe.length===0,"PROTECTED_ACCOUNT","VAT controls cannot be unrestricted adjustment heads");
     return config;
+  }
+  private async sourceReviewDraft(client:Client,bookId:number,branchId:number,actorId:number,request:SourceReviewRequest,permission:"read"|"prepare"):Promise<SourceReviewPayload> {
+    const parsed=sourceReviewRequestSchema.parse(request);
+    if(!("effect" in parsed.mapping)) {
+      const ref=parsed.source as AccountingSettlementRef;
+      const draft=await this.settlementDraft(client,bookId,branchId,actorId,ref,parsed.mapping,permission);
+      return {request:parsed,input:draft.input,cashMovement:draft.cashMovement,originalId:await this.settlementOriginal(client,bookId,branchId,draft)};
+    }
+    const draft=await this.operationalDraft(client,bookId,branchId,actorId,parsed.source as OperationalRef,parsed.mapping,permission);
+    return {request:parsed,input:draft.input,cashMovement:draft.cashMovement,originalId:draft.originalId};
+  }
+  async previewSourceReview(bookId:number,branchId:number,actorId:number,request:SourceReviewRequest) {
+    return this.transaction(bookId,client=>this.sourceReviewDraft(client,bookId,branchId,actorId,request,"read"));
+  }
+  private async sourceReviewRow(client:Client,bookId:number,branchId:number,id:number) {
+    const row=(await client.query(`SELECT r.*,accounting_date::text AS date FROM accounting_source_reviews r
+      WHERE id=$1 AND book_id=$2 AND branch_id=$3 FOR UPDATE`,[id,bookId,branchId])).rows[0];
+    requireAccounting(row,"NOT_FOUND","Transaction review not found in this branch");
+    requireAccounting(createHash("sha256").update(stableEvidence(row.payload)).digest("hex")===row.payload_hash
+      && journalHash(normalizeJournal(row.payload.input))===row.snapshot_hash,"SOURCE_CHANGED","Retained review evidence has changed");
+    return row;
+  }
+  private sourceReviewSummary(row:Record<string,any>) {
+    return {id:row.id,state:row.state,source:{kind:row.source_kind,id:row.source_id},date:row.date,preparedBy:row.prepared_by,
+      reviewedBy:row.reviewed_by,journalId:row.journal_id,reason:row.decision_reason,replacesReviewId:row.replaces_review_id};
+  }
+  async prepareSourceReview(bookId:number,branchId:number,actorId:number,request:SourceReviewRequest) {
+    const parsed=sourceReviewRequestSchema.parse(request);
+    return this.transaction(bookId,async client=>{
+      await this.permission(client,bookId,branchId,actorId,"read");
+      await this.permission(client,bookId,branchId,actorId,"prepare");
+      const prior=(await client.query("SELECT *,accounting_date::text AS date FROM accounting_source_reviews WHERE book_id=$1 AND branch_id=$2 AND request_id=$3",[bookId,branchId,parsed.requestId])).rows[0];
+      if(prior) {
+        requireAccounting(prior.prepared_by===actorId && stableEvidence(prior.payload.request)===stableEvidence(parsed),"DUPLICATE_CONFLICT","Request identity already belongs to a different retained review");
+        await this.sourceReviewRow(client,bookId,branchId,prior.id);
+        return this.sourceReviewSummary(prior);
+      }
+      const payload=await this.sourceReviewDraft(client,bookId,branchId,actorId,parsed,"prepare");
+      const native=(await client.query("SELECT status FROM accounting_journals WHERE book_id=$1 AND event_key=$2",[bookId,payload.input.eventKey])).rows[0];
+      requireAccounting(!native,"SOURCE_ALREADY_PREPARED","Existing native journal is read-only here; do not prepare a duplicate source");
+      const pending=(await client.query("SELECT id FROM accounting_source_reviews WHERE book_id=$1 AND event_key=$2 AND state IN ('draft','submitted')",[bookId,payload.input.eventKey])).rows[0];
+      requireAccounting(!pending,"DUPLICATE_CONFLICT","This transaction already has an active review");
+      const period=(await client.query("SELECT id FROM accounting_periods WHERE book_id=$1 AND status='open' AND $2::date BETWEEN starts_on AND ends_on",[bookId,payload.input.accountingDate])).rows[0];
+      requireAccounting(period,"PERIOD_CLOSED","An open accounting period is required");
+      if(parsed.replacesReviewId) {
+        const old=await this.sourceReviewRow(client,bookId,branchId,parsed.replacesReviewId);
+        requireAccounting(old.prepared_by===actorId && ['returned','cancelled'].includes(old.state) && old.event_key===payload.input.eventKey,"INVALID_STATE","Correction must retain your returned/cancelled review of this source");
+      }
+      const row=(await client.query(`INSERT INTO accounting_source_reviews(book_id,branch_id,period_id,request_id,source_kind,source_id,event_key,accounting_date,payload,payload_hash,snapshot_hash,prepared_by,replaces_review_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *,accounting_date::text AS date`,[bookId,branchId,period.id,parsed.requestId,parsed.source.kind,parsed.source.id,payload.input.eventKey,payload.input.accountingDate,payload,
+        createHash("sha256").update(stableEvidence(payload)).digest("hex"),journalHash(normalizeJournal(payload.input)),actorId,parsed.replacesReviewId??null])).rows[0];
+      await this.audit(client,bookId,actorId,"source_review_prepared",parsed.mapping.evidence,branchId,null,period.id,null,null,row.id);
+      return this.sourceReviewSummary(row);
+    });
+  }
+  async sourceReviewDetails(bookId:number,branchId:number,actorId:number,id:number) {
+    return this.transaction(bookId,async client=>{
+      await this.permission(client,bookId,branchId,actorId,"read");
+      const row=await this.sourceReviewRow(client,bookId,branchId,id);
+      const audit=(await client.query(`SELECT a.id,action,reason,actor_id AS "actorId",u.name AS "actorName",a.created_at::text AS at
+        FROM accounting_audit a JOIN users u ON u.id=a.actor_id WHERE source_review_id=$1 ORDER BY a.id`,[id])).rows;
+      return {...this.sourceReviewSummary(row),payload:row.payload as SourceReviewPayload,audit};
+    });
+  }
+  async sourceReviewAction(bookId:number,branchId:number,actorId:number,id:number,action:"submit"|"return"|"post"|"cancel",reason:string) {
+    requireAccounting(['submit','return','post','cancel'].includes(action)&&typeof reason==='string'&&reason.trim().length>0&&reason.length<=2000,"EVIDENCE_REQUIRED","Decision and documented reason required");
+    return this.transaction(bookId,async client=>{
+      await this.permission(client,bookId,branchId,actorId,"read");
+      await this.permission(client,bookId,branchId,actorId,action==='submit'||action==='cancel'?'prepare':'post');
+      const row=await this.sourceReviewRow(client,bookId,branchId,id);
+      const own=action==='submit'||action==='cancel';
+      requireAccounting(own?row.prepared_by===actorId:row.prepared_by!==actorId,"FORBIDDEN",own?"Original preparer required":"A different named reviewer must decide");
+      const state=({submit:'submitted',return:'returned',post:'posted',cancel:'cancelled'} as const)[action];
+      if(row.state===state) {
+        requireAccounting(action==='submit'||row.reviewed_by===actorId&&row.decision_reason===reason.trim(),"DUPLICATE_CONFLICT","This decision was already made with different evidence/actor");
+        return this.sourceReviewSummary(row);
+      }
+      requireAccounting(row.state===(own?'draft':'submitted'),"INVALID_STATE","Review is not in the required state");
+      if(action==='submit'||action==='post') {
+        const current=await this.sourceReviewDraft(client,bookId,branchId,actorId,row.payload.request,"read");
+        requireAccounting(stableEvidence(current)===stableEvidence(row.payload),"SOURCE_CHANGED","Source facts or account treatment changed; return for a retained correction");
+        const period=(await client.query("SELECT status FROM accounting_periods WHERE id=$1",[row.period_id])).rows[0];
+        requireAccounting(period?.status==='open',"PERIOD_CLOSED","Source review period must remain open");
+      }
+      let journalId:number|null=row.journal_id;
+      if(action==='post') {
+        const current=await this.sourceReviewDraft(client,bookId,branchId,row.prepared_by,row.payload.request,"prepare");
+        const journal=await this.prepare(client,row.prepared_by,current.input,current.originalId);
+        requireAccounting(journal.status==='draft'&&journal.prepared_by===row.prepared_by,"SOURCE_ALREADY_PREPARED","Source already has an independent journal; no duplicate posting permitted");
+        journalId=journal.id;
+        await this.audit(client,bookId,actorId,"source_review_post_requested",reason,branchId,journalId,row.period_id,null,null,id);
+        await client.query("UPDATE accounting_source_reviews SET journal_id=$2 WHERE id=$1",[id,journalId]);
+        await this.postJournal(client,bookId,branchId,actorId,journalId!,reason);
+      }
+      await this.audit(client,bookId,actorId,`source_review_${state}`,reason,branchId,journalId,row.period_id,null,null,id);
+      const updated=(await client.query(`UPDATE accounting_source_reviews SET state=$2,submitted_at=CASE WHEN $2='submitted' THEN now() ELSE submitted_at END,
+        reviewed_by=CASE WHEN $2='submitted' THEN NULL ELSE $3::int END,decision_reason=CASE WHEN $2='submitted' THEN NULL ELSE $4::text END,
+        decided_at=CASE WHEN $2='submitted' THEN NULL ELSE now() END WHERE id=$1 RETURNING *,accounting_date::text AS date`,[id,state,actorId,reason.trim()])).rows[0];
+      return this.sourceReviewSummary(updated);
+    });
+  }
+  async sourceReviewWorkspace(bookId:number,branchId:number,actorId:number) {
+    return this.transaction(bookId,async client=>{
+      const {book}=await this.reportingScope(client,bookId,branchId,actorId);
+      const permissions:string[]=[];
+      for(const p of ['prepare','post'] as const)if((await client.query("SELECT accounting_has_grant($1,$2,$3,$4) allowed",[bookId,branchId,actorId,p])).rows[0]?.allowed)permissions.push(p);
+      const reviews=(await client.query("SELECT *,accounting_date::text AS date FROM accounting_source_reviews WHERE book_id=$1 AND branch_id=$2 ORDER BY id DESC LIMIT 201",[bookId,branchId])).rows;
+      const sources=[];let truncated=reviews.length>200;
+      for(const kind of SOURCE_REVIEW_KINDS) {
+        const result=await sourceCandidates(client,bookId,branchId,kind);
+        truncated||=result.truncated;sources.push(...result.candidates);
+      }
+      return {book:{id:bookId,name:book.name,policyVersion:book.policy_version,cutoverDate:book.policy.cutoverDate},branchId,permissions,
+        accounts:await this.openingChart(client,bookId),sources,reviews:reviews.slice(0,200).map(r=>this.sourceReviewSummary(r)),truncated};
+    },true);
+  }
+  async sourceReviewCandidate(bookId:number,branchId:number,actorId:number,kind:typeof SOURCE_REVIEW_KINDS[number],id:number) {
+    return this.transaction(bookId,async client=>{
+      await this.permission(client,bookId,branchId,actorId,'read');
+      requireAccounting(Number.isSafeInteger(id)&&id>0,'INVALID_SOURCE','Positive recorded source ID required');
+      const result=(await sourceCandidates(client,bookId,branchId,kind,id)).candidates[0];
+      requireAccounting(result,'NOT_FOUND','Source not found in this branch/family');return result;
+    });
   }
   async taxWorkspace(bookId:number,branchId:number,actorId:number) {
     return this.transaction(bookId,async client=>{

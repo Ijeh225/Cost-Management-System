@@ -19,6 +19,97 @@ tags:
     description: Container charges
 
 paths:
+  /accounting/books/{bookId}/source-review/sources/{kind}/{sourceId}:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [client_deposit, invoice_payment, credit_note, client_credit_application, invoice_writeoff, overhead, overhead_topup, expense_payment, schedule_payment, bank_funding, bank_transfer] } }
+      - { name: sourceId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getSourceReviewCandidate
+      responses:
+        '200':
+          description: Exact existing transaction, including records outside recent list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SourceReviewCandidate' }
+  /accounting/books/{bookId}/source-review:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+    get:
+      operationId: getSourceReviewWorkspace
+      responses:
+        '200':
+          description: Scoped explicit source review; only independent approval posts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SourceReviewWorkspace' }
+  /accounting/books/{bookId}/source-review/preview:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+    post:
+      operationId: previewSourceReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SourceReviewRequest' }
+      responses:
+        '200':
+          description: Scoped explicit source review; only independent approval posts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SourceReviewPayload' }
+  /accounting/books/{bookId}/source-review/prepare:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+    post:
+      operationId: prepareSourceReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SourceReviewRequest' }
+      responses:
+        '200':
+          description: Scoped explicit source review; only independent approval posts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SourceReviewSummary' }
+  /accounting/books/{bookId}/source-review/{reviewId}:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+      - { name: reviewId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getSourceReviewDetails
+      responses:
+        '200':
+          description: Scoped explicit source review; only independent approval posts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SourceReviewDetails' }
+  /accounting/books/{bookId}/source-review/{reviewId}/action:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+      - { name: reviewId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      operationId: actOnSourceReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SourceReviewAction' }
+      responses:
+        '200':
+          description: Scoped explicit source review; only independent approval posts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SourceReviewSummary' }
   /accounting/books/{bookId}/statement-of-affairs:
     parameters:
       - $ref: '#/components/parameters/AccountingBookId'
@@ -1661,6 +1752,141 @@ components:
       description: Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
       schema: { type: string }
   schemas:
+    SourceReviewRef:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind: { type: string, enum: [client_deposit, invoice_payment, credit_note, client_credit_application, invoice_writeoff, overhead, overhead_topup, expense_payment, schedule_payment, bank_funding, bank_transfer] }
+        id: { type: integer, minimum: 1 }
+    SourceReviewMapping:
+      type: object
+      additionalProperties: false
+      required: [currency, policyVersion, evidence]
+      properties:
+        currency: { type: string, enum: [NGN] }
+        policyVersion: { type: string, minLength: 1, maxLength: 300 }
+        evidence: { type: string, minLength: 1, maxLength: 300 }
+        effect: { type: string, enum: [expense, asset, advance, loan_repayment, other_non_expense, equity_funding, loan_funding, asset_funding, income_funding, liability_funding, overhead, credit_note, client_credit, writeoff, transfer] }
+        bankAccounts: { type: object, maxProperties: 2, additionalProperties: { type: integer, minimum: 1 } }
+        cashAccountId: { type: integer, minimum: 1 }
+        receivableAccountId: { type: integer, minimum: 1 }
+        depositLiabilityAccountId: { type: integer, minimum: 1 }
+        accountId: { type: integer, minimum: 1 }
+        accountCategory: { type: string, enum: [asset, liability, equity, income, expense] }
+        controlAccountId: { type: integer, minimum: 1 }
+        clientCreditAccountId: { type: integer, minimum: 1 }
+        recognitionDate: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        recognitionEvidence: { type: string, minLength: 1, maxLength: 300 }
+        reductions:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [accountId, amount, category, evidence]
+            properties:
+              accountId: { type: integer, minimum: 1 }
+              amount: { type: string }
+              category: { type: string, enum: [income, liability] }
+              evidence: { type: string }
+        vatAccountId: { type: integer, minimum: 1 }
+        vatReduction: { type: string }
+        vatEvidence: { type: string }
+    SourceReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId, source, mapping]
+      properties:
+        requestId: { type: string, pattern: '^[a-zA-Z0-9_-]{8,80}$' }
+        source: { $ref: '#/components/schemas/SourceReviewRef' }
+        mapping: { $ref: '#/components/schemas/SourceReviewMapping' }
+        replacesReviewId: { type: integer, minimum: 1 }
+    SourceReviewAction:
+      type: object
+      additionalProperties: false
+      required: [action, reason]
+      properties:
+        action: { type: string, enum: [submit, return, post, cancel] }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+    SourceReviewSummary:
+      type: object
+      required: [id, state, source, date, preparedBy, reviewedBy, journalId, reason, replacesReviewId]
+      properties:
+        id: { type: integer }
+        state: { type: string, enum: [draft, submitted, returned, posted, cancelled] }
+        source: { $ref: '#/components/schemas/SourceReviewRef' }
+        date: { type: string }
+        preparedBy: { type: integer }
+        reviewedBy: { type: [integer, 'null'] }
+        journalId: { type: [integer, 'null'] }
+        reason: { type: [string, 'null'] }
+        replacesReviewId: { type: [integer, 'null'] }
+    SourceReviewPayload:
+      type: object
+      required: [request, input, cashMovement, originalId]
+      properties:
+        request: { $ref: '#/components/schemas/SourceReviewRequest' }
+        cashMovement: { type: string }
+        originalId: { type: [integer, 'null'] }
+        input:
+          type: object
+          required: [bookId, branchId, currency, accountingDate, eventKey, narration, evidence, lines]
+          properties:
+            bookId: { type: integer }
+            branchId: { type: integer }
+            currency: { type: string }
+            accountingDate: { type: string }
+            eventKey: { type: string }
+            narration: { type: string }
+            evidence: { type: string }
+            lines:
+              type: array
+              items:
+                type: object
+                required: [accountId, debit, credit]
+                properties: { accountId: { type: integer }, debit: { type: string }, credit: { type: string } }
+    SourceReviewCandidate:
+      type: object
+      required: [kind, id, amount, date, label, bankIds, paymentMethod, classification, journalId, journalStatus]
+      properties:
+        kind: { type: string }
+        id: { type: integer }
+        amount: { type: [string, 'null'] }
+        date: { type: string }
+        label: { type: string }
+        bankIds: { type: array, items: { type: integer } }
+        paymentMethod: { type: [string, 'null'] }
+        classification: { type: [string, 'null'] }
+        journalId: { type: [integer, 'null'] }
+        journalStatus: { type: [string, 'null'] }
+    SourceReviewWorkspace:
+      type: object
+      required: [book, branchId, permissions, accounts, sources, reviews, truncated]
+      properties:
+        book:
+          type: object
+          required: [id, name, policyVersion, cutoverDate]
+          properties: { id: { type: integer }, name: { type: string }, policyVersion: { type: string }, cutoverDate: { type: string } }
+        branchId: { type: integer }
+        permissions: { type: array, items: { type: string } }
+        accounts: { type: array, items: { $ref: '#/components/schemas/OpeningSetupAccount' } }
+        sources: { type: array, items: { $ref: '#/components/schemas/SourceReviewCandidate' } }
+        reviews: { type: array, items: { $ref: '#/components/schemas/SourceReviewSummary' } }
+        truncated: { type: boolean }
+    SourceReviewDetails:
+      allOf:
+        - $ref: '#/components/schemas/SourceReviewSummary'
+        - type: object
+          required: [payload, audit]
+          properties:
+            payload: { $ref: '#/components/schemas/SourceReviewPayload' }
+            audit:
+              type: array
+              items:
+                type: object
+                required: [id, action, reason, actorId, actorName, at]
+                properties: { id: { type: integer }, action: { type: string }, reason: { type: string }, actorId: { type: integer }, actorName: { type: [string, 'null'] }, at: { type: string } }
     AffairsLine:
       type: object
       additionalProperties: false

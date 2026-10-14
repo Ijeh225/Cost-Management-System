@@ -1,6 +1,7 @@
 import type { pool } from "@workspace/db";
 import { WORKSPACES_ALLOWED_BY_FUNCTION } from "./access-policy.js";
 import { ACCOUNTING_AFFAIRS_SQL } from "./accounting-affairs-schema.js";
+import { ACCOUNTING_SOURCE_REVIEW_SQL } from "./accounting-source-review-schema.js";
 
 const allowedWorkspaceSql = `CASE a.job_function ${Object.entries(WORKSPACES_ALLOWED_BY_FUNCTION)
   .map(([job, workspaces]) => `WHEN '${job}' THEN '${JSON.stringify(workspaces)}'::jsonb`).join(" ")} ELSE 'null'::jsonb END`;
@@ -12,6 +13,7 @@ export async function ensureAccountingFoundationSchema(database: Pick<typeof poo
     await client.query("SELECT pg_advisory_xact_lock(804610, 0)");
     await client.query(ACCOUNTING_FOUNDATION_SQL);
     await client.query(ACCOUNTING_AFFAIRS_SQL);
+    await client.query(ACCOUNTING_SOURCE_REVIEW_SQL);
     await client.query("COMMIT");
   } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); }

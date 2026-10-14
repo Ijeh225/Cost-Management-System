@@ -12,6 +12,7 @@ import type { ManualAdjustment } from "../lib/accounting-manual";
 import type { TaxConfiguration } from "../lib/accounting-tax";
 import type { AffairsRequest } from "../lib/accounting-affairs";
 import { hasRetainedInvoiceJournal } from "../lib/invoice-native-cancellation";
+import type { SourceReviewRequest } from '../lib/accounting-source-review';
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 
@@ -177,6 +178,70 @@ async function taxPayment(f:Awaited<ReturnType<typeof taxFixture>>,section:strin
     (await sql(`INSERT INTO container_expense_payments(branch_id,container_id,bank_id,amount,payment_method,paid_at,section)
     VALUES($1,$2,$3,$4,'transfer',$5,$6) RETURNING id`,[f.branch,f.container,f.bank,amount,date,section])).rows[0].id as number;
 }
+describe('selected transaction review integration',()=>{
+  it('retains submission/return/correction and serializes independent posting without a second source',async()=>{
+    const f=await settlementFixture(),r:SourceReviewRequest={requestId:randomBytes(8).toString('hex'),source:{kind:'client_deposit',id:f.deposit},mapping:f.mapping};
+    const original=(await sql('SELECT row_to_json(d) data FROM client_deposits d WHERE id=$1',[f.deposit])).rows[0].data;
+    const before=(await sql('SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1',[f.book])).rows[0].n;
+    expect((await service.previewSourceReview(f.book,f.branch,f.preparer,r)).cashMovement).toBe('100.00');
+    const drafts=await Promise.all([1,2].map(()=>service.prepareSourceReview(f.book,f.branch,f.preparer,r)));
+    expect(drafts[0].id).toBe(drafts[1].id);
+    expect((await sql('SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1',[f.book])).rows[0].n).toBe(before);
+    await expect(service.prepareSourceReview(f.book,f.branch,f.preparer,{...r,mapping:{...f.mapping,evidence:'different'}})).rejects.toMatchObject({code:'DUPLICATE_CONFLICT'});
+    await expect(service.sourceReviewAction(f.book,f.branch,f.approver,drafts[0].id,'post','Dummy review')).rejects.toMatchObject({code:'INVALID_STATE'});
+    await service.sourceReviewAction(f.book,f.branch,f.preparer,drafts[0].id,'submit','Dummy ready for independent review');
+    await service.grantAccess(f.book,f.branch,f.owner,f.preparer,'post','Dummy self-approval negative control');
+    await expect(service.sourceReviewAction(f.book,f.branch,f.preparer,drafts[0].id,'post','Self')).rejects.toMatchObject({code:'FORBIDDEN'});
+    await service.sourceReviewAction(f.book,f.branch,f.approver,drafts[0].id,'return','Please correct voucher evidence');
+    await expect(service.sourceReviewAction(f.book,f.branch,f.preparer,drafts[0].id,'submit','Again')).rejects.toMatchObject({code:'INVALID_STATE'});
+    const corrected=await service.prepareSourceReview(f.book,f.branch,f.preparer,{...r,requestId:randomBytes(8).toString('hex'),replacesReviewId:drafts[0].id,mapping:{...f.mapping,evidence:'Corrected dummy voucher'}});
+    await service.sourceReviewAction(f.book,f.branch,f.preparer,corrected.id,'submit','Corrected independent submission');
+    const posted=await Promise.all([1,2].map(()=>service.sourceReviewAction(f.book,f.branch,f.approver,corrected.id,'post','Dummy independent approval')));
+    expect(posted[0].journalId).toBe(posted[1].journalId);expect(posted[0].state).toBe('posted');
+    expect((await balances(f)).get(f.debit)).toBe('10000');expect((await balances(f)).get(f.credit)).toBe('-10000');
+    const detail=await service.sourceReviewDetails(f.book,f.branch,f.approver,corrected.id);
+    expect(detail.audit.map(a=>a.action)).toEqual(['source_review_prepared','source_review_submitted','source_review_post_requested','source_review_posted']);
+    expect(detail.preparedBy).toBe(f.preparer);expect(detail.reviewedBy).toBe(f.approver);
+    await expect(sql("UPDATE accounting_source_reviews SET payload=payload||'{\"tampered\":true}'::jsonb WHERE id=$1",[corrected.id])).rejects.toThrow('immutable');
+    await expect(sql('DELETE FROM accounting_source_reviews WHERE id=$1',[corrected.id])).rejects.toThrow('cannot be deleted');
+    await expect(service.prepareSourceReview(f.book,f.branch,f.preparer,{...r,requestId:randomBytes(8).toString('hex')})).rejects.toMatchObject({code:'SOURCE_ALREADY_PREPARED'});
+    expect((await service.sourceReviewWorkspace(f.book,f.branch,f.preparer)).sources.find(s=>s.kind==='client_deposit'&&s.id===f.deposit)?.journalStatus).toBe('posted');
+    expect((await sql('SELECT row_to_json(d) data FROM client_deposits d WHERE id=$1',[f.deposit])).rows[0].data).toEqual(original);
+    await ensureAccountingFoundationSchema(database as Pick<typeof pool,'connect'>);
+    expect((await service.sourceReviewDetails(f.book,f.branch,f.approver,corrected.id)).state).toBe('posted');
+  },240000);
+  it('refuses stale snapshots, unaudited transitions, revoked actors, hidden cross-scope and pending period close',async()=>{
+    const f=await operationalFixture(),id=await standalone(f),r:SourceReviewRequest={requestId:randomBytes(8).toString('hex'),source:{kind:'schedule_payment',id},mapping:{currency:'NGN',policyVersion:'isolated-only-v1',evidence:'Dummy schedule voucher',effect:'expense',accountId:f.expense,bankAccounts:f.mapping.bankAccounts}};
+    const draft=await service.prepareSourceReview(f.book,f.branch,f.preparer,r);
+    await expect(sql("UPDATE accounting_source_reviews SET state='submitted',submitted_at=now() WHERE id=$1",[draft.id])).rejects.toThrow('audit');
+    await expect(service.changePeriod(f.book,f.owner,f.period,'close',{evidence:'Dummy',sourceCoverageComplete:true,reconciled:true,unresolvedMappings:0})).rejects.toMatchObject({code:'DRAFTS_PENDING'});
+    await expect(service.sourceReviewDetails(f.book,f.branch,f.operations,draft.id)).rejects.toMatchObject({code:'FORBIDDEN'});
+    await service.sourceReviewAction(f.book,f.branch,f.preparer,draft.id,'submit','Dummy');
+    await sql('UPDATE payment_schedule_payments SET amount=9 WHERE id=$1',[id]);
+    await expect(service.sourceReviewAction(f.book,f.branch,f.approver,draft.id,'post','Dummy')).rejects.toMatchObject({code:'SOURCE_CHANGED'});
+    expect((await sql('SELECT count(*)::int n FROM accounting_journals WHERE book_id=$1',[f.book])).rows[0].n).toBe(0);
+    await service.sourceReviewAction(f.book,f.branch,f.approver,draft.id,'return','Source amount changed; retain correction');
+    const correction=await service.prepareSourceReview(f.book,f.branch,f.preparer,{...r,requestId:randomBytes(8).toString('hex'),replacesReviewId:draft.id});
+    await service.sourceReviewAction(f.book,f.branch,f.preparer,correction.id,'submit','Dummy');
+    await service.revokeAccess(f.book,f.branch,f.owner,f.preparer,'prepare','Dummy revoked before approval');
+    await expect(service.sourceReviewAction(f.book,f.branch,f.approver,correction.id,'post','Dummy')).rejects.toMatchObject({code:'FORBIDDEN'});
+    await service.sourceReviewAction(f.book,f.branch,f.approver,correction.id,'return','Preparer grant removed');
+    await service.changePeriod(f.book,f.owner,f.period,'close',{evidence:'Dummy complete review',sourceCoverageComplete:true,reconciled:true,unresolvedMappings:0});
+  },240000);
+  it('uses the existing transfer builder and supports cancelled-draft correction with zero aggregate cash or profit',async()=>{
+    const f=await operationalFixture(),id=(await sql("INSERT INTO bank_transfers(branch_id,from_bank_id,to_bank_id,amount,created_at,reference) VALUES($1,$2,$3,0.01,'2026-10-10 15:00:00','Dummy staff transfer') RETURNING id",[f.branch,f.bank,f.secondBank])).rows[0].id;
+    const r:SourceReviewRequest={requestId:randomBytes(8).toString('hex'),source:{kind:'bank_transfer',id},mapping:{currency:'NGN',policyVersion:'isolated-only-v1',evidence:'Dummy own-bank voucher',effect:'transfer',bankAccounts:f.mapping.bankAccounts}};
+    const first=await service.prepareSourceReview(f.book,f.branch,f.preparer,r);
+    await service.sourceReviewAction(f.book,f.branch,f.preparer,first.id,'cancel','Cancel incorrect unsent voucher');
+    const second=await service.prepareSourceReview(f.book,f.branch,f.preparer,{...r,requestId:randomBytes(8).toString('hex'),replacesReviewId:first.id});
+    await service.sourceReviewAction(f.book,f.branch,f.preparer,second.id,'submit','Ready');
+    const posted=await service.sourceReviewAction(f.book,f.branch,f.approver,second.id,'post','Independent own-bank review');
+    expect((await balances(f)).get(f.debit)).toBe('-1');expect((await balances(f)).get(f.secondBankAccount)).toBe('1');
+    const native=(await sql('SELECT prepared_by,posted_by,event_key FROM accounting_journals WHERE id=$1',[posted.journalId])).rows[0];
+    expect(native).toMatchObject({prepared_by:f.preparer,posted_by:f.approver,event_key:`source:bank_transfer:${id}:v1`});
+  },180000);
+});
+
 describe("VAT/direct expense configuration integration",()=>{
   it("protects configured tax controls and repeats the migration without mutation or cross-scope audit links",async()=>{
     const f=await taxFixture(),cfg=await approveTax(f);

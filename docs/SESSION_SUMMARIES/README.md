@@ -1,5 +1,9 @@
 # Session Summaries
 
+- Current18:55 WAT: selected source review local implementation PASS490units/3prior skips/build/7HTTP/3realnetworkDB controls(298.74s), ownnamespace cleanup/public baseline/tunnel closure accepted. Release/live15/16UI acceptance next; no new live financial records yet. Protected checkpoint unchanged, native ON TEST ONLY. [Current record](2026-10-14-step12-live-acceptance.md).
+
+- Current18:51 WAT: Owner chose existing selected transaction review extension; owner session restored. Source review UI/API/immutable approval schema implemented locally, 7focusedHTTP/full489units/3prior skips/build PASS; isolated lifecycle/retry/concurrency controls in progress. No production writes yet; native ON TEST ONLY,32source baseline230.50profit/10177.50cash preserved. Exact existing bdbbdc0 Railway c5ab4bcb SUCCESS. Complete final DB/tests then feature release and bounded real staff UI acceptance; print-layout/company launch remain distinct. Older decision/popup entries below are historical, not current blockers.
+
 - Current: [2026-10-14 Step12 Live Acceptance](2026-10-14-step12-live-acceptance.md) - native gatesON TEST ONLY; six confirmed defects deployed/live CLOSED, latest5dc9974/85a0e30d and57aa5c7/9cfa3c3a SUCCESS.483unit/API/3prior skips/build/two distinct network controls/final28controls/currentCSV/mobile PASS. Cash10177.50/profit230.50; no repeat fixture creation. Step12 IN PROGRESS: source-UIworkflow choice awaiting owner, print-layout/company acceptance remain. [Coverage and training](../STEP12_LIVE_ACCEPTANCE.md).
 - Browser handback17:38 WAT: Chrome extension popup blocks restoration of Owner login; user asked to dismiss it. Inspect fresh actual state after dismissal, do not repeat financial tests. Final evidence151772d pushed, documentation/helper-only deployment not yet confirmed.
 

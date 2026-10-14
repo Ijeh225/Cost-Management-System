@@ -1,7 +1,16 @@
 export * from "./generated/api";
 export { LoginResponse, UploadContainersResponse } from "./generated/api";
 export {
-  GetAffairsWorkspaceParams,GetAffairsVersionParams,PrepareAffairsParams,ActOnAffairsParams,
+  GetSourceReviewCandidateParams,
+  GetSourceReviewWorkspaceParams,
+  PreviewSourceReviewParams,
+  PrepareSourceReviewParams,
+  GetSourceReviewDetailsParams,
+  ActOnSourceReviewParams,
+  GetAffairsWorkspaceParams,
+  GetAffairsVersionParams,
+  PrepareAffairsParams,
+  ActOnAffairsParams,
   GetAccountingOptionsParams,
   GetNativeAccountingReportParams,
   GetAccountingJournalParams,
@@ -29,6 +38,12 @@ export {
 } from "./generated/api";
 export * from "./generated/types";
 export type {
+  GetSourceReviewCandidateParams as GetSourceReviewCandidateQuery,
+  GetSourceReviewWorkspaceParams as GetSourceReviewWorkspaceQuery,
+  PreviewSourceReviewParams as PreviewSourceReviewQuery,
+  PrepareSourceReviewParams as PrepareSourceReviewQuery,
+  GetSourceReviewDetailsParams as GetSourceReviewDetailsQuery,
+  ActOnSourceReviewParams as ActOnSourceReviewQuery,
   LoginResponse as LoginResponseType,
   UploadContainersResponse as UploadContainersResponseType,
   GetAccountingOptionsParams as GetAccountingOptionsQuery,

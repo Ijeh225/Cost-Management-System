@@ -7,6 +7,705 @@
  */
 import * as zod from "zod";
 
+export const GetSourceReviewCandidateParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  kind: zod.enum([
+    "client_deposit",
+    "invoice_payment",
+    "credit_note",
+    "client_credit_application",
+    "invoice_writeoff",
+    "overhead",
+    "overhead_topup",
+    "expense_payment",
+    "schedule_payment",
+    "bank_funding",
+    "bank_transfer",
+  ]),
+  sourceId: zod.coerce.number().min(1),
+});
+
+export const GetSourceReviewCandidateQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const GetSourceReviewCandidateResponse = zod.object({
+  kind: zod.string(),
+  id: zod.number(),
+  amount: zod.string().nullable(),
+  date: zod.string(),
+  label: zod.string(),
+  bankIds: zod.array(zod.number()),
+  paymentMethod: zod.string().nullable(),
+  classification: zod.string().nullable(),
+  journalId: zod.number().nullable(),
+  journalStatus: zod.string().nullable(),
+});
+
+export const GetSourceReviewWorkspaceParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const GetSourceReviewWorkspaceQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const GetSourceReviewWorkspaceResponse = zod.object({
+  book: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    policyVersion: zod.string(),
+    cutoverDate: zod.string(),
+  }),
+  branchId: zod.number(),
+  permissions: zod.array(zod.string()),
+  accounts: zod.array(
+    zod.object({
+      id: zod.number(),
+      code: zod.string(),
+      name: zod.string(),
+      category: zod.string(),
+      active: zod.boolean(),
+    }),
+  ),
+  sources: zod.array(
+    zod.object({
+      kind: zod.string(),
+      id: zod.number(),
+      amount: zod.string().nullable(),
+      date: zod.string(),
+      label: zod.string(),
+      bankIds: zod.array(zod.number()),
+      paymentMethod: zod.string().nullable(),
+      classification: zod.string().nullable(),
+      journalId: zod.number().nullable(),
+      journalStatus: zod.string().nullable(),
+    }),
+  ),
+  reviews: zod.array(
+    zod.object({
+      id: zod.number(),
+      state: zod.enum([
+        "draft",
+        "submitted",
+        "returned",
+        "posted",
+        "cancelled",
+      ]),
+      source: zod.object({
+        kind: zod.enum([
+          "client_deposit",
+          "invoice_payment",
+          "credit_note",
+          "client_credit_application",
+          "invoice_writeoff",
+          "overhead",
+          "overhead_topup",
+          "expense_payment",
+          "schedule_payment",
+          "bank_funding",
+          "bank_transfer",
+        ]),
+        id: zod.number().min(1),
+      }),
+      date: zod.string(),
+      preparedBy: zod.number(),
+      reviewedBy: zod.number().nullable(),
+      journalId: zod.number().nullable(),
+      reason: zod.string().nullable(),
+      replacesReviewId: zod.number().nullable(),
+    }),
+  ),
+  truncated: zod.boolean(),
+});
+
+export const PreviewSourceReviewParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const PreviewSourceReviewQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const previewSourceReviewBodyRequestIdRegExp = new RegExp(
+  "^[a-zA-Z0-9_-]{8,80}$",
+);
+
+export const previewSourceReviewBodyMappingPolicyVersionMax = 300;
+
+export const previewSourceReviewBodyMappingEvidenceMax = 300;
+
+export const previewSourceReviewBodyMappingRecognitionDateRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
+export const previewSourceReviewBodyMappingRecognitionEvidenceMax = 300;
+
+export const previewSourceReviewBodyMappingReductionsMax = 50;
+
+export const PreviewSourceReviewBody = zod.object({
+  requestId: zod.string().regex(previewSourceReviewBodyRequestIdRegExp),
+  source: zod.object({
+    kind: zod.enum([
+      "client_deposit",
+      "invoice_payment",
+      "credit_note",
+      "client_credit_application",
+      "invoice_writeoff",
+      "overhead",
+      "overhead_topup",
+      "expense_payment",
+      "schedule_payment",
+      "bank_funding",
+      "bank_transfer",
+    ]),
+    id: zod.number().min(1),
+  }),
+  mapping: zod.object({
+    currency: zod.enum(["NGN"]),
+    policyVersion: zod
+      .string()
+      .min(1)
+      .max(previewSourceReviewBodyMappingPolicyVersionMax),
+    evidence: zod
+      .string()
+      .min(1)
+      .max(previewSourceReviewBodyMappingEvidenceMax),
+    effect: zod
+      .enum([
+        "expense",
+        "asset",
+        "advance",
+        "loan_repayment",
+        "other_non_expense",
+        "equity_funding",
+        "loan_funding",
+        "asset_funding",
+        "income_funding",
+        "liability_funding",
+        "overhead",
+        "credit_note",
+        "client_credit",
+        "writeoff",
+        "transfer",
+      ])
+      .optional(),
+    bankAccounts: zod.record(zod.string(), zod.number().min(1)).optional(),
+    cashAccountId: zod.number().min(1).optional(),
+    receivableAccountId: zod.number().min(1).optional(),
+    depositLiabilityAccountId: zod.number().min(1).optional(),
+    accountId: zod.number().min(1).optional(),
+    accountCategory: zod
+      .enum(["asset", "liability", "equity", "income", "expense"])
+      .optional(),
+    controlAccountId: zod.number().min(1).optional(),
+    clientCreditAccountId: zod.number().min(1).optional(),
+    recognitionDate: zod
+      .string()
+      .regex(previewSourceReviewBodyMappingRecognitionDateRegExp)
+      .optional(),
+    recognitionEvidence: zod
+      .string()
+      .min(1)
+      .max(previewSourceReviewBodyMappingRecognitionEvidenceMax)
+      .optional(),
+    reductions: zod
+      .array(
+        zod.object({
+          accountId: zod.number().min(1),
+          amount: zod.string(),
+          category: zod.enum(["income", "liability"]),
+          evidence: zod.string(),
+        }),
+      )
+      .max(previewSourceReviewBodyMappingReductionsMax)
+      .optional(),
+    vatAccountId: zod.number().min(1).optional(),
+    vatReduction: zod.string().optional(),
+    vatEvidence: zod.string().optional(),
+  }),
+  replacesReviewId: zod.number().min(1).optional(),
+});
+
+export const previewSourceReviewResponseRequestRequestIdRegExp = new RegExp(
+  "^[a-zA-Z0-9_-]{8,80}$",
+);
+
+export const previewSourceReviewResponseRequestMappingPolicyVersionMax = 300;
+
+export const previewSourceReviewResponseRequestMappingEvidenceMax = 300;
+
+export const previewSourceReviewResponseRequestMappingRecognitionDateRegExp =
+  new RegExp("^\\d{4}-\\d{2}-\\d{2}$");
+export const previewSourceReviewResponseRequestMappingRecognitionEvidenceMax = 300;
+
+export const previewSourceReviewResponseRequestMappingReductionsMax = 50;
+
+export const PreviewSourceReviewResponse = zod.object({
+  request: zod.object({
+    requestId: zod
+      .string()
+      .regex(previewSourceReviewResponseRequestRequestIdRegExp),
+    source: zod.object({
+      kind: zod.enum([
+        "client_deposit",
+        "invoice_payment",
+        "credit_note",
+        "client_credit_application",
+        "invoice_writeoff",
+        "overhead",
+        "overhead_topup",
+        "expense_payment",
+        "schedule_payment",
+        "bank_funding",
+        "bank_transfer",
+      ]),
+      id: zod.number().min(1),
+    }),
+    mapping: zod.object({
+      currency: zod.enum(["NGN"]),
+      policyVersion: zod
+        .string()
+        .min(1)
+        .max(previewSourceReviewResponseRequestMappingPolicyVersionMax),
+      evidence: zod
+        .string()
+        .min(1)
+        .max(previewSourceReviewResponseRequestMappingEvidenceMax),
+      effect: zod
+        .enum([
+          "expense",
+          "asset",
+          "advance",
+          "loan_repayment",
+          "other_non_expense",
+          "equity_funding",
+          "loan_funding",
+          "asset_funding",
+          "income_funding",
+          "liability_funding",
+          "overhead",
+          "credit_note",
+          "client_credit",
+          "writeoff",
+          "transfer",
+        ])
+        .optional(),
+      bankAccounts: zod.record(zod.string(), zod.number().min(1)).optional(),
+      cashAccountId: zod.number().min(1).optional(),
+      receivableAccountId: zod.number().min(1).optional(),
+      depositLiabilityAccountId: zod.number().min(1).optional(),
+      accountId: zod.number().min(1).optional(),
+      accountCategory: zod
+        .enum(["asset", "liability", "equity", "income", "expense"])
+        .optional(),
+      controlAccountId: zod.number().min(1).optional(),
+      clientCreditAccountId: zod.number().min(1).optional(),
+      recognitionDate: zod
+        .string()
+        .regex(previewSourceReviewResponseRequestMappingRecognitionDateRegExp)
+        .optional(),
+      recognitionEvidence: zod
+        .string()
+        .min(1)
+        .max(previewSourceReviewResponseRequestMappingRecognitionEvidenceMax)
+        .optional(),
+      reductions: zod
+        .array(
+          zod.object({
+            accountId: zod.number().min(1),
+            amount: zod.string(),
+            category: zod.enum(["income", "liability"]),
+            evidence: zod.string(),
+          }),
+        )
+        .max(previewSourceReviewResponseRequestMappingReductionsMax)
+        .optional(),
+      vatAccountId: zod.number().min(1).optional(),
+      vatReduction: zod.string().optional(),
+      vatEvidence: zod.string().optional(),
+    }),
+    replacesReviewId: zod.number().min(1).optional(),
+  }),
+  cashMovement: zod.string(),
+  originalId: zod.number().nullable(),
+  input: zod.object({
+    bookId: zod.number(),
+    branchId: zod.number(),
+    currency: zod.string(),
+    accountingDate: zod.string(),
+    eventKey: zod.string(),
+    narration: zod.string(),
+    evidence: zod.string(),
+    lines: zod.array(
+      zod.object({
+        accountId: zod.number(),
+        debit: zod.string(),
+        credit: zod.string(),
+      }),
+    ),
+  }),
+});
+
+export const PrepareSourceReviewParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const PrepareSourceReviewQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const prepareSourceReviewBodyRequestIdRegExp = new RegExp(
+  "^[a-zA-Z0-9_-]{8,80}$",
+);
+
+export const prepareSourceReviewBodyMappingPolicyVersionMax = 300;
+
+export const prepareSourceReviewBodyMappingEvidenceMax = 300;
+
+export const prepareSourceReviewBodyMappingRecognitionDateRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
+export const prepareSourceReviewBodyMappingRecognitionEvidenceMax = 300;
+
+export const prepareSourceReviewBodyMappingReductionsMax = 50;
+
+export const PrepareSourceReviewBody = zod.object({
+  requestId: zod.string().regex(prepareSourceReviewBodyRequestIdRegExp),
+  source: zod.object({
+    kind: zod.enum([
+      "client_deposit",
+      "invoice_payment",
+      "credit_note",
+      "client_credit_application",
+      "invoice_writeoff",
+      "overhead",
+      "overhead_topup",
+      "expense_payment",
+      "schedule_payment",
+      "bank_funding",
+      "bank_transfer",
+    ]),
+    id: zod.number().min(1),
+  }),
+  mapping: zod.object({
+    currency: zod.enum(["NGN"]),
+    policyVersion: zod
+      .string()
+      .min(1)
+      .max(prepareSourceReviewBodyMappingPolicyVersionMax),
+    evidence: zod
+      .string()
+      .min(1)
+      .max(prepareSourceReviewBodyMappingEvidenceMax),
+    effect: zod
+      .enum([
+        "expense",
+        "asset",
+        "advance",
+        "loan_repayment",
+        "other_non_expense",
+        "equity_funding",
+        "loan_funding",
+        "asset_funding",
+        "income_funding",
+        "liability_funding",
+        "overhead",
+        "credit_note",
+        "client_credit",
+        "writeoff",
+        "transfer",
+      ])
+      .optional(),
+    bankAccounts: zod.record(zod.string(), zod.number().min(1)).optional(),
+    cashAccountId: zod.number().min(1).optional(),
+    receivableAccountId: zod.number().min(1).optional(),
+    depositLiabilityAccountId: zod.number().min(1).optional(),
+    accountId: zod.number().min(1).optional(),
+    accountCategory: zod
+      .enum(["asset", "liability", "equity", "income", "expense"])
+      .optional(),
+    controlAccountId: zod.number().min(1).optional(),
+    clientCreditAccountId: zod.number().min(1).optional(),
+    recognitionDate: zod
+      .string()
+      .regex(prepareSourceReviewBodyMappingRecognitionDateRegExp)
+      .optional(),
+    recognitionEvidence: zod
+      .string()
+      .min(1)
+      .max(prepareSourceReviewBodyMappingRecognitionEvidenceMax)
+      .optional(),
+    reductions: zod
+      .array(
+        zod.object({
+          accountId: zod.number().min(1),
+          amount: zod.string(),
+          category: zod.enum(["income", "liability"]),
+          evidence: zod.string(),
+        }),
+      )
+      .max(prepareSourceReviewBodyMappingReductionsMax)
+      .optional(),
+    vatAccountId: zod.number().min(1).optional(),
+    vatReduction: zod.string().optional(),
+    vatEvidence: zod.string().optional(),
+  }),
+  replacesReviewId: zod.number().min(1).optional(),
+});
+
+export const PrepareSourceReviewResponse = zod.object({
+  id: zod.number(),
+  state: zod.enum(["draft", "submitted", "returned", "posted", "cancelled"]),
+  source: zod.object({
+    kind: zod.enum([
+      "client_deposit",
+      "invoice_payment",
+      "credit_note",
+      "client_credit_application",
+      "invoice_writeoff",
+      "overhead",
+      "overhead_topup",
+      "expense_payment",
+      "schedule_payment",
+      "bank_funding",
+      "bank_transfer",
+    ]),
+    id: zod.number().min(1),
+  }),
+  date: zod.string(),
+  preparedBy: zod.number(),
+  reviewedBy: zod.number().nullable(),
+  journalId: zod.number().nullable(),
+  reason: zod.string().nullable(),
+  replacesReviewId: zod.number().nullable(),
+});
+
+export const GetSourceReviewDetailsParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  reviewId: zod.coerce.number().min(1),
+});
+
+export const GetSourceReviewDetailsQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const getSourceReviewDetailsResponseTwoPayloadRequestRequestIdRegExp =
+  new RegExp("^[a-zA-Z0-9_-]{8,80}$");
+
+export const getSourceReviewDetailsResponseTwoPayloadRequestMappingPolicyVersionMax = 300;
+
+export const getSourceReviewDetailsResponseTwoPayloadRequestMappingEvidenceMax = 300;
+
+export const getSourceReviewDetailsResponseTwoPayloadRequestMappingRecognitionDateRegExp =
+  new RegExp("^\\d{4}-\\d{2}-\\d{2}$");
+export const getSourceReviewDetailsResponseTwoPayloadRequestMappingRecognitionEvidenceMax = 300;
+
+export const getSourceReviewDetailsResponseTwoPayloadRequestMappingReductionsMax = 50;
+
+export const GetSourceReviewDetailsResponse = zod
+  .object({
+    id: zod.number(),
+    state: zod.enum(["draft", "submitted", "returned", "posted", "cancelled"]),
+    source: zod.object({
+      kind: zod.enum([
+        "client_deposit",
+        "invoice_payment",
+        "credit_note",
+        "client_credit_application",
+        "invoice_writeoff",
+        "overhead",
+        "overhead_topup",
+        "expense_payment",
+        "schedule_payment",
+        "bank_funding",
+        "bank_transfer",
+      ]),
+      id: zod.number().min(1),
+    }),
+    date: zod.string(),
+    preparedBy: zod.number(),
+    reviewedBy: zod.number().nullable(),
+    journalId: zod.number().nullable(),
+    reason: zod.string().nullable(),
+    replacesReviewId: zod.number().nullable(),
+  })
+  .and(
+    zod.object({
+      payload: zod.object({
+        request: zod.object({
+          requestId: zod
+            .string()
+            .regex(
+              getSourceReviewDetailsResponseTwoPayloadRequestRequestIdRegExp,
+            ),
+          source: zod.object({
+            kind: zod.enum([
+              "client_deposit",
+              "invoice_payment",
+              "credit_note",
+              "client_credit_application",
+              "invoice_writeoff",
+              "overhead",
+              "overhead_topup",
+              "expense_payment",
+              "schedule_payment",
+              "bank_funding",
+              "bank_transfer",
+            ]),
+            id: zod.number().min(1),
+          }),
+          mapping: zod.object({
+            currency: zod.enum(["NGN"]),
+            policyVersion: zod
+              .string()
+              .min(1)
+              .max(
+                getSourceReviewDetailsResponseTwoPayloadRequestMappingPolicyVersionMax,
+              ),
+            evidence: zod
+              .string()
+              .min(1)
+              .max(
+                getSourceReviewDetailsResponseTwoPayloadRequestMappingEvidenceMax,
+              ),
+            effect: zod
+              .enum([
+                "expense",
+                "asset",
+                "advance",
+                "loan_repayment",
+                "other_non_expense",
+                "equity_funding",
+                "loan_funding",
+                "asset_funding",
+                "income_funding",
+                "liability_funding",
+                "overhead",
+                "credit_note",
+                "client_credit",
+                "writeoff",
+                "transfer",
+              ])
+              .optional(),
+            bankAccounts: zod
+              .record(zod.string(), zod.number().min(1))
+              .optional(),
+            cashAccountId: zod.number().min(1).optional(),
+            receivableAccountId: zod.number().min(1).optional(),
+            depositLiabilityAccountId: zod.number().min(1).optional(),
+            accountId: zod.number().min(1).optional(),
+            accountCategory: zod
+              .enum(["asset", "liability", "equity", "income", "expense"])
+              .optional(),
+            controlAccountId: zod.number().min(1).optional(),
+            clientCreditAccountId: zod.number().min(1).optional(),
+            recognitionDate: zod
+              .string()
+              .regex(
+                getSourceReviewDetailsResponseTwoPayloadRequestMappingRecognitionDateRegExp,
+              )
+              .optional(),
+            recognitionEvidence: zod
+              .string()
+              .min(1)
+              .max(
+                getSourceReviewDetailsResponseTwoPayloadRequestMappingRecognitionEvidenceMax,
+              )
+              .optional(),
+            reductions: zod
+              .array(
+                zod.object({
+                  accountId: zod.number().min(1),
+                  amount: zod.string(),
+                  category: zod.enum(["income", "liability"]),
+                  evidence: zod.string(),
+                }),
+              )
+              .max(
+                getSourceReviewDetailsResponseTwoPayloadRequestMappingReductionsMax,
+              )
+              .optional(),
+            vatAccountId: zod.number().min(1).optional(),
+            vatReduction: zod.string().optional(),
+            vatEvidence: zod.string().optional(),
+          }),
+          replacesReviewId: zod.number().min(1).optional(),
+        }),
+        cashMovement: zod.string(),
+        originalId: zod.number().nullable(),
+        input: zod.object({
+          bookId: zod.number(),
+          branchId: zod.number(),
+          currency: zod.string(),
+          accountingDate: zod.string(),
+          eventKey: zod.string(),
+          narration: zod.string(),
+          evidence: zod.string(),
+          lines: zod.array(
+            zod.object({
+              accountId: zod.number(),
+              debit: zod.string(),
+              credit: zod.string(),
+            }),
+          ),
+        }),
+      }),
+      audit: zod.array(
+        zod.object({
+          id: zod.number(),
+          action: zod.string(),
+          reason: zod.string(),
+          actorId: zod.number(),
+          actorName: zod.string().nullable(),
+          at: zod.string(),
+        }),
+      ),
+    }),
+  );
+
+export const ActOnSourceReviewParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  reviewId: zod.coerce.number().min(1),
+});
+
+export const ActOnSourceReviewQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const actOnSourceReviewBodyReasonMax = 2000;
+
+export const ActOnSourceReviewBody = zod.object({
+  action: zod.enum(["submit", "return", "post", "cancel"]),
+  reason: zod.string().min(1).max(actOnSourceReviewBodyReasonMax),
+});
+
+export const ActOnSourceReviewResponse = zod.object({
+  id: zod.number(),
+  state: zod.enum(["draft", "submitted", "returned", "posted", "cancelled"]),
+  source: zod.object({
+    kind: zod.enum([
+      "client_deposit",
+      "invoice_payment",
+      "credit_note",
+      "client_credit_application",
+      "invoice_writeoff",
+      "overhead",
+      "overhead_topup",
+      "expense_payment",
+      "schedule_payment",
+      "bank_funding",
+      "bank_transfer",
+    ]),
+    id: zod.number().min(1),
+  }),
+  date: zod.string(),
+  preparedBy: zod.number(),
+  reviewedBy: zod.number().nullable(),
+  journalId: zod.number().nullable(),
+  reason: zod.string().nullable(),
+  replacesReviewId: zod.number().nullable(),
+});
+
 export const GetAffairsWorkspaceParams = zod.object({
   bookId: zod.coerce.number().min(1),
 });
