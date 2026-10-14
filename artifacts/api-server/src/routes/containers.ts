@@ -1837,9 +1837,13 @@ router.put("/containers/:id", requireAuth, async (req: AuthRequest, res) => {
     if (declaration !== undefined) updates.declaration = declaration;
     if (size !== undefined) updates.size = size;
     if (vessel !== undefined) updates.vessel = vessel;
-    // Status changes via PUT: admins can set any status freely.
+    // Administrator navigation still requires submitted department milestones.
     // Non-admin dept users may only perform the natural forward advance from stages they're allowed to advance.
     if (status !== undefined) {
+      if (status !== existing.status && ["gate_in", "examination", "final_release", "delivery", "closed"].includes(status)) {
+        const readinessError = finalWorkflowReadinessError(existing);
+        if (readinessError) return res.status(409).json(readinessError);
+      }
       if (!isAdmin) {
         const currentIdx = PIPELINE_STAGE_ORDER.indexOf(existing.status);
         const naturalNext = currentIdx !== -1 ? PIPELINE_STAGE_ORDER[currentIdx + 1] : undefined;

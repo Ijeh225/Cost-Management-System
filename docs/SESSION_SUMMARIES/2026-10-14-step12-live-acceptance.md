@@ -1,5 +1,17 @@
 # Step12 Live Acceptance
 
+## 2026-10-14 15:52 WAT - Shared readiness patch ready and period controls
+-471units/3prior skips/full build/typechecks accepted,7new PUT guard tests. Publish and live retest37alone; no job36repeat. Test fixture type omission corrected before accepted build, not app bug.
+- Actual audited zero bank head28/1011 created; future period2empty close/reopen restricted/global grants/review/closed-date no-journal/audit accepted. Octoberleftopen, no false historical reconciliation attestation. Next bank transfer and source/output/role/UI coverage.
+
+## 2026-10-14 15:46 WAT - Source adjustments/workflow accepted, alternate status route failure
+- Real schedule14advance50/15expense30(native16/17), CN3(native18)100 and invoice17writeoff200/audit14(native19) noncash accepted. Current exact bank10197.50/AR0/advance50/inputVAT3/profit250.50. Jobs36closed/37pending share18BL; independent stages, gates/delivery/empty/tasks4accepted. Do not repeat accepted phase creation.
+- STEP12-OPS-001 High live basic PUT can close37without requiredreleases, unlike PATCH/gateguards. Temporaryteststate restored/auditretained. Reuse shared readiness error for PUT; add7route cases and build/release/same37negative retest. Then UI/output/roles/periods/remaining mapped-source acceptance; flagsONTESTONLY, no actual certification.
+
+## 2026-10-14 15:40 WAT - Exact payable release and expense source acceptance
+-91a3088/Railway2e43bbae SUCCESS, retained11bill/10direct source resumes unchanged; native14 and linked13schedule/expensepayment11/native15 complete100AP. Full direct cost/VAT/reversal and overhead exact bank10277.50/profit580.50/inputVAT3/TB/BSreconcile. Paid/deletable-unpaid controls accepted. STEP12-OH-001 CLOSED.
+- Adjustments phase running: standalone14/advancepayment9, then operatingexpense/CN/writeoff; after that operational/sharedBL/UI/output/roles/periods. Current new-book acceptance is not whole-company historical completeness/professional approval. Keep gatesON and retain all IDs; no repeated creation modes.
+
 ## 2026-10-14 15:33 WAT - Payable fix release ready
 -464units/3prior skips/build/typechecks and1network105.23s same-day/history/future-date controls PASS, own namespace/tunnel/baseline cleanup accepted. Commit/push exact correction, await Railway SUCCESS, then resume-overhead retains11bill/10payment and executes remaining40 scheduled settlement; no repeat source creation.
 

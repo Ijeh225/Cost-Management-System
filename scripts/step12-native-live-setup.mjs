@@ -5,8 +5,8 @@ import {writeFileSync} from 'node:fs';
 const cli=process.env.RAILWAY_CLI_PATH;
 assert(cli,'Authenticated Railway CLI required');
 const mode=process.argv[2]??'inspect';
-assert(['inspect','setup'].includes(mode));
-if(mode==='setup')assert(process.argv.includes('--confirm=STEP12-LIVE-TEST-20261014'),'Explicit live fixture confirmation required');
+assert(['inspect','setup','bank-chart','periods'].includes(mode));
+if(mode!=='inspect')assert(process.argv.includes('--confirm=STEP12-LIVE-TEST-20261014'),'Explicit live fixture confirmation required');
 const remote=async(mode)=>{
  const assert=require('node:assert/strict'),{createRequire}=require('node:module');
  const {Pool}=createRequire(process.cwd()+'/lib/db/package.json')('pg');
@@ -30,6 +30,26 @@ const remote=async(mode)=>{
   assert(preparer&&reviewer&&preparer.id!==reviewer.id,'Two controlled independent API-created accounts required');
   const label='STEP12 TEST ONLY - 20261014 - NOT OFFICIAL COMPANY BOOKS';
   const old=(await pool.query('SELECT id,name FROM accounting_books WHERE name=$1',[label])).rows;
+  if(mode==='bank-chart'||mode==='periods'){
+   assert.equal(old.length,1);assert.equal(old[0].id,1);const engine=new native.NativeAccounting(pool);
+   if(mode==='bank-chart'){
+    const account=await engine.addAccount(1,2,owner.id,'1011','STEP12 TEST ONLY second own bank','asset');
+    console.log(JSON.stringify({mode,bookId:1,accountId:account,code:'1011',warning:'New zero-balance bank head; original verified openings and posted journals unchanged'}));return;
+   }
+   const existing=(await pool.query("SELECT id FROM accounting_periods WHERE book_id=1 AND name='STEP12 TEST ONLY empty November period'")).rows;assert.equal(existing.length,0,'Inspect prior period proof instead of repeating it');
+   const period=await engine.createPeriod(1,2,owner.id,'STEP12 TEST ONLY empty November period','2026-11-01','2026-11-30');
+   const review={evidence:'TEST ONLY empty future period has no dated sources/journals; no certification of October or historical/company completeness',sourceCoverageComplete:true,reconciled:true,unresolvedMappings:0};
+   await assert.rejects(engine.changePeriod(1,reviewer.id,period,'close',review),e=>e.code==='FORBIDDEN');
+   await assert.rejects(engine.changePeriod(1,owner.id,period,'close',{...review,sourceCoverageComplete:false}),e=>e.code==='CLOSE_REVIEW_REQUIRED');
+   await engine.changePeriod(1,owner.id,period,'close',review);
+   const candidate={bookId:1,branchId:2,currency:'NGN',accountingDate:'2026-11-10',eventKey:'step12:closed-period-proof',narration:'Closed period negative only',evidence:'Must refuse without financial write',lines:[{accountId:20,debit:'0.01',credit:'0'},{accountId:7,debit:'0',credit:'0.01'}]};
+   await assert.rejects(engine.prepareJournal(preparer.id,candidate),e=>e.code==='PERIOD_CLOSED');
+   assert.equal((await pool.query('SELECT count(*)::int n FROM accounting_journals WHERE event_key=$1',[candidate.eventKey])).rows[0].n,0);
+   await engine.changePeriod(1,owner.id,period,'reopen',review);
+   const audit=(await pool.query("SELECT action,count(*)::int n FROM accounting_audit WHERE period_id=$1 AND action IN ('period_closed','period_reopened') GROUP BY action",[period])).rows;
+   assert.equal(audit.length,2);assert(audit.every(r=>r.n===1));
+   console.log(JSON.stringify({mode,periodId:period,finalState:'open',scope:'Empty future period only; October remains open',negativeClosedPrepare:'PERIOD_CLOSED',noCandidateJournal:true,audit,method:'Actual deployed service with named grants, not period UI'}));return;
+  }
   assert.equal(old.length,0,'Test book exists: inspect and resume it, do not recreate');
   const branchIds=branches.filter(b=>b.active&&[2,3].includes(b.id)&&b.name.startsWith('E2E-')).map(b=>b.id);
   assert.equal(branchIds.length,2,'Only the two existing test branches belong to this rehearsal book');assert(branchIds.includes(preparer.branchId)&&preparer.branchId===reviewer.branchId);
@@ -60,8 +80,8 @@ const result=spawnSync(cli,['ssh','--project','30166120-54e6-4f58-86ed-18ab39691
  {encoding:'utf8',windowsHide:true,timeout:240000,maxBuffer:4*1024*1024});
 assert.equal(result.status,0,'Live test setup/inspection failed; diagnostic output withheld');
 console.log(result.stdout);
-if(mode==='setup'){
+if(mode!=='inspect'){
  const row=result.stdout.split(/\r?\n/).find(l=>l.startsWith('{'));
- assert(row,'Setup evidence missing');const data=JSON.parse(row);assert(data.bookId&&data.accounts);
- writeFileSync('docs/evidence/2026-10-14-step12-native-setup.json',JSON.stringify(data,null,2)+'\n',{flag:'wx'});
+ assert(row,'Setup evidence missing');const data=JSON.parse(row);
+ writeFileSync(`docs/evidence/2026-10-14-step12-native-${mode}.json`,JSON.stringify(data,null,2)+'\n',{flag:'wx'});
 }

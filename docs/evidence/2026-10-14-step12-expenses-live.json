@@ -1,0 +1,174 @@
+{
+  "bookId": 1,
+  "results": [
+    {
+      "time": "2026-10-14T14:39:45.870Z",
+      "pass": "Live overhead-linked schedule created",
+      "expenseId": 11,
+      "scheduleId": 13
+    },
+    {
+      "time": "2026-10-14T14:39:47.620Z",
+      "pass": "Live scheduled overhead settlement recorded once in expense-payment ledger",
+      "expenseId": 11,
+      "paymentId": 11,
+      "scheduleId": 13
+    },
+    {
+      "time": "2026-10-14T14:39:59.072Z",
+      "pass": "Live duty/shipping/terminal VAT and direct/scheduled overhead reconcile with no duplicate expense",
+      "bank": 10277.5,
+      "profit": 580.5,
+      "inputVat": 3,
+      "expenseId": 11,
+      "scheduleId": 13,
+      "dutyId": 10,
+      "dutyJournal": 10,
+      "costIds": [
+        {
+          "section": "shipping",
+          "id": 3,
+          "journalId": 11
+        },
+        {
+          "section": "terminal",
+          "id": 4,
+          "journalId": 12
+        }
+      ],
+      "overheadJournal": 13,
+      "directJournal": 14,
+      "scheduledJournal": 15,
+      "tax": {
+        "from": "2026-10-14",
+        "to": "2026-10-31",
+        "branchId": 2,
+        "basis": "Posted native journals; reviewed tax classifications only",
+        "rows": [
+          {
+            "journalId": 4,
+            "date": "2026-10-14",
+            "sourceKind": "invoice",
+            "sourceId": 17,
+            "configurationId": 1,
+            "code": "EXEMPT",
+            "treatment": "exempt",
+            "net": "600.00",
+            "vat": "0.00",
+            "gross": "600.00",
+            "recoverable": "0.00",
+            "nonRecoverable": "0.00",
+            "direction": "sale",
+            "reversal": false
+          },
+          {
+            "journalId": 4,
+            "date": "2026-10-14",
+            "sourceKind": "invoice",
+            "sourceId": 17,
+            "configurationId": 1,
+            "code": "EXEMPT",
+            "treatment": "exempt",
+            "net": "400.00",
+            "vat": "0.00",
+            "gross": "400.00",
+            "recoverable": "0.00",
+            "nonRecoverable": "0.00",
+            "direction": "sale",
+            "reversal": false
+          },
+          {
+            "journalId": 8,
+            "date": "2026-10-14",
+            "sourceKind": "duty_payment",
+            "sourceId": 8,
+            "configurationId": 1,
+            "code": "STD",
+            "treatment": "taxable",
+            "net": "100.00",
+            "vat": "7.50",
+            "gross": "107.50",
+            "recoverable": "7.50",
+            "nonRecoverable": "0.00",
+            "direction": "purchase",
+            "reversal": false
+          },
+          {
+            "journalId": 9,
+            "date": "2026-10-14",
+            "sourceKind": "duty_payment",
+            "sourceId": 9,
+            "configurationId": 1,
+            "code": "STD",
+            "treatment": "taxable",
+            "net": "-100.00",
+            "vat": "-7.50",
+            "gross": "-107.50",
+            "recoverable": "-7.50",
+            "nonRecoverable": "0.00",
+            "direction": "purchase",
+            "reversal": true
+          },
+          {
+            "journalId": 10,
+            "date": "2026-10-14",
+            "sourceKind": "duty_payment",
+            "sourceId": 10,
+            "configurationId": 1,
+            "code": "COST",
+            "treatment": "taxable",
+            "net": "100.00",
+            "vat": "7.50",
+            "gross": "107.50",
+            "recoverable": "0.00",
+            "nonRecoverable": "7.50",
+            "direction": "purchase",
+            "reversal": false
+          },
+          {
+            "journalId": 11,
+            "date": "2026-10-14",
+            "sourceKind": "container_payment",
+            "sourceId": 3,
+            "configurationId": 1,
+            "code": "COST",
+            "treatment": "taxable",
+            "net": "100.00",
+            "vat": "7.50",
+            "gross": "107.50",
+            "recoverable": "0.00",
+            "nonRecoverable": "7.50",
+            "direction": "purchase",
+            "reversal": false
+          },
+          {
+            "journalId": 12,
+            "date": "2026-10-14",
+            "sourceKind": "container_payment",
+            "sourceId": 4,
+            "configurationId": 1,
+            "code": "MIXED",
+            "treatment": "taxable",
+            "net": "100.00",
+            "vat": "7.50",
+            "gross": "107.50",
+            "recoverable": "3.00",
+            "nonRecoverable": "4.50",
+            "direction": "purchase",
+            "reversal": false
+          }
+        ],
+        "unclassified": 0,
+        "totals": {
+          "netPurchases": "300.00",
+          "purchaseVat": "22.50",
+          "recoverable": "3.00",
+          "nonRecoverable": "19.50",
+          "netSales": "1000.00",
+          "outputVat": "0.00"
+        },
+        "limitation": "Credit notes are shown as reviewed aggregate adjustments, not guessed allocations to mixed item tax codes. Legacy unclassified entries require separate reconciliation. This is not an official VAT return."
+      }
+    }
+  ]
+}

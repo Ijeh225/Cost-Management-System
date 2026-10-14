@@ -1,0 +1,19 @@
+{
+  "mode": "periods",
+  "periodId": 2,
+  "finalState": "open",
+  "scope": "Empty future period only; October remains open",
+  "negativeClosedPrepare": "PERIOD_CLOSED",
+  "noCandidateJournal": true,
+  "audit": [
+    {
+      "action": "period_closed",
+      "n": 1
+    },
+    {
+      "action": "period_reopened",
+      "n": 1
+    }
+  ],
+  "method": "Actual deployed service with named grants, not period UI"
+}

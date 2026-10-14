@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile,appendFile,writeFile} from 'node:fs/promises';
 import {postLiveSource} from './step12-live-source-posting.mjs';
 const mode=process.argv[2]??'inspect';
-assert(['users','inspect','accounting','transactions','resume-deposit','expenses','resume-overhead'].includes(mode));
+assert(['users','inspect','accounting','transactions','resume-deposit','expenses','resume-overhead','adjustments','operations'].includes(mode));
 assert(process.argv.includes('--confirm=STEP12-LIVE-TEST-20261014'));
 let input='';for await(const chunk of process.stdin)input+=chunk;
 const credential=JSON.parse(input);input='';
@@ -17,7 +17,7 @@ async function session(email,password){
   const r=await fetch(origin+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(45000)});
   for(const c of r.headers.getSetCookie()){const pair=c.split(';')[0],at=pair.indexOf('=');cookies.set(pair.slice(0,at),pair.slice(at+1));}
   const data=await r.json();
-  if(r.status!==expected){console.error(JSON.stringify({method,path,status:r.status,error:data.error,code:data.code}));throw new Error('Unexpected HTTP acceptance result');}
+  if(!(Array.isArray(expected)?expected.includes(r.status):r.status===expected)){console.error(JSON.stringify({method,path,status:r.status,error:data.error,code:data.code}));throw new Error('Unexpected HTTP acceptance result');}
   return data;
  }
  const login=await request('POST','/auth/login',{email,password},200,'all');
@@ -234,7 +234,7 @@ else if(mode==='expenses'||mode==='resume-overhead'){
   direct=await owner.request('POST',`/overhead-expenses/${overhead.id}/payments`,{amount:60,paymentMethod:'bank',bankId:5,paidAt:'2026-10-14T12:00:00Z',notes:'STEP12 TEST ONLY direct60'},201);
   await pass('Live overhead direct partial settlement recorded',{expenseId:overhead.id,paymentId:direct.payment.id});
   }else{
-   overhead=(await owner.request('GET','/overhead-expenses')).find(e=>e.id===11);assert(overhead);assert.equal(overhead.reference,'STEP12-QA-OH-20261014');assert.equal(overhead.balance,40);assert.equal(overhead.payments.length,1);
+   overhead=(await owner.request('GET','/overhead-expenses')).expenses.find(e=>e.id===11);assert(overhead);assert.equal(overhead.reference,'STEP12-QA-OH-20261014');assert.equal(overhead.balance,40);assert.equal(overhead.payments.length,1);
    direct={payment:overhead.payments[0]};assert.equal(direct.payment.id,10);assert.equal(direct.payment.amount,60);
    assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10317.50);
    finalDuty={id:10};finalDutyJournal=10;costIds=[{section:'shipping',id:3,journalId:11},{section:'terminal',id:4,journalId:12}];
@@ -247,7 +247,7 @@ else if(mode==='expenses'||mode==='resume-overhead'){
   await preparer.request('PATCH',`/payment-schedules/${linked.schedule.id}/approve`,{},403);
   await owner.request('PATCH',`/payment-schedules/${linked.schedule.id}/approve`,{comment:'Authorised dummy settlement'});
   await preparer.request('PATCH',`/payment-schedules/${linked.schedule.id}/pay`,{amount:40,paymentMethod:'bank',bankId:5,paidAt:'2026-10-14T12:00:00Z'});
-  const expenses=await owner.request('GET','/overhead-expenses');const paidExpense=expenses.find(e=>e.id===overhead.id);assert(paidExpense);assert.equal(paidExpense.balance,0);
+  const expenses=await owner.request('GET','/overhead-expenses');const paidExpense=expenses.expenses.find(e=>e.id===overhead.id);assert(paidExpense);assert.equal(paidExpense.balance,0);
   const scheduledPayment=paidExpense.payments.find(p=>p.id!==direct.payment.id);assert(scheduledPayment);
   await pass('Live scheduled overhead settlement recorded once in expense-payment ledger',{expenseId:overhead.id,paymentId:scheduledPayment.id,scheduleId:linked.schedule.id});
   const scheduledJournal=postLiveSource(f,{kind:'expense_payment',id:scheduledPayment.id},ohMap);
@@ -264,6 +264,109 @@ else if(mode==='expenses'||mode==='resume-overhead'){
   await pass('Live duty/shipping/terminal VAT and direct/scheduled overhead reconcile with no duplicate expense',{bank:10277.50,profit:580.50,inputVat:3,expenseId:overhead.id,scheduleId:linked.schedule.id,dutyId:finalDuty.id,dutyJournal:finalDutyJournal,costIds,overheadJournal:ohJournal.journalId,directJournal:directJournal.journalId,scheduledJournal:scheduledJournal.journalId,tax});
   await writeFile('docs/evidence/2026-10-14-step12-expenses-live.json',JSON.stringify({bookId:1,results},null,2)+'\n',{flag:'wx'});
  }finally{for(const actor of [owner,preparer,reviewer])await actor.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='adjustments'){
+ const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8')),a=f.accounts;
+ const owner=await session(credential.email,credential.password),preparer=await session('step12.preparer.20261014@donclimax.test',credential.testPassword),reviewer=await session('step12.reviewer.20261014@donclimax.test',credential.testPassword),results=[];
+ async function pass(name,detail={}){const item={time:new Date().toISOString(),pass:name,...detail};results.push(item);await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(item)+'\n');console.log(JSON.stringify(item));}
+ const basic={currency:'NGN',policyVersion:'step12-dummy-20261014-v1',evidence:'TEST ONLY reviewed controlled adjustment',bankAccounts:{5:a['1010']},cashAccountId:a['1000']};
+ try{
+  assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10277.50,'Resume expense settlement first; do not duplicate phases');
+  for(const [classification,amount,accountId,effect]of [['advance',50,a['1200'],'advance'],['operating_expense',30,a['6000'],'expense']]){
+   const schedule=await preparer.request('POST','/payment-schedules',{scheduleDate:'2026-10-14',vendorBeneficiary:`STEP12 TEST ONLY ${classification} 20261014`,description:'Dummy reviewed voucher, no external money transfer',amountRequested:amount,priority:'normal'},201);
+   await pass('Live standalone payment schedule created',{scheduleId:schedule.id,classification,amount});
+   await preparer.request('PATCH',`/payment-schedules/${schedule.id}/pay`,{amount,paymentMethod:'bank',bankId:5},400);
+   await owner.request('PATCH',`/payment-schedules/${schedule.id}/approve`,{comment:'Reviewed dummy voucher'});
+   await owner.request('PATCH',`/payment-schedules/${schedule.id}/approve`,{},409);
+   await preparer.request('PATCH',`/payment-schedules/${schedule.id}/pay`,{amount,paymentMethod:'bank',bankId:5,classification,classificationReason:'Reviewed fictional advance/operating voucher, not inferred from vendor',...(classification==='operating_expense'?{expenseHead:'Office supplies'}:{})});
+   const detail=await preparer.request('GET',`/payment-schedules/${schedule.id}`);assert.equal(detail.payments.length,1);assert.equal(detail.events.filter(e=>e.type==='created').length,1);assert.equal(detail.events.filter(e=>e.type==='approved').length,1);assert.equal(detail.events.filter(e=>e.type==='paid').length,1);
+   await pass('Live standalone payment saved with explicit classification',{scheduleId:schedule.id,paymentId:detail.payments[0].id,classification});
+   const native=postLiveSource(f,{kind:'schedule_payment',id:detail.payments[0].id},{...basic,effect,accountId});
+   await preparer.request('PATCH',`/payment-schedules/${schedule.id}/pay`,{amount:1,paymentMethod:'bank',bankId:5},400);
+   await preparer.request('PATCH',`/payment-schedules/${schedule.id}/complete`,{});
+   await pass('Live classified standalone schedule paid once and completed; native treatment preserved',{scheduleId:schedule.id,native});
+  }
+  const bankBefore=(await owner.request('GET','/banks/5/transactions')).closingBalance;assert.equal(bankBefore,10197.50);
+  await owner.request('POST','/invoices/17/cancel',{},400);await owner.request('DELETE','/invoices/17',undefined,400);
+  const note=await owner.request('POST','/invoices/17/credit-note',{amount:100,reason:'STEP12 TEST ONLY supported service allowance'},201);assert.equal(note.appliedToInvoice,100);assert.equal(note.creditedToClient,0);
+  await pass('Live credit note applied to invoice without bank movement',{noteId:note.id,invoiceId:17,amount:100});
+  const credit=postLiveSource(f,{kind:'credit_note',id:note.id},{...basic,effect:'credit_note',receivableAccountId:a['1100'],clientCreditAccountId:a['2100'],reductions:[{accountId:a['4000'],amount:'100.00',category:'income',evidence:'Allowance reduces original exempt bundled service recognition'}]});assert.equal(credit.cashMovement,'0.00');
+  assert.equal((await owner.request('GET','/invoices/17')).outstanding,200);assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,bankBefore);
+  const writeoff=await owner.request('POST','/invoices/17/write-off',{},201);assert.equal(writeoff.writtenOffAmount,200);
+  const audit=(await owner.request('GET','/invoices/17/audit-log')).filter(e=>e.action==='written_off');assert.equal(audit.length,1);
+  await pass('Live overdue invoice residual write-off and one audit retained',{invoiceId:17,writeoffAuditId:audit[0].id,expenseId:writeoff.overheadExpenseId,amount:200});
+  const badDebt=postLiveSource(f,{kind:'invoice_writeoff',id:audit[0].id},{...basic,effect:'writeoff',accountId:a['6100'],receivableAccountId:a['1100']});assert.equal(badDebt.cashMovement,'0.00');
+  await owner.request('POST','/invoices/17/write-off',{},400);
+  await owner.request('POST',`/overhead-expenses/${writeoff.overheadExpenseId}/payments`,{amount:1,paymentMethod:'bank',bankId:5},409);
+  await owner.request('POST',`/overhead-expenses/${writeoff.overheadExpenseId}/payment-schedules`,{},409);
+  await owner.request('DELETE',`/overhead-expenses/${writeoff.overheadExpenseId}`,undefined,409);
+  assert.equal((await owner.request('GET','/invoices/17')).status,'written_off');
+  assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,bankBefore);
+  const root='/accounting/books/1/reports/',query='?branchId=2&from=2026-10-14&to=2026-10-31',reports={};
+  for(const kind of ['general-ledger','trial-balance','balance-sheet','management-accounts']){reports[kind]=await reviewer.request('GET',root+kind+query);assert.equal(reports[kind].balanced,true);assert.equal(reports[kind].totals.closingDifference,'0.00');}
+  assert.deepEqual(reports['general-ledger'].totals,reports['trial-balance'].totals);
+  const tb=reports['trial-balance'];for(const[code,amount]of[['1010','10197.50'],['1100','0.00'],['1200','50.00'],['1400','3.00'],['2100','0.00'],['2000','0.00'],['6100','200.00']])assert.equal(tb.rows.find(r=>r.code===code).closing,amount,code);
+  const pack=reports['management-accounts'];assert.equal(pack.statements.profitAndLoss.profit,'250.50');assert.equal(pack.statements.balanceSheet.difference,'0.00');
+  await pass('Live standalone advance/expense, credit note/write-off reconcile Bank/GL/TB/BS/management without noncash counted as cash',{bank:bankBefore,profit:'250.50',receivable:'0.00',advance:'50.00',inputVat:'3.00',creditJournal:credit.journalId,writeoffJournal:badDebt.journalId});
+  await writeFile('docs/evidence/2026-10-14-step12-adjustments-live.json',JSON.stringify({bookId:1,results},null,2)+'\n',{flag:'wx'});
+ }finally{for(const actor of[owner,preparer,reviewer])await actor.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='operations'){
+ const owner=await session(credential.email,credential.password),finance=await session('step12.preparer.20261014@donclimax.test',credential.testPassword),results=[];
+ async function record(name,detail={}){const item={time:new Date().toISOString(),...detail,name};results.push(item);await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(item)+'\n');console.log(JSON.stringify(item));}
+ const getContainer=async id=>(await owner.request('GET',`/containers/${id}`)).container;
+ try{
+  const original=await getContainer(37);assert.equal(original.status,'pending_verification');assert.equal(original.verifiedAt,null);
+  await owner.request('POST','/containers/37/gate-in',{},409);
+  await owner.request('PATCH','/containers/37/status',{status:'closed'},[400,409]);
+  const alternate=await owner.request('PUT','/containers/37',{status:'closed'},[200,409]);
+  if(alternate.status==='closed'){
+   await owner.request('PUT','/containers/37',{status:original.status});
+   await record('STEP12-OPS-001 alternate basic-edit status route bypasses final workflow prerequisites',{failure:true,priority:'High',containerId:37,route:'PUT /containers/:id',temporaryStatusRestored:true});
+  }else await record('Alternate basic-edit status route respects final workflow prerequisites',{pass:true});
+  let c=await getContainer(36);assert.equal(c.status,'pending_verification');assert(c.verificationOfficerIds.includes(owner.user.id),'Use the actual assigned officer, not an admin override');
+  await finance.request('POST','/containers/36/verify',{},403);
+  c=await owner.request('POST','/containers/36/verify',{});assert.equal(c.status,'registered');assert(c.verifiedAt);
+  await owner.request('POST','/containers/36/verify',{},400);
+  for(const status of ['documentation','duty_assessment','duty_payment','transire_processing'])await owner.request('PATCH','/containers/36/status',{status});
+  await owner.request('PATCH','/containers/36',{paarNumber:'STEP12-QA-PAAR-20261014',paarOfficer:'STEP12 Documentation Owner',paarReleasedAt:'2026-10-14T12:00:00Z',eta:'2026-10-14'});
+  const fields=[['transire_processing','transireStageOwner','expectedTransireDate','transireReleasedAt'],['shipping','shippingStageOwner','expectedDoDate','doReleasedAt'],['terminal','terminalStageOwner','expectedTdoDate','tdoReleasedAt'],['pull_out','pulloutStageOwner','expectedPulloutDate','pulloutReleasedAt']];
+  const ownership={};
+  for(const [stage,field,expected,actual]of fields){
+   await finance.request('POST','/containers/36/stage-action',{stage,action:'update_stage_owner',stageOwner:'Denied finance overwrite'},403);
+   const name=`STEP12 ${stage} Owner`;ownership[field]=name;
+   await owner.request('POST','/containers/36/stage-action',{stage,action:'update_stage_owner',stageOwner:name});
+   await owner.request('POST','/containers/36/stage-action',{stage,action:'set_expected_date',expectedDate:'2026-10-15'});
+   c=await getContainer(36);assert.equal(c[expected].slice(0,10),'2026-10-15');assert.equal(c[actual],null);
+   await owner.request('POST','/containers/36/stage-action',{stage,action:'mark_released',finalDate:'2026-10-14T12:00:00Z'});
+   await owner.request('POST','/containers/36/stage-action',{stage,action:'mark_released'},409);
+   c=await getContainer(36);for(const[key,value]of Object.entries(ownership))assert.equal(c[key],value);assert.equal(c[actual].slice(0,10),'2026-10-14');
+   await record('Independent department owner/expected/actual and duplicate-release protection',{pass:true,containerId:36,stage,owner:name});
+  }
+  await finance.request('POST','/containers/36/gate-in',{},403);
+  c=await owner.request('POST','/containers/36/gate-in',{});const gateIn=c.gateInDate;assert(gateIn);
+  await owner.request('POST','/containers/36/gate-in',{},409);assert.equal((await getContainer(36)).gateInDate,gateIn);
+  for(const status of ['examination','final_release'])await owner.request('PATCH','/containers/36/status',{status});
+  await owner.request('POST','/containers/36/stage-action',{stage:'final_release',action:'set_expected_date',expectedDate:'2026-10-15'});
+  await owner.request('POST','/containers/36/stage-action',{stage:'final_release',action:'mark_released',finalDate:'2026-10-14T12:00:00Z'});
+  await owner.request('POST','/containers/36/gate-out',{});await owner.request('POST','/containers/36/gate-out',{},409);
+  await owner.request('PATCH','/containers/36/status',{status:'delivery'});
+  await owner.request('PATCH','/containers/36',{deliveredAt:'2026-10-14',deliveryLocation:'TEST ONLY dummy warehouse',truckNumber:'STEP12-TEST-TRUCK',driverName:'Fictional QA driver',offloadingConfirmed:true,emptyReturnDueDate:'2026-10-15'});
+  c=await getContainer(36);assert.equal(c.deliveryStatus,'delivered');assert.equal(c.deliveredAt.slice(0,10),'2026-10-14');
+  await owner.request('POST','/containers/36/empty-gate-out',{},409);await owner.request('POST','/containers/36/empty-gate-in',{});await owner.request('POST','/containers/36/empty-gate-out',{});
+  await owner.request('PATCH','/containers/36/status',{status:'closed'});
+  c=await getContainer(36);assert.equal(c.status,'closed');assert(c.emptyReturnDate);
+  const sibling=await getContainer(37);assert.equal(sibling.status,'pending_verification');assert.equal(sibling.deliveredAt,null);assert.equal(sibling.transireStageOwner,null);assert.equal(c.shipmentId,sibling.shipmentId);
+  const overview=await owner.request('GET','/containers/36/overview');
+  await record('Live complete one-job documentation/parallel releases/gate/examination/release/delivery/empty/closed workflow; same-BL sibling independent',{pass:true,containerId:36,siblingId:37,closedAt:new Date().toISOString(),gateIn,overview});
+  const task=await owner.request('POST','/containers/37/tasks',{title:'STEP12 TEST ONLY assigned follow-up',assignedStaffId:finance.user.id,dueDate:'2026-10-14',priority:'high'},201);
+  await record('Live controlled assigned task created',{pass:true,taskId:task.id,containerId:37,assignee:finance.user.id});
+  const tasks=await finance.request('GET','/my-tasks');
+  await finance.request('PATCH',`/containers/37/tasks/${task.id}`,{status:'completed'});
+  assert.equal((await owner.request('GET','/containers/37/tasks')).find(t=>t.id===task.id).status,'completed');
+  await record('Live assigned task retrieval/completion and retained history',{pass:true,taskId:task.id,queue:tasks});
+  await writeFile('docs/evidence/2026-10-14-step12-operations-live.json',JSON.stringify({containerId:36,siblingId:37,results},null,2)+'\n',{flag:'wx'});
+ }finally{for(const actor of[owner,finance])await actor.request('POST','/auth/logout',{},200,'all');}
 }
 else {
  const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8')),a=f.accounts;

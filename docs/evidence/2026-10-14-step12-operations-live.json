@@ -1,0 +1,250 @@
+{
+  "containerId": 36,
+  "siblingId": 37,
+  "results": [
+    {
+      "time": "2026-10-14T14:44:12.017Z",
+      "failure": true,
+      "priority": "High",
+      "containerId": 37,
+      "route": "PUT /containers/:id",
+      "temporaryStatusRestored": true,
+      "name": "STEP12-OPS-001 alternate basic-edit status route bypasses final workflow prerequisites"
+    },
+    {
+      "time": "2026-10-14T14:44:20.175Z",
+      "pass": true,
+      "containerId": 36,
+      "stage": "transire_processing",
+      "owner": "STEP12 transire_processing Owner",
+      "name": "Independent department owner/expected/actual and duplicate-release protection"
+    },
+    {
+      "time": "2026-10-14T14:44:24.480Z",
+      "pass": true,
+      "containerId": 36,
+      "stage": "shipping",
+      "owner": "STEP12 shipping Owner",
+      "name": "Independent department owner/expected/actual and duplicate-release protection"
+    },
+    {
+      "time": "2026-10-14T14:44:27.449Z",
+      "pass": true,
+      "containerId": 36,
+      "stage": "terminal",
+      "owner": "STEP12 terminal Owner",
+      "name": "Independent department owner/expected/actual and duplicate-release protection"
+    },
+    {
+      "time": "2026-10-14T14:44:31.225Z",
+      "pass": true,
+      "containerId": 36,
+      "stage": "pull_out",
+      "owner": "STEP12 pull_out Owner",
+      "name": "Independent department owner/expected/actual and duplicate-release protection"
+    },
+    {
+      "time": "2026-10-14T14:44:40.893Z",
+      "pass": true,
+      "containerId": 36,
+      "siblingId": 37,
+      "closedAt": "2026-10-14T14:44:40.893Z",
+      "gateIn": "2026-10-14T14:44:31.805Z",
+      "overview": {
+        "containerId": 36,
+        "containerNumber": "S12Q2610141",
+        "blNumber": "STEP12-LIVE-BL-20261014",
+        "clientId": 12,
+        "customerName": "STEP12 LIVE 20261014 Financial Workflow QA",
+        "branchId": 2,
+        "workflowStage": "Closed",
+        "physical": {
+          "inTerminal": false,
+          "gateIn": "2026-10-14T14:44:31.805Z",
+          "gateOut": "2026-10-14T14:44:35.877Z",
+          "deliveredAt": "2026-10-14T00:00:00.000Z",
+          "emptyReturnedAt": "2026-10-14T14:44:38.870Z",
+          "closed": true
+        },
+        "milestones": [
+          {
+            "key": "documentation",
+            "label": "Documentation / PAAR",
+            "owner": "STEP12 Documentation Owner",
+            "expected": "2026-10-14T00:00:00.000Z",
+            "actual": "2026-10-14T12:00:00.000Z",
+            "delay": null,
+            "href": "/documentation",
+            "state": "recorded"
+          },
+          {
+            "key": "transire",
+            "label": "Transire",
+            "owner": "STEP12 transire_processing Owner",
+            "expected": "2026-10-15T00:00:00.000Z",
+            "actual": "2026-10-14T12:00:00.000Z",
+            "delay": null,
+            "href": "/workspace/transire",
+            "state": "recorded"
+          },
+          {
+            "key": "shipping",
+            "label": "Shipping / DO",
+            "owner": "STEP12 shipping Owner",
+            "expected": "2026-10-15T00:00:00.000Z",
+            "actual": "2026-10-14T12:00:00.000Z",
+            "delay": null,
+            "href": "/workspace/shipping",
+            "state": "recorded"
+          },
+          {
+            "key": "terminal",
+            "label": "Terminal / TDO",
+            "owner": "STEP12 terminal Owner",
+            "expected": "2026-10-15T00:00:00.000Z",
+            "actual": "2026-10-14T12:00:00.000Z",
+            "delay": null,
+            "href": "/workspace/terminal-ops",
+            "state": "recorded"
+          },
+          {
+            "key": "pullout",
+            "label": "Pullout",
+            "owner": "STEP12 pull_out Owner",
+            "expected": "2026-10-15T00:00:00.000Z",
+            "actual": "2026-10-14T12:00:00.000Z",
+            "delay": null,
+            "href": "/workspace/pull-out",
+            "state": "recorded"
+          },
+          {
+            "key": "release",
+            "label": "Bonded terminal release",
+            "owner": null,
+            "expected": "2026-10-15T00:00:00.000Z",
+            "actual": "2026-10-14T12:00:00.000Z",
+            "delay": null,
+            "href": "/workspace/terminal",
+            "state": "recorded"
+          }
+        ],
+        "blockers": [],
+        "missingFinalPrerequisites": [],
+        "nextAction": {
+          "text": null,
+          "owner": null,
+          "dueAt": null
+        },
+        "unassignedMilestones": 0,
+        "asOf": "2026-10-14T14:44:40.671Z",
+        "tasks": [],
+        "documents": [],
+        "approvals": [],
+        "finance": {
+          "clearingBudget": 600,
+          "costBudget": 107.5,
+          "actualPaidCost": 322.5,
+          "invoices": [
+            {
+              "id": 17,
+              "number": "INV-202610-003",
+              "status": "written_off",
+              "total": 0,
+              "paid": 0,
+              "outstanding": 0
+            }
+          ],
+          "note": "Budgets and actual paid costs belong to this visit only. Each linked invoice is shown once at its FULL invoice value including VAT; it may cover other containers. Collections are net recorded invoice payments, including reversals. Do not sum these invoice values across visits. No allocation or profit is inferred. Draft/cancelled/written-off invoices have zero financial effect. Costs are all-time payments, not period-matched P&L costs."
+        }
+      },
+      "name": "Live complete one-job documentation/parallel releases/gate/examination/release/delivery/empty/closed workflow; same-BL sibling independent"
+    },
+    {
+      "time": "2026-10-14T14:44:41.309Z",
+      "pass": true,
+      "taskId": 4,
+      "containerId": 37,
+      "assignee": 15,
+      "name": "Live controlled assigned task created"
+    },
+    {
+      "time": "2026-10-14T14:44:42.556Z",
+      "pass": true,
+      "taskId": 4,
+      "queue": {
+        "assignedContainers": [
+          {
+            "id": 37,
+            "customerName": "STEP12 LIVE 20261014 Financial Workflow QA",
+            "containerNumber": "S12Q2610142",
+            "blNumber": "STEP12-LIVE-BL-20261014",
+            "declaration": "TEST ONLY live end-to-end acceptance, no actual cargo movement",
+            "size": "",
+            "vessel": "",
+            "status": "pending_verification",
+            "isLocked": false,
+            "lockedSections": [],
+            "assignedStaffId": null,
+            "assignedStaffName": null,
+            "branchId": 2,
+            "totalCost": 0,
+            "clearingCharges": 400,
+            "grossProfit": 400,
+            "dutyNotPaid": 0,
+            "createdAt": "2026-10-14T14:01:05.950Z",
+            "updatedAt": "2026-10-14T14:44:11.781Z"
+          }
+        ],
+        "sectionApprovals": [],
+        "mySections": [
+          "customs"
+        ],
+        "correctionTasks": [
+          {
+            "id": 4,
+            "containerId": 37,
+            "title": "STEP12 TEST ONLY assigned follow-up",
+            "notes": "",
+            "priority": "high",
+            "status": "pending",
+            "dueDate": "2026-10-14T00:00:00.000Z",
+            "createdAt": "2026-10-14T14:44:41.077Z",
+            "isRejectionTask": false
+          }
+        ],
+        "dailyQueue": [
+          {
+            "id": 4,
+            "containerId": 37,
+            "containerNumber": "S12Q2610142",
+            "blNumber": "STEP12-LIVE-BL-20261014",
+            "branchId": 2,
+            "customerName": "STEP12 LIVE 20261014 Financial Workflow QA",
+            "title": "STEP12 TEST ONLY assigned follow-up",
+            "notes": "",
+            "priority": "high",
+            "status": "pending",
+            "dueDate": "2026-10-14T00:00:00.000Z",
+            "bucket": "today",
+            "workflowStage": "Awaiting Verification",
+            "blockers": [
+              "Container verification not recorded"
+            ],
+            "missingFinalPrerequisites": [
+              "Documentation / PAAR",
+              "Transire release",
+              "Shipping / DO release",
+              "Terminal / TDO release",
+              "Pullout release"
+            ],
+            "href": "/containers/37?tab=tasks&taskId=4"
+          }
+        ],
+        "workDate": "2026-10-14",
+        "timeZone": "Africa/Lagos",
+        "asOf": "2026-10-14T14:44:41.525Z"
+      },
+      "name": "Live assigned task retrieval/completion and retained history"
+    }
+  ]
+}

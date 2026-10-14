@@ -1,5 +1,19 @@
 # Live End-to-End Test Register
 
+## 2026-10-14 15:52 WAT - STEP12-OPS-001 local correction PASS / period service live PASS
+-7real PUT route regressions plus471unit/API/3skips/build/typechecks PASS. Deploy/retest37final statuses pending; normal metadata editing and ready administrator navigation preserved.
+- Deployed native head1011/id28 created zero for second QA bank. Empty future period2 close/reopen grants/review/closed-write-negative/no-journal/exact audit PASS; October remainsOPEN. Evidence native-bank-chart/native-periods JSON; actual service tests, not UI or company-wide reconciled close.
+
+## 2026-10-14 15:46 WAT - More genuine deployed writes / STEP12-OPS-001 HIGH
+- Standalone14/15(payment9/10/native16/17), CN3/native18, writeoff200/audit14/native19/BadDebt13 accepted; cash unaffected by CN/writeoff, advance50notexpense. Bank10197.50/AR0/inputVAT3/advance50/profit250.50 and all4native report totals reconcile. Safety negatives accepted; not a complete real-company reconciliation.
+- Job36 actual assigned verification, PAAR/independent department controls/releases, gates/immutable retry, examination/release/delivery/empty/closed passed;37sameBL independent. Task4assigned15foundin dailyQueue/completed, originaltaskhistory retained.
+- FAIL STEP12-OPS-001: owner PUT basic edit bypasses final-workflow checks and permits unfinished37Closed. Restored pending state with audit retained; fix shared prerequisite guard at route source, test/build/deploy/retest. No full Step12 acceptance yet. Runner response-shape/negative-status expectations corrected after read-only failures, not product defects.
+
+## 2026-10-14 15:40 WAT - STEP12-OH-001 CLOSED / expense/VAT live acceptance
+- Exact91a3088/Railway2e43bbae SUCCESS; unchanged retained payment10 accepted native14.40linked schedule13 settlement creates expense-payment11/native15, not standalone cash duplicate. Bill100/native13 expense recognised once/AP0. Repeat overpayment refused, paid deletion409, disposable unpaid12delete accepted.
+- Operational/nativebank10277.50, VATrecoverable3, duty107.50/shipping107.50/terminal104.50/overhead100/nativeprofit580.50/TBbalanced/BSdifference0. Taxregister originalSTDduty/reversaloffsets, finalCOST/MIXED matches actual322.50directcash/319.50expense. Evidence expenses-live JSON/eventlog.
+- Runner list-shape and initial wrong tax basis were test-input errors, corrected without duplicate source; not bugs. Adjustments14/advancepayment9 in progress. Remaining module/UI/control coverage pending; no full acceptance claim.
+
 ## 2026-10-14 15:33 WAT - STEP12-OH-001 local correction PASS / release pending
 -1network owned case105.23s accepts same-day entered-later obligation, historical retry after later settlement, exact cash/AP/expense and future recognition refusal. Own namespace/source baseline/tunnel cleanup verified.464unit/API/3prior skips/build/typechecks PASS.
 - Exact deployed receipt10 retest remains pending; preserve source IDs and resume-overhead after patch SUCCESS. Do not mark full module/system passed yet.

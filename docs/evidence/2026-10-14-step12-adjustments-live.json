@@ -1,0 +1,119 @@
+{
+  "bookId": 1,
+  "results": [
+    {
+      "time": "2026-10-14T14:40:19.840Z",
+      "pass": "Live standalone payment schedule created",
+      "scheduleId": 14,
+      "classification": "advance",
+      "amount": 50
+    },
+    {
+      "time": "2026-10-14T14:40:22.045Z",
+      "pass": "Live standalone payment saved with explicit classification",
+      "scheduleId": 14,
+      "paymentId": 9,
+      "classification": "advance"
+    },
+    {
+      "time": "2026-10-14T14:40:28.466Z",
+      "pass": "Live classified standalone schedule paid once and completed; native treatment preserved",
+      "scheduleId": 14,
+      "native": {
+        "source": {
+          "kind": "schedule_payment",
+          "id": 9
+        },
+        "journalId": 16,
+        "eventKey": "source:schedule_payment:9:v1",
+        "cashMovement": "-50.00",
+        "lines": [
+          {
+            "accountId": 5,
+            "debit": "50.00",
+            "credit": "0.00",
+            "memo": ""
+          },
+          {
+            "accountId": 2,
+            "debit": "0.00",
+            "credit": "50.00",
+            "memo": ""
+          }
+        ],
+        "existedBefore": false,
+        "method": "deployed NativeAccounting service with named preparer/reviewer grants, not direct SQL posting or signed-in source-review UI"
+      }
+    },
+    {
+      "time": "2026-10-14T14:40:28.897Z",
+      "pass": "Live standalone payment schedule created",
+      "scheduleId": 15,
+      "classification": "operating_expense",
+      "amount": 30
+    },
+    {
+      "time": "2026-10-14T14:40:31.993Z",
+      "pass": "Live standalone payment saved with explicit classification",
+      "scheduleId": 15,
+      "paymentId": 10,
+      "classification": "operating_expense"
+    },
+    {
+      "time": "2026-10-14T14:40:38.153Z",
+      "pass": "Live classified standalone schedule paid once and completed; native treatment preserved",
+      "scheduleId": 15,
+      "native": {
+        "source": {
+          "kind": "schedule_payment",
+          "id": 10
+        },
+        "journalId": 17,
+        "eventKey": "source:schedule_payment:10:v1",
+        "cashMovement": "-30.00",
+        "lines": [
+          {
+            "accountId": 18,
+            "debit": "30.00",
+            "credit": "0.00",
+            "memo": ""
+          },
+          {
+            "accountId": 2,
+            "debit": "0.00",
+            "credit": "30.00",
+            "memo": ""
+          }
+        ],
+        "existedBefore": false,
+        "method": "deployed NativeAccounting service with named preparer/reviewer grants, not direct SQL posting or signed-in source-review UI"
+      }
+    },
+    {
+      "time": "2026-10-14T14:40:39.865Z",
+      "pass": "Live credit note applied to invoice without bank movement",
+      "noteId": 3,
+      "invoiceId": 17,
+      "amount": 100
+    },
+    {
+      "time": "2026-10-14T14:40:48.127Z",
+      "pass": "Live overdue invoice residual write-off and one audit retained",
+      "invoiceId": 17,
+      "writeoffAuditId": 14,
+      "expenseId": 13,
+      "amount": 200
+    },
+    {
+      "time": "2026-10-14T14:41:06.841Z",
+      "pass": "Live standalone advance/expense, credit note/write-off reconcile Bank/GL/TB/BS/management without noncash counted as cash",
+      "bank": 10197.5,
+      "profit": "250.50",
+      "receivable": "0.00",
+      "advance": "50.00",
+      "inputVat": "3.00",
+      "creditJournal": 18,
+      "writeoffJournal": 19
+    }
+  ]
+}
