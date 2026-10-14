@@ -74,3 +74,8 @@
 {"time":"2026-10-14T15:49:49.525Z","check":"Exact indexed-content reader","pass":true,"documentIds":[12,13],"method":"Real deployed approved document_search endpoint, retained versions"}
 {"time":"2026-10-14T15:49:49.531Z","check":"Natural-language content routing","status":"answered","sessionId":44,"citationIds":[{"type":"document","id":13},{"type":"document","id":12}],"matchingContentReported":true,"limitation":"Phrase presence alone is not proof of correct tool selection; inspect source routing alongside direct content-reader result. No raw AI transcript retained."}
 {"time":"2026-10-14T15:49:49.533Z","check":"Exact vendor reader","sourceIds":[{"type":"payment_schedule","id":14}],"recordCount":1}
+{"time":"2026-10-14T16:12:12.437Z","check":"STEP12-INV-001 cancellation refuses retained native recognition with net-zero collections","pass":true,"invoiceId":18,"nativeJournalId":21}
+{"time":"2026-10-14T16:12:13.938Z","check":"Required unpaid native-recognition control created","pass":true,"invoiceId":20}
+{"time":"2026-10-14T16:12:20.831Z","check":"STEP12-INV-001 actual unpaid recognized invoice refuses cancellation without any source mutation","pass":true,"invoiceId":20,"nativeJournalId":33}
+{"time":"2026-10-14T16:12:25.681Z","check":"Reviewed noncash credit offsets tiny control while retaining original native journal","pass":true,"invoiceId":20,"noteId":5,"creditJournalId":34}
+{"time":"2026-10-14T16:12:26.123Z","check":"One required native-unrecognised cancellation fixture created","pass":true,"invoiceId":21}

@@ -1,5 +1,15 @@
 # Step12 Live Acceptance
 
+## 2026-10-14 17:22 WAT - Release-ready display correction and training evidence
+-483units/3prior skips/full build/typechecks/helper syntax/diff PASS. Publish STEP12-INV-002 formatter correction/current proof. Resume-cancel reuses21cancelled and18/20recognized, creates/posts nothing; finishes28head role review and exact totals.
+- Coverage/training/financial-control/issue matrix saved STEP12_LIVE_ACCEPTANCE.md. Actual finalmanagement screenshot shows13322.82bothsides/230.50profit/10177.50cash. Keep nativeONTESTONLY and preserve all records/checkpoints. Staff source-review gap/printlayout/company acceptance remain separate outstanding gates.
+
+## 2026-10-14 17:17 WAT - Retained continuation, no repeat creates
+-5dc9974 exact85a0e30d SUCCESS/gatesbothON. Native20recognition33refusescancel409 beforeanypayments; CN5/native34 offsets0.01. Normal21issued/cancelled once exposesrealsharedformatter outstanding0.01 mismatch againstAR. STEP12-INV-002 narrowfix pendingrelease; run ONLY resume-cancel afterrelease. Existing18/20/21/33/34/CN5 retained; no restartcancel-native-retest or oldcore/create phases.
+- Native figures stable230.50profit/10177.50cash, equal13322.82debits/credits. Re-review newbank28role onlyafterdisplaypasses; preserve4existingadjustmentheads/allotherprotectedheads. Current manual preparation safely blocked by incomplete newhead review.
+- Actual VATUI/date/register and managementtotals accepted. ReadonlyAIaudit43metadata/44document_search confirmsquotedcontenttest, exactvendor14. Segmentednative input workaround was automation correction, not appbug.
+- Source/UI review confirms STEP12-SOURCE-UI-001: generic native sources have service integration but no ordinary staff review/post workspace/API. Extend existing architecture before staff launch; don't pretend service tests demonstrate full user-facing integration. Printpreview layout/actualcompany approvals remain distinct. Step12 IN PROGRESS; publishdisplayfix/currentevidence, same-IDretest and coverage/trainingrecords next.
+
 ## 2026-10-14 17:05 WAT - Focused guard ready to publish
 - Two distinct network cases accepted:119.35s old-risk/retained-state control, then61.29s suite actual cancellation/native-prepare row-lock race. Own schemas/public baseline/tunnels cleaned.480unit/API/3prior skips/build/typechecks/syntax/diff PASS.
 - Commit/push source guard and current helpers/evidence, await exact Railway SUCCESS, run ONLY cancel-native-retest. Reuses18/native21 and creates one unrecognized cancellation fixture, re-reviews added protected bank head; no financial adjustment/reversal needed. Step12 remains IN PROGRESS pending live guard/output/residual coverage.

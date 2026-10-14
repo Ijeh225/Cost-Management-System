@@ -114,13 +114,13 @@ async function generateCreditNoteNumber(executor: Pick<typeof db, "select"> = db
   return `${prefix}${pad(seq + 1)}`;
 }
 
-async function formatInvoice(inv: any, payments: any[], items?: any[], creditNotes?: any[]) {
+export async function formatInvoice(inv: any, payments: any[], items?: any[], creditNotes?: any[]) {
   const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
   const reversedPaymentIds = new Set(payments
     .filter(payment => payment.entryType === "reversal" && payment.reversalOfPaymentId != null)
     .map(payment => payment.reversalOfPaymentId));
   const total = parseFloat(inv.total ?? "0");
-  const outstanding = inv.status === "written_off" ? 0 : Math.max(0, total - totalPaid);
+  const outstanding = ["written_off", "cancelled"].includes(inv.status) ? 0 : Math.max(0, total - totalPaid);
   const status = getEffectiveInvoiceStatus({ status: inv.status, total, totalPaid, dueDate: inv.dueDate });
   let priorCredit = 0;
 

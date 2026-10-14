@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks=vi.hoisted(()=>({authSelect:vi.fn(),transaction:vi.fn(),select:vi.fn(),execute:vi.fn(),update:vi.fn(),insert:vi.fn()}));
 vi.mock("@workspace/db",async()=>({...await import("../../../../lib/db/src/schema/index.js"),db:{select:mocks.authSelect,transaction:mocks.transaction}}));
-import {invoicesRouter} from "../routes/invoices.js";
+import {invoicesRouter,formatInvoice} from "../routes/invoices.js";
 import {signToken,createCsrfToken} from "../lib/auth.js";
 const user={id:1,isActive:true,sessionToken:'cancel-unit',branchId:2,email:'fixture@example.test',name:'QA owner',
   authorityLevel:'super_admin',jobFunction:'general_staff',workspaceAccess:'[]',accessProfileMigratedAt:new Date()};
@@ -24,6 +24,13 @@ beforeEach(()=>{
   mocks.insert.mockImplementation(()=>({values:async()=>{order.push('audit');}}));
 });
 describe('actual invoice cancellation route',()=>{
+  it.each(['cancelled','written_off'])('displays zero collectible balance for %s while preserving original value',async status=>{
+    const result=await formatInvoice({...invoice,status,total:'0.01'},[]);
+    expect(result.outstanding).toBe(0);expect(result.total).toBe(0.01);expect(result.status).toBe(status);
+  });
+  it('retains draft estimates and active unpaid balances',async()=>{
+    for(const status of ['draft','sent'])expect((await formatInvoice({...invoice,status,total:'0.01'},[])).outstanding).toBe(0.01);
+  });
   it('refuses retained recognition before any operational cancellation or audit',async()=>{
     mocks.execute.mockResolvedValueOnce({rows:[{relation:'accounting_journals'}]}).mockResolvedValueOnce({rows:[{retained:true}]});
     const r=await cancel().send({});

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile,appendFile,writeFile} from 'node:fs/promises';
 import {postLiveSource} from './step12-live-source-posting.mjs';
 const mode=process.argv[2]??'inspect';
-assert(['users','inspect','accounting','transactions','resume-deposit','expenses','resume-overhead','adjustments','operations','bank-transfer','status-retest','read-checks','invoice-edges','support','ai-content-check','cancel-native-retest'].includes(mode));
+assert(['users','inspect','accounting','transactions','resume-deposit','expenses','resume-overhead','adjustments','operations','bank-transfer','status-retest','read-checks','invoice-edges','support','ai-content-check','ai-audit-check','cancel-native-retest','resume-cancel'].includes(mode));
 assert(process.argv.includes('--confirm=STEP12-LIVE-TEST-20261014'));
 let input='';for await(const chunk of process.stdin)input+=chunk;
 const credential=JSON.parse(input);input='';
@@ -451,16 +451,61 @@ else if(mode==='invoice-edges'){
   await writeFile('docs/evidence/2026-10-14-step12-invoice-edges-live.json',JSON.stringify({results},null,2)+'\n',{flag:'wx'});
  }finally{for(const actor of[owner,preparer])await actor.request('POST','/auth/logout',{},200,'all');}
 }
-else if(mode==='cancel-native-retest'){
+else if(mode==='resume-cancel'){
  const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8')),a=f.accounts;
  const owner=await session(credential.email,credential.password),results=[];
  async function record(check,detail={}){const result={time:new Date().toISOString(),check,pass:true,...detail};results.push(result);await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(result)+'\n');console.log(JSON.stringify(result));}
  try{
-  const before=await owner.request('GET','/invoices/18');assert.equal(before.payments.reduce((sum,p)=>sum+p.amount,0),0);
+  const cancelled=await owner.request('GET','/invoices/21');assert.equal(cancelled.status,'cancelled');assert.equal(cancelled.total,0.01);assert.equal(cancelled.outstanding,0);
+  await owner.request('POST','/invoices/21/cancel',{},400);
+  await record('STEP12-INV-002 retained cancelled invoice shows zero outstanding without changing original total',{invoiceId:21,invoiceNumber:cancelled.invoiceNumber,total:cancelled.total,outstanding:cancelled.outstanding});
+  for(const id of[18,20]){const rejected=await owner.request('POST',`/invoices/${id}/cancel`,{},409);assert.match(rejected.error,/native accounting/);}
+  const list=await owner.request('GET','/invoices');assert.equal(list.find(i=>i.id===21).outstanding,0);
+  const ar=await owner.request('GET','/accounts-receivable');assert(ar.clients.every(c=>Array.isArray(c.unpaidInvoices)));assert(!ar.clients.some(c=>c.unpaidInvoices.some(i=>i.id===21)));
+  await record('STEP12-INV-001 retained recognized invoices protected; normal cancelled record/list/AR consistent',{recognizedInvoiceIds:[18,20],cancelledInvoiceId:21});
+  const workspace=await owner.request('GET','/accounting/books/1/manual?branchId=2');
+  if(!workspace.accountReviewComplete)await owner.request('POST','/accounting/books/1/manual/accounts/review?branchId=2',{
+   ownerEvidence:'Owner authorised continued TEST ONLY review after adding second bank head',accountantEvidence:'TEST FIXTURE ONLY simulated complete chart review, NOT professional certification',
+   accounts:workspace.accounts.map(row=>({accountId:row.id,role:[a['6200'],a['1390'],a['6010'],a['2310']].includes(row.id)?'adjustment':'protected'}))});
+  const reviewed=await owner.request('GET','/accounting/books/1/manual?branchId=2');assert.equal(reviewed.accountReviewComplete,true);
+  const pack=await owner.request('GET','/accounting/books/1/reports/management-accounts?branchId=2&from=2026-10-14&to=2026-10-14');
+  assert.equal(pack.statements.profitAndLoss.profit,'230.50');assert.equal(pack.statements.balanceSheet.difference,'0.00');assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10152.50);
+  await record('Complete28-head review and both cancellation controls retain exact native totals',{accounts:reviewed.accounts.length,profit:'230.50',bank5:10152.50,bank6:25});
+  await writeFile('docs/evidence/2026-10-14-step12-invoice-cancel-live.json',JSON.stringify({method:'Retained partial cancellation control resumed; no repeated fixture creations',recognizedInvoiceId:20,recognitionJournalId:33,creditNoteId:5,creditJournalId:34,results},null,2)+'\n',{flag:'wx'});
+ }finally{await owner.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='ai-audit-check'){
+ const owner=await session(credential.email,credential.password);
+ try{
+  const audit=await owner.request('GET','/ai-assistant/audit?limit=50');
+  const results=[43,44].map(sessionId=>{const row=audit.find(r=>r.sessionId===sessionId&&r.eventType==='copilot_question_answered');assert(row);return{sessionId,toolName:row.toolName,method:'Read-only retained actual routing audit, no repeated question or raw transcript'};});
+  await writeFile('docs/evidence/2026-10-14-step12-ai-routing-live.json',JSON.stringify({results},null,2)+'\n',{flag:'wx'});
+  for(const result of results)console.log(JSON.stringify(result));
+ }finally{await owner.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='cancel-native-retest'){
+ const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8')),a=f.accounts;
+ const owner=await session(credential.email,credential.password),preparer=await session('step12.preparer.20261014@donclimax.test',credential.testPassword),results=[];
+ async function record(check,detail={}){const result={time:new Date().toISOString(),check,pass:true,...detail};results.push(result);await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(result)+'\n');console.log(JSON.stringify(result));}
+ try{
+  const before=await owner.request('GET','/invoices/18');assert.equal(before.payments.filter(p=>!p.sourceDepositId&&!['credit','credit_note','deposit'].includes(p.paymentMethod.trim().toLowerCase())).reduce((sum,p)=>sum+p.amount,0),0);
   const denied=await owner.request('POST','/invoices/18/cancel',{},409);assert.match(denied.error,/native accounting/);
   assert.equal((await owner.request('GET','/invoices/18')).status,before.status);
   await record('STEP12-INV-001 cancellation refuses retained native recognition with net-zero collections',{invoiceId:18,nativeJournalId:21});
   const list=await owner.request('GET','/invoices');assert(!JSON.stringify(list).includes('STEP12 TEST ONLY issued cancellation acceptance'),'Inspect existing cancellation fixture rather than duplicating it');
+  assert(!JSON.stringify(list).includes('STEP12 TEST ONLY unpaid native cancellation control'),'Inspect prior native cancellation control rather than duplicating it');
+  const unpaid=await owner.request('POST','/invoices',{containerIds:[38],vatRate:0,dueDate:'2026-10-15',notes:'STEP12 TEST ONLY unpaid native cancellation control'},201);
+  await record('Required unpaid native-recognition control created',{invoiceId:unpaid.id});
+  await owner.request('PATCH',`/invoices/${unpaid.id}/items/${unpaid.items[0].id}`,{amount:0.01,description:'TEST ONLY unpaid native cancellation control'});
+  await owner.request('PATCH',`/invoices/${unpaid.id}`,{status:'sent'});
+  const recognition=await preparer.request('POST','/accounting/books/1/tax-configuration/sources/prepare?branchId=2',{kind:'invoice',id:unpaid.id,evidence:'TEST ONLY unpaid recognition control',configurationId:1,taxCode:'EXEMPT',recognitionDate:'2026-10-14',receivableAccountId:a['1100'],incomeAccountId:a['4000']});
+  postLiveSource(f,{kind:'configured_journal',id:recognition.id},{});
+  const rejected=await owner.request('POST',`/invoices/${unpaid.id}/cancel`,{},409);assert.match(rejected.error,/native accounting/);
+  const retained=await owner.request('GET',`/invoices/${unpaid.id}`);assert.equal(retained.status,'sent');assert.equal(retained.outstanding,0.01);assert.equal(retained.payments.length,0);
+  await record('STEP12-INV-001 actual unpaid recognized invoice refuses cancellation without any source mutation',{invoiceId:unpaid.id,nativeJournalId:recognition.id});
+  const note=await owner.request('POST',`/invoices/${unpaid.id}/credit-note`,{amount:0.01,reason:'TEST ONLY reviewed offset after cancellation negative test'},201);
+  const correction=postLiveSource(f,{kind:'credit_note',id:note.id},{currency:'NGN',policyVersion:'step12-dummy-20261014-v1',evidence:'TEST ONLY exact original tiny service correction',effect:'credit_note',receivableAccountId:a['1100'],clientCreditAccountId:a['2100'],reductions:[{accountId:a['4000'],amount:'0.01',category:'income',evidence:'Offset original unpaid tiny exempt recognition'}]});
+  await record('Reviewed noncash credit offsets tiny control while retaining original native journal',{invoiceId:unpaid.id,noteId:note.id,creditJournalId:correction.journalId});
   const fixture=await owner.request('POST','/invoices',{containerIds:[38],vatRate:0,dueDate:'2026-10-15',notes:'STEP12 TEST ONLY issued cancellation acceptance'},201);
   await record('One required native-unrecognised cancellation fixture created',{invoiceId:fixture.id});
   await owner.request('PATCH',`/invoices/${fixture.id}/items/${fixture.items[0].id}`,{amount:0.01,description:'TEST ONLY cancellable unrecognised service'});
@@ -482,7 +527,7 @@ else if(mode==='cancel-native-retest'){
   assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10152.50);
   await record('Cancellation controls/review preserve all previously reconciled native figures',{profit:'230.50',bank5:10152.50,bank6:25});
   await writeFile('docs/evidence/2026-10-14-step12-invoice-cancel-live.json',JSON.stringify({results},null,2)+'\n',{flag:'wx'});
- }finally{await owner.request('POST','/auth/logout',{},200,'all');}
+ }finally{for(const actor of[owner,preparer])await actor.request('POST','/auth/logout',{},200,'all');}
 }
 else if(mode==='ai-content-check'){
  const owner=await session(credential.email,credential.password),results=[];

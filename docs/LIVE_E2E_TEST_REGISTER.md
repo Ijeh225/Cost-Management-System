@@ -1,5 +1,16 @@
 # Live End-to-End Test Register
 
+## 2026-10-14 17:22 WAT - Final formatter suite accepted / retained re-test next
+-483unit/API PASS/3prior skips/61files, complete typechecks/build/helper syntax/diff PASS. STEP12-INV-002 cancelled-display fix release-ready, exact same21detail/list/AR/normal-repeat refusal and18/20native guard plus28head review next; run resume-cancel only.
+- Consolidated coverage/training in `docs/STEP12_LIVE_ACCEPTANCE.md`; actual scoped staff management screenshot13322.82balanced/230.50profit/10177.50cash retained. All method limitations and generic source-review gap explicit; no blanket system/staff-launch acceptance claimed.
+
+## 2026-10-14 17:17 WAT - Exact native guard deployment and live cancelled-display defect
+- STEP12-INV-001 High live protection PASS at5dc9974/Railway85a0e30d SUCCESS: retained18/native21 refuses409; truly unpaid20/native33 refuses409, Sent/0.01AR/no payments unchanged; CN5/native34 reviewed offset restores native totals without cash. Both live gatesON verified. Existing119.35s/61.29s isolated protection/race evidence retained.
+- STEP12-INV-002 Medium OPEN: actual unrecognized issued invoice21 cancels normally but shared GET/list formatter still returns outstanding0.01; AR excludes it. Narrow cancelled/written-off display guard with original total retained added;12focused tests PASS. Build/release and `resume-cancel` next, no new records. Earlier test helper counted noncash CN as cash before any write; corrected, not product defect.
+- Actual VAT staffUI native segmenteddate entry/register PASS: purchases300/VAT22.50/recoverable3/nonrecoverable19.50/net exempt sales900/output0. Management current13322.82debit=credit/profit230.50/cash10177.50 visible. Source completeness/historical caveats remain explicit.
+- Actual retained AI audit44 document_search confirms explicit indexed-content question on12/13; original43container_documents metadata qualification is not content proof. Exact vendor14 one match accepted. No raw transcripts retained.
+- STEP12-SOURCE-UI-001 High implementation gap: generic receipt/deposit/overhead/schedule/bank native adapters accepted through deployed engine only; ordinary public staff source-review/posting routes/UI absent. Existing configured invoice/duty/container UI does not cover them. Requires controlled workflow extension, not permission bypass or freehand protected-account corrections. Full Step12/staff launch NOT accepted; print-layout and actual books approval remain bounded outstanding work.
+
 ## 2026-10-14 17:05 WAT - Cancellation concurrency accepted / deployment next
 - Actual isolated source prepare waits on row-locked invoice cancellation, then refuses SOURCE_REVIEW_REQUIRED with zero journal; race case PASS (61.29s suite), cleanup/tunnel verified. Retained native recognition protection/old-risk characterization separately PASS119.35s.480unit/API/3prior skips/full build/final typechecks PASS.
 - STEP12-INV-001 locally corrected, NOT live CLOSED yet. Publish and verify exact release; re-use18/native21 for refusal, one necessary unrecognized issued cancellation control for normal behavior, then verify current230.50profit/10177.50cash unchanged. Original fixture phases must not be repeated.
