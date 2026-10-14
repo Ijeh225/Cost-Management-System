@@ -1,5 +1,16 @@
 # Step12 Live Acceptance
 
+## 2026-10-14 15:33 WAT - Payable fix release ready
+-464units/3prior skips/build/typechecks and1network105.23s same-day/history/future-date controls PASS, own namespace/tunnel/baseline cleanup accepted. Commit/push exact correction, await Railway SUCCESS, then resume-overhead retains11bill/10payment and executes remaining40 scheduled settlement; no repeat source creation.
+
+## 2026-10-14 15:30 WAT - Expense continuation and new confirmed payable defect
+- Duty source/reversal and cost VAT exercise accepted, retained IDs8/9/10 and shipping3/terminal4/native8-12. Wrong test taxAmount corrected to gross inclusive, same source resumed; correct guard refusal not labelled app bug.
+- STEP12-OH-001 confirmed: overhead11/native13 posted100, actual direct payment10of60 dated earlier same day refused because bill creation timestamp is used rather than recognition date. Source fix uses verified posted dependencies and retains exact dates/earlier settlements/unchanged-source checks. Network regression/build/release/live resume next; do not repeat expenses creation mode.
+
+## 2026-10-14 15:22 WAT - Deposit live closure and exact continuation
+- Verified actual completed resume evidence: allocation21/native7, source deposit5/native6 retained, Bank10700/AR300/deposit0/profit1000 and balanced reports. Exact fix a64df51 deployed SUCCESS as9d3d9bd1. STEP12-DEPOSIT-001 CLOSED; do not repeat creation or accepted core phases.
+- Continue independent live testing expense/direct VAT/reversal, overhead/schedule, credit/write-off and remaining workflow/UI/role/period acceptance. No full launch readiness or real accountant sign-off claimed; enabled test book and controls remain intact.
+
 ## 2026-10-14 14:18 WAT - Live activation/testing authorised
 - User explicitly authorised enabling native accounting in the deployed app for live testing; all existing data is test data. Authorised necessary controlled creates/edits/imports/deletes/fixes, not a claim of actual accountant certification.
 - New request supersedes prior keep-OFF instruction for this live rehearsal. Preserve mandatory independent approval, branch isolation, immutable posted journals/audit and idempotency controls; do not bypass them under blanket override wording.

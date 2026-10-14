@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile,appendFile,writeFile} from 'node:fs/promises';
 import {postLiveSource} from './step12-live-source-posting.mjs';
 const mode=process.argv[2]??'inspect';
-assert(['users','inspect','accounting','transactions','resume-deposit'].includes(mode));
+assert(['users','inspect','accounting','transactions','resume-deposit','expenses','resume-overhead'].includes(mode));
 assert(process.argv.includes('--confirm=STEP12-LIVE-TEST-20261014'));
 let input='';for await(const chunk of process.stdin)input+=chunk;
 const credential=JSON.parse(input);input='';
@@ -182,6 +182,87 @@ else if(mode==='transactions'){
   const management=await reviewer.request('GET',root+'/reports/management-accounts?branchId=2&from=2026-10-14&to=2026-10-31');assert.equal(management.statements.profitAndLoss.profit,'1000.00');assert.equal(management.statements.balanceSheet.difference,'0.00');
   await pass('Live deposit received once/allocated without extra cash, Bank and GL/TB/BS/management reconciliation',{clientId:client.id,bankId:bank.id,invoiceId:invoice.id,depositId:deposit.id,allocationPaymentId:allocated.id,depositJournal:depPost,allocationJournal:allocPost,bank:10700,outstanding:300,profit:1000});
   await writeFile('docs/evidence/2026-10-14-step12-transactions-live.json',JSON.stringify({bookId:f.bookId,clientId:client.id,bankId:bank.id,containerIds:jobs.map(j=>j.id),invoiceId:invoice.id,invoiceNumber:invoice.invoiceNumber,fundingId:funding.id,paymentId:payment.id,depositId:deposit.id,allocationPaymentId:allocated.id,beforeLedger:beforeLedger.summary,results},null,2)+'\n',{flag:'wx'});
+ }finally{for(const actor of [owner,preparer,reviewer])await actor.request('POST','/auth/logout',{},200,'all');}
+}
+else if(mode==='expenses'||mode==='resume-overhead'){
+ const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8')),a=f.accounts;
+ const owner=await session(credential.email,credential.password),preparer=await session('step12.preparer.20261014@donclimax.test',credential.testPassword),reviewer=await session('step12.reviewer.20261014@donclimax.test',credential.testPassword);
+ const root='/accounting/books/1',at=p=>root+p+'?branchId=2',results=[];
+ async function pass(name,detail={}){const item={time:new Date().toISOString(),pass:name,...detail};results.push(item);await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(item)+'\n');console.log(JSON.stringify(item));}
+ const basic={currency:'NGN',policyVersion:'step12-dummy-20261014-v1',evidence:'TEST ONLY reviewed source',bankAccounts:{5:a['1010']},cashAccountId:a['1000']};
+ async function configured(kind,id,code){
+  const body=kind==='duty_reversal'?{kind,id,evidence:'TEST ONLY reversal inherits retained original purchase tax'}:{kind,id,evidence:'TEST ONLY documented gross107.50 net100 VAT7.50 scenario',configurationId:1,taxCode:code,basis:'inclusive',taxAmount:'107.50',settlementAccountId:a['1010']};
+  const j=await preparer.request('POST',at('/tax-configuration/sources/prepare'),body);
+  assert.equal((await preparer.request('POST',at('/tax-configuration/sources/prepare'),body)).id,j.id);
+  await reviewer.request('POST',at(`/tax-configuration/journals/${j.id}/post`),{reason:'Independent dummy-source review against exact recorded bank amount and configured recovery'});
+  return j.id;
+ }
+ try{
+  let overhead,direct,finalDutyJournal,finalDuty,costIds=[];
+  if(mode==='expenses'){
+  const prior=await owner.request('GET','/duty-payments/36/transactions');assert(prior.transactions.length===0||(prior.transactions.length===1&&prior.transactions[0].id===8&&prior.transactions[0].reference==='STEP12-QA-DUTY-20261014'),'Unexpected partial phase: inspect retained IDs');
+  if(!prior.transactions.length){
+   await owner.request('PUT','/containers/36/charges',{section:'customs',customs:{duty:107.50},reason:'TEST ONLY dummy assessment'});
+   await owner.request('PATCH','/duty-payments/36',{amount:107.50,paymentDate:'2026-10-14',paymentMethod:'bank',bankId:5,reference:'STEP12-QA-DUTY-20261014'});
+  }
+  let history=(await owner.request('GET','/duty-payments/36/transactions')).transactions;
+  const duty=history.find(p=>p.reference==='STEP12-QA-DUTY-20261014');assert(duty);
+  await pass('Live duty assessed and bank payment recorded',{dutyId:duty.id,containerId:36,amount:107.50});
+  const dutyJournal=await configured('duty_payment',duty.id,'STD');
+  await owner.request('POST',`/duty-payments/transactions/${duty.id}/reverse`,{reversalDate:'2026-10-14',reference:'STEP12-QA-DUTY-REV-20261014',reason:'TEST ONLY traceable original duty reversal'});
+  history=(await owner.request('GET','/duty-payments/36/transactions')).transactions;
+  const reversal=history.find(p=>p.reversalOfTransactionId===duty.id);assert(reversal);assert.equal(reversal.amount,-107.50);
+  await pass('Live traceable duty reversal recorded',{dutyId:duty.id,reversalId:reversal.id,dutyJournal});
+  const reversalJournal=await configured('duty_reversal',reversal.id);
+  await owner.request('POST',`/duty-payments/transactions/${duty.id}/reverse`,{reference:'STEP12-QA-DUTY-REV-RETRY',reason:'Repeated reversal must be refused'},409);
+  assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10700);
+  await pass('Live duty reversal inherits original VAT, bank restored, duplicate reversal refused',{dutyJournal,reversalJournal});
+  await owner.request('PATCH','/duty-payments/36',{amount:107.50,paymentDate:'2026-10-14',paymentMethod:'bank',bankId:5,reference:'STEP12-QA-DUTY-FINAL-20261014'});
+  history=(await owner.request('GET','/duty-payments/36/transactions')).transactions;
+  finalDuty=history.find(p=>p.reference==='STEP12-QA-DUTY-FINAL-20261014');
+  await pass('Live replacement duty payment retained for nonrecoverable VAT scenario',{dutyId:finalDuty.id});
+  finalDutyJournal=await configured('duty_payment',finalDuty.id,'COST');
+  for(const [section,code]of [['shipping','COST'],['terminal','MIXED']]){
+   const paid=await owner.request('POST','/container-expense-payments/batch',{items:[{containerId:36,amount:107.50}],section,paymentMethod:'bank',bankId:5,reference:`STEP12-QA-${section.toUpperCase()}-20261014`,narration:'TEST ONLY gross107.50 net100 VAT7.50',paidAt:'2026-10-14T12:00:00Z'},201);
+   assert.equal(paid.count,1);const id=paid.payments[0].id;await pass('Live container direct payment recorded',{section,id,amount:107.50});
+   costIds.push({section,id,journalId:await configured('container_payment',id,code)});
+  }
+  overhead=await owner.request('POST','/overhead-expenses',{category:'Office Supplies',description:'STEP12 TEST ONLY office obligation 20261014',amount:100,reference:'STEP12-QA-OH-20261014'},201);
+  await pass('Live overhead obligation created',{expenseId:overhead.id,amount:100});
+  const initialMap={...basic,effect:'overhead',accountId:a['6000'],controlAccountId:a['2000'],recognitionDate:'2026-10-14',recognitionEvidence:'Dummy supplier obligation recognised today before settlement'};
+  postLiveSource(f,{kind:'overhead',id:overhead.id},initialMap);
+  direct=await owner.request('POST',`/overhead-expenses/${overhead.id}/payments`,{amount:60,paymentMethod:'bank',bankId:5,paidAt:'2026-10-14T12:00:00Z',notes:'STEP12 TEST ONLY direct60'},201);
+  await pass('Live overhead direct partial settlement recorded',{expenseId:overhead.id,paymentId:direct.payment.id});
+  }else{
+   overhead=(await owner.request('GET','/overhead-expenses')).find(e=>e.id===11);assert(overhead);assert.equal(overhead.reference,'STEP12-QA-OH-20261014');assert.equal(overhead.balance,40);assert.equal(overhead.payments.length,1);
+   direct={payment:overhead.payments[0]};assert.equal(direct.payment.id,10);assert.equal(direct.payment.amount,60);
+   assert.equal((await owner.request('GET','/banks/5/transactions')).closingBalance,10317.50);
+   finalDuty={id:10};finalDutyJournal=10;costIds=[{section:'shipping',id:3,journalId:11},{section:'terminal',id:4,journalId:12}];
+  }
+  const ohMap={...basic,effect:'overhead',accountId:a['6000'],controlAccountId:a['2000'],recognitionDate:'2026-10-14',recognitionEvidence:'Dummy supplier obligation recognised today before settlement'};
+  const ohJournal=postLiveSource(f,{kind:'overhead',id:overhead.id},ohMap);
+  const directJournal=postLiveSource(f,{kind:'expense_payment',id:direct.payment.id},ohMap);
+  const linked=await owner.request('POST',`/overhead-expenses/${overhead.id}/payment-schedules`,{amountRequested:40,scheduleDate:'2026-10-14',vendorBeneficiary:'STEP12 TEST ONLY overhead supplier',description:'Pay remaining overhead40'},201);
+  await pass('Live overhead-linked schedule created',{expenseId:overhead.id,scheduleId:linked.schedule.id});
+  await preparer.request('PATCH',`/payment-schedules/${linked.schedule.id}/approve`,{},403);
+  await owner.request('PATCH',`/payment-schedules/${linked.schedule.id}/approve`,{comment:'Authorised dummy settlement'});
+  await preparer.request('PATCH',`/payment-schedules/${linked.schedule.id}/pay`,{amount:40,paymentMethod:'bank',bankId:5,paidAt:'2026-10-14T12:00:00Z'});
+  const expenses=await owner.request('GET','/overhead-expenses');const paidExpense=expenses.find(e=>e.id===overhead.id);assert(paidExpense);assert.equal(paidExpense.balance,0);
+  const scheduledPayment=paidExpense.payments.find(p=>p.id!==direct.payment.id);assert(scheduledPayment);
+  await pass('Live scheduled overhead settlement recorded once in expense-payment ledger',{expenseId:overhead.id,paymentId:scheduledPayment.id,scheduleId:linked.schedule.id});
+  const scheduledJournal=postLiveSource(f,{kind:'expense_payment',id:scheduledPayment.id},ohMap);
+  const linkedDetail=await preparer.request('GET',`/payment-schedules/${linked.schedule.id}`);assert.equal(linkedDetail.payments.length,0);assert.equal(linkedDetail.events.filter(e=>e.type==='approved').length,1);assert.equal(linkedDetail.events.filter(e=>e.type==='paid').length,1);
+  await preparer.request('PATCH',`/payment-schedules/${linked.schedule.id}/pay`,{amount:1,paymentMethod:'bank',bankId:5},400);
+  await owner.request('DELETE',`/overhead-expenses/${overhead.id}`,undefined,409);
+  const disposable=await owner.request('POST','/overhead-expenses',{category:'Office Supplies',description:'STEP12 TEST ONLY deletable unpaid fixture',amount:1},201);
+  await owner.request('DELETE',`/overhead-expenses/${disposable.id}`);
+  const bank=await owner.request('GET','/banks/5/transactions');assert.equal(bank.closingBalance,10277.50);
+  const tb=await reviewer.request('GET',root+'/reports/trial-balance?branchId=2&from=2026-10-14&to=2026-10-31');assert.equal(tb.balanced,true);
+  for(const [code,amount]of [['1010','10277.50'],['1400','3.00'],['5010','107.50'],['5020','107.50'],['5030','104.50'],['6000','100.00'],['2000','0.00']])assert.equal(tb.rows.find(r=>r.code===code).closing,amount,code);
+  const management=await reviewer.request('GET',root+'/reports/management-accounts?branchId=2&from=2026-10-14&to=2026-10-31');assert.equal(management.statements.profitAndLoss.profit,'580.50');assert.equal(management.statements.balanceSheet.difference,'0.00');
+  const tax=await reviewer.request('GET',root+'/tax-configuration/register?branchId=2&from=2026-10-14&to=2026-10-31');
+  await pass('Live duty/shipping/terminal VAT and direct/scheduled overhead reconcile with no duplicate expense',{bank:10277.50,profit:580.50,inputVat:3,expenseId:overhead.id,scheduleId:linked.schedule.id,dutyId:finalDuty.id,dutyJournal:finalDutyJournal,costIds,overheadJournal:ohJournal.journalId,directJournal:directJournal.journalId,scheduledJournal:scheduledJournal.journalId,tax});
+  await writeFile('docs/evidence/2026-10-14-step12-expenses-live.json',JSON.stringify({bookId:1,results},null,2)+'\n',{flag:'wx'});
  }finally{for(const actor of [owner,preparer,reviewer])await actor.request('POST','/auth/logout',{},200,'all');}
 }
 else {

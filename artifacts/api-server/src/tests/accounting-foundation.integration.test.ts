@@ -353,6 +353,28 @@ describe("Step7 remaining operational source integration",()=>{
     await sql("UPDATE overhead_expenses SET amount=121 WHERE id=$1",[bill]);
     await expect(service.prepareOperational(f.book,f.branch,f.preparer,{kind:"expense_payment",id:payment},mapping)).rejects.toMatchObject({code:"SOURCE_CHANGED"});
   },180000);
+  it("Step12 same-day overhead entry time does not reject dated settlement or corrupt historical retries",async()=>{
+    const f=await operationalFixture();
+    const bill=(await sql(`INSERT INTO overhead_expenses(branch_id,category,description,amount,created_at)
+      VALUES($1,'Office','Dummy bill entered after payment time',100,'2026-10-10 15:00:00') RETURNING id`,[f.branch])).rows[0].id;
+    const mapping={...f.mapping,effect:"overhead" as const,recognitionDate:"2026-10-10",recognitionEvidence:"Reviewed same-day obligation, not entry timestamp"};
+    const first=(await sql(`INSERT INTO expense_payments(branch_id,expense_id,amount,bank_id,payment_method,paid_at)
+      VALUES($1,$2,60,$3,'transfer','2026-10-10 12:00:00') RETURNING id`,[f.branch,bill,f.bank])).rows[0].id;
+    await expect(service.prepareOperational(f.book,f.branch,f.preparer,{kind:"expense_payment",id:first},mapping)).rejects.toMatchObject({code:"SOURCE_NOT_POSTED"});
+    await postOperational(f,{kind:"overhead",id:bill},mapping);
+    const firstJournal=await postOperational(f,{kind:"expense_payment",id:first},mapping);
+    const later=(await sql(`INSERT INTO expense_payments(branch_id,expense_id,amount,bank_id,payment_method,paid_at)
+      VALUES($1,$2,40,$3,'transfer','2026-10-10 16:00:00') RETURNING id`,[f.branch,bill,f.bank])).rows[0].id;
+    await postOperational(f,{kind:"expense_payment",id:later},mapping);
+    expect((await postOperational(f,{kind:"expense_payment",id:first},mapping)).id).toBe(firstJournal.id);
+    expect(await balances(f)).toEqual(new Map([[f.expense,"10000"],[f.credit,"0"],[f.debit,"-10000"]]));
+    const earlier=(await sql(`INSERT INTO expense_payments(branch_id,expense_id,amount,bank_id,payment_method,paid_at)
+      VALUES($1,$2,1,$3,'transfer','2026-10-09 12:00:00') RETURNING id`,[f.branch,bill,f.bank])).rows[0].id;
+    // Keep the original source below its total while proving the future bill
+    // is still unavailable before its reviewed accounting date.
+    await sql("DELETE FROM expense_payments WHERE id=$1",[later]);
+    await expect(service.prepareOperational(f.book,f.branch,f.preparer,{kind:"expense_payment",id:earlier},mapping)).rejects.toMatchObject({code:"SOURCE_NOT_POSTED"});
+  },180000);
   it("honors five standalone classifications and rejects unknown/stale evidence and wrong bank branches",async()=>{
     const f=await operationalFixture();
     for(const [effect,accountId] of [["loan_funding",f.credit],["equity_funding",f.equity]] as const) {

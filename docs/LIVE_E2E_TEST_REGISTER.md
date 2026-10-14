@@ -1,5 +1,18 @@
 # Live End-to-End Test Register
 
+## 2026-10-14 15:33 WAT - STEP12-OH-001 local correction PASS / release pending
+-1network owned case105.23s accepts same-day entered-later obligation, historical retry after later settlement, exact cash/AP/expense and future recognition refusal. Own namespace/source baseline/tunnel cleanup verified.464unit/API/3prior skips/build/typechecks PASS.
+- Exact deployed receipt10 retest remains pending; preserve source IDs and resume-overhead after patch SUCCESS. Do not mark full module/system passed yet.
+
+## 2026-10-14 15:30 WAT - STEP12-OH-001 HIGH / live FAIL, exact fixtures preserved
+- Native payable rejects expense_payment10(60 dated12:00) although overhead11/native13(100) recognised same day. Root cause timestamp-based existedBefore excludes bill entered14:27. Source correction/test in progress; no closure claimed yet. Resume bill11/payment10, not duplicate duty/expense phase.
+- Duty8/full recovery/reversal9/native8/9/bank restoration10700/duplicate409 PASS. Replacement duty10,shipping3,terminal4 native10/11/12 exercise nonrecoverable and40percent VAT. Initial wrong VAT-only input correctly refused; helper corrected to full inclusive gross107.50, not an app defect.
+
+## 2026-10-14 15:22 WAT - STEP12-DEPOSIT-001 CLOSED by exact deployed live retest
+- a64df51 / Railway9d3d9bd1 SUCCESS. Actual retained deposit5 Bank Transfer receipt posts once(native6) without method rewrite. Allocation21/native7 stable request retry accepted; native cashMovement0.00, no second bank receipt.
+- Actual operational bank10700/nativebank10700/AR300/deposit0/profit1000; native TB balanced and BSdifference0. Evidence transactions-live JSON/event log. No duplicate client/bank/job/invoice/deposit created.
+- Core/receipt phases accepted; full Step12 still IN PROGRESS, next expense/VAT/overhead/schedule/credit/write-off/operational/UI/period scenarios. Both native gatesON under explicit owner live-test authority; protections retained.
+
 ## 2026-10-14 15:08 WAT - STEP12-DEPOSIT-001 local tests PASS; live closure pending
 -464unit/API PASS/3prior skips includes4real form-label/evidence and bank-negative cases.1network isolated actual Bank Transfer source receipt/idempotency/independent posting/source-preservation regression PASS, namespace/financial baseline/tunnel cleanup verified. Build/typechecks PASS.
 - Alias correction does not rewrite source, weaken bank/grant checks or infer a bank. Deploy and retest retained deposit5, then allocate300once and reconcile expectedbank10700/AR300/deposit0/profit1000 before closing defect.

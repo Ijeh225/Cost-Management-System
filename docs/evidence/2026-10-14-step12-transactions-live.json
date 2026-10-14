@@ -1,0 +1,84 @@
+{
+  "bookId": 1,
+  "clientId": 12,
+  "bankId": 5,
+  "containerIds": [
+    36,
+    37
+  ],
+  "invoiceId": 17,
+  "invoiceNumber": "INV-202610-003",
+  "fundingId": 3,
+  "paymentId": 20,
+  "depositId": 5,
+  "allocationPaymentId": 21,
+  "results": [
+    {
+      "time": "2026-10-14T14:15:37.117Z",
+      "pass": "STEP12-DEPOSIT-001 live retained Bank Transfer deposit posts once without source method rewrite",
+      "depositId": 5,
+      "native": {
+        "source": {
+          "kind": "client_deposit",
+          "id": 5
+        },
+        "journalId": 6,
+        "eventKey": "source:client_deposit:5:v1",
+        "cashMovement": "300.00",
+        "lines": [
+          {
+            "accountId": 2,
+            "debit": "300.00",
+            "credit": "0.00",
+            "memo": ""
+          },
+          {
+            "accountId": 9,
+            "debit": "0.00",
+            "credit": "300.00",
+            "memo": ""
+          }
+        ],
+        "existedBefore": false,
+        "method": "deployed NativeAccounting service with named preparer/reviewer grants, not direct SQL posting or signed-in source-review UI"
+      }
+    },
+    {
+      "time": "2026-10-14T14:15:45.373Z",
+      "pass": "Live deposit allocation retry/noncash controls and operational Bank/native GL/TB/BS/management reconcile",
+      "invoiceId": 17,
+      "clientId": 12,
+      "bankId": 5,
+      "depositId": 5,
+      "allocationPaymentId": 21,
+      "allocationJournal": {
+        "source": {
+          "kind": "invoice_payment",
+          "id": 21
+        },
+        "journalId": 7,
+        "eventKey": "source:invoice_payment:21:v1",
+        "cashMovement": "0.00",
+        "lines": [
+          {
+            "accountId": 9,
+            "debit": "300.00",
+            "credit": "0.00",
+            "memo": ""
+          },
+          {
+            "accountId": 3,
+            "debit": "0.00",
+            "credit": "300.00",
+            "memo": ""
+          }
+        ],
+        "existedBefore": false,
+        "method": "deployed NativeAccounting service with named preparer/reviewer grants, not direct SQL posting or signed-in source-review UI"
+      },
+      "bank": 10700,
+      "outstanding": 300,
+      "profit": 1000
+    }
+  ]
+}

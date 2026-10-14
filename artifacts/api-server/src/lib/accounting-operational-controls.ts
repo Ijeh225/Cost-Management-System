@@ -110,7 +110,10 @@ export async function validateOperationalControls(client:Client,bookId:number,br
     requireAccounting(mapping.controlAccountId===original.controlAccountId,"INVALID_MAPPING","Bill and payments must share the original payable control");
     if(source.kind==="overhead_topup") requireAccounting(mapping.accountId===original.accountId,"INVALID_MAPPING","Top-up must use the original reviewed expense head");
     if(source.kind==="expense_payment") {
-      const balance=prior.filter(j=>evidenceOf(j).source?.expenseId===source.expenseId && existedBefore(j))
+      // Entry time is not the recognition date. Use the verified bill and
+      // dated prior settlements, excluding later payments when replaying.
+      const dependencies=new Set(source.dependencies);
+      const balance=prior.filter(j=>dependencies.has(j.event_key))
         .reduce((sum,j)=>sum-value(j,mapping.controlAccountId),0n);
       requireAccounting(balance>=moneyToMinor(source.amount),"CONTROL_MISMATCH","Payment cannot exceed the posted obligation");
     }
