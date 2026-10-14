@@ -8,6 +8,12 @@ const deposit: SettlementSource = { kind: "client_deposit", id: 4, branchId: 2, 
   accountingDate: "2026-10-11", amount: "100.00", paymentMethod: "transfer", bankId: 7 };
 const payment: SettlementSource = { ...deposit, kind: "invoice_payment", id: 9, entryType: "payment" };
 describe("Step7 settlement mapping - no automatic posting", () => {
+  it.each(["Bank Transfer","BANK TRANSFER"," bank_transfer ","Cheque"])("accepts real deposit form method %s without rewriting retained evidence",method=>{
+    const source={...deposit,paymentMethod:method},draft=buildSettlementJournal(1,source,mapping);
+    expect(draft.cashMovement).toBe("100.00");expect(draft.input.lines[0]!.accountId).toBe(101);
+    expect(JSON.parse(draft.input.evidence).source.paymentMethod).toBe(method);
+    expect(()=>buildSettlementJournal(1,{...source,bankId:null},mapping)).toThrow();
+  });
   it("records a deposit receipt against liability, never income", () => {
     const draft = buildSettlementJournal(1, deposit, mapping);
     expect(draft.input.lines).toEqual([{ accountId: 101, debit: "100.00", credit: "0" }, { accountId: 210, debit: "0", credit: "100.00" }]);

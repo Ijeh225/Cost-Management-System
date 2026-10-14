@@ -1,5 +1,22 @@
 # Project State
 
+## 2026-10-14 15:08 WAT - Deposit form-label correction verified locally; release pending
+- STEP12-DEPOSIT-001 narrowly recognises actual `Bank Transfer` form label as bank_transfer for routing only; original paymentMethod/source/evidence/hash is not rewritten.4new label/evidence/bank-negative units included in464unit/API PASS/3prior skips.1actual form-label isolated DB receipt/idempotency/source-preservation test PASS(72.36s), own schema removed, shared baseline unchanged and tunnel closed. Full typechecks/build PASS.
+- Publish/retest still pending. Resume ONLY `resume-deposit` using existing client12/bank5/invoice17/deposit5/cash20/jobs36/37/native3-5, not transactions creation mode. Stable allocation requestKey preserves retries. Full Step12 still IN PROGRESS; live gatesON.
+
+## 2026-10-14 15:03 WAT - STEP12-DEPOSIT-001 confirmed live; preserve exact resume
+- Live new sources: client12, bank5, funding3/native journal3(10000capital); jobs36/37 share shipment18/B-L STEP12-LIVE-BL-20261014; invoice17 INV-202610-003 totals1000/2items, issued/native journal4; cash payment20(400)/native journal5, invoice outstanding600.
+- Actual deposit5(client12/bank5/300) saves valid API/UI method `Bank Transfer`, but deployed native receipt rejects SOURCE_REVIEW_REQUIRED `Supported payment method and explicit bank required`. Source confirmed: builder lowercases to `bank transfer` but whitelist only accepts `bank_transfer`/`transfer`. No native deposit journal or allocation exists yet; DO NOT recreate client/bank/jobs/invoice/payment/deposit or rerun full transactions creation mode.
+- Correct only known method alias in existing native settlement builder while retaining original source/evidence and all bank/scope controls. Add real form-label tests/database regression, build/deploy/live retest deposit5 then allocate300 using stable requestKey and reconcile bank10700/nativeAR300/deposit0/profit1000.
+- Native generic funding/settlement backend acceptance uses actual deployed service with named actors, not raw SQL journal writes and NOT signed-in source-posting UI acceptance. Tax/invoice/native core workflows tested real HTTPS. Full operational/source/UI/role/period acceptance still IN PROGRESS; real company approvals remain separate.
+
+## 2026-10-14 14:49 WAT - First real native write acceptance PASS / Step12 continues
+- STEP12-ROUTE-001 corrected/pushed `25557b729c91008f70a69b05915c10ee0f5c0ead`; exact Railway `25c0b3cd-1ad5-4630-a486-f2558435ad3f` SUCCESS. Same staff15/16 now access native routes without promotion.460unit/API/3prior skips/typechecks/build retained; live negative auth/foreign scope remained refused.
+- Actual deployed authenticated HTTP/CSRF write controls passed using stable fixture identities: full27-account zero new-QA-book opening1 independently verified with no journal; hypothetical VAT/direct-cost configuration1 independently approved; manual journal1 exact0.12 posted and linked reversal2 posted once; valuation1 approved, netassets80.01 with explicit unknown book amount, no ledger effect.
+- Live GL/TB/BS/management reconcile manual+reversal: period debit/credit0.24, closing difference0, closing balances0, profit0. Legacy operational sources are not silently imported or claimed reconciled into this new dated test book. Test controls are not actual accountant certification.
+- Actual record IDs/results retained in `docs/evidence/2026-10-14-step12-accounting-live.json` and append-only events log. BOTH live native gates remainON per owner. No duplicate historical invoice/test fixture, source deletion or destructive restoration.
+- Step12 still IN PROGRESS: next controlled operational invoice/payment/duty/expense/schedule/bank source scenarios and native links, real UI/output/role/period/restore/training acceptance. Do not re-run accepted core phase after further transactions; continue from retained IDs/current phase.
+
 ## 2026-10-14 14:41 WAT - Routing fix release ready
 - Full unit/API suite460PASS/3prior skips/58files, including9new real-route-chain cases; complete build/typechecks and helper syntax/diff checks PASS. Publish namespace-only STEP12-ROUTE-001 fix with live rehearsal records/helpers and then confirm actual staff native opening GET succeeds. No role escalation or financial rule bypass.
 

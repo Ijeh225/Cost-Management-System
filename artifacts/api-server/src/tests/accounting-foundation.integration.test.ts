@@ -567,6 +567,16 @@ describe("Step7 invoice recognition integration", () => {
   });
 });
 describe("Step7 inactive source integration", () => {
+  it("Step12 actual deposit method Bank Transfer posts once and preserves original source/evidence",async()=>{
+    const f=await settlementFixture();await sql("UPDATE client_deposits SET payment_method='Bank Transfer' WHERE id=$1",[f.deposit]);
+    const before=(await sql("SELECT row_to_json(d) data FROM client_deposits d WHERE id=$1",[f.deposit])).rows[0].data;
+    const first=await service.prepareSettlement(f.book,f.branch,f.preparer,{kind:"client_deposit",id:f.deposit},f.mapping);
+    expect((await service.prepareSettlement(f.book,f.branch,f.preparer,{kind:"client_deposit",id:f.deposit},f.mapping)).id).toBe(first.id);
+    await service.approveAndPost(f.book,f.branch,f.approver,first.id,"Dummy independent real form-method receipt review");
+    expect(await balances(f)).toEqual(new Map([[f.debit,"10000"],[f.credit,"-10000"]]));
+    const read=await service.readJournal(f.book,f.branch,f.approver,first.id);expect(JSON.parse(read.evidence).source.paymentMethod).toBe("Bank Transfer");
+    expect((await sql("SELECT row_to_json(d) data FROM client_deposits d WHERE id=$1",[f.deposit])).rows[0].data).toEqual(before);
+  });
   it("previews without writes, posts one deposit and allocation without counting cash twice", async () => {
     const f = await settlementFixture();
     const snapshot = (await sql("SELECT row_to_json(d) data FROM client_deposits d WHERE id=$1", [f.deposit])).rows[0].data;

@@ -1,5 +1,21 @@
 # Live End-to-End Test Register
 
+## 2026-10-14 15:08 WAT - STEP12-DEPOSIT-001 local tests PASS; live closure pending
+-464unit/API PASS/3prior skips includes4real form-label/evidence and bank-negative cases.1network isolated actual Bank Transfer source receipt/idempotency/independent posting/source-preservation regression PASS, namespace/financial baseline/tunnel cleanup verified. Build/typechecks PASS.
+- Alias correction does not rewrite source, weaken bank/grant checks or infer a bank. Deploy and retest retained deposit5, then allocate300once and reconcile expectedbank10700/AR300/deposit0/profit1000 before closing defect.
+
+## 2026-10-14 15:03 WAT - STEP12-DEPOSIT-001 HIGH / actual live FAIL
+- Client Deposits/native settlement integration: deployed deposit5 using valid `Bank Transfer` method recorded300 in bank5, native receipt refuses SOURCE_REVIEW_REQUIRED even with explicit valid bank mapping. Root cause known-label mismatch (`bank transfer` versus accepted `bank_transfer`), not missing bank or actual source corruption.
+- Before failure: real client12/bank5, funding3 and duplicate reference409(no second funding), jobs36/37 share B/L/shipment18, draft/issued invoice17(total1000/2items)/native recognition4, partial cash20(400)/native5/outstanding600 accepted. Deposit5 retained; no native posting/allocation yet.
+- Preserve exact IDs; fix builder alias/evidence compatibility and test before resuming retained deposit. No historical data deletion or silent method rewrite. Full system remains IN PROGRESS.
+
+## 2026-10-14 14:49 WAT - STEP12-ROUTE-001 CLOSED by live retest; native core PASS
+- Exact25557b7 release25c0b3cd SUCCESS, live finance staff15/16 authenticated/CSRF requests succeed without elevated authority. Foreign finance17 scope mismatch and unauthenticated calls refused;9real chain regressions included in460unit/API PASS.
+- Actual live opening1: all27explicit zero new-QA-book accounts, bad unbalanced preview refused, stable prepare retry retained one ID, staff self-verification refused, independent16 verifies once; journalIdnull. Not actual company opening balances.
+- Actual live VAT config1:5hypothetical codes, explicit Duty/Shipping/Terminal heads, independent review, owner self-approval refused. Manual1:0.12 depreciation supported chart, submit/post/retry controls; linked posted reversal2 offsets once. Valuation1:assets100.01/liabilities20/netassets80.01,1unknown carrying amount, independent review/no self approval/no journal.
+- Actual live GL/TB/Balance Sheet/management: exact period0.24debit/credit and all closing/profit0 after manual reversal; four retained line entries, valuation has no financial posting. Evidence JSON/event log saved, no credentials.
+- Bounds: this is new-book native core acceptance, NOT full operational source/bank/legacy opening reconciliation, whole-system UI or professional launch acceptance. Next operational write/source-link and UI/output/role/period verification. Both gates remainON for owner-authorised live testing; no old records deleted.
+
 ## 2026-10-14 14:41 WAT - Routing correction tests PASS, release pending
 -460unit/API PASS/3prior skips/58files includes9real entire-router-chain regressions; complete typechecks/build PASS, live helper syntax PASS. Publish and verify staff access before closing STEP12-ROUTE-001. Initial live failure remains a confirmed defect, not a guess.
 

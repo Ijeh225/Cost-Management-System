@@ -35,7 +35,8 @@ export function buildSettlementJournal(bookId: number, source: SettlementSource,
     : ["payment", "reversal"].includes(source.entryType ?? "") && negative === reversal
       && (!reversal || Number.isSafeInteger(source.reversalOfId) && source.reversalOfId! > 0)),
   "INVALID_SOURCE", "Positive original or linked negative reversal required");
-  const method = source.paymentMethod.trim().toLowerCase();
+  const recordedMethod = source.paymentMethod.trim().toLowerCase();
+  const method = recordedMethod === "bank transfer" ? "bank_transfer" : recordedMethod;
   const allocation = source.kind === "invoice_payment" && source.sourceDepositId != null;
   let debitAccountId: number;
   let creditAccountId: number;

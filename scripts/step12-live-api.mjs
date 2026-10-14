@@ -1,8 +1,9 @@
 // Controlled live HTTP acceptance. Run only with explicit owner authorisation.
 import assert from 'node:assert/strict';
 import {readFile,appendFile,writeFile} from 'node:fs/promises';
+import {postLiveSource} from './step12-live-source-posting.mjs';
 const mode=process.argv[2]??'inspect';
-assert(['users','inspect','accounting'].includes(mode));
+assert(['users','inspect','accounting','transactions','resume-deposit'].includes(mode));
 assert(process.argv.includes('--confirm=STEP12-LIVE-TEST-20261014'));
 let input='';for await(const chunk of process.stdin)input+=chunk;
 const credential=JSON.parse(input);input='';
@@ -41,7 +42,7 @@ if(mode==='users'||mode==='inspect'){
    console.log(JSON.stringify({mode,users:result}));
   }
  }finally{await owner.request('POST','/auth/logout',{},200,'all');}
-}else{
+}else if(mode==='accounting'){
  assert(process.env.STEP12_SETUP_PATH,'Reviewed setup evidence path required');
  const fixture=JSON.parse(await readFile(process.env.STEP12_SETUP_PATH,'utf8'));
  assert(fixture.bookId&&fixture.testBranchId===2);
@@ -135,4 +136,74 @@ if(mode==='users'||mode==='inspect'){
  }finally{
   for(const actor of [owner,preparer,reviewer,foreign])await actor.request('POST','/auth/logout',{},200,'all');
  }
+}
+else if(mode==='transactions'){
+ const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8'));
+ const core=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-accounting-live.json','utf8'));
+ const owner=await session(credential.email,credential.password),preparer=await session('step12.preparer.20261014@donclimax.test',credential.testPassword),reviewer=await session('step12.reviewer.20261014@donclimax.test',credential.testPassword);
+ const results=[],label='STEP12 LIVE 20261014 Financial Workflow QA',a=f.accounts,root=`/accounting/books/${f.bookId}`,at=(p)=>root+p+'?branchId=2';
+ const eq=(actual,value)=>assert.equal(Math.round(Number(actual)*100),Math.round(value*100));
+ async function pass(name,detail={}){const item={time:new Date().toISOString(),pass:name,...detail};results.push(item);await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(item)+'\n');console.log(JSON.stringify(item));}
+ try{
+  const existing=(await owner.request('GET','/clients')).filter(c=>c.name===label);assert.equal(existing.length,0,'Controlled client exists; inspect/resume its exact recorded IDs, never rerun creation blindly');
+  const beforeBanks=await owner.request('GET','/banks'),beforeLedger=await owner.request('GET','/reports/financial-ledger');
+  const client=await owner.request('POST','/clients',{name:label,branchId:2,notes:'Authorised live test data, no external client/contact/messages'},201);
+  const bank=await owner.request('POST','/banks',{name:'STEP12 TEST ONLY Bank 20261014',branchId:2},201);
+  await pass('Live controlled client/bank creation',{clientId:client.id,bankId:bank.id,existingBankBalances:beforeBanks.map(b=>({id:b.id,balance:b.currentBalance}))});
+  const funding=await owner.request('POST',`/banks/${bank.id}/fund-additions`,{amount:10000,reference:'STEP12-QA-FUND-20261014',narration:'TEST ONLY dummy capital funding, no external money transfer'},201);
+  await owner.request('POST',`/banks/${bank.id}/fund-additions`,{amount:10000,reference:' STEP12-QA-FUND-20261014 ',narration:'Duplicate test must be refused'},409);
+  const fundingPost=postLiveSource(f,{kind:'bank_funding',id:funding.id},{currency:'NGN',policyVersion:'step12-dummy-20261014-v1',evidence:'TEST ONLY explicitly reviewed dummy capital funding',effect:'equity_funding',accountId:a['3000'],bankAccounts:{[bank.id]:a['1010']}});
+  await pass('Live Bank funding/ref duplicate refusal and deployed source journal once',{bankId:bank.id,fundingId:funding.id,native:fundingPost});
+  const jobs=[];for(const [number,clearing] of [['S12Q2610141',600],['S12Q2610142',400]])jobs.push(await owner.request('POST','/containers',{containerNumber:number,blNumber:'STEP12-LIVE-BL-20261014',customerName:label,clientId:client.id,branchId:2,command:'PTML',clearingCharges:clearing,declaration:'TEST ONLY live end-to-end acceptance, no actual cargo movement'},201));
+  await pass('Live two independent jobs under one B/L',{containerIds:jobs.map(j=>j.id),shipmentIds:jobs.map(j=>j.shipmentId)});
+  const invoice=await owner.request('POST','/invoices',{containerIds:jobs.map(j=>j.id),branchId:2,vatRate:0,dueDate:'2026-10-13',notes:label},201);
+  eq(invoice.total,1000);assert.equal(invoice.items.length,2);assert.equal(invoice.status,'draft');
+  await owner.request('PATCH',`/invoices/${invoice.id}`,{status:'sent'});
+  const recognised=await preparer.request('POST',at('/tax-configuration/sources/prepare'),{kind:'invoice',id:invoice.id,evidence:'TEST ONLY bundled clearing fee source review',configurationId:core.configurationId,taxCode:'EXEMPT',recognitionDate:'2026-10-14',receivableAccountId:a['1100'],incomeAccountId:a['4000']});
+  await reviewer.request('POST',at(`/tax-configuration/journals/${recognised.id}/post`),{reason:'Independent TEST ONLY reviewer checked two container items sum1000 and exempt scenario'});
+  await pass('Live invoice draft/issue/retained overdue terms and two-container native recognition',{invoiceId:invoice.id,invoiceNumber:invoice.invoiceNumber,nativeJournalId:recognised.id,total:1000});
+  await owner.request('POST',`/invoices/${invoice.id}/payments`,{amount:400,paymentMethod:'transfer',bankId:bank.id,reference:'STEP12-QA-COLLECTION-20261014',requestId:'step12_invoice_cash_20261014'},201);
+  let live=await owner.request('GET',`/invoices/${invoice.id}`);
+  const payment=live.payments.find(p=>p.reference==='STEP12-QA-COLLECTION-20261014');assert(payment);eq(live.outstanding,600);
+  const settlement={currency:'NGN',policyVersion:'step12-dummy-20261014-v1',evidence:'TEST ONLY recorded receipt/deposit allocation source review',bankAccounts:{[bank.id]:a['1010']},cashAccountId:a['1000'],receivableAccountId:a['1100'],depositLiabilityAccountId:a['2100']};
+  const cashPost=postLiveSource(f,{kind:'invoice_payment',id:payment.id},settlement);
+  await pass('Live partial invoice cash collection and native AR/bank posting',{invoiceId:invoice.id,paymentId:payment.id,outstanding:600,native:cashPost});
+  const deposit=await owner.request('POST',`/clients/${client.id}/deposits`,{amount:300,paymentMethod:'Bank Transfer',bankId:bank.id,reference:'STEP12-QA-DEPOSIT-20261014',notes:'TEST ONLY controlled deposit'},201);
+  await pass('Live client deposit recorded using the actual UI/API Bank Transfer method',{clientId:client.id,depositId:deposit.id,bankId:bank.id,amount:300});
+  const depPost=postLiveSource(f,{kind:'client_deposit',id:deposit.id},settlement);
+  await owner.request('POST',`/client-deposits/${deposit.id}/allocate`,{invoiceId:invoice.id,amount:300,requestKey:'step12_deposit_alloc_20261014'},200);
+  live=await owner.request('GET',`/invoices/${invoice.id}`);eq(live.outstanding,300);
+  const allocated=live.payments.find(p=>p.sourceDepositId===deposit.id);assert(allocated);
+  const allocPost=postLiveSource(f,{kind:'invoice_payment',id:allocated.id},settlement);assert.equal(allocPost.cashMovement,'0.00');
+  const b=await owner.request('GET',`/banks/${bank.id}/transactions`);eq(b.closingBalance,10700);
+  const tb=await reviewer.request('GET',root+'/reports/trial-balance?branchId=2&from=2026-10-14&to=2026-10-31');assert.equal(tb.balanced,true);assert.equal(tb.totals.closingDifference,'0.00');
+  const balance=code=>tb.rows.find(r=>r.code===code).closing;
+  assert.equal(balance('1010'),'10700.00');assert.equal(balance('1100'),'300.00');assert.equal(balance('2100'),'0.00');
+  const management=await reviewer.request('GET',root+'/reports/management-accounts?branchId=2&from=2026-10-14&to=2026-10-31');assert.equal(management.statements.profitAndLoss.profit,'1000.00');assert.equal(management.statements.balanceSheet.difference,'0.00');
+  await pass('Live deposit received once/allocated without extra cash, Bank and GL/TB/BS/management reconciliation',{clientId:client.id,bankId:bank.id,invoiceId:invoice.id,depositId:deposit.id,allocationPaymentId:allocated.id,depositJournal:depPost,allocationJournal:allocPost,bank:10700,outstanding:300,profit:1000});
+  await writeFile('docs/evidence/2026-10-14-step12-transactions-live.json',JSON.stringify({bookId:f.bookId,clientId:client.id,bankId:bank.id,containerIds:jobs.map(j=>j.id),invoiceId:invoice.id,invoiceNumber:invoice.invoiceNumber,fundingId:funding.id,paymentId:payment.id,depositId:deposit.id,allocationPaymentId:allocated.id,beforeLedger:beforeLedger.summary,results},null,2)+'\n',{flag:'wx'});
+ }finally{for(const actor of [owner,preparer,reviewer])await actor.request('POST','/auth/logout',{},200,'all');}
+}
+else {
+ const f=JSON.parse(await readFile('docs/evidence/2026-10-14-step12-native-setup.json','utf8')),a=f.accounts;
+ const owner=await session(credential.email,credential.password),reviewer=await session('step12.reviewer.20261014@donclimax.test',credential.testPassword);
+ const root=`/accounting/books/${f.bookId}`,results=[];
+ async function pass(name,detail={}){const item={time:new Date().toISOString(),pass:name,...detail};results.push(item);await appendFile('docs/evidence/2026-10-14-step12-live-events.jsonl',JSON.stringify(item)+'\n');console.log(JSON.stringify(item));}
+ try{
+  const invoice=await owner.request('GET','/invoices/17'),deposits=await owner.request('GET','/clients/12/deposits');
+  assert.equal(invoice.clientId,12);assert.equal(invoice.total,1000);const deposit=deposits.find(d=>d.id===5);assert(deposit);assert.equal(deposit.amount,300);assert.equal(deposit.bankId,5);assert.equal(deposit.paymentMethod,'Bank Transfer');
+  const mapping={currency:'NGN',policyVersion:'step12-dummy-20261014-v1',evidence:'TEST ONLY recorded receipt/deposit allocation source review',bankAccounts:{5:a['1010']},cashAccountId:a['1000'],receivableAccountId:a['1100'],depositLiabilityAccountId:a['2100']};
+  const depPost=postLiveSource(f,{kind:'client_deposit',id:5},mapping);
+  await pass('STEP12-DEPOSIT-001 live retained Bank Transfer deposit posts once without source method rewrite',{depositId:5,native:depPost});
+  await owner.request('POST','/client-deposits/5/allocate',{invoiceId:17,amount:300,requestKey:'step12_deposit_alloc_20261014'});
+  const replay=await owner.request('POST','/client-deposits/5/allocate',{invoiceId:17,amount:300,requestKey:'step12_deposit_alloc_20261014'});assert.equal(replay.replayed,true);
+  const live=await owner.request('GET','/invoices/17');assert.equal(live.outstanding,300);const allocation=live.payments.find(p=>p.sourceDepositId===5);assert(allocation);
+  const allocationPost=postLiveSource(f,{kind:'invoice_payment',id:allocation.id},mapping);assert.equal(allocationPost.cashMovement,'0.00');
+  const bank=await owner.request('GET','/banks/5/transactions');assert.equal(bank.closingBalance,10700);
+  const tb=await reviewer.request('GET',root+'/reports/trial-balance?branchId=2&from=2026-10-14&to=2026-10-31');assert.equal(tb.balanced,true);assert.equal(tb.totals.closingDifference,'0.00');
+  assert.equal(tb.rows.find(r=>r.code==='1010').closing,'10700.00');assert.equal(tb.rows.find(r=>r.code==='1100').closing,'300.00');assert.equal(tb.rows.find(r=>r.code==='2100').closing,'0.00');
+  const m=await reviewer.request('GET',root+'/reports/management-accounts?branchId=2&from=2026-10-14&to=2026-10-31');assert.equal(m.statements.profitAndLoss.profit,'1000.00');assert.equal(m.statements.balanceSheet.difference,'0.00');
+  await pass('Live deposit allocation retry/noncash controls and operational Bank/native GL/TB/BS/management reconcile',{invoiceId:17,clientId:12,bankId:5,depositId:5,allocationPaymentId:allocation.id,allocationJournal:allocationPost,bank:10700,outstanding:300,profit:1000});
+  await writeFile('docs/evidence/2026-10-14-step12-transactions-live.json',JSON.stringify({bookId:1,clientId:12,bankId:5,containerIds:[36,37],invoiceId:17,invoiceNumber:invoice.invoiceNumber,fundingId:3,paymentId:20,depositId:5,allocationPaymentId:allocation.id,results},null,2)+'\n',{flag:'wx'});
+ }finally{for(const actor of [owner,reviewer])await actor.request('POST','/auth/logout',{},200,'all');}
 }

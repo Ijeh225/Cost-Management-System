@@ -26,3 +26,21 @@
 
 ## 2026-10-14 14:41 WAT - Release-ready source correction
 - Full460unit/API/3prior skips/58files and complete build/typechecks PASS. Helpers node syntax/diff checks PASS. Commit/push focused routing fix plus recorded live activation/setup evidence; wait for exact patched deployment, then resume same controlled book/user IDs and core runner.
+
+## 2026-10-14 14:49 WAT - Exact patch deployment and genuine native write tests
+-25557b729c91008f70a69b05915c10ee0f5c0ead pushed; exact Railway25c0b3cd-1ad5-4630-a486-f2558435ad3f SUCCESS. Same finance staff15/16 succeeds, so STEP12-ROUTE-001 CLOSED by live retest, not admin workaround.
+- Live core runner uses real HTTPS session/CSRF/branch checks, not mocked UI: opening1full27zeros independently verified (no journal), tax config1fivehypothetical codes approved, manual journal1depreciation0.12posted +traceable reversal2posted, valuation1approved80.01netassets/unknownbook explicit and no GL effect. Self/grant/scope/auth negatives and stable request identity tests accepted.
+- Live GL/TB/BS/management period movements0.24bothsides, closing difference/profit/all balances0.00 after manual reversal. JSON/event evidence retained; no credentials. Do not repeat this core phase after new source postings.
+- EXACT NEXT: new bounded operational QA transactions (invoices/payments/deposits/duty/shipping/terminal/overhead/schedules/banks/approvals/workflow), verify approved native source links and reconcile cash/accrual/tax, then actual browser screens/exports/print/mobile/roles/periods/training. No full Step12/actual books acceptance claimed.
+- Both production native gatesON for owner-authorised live TEST ONLY book1(scope2/3, noHeadOffice). Main release25557b7. Evidence/doc edits after release currently uncommitted. Owner API sessions were logged out; current Chrome may need owner sign-in before visual checks.
+
+## 2026-10-14 15:03 WAT - Financial live phase retained partial progress / new defect
+- Real deployed sources client12/bank5/funding3→nativejournal3capital10000, jobs36/37shareB-L/shipment18, invoice17 INV-202610-003gross1000/2items issued→nativejournal4, cashreceipt20amount400→nativejournal5/outstanding600. Funding duplicate reference refused409. API/CSRF writes real; generic source tests invoke deployed native engine with independent named actors, not raw SQL journal writes or claimed UI source approval.
+- Deposit5amount300 saves exact required UI/API method Bank Transfer. Native service preview rejects SOURCE_REVIEW_REQUIRED supported-method/explicit-bank error. Existing builder lowercases it to bank transfer but accepts bank_transfer; STEP12-DEPOSIT-001 High confirmed, no deposit journal/allocations created.
+- Correct exact alias only, preserving original source and immutable evidence/hash, explicit bank/scope checks.4pure label cases +1network regression added, test/build/deploy/live retest before closure.
+- EXACT RESUME: do NOT run transactions creation mode again (refuses existing labelled client). Implement/resume retained deposit5 for client12/invoice17/bank5; allocation300uses `/client-deposits/5/allocate` body requestKey step12_deposit_alloc_20261014. Then expectedbank10700/nativeAR300/deposit0/profit1000 and continue missing duty/container/overhead/schedule/gate/outputs/roles/period cases. Old records preserved, flagsON, no full Step12 acceptance claim.
+
+## 2026-10-14 15:08 WAT - Local alias correction accepted
+-464unit/API/3prior skips,1network isolated real form-label receipt/idempotency/source-evidence preservation case(72.36s), complete typechecks/build PASS.4new labels only, not broad payment-method inference. Isolated own namespace removed, shared baseline unchanged/tunnel closed.
+- Release correction, observe exact success, then run `step12-live-api.mjs resume-deposit` with retainedIDs (NOT transactions). Source helper captures AccountingError code/message only and no credentials; fixture prior failure left one unposted deposit, no allocation.
+- Main currently25557b7, gatesON; correction/evidence/current3records pending commit/deployment. Full Step12 not completed; core native phase alreadyaccepted must not repeat after source transactions.

@@ -1,6 +1,6 @@
 # Session Summaries
 
-- Current: [2026-10-14 Step12 Live Acceptance](2026-10-14-step12-live-acceptance.md) - LIVE native gates ON/book1 initialised; real staff-route defect STEP12-ROUTE-001 fixed locally/9regressions/build PASS14:39 WAT; deployment/retest pending, full acceptance IN PROGRESS.
+- Current: [2026-10-14 Step12 Live Acceptance](2026-10-14-step12-live-acceptance.md) - LIVE native gatesON; core/source financial writes partially accepted; new Bank Transfer adapter defect locally fixed/464units+1DB/build PASS15:08 WAT. Deploy/retest retained deposit5 next, no duplicate fixtures; full Step12 IN PROGRESS.
 
 - Current: [2026-10-14 Step11 Statement of Affairs](2026-10-14-step11-statement-of-affairs.md) - functional e112918 and records c816352 deployments accepted; Step12 scope explained14:13 WAT, not started; official accounting OFF. Latest explanation notes local/uncommitted.
 

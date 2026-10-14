@@ -1,0 +1,52 @@
+{
+  "bookId": 1,
+  "openingId": 1,
+  "configurationId": 1,
+  "manualJournalId": 1,
+  "reversalId": 2,
+  "valuationId": 1,
+  "results": [
+    {
+      "time": "2026-10-14T13:49:02.965Z",
+      "pass": "Live native activation/catalog, authentication and branch restrictions",
+      "bookId": 1,
+      "preparerId": 15,
+      "reviewerId": 16
+    },
+    {
+      "time": "2026-10-14T13:49:07.433Z",
+      "pass": "Live complete zero opening preview/validation, identity retry, independent verification and no zero journal",
+      "openingId": 1,
+      "accounts": 27
+    },
+    {
+      "time": "2026-10-14T13:49:10.396Z",
+      "pass": "Live independent VAT/direct-cost configuration with taxable/zero/exempt, mixed recovery, no self approval",
+      "configurationId": 1
+    },
+    {
+      "time": "2026-10-14T13:49:15.348Z",
+      "pass": "Live manual reviewed account classification, draft/submission/independent posting and retry deduplication",
+      "journalId": 1
+    },
+    {
+      "time": "2026-10-14T13:49:18.695Z",
+      "pass": "Live manual linked reversal offsets original once",
+      "originalId": 1,
+      "reversalId": 2
+    },
+    {
+      "time": "2026-10-14T13:49:20.869Z",
+      "pass": "Live Statement of Affairs reviewed estimated/book/unknown values and exact net assets",
+      "valuationId": 1,
+      "netAssets": "80.01"
+    },
+    {
+      "time": "2026-10-14T13:49:23.052Z",
+      "pass": "Live GL/TB/Balance Sheet/Management Accounts reconcile post and reversal; valuation has no ledger effect",
+      "movementDebit": "0.24",
+      "closingDifference": "0.00",
+      "profit": "0.00"
+    }
+  ]
+}
