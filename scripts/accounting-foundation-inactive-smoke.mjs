@@ -1,7 +1,7 @@
 // Safe deployed-bundle acceptance: no credentials, database connection or writes.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-const { NativeAccounting, accountingEnabled, buildSettlementJournal, previewOpeningBalances, buildInvoiceJournal, buildOperationalJournal, buildReviewedOpening, buildAccountingReport,buildAccountingStatements,calculateVat } =
+const { NativeAccounting, accountingEnabled, buildSettlementJournal, previewOpeningBalances, buildInvoiceJournal, buildOperationalJournal, buildReviewedOpening, buildAccountingReport,buildAccountingStatements,calculateVat,buildAffairs } =
   createRequire(import.meta.url)("../artifacts/api-server/dist/accounting-foundation.cjs");
 assert.equal(accountingEnabled(), false, "This smoke is for an INACTIVE release only");
 assert.notEqual(process.env.NATIVE_ACCOUNTING_SCHEMA_ENABLED, "true", "Live schema must remain inactive");
@@ -39,6 +39,13 @@ const opening={bookId:1,branchId:2,currency:"NGN",cutoverDate:"2026-10-11",polic
 assert.equal(buildReviewedOpening(opening).status,"reviewed_draft");
 let connections = 0;
 const engine = new NativeAccounting({ connect: async () => { connections++; throw new Error("Smoke must not connect"); } });
+for(const run of [()=>engine.affairsWorkspace(1,2,3),()=>engine.affairsDetails(1,2,3,4),()=>engine.prepareAffairs(1,2,3,{}),()=>engine.affairsAction(1,2,3,4,"approve","Dummy review")])
+  await assert.rejects(run,{code:"ACCOUNTING_DISABLED"});
+const affairs=buildAffairs(1,2,"NGN",{requestId:"smoke_dummy_affairs",asOf:"2026-10-14",title:"Dummy only",scopeEvidence:"Dummy scoped evidence",limitations:"Dummy incomplete records",lines:[
+  {key:"equipment",category:"asset",name:"Dummy equipment",value:"10.01",bookValue:null,basis:"estimate",basisExplanation:"Dummy estimate",evidence:"Dummy survey"},
+  {key:"supplier",category:"liability",name:"Dummy supplier",value:"20",bookValue:"20",basis:"book",basisExplanation:"Dummy carrying amount",evidence:"Dummy confirmation"}]});
+assert.equal(affairs.payload.totals.netAssets,"-9.99");assert.equal(affairs.payload.totals.unknownBookValues,1);
+console.log("PASS: Step11 exact evidence-backed valuation and all four inactive workflow gates; no native connections/writes");
 assert.equal(calculateVat("107.50","inclusive",{code:"DUMMY",name:"Dummy",treatment:"taxable",rate:"7.5",recoverablePercent:"40",basisEvidence:"Dummy approved basis"}).recoverable,"3.00");
 for(const run of [()=>engine.taxWorkspace(1,2,3),()=>engine.prepareTaxConfiguration(1,2,3,{}),()=>engine.taxConfigurationAction(1,2,3,4,"approve","Dummy"),
   ()=>engine.configuredSource(1,2,3,"invoice",4),()=>engine.configuredJournal(1,2,3,4),()=>engine.reviewConfiguredSource(1,2,3,{kind:"duty_reversal",id:4,evidence:"Dummy"}),

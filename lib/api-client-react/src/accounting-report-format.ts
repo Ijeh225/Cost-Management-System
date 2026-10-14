@@ -10,6 +10,7 @@ function cell(value:unknown) {
   if(/^[=+@\t\r]/.test(text) || /^-/.test(text) && !/^-\d+(\.\d+)?$/.test(text)) text=`'${text}`;
   return `"${text.replaceAll('"','""')}"`;
 }
+export {cell as accountingCsvCell};
 export function accountingReportCsv(report:AccountingReport) {
   const rows:unknown[][]=[
     [report.kind,report.book.name,report.book.currency,"Posted double entry"],

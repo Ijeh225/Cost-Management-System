@@ -21,9 +21,14 @@ import type {
   AccountingJournal,
   AccountingOptions,
   AccountingReport,
+  ActOnAffairsParams,
   ActOnManualAccountingJournalParams,
   ActOnOpeningSetupParams,
   ActOnTaxConfigurationParams,
+  AffairsAction,
+  AffairsDetails,
+  AffairsRequest,
+  AffairsWorkspace,
   AnalyticsResponse,
   ApprovalQueueItem,
   AuditEntry,
@@ -53,6 +58,8 @@ import type {
   GetAccountingCatalogParams,
   GetAccountingJournalParams,
   GetAccountingOptionsParams,
+  GetAffairsVersionParams,
+  GetAffairsWorkspaceParams,
   GetConfiguredTaxJournalParams,
   GetContainerReportParams,
   GetCustomSectionsParams,
@@ -91,6 +98,7 @@ import type {
   PostTaxSourceBody,
   PostTaxSourceParams,
   PostedTaxRegister,
+  PrepareAffairsParams,
   PrepareManualAccountingJournalParams,
   PrepareOpeningSetupParams,
   PrepareTaxConfigurationParams,
@@ -132,6 +140,467 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export const getGetAffairsWorkspaceUrl = (
+  bookId: number,
+  params: GetAffairsWorkspaceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/statement-of-affairs?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/statement-of-affairs`;
+};
+
+export const getAffairsWorkspace = async (
+  bookId: number,
+  params: GetAffairsWorkspaceParams,
+  options?: RequestInit,
+): Promise<AffairsWorkspace> => {
+  return customFetch<AffairsWorkspace>(
+    getGetAffairsWorkspaceUrl(bookId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAffairsWorkspaceQueryKey = (
+  bookId: number,
+  params?: GetAffairsWorkspaceParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/statement-of-affairs`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAffairsWorkspaceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAffairsWorkspace>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetAffairsWorkspaceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAffairsWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAffairsWorkspaceQueryKey(bookId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAffairsWorkspace>>
+  > = ({ signal }) =>
+    getAffairsWorkspace(bookId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAffairsWorkspace>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAffairsWorkspaceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAffairsWorkspace>>
+>;
+export type GetAffairsWorkspaceQueryError = ErrorType<unknown>;
+
+export function useGetAffairsWorkspace<
+  TData = Awaited<ReturnType<typeof getAffairsWorkspace>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  params: GetAffairsWorkspaceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAffairsWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAffairsWorkspaceQueryOptions(
+    bookId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPrepareAffairsUrl = (
+  bookId: number,
+  params: PrepareAffairsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/statement-of-affairs?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/statement-of-affairs`;
+};
+
+export const prepareAffairs = async (
+  bookId: number,
+  affairsRequest: AffairsRequest,
+  params: PrepareAffairsParams,
+  options?: RequestInit,
+): Promise<OpeningSetupResult> => {
+  return customFetch<OpeningSetupResult>(getPrepareAffairsUrl(bookId, params), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(affairsRequest),
+  });
+};
+
+export const getPrepareAffairsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareAffairs>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<AffairsRequest>;
+      params: PrepareAffairsParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof prepareAffairs>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<AffairsRequest>;
+    params: PrepareAffairsParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["prepareAffairs"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof prepareAffairs>>,
+    {
+      bookId: number;
+      data: BodyType<AffairsRequest>;
+      params: PrepareAffairsParams;
+    }
+  > = (props) => {
+    const { bookId, data, params } = props ?? {};
+
+    return prepareAffairs(bookId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PrepareAffairsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof prepareAffairs>>
+>;
+export type PrepareAffairsMutationBody = BodyType<AffairsRequest>;
+export type PrepareAffairsMutationError = ErrorType<unknown>;
+
+export const usePrepareAffairs = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareAffairs>>,
+    TError,
+    {
+      bookId: number;
+      data: BodyType<AffairsRequest>;
+      params: PrepareAffairsParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof prepareAffairs>>,
+  TError,
+  {
+    bookId: number;
+    data: BodyType<AffairsRequest>;
+    params: PrepareAffairsParams;
+  },
+  TContext
+> => {
+  return useMutation(getPrepareAffairsMutationOptions(options));
+};
+
+export const getGetAffairsVersionUrl = (
+  bookId: number,
+  versionId: number,
+  params: GetAffairsVersionParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/statement-of-affairs/${versionId}?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/statement-of-affairs/${versionId}`;
+};
+
+export const getAffairsVersion = async (
+  bookId: number,
+  versionId: number,
+  params: GetAffairsVersionParams,
+  options?: RequestInit,
+): Promise<AffairsDetails> => {
+  return customFetch<AffairsDetails>(
+    getGetAffairsVersionUrl(bookId, versionId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAffairsVersionQueryKey = (
+  bookId: number,
+  versionId: number,
+  params?: GetAffairsVersionParams,
+) => {
+  return [
+    `/api/accounting/books/${bookId}/statement-of-affairs/${versionId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAffairsVersionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAffairsVersion>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  versionId: number,
+  params: GetAffairsVersionParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAffairsVersion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetAffairsVersionQueryKey(bookId, versionId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAffairsVersion>>
+  > = ({ signal }) =>
+    getAffairsVersion(bookId, versionId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bookId && versionId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAffairsVersion>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAffairsVersionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAffairsVersion>>
+>;
+export type GetAffairsVersionQueryError = ErrorType<unknown>;
+
+export function useGetAffairsVersion<
+  TData = Awaited<ReturnType<typeof getAffairsVersion>>,
+  TError = ErrorType<unknown>,
+>(
+  bookId: number,
+  versionId: number,
+  params: GetAffairsVersionParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAffairsVersion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAffairsVersionQueryOptions(
+    bookId,
+    versionId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getActOnAffairsUrl = (
+  bookId: number,
+  versionId: number,
+  params: ActOnAffairsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {});
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounting/books/${bookId}/statement-of-affairs/${versionId}/action?${stringifiedParams}`
+    : `/api/accounting/books/${bookId}/statement-of-affairs/${versionId}/action`;
+};
+
+export const actOnAffairs = async (
+  bookId: number,
+  versionId: number,
+  affairsAction: AffairsAction,
+  params: ActOnAffairsParams,
+  options?: RequestInit,
+): Promise<OpeningSetupResult> => {
+  return customFetch<OpeningSetupResult>(
+    getActOnAffairsUrl(bookId, versionId, params),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(affairsAction),
+    },
+  );
+};
+
+export const getActOnAffairsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actOnAffairs>>,
+    TError,
+    {
+      bookId: number;
+      versionId: number;
+      data: BodyType<AffairsAction>;
+      params: ActOnAffairsParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof actOnAffairs>>,
+  TError,
+  {
+    bookId: number;
+    versionId: number;
+    data: BodyType<AffairsAction>;
+    params: ActOnAffairsParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["actOnAffairs"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof actOnAffairs>>,
+    {
+      bookId: number;
+      versionId: number;
+      data: BodyType<AffairsAction>;
+      params: ActOnAffairsParams;
+    }
+  > = (props) => {
+    const { bookId, versionId, data, params } = props ?? {};
+
+    return actOnAffairs(bookId, versionId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ActOnAffairsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof actOnAffairs>>
+>;
+export type ActOnAffairsMutationBody = BodyType<AffairsAction>;
+export type ActOnAffairsMutationError = ErrorType<unknown>;
+
+export const useActOnAffairs = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actOnAffairs>>,
+    TError,
+    {
+      bookId: number;
+      versionId: number;
+      data: BodyType<AffairsAction>;
+      params: ActOnAffairsParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof actOnAffairs>>,
+  TError,
+  {
+    bookId: number;
+    versionId: number;
+    data: BodyType<AffairsAction>;
+    params: ActOnAffairsParams;
+  },
+  TContext
+> => {
+  return useMutation(getActOnAffairsMutationOptions(options));
+};
 
 export const getGetTaxConfigurationWorkspaceUrl = (
   bookId: number,

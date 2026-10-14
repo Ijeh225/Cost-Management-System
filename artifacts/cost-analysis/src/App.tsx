@@ -69,6 +69,7 @@ import AiAssistantPage from "@/pages/ai-assistant/index";
 import NativeAccountingPage from "@/pages/accounting/index";
 import ManualAccountingPage from "@/pages/accounting/manual";
 import OpeningBalancesPage from "@/pages/accounting/openings";
+import StatementOfAffairsPage from "@/pages/accounting/affairs";
 import TaxConfigurationPage from "@/pages/accounting/tax";
 
 const queryClient = new QueryClient({
@@ -334,6 +335,7 @@ function Router() {
               <Route path="/accounting/management-accounts"><FinanceGuard><NativeAccountingPage kind="management-accounts"/></FinanceGuard></Route>
               <Route path="/accounting/manual-journals"><FinanceGuard><ManualAccountingPage/></FinanceGuard></Route>
               <Route path="/accounting/opening-balances"><FinanceGuard><OpeningBalancesPage/></FinanceGuard></Route>
+              <Route path="/accounting/statement-of-affairs"><FinanceGuard><StatementOfAffairsPage/></FinanceGuard></Route>
               <Route path="/accounting/tax-configuration"><FinanceGuard><TaxConfigurationPage/></FinanceGuard></Route>
               <Route path="/reports/cashflow">
                 <FinanceGuard><CashFlowPage /></FinanceGuard>

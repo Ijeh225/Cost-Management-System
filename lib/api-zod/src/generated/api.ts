@@ -7,6 +7,246 @@
  */
 import * as zod from "zod";
 
+export const GetAffairsWorkspaceParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const GetAffairsWorkspaceQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const GetAffairsWorkspaceResponse = zod.object({
+  book: zod.object({
+    id: zod.number(),
+    currency: zod.string(),
+  }),
+  permissions: zod.array(zod.string()),
+  versions: zod.array(
+    zod.object({
+      id: zod.number(),
+      state: zod.enum(["pending", "approved", "rejected", "cancelled"]),
+      preparedBy: zod.number(),
+      reviewedBy: zod.number().nullable(),
+      createdAt: zod.date(),
+      replacesId: zod.number().nullable(),
+      superseded: zod.boolean(),
+      asOf: zod.string().optional(),
+      title: zod.string().optional(),
+    }),
+  ),
+  truncated: zod.boolean(),
+});
+
+export const PrepareAffairsParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+});
+
+export const PrepareAffairsQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const prepareAffairsBodyRequestIdRegExp = new RegExp(
+  "^[a-zA-Z0-9_-]{8,80}$",
+);
+export const prepareAffairsBodyTitleMax = 200;
+
+export const prepareAffairsBodyScopeEvidenceMax = 1000;
+
+export const prepareAffairsBodyLimitationsMax = 1000;
+
+export const prepareAffairsBodyLinesItemKeyRegExp = new RegExp(
+  "^[a-zA-Z0-9_-]{1,80}$",
+);
+export const prepareAffairsBodyLinesItemNameMax = 200;
+
+export const prepareAffairsBodyLinesItemBasisExplanationMax = 1000;
+
+export const prepareAffairsBodyLinesItemEvidenceMax = 1000;
+
+export const prepareAffairsBodyLinesMax = 200;
+
+export const PrepareAffairsBody = zod.object({
+  requestId: zod.string().regex(prepareAffairsBodyRequestIdRegExp),
+  asOf: zod.date(),
+  title: zod.string().min(1).max(prepareAffairsBodyTitleMax),
+  scopeEvidence: zod.string().min(1).max(prepareAffairsBodyScopeEvidenceMax),
+  limitations: zod.string().min(1).max(prepareAffairsBodyLimitationsMax),
+  replacesId: zod.number().min(1).optional(),
+  lines: zod
+    .array(
+      zod.object({
+        key: zod.string().regex(prepareAffairsBodyLinesItemKeyRegExp),
+        category: zod.enum(["asset", "liability"]),
+        name: zod.string().min(1).max(prepareAffairsBodyLinesItemNameMax),
+        value: zod.string().describe("Nonnegative decimal"),
+        bookValue: zod
+          .string()
+          .nullable()
+          .describe("Declared carrying amount; null means unknown"),
+        basis: zod.enum(["book", "estimate"]),
+        basisExplanation: zod
+          .string()
+          .min(1)
+          .max(prepareAffairsBodyLinesItemBasisExplanationMax),
+        evidence: zod
+          .string()
+          .min(1)
+          .max(prepareAffairsBodyLinesItemEvidenceMax),
+      }),
+    )
+    .min(1)
+    .max(prepareAffairsBodyLinesMax),
+});
+
+export const PrepareAffairsResponse = zod.object({
+  id: zod.number(),
+});
+
+export const GetAffairsVersionParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  versionId: zod.coerce.number().min(1),
+});
+
+export const GetAffairsVersionQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const getAffairsVersionResponseTwoPayloadRequestRequestIdRegExp =
+  new RegExp("^[a-zA-Z0-9_-]{8,80}$");
+export const getAffairsVersionResponseTwoPayloadRequestTitleMax = 200;
+
+export const getAffairsVersionResponseTwoPayloadRequestScopeEvidenceMax = 1000;
+
+export const getAffairsVersionResponseTwoPayloadRequestLimitationsMax = 1000;
+
+export const getAffairsVersionResponseTwoPayloadRequestLinesItemKeyRegExp =
+  new RegExp("^[a-zA-Z0-9_-]{1,80}$");
+export const getAffairsVersionResponseTwoPayloadRequestLinesItemNameMax = 200;
+
+export const getAffairsVersionResponseTwoPayloadRequestLinesItemBasisExplanationMax = 1000;
+
+export const getAffairsVersionResponseTwoPayloadRequestLinesItemEvidenceMax = 1000;
+
+export const getAffairsVersionResponseTwoPayloadRequestLinesMax = 200;
+
+export const GetAffairsVersionResponse = zod
+  .object({
+    id: zod.number(),
+    state: zod.enum(["pending", "approved", "rejected", "cancelled"]),
+    preparedBy: zod.number(),
+    reviewedBy: zod.number().nullable(),
+    createdAt: zod.date(),
+    replacesId: zod.number().nullable(),
+    superseded: zod.boolean(),
+    asOf: zod.string().optional(),
+    title: zod.string().optional(),
+  })
+  .and(
+    zod.object({
+      reviewedAt: zod.string().nullable(),
+      decisionReason: zod.string().nullable(),
+      payload: zod.object({
+        bookId: zod.number(),
+        branchId: zod.number(),
+        currency: zod.string(),
+        request: zod.object({
+          requestId: zod
+            .string()
+            .regex(getAffairsVersionResponseTwoPayloadRequestRequestIdRegExp),
+          asOf: zod.date(),
+          title: zod
+            .string()
+            .min(1)
+            .max(getAffairsVersionResponseTwoPayloadRequestTitleMax),
+          scopeEvidence: zod
+            .string()
+            .min(1)
+            .max(getAffairsVersionResponseTwoPayloadRequestScopeEvidenceMax),
+          limitations: zod
+            .string()
+            .min(1)
+            .max(getAffairsVersionResponseTwoPayloadRequestLimitationsMax),
+          replacesId: zod.number().min(1).optional(),
+          lines: zod
+            .array(
+              zod.object({
+                key: zod
+                  .string()
+                  .regex(
+                    getAffairsVersionResponseTwoPayloadRequestLinesItemKeyRegExp,
+                  ),
+                category: zod.enum(["asset", "liability"]),
+                name: zod
+                  .string()
+                  .min(1)
+                  .max(
+                    getAffairsVersionResponseTwoPayloadRequestLinesItemNameMax,
+                  ),
+                value: zod.string().describe("Nonnegative decimal"),
+                bookValue: zod
+                  .string()
+                  .nullable()
+                  .describe("Declared carrying amount; null means unknown"),
+                basis: zod.enum(["book", "estimate"]),
+                basisExplanation: zod
+                  .string()
+                  .min(1)
+                  .max(
+                    getAffairsVersionResponseTwoPayloadRequestLinesItemBasisExplanationMax,
+                  ),
+                evidence: zod
+                  .string()
+                  .min(1)
+                  .max(
+                    getAffairsVersionResponseTwoPayloadRequestLinesItemEvidenceMax,
+                  ),
+              }),
+            )
+            .min(1)
+            .max(getAffairsVersionResponseTwoPayloadRequestLinesMax),
+        }),
+        totals: zod.object({
+          assets: zod.string(),
+          liabilities: zod.string(),
+          netAssets: zod.string(),
+          declaredBookAssets: zod.string(),
+          declaredBookLiabilities: zod.string(),
+          estimatedLines: zod.number(),
+          unknownBookValues: zod.number(),
+        }),
+        warnings: zod.array(zod.string()),
+      }),
+      audit: zod.array(
+        zod.object({
+          actorId: zod.number(),
+          action: zod.string(),
+          reason: zod.string(),
+          createdAt: zod.string(),
+        }),
+      ),
+    }),
+  );
+
+export const ActOnAffairsParams = zod.object({
+  bookId: zod.coerce.number().min(1),
+  versionId: zod.coerce.number().min(1),
+});
+
+export const ActOnAffairsQueryParams = zod.object({
+  branchId: zod.coerce.number().min(1),
+});
+
+export const actOnAffairsBodyReasonMax = 2000;
+
+export const ActOnAffairsBody = zod.object({
+  action: zod.enum(["approve", "reject", "cancel"]),
+  reason: zod.string().min(1).max(actOnAffairsBodyReasonMax),
+});
+
+export const ActOnAffairsResponse = zod.object({
+  id: zod.number(),
+});
+
 export const GetTaxConfigurationWorkspaceParams = zod.object({
   bookId: zod.coerce.number().min(1),
 });

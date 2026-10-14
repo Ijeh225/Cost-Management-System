@@ -1,0 +1,26 @@
+# Step 11: Statement of Affairs
+
+## 2026-10-14 13:31 WAT - Implementation authorised
+- User requested Step 11. Clean restored checkout at 385c02f; Step 10 already accepted and deployed inactive.
+- Reviewed both current plans and existing opening/manual/report architecture. No Statement of Affairs implementation exists.
+- Build a dated, branch-scoped valuation schedule, asset/liability/net-assets calculation, evidence and valuation basis, explicit estimates versus declared book values, independent review and immutable history. No new ledger or financial postings.
+- Official accounting and schema activation remain OFF. No production records are changed. Statutory/insolvency certification is outside this feature.
+- In progress: implementation and controlled tests. This request does not separately authorise official activation or a test-data wipe.
+
+## 2026-10-14 13:48 WAT - Controlled tests
+- Implemented exact valuation calculator, scoped immutable native schedules/SQL guards, independent decisions, retained corrections, API/spec/generated clients and responsive UI with CSV/print.
+- 451 unit/API PASS, 3 prior skips. New 3 controlled Step11 network PostgreSQL tests PASS (196.53s); 2 existing repeat-migration/rollback checks PASS (20.39s). Own schemas removed, shared source baseline unchanged, tunnel closed after both runs.
+- Built loopback UI PASS: unknown versus zero/book values, stable interrupted-response retry, independent review, CSV formula protection, print, scope clearing, refresh, mobile, inactive/error states. No production writes.
+- Initial build check exposed a missing inferred audit type in the integration assertion, corrected; final typecheck/build PASS (usual existing Vite warnings). OFF smoke PASS before any native connection.
+- Visual print review caught a dark-theme background on unused page area; correcting print background and audit pagination before final acceptance. Not a production/live defect claim.
+
+## 2026-10-14 13:49 WAT - Exact stopping point
+- Step11 internal valuation scope implemented/tested locally.5distinct DB cases/451unit API/build/typechecks/loopback UI/OFF smoke accepted. Print background corrected and final rendered2pages visually inspected; audit section kept together.
+- Final isolated namespace inspection `[]`; source baseline unchanged; own tunnel closed. No live record, native posting, production schema or activation change.
+- Added operating guide and updated both accounting plans plus PROJECT_STATE/LIVE_E2E_TEST_REGISTER/session index. All changes uncommitted/unpushed/undeployed; HEAD385c02f retained. Latest user requested implementation only, not official activation or a wipe.
+- Next publication of inactive Step11 upon request; verify exact release/OFF proof, then separately authorised Step12. Real scopes, accountant valuations/completeness, book/chart/date/grants/tax basis/openings/subledger reconciliation are still required before official launch.
+
+## 2026-10-14 13:53 WAT - Publication authorised
+- User requested commit, push and verified deployment of Step11; keep official accounting OFF and update3records.
+- Reviewed Step11 work/status/diff; local current built inactive smoke PASS. Production both native variables unset/defaultOFF before release.
+- Commit/push/auto-deployment now in progress. Exact release evidence and remote runtime health/auth/OFF checks still pending; no live financial write or activation.

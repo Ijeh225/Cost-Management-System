@@ -31,6 +31,7 @@ import { accountingReportsRouter } from "./accounting-reports.js";
 import { accountingManualRouter } from "./accounting-manual.js";
 import { accountingOpeningsRouter } from "./accounting-openings.js";
 import { accountingTaxRouter } from "./accounting-tax.js";
+import { accountingAffairsRouter } from "./accounting-affairs.js";
 
 const router: IRouter = Router();
 
@@ -64,6 +65,7 @@ router.use(paymentSchedulesRouter);
 router.use(aiAssistantRouter);
 router.use(accountingOpeningsRouter);
 router.use(accountingTaxRouter);
+router.use(accountingAffairsRouter);
 router.use(accountingManualRouter);
 router.use(accountingReportsRouter);
 

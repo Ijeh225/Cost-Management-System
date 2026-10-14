@@ -5,6 +5,168 @@
  * Cost Analysis Per Container API
  * OpenAPI spec version: 0.1.0
  */
+export type AffairsLineCategory =
+  (typeof AffairsLineCategory)[keyof typeof AffairsLineCategory];
+
+export const AffairsLineCategory = {
+  asset: "asset",
+  liability: "liability",
+} as const;
+
+export type AffairsLineBasis =
+  (typeof AffairsLineBasis)[keyof typeof AffairsLineBasis];
+
+export const AffairsLineBasis = {
+  book: "book",
+  estimate: "estimate",
+} as const;
+
+export interface AffairsLine {
+  /** @pattern ^[a-zA-Z0-9_-]{1,80}$ */
+  key: string;
+  category: AffairsLineCategory;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  name: string;
+  /** Nonnegative decimal */
+  value: string;
+  /**
+   * Declared carrying amount; null means unknown
+   * @nullable
+   */
+  bookValue: string | null;
+  basis: AffairsLineBasis;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  basisExplanation: string;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  evidence: string;
+}
+
+export interface AffairsRequest {
+  /** @pattern ^[a-zA-Z0-9_-]{8,80}$ */
+  requestId: string;
+  asOf: string;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  title: string;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  scopeEvidence: string;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  limitations: string;
+  /** @minimum 1 */
+  replacesId?: number;
+  /**
+   * @minItems 1
+   * @maxItems 200
+   */
+  lines: AffairsLine[];
+}
+
+export type AffairsActionAction =
+  (typeof AffairsActionAction)[keyof typeof AffairsActionAction];
+
+export const AffairsActionAction = {
+  approve: "approve",
+  reject: "reject",
+  cancel: "cancel",
+} as const;
+
+export interface AffairsAction {
+  action: AffairsActionAction;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  reason: string;
+}
+
+export interface AffairsTotals {
+  assets: string;
+  liabilities: string;
+  netAssets: string;
+  declaredBookAssets: string;
+  declaredBookLiabilities: string;
+  estimatedLines: number;
+  unknownBookValues: number;
+}
+
+export type AffairsVersionState =
+  (typeof AffairsVersionState)[keyof typeof AffairsVersionState];
+
+export const AffairsVersionState = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+  cancelled: "cancelled",
+} as const;
+
+export interface AffairsVersion {
+  id: number;
+  state: AffairsVersionState;
+  preparedBy: number;
+  /** @nullable */
+  reviewedBy: number | null;
+  createdAt: string;
+  /** @nullable */
+  replacesId: number | null;
+  superseded: boolean;
+  asOf?: string;
+  title?: string;
+}
+
+export type AffairsWorkspaceBook = {
+  id: number;
+  currency: string;
+};
+
+export interface AffairsWorkspace {
+  book: AffairsWorkspaceBook;
+  permissions: string[];
+  versions: AffairsVersion[];
+  truncated: boolean;
+}
+
+export type AffairsDetailsPayload = {
+  bookId: number;
+  branchId: number;
+  currency: string;
+  request: AffairsRequest;
+  totals: AffairsTotals;
+  warnings: string[];
+};
+
+export type AffairsDetailsAuditItem = {
+  actorId: number;
+  action: string;
+  reason: string;
+  createdAt: string;
+};
+
+export type AffairsDetails = AffairsVersion & {
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  decisionReason: string | null;
+  payload: AffairsDetailsPayload;
+  audit: AffairsDetailsAuditItem[];
+};
+
 export type AccountingTaxCodeTreatment =
   (typeof AccountingTaxCodeTreatment)[keyof typeof AccountingTaxCodeTreatment];
 
@@ -2035,6 +2197,34 @@ export type ManualAccountingBranchParameter = number;
  * Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
  */
 export type AccountingBranchParameter = string;
+
+export type GetAffairsWorkspaceParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type PrepareAffairsParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type GetAffairsVersionParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
+
+export type ActOnAffairsParams = {
+  /**
+   * @minimum 1
+   */
+  branchId: ManualAccountingBranchParameter;
+};
 
 export type GetTaxConfigurationWorkspaceParams = {
   /**

@@ -19,6 +19,62 @@ tags:
     description: Container charges
 
 paths:
+  /accounting/books/{bookId}/statement-of-affairs:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+    get:
+      operationId: getAffairsWorkspace
+      responses:
+        '200':
+          description: Scoped valuation versions, not a financial ledger
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AffairsWorkspace' }
+    post:
+      operationId: prepareAffairs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AffairsRequest' }
+      responses:
+        '200':
+          description: Immutable pending valuation, no posting
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningSetupResult' }
+  /accounting/books/{bookId}/statement-of-affairs/{versionId}:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+      - { name: versionId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getAffairsVersion
+      responses:
+        '200':
+          description: Original evidence, values and decision audit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AffairsDetails' }
+  /accounting/books/{bookId}/statement-of-affairs/{versionId}/action:
+    parameters:
+      - $ref: '#/components/parameters/AccountingBookId'
+      - $ref: '#/components/parameters/ManualAccountingBranch'
+      - { name: versionId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      operationId: actOnAffairs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AffairsAction' }
+      responses:
+        '200':
+          description: Independently reviewed decision, no financial posting
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningSetupResult' }
   /accounting/books/{bookId}/tax-configuration:
     parameters:
       - $ref: '#/components/parameters/AccountingBookId'
@@ -1605,6 +1661,103 @@ components:
       description: Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
       schema: { type: string }
   schemas:
+    AffairsLine:
+      type: object
+      additionalProperties: false
+      required: [key, category, name, value, bookValue, basis, basisExplanation, evidence]
+      properties:
+        key: { type: string, pattern: '^[a-zA-Z0-9_-]{1,80}$' }
+        category: { type: string, enum: [asset, liability] }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        value: { type: string, description: Nonnegative decimal, at most two decimal places }
+        bookValue: { type: [string, 'null'], description: Declared carrying amount; null means unknown, not zero }
+        basis: { type: string, enum: [book, estimate] }
+        basisExplanation: { type: string, minLength: 1, maxLength: 1000 }
+        evidence: { type: string, minLength: 1, maxLength: 1000 }
+    AffairsRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId, asOf, title, scopeEvidence, limitations, lines]
+      properties:
+        requestId: { type: string, pattern: '^[a-zA-Z0-9_-]{8,80}$' }
+        asOf: { type: string, format: date }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        scopeEvidence: { type: string, minLength: 1, maxLength: 1000 }
+        limitations: { type: string, minLength: 1, maxLength: 1000 }
+        replacesId: { type: integer, minimum: 1 }
+        lines: { type: array, minItems: 1, maxItems: 200, items: { $ref: '#/components/schemas/AffairsLine' } }
+    AffairsAction:
+      type: object
+      additionalProperties: false
+      required: [action, reason]
+      properties:
+        action: { type: string, enum: [approve, reject, cancel] }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+    AffairsTotals:
+      type: object
+      required: [assets, liabilities, netAssets, declaredBookAssets, declaredBookLiabilities, estimatedLines, unknownBookValues]
+      properties:
+        assets: { type: string }
+        liabilities: { type: string }
+        netAssets: { type: string }
+        declaredBookAssets: { type: string }
+        declaredBookLiabilities: { type: string }
+        estimatedLines: { type: integer }
+        unknownBookValues: { type: integer }
+    AffairsVersion:
+      type: object
+      required: [id, state, preparedBy, reviewedBy, createdAt, replacesId, superseded]
+      properties:
+        id: { type: integer }
+        state: { type: string, enum: [pending, approved, rejected, cancelled] }
+        preparedBy: { type: integer }
+        reviewedBy: { type: [integer, 'null'] }
+        createdAt: { type: string, format: date-time }
+        replacesId: { type: [integer, 'null'] }
+        superseded: { type: boolean }
+        asOf: { type: string }
+        title: { type: string }
+    AffairsWorkspace:
+      type: object
+      required: [book, permissions, versions, truncated]
+      properties:
+        book:
+          type: object
+          required: [id, currency]
+          properties:
+            id: { type: integer }
+            currency: { type: string }
+        permissions: { type: array, items: { type: string } }
+        versions: { type: array, items: { $ref: '#/components/schemas/AffairsVersion' } }
+        truncated: { type: boolean }
+    AffairsDetails:
+      allOf:
+        - $ref: '#/components/schemas/AffairsVersion'
+        - type: object
+          required: [payload, reviewedAt, decisionReason, audit]
+          properties:
+            reviewedAt: { type: [string, 'null'] }
+            decisionReason: { type: [string, 'null'] }
+            payload:
+              type: object
+              required: [bookId, branchId, currency, request, totals, warnings]
+              properties:
+                bookId: { type: integer }
+                branchId: { type: integer }
+                currency: { type: string }
+                request: { $ref: '#/components/schemas/AffairsRequest' }
+                totals: { $ref: '#/components/schemas/AffairsTotals' }
+                warnings: { type: array, items: { type: string } }
+            audit:
+              type: array
+              items:
+                type: object
+                required: [actorId, action, reason, createdAt]
+                properties:
+                  actorId: { type: integer }
+                  action: { type: string }
+                  reason: { type: string }
+                  createdAt: { type: string }
     AccountingTaxCode:
       type: object
       additionalProperties: false

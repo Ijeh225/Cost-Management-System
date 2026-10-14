@@ -14,6 +14,7 @@ import { sourceCoverage, type ReconciliationControl } from "./accounting-source-
 import { buildAccountingReport, validateReportFilter, type ReportFilter, type ReportAccount, type ReportLine } from "./accounting-reports.js";
 import { manualInput, mappedControlAccounts, type ManualAdjustment } from "./accounting-manual.js";
 import { buildOpeningSetup, type OpeningSetupRequest, type OpeningAccount } from "./accounting-opening-setup.js";
+import { buildAffairs, type AffairsRequest } from "./accounting-affairs.js";
 import { createHash } from "node:crypto";
 import { stableEvidence } from "./accounting-operational-mapping.js";
 import { validateTaxConfiguration, sameTaxRule, directExpenseHead, type TaxConfiguration } from "./accounting-tax.js";
@@ -732,6 +733,77 @@ export class NativeAccounting {
   }
   private async openingChart(client:Client,bookId:number):Promise<OpeningAccount[]> {
     return (await client.query<OpeningAccount>("SELECT id,code,name,category,active FROM accounting_accounts WHERE book_id=$1 ORDER BY id",[bookId])).rows;
+  }
+  async affairsWorkspace(bookId:number,branchId:number,actorId:number) {
+    return this.transaction(bookId,async client=>{
+      const {book}=await this.reportingScope(client,bookId,branchId,actorId);
+      const permissions:string[]=[];
+      for(const p of ["prepare","post"] as const)
+        if((await client.query("SELECT accounting_has_grant($1,$2,$3,$4) allowed",[bookId,branchId,actorId,p])).rows[0]?.allowed) permissions.push(p);
+      const rows=(await client.query(`SELECT id,state,prepared_by AS "preparedBy",reviewed_by AS "reviewedBy",created_at AS "createdAt",
+        replaces_id AS "replacesId",payload->'request'->>'asOf' AS "asOf",payload->'request'->>'title' AS title,
+        EXISTS(SELECT 1 FROM accounting_affairs replacement WHERE replacement.replaces_id=accounting_affairs.id AND replacement.state='approved') AS superseded
+        FROM accounting_affairs WHERE book_id=$1 AND branch_id=$2 ORDER BY id DESC LIMIT 201`,[bookId,branchId])).rows;
+      return {book:{id:bookId,currency:book.currency},permissions,versions:rows.slice(0,200),truncated:rows.length>200};
+    },true);
+  }
+  async affairsDetails(bookId:number,branchId:number,actorId:number,id:number) {
+    return this.transaction(bookId,async client=>{
+      await this.reportingScope(client,bookId,branchId,actorId);
+      const row=(await client.query<{id:number;state:string;preparedBy:number;reviewedBy:number|null;createdAt:Date;replacesId:number|null;
+        reviewedAt:Date|null;decisionReason:string|null;superseded:boolean;payload:ReturnType<typeof buildAffairs>["payload"]}>(`SELECT id,state,prepared_by AS "preparedBy",reviewed_by AS "reviewedBy",created_at AS "createdAt",
+        replaces_id AS "replacesId",reviewed_at AS "reviewedAt",decision_reason AS "decisionReason",payload,
+        EXISTS(SELECT 1 FROM accounting_affairs r WHERE r.replaces_id=accounting_affairs.id AND r.state='approved') AS superseded
+        FROM accounting_affairs WHERE id=$1 AND book_id=$2 AND branch_id=$3`,[id,bookId,branchId])).rows[0];
+      requireAccounting(row,"NOT_FOUND","Statement of Affairs not found in this scope");
+      const audit=(await client.query<{actorId:number;action:string;reason:string;createdAt:Date}>(`SELECT actor_id AS "actorId",action,reason,created_at AS "createdAt" FROM accounting_audit
+        WHERE affairs_id=$1 AND book_id=$2 AND branch_id=$3 ORDER BY id`,[id,bookId,branchId])).rows;
+      return {...row,audit};
+    },true);
+  }
+  async prepareAffairs(bookId:number,branchId:number,actorId:number,request:AffairsRequest) {
+    return this.transaction(bookId,async client=>{
+      const {book}=await this.reportingScope(client,bookId,branchId,actorId);
+      await this.permission(client,bookId,branchId,actorId,"prepare");
+      const draft=buildAffairs(bookId,branchId,book.currency,request);
+      const existing=(await client.query("SELECT id,payload_hash,prepared_by FROM accounting_affairs WHERE book_id=$1 AND branch_id=$2 AND request_id=$3",[bookId,branchId,request.requestId])).rows[0];
+      if(existing) {
+        requireAccounting(existing.prepared_by===actorId&&existing.payload_hash===draft.hash,"DUPLICATE_CONFLICT","Request identity belongs to another payload or preparer");
+        return {id:existing.id};
+      }
+      if(request.replacesId) {
+        const previous=(await client.query("SELECT state,payload FROM accounting_affairs WHERE id=$1 AND book_id=$2 AND branch_id=$3",[request.replacesId,bookId,branchId])).rows[0];
+        requireAccounting(previous&&previous.state!=="pending"&&previous.payload.request.asOf===request.asOf,"INVALID_REVISION","Replacement needs a final version with the same branch and valuation date");
+        requireAccounting(!(await client.query("SELECT id FROM accounting_affairs WHERE replaces_id=$1 AND state IN ('pending','approved')",[request.replacesId])).rowCount,"DUPLICATE_CONFLICT","A pending or approved replacement already exists; use the latest version");
+      }
+      const row=(await client.query(`INSERT INTO accounting_affairs(book_id,branch_id,request_id,payload,payload_hash,prepared_by,replaces_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,[bookId,branchId,request.requestId,draft.payload,draft.hash,actorId,request.replacesId??null])).rows[0];
+      await client.query("INSERT INTO accounting_audit(book_id,branch_id,actor_id,affairs_id,action,reason) VALUES($1,$2,$3,$4,'affairs_prepared',$5)",
+        [bookId,branchId,actorId,row.id,request.scopeEvidence.trim()]);
+      return {id:row.id};
+    });
+  }
+  async affairsAction(bookId:number,branchId:number,actorId:number,id:number,action:"approve"|"reject"|"cancel",reason:string) {
+    requireAccounting(["approve","reject","cancel"].includes(action)&&typeof reason==="string"&&reason.trim().length>0&&reason.length<=2000,"EVIDENCE_REQUIRED","Supported decision and review evidence required");
+    return this.transaction(bookId,async client=>{
+      await this.reportingScope(client,bookId,branchId,actorId);
+      await this.permission(client,bookId,branchId,actorId,action==="cancel"?"prepare":"post");
+      const row=(await client.query("SELECT * FROM accounting_affairs WHERE id=$1 AND book_id=$2 AND branch_id=$3 FOR UPDATE",[id,bookId,branchId])).rows[0];
+      requireAccounting(row,"NOT_FOUND","Statement of Affairs not found in this scope");
+      requireAccounting(action==="cancel"?row.prepared_by===actorId:row.prepared_by!==actorId,"SELF_APPROVAL","Original preparer cancellation or independent reviewer required");
+      const state=action==="approve"?"approved":action==="reject"?"rejected":"cancelled";
+      if(row.state===state) {
+        requireAccounting(row.reviewed_by===actorId&&row.decision_reason===reason.trim(),"DUPLICATE_CONFLICT","A different decision already exists");
+        return {id};
+      }
+      requireAccounting(row.state==="pending","AFFAIRS_STATE","Only pending versions accept a decision; correct final versions with a retained replacement");
+      const rebuilt=buildAffairs(bookId,branchId,row.payload.currency,row.payload.request);
+      requireAccounting(rebuilt.hash===row.payload_hash,"SOURCE_CHANGED","Stored valuation payload no longer matches its retained hash");
+      await client.query("INSERT INTO accounting_audit(book_id,branch_id,actor_id,affairs_id,action,reason) VALUES($1,$2,$3,$4,$5,$6)",
+        [bookId,branchId,actorId,id,`affairs_${state}`,reason.trim()]);
+      await client.query("UPDATE accounting_affairs SET state=$2,reviewed_by=$3,decision_reason=$4,reviewed_at=now() WHERE id=$1",[id,state,actorId,reason.trim()]);
+      return {id};
+    });
   }
   private async openingSetupDraft(client:Client,bookId:number,branchId:number,actorId:number,request:OpeningSetupRequest) {
     const scope=await this.reportingScope(client,bookId,branchId,actorId);

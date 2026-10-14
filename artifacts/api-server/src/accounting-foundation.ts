@@ -13,3 +13,4 @@ export { buildAccountingReport } from "./lib/accounting-reports";
 export { buildAccountingStatements } from "./lib/accounting-statements";
 export { ACCOUNTING_PERMISSIONS, ACCOUNTING_POLICY_KEYS, DRAFT_CHART, DRAFT_CHART_VERSION,
   AccountingError, accountingEnabled, moneyToMinor, minorToMoney } from "./lib/accounting-rules";
+export * from "./lib/accounting-affairs.js";

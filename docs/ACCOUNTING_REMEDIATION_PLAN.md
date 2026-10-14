@@ -1,5 +1,14 @@
 # Accounting Remediation and Feature Plan
 
+Current2026-10-14 13:49 WAT: Steps6-10 inactive engineering/publication accepted
+as recorded in PROJECT_STATE; Step11 internal Statement of Affairs now complete
+and controlled-test accepted locally (451unit/API,5distinct isolated DB/UI/print).
+No duplicate GL/Balance Sheet or valuation financial postings. Unknown book values
+remain explicit; independent approval is not professional completeness or statutory
+certification. Step11 not yet committed/pushed/deployed. Official accounting stays
+OFF. Publish upon request, then separately authorised Step12 final acceptance,
+real approved setup/reconciliation/rollout/training. Older snapshots below are history.
+
 Current2026-10-10 22:35 WAT: Step6 inactive technical scope accepted and
 deployed40aec3d/exact Railwayc687034c SUCCESS/healthz/bundle smoke PASS.
 Both switches false; production62tables/financial baseline unchanged. All23

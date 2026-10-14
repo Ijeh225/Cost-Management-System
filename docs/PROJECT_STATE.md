@@ -1,5 +1,30 @@
 # Project State
 
+## 2026-10-14 13:53 WAT - Step 11 publication authorised / pending
+- User explicitly requested commit, push, exact successful deployment confirmation and updates to all3project records, keeping official accounting OFF.
+- Reviewed clean-origin Step11 change set/current records on master in restored checkout; diff checks and current built Step11/native OFF smoke PASS. Retained451unit/API +5distinct isolated DB/build/UI/CSV/print/mobile acceptance; no unnecessary repeated tests or duplicate test records.
+- Production Railway accounting/schema variables both unset/defaultOFF, read-only verified. No activation, production financial writes or native schema execution authorised/performed.
+- Publication in progress; record exact functional commit, matching Railway release and post-deployment health/auth/runtime OFF proof when observed. Do not treat a push as deployment success.
+
+## 2026-10-14 13:49 WAT - Step 11 implemented and controlled tests accepted (local)
+- Statement of Affairs complete within the recorded internal-management scope: dated branch assets/liabilities/net assets, exact decimal calculations, evidence, estimated versus declared book carrying values, explicit unknowns, independent review/rejection/cancellation, immutable version/audit and correction lineage, CSV and responsive printable UI. Guide: `docs/ACCOUNTING_STATEMENT_OF_AFFAIRS_GUIDE.md`.
+- Duplicate review reused NativeAccounting transaction/scope/grants/audit, existing finance guards, catalog/cache and CSV protection. Valuation approval creates no GL journal, opening or operational financial change. Not a second ledger, automatic book reconciliation, group consolidation or statutory certification.
+- Accepted:451unit/API PASS (3prior skips);5distinct isolated DB cases (3Step11 +2repeat-migration/rollback); complete typechecks/build; final built loopback UI/CSV/print/mobile/error/scope/refresh PASS. Printed pages visually inspected; local dark-theme print background corrected and retested. Local OFF bundle smoke PASS with zero native connections/writes.
+- Both isolated namespaces removed; subsequent owned namespace inspection `[]`, shared11-source financial baseline unchanged and tunnel closed. No production financial writes or new live test records.
+- Changes are UNCOMMITTED/UNPUSHED/NOT DEPLOYED. HEAD remains385c02f (accepted Step10 inactive release). Step11 engineering acceptance does not imply live publication. Official accounting/schema activation stays OFF; no flags were changed.
+- Exact next: publish this Step11 inactive release when requested, confirm exact deployment/auth/health/OFF controls, then separately authorised Step12 final acceptance/rollout/training. Actual accountant/owner scope/chart/cutover/grants/VAT recovery and complete verified openings/reconciliation remain prerequisites to official activation. Do not repeat accepted Step10/11 controlled cases or wipe test data without a specific need/authority.
+
+## 2026-10-14 13:48 WAT - Step 11 controlled acceptance in progress
+- New Statement of Affairs implementation reuses scoped native grants/review/audit; no duplicate Balance Sheet/GL. Exact assets/liabilities/net assets, evidence, explicit estimates/declared carrying values and unknowns, immutable decisions/replacement chain and CSV/print included.
+- 451unit/API +3prior skips,3new DB concurrency/immutability/scope cases and2migration cases PASS; isolated source baseline/namespace/tunnel cleanup verified. Build/typechecks and built dummy UI/OFF smoke PASS.
+- Final print visual review found dark-theme unused page background; correction and recheck underway. No production writes, activation, commit/push/deployment this turn.
+
+## 2026-10-14 13:31 WAT - Step 11 started
+- Step 11 Statement of Affairs authorised; duplicate review found no existing valuation workflow. Step 10 remains complete/deployed inactive at 385c02f.
+- Implement dated evidence-backed branch asset/liability schedules, net assets, explicit estimated versus declared book values, independent approval and immutable versions; never post valuations into the GL.
+- Official accounting/schema flags stay OFF. Controlled implementation/testing is in progress; no production financial writes or activation.
+- Session: `docs/SESSION_SUMMARIES/2026-10-14-step11-statement-of-affairs.md`.
+
 ## Current Work Register - Authoritative as of 2026-10-14
 
 ### Step 10 Deployed INACTIVE / Exact Resume - 2026-10-14 13:00 WAT

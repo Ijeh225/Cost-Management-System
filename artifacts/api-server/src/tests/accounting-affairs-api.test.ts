@@ -1,0 +1,27 @@
+import express from "express";
+import cookieParser from "cookie-parser";
+import request from "supertest";
+import { beforeEach,describe,expect,it,vi } from "vitest";
+const mocks=vi.hoisted(()=>({select:vi.fn(),connect:vi.fn(),workspace:vi.fn(),details:vi.fn(),prepare:vi.fn(),action:vi.fn()}));
+vi.mock("@workspace/db",async()=>({...await import("../../../../lib/db/src/schema/index.js"),db:{select:mocks.select},pool:{connect:mocks.connect}}));
+vi.mock("../lib/native-accounting.js",()=>({NativeAccounting:class{affairsWorkspace=mocks.workspace;affairsDetails=mocks.details;prepareAffairs=mocks.prepare;affairsAction=mocks.action;}}));
+import * as tables from "@workspace/db";
+import { accountingAffairsRouter } from "../routes/accounting-affairs.js";
+import { signToken,createCsrfToken } from "../lib/auth.js";
+import { AccountingError } from "../lib/accounting-rules.js";
+const user={id:12,isActive:true,sessionToken:"affairs-unit",branchId:2,authorityLevel:"staff",jobFunction:"accounts",workspaceAccess:'["accounts"]',accessProfileMigratedAt:new Date()};
+const app=express();app.use(express.json());app.use(cookieParser());app.use("/api",accountingAffairsRouter);
+const cookie=`cost_analysis_session=${signToken(user.id,user.sessionToken)}`,url="/api/accounting/books/1/statement-of-affairs";
+const post=(target:string)=>request(app).post(target).set("Cookie",cookie).set("X-CSRF-Token",createCsrfToken(user.sessionToken));
+const body={requestId:"dummy_affairs_01",asOf:"2026-10-14",title:"Dummy valuation",scopeEvidence:"Dummy",limitations:"Dummy incomplete",lines:[{key:"bank",category:"asset",name:"Dummy bank",value:"1",bookValue:null,basis:"estimate",basisExplanation:"Dummy estimate",evidence:"Dummy reference"}]};
+let owner=false,operations=false;
+beforeEach(()=>{vi.clearAllMocks();process.env.NATIVE_ACCOUNTING_ENABLED="true";owner=false;operations=false;
+  mocks.select.mockImplementation(()=>({from:(table:unknown)=>({where:()=>{const rows=table===tables.usersTable?[{...user,authorityLevel:owner?"super_admin":"staff",jobFunction:operations?"operations":"accounts",workspaceAccess:operations?'["shipping"]':'["accounts"]'}]:[{isActive:true}];return Object.assign(Promise.resolve(rows),{limit:async()=>rows});}})}));
+  mocks.workspace.mockResolvedValue({versions:[]});mocks.details.mockResolvedValue({id:4});mocks.prepare.mockResolvedValue({id:4});mocks.action.mockResolvedValue({id:4});});
+describe("Statement of Affairs public controls",()=>{
+  it("requires authenticated finance access and CSRF",async()=>{expect((await request(app).post(url).send(body)).status).toBe(401);expect((await request(app).post(url).set("Cookie",cookie).send(body)).status).toBe(403);operations=true;expect((await post(url).send(body)).status).toBe(403);expect(mocks.prepare).not.toHaveBeenCalled();});
+  it("rejects unexpected fields and invalid branch selectors",async()=>{for(const suffix of ["?branchId=all","?branchId=3","?branchId=2&branchId=2","?unsafe=1"])expect((await post(url+suffix).send(body)).status).toBeGreaterThanOrEqual(400);for(const change of [{state:"approved"},{reviewedBy:12},{lines:[{...body.lines[0],category:"income"}]}])expect((await post(url).send({...body,...change})).status).toBe(400);expect(mocks.prepare).not.toHaveBeenCalled();});
+  it("allows owner explicit branch from All but never widens selected branch",async()=>{owner=true;expect((await post(url+"?branchId=3").set("X-Branch-Id","2").send(body)).status).toBe(403);expect((await post(url).set("X-Branch-Id","all").send(body)).status).toBe(403);expect((await post(url+"?branchId=3").set("X-Branch-Id","all").send(body)).body).toEqual({id:4});expect(mocks.prepare).toHaveBeenCalledWith(1,3,12,body);});
+  it("gates inactive writes without engine or DB access",async()=>{delete process.env.NATIVE_ACCOUNTING_ENABLED;for(const target of [url,url+"/4/action"])expect((await post(target).send({})).status).toBe(503);expect(mocks.prepare).not.toHaveBeenCalled();expect(mocks.action).not.toHaveBeenCalled();expect(mocks.connect).not.toHaveBeenCalled();});
+  it("exposes no-store scoped reads and domain decisions",async()=>{const r=await request(app).get(url+"/4").set("Cookie",cookie);expect(r.status).toBe(200);expect(r.headers['cache-control']).toBe('no-store');mocks.details.mockRejectedValue(new AccountingError("NOT_FOUND","Unrelated version"));expect((await request(app).get(url+"/4").set("Cookie",cookie)).status).toBe(404);mocks.action.mockRejectedValue(new AccountingError("SELF_APPROVAL","Independent reviewer required"));expect((await post(url+"/4/action").send({action:"approve",reason:"Dummy"})).status).toBe(400);expect((await post(url+"/4/action").send({action:"post",reason:"Dummy"})).status).toBe(400);});
+});

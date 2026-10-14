@@ -1,5 +1,25 @@
 # Live End-to-End Test Register
 
+## 2026-10-14 13:53 WAT - Step 11 inactive publication started
+- User authorised commit/push/deploy and explicit OFF verification. Production native accounting/schema variables unset/defaultOFF before publication; local built Step11/native OFF smoke PASS with zero native connections/writes.
+- Retained accepted451unit/API +5distinct controlled DB/UI/print cases; deployment health/auth/current-runtime acceptance pending exact release. No live financial write test or activation performed.
+
+## 2026-10-14 13:49 WAT - Step 11 local acceptance
+- 451unit/API PASS/3pre-existing skips;5distinct isolated cases PASS:3new valuation identity/concurrent decisions/immutable correction/scope controls (196.53s),2schema repeat/atomic rollback regressions (20.39s). Approval/retries retain one decision and create no journal; audit/payload/final-version deletion and unaudited decisions refused.
+- Accepted built loopback UI: explicit unknown/book versus estimate input, interrupted-response same-identity retry, independent review, CSV formula-injection protection, print review state/evidence/totals/audit, mobile width, branch reset, refresh retains same-scope data but disables writes/export, inactive and failure displays. Dark-theme printed background fixed; final browser rerun and both rendered pages visually accepted.
+- All typechecks/full build PASS (retained Vite sourcemap/chunk warnings); native OFF bundle checks include all4new affairs methods and refuse before connection. Isolated schemas cleaned; final namespace inspection `[]`; public11-source baseline unchanged; tunnel closed.
+- No official/live valuation write or deployment performed. Step11 is local-only, not yet committed/pushed/deployed. Existing production Step10 release remains385c02f. Pending publication proof is distinct from actual accountant valuation/completeness/statutory acceptance.
+
+## 2026-10-14 13:48 WAT - Step 11 controlled evidence
+- New calculator/API cases included in451PASS/3prior skips. Network isolated PostgreSQL:3new Step11 tests PASS plus2existing migration idempotency/rollback tests PASS; public source totals unchanged, own schemas removed and tunnel closed.
+- Concurrency/retry identity, independent approval, review-state conflict, scope/access refusal, unaudited raw SQL decision refusal, final payload/audit immutability, cancelled/rejected corrections and superseded lineage verified. Approval creates no journal.
+- Built loopback dummy UI and OFF smoke PASS. Print visual review found dark unused-page background; fixing locally before final visual acceptance. No new live test record or production accounting activation.
+
+## 2026-10-14 13:31 WAT - Step 11 implementation scope
+- Statement of Affairs has no existing implementation. Build/test a separate reviewed valuation schedule; do not repeat accepted Step 10 tests or interpret a valuation as a posted Balance Sheet.
+- No live write test, new test record, posting or activation performed. Official accounting stays inactive.
+- Pending: calculator, permissions/scope, independent review, immutable history/idempotency, isolated database and UI acceptance.
+
 ## Current Test and Defect Register - Authoritative as of 2026-10-14
 
 ### Step 10 Exact Inactive Release PASS - 2026-10-14 13:00 WAT

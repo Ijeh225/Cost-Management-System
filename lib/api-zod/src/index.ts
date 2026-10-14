@@ -1,6 +1,7 @@
 export * from "./generated/api";
 export { LoginResponse, UploadContainersResponse } from "./generated/api";
 export {
+  GetAffairsWorkspaceParams,GetAffairsVersionParams,PrepareAffairsParams,ActOnAffairsParams,
   GetAccountingOptionsParams,
   GetNativeAccountingReportParams,
   GetAccountingJournalParams,

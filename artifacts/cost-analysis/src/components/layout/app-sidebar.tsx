@@ -91,6 +91,7 @@ export function AppSidebar() {
       { title: "Management Accounts", url: "/accounting/management-accounts", icon: BarChart2 },
       { title: "Manual Journals", url: "/accounting/manual-journals", icon: BookOpen },
       { title: "Opening Balances", url: "/accounting/opening-balances", icon: BookOpen },
+      { title: "Statement of Affairs", url: "/accounting/statement-of-affairs", icon: BookOpen },
       { title: "VAT / Direct Expenses", url: "/accounting/tax-configuration", icon: BookOpen }] : []),
     { title: "My Tasks",        url: "/my-tasks",       icon: ListTodo         },
     { title: "Notifications",   url: "/notifications",  icon: Bell, badge: unreadCount, badgeLoading: notificationsLoading },
@@ -148,6 +149,7 @@ export function AppSidebar() {
     {title:"Management Accounts",url:"/accounting/management-accounts",icon:BarChart2},
     {title:"Manual Journals",url:"/accounting/manual-journals",icon:BookOpen},
     {title:"Opening Balances",url:"/accounting/opening-balances",icon:BookOpen},
+    {title:"Statement of Affairs",url:"/accounting/statement-of-affairs",icon:BookOpen},
     {title:"VAT / Direct Expenses",url:"/accounting/tax-configuration",icon:BookOpen});
 
   return (

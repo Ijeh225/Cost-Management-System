@@ -10,6 +10,7 @@ import type { OperationalMapping,OperationalRef } from "../lib/accounting-operat
 import type { ReviewedOpening } from "../lib/accounting-reviewed-opening";
 import type { ManualAdjustment } from "../lib/accounting-manual";
 import type { TaxConfiguration } from "../lib/accounting-tax";
+import type { AffairsRequest } from "../lib/accounting-affairs";
 
 const schema = `acct_foundation_${Date.now()}_${randomBytes(4).toString("hex")}`;
 const previousEnabled = process.env.NATIVE_ACCOUNTING_ENABLED;
@@ -703,6 +704,53 @@ async function fixture(approved = true, multiBranch = false, initialise = true) 
   return result;
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
+
+const affairsInput=():AffairsRequest=>({requestId:randomBytes(8).toString("hex"),asOf:"2026-10-14",title:"Dummy affairs",scopeEvidence:"Dummy branch asset/supplier schedules",limitations:"Dummy partial records, NOT statutory certification",lines:[
+  {key:"bank",category:"asset",name:"Dummy bank",value:"100.01",bookValue:"100.01",basis:"book",basisExplanation:"Dummy carrying value",evidence:"Dummy dated statement"},
+  {key:"equipment",category:"asset",name:"Dummy equipment",value:"60.10",bookValue:null,basis:"estimate",basisExplanation:"Dummy survey",evidence:"Dummy valuation"},
+  {key:"supplier",category:"liability",name:"Dummy supplier",value:"200.12",bookValue:null,basis:"estimate",basisExplanation:"Dummy settlement",evidence:"Dummy supplier"}]});
+describe("Step11 controlled Statement of Affairs",()=>{
+  it("retries once, independently approves evidence and never posts valuation journals",async()=>{
+    const f=await fixture(),input=affairsInput(),before=(await sql("SELECT count(*) n FROM accounting_journals WHERE book_id=$1",[f.book])).rows[0].n;
+    const [a,b]=await Promise.all([service.prepareAffairs(f.book,f.branch,f.preparer,input),service.prepareAffairs(f.book,f.branch,f.preparer,input)]);expect(a.id).toBe(b.id);
+    await expect(service.prepareAffairs(f.book,f.branch,f.preparer,{...input,title:"Conflicting retry"})).rejects.toMatchObject({code:"DUPLICATE_CONFLICT"});
+    await expect(service.affairsAction(f.book,f.branch,f.preparer,a.id,"approve","Dummy")).rejects.toMatchObject({code:"FORBIDDEN"});
+    await service.grantAccess(f.book,f.branch,f.owner,f.preparer,"post","Dummy test of self review refusal");
+    await expect(service.affairsAction(f.book,f.branch,f.preparer,a.id,"approve","Dummy")).rejects.toMatchObject({code:"SELF_APPROVAL"});
+    await service.affairsAction(f.book,f.branch,f.approver,a.id,"approve","Dummy independent valuation evidence");
+    await service.affairsAction(f.book,f.branch,f.approver,a.id,"approve","Dummy independent valuation evidence");
+    const d=await service.affairsDetails(f.book,f.branch,f.approver,a.id);expect(d.state).toBe("approved");expect(d.payload.totals.netAssets).toBe("-40.01");expect(d.audit.map(x=>x.action)).toEqual(["affairs_prepared","affairs_approved"]);
+    expect((await sql("SELECT count(*) n FROM accounting_journals WHERE book_id=$1",[f.book])).rows[0].n).toBe(before);
+    await expect(sql("UPDATE accounting_affairs SET payload=payload||'{\"forged\":true}' WHERE id=$1",[a.id])).rejects.toThrow(/immutable/);
+    await expect(sql("DELETE FROM accounting_affairs WHERE id=$1",[a.id])).rejects.toThrow(/immutable/);
+    await expect(sql("UPDATE accounting_audit SET reason='changed' WHERE affairs_id=$1",[a.id])).rejects.toThrow(/immutable/);
+  });
+  it("isolates scope, rejects unaudited decisions and keeps rejected/cancelled replacement history",async()=>{
+    const f=await fixture(true,true),input=affairsInput(),a=await service.prepareAffairs(f.book,f.branch,f.preparer,input);
+    expect((await service.affairsWorkspace(f.book,f.secondBranch!,f.owner)).versions).toEqual([]);
+    await expect(service.affairsDetails(f.book,f.secondBranch!,f.owner,a.id)).rejects.toMatchObject({code:"NOT_FOUND"});
+    await expect(service.affairsDetails(f.book,f.branch,f.operations,a.id)).rejects.toMatchObject({code:"FORBIDDEN"});
+    await expect(sql("UPDATE accounting_affairs SET state='approved',reviewed_by=$2,reviewed_at=now(),decision_reason='forged' WHERE id=$1",[a.id,f.approver])).rejects.toThrow(/audit/);
+    await service.affairsAction(f.book,f.branch,f.approver,a.id,"reject","Dummy missing proof");
+    const next=await service.prepareAffairs(f.book,f.branch,f.preparer,{...input,requestId:randomBytes(8).toString("hex"),replacesId:a.id});
+    await service.affairsAction(f.book,f.branch,f.preparer,next.id,"cancel","Dummy correction withdrawn");
+    await expect(service.affairsAction(f.book,f.branch,f.approver,next.id,"approve","Dummy")).rejects.toMatchObject({code:"AFFAIRS_STATE"});
+    await expect(service.prepareAffairs(f.book,f.branch,f.preparer,{...input,requestId:randomBytes(8).toString("hex"),replacesId:a.id,asOf:"2026-10-15"})).rejects.toMatchObject({code:"INVALID_REVISION"});
+    expect((await service.affairsWorkspace(f.book,f.branch,f.preparer)).versions).toHaveLength(2);
+  });
+  it("serialises decisions/replacements and labels superseded snapshots without overwriting evidence",async()=>{
+    const f=await fixture(),input=affairsInput(),a=await service.prepareAffairs(f.book,f.branch,f.preparer,input);
+    const decisions=await Promise.allSettled([service.affairsAction(f.book,f.branch,f.approver,a.id,"approve","Dummy accept"),service.affairsAction(f.book,f.branch,f.approver,a.id,"reject","Dummy reject")]);
+    expect(decisions.filter(d=>d.status==="fulfilled")).toHaveLength(1);
+    const replacements=await Promise.allSettled([1,2].map(()=>service.prepareAffairs(f.book,f.branch,f.preparer,{...input,requestId:randomBytes(8).toString("hex"),replacesId:a.id})));
+    const success=replacements.find(r=>r.status==="fulfilled")!;expect(replacements.filter(r=>r.status==="fulfilled")).toHaveLength(1);
+    if(success.status!=="fulfilled")throw new Error("Expected one replacement");
+    await service.affairsAction(f.book,f.branch,f.approver,success.value.id,"approve","Dummy reviewed correction");
+    expect((await service.affairsDetails(f.book,f.branch,f.approver,a.id)).superseded).toBe(true);
+    expect((await service.affairsDetails(f.book,f.branch,f.approver,success.value.id)).superseded).toBe(false);
+    await expect(service.prepareAffairs(f.book,f.branch,f.preparer,{...input,requestId:randomBytes(8).toString("hex"),replacesId:a.id})).rejects.toMatchObject({code:"DUPLICATE_CONFLICT"});
+  });
+});
 async function setupRequest(f:{book:number;branch:number},positive=false,key=randomBytes(8).toString("hex")) {
   const accounts=(await sql("SELECT id FROM accounting_accounts WHERE book_id=$1 ORDER BY id",[f.book])).rows;
   return {requestId:key,cutoverDate:"2026-10-01",policyVersion:"isolated-only-v1",ownerEvidence:"Dummy owner",
