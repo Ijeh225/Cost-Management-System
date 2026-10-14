@@ -330,6 +330,8 @@ function Router() {
               </Route>
               <Route path="/accounting/general-ledger"><FinanceGuard><NativeAccountingPage kind="general-ledger"/></FinanceGuard></Route>
               <Route path="/accounting/trial-balance"><FinanceGuard><NativeAccountingPage kind="trial-balance"/></FinanceGuard></Route>
+              <Route path="/accounting/balance-sheet"><FinanceGuard><NativeAccountingPage kind="balance-sheet"/></FinanceGuard></Route>
+              <Route path="/accounting/management-accounts"><FinanceGuard><NativeAccountingPage kind="management-accounts"/></FinanceGuard></Route>
               <Route path="/accounting/manual-journals"><FinanceGuard><ManualAccountingPage/></FinanceGuard></Route>
               <Route path="/accounting/opening-balances"><FinanceGuard><OpeningBalancesPage/></FinanceGuard></Route>
               <Route path="/accounting/tax-configuration"><FinanceGuard><TaxConfigurationPage/></FinanceGuard></Route>

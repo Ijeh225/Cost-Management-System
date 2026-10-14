@@ -40,7 +40,7 @@ accountingReportsRouter.get("/accounting/books/:bookId/options",async(req:AuthRe
 });
 accountingReportsRouter.get("/accounting/books/:bookId/reports/:kind",async(req:AuthRequest,res)=>{
   try {
-    const query=reportQuery.parse(req.query),kind=z.enum(["general-ledger","trial-balance"]).parse(req.params.kind);
+    const query=reportQuery.parse(req.query),kind=z.enum(["general-ledger","trial-balance","balance-sheet","management-accounts"]).parse(req.params.kind);
     return res.json(await engine.accountingReport(id.parse(req.params.bookId),scope(req,query.branchId),req.user!.id,kind,
       {from:query.from,to:query.to,accountId:query.accountId,periodId:query.periodId,includeZero:query.includeZero==="true",includeInactive:query.includeInactive==="true"}));
   } catch(error){return failed(res,error);}

@@ -12,4 +12,6 @@ export type AccountingReportKind =
 export const AccountingReportKind = {
   "general-ledger": "general-ledger",
   "trial-balance": "trial-balance",
+  "balance-sheet": "balance-sheet",
+  "management-accounts": "management-accounts",
 } as const;

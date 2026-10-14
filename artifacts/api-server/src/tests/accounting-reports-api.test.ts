@@ -20,6 +20,17 @@ beforeEach(()=>{
   mocks.catalog.mockResolvedValue({status:"active",books:[]});mocks.options.mockResolvedValue({accounts:[],periods:[]});mocks.report.mockResolvedValue({basis:"posted_double_entry"});mocks.journal.mockResolvedValue({id:1});
 });
 describe("Step8 public read-only route boundary",()=>{
+  it("Step10 statements reuse the same authenticated scoped engine, with no new write route",async()=>{
+    for(const kind of ['balance-sheet','management-accounts']) {
+      const target=url.replace('trial-balance',kind);
+      expect((await request(app).get(target)).status).toBe(401);
+      expect((await request(app).get(target).set('Cookie',cookie)).status).toBe(200);
+      expect(mocks.report.mock.calls.at(-1)?.slice(0,4)).toEqual([1,2,12,kind]);
+      expect((await request(app).get(target+'&branchId=all').set('Cookie',cookie)).status).toBe(403);
+      operations=true;expect((await request(app).get(target).set('Cookie',cookie)).status).toBe(403);operations=false;
+      expect((await request(app).post(target).set('Cookie',cookie)).status).toBe(403); // Existing CSRF guard; no write route.
+    }
+  });
   it("requires current authenticated finance access",async()=>{
     expect((await request(app).get(url)).status).toBe(401);operations=true;
     expect((await request(app).get(url).set("Cookie",cookie)).status).toBe(403);expect(mocks.report).not.toHaveBeenCalled();

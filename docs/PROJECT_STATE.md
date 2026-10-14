@@ -1,6 +1,76 @@
 # Project State
 
-## Current Work Register - Authoritative as of 2026-10-13
+## Current Work Register - Authoritative as of 2026-10-14
+
+### Step 10 Engineering Accepted / Publishing INACTIVE - 2026-10-14 12:51 WAT
+
+- Engineering complete: existing posted ledger/catalog/GLTB/read grants/coverage
+  reused, no duplicate ledger/poster/schema activation. BS equation and FY earnings,
+  accrual P&L/unpaid/noncash, identified cash/bridge, supported ARAP aging/open items,
+  branch/item-level job performance/current exact budget context, native KPIs and
+  dashboard entry, journal/account drilldown, snapshot CSV/print/mobile delivered.
+- NEW invoice drafts retain actual due date with stale-approval protection; legacy
+  invoice evidence/hash/absence preserved, no historical due date invented. Bill/
+  legacy missing terms remain Undated; unallocated controls and ambiguous cash
+  purposes explicit. Budgets are current/lifetime gross context, not approved period
+  net variance. Guide ACCOUNTING_STATEMENTS_MANAGEMENT_GUIDE.md records these limits.
+- Final435unit/API PASS/3prior skips (55files), full build/typechecks/new OFF zero-DB
+  smoke and built new/shared UI, branch refresh/error/CSV/print/mobile/accessibility/
+  dashboard entry PASS. Print text/render inspected; KPI fragmentation corrected.
+- Final11DISTINCT owned DB cases accepted:7PASS797s (3new+4GLTB) plus4PASS358s
+  (2due/legacy terms+2invoice/source concurrency). Original public11aggregates
+  unchanged; final owned namespaces []/closed tunnel verified. Earlier failures
+  recovered/corrected, not open product defects. No production source mutations.
+- Protected checkpoints kept. Production switches still unset/defaultOFF. Next
+  commit/push/exact inactive deployment/health/auth/deployed bundle proof, then
+  records publication. Step11 Statement of Affairs is next on instruction; real
+  chart/book/date/grants/professional rules/openings/reconciliation precede activation.
+
+### Step 10 Seven DB Cases Accepted / Retained Terms Check - 2026-10-14 12:48 WAT
+
+- Final7isolated DB PASS797s (3new financial/control cases +4shared GLTB);
+  source11public baseline preserved, owned cleanup/tunnel closure verified.
+  Earlier network reset recovered; subsequent wrong VAT fixture base refused by
+  existing split guard, corrected without weakening it. These are not open product defects.
+- Final434unit/API/3prior skips, full build/typechecks, new OFF zero-DB smoke and
+  built BS/pack/shared GLTB/CSV/print/mobile/scope/refresh/error/accessibility PASS.
+  Print KPI split corrected and rendered pages inspected; dashboard entry checked.
+- Final review adds actual recorded due-date retention to NEW native invoice
+  drafts; preserve old evidence/hash/absence. New draft terms revalidated at approval;
+  later edits never rewrite historical aging, and coverage reports stale terms.
+  Two dedicated terms and2shared invoice/dedup DB cases running; final435unit/API
+  rerun underway. Commit/push/deployment not yet claimed; official accounting OFF.
+
+### Step 10 Built / Acceptance Recovery - 2026-10-14 12:15 WAT
+
+- Added BS/management routes/screens to existing scoped posted GL/TB engine and
+  catalog; no new ledger/schema/poster. Exact earnings, accrual P&L, identified
+  cash/bridge, supported AR/AP open items, branch/item-level job performance,
+  current budget context, coverage, CSV/print/drilldown and native dashboard KPIs.
+- Initial433unit/API PASS/3prior skips, full build/typechecks and built new/shared
+  browser/mobile acceptance PASS; final hardening rerun underway. New OFF smoke
+  zero native connections/writes PASS. Screenshots inspected; final print QA pending.
+- First isolated run main financial scenario PASS; SSH network reset prevented
+  remaining acceptance and cleanup. Exact owned namespace recovered using guarded
+  helper; public11sources unchanged. Full final DB acceptance still pending, not
+  claimed as PASS; reconnect/rerun next. No production mutation or activation.
+- Retained due evidence is absent on legacy adapters: open items explicitly Undated,
+  unsupported/opening allocation differences visible; never use current mutable
+  due fields as past proof. Budget/current period and VAT bases disclosed. Guide:
+  ACCOUNTING_STATEMENTS_MANAGEMENT_GUIDE.md. No real setup/professional approval inferred.
+
+### Step 10 Authorised / Duplicate Review - 2026-10-14 11:50 WAT
+
+- Owner authorises Balance Sheet/Management Accounts, duplicate-work checks,
+  proper tests, continuity records, commit/push/deploy; official accounting OFF.
+- Clean 8ed5e52 verified; prior VAT/opening/Steps6-9 acceptance retained. Reuse
+  posted engine, GL/TB snapshot, scoped grants, coverage and journal drilldown.
+- Build read-only dated assets/liabilities/equity and earnings, accrual performance,
+  reconciled cash movement, supported open items/job/branch context and exceptions.
+  Never invent due dates, classifications, budgets or independent reconciliation.
+- Engineering/testing in progress, not completed/deployed. Actual setup approvals,
+  verified openings and separate activation remain required; original records kept.
+- Current session: SESSION_SUMMARIES/2026-10-14-step10-management-accounts.md.
 
 ### VAT / Direct Expenses Deployed INACTIVE / Exact Resume - 2026-10-13 19:46 WAT
 

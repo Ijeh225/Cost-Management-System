@@ -18,6 +18,9 @@ import { createHash } from "node:crypto";
 import { stableEvidence } from "./accounting-operational-mapping.js";
 import { validateTaxConfiguration, sameTaxRule, directExpenseHead, type TaxConfiguration } from "./accounting-tax.js";
 import { buildTaxRegister, type TaxRegisterJournal } from "./accounting-tax-register.js";
+import { buildAccountingStatements, type StatementLine, type JobBudget } from "./accounting-statements.js";
+import type { AccountingReportKind } from "./accounting-reports.js";
+import { BUDGET_CHARGE_FIELDS } from "./calculations.js";
 
 type Database = Pick<typeof pool, "connect">;
 async function connectClient(database: Database) { return database.connect(); }
@@ -206,10 +209,11 @@ export class NativeAccounting {
     const book = (await client.query("SELECT * FROM accounting_books WHERE id=$1", [bookId])).rows[0];
     requireAccounting(book?.status === "approved" && book.policy_version === mapping.policyVersion && book.currency === mapping.currency,
       "BOOK_NOT_APPROVED", "Matching approved book currency and policy version required");
-    const row = (await client.query("SELECT *,created_at AT TIME ZONE 'UTC' AS created_at FROM invoices WHERE id=$1 AND branch_id=$2 FOR SHARE", [invoiceId, branchId])).rows[0];
+    const row = (await client.query("SELECT i.*,created_at AT TIME ZONE 'UTC' AS created_at,to_jsonb(i)->>'due_date' AS retained_due_date FROM invoices i WHERE id=$1 AND branch_id=$2 FOR SHARE", [invoiceId, branchId])).rows[0];
     requireAccounting(row, "NOT_FOUND", "Invoice not found in this branch");
-    const originalPosted=(await client.query("SELECT status FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3",
-      [bookId,branchId,invoiceEventKey(invoiceId)])).rows[0]?.status === "posted";
+    const original=(await client.query("SELECT status,evidence FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3",
+      [bookId,branchId,invoiceEventKey(invoiceId)])).rows[0];
+    const originalPosted=original?.status === "posted";
     requireAccounting(["sent", "partial", "paid", "overdue",...(originalPosted ? ["written_off"] : [])].includes(row.status)
       && (originalPosted || !row.written_off_amount || moneyToMinor(row.written_off_amount) === 0n),
     "SOURCE_REVIEW_REQUIRED", "Adjusted historical invoices need previously posted original recognition; do not reconstruct it from guesses");
@@ -228,6 +232,8 @@ export class NativeAccounting {
     const source: InvoiceAccountingSource = { kind: "invoice", id: invoiceId, branchId, clientId: row.client_id,
       createdDate: financialDateKey(new Date(row.created_at)), subtotal: row.subtotal, vatAmount: row.vat_amount, total: row.total,
       items: items.map(item => ({ id: item.id, containerId: item.container_id, amount: item.amount })) };
+    // New drafts retain actual terms; older immutable evidence keeps its original hash/absence.
+    if(!original || Object.hasOwn(JSON.parse(original.evidence).source,"dueDate")) source.dueDate=row.retained_due_date??null;
     const taxConfig=await this.applicableTax(client,bookId,branchId,mapping.recognitionDate);
     if(mapping.tax || taxConfig && !originalPosted) {
       requireAccounting(mapping.tax,"TAX_REVIEW_REQUIRED","Explicit invoice item tax classifications required under configured VAT policy");
@@ -538,9 +544,11 @@ export class NativeAccounting {
       return {book:{id:scope.book.id,name:scope.book.name,currency:scope.book.currency,cutoverDate:scope.book.policy.cutoverDate},branches:scope.branches,accounts,periods};
     },true);
   }
-  async accountingReport(bookId:number,branchId:number|null,actorId:number,kind:"general-ledger"|"trial-balance",filter:ReportFilter) {
+  async accountingReport(bookId:number,branchId:number|null,actorId:number,kind:AccountingReportKind,filter:ReportFilter) {
     validateReportFilter(filter);
-    requireAccounting(["general-ledger","trial-balance"].includes(kind),"INVALID_FILTER","Supported report kind required");
+    requireAccounting(["general-ledger","trial-balance","balance-sheet","management-accounts"].includes(kind),"INVALID_FILTER","Supported report kind required");
+    const statementsRequested=kind==="balance-sheet"||kind==="management-accounts";
+    requireAccounting(!statementsRequested||filter.accountId===undefined,"INVALID_FILTER","Statements need the complete scoped chart");
     return this.transaction(bookId,async client=>{
       const {book,branches}=await this.reportingScope(client,bookId,branchId,actorId);
       requireAccounting(filter.from>=book.policy.cutoverDate,"PRE_CUTOVER","Report starts before approved accounting cutover");
@@ -549,7 +557,7 @@ export class NativeAccounting {
         requireAccounting(period && filter.from>=period.starts_on && filter.to<=period.ends_on,"INVALID_PERIOD","Dates must fall within the selected book period");
       }
       const accounts=(await client.query<ReportAccount>("SELECT id,code,name,category,active FROM accounting_accounts WHERE book_id=$1 ORDER BY code,id",[bookId])).rows;
-      const lines=(await client.query<ReportLine>(`SELECT l.id,l.journal_id AS "journalId",l.account_id AS "accountId",j.branch_id AS "branchId",
+      const lines=(await client.query<StatementLine>(`SELECT l.id,l.journal_id AS "journalId",l.account_id AS "accountId",j.branch_id AS "branchId",j.evidence,
         j.accounting_date::text date,j.status,j.kind,j.event_key AS "eventKey",j.narration,l.memo,
         l.debit_minor::text AS "debitMinor",l.credit_minor::text AS "creditMinor"
         FROM accounting_journal_lines l JOIN accounting_journals j ON j.id=l.journal_id
@@ -557,6 +565,32 @@ export class NativeAccounting {
         ORDER BY j.accounting_date,j.id,l.id LIMIT 50001`,[bookId,branches.map(b=>b.id),filter.to])).rows;
       requireAccounting(lines.length<=50000,"REPORT_TOO_LARGE","Report exceeds 50,000 posted lines; choose a narrower branch/book scope");
       const report=buildAccountingReport(accounts,lines,filter,kind);
+      let statements:ReturnType<typeof buildAccountingStatements>|undefined;
+      if(statementsRequested) {
+        const jobs=[...new Set(lines.flatMap(l=>{try{const s=JSON.parse(l.evidence??"{}").source;
+          return [...(s?.items??[]).map((i:any)=>i.containerId),s?.containerId].filter(Number.isSafeInteger);}catch{return [];}}))];
+        // Optional budget metadata, not financial facts. No invoice/header join can duplicate amounts.
+        const budgets=(await client.query<JobBudget>(`SELECT c.id,c.branch_id AS "branchId",
+          coalesce(to_jsonb(c)->>'container_number','Container #'||c.id) name,
+          to_jsonb(c)->>'clearing_charges' revenue,NULL::text cost
+          FROM containers c WHERE c.branch_id=ANY($1::int[]) AND c.id=ANY($2::int[])`,[branches.map(b=>b.id),jobs])).rows;
+        const costs=new Map<number,bigint>();
+        const budgetMinor=(v:string)=>v.startsWith('-')?-moneyToMinor(v.slice(1)):moneyToMinor(v);
+        for(const [section,fields] of Object.entries(BUDGET_CHARGE_FIELDS)) {
+          const costsRows=(await client.query(`SELECT container_id,
+            (SELECT jsonb_object_agg(key,value #>> '{}') FROM jsonb_each(to_jsonb(c))) fields FROM ${section}_charges c
+            WHERE branch_id=ANY($1::int[]) AND container_id=ANY($2::int[])`,[branches.map(b=>b.id),jobs])).rows;
+          for(const row of costsRows) {
+            const amount=fields.reduce((n,key)=>n+budgetMinor(row.fields[key.replace(/[A-Z]/g,c=>`_${c.toLowerCase()}`)]??"0"),0n);
+            costs.set(row.container_id,(costs.get(row.container_id)??0n)+amount);
+          }
+        }
+        const extra=(await client.query(`SELECT container_id,sum(amount)::text amount FROM container_extra_charges
+          WHERE branch_id=ANY($1::int[]) AND container_id=ANY($2::int[]) GROUP BY container_id`,[branches.map(b=>b.id),jobs])).rows;
+        for(const row of extra) costs.set(row.container_id,(costs.get(row.container_id)??0n)+budgetMinor(row.amount));
+        for(const budget of budgets) budget.cost=costs.has(budget.id)?minorToMoney(costs.get(budget.id)!):null;
+        statements=buildAccountingStatements(accounts,lines,filter,book.policy.financialYearEnd,budgets);
+      }
       const coverage=[];
       for(const branch of branches) {
         const checked=await this.coverage(client,bookId,branch.id,actorId,filter.to,[]);
@@ -571,9 +605,10 @@ export class NativeAccounting {
         "Inactive accounts with posted history are retained; zero-account visibility follows the selected filters."];
       if(branchId!==null || filter.accountId) warnings.push("Filtered branch/account view is not legal-group consolidation; its balances are not guaranteed to match a whole-book trial balance.");
       if(coverage.some(c=>c.exceptionCount>0)) warnings.push("Unposted, historical, stale or unclassified source exceptions remain; review the coverage register before relying on these figures.");
+      if(statements) warnings.push(...statements.warnings);
       return {...report,book:{id:bookId,name:book.name,currency:book.currency,policyVersion:book.policy_version,cutoverDate:book.policy.cutoverDate},
         branches,scope:branchId===null ? "whole_book" as const : "branch" as const,asOf:filter.to,generatedAt:new Date().toISOString(),warnings,coverage,
-        sourceCompletenessConfirmed:false,limit:50000,truncated:false};
+        sourceCompletenessConfirmed:false,limit:50000,truncated:false,statements};
     },true);
   }
   async reportJournal(bookId:number,branchId:number|null,actorId:number,journalId:number) {

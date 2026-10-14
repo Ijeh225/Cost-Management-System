@@ -381,12 +381,12 @@ paths:
     get:
       operationId: getNativeAccountingReport
       tags: [accounting]
-      summary: Read-only posted General Ledger or Trial Balance; exact decimal strings
+      summary: Read-only posted ledger, trial balance, balance sheet or management pack; exact decimal strings
       description: Finance capability plus named native read grants are required. All scope means one whole book, never unrelated books. Period filters constrain movements, not earlier opening balances. Native accounting disabled returns 503. More than 50000 posted historical lines returns 413, never truncated financial totals. Source equality is not professional approval or independent control reconciliation.
       parameters:
         - $ref: '#/components/parameters/AccountingBookId'
         - $ref: '#/components/parameters/AccountingBranch'
-        - { name: kind, in: path, required: true, schema: { type: string, enum: [general-ledger, trial-balance] } }
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [general-ledger, trial-balance, balance-sheet, management-accounts] } }
         - { name: from, in: query, required: true, schema: { type: string } }
         - { name: to, in: query, required: true, schema: { type: string } }
         - { name: accountId, in: query, schema: { type: integer, minimum: 1 } }
@@ -2109,8 +2109,9 @@ components:
       type: object
       required: [kind, basis, filter, book, branches, scope, asOf, generatedAt, rows, totals, balanced, warnings, coverage, sourceCompletenessConfirmed, limit, truncated]
       properties:
-        kind: { type: string, enum: [general-ledger, trial-balance] }
+        kind: { type: string, enum: [general-ledger, trial-balance, balance-sheet, management-accounts] }
         basis: { type: string, enum: [posted_double_entry] }
+        statements: { $ref: '#/components/schemas/AccountingStatements' }
         book: { $ref: '#/components/schemas/AccountingBook' }
         branches:
           type: array
@@ -2190,6 +2191,156 @@ components:
                     date: { type: string }
                     status: { type: string }
                     reason: { type: string }
+    StatementAccountAmount:
+      type: object
+      required: [accountId, code, name, category, amount]
+      properties:
+        accountId: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        category: { type: string }
+        amount: { type: string }
+    StatementAging:
+      type: object
+      required: [rows, total, controlBalance, unallocatedControl, buckets, dueDatesComplete, controlAccounts, identified]
+      properties:
+        total: { type: string }
+        controlBalance: { type: string }
+        unallocatedControl: { type: string }
+        dueDatesComplete: { type: boolean }
+        identified: { type: boolean }
+        controlAccounts: { type: array, items: { type: integer } }
+        buckets:
+          type: array
+          items:
+            type: object
+            required: [bucket, amount]
+            properties: { bucket: { type: string }, amount: { type: string } }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [type, branchId, sourceId, partyId, recognitionDate, dueDate, balance, accountIds, daysOverdue, bucket]
+            properties:
+              type: { type: string, enum: [receivable, payable] }
+              branchId: { type: integer }
+              sourceId: { type: integer }
+              partyId: { type: integer, nullable: true }
+              recognitionDate: { type: string }
+              dueDate: { type: string, nullable: true }
+              balance: { type: string }
+              accountIds: { type: array, items: { type: integer } }
+              daysOverdue: { type: integer, nullable: true }
+              bucket: { type: string }
+    AccountingStatements:
+      type: object
+      required: [balanceSheet, profitAndLoss, cashFlow, receivables, payables, branchPerformance, jobPerformance, warnings]
+      properties:
+        warnings: { type: array, items: { type: string } }
+        balanceSheet:
+          type: object
+          required: [rows, assets, liabilities, postedEquity, priorUnclosedEarnings, currentYearEarnings, financialYearStart, equityIncludingEarnings, difference, balanced]
+          properties:
+            rows: { type: array, items: { $ref: '#/components/schemas/StatementAccountAmount' } }
+            assets: { type: string }
+            liabilities: { type: string }
+            postedEquity: { type: string }
+            priorUnclosedEarnings: { type: string }
+            currentYearEarnings: { type: string }
+            financialYearStart: { type: string }
+            equityIncludingEarnings: { type: string }
+            difference: { type: string }
+            balanced: { type: boolean }
+        profitAndLoss:
+          type: object
+          required: [basis, rows, income, expense, profit]
+          properties:
+            basis: { type: string, enum: [posted_accrual] }
+            rows: { type: array, items: { $ref: '#/components/schemas/StatementAccountAmount' } }
+            income: { type: string }
+            expense: { type: string }
+            profit: { type: string }
+        cashFlow:
+          type: object
+          required: [basis, accountIds, opening, closing, movement, operating, investing, financing, transfers, unclassified, difference, identified, classificationsComplete, entries, profitBridge]
+          properties:
+            basis: { type: string, enum: [posted_identified_cash] }
+            accountIds: { type: array, items: { type: integer } }
+            opening: { type: string }
+            closing: { type: string }
+            movement: { type: string }
+            operating: { type: string }
+            investing: { type: string }
+            financing: { type: string }
+            transfers: { type: string }
+            unclassified: { type: string }
+            difference: { type: string }
+            identified: { type: boolean }
+            classificationsComplete: { type: boolean }
+            entries:
+              type: array
+              items:
+                type: object
+                required: [journalId, branchId, date, eventKey, classification, amount]
+                properties:
+                  journalId: { type: integer }
+                  branchId: { type: integer }
+                  date: { type: string }
+                  eventKey: { type: string }
+                  classification: { type: string }
+                  amount: { type: string }
+            profitBridge:
+              type: object
+              required: [profit, adjustments, cashMovement, difference]
+              properties:
+                profit: { type: string }
+                cashMovement: { type: string }
+                difference: { type: string }
+                adjustments:
+                  type: array
+                  items:
+                    type: object
+                    required: [accountId, code, name, adjustment]
+                    properties:
+                      accountId: { type: integer }
+                      code: { type: string }
+                      name: { type: string }
+                      adjustment: { type: string }
+        receivables: { $ref: '#/components/schemas/StatementAging' }
+        payables: { $ref: '#/components/schemas/StatementAging' }
+        branchPerformance:
+          type: array
+          items:
+            type: object
+            required: [branchId, income, expense, profit, cashMovement]
+            properties:
+              branchId: { type: integer }
+              income: { type: string }
+              expense: { type: string }
+              profit: { type: string }
+              cashMovement: { type: string }
+        jobPerformance:
+          type: object
+          required: [rows, unallocatedIncome, unallocatedExpense]
+          properties:
+            unallocatedIncome: { type: string }
+            unallocatedExpense: { type: string }
+            rows:
+              type: array
+              items:
+                type: object
+                required: [containerId, branchId, name, income, expense, profit, budgetRevenue, budgetCost, revenueVariance, costVariance]
+                properties:
+                  containerId: { type: integer }
+                  branchId: { type: integer }
+                  name: { type: string }
+                  income: { type: string }
+                  expense: { type: string }
+                  profit: { type: string }
+                  budgetRevenue: { type: string, nullable: true }
+                  budgetCost: { type: string, nullable: true }
+                  revenueVariance: { type: string, nullable: true }
+                  costVariance: { type: string, nullable: true }
     AccountingJournal:
       type: object
       required: [id, branchId, date, eventKey, kind, narration, evidence, reversalOf, postedAt, preparedBy, postedBy, lines]

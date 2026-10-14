@@ -5,7 +5,7 @@ import { ensureAccountingFoundationSchema } from "../lib/accounting-schema";
 import { NativeAccounting } from "../lib/native-accounting";
 import { ACCOUNTING_POLICY_KEYS, type JournalInput } from "../lib/accounting-rules";
 import { previewOpeningBalances } from "../lib/accounting-source-mapping";
-import type { InvoiceAccountingMapping } from "../lib/accounting-invoice-mapping";
+import { buildInvoiceJournal,type InvoiceAccountingMapping } from "../lib/accounting-invoice-mapping";
 import type { OperationalMapping,OperationalRef } from "../lib/accounting-operational-mapping";
 import type { ReviewedOpening } from "../lib/accounting-reviewed-opening";
 import type { ManualAdjustment } from "../lib/accounting-manual";
@@ -48,8 +48,14 @@ beforeAll(async () => {
     CREATE TABLE banks(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL);
     CREATE TABLE invoices(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL,client_id INTEGER,status TEXT NOT NULL,
       total NUMERIC(15,2) NOT NULL,written_off_amount NUMERIC(15,2),subtotal NUMERIC(15,2) NOT NULL DEFAULT 0,
-      vat_amount NUMERIC(15,2) NOT NULL DEFAULT 0,created_at TIMESTAMP NOT NULL DEFAULT '2026-10-09 10:00:00',updated_at TIMESTAMP,invoice_number TEXT);
-    CREATE TABLE containers(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL,bl_number TEXT NOT NULL);
+      vat_amount NUMERIC(15,2) NOT NULL DEFAULT 0,created_at TIMESTAMP NOT NULL DEFAULT '2026-10-09 10:00:00',updated_at TIMESTAMP,invoice_number TEXT,due_date DATE);
+    CREATE TABLE containers(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL,bl_number TEXT NOT NULL,container_number TEXT,clearing_charges NUMERIC(15,2));
+    CREATE TABLE shipping_charges(container_id INTEGER,branch_id INTEGER,shipping_company NUMERIC(15,2));
+    CREATE TABLE customs_charges(container_id INTEGER,branch_id INTEGER,duty NUMERIC(15,2),duty_paid NUMERIC(15,2));
+    CREATE TABLE terminal_charges(container_id INTEGER,branch_id INTEGER,terminal_charges NUMERIC(15,2));
+    CREATE TABLE delivery_charges(container_id INTEGER,branch_id INTEGER,delivery NUMERIC(15,2));
+    CREATE TABLE operations_charges(container_id INTEGER,branch_id INTEGER,miscellaneous NUMERIC(15,2));
+    CREATE TABLE container_extra_charges(container_id INTEGER,branch_id INTEGER,amount NUMERIC(15,2));
     CREATE TABLE invoice_items(id SERIAL PRIMARY KEY,invoice_id INTEGER NOT NULL,branch_id INTEGER NOT NULL,
       container_id INTEGER,amount NUMERIC(15,2) NOT NULL);
     CREATE TABLE credit_notes(id SERIAL PRIMARY KEY,invoice_id INTEGER NOT NULL,status TEXT NOT NULL,branch_id INTEGER,
@@ -901,6 +907,106 @@ describe("Step9 controlled manual journal workflow",()=>{
     }finally{process.env.NATIVE_ACCOUNTING_ENABLED="true";}
   });
 });
+describe("Step10 controlled financial statements",()=>{
+  const filter={from:'2026-10-01',to:'2026-10-13',includeZero:true,includeInactive:false};
+  it("reconciles one posted invoice/deposit/collection/unpaid bill/payment/adjustment with GLTB without writes or duplicated jobs",async()=>{
+    const f=await invoiceFixture();
+    const expense=await service.addAccount(f.book,f.branch,f.owner,'6000','Dummy overhead','expense');
+    const payable=await service.addAccount(f.book,f.branch,f.owner,'2000','Dummy payable','liability');
+    const contra=await service.addAccount(f.book,f.branch,f.owner,'1390','Dummy depreciation contra','asset');
+    const recognised=await service.prepareInvoice(f.book,f.branch,f.preparer,f.invoice,f.invoiceMapping);
+    await service.approveAndPost(f.book,f.branch,f.approver,recognised.id,'Dummy reviewed invoice');await postDeposit(f);
+    const allocated=await settlementPayment(f,'30','deposit',f.deposit);
+    const allocation=await service.prepareSettlement(f.book,f.branch,f.preparer,{kind:'invoice_payment',id:allocated},f.mapping);
+    await service.approveAndPost(f.book,f.branch,f.approver,allocation.id,'Dummy allocation');
+    const received=await settlementPayment(f,'20');const collection=await service.prepareSettlement(f.book,f.branch,f.preparer,{kind:'invoice_payment',id:received},f.mapping);
+    await service.approveAndPost(f.book,f.branch,f.approver,collection.id,'Dummy cash collection');
+    const bill=(await sql("INSERT INTO overhead_expenses(branch_id,category,description,amount,created_at) VALUES($1,'Office','Dummy obligation',80,'2026-10-10') RETURNING id",[f.branch])).rows[0].id;
+    const op:OperationalMapping={currency:'NGN',policyVersion:'isolated-only-v1',evidence:'Dummy reviewed',effect:'overhead',accountId:expense,controlAccountId:payable,recognitionDate:'2026-10-10',recognitionEvidence:'Dummy recognition',bankAccounts:{[f.bank]:f.debit}};
+    await postOperational(f,{kind:'overhead',id:bill},op);
+    const paid=(await sql("INSERT INTO expense_payments(branch_id,expense_id,amount,payment_method,bank_id,paid_at) VALUES($1,$2,25,'transfer',$3,'2026-10-11') RETURNING id",[f.branch,bill,f.bank])).rows[0].id;
+    await postOperational(f,{kind:'expense_payment',id:paid},op);
+    const adjustment=await service.prepareJournal(f.preparer,{...input(f),lines:[{accountId:expense,debit:'10',credit:'0'},{accountId:contra,debit:'0',credit:'10'}]});
+    await service.approveAndPost(f.book,f.branch,f.approver,adjustment.id,'Dummy noncash adjustment');
+    await sql('UPDATE containers SET clearing_charges=70,container_number=\'Dummy job\' WHERE id=$1',[f.containers[0]!.id]);
+    await sql('INSERT INTO customs_charges(container_id,branch_id,duty,duty_paid) VALUES($1,$2,5,999)',[f.containers[0]!.id,f.branch]);
+    await sql('INSERT INTO shipping_charges(container_id,branch_id,shipping_company) VALUES($1,$2,10)',[f.containers[0]!.id,f.branch]);
+    await sql('INSERT INTO container_extra_charges(container_id,branch_id,amount) VALUES($1,$2,2)',[f.containers[0]!.id,f.branch]);
+    const snapshot=(await sql('SELECT count(*)::int n,sum(debit_minor)::text amount FROM accounting_journal_lines WHERE book_id=$1',[f.book])).rows[0];
+    const pack=await service.accountingReport(f.book,f.branch,f.preparer,'management-accounts',filter),bs=await service.accountingReport(f.book,f.branch,f.preparer,'balance-sheet',filter),tb=await service.accountingReport(f.book,f.branch,f.preparer,'trial-balance',filter);
+    expect(pack.totals).toEqual(tb.totals);expect(bs.statements!.balanceSheet).toEqual(pack.statements!.balanceSheet);
+    expect(pack.statements!.profitAndLoss).toMatchObject({income:'100.00',expense:'90.00',profit:'10.00'});
+    expect(pack.statements!.balanceSheet).toMatchObject({assets:'142.50',liabilities:'132.50',equityIncludingEarnings:'10.00',difference:'0.00',balanced:true});
+    expect(pack.statements!.cashFlow).toMatchObject({opening:'0.00',closing:'95.00',movement:'95.00',difference:'0.00'});
+    expect(pack.statements!.cashFlow.profitBridge.difference).toBe('0.00');
+    expect(pack.statements!.receivables).toMatchObject({total:'57.50',controlBalance:'57.50',unallocatedControl:'0.00',dueDatesComplete:false});
+    expect(pack.statements!.payables).toMatchObject({total:'55.00',controlBalance:'55.00',unallocatedControl:'0.00'});
+    expect(pack.statements!.jobPerformance.rows.map(j=>j.income)).toEqual(['60.00','40.00']);
+    expect(pack.statements!.jobPerformance.rows[0]).toMatchObject({budgetRevenue:'70.00',budgetCost:'17.00',revenueVariance:'-10.00',costVariance:'-17.00'});
+    expect(pack.sourceCompletenessConfirmed).toBe(false);
+    expect((await sql('SELECT count(*)::int n,sum(debit_minor)::text amount FROM accounting_journal_lines WHERE book_id=$1',[f.book])).rows[0]).toEqual(snapshot);
+  },360000);
+  it("retains configured input VAT and duty reversal once, ignores a configured draft and reconciles original snapshot dates",async()=>{
+    const f=await taxFixture(),cfg=await approveTax(f),id=await taxPayment(f);
+    const journal=await service.reviewConfiguredSource(f.book,f.branch,f.preparer,{kind:'duty_payment',id,configurationId:cfg,taxCode:'STD',basis:'inclusive',taxAmount:'107.50',settlementAccountId:f.debit,evidence:'Dummy'},true);
+    if(journal.kind!=='prepared') throw new Error('Expected controlled source draft');
+    await service.postConfiguredSource(f.book,f.branch,f.approver,journal.id,'Dummy independent');
+    const before=await service.accountingReport(f.book,f.branch,f.preparer,'management-accounts',{...filter,to:'2026-10-10'});
+    expect(before.statements!.profitAndLoss.expense).toBe('100.00');expect(before.statements!.balanceSheet.rows.find(a=>a.accountId===f.input)?.amount).toBe('7.50');
+    expect(before.statements!.cashFlow.movement).toBe('-107.50');expect(before.statements!.cashFlow.profitBridge.difference).toBe('0.00');
+    const reversal=(await sql("INSERT INTO duty_payment_transactions(branch_id,container_id,bank_id,amount,payment_method,paid_at,entry_type,reversal_of_transaction_id) VALUES($1,$2,$3,-107.50,'transfer','2026-10-11','reversal',$4) RETURNING id",[f.branch,f.container,f.bank,id])).rows[0].id;
+    const reverse=await service.reviewConfiguredSource(f.book,f.branch,f.preparer,{kind:'duty_reversal',id:reversal,evidence:'Dummy reverse'},true);
+    if(reverse.kind!=='prepared') throw new Error('Expected controlled reversal draft');
+    await service.postConfiguredSource(f.book,f.branch,f.approver,reverse.id,'Dummy reverse review');
+    const draftId=await taxPayment(f,'shipping');await service.reviewConfiguredSource(f.book,f.branch,f.preparer,{kind:'container_payment',id:draftId,configurationId:cfg,taxCode:'STD',basis:'inclusive',taxAmount:'107.50',settlementAccountId:f.debit,evidence:'Dummy unposted'},true);
+    const after=await service.accountingReport(f.book,f.branch,f.preparer,'management-accounts',filter);
+    expect(after.statements!.profitAndLoss.expense).toBe('0.00');expect(after.statements!.cashFlow).toMatchObject({movement:'0.00',difference:'0.00'});
+    expect(after.statements!.balanceSheet.balanced).toBe(true);expect(after.coverage[0]!.counts.draft).toBe(1);
+    expect((await service.accountingReport(f.book,f.branch,f.preparer,'management-accounts',{...filter,to:'2026-10-10'})).statements).toEqual(before.statements);
+  },360000);
+  it("enforces all named grants, own book/branch, period, complete chart and OFF before connection",async()=>{
+    const f=await fixture(true,true);
+    expect((await service.accountingReport(f.book,null,f.owner,'balance-sheet',filter)).branches).toHaveLength(2);
+    await expect(service.accountingReport(f.book,null,f.preparer,'management-accounts',filter)).rejects.toMatchObject({code:'FORBIDDEN'});
+    await expect(service.accountingReport(f.book,f.branch,f.operations,'management-accounts',filter)).rejects.toMatchObject({code:'FORBIDDEN'});
+    await expect(service.accountingReport(f.book,f.branch,f.preparer,'balance-sheet',{...filter,accountId:f.debit})).rejects.toMatchObject({code:'INVALID_FILTER'});
+    await expect(service.accountingReport(f.book,f.branch,f.preparer,'balance-sheet',{...filter,from:'2026-09-30'})).rejects.toMatchObject({code:'PRE_CUTOVER'});
+    await expect(service.accountingReport(f.book,f.branch,f.preparer,'management-accounts',{...filter,to:'2026-11-01',periodId:f.period})).rejects.toMatchObject({code:'INVALID_PERIOD'});
+    await service.revokeAccess(f.book,f.branch,f.owner,f.preparer,'read','Dummy revoked');await expect(service.accountingReport(f.book,f.branch,f.preparer,'balance-sheet',filter)).rejects.toMatchObject({code:'FORBIDDEN'});
+    delete process.env.NATIVE_ACCOUNTING_ENABLED;let connections=0;const off=new NativeAccounting({connect:async()=>{connections++;throw new Error('No DB');}} as Pick<typeof pool,'connect'>);
+    try{for(const kind of ['balance-sheet','management-accounts'] as const) await expect(off.accountingReport(f.book,f.branch,f.owner,kind,filter)).rejects.toMatchObject({code:'ACCOUNTING_DISABLED'});expect(connections).toBe(0);}
+    finally{process.env.NATIVE_ACCOUNTING_ENABLED='true';}
+  },240000);
+});
+
+describe('Step10 retained invoice terms',()=>{
+  const filter={from:'2026-10-01',to:'2026-10-13',includeZero:true,includeInactive:false};
+  it('captures actual new due terms, blocks stale approval and keeps historical aging after source terms change',async()=>{
+    const f=await invoiceFixture();await sql("UPDATE invoices SET due_date='2026-10-10' WHERE id=$1",[f.invoice]);
+    const draft=await service.prepareInvoice(f.book,f.branch,f.preparer,f.invoice,f.invoiceMapping);
+    expect(JSON.parse(draft.evidence).source.dueDate).toBe('2026-10-10');
+    await sql("UPDATE invoices SET due_date='2026-10-11' WHERE id=$1",[f.invoice]);
+    await expect(service.approveAndPost(f.book,f.branch,f.approver,draft.id,'Dummy stale terms')).rejects.toMatchObject({code:'SOURCE_CHANGED'});
+    await sql("UPDATE invoices SET due_date='2026-10-10' WHERE id=$1",[f.invoice]);await service.approveAndPost(f.book,f.branch,f.approver,draft.id,'Dummy reviewed original terms');
+    await sql("UPDATE invoices SET due_date='2026-10-30' WHERE id=$1",[f.invoice]);
+    const pack=await service.accountingReport(f.book,f.branch,f.preparer,'management-accounts',filter);
+    expect(pack.statements!.receivables.rows[0]).toMatchObject({dueDate:'2026-10-10',daysOverdue:3,bucket:'1-30',balance:'107.50'});
+    expect(pack.coverage[0]!.counts.stale).toBe(1);expect(pack.statements!.balanceSheet.difference).toBe('0.00');
+  },240000);
+  it('preserves a pre-Step10 draft hash and cannot fabricate a due date in legacy evidence',async()=>{
+    const f=await invoiceFixture();await sql("UPDATE invoices SET due_date='2026-10-10' WHERE id=$1",[f.invoice]);
+    const old=buildInvoiceJournal(f.book,{kind:'invoice',id:f.invoice,branchId:f.branch,clientId:f.client,createdDate:'2026-10-09',subtotal:'100',vatAmount:'7.50',total:'107.50',items:f.items.map(i=>({id:i.id,containerId:f.containers[f.items.indexOf(i)]!.id,amount:i.amount}))},f.invoiceMapping);
+    // Reproduce the prior dedicated adapter's draft through the SAME internal prepare,
+    // only inside the guarded owned test namespace; SQL/grants/audit guards stay active.
+    const legacy=await (service as any).transaction(f.book,(client:unknown)=>(service as any).prepare(client,f.preparer,old.input));
+    await service.approveAndPost(f.book,f.branch,f.approver,legacy.id,'Dummy legacy adapter approval');
+    expect((await sql('SELECT payload_hash FROM accounting_journals WHERE id=$1',[legacy.id])).rows[0].payload_hash).toBe(legacy.payload_hash);
+    expect(JSON.parse((await service.reportJournal(f.book,f.branch,f.preparer,legacy.id)).evidence).source.dueDate).toBeUndefined();
+    const pack=await service.accountingReport(f.book,f.branch,f.preparer,'management-accounts',filter);
+    expect(pack.statements!.receivables.rows[0]?.bucket).toBe('undated');expect(pack.coverage[0]!.counts.posted).toBe(1);
+  },240000);
+});
+
 describe("Step8 posted General Ledger and Trial Balance",()=>{
   const filters={from:"2026-10-10",to:"2026-10-11",includeZero:true,includeInactive:false};
   async function postAmount(f:Fixture,amount:string,date:string) {

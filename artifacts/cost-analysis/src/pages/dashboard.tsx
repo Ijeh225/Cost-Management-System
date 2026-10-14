@@ -550,6 +550,9 @@ function FinancialDashboardView({
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Accrual revenue from issued invoices, less actual paid container costs and actual paid overhead. These figures use the same calculation as P&amp;L.
               </p>
+              <Link href="/accounting/management-accounts" className="mt-2 inline-block text-xs font-medium text-primary underline">
+                Native accounting dashboard and management reports (posted ledger; separate approved setup)
+              </Link>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] sm:items-end">
               <label className="space-y-1 text-xs text-muted-foreground">

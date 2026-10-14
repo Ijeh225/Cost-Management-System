@@ -17,7 +17,8 @@ export function validateReportFilter(filter: ReportFilter) {
 function sides(net: bigint) { return { debit: minorToMoney(net > 0n ? net : 0n), credit: minorToMoney(net < 0n ? -net : 0n) }; }
 
 // All calculations use minor-unit integers; openings include ALL earlier periods.
-export function buildAccountingReport(accounts: ReportAccount[], facts: ReportLine[], filter: ReportFilter, kind: "general-ledger" | "trial-balance") {
+export type AccountingReportKind = "general-ledger" | "trial-balance" | "balance-sheet" | "management-accounts";
+export function buildAccountingReport(accounts: ReportAccount[], facts: ReportLine[], filter: ReportFilter, kind: AccountingReportKind) {
   validateReportFilter(filter);
   requireAccounting(new Set(accounts.map(a => a.id)).size === accounts.length, "INVALID_ACCOUNT", "Distinct chart accounts required");
   if (filter.accountId) requireAccounting(accounts.some(a => a.id === filter.accountId), "NOT_FOUND", "Account not found in this book");

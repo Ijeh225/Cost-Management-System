@@ -10,5 +10,6 @@ export { buildOpeningSetup } from "./lib/accounting-opening-setup";
 export { calculateVat, validateTaxConfiguration } from "./lib/accounting-tax";
 export { buildTaxRegister } from "./lib/accounting-tax-register";
 export { buildAccountingReport } from "./lib/accounting-reports";
+export { buildAccountingStatements } from "./lib/accounting-statements";
 export { ACCOUNTING_PERMISSIONS, ACCOUNTING_POLICY_KEYS, DRAFT_CHART, DRAFT_CHART_VERSION,
   AccountingError, accountingEnabled, moneyToMinor, minorToMoney } from "./lib/accounting-rules";

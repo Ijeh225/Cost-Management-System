@@ -631,6 +631,8 @@ export type AccountingReportKind =
 export const AccountingReportKind = {
   "general-ledger": "general-ledger",
   "trial-balance": "trial-balance",
+  "balance-sheet": "balance-sheet",
+  "management-accounts": "management-accounts",
 } as const;
 
 export type AccountingReportBasis =
@@ -705,9 +707,169 @@ export type AccountingReportCoverageItem = {
   exceptions: AccountingReportCoverageItemExceptionsItem[];
 };
 
+export interface StatementAccountAmount {
+  accountId: number;
+  code: string;
+  name: string;
+  category: string;
+  amount: string;
+}
+
+export type AccountingStatementsProfitAndLossBasis =
+  (typeof AccountingStatementsProfitAndLossBasis)[keyof typeof AccountingStatementsProfitAndLossBasis];
+
+export const AccountingStatementsProfitAndLossBasis = {
+  posted_accrual: "posted_accrual",
+} as const;
+
+export type AccountingStatementsCashFlowBasis =
+  (typeof AccountingStatementsCashFlowBasis)[keyof typeof AccountingStatementsCashFlowBasis];
+
+export const AccountingStatementsCashFlowBasis = {
+  posted_identified_cash: "posted_identified_cash",
+} as const;
+
+export type StatementAgingRowsItemType =
+  (typeof StatementAgingRowsItemType)[keyof typeof StatementAgingRowsItemType];
+
+export const StatementAgingRowsItemType = {
+  receivable: "receivable",
+  payable: "payable",
+} as const;
+
+export type StatementAgingBucketsItem = {
+  bucket: string;
+  amount: string;
+};
+
+export type StatementAgingRowsItem = {
+  type: StatementAgingRowsItemType;
+  branchId: number;
+  sourceId: number;
+  partyId: number | null;
+  recognitionDate: string;
+  dueDate: string | null;
+  balance: string;
+  accountIds: number[];
+  daysOverdue: number | null;
+  bucket: string;
+};
+
+export interface StatementAging {
+  total: string;
+  controlBalance: string;
+  unallocatedControl: string;
+  dueDatesComplete: boolean;
+  identified: boolean;
+  controlAccounts: number[];
+  buckets: StatementAgingBucketsItem[];
+  rows: StatementAgingRowsItem[];
+}
+
+export type AccountingStatementsBalanceSheet = {
+  rows: StatementAccountAmount[];
+  assets: string;
+  liabilities: string;
+  postedEquity: string;
+  priorUnclosedEarnings: string;
+  currentYearEarnings: string;
+  financialYearStart: string;
+  equityIncludingEarnings: string;
+  difference: string;
+  balanced: boolean;
+};
+
+export type AccountingStatementsProfitAndLoss = {
+  basis: AccountingStatementsProfitAndLossBasis;
+  rows: StatementAccountAmount[];
+  income: string;
+  expense: string;
+  profit: string;
+};
+
+export type AccountingStatementsCashFlowEntriesItem = {
+  journalId: number;
+  branchId: number;
+  date: string;
+  eventKey: string;
+  classification: string;
+  amount: string;
+};
+
+export type AccountingStatementsCashFlowProfitBridgeAdjustmentsItem = {
+  accountId: number;
+  code: string;
+  name: string;
+  adjustment: string;
+};
+
+export type AccountingStatementsCashFlowProfitBridge = {
+  profit: string;
+  cashMovement: string;
+  difference: string;
+  adjustments: AccountingStatementsCashFlowProfitBridgeAdjustmentsItem[];
+};
+
+export type AccountingStatementsCashFlow = {
+  basis: AccountingStatementsCashFlowBasis;
+  accountIds: number[];
+  opening: string;
+  closing: string;
+  movement: string;
+  operating: string;
+  investing: string;
+  financing: string;
+  transfers: string;
+  unclassified: string;
+  difference: string;
+  identified: boolean;
+  classificationsComplete: boolean;
+  entries: AccountingStatementsCashFlowEntriesItem[];
+  profitBridge: AccountingStatementsCashFlowProfitBridge;
+};
+
+export type AccountingStatementsBranchPerformanceItem = {
+  branchId: number;
+  income: string;
+  expense: string;
+  profit: string;
+  cashMovement: string;
+};
+
+export type AccountingStatementsJobPerformanceRowsItem = {
+  containerId: number;
+  branchId: number;
+  name: string;
+  income: string;
+  expense: string;
+  profit: string;
+  budgetRevenue: string | null;
+  budgetCost: string | null;
+  revenueVariance: string | null;
+  costVariance: string | null;
+};
+
+export type AccountingStatementsJobPerformance = {
+  unallocatedIncome: string;
+  unallocatedExpense: string;
+  rows: AccountingStatementsJobPerformanceRowsItem[];
+};
+
+export interface AccountingStatements {
+  warnings: string[];
+  balanceSheet: AccountingStatementsBalanceSheet;
+  profitAndLoss: AccountingStatementsProfitAndLoss;
+  cashFlow: AccountingStatementsCashFlow;
+  receivables: StatementAging;
+  payables: StatementAging;
+  branchPerformance: AccountingStatementsBranchPerformanceItem[];
+  jobPerformance: AccountingStatementsJobPerformance;
+}
+
 export interface AccountingReport {
   kind: AccountingReportKind;
   basis: AccountingReportBasis;
+  statements?: AccountingStatements;
   book: AccountingBook;
   branches: AccountingReportBranchesItem[];
   scope: AccountingReportScope;

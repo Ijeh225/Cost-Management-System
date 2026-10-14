@@ -14,10 +14,12 @@ import type { AccountingReportKind } from "./accountingReportKind";
 import type { AccountingReportRowsItem } from "./accountingReportRowsItem";
 import type { AccountingReportScope } from "./accountingReportScope";
 import type { AccountingReportTotals } from "./accountingReportTotals";
+import type { AccountingStatements } from "./accountingStatements";
 
 export interface AccountingReport {
   kind: AccountingReportKind;
   basis: AccountingReportBasis;
+  statements?: AccountingStatements;
   book: AccountingBook;
   branches: AccountingReportBranchesItem[];
   scope: AccountingReportScope;

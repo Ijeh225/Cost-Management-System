@@ -3,6 +3,7 @@ import { calculateVat, invoiceTaxSchema, type InvoiceTaxMapping } from "./accoun
 
 export interface InvoiceAccountingSource {
   kind: "invoice"; id: number; branchId: number; clientId: number; createdDate: string;
+  dueDate?: string|null;
   subtotal: string; vatAmount: string; total: string;
   items: { id: number; containerId: number | null; amount: string }[];
 }
@@ -24,6 +25,7 @@ export function buildInvoiceJournal(bookId: number, source: InvoiceAccountingSou
   requireAccounting(source.kind === "invoice" && Number.isSafeInteger(source.clientId) && source.clientId > 0,
     "INVALID_SOURCE", "Linked invoice customer required");
   accountingDate(source.createdDate); accountingDate(mapping.recognitionDate);
+  if(source.dueDate!==undefined && source.dueDate!==null) accountingDate(source.dueDate);
   requireAccounting(mapping.recognitionDate >= source.createdDate, "SOURCE_REVIEW_REQUIRED", "Recognition cannot precede source creation");
   requireAccounting(mapping.currency === "NGN", "MAPPING_REQUIRED", "Explicit supported base currency required");
   for (const evidence of [mapping.policyVersion, mapping.evidence, mapping.recognitionEvidence])
@@ -84,6 +86,7 @@ export function buildInvoiceJournal(bookId: number, source: InvoiceAccountingSou
   } else requireAccounting(mapping.vatAccountId == null && mapping.vatEvidence == null,
     "MAPPING_REQUIRED", "Zero-VAT invoice must not invent a tax posting");
   const canonicalSource = { kind: source.kind, id: source.id, branchId: source.branchId, clientId: source.clientId,
+    ...(source.dueDate!==undefined ? {dueDate:source.dueDate} : {}),
     createdDate: source.createdDate, subtotal: minorToMoney(subtotal), vatAmount: minorToMoney(vat), total: minorToMoney(total),
     items: [...source.items].sort((a, b) => a.id - b.id).map(i => ({ id: i.id, containerId: i.containerId, amount: minorToMoney(moneyToMinor(i.amount)) })) };
   const canonicalMapping = { currency: mapping.currency, policyVersion: mapping.policyVersion, evidence: mapping.evidence.trim(),

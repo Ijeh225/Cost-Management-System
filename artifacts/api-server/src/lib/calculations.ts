@@ -1,5 +1,15 @@
 type NumericRecord = Record<string, string | number | Date | null | undefined>;
 
+// Shared budget field inventory; actual payments and duty paid/unpaid summaries are not budget lines.
+export const BUDGET_CHARGE_FIELDS = {
+  shipping: ["shippingCompany","shippingPaymentVat","consignee","finalInvoiceShippingCompany","telexCharge","shippingRunnings","shippingDetentionToBePaidByCustomer"],
+  customs: ["duty","valuation","ciu","upCountryCustom","dciu","mdReleasingPackage","ocSettlement","ocReleaseLocal","dcEnforcementForTransire","complianceTeam","cacSettlement","crffn","soncap","alerts","examinationBonus"],
+  terminal: ["terminalCharges","terminalAdditions1","ikorouduTerminalAdditions2","terminalDemurrageToBePaidByCustomer","terminalPaymentVat","wharfageFeeForNpa","sifaxGmtSigning","tsDcAdmin","tincanBond","bond","manifest"],
+  delivery: ["passingOfTruck","passingOfTruckForEmptyReturn","parkingForPullout","pullout","delivery","emptyReturn","unchainingTruck","emptyCallUp","pulloutExpenses","transferToIkorodu","transportAllowance"],
+  operations: ["fouBooking","fou","scanningToPhysical","security","additionalDeliveryExpenses","miscellaneous","abandoned","agenciesBlocks","callUp","transireRunnings","officePtml","freshPayment"],
+} as const;
+const sumFields=(row:NumericRecord,keys:readonly string[])=>keys.reduce((total,key)=>total+toNum(row[key]),0);
+
 function toNum(val: string | number | Date | null | undefined): number {
   if (val === null || val === undefined || val instanceof Date) return 0;
   const n = typeof val === "number" ? val : parseFloat(val);
@@ -7,37 +17,23 @@ function toNum(val: string | number | Date | null | undefined): number {
 }
 
 export function sumShipping(s: NumericRecord): number {
-  return toNum(s.shippingCompany) + toNum(s.shippingPaymentVat) + toNum(s.consignee) +
-    toNum(s.finalInvoiceShippingCompany) + toNum(s.telexCharge) + toNum(s.shippingRunnings) +
-    toNum(s.shippingDetentionToBePaidByCustomer);
+  return sumFields(s,BUDGET_CHARGE_FIELDS.shipping);
 }
 
 export function sumCustoms(c: NumericRecord): number {
-  return toNum(c.duty) + toNum(c.valuation) + toNum(c.ciu) +
-    toNum(c.upCountryCustom) + toNum(c.dciu) + toNum(c.mdReleasingPackage) +
-    toNum(c.ocSettlement) + toNum(c.ocReleaseLocal) + toNum(c.dcEnforcementForTransire) +
-    toNum(c.complianceTeam) + toNum(c.cacSettlement) + toNum(c.crffn) + toNum(c.soncap) +
-    toNum(c.alerts) + toNum(c.examinationBonus);
+  return sumFields(c,BUDGET_CHARGE_FIELDS.customs);
 }
 
 export function sumTerminal(t: NumericRecord): number {
-  return toNum(t.terminalCharges) + toNum(t.terminalAdditions1) + toNum(t.ikorouduTerminalAdditions2) +
-    toNum(t.terminalDemurrageToBePaidByCustomer) + toNum(t.terminalPaymentVat) +
-    toNum(t.wharfageFeeForNpa) + toNum(t.sifaxGmtSigning) + toNum(t.tsDcAdmin) +
-    toNum(t.tincanBond) + toNum(t.bond) + toNum(t.manifest);
+  return sumFields(t,BUDGET_CHARGE_FIELDS.terminal);
 }
 
 export function sumDelivery(d: NumericRecord): number {
-  return toNum(d.passingOfTruck) + toNum(d.passingOfTruckForEmptyReturn) + toNum(d.parkingForPullout) +
-    toNum(d.pullout) + toNum(d.delivery) + toNum(d.emptyReturn) + toNum(d.unchainingTruck) +
-    toNum(d.emptyCallUp) + toNum(d.pulloutExpenses) + toNum(d.transferToIkorodu) + toNum(d.transportAllowance);
+  return sumFields(d,BUDGET_CHARGE_FIELDS.delivery);
 }
 
 export function sumOperations(o: NumericRecord): number {
-  return toNum(o.fouBooking) + toNum(o.fou) + toNum(o.scanningToPhysical) + toNum(o.security) +
-    toNum(o.additionalDeliveryExpenses) + toNum(o.miscellaneous) + toNum(o.abandoned) +
-    toNum(o.agenciesBlocks) + toNum(o.callUp) + toNum(o.transireRunnings) +
-    toNum(o.officePtml) + toNum(o.freshPayment);
+  return sumFields(o,BUDGET_CHARGE_FIELDS.operations);
 }
 
 export function calcTotalCost(

@@ -1,7 +1,7 @@
 // Safe deployed-bundle acceptance: no credentials, database connection or writes.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-const { NativeAccounting, accountingEnabled, buildSettlementJournal, previewOpeningBalances, buildInvoiceJournal, buildOperationalJournal, buildReviewedOpening, buildAccountingReport,calculateVat } =
+const { NativeAccounting, accountingEnabled, buildSettlementJournal, previewOpeningBalances, buildInvoiceJournal, buildOperationalJournal, buildReviewedOpening, buildAccountingReport,buildAccountingStatements,calculateVat } =
   createRequire(import.meta.url)("../artifacts/api-server/dist/accounting-foundation.cjs");
 assert.equal(accountingEnabled(), false, "This smoke is for an INACTIVE release only");
 assert.notEqual(process.env.NATIVE_ACCOUNTING_SCHEMA_ENABLED, "true", "Live schema must remain inactive");
@@ -16,8 +16,9 @@ assert.throws(() => buildSettlementJournal(1, { ...source, kind: "invoice_paymen
 const invoiceMapping = { currency: "NGN", policyVersion: "smoke-only", evidence: "Dummy invoice review",
   recognitionDate: "2026-10-11", recognitionEvidence: "Dummy date review", receivableAccountId: 110,
   items: [{ itemId: 1, splits: [{ accountId: 400, amount: "100", treatment: "income", evidence: "Dummy fee" }] }] };
-assert.equal(buildInvoiceJournal(1, { kind: "invoice", id: 8, branchId: 2, clientId: 8, createdDate: "2026-10-11",
-  subtotal: "100", vatAmount: "0", total: "100", items: [{ id: 1, containerId: null, amount: "100" }] }, invoiceMapping).cashMovement, "0.00");
+const smokeInvoice=buildInvoiceJournal(1, { kind: "invoice", id: 8, branchId: 2, clientId: 8, createdDate: "2026-10-11",dueDate:"2026-10-15",
+  subtotal: "100", vatAmount: "0", total: "100", items: [{ id: 1, containerId: null, amount: "100" }] }, invoiceMapping);
+assert.equal(smokeInvoice.cashMovement,"0.00");assert.equal(JSON.parse(smokeInvoice.input.evidence).source.dueDate,"2026-10-15");
 assert.equal(previewOpeningBalances({ bookId: 1, branchId: 2, currency: "NGN", cutoverDate: "2026-10-11",
   policyVersion: "smoke-only", strategy: "opening_balances_forward", ownerEvidence: "Dummy owner",
   accountantEvidence: "Dummy accountant", sourceCoverageEvidence: "Dummy coverage", lines: [
@@ -59,6 +60,7 @@ const reportFilter={from:"2026-10-11",to:"2026-10-11",includeZero:true,includeIn
 await assert.rejects(()=>engine.reportCatalog(3,null),{code:"ACCOUNTING_DISABLED"});
 await assert.rejects(()=>engine.reportOptions(1,2,3),{code:"ACCOUNTING_DISABLED"});
 await assert.rejects(()=>engine.accountingReport(1,2,3,"trial-balance",reportFilter),{code:"ACCOUNTING_DISABLED"});
+for(const kind of ['balance-sheet','management-accounts']) await assert.rejects(()=>engine.accountingReport(1,2,3,kind,reportFilter),{code:'ACCOUNTING_DISABLED'});
 await assert.rejects(()=>engine.reportJournal(1,2,3,4),{code:"ACCOUNTING_DISABLED"});
 for(const run of [()=>engine.manualWorkspace(1,2,3),()=>engine.manualDetails(1,2,3,4),()=>engine.prepareManual(1,2,3,{}),
   ()=>engine.reviewManualAccounts(1,3,{}),()=>engine.manualAction(1,2,3,4,"post","Dummy"),()=>engine.prepareManualReversal(1,2,3,4,"2026-10-12","Dummy")])
@@ -73,4 +75,8 @@ const gl=buildAccountingReport(reportAccounts,reportLines,reportFilter,"general-
 assert.equal(tb.totals.debit,"0.30");assert.equal(tb.totals.credit,"0.30");assert.equal(tb.balanced,true);
 assert.deepEqual(tb.totals,gl.totals);
 assert.equal(connections, 0);
+const statements=buildAccountingStatements(reportAccounts,reportLines,reportFilter,'12-31');
+assert.equal(statements.balanceSheet.assets,'0.30');assert.equal(statements.balanceSheet.liabilities,'0.30');assert.equal(statements.balanceSheet.difference,'0.00');
+assert.equal(statements.cashFlow.identified,false);
+console.log('PASS: NEW Step10 Balance Sheet / Management Accounts / retained invoice terms calculations and deployed OFF gates; no native connections or writes');
 console.log("PASS: deployed inactive accounting bundle, VAT/direct expense configuration and source review/register, opening setup/verification, settlement/invoice/operational/opening previews, exact GL/TB, manual journal/review/reversal and report/reconciliation/posting gates; zero database connections/writes");

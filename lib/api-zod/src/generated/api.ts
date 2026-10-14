@@ -1026,12 +1026,17 @@ export const GetAccountingOptionsResponse = zod.object({
 
 /**
  * Finance capability plus named native read grants are required. All scope means one whole book, never unrelated books. Period filters constrain movements, not earlier opening balances. Native accounting disabled returns 503. More than 50000 posted historical lines returns 413, never truncated financial totals. Source equality is not professional approval or independent control reconciliation.
- * @summary Read-only posted General Ledger or Trial Balance; exact decimal strings
+ * @summary Read-only posted ledger, trial balance, balance sheet or management pack; exact decimal strings
  */
 
 export const GetNativeAccountingReportParams = zod.object({
   bookId: zod.coerce.number().min(1),
-  kind: zod.enum(["general-ledger", "trial-balance"]),
+  kind: zod.enum([
+    "general-ledger",
+    "trial-balance",
+    "balance-sheet",
+    "management-accounts",
+  ]),
 });
 
 export const getNativeAccountingReportQueryIncludeZeroDefault = `true`;
@@ -1057,8 +1062,174 @@ export const GetNativeAccountingReportQueryParams = zod.object({
 });
 
 export const GetNativeAccountingReportResponse = zod.object({
-  kind: zod.enum(["general-ledger", "trial-balance"]),
+  kind: zod.enum([
+    "general-ledger",
+    "trial-balance",
+    "balance-sheet",
+    "management-accounts",
+  ]),
   basis: zod.enum(["posted_double_entry"]),
+  statements: zod
+    .object({
+      warnings: zod.array(zod.string()),
+      balanceSheet: zod.object({
+        rows: zod.array(
+          zod.object({
+            accountId: zod.number(),
+            code: zod.string(),
+            name: zod.string(),
+            category: zod.string(),
+            amount: zod.string(),
+          }),
+        ),
+        assets: zod.string(),
+        liabilities: zod.string(),
+        postedEquity: zod.string(),
+        priorUnclosedEarnings: zod.string(),
+        currentYearEarnings: zod.string(),
+        financialYearStart: zod.string(),
+        equityIncludingEarnings: zod.string(),
+        difference: zod.string(),
+        balanced: zod.boolean(),
+      }),
+      profitAndLoss: zod.object({
+        basis: zod.enum(["posted_accrual"]),
+        rows: zod.array(
+          zod.object({
+            accountId: zod.number(),
+            code: zod.string(),
+            name: zod.string(),
+            category: zod.string(),
+            amount: zod.string(),
+          }),
+        ),
+        income: zod.string(),
+        expense: zod.string(),
+        profit: zod.string(),
+      }),
+      cashFlow: zod.object({
+        basis: zod.enum(["posted_identified_cash"]),
+        accountIds: zod.array(zod.number()),
+        opening: zod.string(),
+        closing: zod.string(),
+        movement: zod.string(),
+        operating: zod.string(),
+        investing: zod.string(),
+        financing: zod.string(),
+        transfers: zod.string(),
+        unclassified: zod.string(),
+        difference: zod.string(),
+        identified: zod.boolean(),
+        classificationsComplete: zod.boolean(),
+        entries: zod.array(
+          zod.object({
+            journalId: zod.number(),
+            branchId: zod.number(),
+            date: zod.string(),
+            eventKey: zod.string(),
+            classification: zod.string(),
+            amount: zod.string(),
+          }),
+        ),
+        profitBridge: zod.object({
+          profit: zod.string(),
+          cashMovement: zod.string(),
+          difference: zod.string(),
+          adjustments: zod.array(
+            zod.object({
+              accountId: zod.number(),
+              code: zod.string(),
+              name: zod.string(),
+              adjustment: zod.string(),
+            }),
+          ),
+        }),
+      }),
+      receivables: zod.object({
+        total: zod.string(),
+        controlBalance: zod.string(),
+        unallocatedControl: zod.string(),
+        dueDatesComplete: zod.boolean(),
+        identified: zod.boolean(),
+        controlAccounts: zod.array(zod.number()),
+        buckets: zod.array(
+          zod.object({
+            bucket: zod.string(),
+            amount: zod.string(),
+          }),
+        ),
+        rows: zod.array(
+          zod.object({
+            type: zod.enum(["receivable", "payable"]),
+            branchId: zod.number(),
+            sourceId: zod.number(),
+            partyId: zod.number().nullable(),
+            recognitionDate: zod.string(),
+            dueDate: zod.string().nullable(),
+            balance: zod.string(),
+            accountIds: zod.array(zod.number()),
+            daysOverdue: zod.number().nullable(),
+            bucket: zod.string(),
+          }),
+        ),
+      }),
+      payables: zod.object({
+        total: zod.string(),
+        controlBalance: zod.string(),
+        unallocatedControl: zod.string(),
+        dueDatesComplete: zod.boolean(),
+        identified: zod.boolean(),
+        controlAccounts: zod.array(zod.number()),
+        buckets: zod.array(
+          zod.object({
+            bucket: zod.string(),
+            amount: zod.string(),
+          }),
+        ),
+        rows: zod.array(
+          zod.object({
+            type: zod.enum(["receivable", "payable"]),
+            branchId: zod.number(),
+            sourceId: zod.number(),
+            partyId: zod.number().nullable(),
+            recognitionDate: zod.string(),
+            dueDate: zod.string().nullable(),
+            balance: zod.string(),
+            accountIds: zod.array(zod.number()),
+            daysOverdue: zod.number().nullable(),
+            bucket: zod.string(),
+          }),
+        ),
+      }),
+      branchPerformance: zod.array(
+        zod.object({
+          branchId: zod.number(),
+          income: zod.string(),
+          expense: zod.string(),
+          profit: zod.string(),
+          cashMovement: zod.string(),
+        }),
+      ),
+      jobPerformance: zod.object({
+        unallocatedIncome: zod.string(),
+        unallocatedExpense: zod.string(),
+        rows: zod.array(
+          zod.object({
+            containerId: zod.number(),
+            branchId: zod.number(),
+            name: zod.string(),
+            income: zod.string(),
+            expense: zod.string(),
+            profit: zod.string(),
+            budgetRevenue: zod.string().nullable(),
+            budgetCost: zod.string().nullable(),
+            revenueVariance: zod.string().nullable(),
+            costVariance: zod.string().nullable(),
+          }),
+        ),
+      }),
+    })
+    .optional(),
   book: zod.object({
     id: zod.number(),
     name: zod.string(),

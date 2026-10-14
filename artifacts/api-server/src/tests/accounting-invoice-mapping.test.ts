@@ -14,6 +14,14 @@ function fixture() {
   return { source, mapping };
 }
 describe("inactive issued invoice mapping", () => {
+  it('Step10 retains actual due terms without adding them to legacy evidence or changing cash/lines',()=>{
+    const {source,mapping}=fixture(),old=buildInvoiceJournal(1,source,mapping);
+    expect(JSON.parse(old.input.evidence).source).not.toHaveProperty('dueDate');
+    const dated=buildInvoiceJournal(1,{...source,dueDate:'2026-10-15'},mapping);
+    expect(JSON.parse(dated.input.evidence).source.dueDate).toBe('2026-10-15');expect(dated.input.lines).toEqual(old.input.lines);expect(dated.cashMovement).toBe('0.00');
+    expect(buildInvoiceJournal(1,source,mapping).input.evidence).toBe(old.input.evidence);
+    expect(()=>buildInvoiceJournal(1,{...source,dueDate:'2026-02-30'},mapping)).toThrow();
+  });
   it("recognizes multi-container totals once, records existing VAT and creates no cash", () => {
     const { source, mapping } = fixture(); const result = buildInvoiceJournal(1, source, mapping);
     expect(result.input.lines).toEqual([{ accountId: 110, debit: "107.50", credit: "0" },

@@ -1,6 +1,57 @@
 # Live End-to-End Test Register
 
-## Current Test and Defect Register - Authoritative as of 2026-10-13
+## Current Test and Defect Register - Authoritative as of 2026-10-14
+
+### Step 10 Controlled Acceptance PASS / Release Pending - 2026-10-14 12:51 WAT
+
+- 11DISTINCT owned DB cases PASS:3new BS/management/VAT/control +2retained/legacy
+  invoice terms +4shared GLTB +2shared invoice/idempotency. Final7PASS797s and4PASS358s.
+  Equation, accrual/cash differences, deposits, allocations, unpaid bill/settlement,
+  noncash adjustment, original duty VAT/reversal, drafts, grants/date/branch, source
+  uniqueness, shared B/L allocation, budgets and legacy immutable hashes accepted.
+- 435unit/API PASS/3prior skips (55files), full build/typechecks/new OFF zero-native-DB
+  smoke and built BS/pack/shared GLTB CSV/print/mobile/scope/refresh/error/drilldown/
+  accessibility/dashboard entry PASS. Six-page management print text/render reviewed;
+  split KPI cards corrected. Source guard rejects wrong inclusive VAT test input.
+- Every owned run preserves public11source aggregates; final namespace inspection[]
+  and tunnel closure confirmed. No production native schema/config/posting or actual
+  company reconciliation claimed. No new confirmed open defect from this task.
+- Exact inactive commit/push/deployment/health/auth/bundle proof pending. Missing
+  historical/bill due and opening allocations remain explicit data/review limitations,
+  not fake zero/overdue balances. Real setup/cutover approval remains separate.
+
+### Step 10 Seven DB Cases PASS / Final Terms Regression - 2026-10-14 12:48 WAT
+
+- Final7DB PASS797s/62filtered: BS/P&L/cash bridge/ARAP/jobs/budgets, duty VAT/reversal/
+  draft, scoped control gates, plus4existing GLTB cases. Public11sources preserved.
+- 434units/API/3prior skips/full build/OFF/built reports and dashboard entry PASS.
+  Print cards kept together; generated print content/render inspected. Dummy branch
+  selector/dashboard schema fixtures corrected; no product workaround required.
+- New due retention/legacy hash compatibility and2existing invoice concurrency cases
+  still running; final unit count435 pending. Earlier network run and mistaken VAT
+  test input are superseded by accepted reruns, not unresolved financial bugs.
+- No production posting/schema/flag change; exact inactive publication pending.
+
+### Step 10 Local PASS / DB Connection Recovery - 2026-10-14 12:15 WAT
+
+- 433unit/API PASS/3existing skips; full build/typechecks and built new BS/pack plus
+  shared GLTB CSV/print/mobile/OFF/error/scope/drilldown checks PASS. Final hardening
+  reruns and rendered-print review pending. Two initial test assertions corrected:
+  allocations have NO cash entry; existing CSRF refuses writes with403.
+- Main controlled DB invoice/deposit/allocation/collection/unpaid bill/settlement/
+  noncash adjustment/GLTB/shared-BL budget reconciliation PASS. Subsequent network
+  ECONNRESET invalidated remainder; not a financial assertion defect. Exact owned
+  namespace inspected/recovered, public11aggregate baseline preserved; rerun next.
+- No new live writes or native activation. Legacy immutable due details are absent,
+  explicitly Undated; unallocated controls/cash purposes and budget bases disclosed.
+
+### Step 10 Acceptance Planned - 2026-10-14 11:50 WAT
+
+- Authorised read-only reporting engineering; not yet accepted. Test balance-sheet
+  equation/earnings, accrual versus cash, VAT/control balances, reversals/drafts,
+  branch/book/date/grants, source uniqueness, aging gaps, job allocations, CSV/print,
+  refresh/mobile/OFF. Owned isolated fixtures only; no production activation.
+- Previous 11distinct VAT DB/419unit/API acceptance retained. Clean 8ed5e52 verified.
 
 ### VAT / Direct Expense Exact Inactive Deployment PASS - 2026-10-13 19:46 WAT
 

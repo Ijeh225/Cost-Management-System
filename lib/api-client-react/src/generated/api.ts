@@ -2800,11 +2800,15 @@ export function useGetAccountingOptions<
 
 /**
  * Finance capability plus named native read grants are required. All scope means one whole book, never unrelated books. Period filters constrain movements, not earlier opening balances. Native accounting disabled returns 503. More than 50000 posted historical lines returns 413, never truncated financial totals. Source equality is not professional approval or independent control reconciliation.
- * @summary Read-only posted General Ledger or Trial Balance; exact decimal strings
+ * @summary Read-only posted ledger, trial balance, balance sheet or management pack; exact decimal strings
  */
 export const getGetNativeAccountingReportUrl = (
   bookId: number,
-  kind: "general-ledger" | "trial-balance",
+  kind:
+    | "general-ledger"
+    | "trial-balance"
+    | "balance-sheet"
+    | "management-accounts",
   params: GetNativeAccountingReportParams,
 ) => {
   const normalizedParams = new URLSearchParams();
@@ -2824,7 +2828,11 @@ export const getGetNativeAccountingReportUrl = (
 
 export const getNativeAccountingReport = async (
   bookId: number,
-  kind: "general-ledger" | "trial-balance",
+  kind:
+    | "general-ledger"
+    | "trial-balance"
+    | "balance-sheet"
+    | "management-accounts",
   params: GetNativeAccountingReportParams,
   options?: RequestInit,
 ): Promise<AccountingReport> => {
@@ -2839,7 +2847,11 @@ export const getNativeAccountingReport = async (
 
 export const getGetNativeAccountingReportQueryKey = (
   bookId: number,
-  kind: "general-ledger" | "trial-balance",
+  kind:
+    | "general-ledger"
+    | "trial-balance"
+    | "balance-sheet"
+    | "management-accounts",
   params?: GetNativeAccountingReportParams,
 ) => {
   return [
@@ -2853,7 +2865,11 @@ export const getGetNativeAccountingReportQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   bookId: number,
-  kind: "general-ledger" | "trial-balance",
+  kind:
+    | "general-ledger"
+    | "trial-balance"
+    | "balance-sheet"
+    | "management-accounts",
   params: GetNativeAccountingReportParams,
   options?: {
     query?: UseQueryOptions<
@@ -2896,7 +2912,7 @@ export type GetNativeAccountingReportQueryResult = NonNullable<
 export type GetNativeAccountingReportQueryError = ErrorType<unknown>;
 
 /**
- * @summary Read-only posted General Ledger or Trial Balance; exact decimal strings
+ * @summary Read-only posted ledger, trial balance, balance sheet or management pack; exact decimal strings
  */
 
 export function useGetNativeAccountingReport<
@@ -2904,7 +2920,11 @@ export function useGetNativeAccountingReport<
   TError = ErrorType<unknown>,
 >(
   bookId: number,
-  kind: "general-ledger" | "trial-balance",
+  kind:
+    | "general-ledger"
+    | "trial-balance"
+    | "balance-sheet"
+    | "management-accounts",
   params: GetNativeAccountingReportParams,
   options?: {
     query?: UseQueryOptions<
