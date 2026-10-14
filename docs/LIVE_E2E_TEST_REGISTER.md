@@ -1,5 +1,32 @@
 # Live End-to-End Test Register
 
+## 2026-10-14 14:41 WAT - Routing correction tests PASS, release pending
+-460unit/API PASS/3prior skips/58files includes9real entire-router-chain regressions; complete typechecks/build PASS, live helper syntax PASS. Publish and verify staff access before closing STEP12-ROUTE-001. Initial live failure remains a confirmed defect, not a guess.
+
+## 2026-10-14 14:39 WAT - STEP12-ROUTE-001 local correction acceptance
+-9full-router composition regressions PASS: finance staff reaches catalog/options/openings/manual/tax/affairs/TB, unauthenticated/non-finance/foreign scope remain refused, AI admin access unchanged, unrelated paths404 rather than caught by AI. Full build/typechecks PASS; full units running.
+- Live release/retest pending; do not close the defect before actual staff request succeeds. No opening/native financial journals posted yet; ledger-zero control has not been tested live.
+
+## 2026-10-14 14:36 WAT - STEP12-ROUTE-001 HIGH / live FAIL
+- Module: native Opening Balances/all accounting siblings for finance staff. Actual preparer15 GET `/api/accounting/books/1/opening-balances?branchId=2`403 `Admin access required` despite valid profile/grants. Bootstrap only; no opening/financial writes yet.
+- Source-confirmed cause: AI router middleware is global, blocks routes mounted after it. Individual router tests cannot detect this composition defect.
+- Corrective scope `/ai-assistant` only; keep AI rollout/admin and native finance/branch/grant checks intact. Full real-router-chain tests +live retest required; IN PROGRESS, not fixed/deployed claim yet.
+
+## 2026-10-14 14:31 WAT - Step12 protection/activation/setup PASS (bounded)
+- Fresh protected c816352 tag +286834byte private DB backup/hash verified; full isolated restore62tables/financial baseline PASS, restore DB removed. Existing operational baseline:11invoices/17containers/3banks/8clients; no historical invoice deletion or source financial mutation during activation/setup.
+- Actual production config release6f8caa78 SUCCESS; remote current runtime accountingEnabled/schemaEnabled true, native tables exist. This is the explicitly authorised live rehearsal, superseding earlier OFF instructions; no actual accountant certification claimed.
+- Live Users API created controlled finance15/16 and other-branch17; deployed engine created clearly labelled test book1/period1,27chart heads and restricted grants for test branches2+3 only, no HeadOffice book. Evidence IDs saved without credentials.
+- Native opening/financial postings/VAT/valuation/workflow/report live tests not yet passed. Keep full system status IN PROGRESS until module-by-module acceptance and reconciliation, not from successful activation alone.
+
+## 2026-10-14 14:18 WAT - Step12 real deployed write acceptance authorised
+- User authorises controlled live test data mutations and native gate enablement. First create/verify new backup and restore rehearsal, then test with explicit dummy book/configuration/openings and independent test actors. Preserve application safeguards and retained record identity; no blind restore/wipe or invented professional approval.
+- No new live acceptance PASS claimed yet. Track per-module UI/API/source/accounting reconciliation, write/reversal/retry, branch/role/period/output failures with exact IDs and expected/observed balances. Previously completed tests remain historical evidence, not substitutes for these new live scenarios.
+
+## 2026-10-14 14:13 WAT - Step 12 acceptance scope only
+- Explained Step12 from both approved roadmap records; no new tests or implementation started. Inventory existing acceptance first, then cover integration/source completeness, retries/concurrency/partial failures, finance/non-finance role and branch boundaries, periods/reversals, multiple containers/B/L and outputs; rehearse backups/restores/migrations in isolation.
+- Step11 records-only release dbc06888 SUCCESS at c816352 and repeat deployed health/auth/OFF checks were observed in the preceding publication turn; old 'publish records' instruction is already completed. No fresh live test/deployment is claimed by this read-and-explain turn.
+- Production accounting remains OFF under retained release evidence. Real opening balances, actual accountant/owner acceptance and reconciliations/training precede separate activation. No repeated records, test-data wipe or blind production database restore.
+
 ## 2026-10-14 14:00 WAT - Step 11 exact inactive deployment PASS
 - `e1129183df8cffda72c45028fb2ad68d746ecbdd` pushed; Railway production `ca724baa-63cb-4113-8e21-7d1b719114d3` SUCCESS with matching commitHash observed. No generic push-only success claim.
 - Post-release live health200:ok; new workspace/version API GETs401 unauthenticated. Official SSH current deployed NEW Step11 pure valuation/all4workflow OFF smoke and retained foundation/report smoke PASS with zero native connections/writes.

@@ -1,0 +1,67 @@
+// Owner-authorised Step12 deployed test-book setup. No credentials or sessions persisted.
+import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
+import {writeFileSync} from 'node:fs';
+const cli=process.env.RAILWAY_CLI_PATH;
+assert(cli,'Authenticated Railway CLI required');
+const mode=process.argv[2]??'inspect';
+assert(['inspect','setup'].includes(mode));
+if(mode==='setup')assert(process.argv.includes('--confirm=STEP12-LIVE-TEST-20261014'),'Explicit live fixture confirmation required');
+const remote=async(mode)=>{
+ const assert=require('node:assert/strict'),{createRequire}=require('node:module');
+ const {Pool}=createRequire(process.cwd()+'/lib/db/package.json')('pg');
+ const native=require(process.cwd()+'/artifacts/api-server/dist/accounting-foundation.cjs');
+ const pool=new Pool({connectionString:process.env.DATABASE_URL});
+ try{
+  assert.equal((await pool.query('SELECT current_database() name')).rows[0].name,'railway');
+  const branches=(await pool.query('SELECT id,name,is_active AS active FROM branches ORDER BY id')).rows;
+  const users=(await pool.query(`SELECT id,name,email,branch_id AS "branchId",authority_level AS authority,job_function AS job,
+   is_active AS active FROM users WHERE is_active OR email LIKE 'step12.%@donclimax.test' ORDER BY id`)).rows;
+  const exists=(await pool.query("SELECT to_regclass('public.accounting_books') name")).rows[0].name;
+  if(mode==='inspect'){
+   const books=exists?(await pool.query('SELECT id,name,status FROM accounting_books ORDER BY id')).rows:[];
+   console.log(JSON.stringify({mode,accountingEnabled:native.accountingEnabled(),schemaEnabled:process.env.NATIVE_ACCOUNTING_SCHEMA_ENABLED==='true',branches,users,books}));return;
+  }
+  assert.equal(native.accountingEnabled(),true,'Native live gate not enabled');
+  assert(exists,'Native schema migration must complete first');
+  const owner=users.find(u=>u.email==='ijehifeany@gmail.com'&&u.active&&u.authority==='super_admin');assert(owner,'Active existing owner required');
+  const preparer=users.find(u=>u.email==='step12.preparer.20261014@donclimax.test'&&u.active&&u.job==='accounts');
+  const reviewer=users.find(u=>u.email==='step12.reviewer.20261014@donclimax.test'&&u.active&&u.job==='accounts');
+  assert(preparer&&reviewer&&preparer.id!==reviewer.id,'Two controlled independent API-created accounts required');
+  const label='STEP12 TEST ONLY - 20261014 - NOT OFFICIAL COMPANY BOOKS';
+  const old=(await pool.query('SELECT id,name FROM accounting_books WHERE name=$1',[label])).rows;
+  assert.equal(old.length,0,'Test book exists: inspect and resume it, do not recreate');
+  const branchIds=branches.filter(b=>b.active&&[2,3].includes(b.id)&&b.name.startsWith('E2E-')).map(b=>b.id);
+  assert.equal(branchIds.length,2,'Only the two existing test branches belong to this rehearsal book');assert(branchIds.includes(preparer.branchId)&&preparer.branchId===reviewer.branchId);
+  const engine=new native.NativeAccounting(pool),book=await engine.createDraftBook(owner.id,label,'NGN',branchIds);
+  const evidence='Owner authorised live dummy-data rehearsal 2026-10-14; TEST ONLY, no actual professional/company certification';
+  for(const br of branchIds)for(const p of native.ACCOUNTING_PERMISSIONS)await engine.grantAccess(book,br,owner.id,owner.id,p,evidence);
+  for(const [user,permissions] of [[preparer,['read','prepare','reverse']],[reviewer,['read','post','configure','close','reopen']]])
+   for(const p of permissions)await engine.grantAccess(book,user.branchId,owner.id,user.id,p,evidence);
+  const accounts={};
+  for(const [code,name,category] of native.DRAFT_CHART)accounts[code]=await engine.addAccount(book,preparer.branchId,owner.id,code,'TEST ONLY '+name,category);
+  for(const [code,name,category] of [['1400','Test input VAT','asset'],['2210','Test output VAT','liability'],['5010','Test Duty expense','expense'],['5020','Test Shipping expense','expense'],['5030','Test Terminal expense','expense'],['6010','Test accrued overhead','expense'],['2310','Test adjustment accrual','liability']])
+   accounts[code]=await engine.addAccount(book,preparer.branchId,owner.id,code,name,category);
+  const policy=Object.fromEntries(native.ACCOUNTING_POLICY_KEYS.map(k=>[k,'TEST ONLY dummy rehearsal policy; not actual accountant approval: '+k]));
+  policy.cutoverDate='2026-10-14';policy.financialYearEnd='12-31';policy.legalEntity=label;
+  policy.revenueRecognition='TEST ONLY gross bundled clearing fees on issued invoices; source-backed accrual; not real launch policy';
+  policy.passThroughCosts='TEST ONLY company-borne direct Duty/Shipping/Terminal expense, per owner requested model; no agent trust assumption';
+  policy.vat='TEST ONLY service exempt scenario plus reviewed dummy taxable/zero/exempt purchase cases; no legal certification';
+  await engine.approveBook(book,preparer.branchId,owner.id,{policy,version:'step12-dummy-20261014-v1',ownerEvidence:evidence,
+   accountantEvidence:'TEST FIXTURE ONLY - simulated review for acceptance; no actual accountant sign-off supplied'});
+  const period=await engine.createPeriod(book,preparer.branchId,owner.id,'STEP12 TEST October2026','2026-10-14','2026-10-31');
+  console.log(JSON.stringify({mode,bookId:book,periodId:period,ownerId:owner.id,preparerId:preparer.id,reviewerId:reviewer.id,
+    testBranchId:preparer.branchId,branchIds,accounts,warning:'TEST ONLY. Opening verification, tax configuration and journal workflows must run through deployed API/UI. No source/backfill/import/openings posted by setup.'}));
+ }finally{await pool.end();}
+};
+const code=`(${remote.toString()})(${JSON.stringify(mode)}).catch(()=>{console.error('Step12 native operation failed; inspect retained fixture before retry; secrets withheld');process.exitCode=1;})`;
+const encoded=Buffer.from(code).toString('base64');
+const result=spawnSync(cli,['ssh','--project','30166120-54e6-4f58-86ed-18ab396913f1','--environment','ecfbfac8-ec44-4257-990f-8a348e126f63','--service','95352cd0-c586-4e39-a35e-fb3c23ad9e52','--',`node -e "eval(Buffer.from('${encoded}','base64').toString())"`],
+ {encoding:'utf8',windowsHide:true,timeout:240000,maxBuffer:4*1024*1024});
+assert.equal(result.status,0,'Live test setup/inspection failed; diagnostic output withheld');
+console.log(result.stdout);
+if(mode==='setup'){
+ const row=result.stdout.split(/\r?\n/).find(l=>l.startsWith('{'));
+ assert(row,'Setup evidence missing');const data=JSON.parse(row);assert(data.bookId&&data.accounts);
+ writeFileSync('docs/evidence/2026-10-14-step12-native-setup.json',JSON.stringify(data,null,2)+'\n',{flag:'wx'});
+}

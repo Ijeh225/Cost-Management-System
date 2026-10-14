@@ -179,7 +179,7 @@ async function requireAiAssistantRollout(req: AuthRequest, res: Response, next: 
   }
 }
 
-aiAssistantRouter.use(requireAdmin, requireAiAssistantRollout);
+aiAssistantRouter.use("/ai-assistant", requireAdmin, requireAiAssistantRollout);
 
 type RateBucket = { startedAt: number; count: number };
 const rateBuckets = new Map<number, RateBucket>();

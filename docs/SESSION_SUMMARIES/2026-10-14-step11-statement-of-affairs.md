@@ -31,3 +31,10 @@
 - Both native production variables unset/defaultOFF before/after release; actual runtime OFF assertions passed. No official activation, schema enablement, financial write, new live valuation record or test-data wipe.
 - All3records/index/plans updated with confirmed evidence; publish this records-only follow-up and confirm its deployment too. Engineering acceptance retained451unit/API/3prior skips +5distinct isolated DB/build/UI/CSV/print/mobile checks.
 - Next separately authorised Step12 final acceptance/rollout/training, actual approvals/openings/reconciliation, then separate activation. Deployment is not accountant certification or confirmation of real financial completeness.
+
+## 2026-10-14 14:13 WAT - Step12 explanation / publication closure
+- Preceding turn completed records-only commit/push c816352937e08aba4855824f8016f5f6bdbda00e; Railway dbc06888-409a-4324-8d62-63f9094bdfaf SUCCESS at matching hash, live health200/auth401 and repeated actual deployed Step11/native OFF smoke PASS. Both native variables unset/defaultOFF. Publication ended with Git clean and remote master matching.
+- User now asked what Step12 is before proceeding. Read both roadmap scopes/current records; Step12 is final accounting acceptance/rollout/training, not another core report or blanket whole-app completion.
+- Explain integrated isolated tests/evidence gaps, role/branch/period/concurrency/output controls, backup/restore/migration/cutover rehearsal, actual owner/accountant configuration/openings/report acceptance, staged rollout and manual/training.
+- No Step12 execution/official activation authorised by this explanation. Actual financial inputs/professional acceptance remain launch prerequisites; dummy rehearsals can proceed when instructed with accounting OFF. Do not automatically repeat completed tests, wipe data or restore an old database over later legitimate postings.
+- Updated3records/index for continuity only; these explanation notes are local/uncommitted, not a new release or defect fix.

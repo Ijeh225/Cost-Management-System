@@ -1,0 +1,43 @@
+{
+  "mode": "setup",
+  "bookId": 1,
+  "periodId": 1,
+  "ownerId": 1,
+  "preparerId": 15,
+  "reviewerId": 16,
+  "testBranchId": 2,
+  "branchIds": [
+    2,
+    3
+  ],
+  "accounts": {
+    "1000": 1,
+    "1010": 2,
+    "1100": 3,
+    "1120": 4,
+    "1200": 5,
+    "1300": 6,
+    "1390": 7,
+    "1400": 21,
+    "2000": 8,
+    "2100": 9,
+    "2200": 10,
+    "2210": 22,
+    "2300": 11,
+    "2310": 27,
+    "2400": 12,
+    "3000": 13,
+    "3100": 14,
+    "4000": 15,
+    "4100": 16,
+    "5000": 17,
+    "5010": 23,
+    "5020": 24,
+    "5030": 25,
+    "6000": 18,
+    "6010": 26,
+    "6100": 19,
+    "6200": 20
+  },
+  "warning": "TEST ONLY. Opening verification, tax configuration and journal workflows must run through deployed API/UI. No source/backfill/import/openings posted by setup."
+}

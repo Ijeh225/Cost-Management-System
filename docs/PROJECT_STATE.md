@@ -1,5 +1,35 @@
 # Project State
 
+## 2026-10-14 14:41 WAT - Routing fix release ready
+- Full unit/API suite460PASS/3prior skips/58files, including9new real-route-chain cases; complete build/typechecks and helper syntax/diff checks PASS. Publish namespace-only STEP12-ROUTE-001 fix with live rehearsal records/helpers and then confirm actual staff native opening GET succeeds. No role escalation or financial rule bypass.
+
+## 2026-10-14 14:39 WAT - STEP12-ROUTE-001 fix locally verified; live release pending
+- Scoped AI namespace guard fixed at source without moving routers or granting extra staff authority.9new real sibling-router-chain regression cases PASS, full typechecks/Railway build PASS. Full unit suite running; exact deployment/live preparer retest still pending.
+- Native accounting/schema currently ON for authorised QA book1 only; do not run the older inactive smoke against this live environment or interpret historical OFF text as current. No opening/source/financial journal yet; resume same stable live runner only after patched release.
+
+## 2026-10-14 14:36 WAT - STEP12-ROUTE-001 confirmed live; correcting source
+- Live finance preparer15 with named read/prepare grants cannot GET native opening workspace:403 `Admin access required`. No opening/native financial write occurred; initial catalog/auth/branch-negative checks passed only.
+- Root cause: AI router's unscoped `use(requireAdmin, requireAiAssistantRollout)` intercepts sibling accounting routers mounted later in real route chain. Isolated individual-router tests did not exercise this composition. Do not promote finance staff to admin as workaround.
+- Fix scope AI guards to `/ai-assistant`, preserving AI admin/rollout policy and accounting finance/branch/book grants. Add real full-router composition regressions, test/build/publish and live retest before continuing. Both live gates remain enabled for authorised TEST ONLY book1; existing fixture IDs preserved.
+
+## 2026-10-14 14:31 WAT - Native accounting enabled for authorised LIVE TEST ONLY
+- Owner's new explicit activation request executed after protection: remote annotated tag `checkpoint-before-step12-live-accounting-2026-10-14` at c816352, private full production DB archive286834bytes SHA256 `a5658e88ded0a9c45dfc0c135303f365325fd8d6e8b23dd9b04f31d9ab42025e`; full isolated restore62tables/source totals PASS and temporary restore DB removed. Archive covers DB, not external document bucket contents/secrets.
+- Set BOTH production native gates TRUE. Railway config release `6f8caa78-933a-4551-9c3a-03bc5f1ecbaa` SUCCESS at c816352; remote deployed inspect confirms accountingEnabled/schemaEnabled true and native schema available. Prior OFF instructions/evidence remain historical; current state is enabled for this owner-authorised test rehearsal.
+- Created via real deployed owner-authenticated Users API: preparer15,reviewer16 (finance branch2), foreign-branch finance17 (branch3). No password/session saved in records or changed on old users. Owner API login/logout may require browser owner sign-in refresh.
+- Initialised TEST ONLY book1/period1 on existing test branches2+3 using current deployed NativeAccounting engine and named audited owner/test grants. HeadOffice branch1 deliberately excluded; no actual company chart/policy/professional approval fabricated. Dummy book/config/date explicitly labelled not official company books. No native opening, source posting or financial fixture yet; those will use existing review controls/live routes.
+- Setup IDs/chart metadata retained in `docs/evidence/2026-10-14-step12-native-setup.json`; no secrets. Step12 still IN PROGRESS, not accepted. Next deployed opening/review/manual/valuation/VAT/source integration and full operational UI/API scenarios, with exact figures, reversals, permissions and outputs recorded.
+
+## 2026-10-14 14:18 WAT - Step12 LIVE rehearsal and activation authorised
+- User authorises live accounting enablement/testing on disposable app test data, including necessary controlled record writes and fixes. Supersedes earlier OFF instruction for this rehearsal, not actual company financial/professional sign-off.
+- Plan: new protected code/full DB backup +isolated restore proof; then activate native gates and initialise clearly named TEST ONLY book/chart/date/openings/configuration/scoped test users. Test deployed modules end-to-end with audit, exact balances and permission/branch/period/duplicate controls intact; no bypass or fabricated real accountant approval.
+- No live flag/schema/financial write yet; checkpoint and preflight in progress. Current c816352 and all existing Step11/previous records retained. Latest session: `docs/SESSION_SUMMARIES/2026-10-14-step12-live-acceptance.md`.
+
+## 2026-10-14 14:13 WAT - Step 12 scope explained; not started
+- User asked what Step12 contains before proceeding. Confirmed both accounting plans: final integrated acceptance, backup/restore/migration and cutover rehearsal, accountant/owner acceptance, staged rollout verification, manual/training and retained records. This is the last step of this accounting plan, not a claim that the entire app is finished or free of defects.
+- Step11 feature release e112918 and records-only HEAD c816352 are already pushed; preceding publication turn observed records release `dbc06888-409a-4324-8d62-63f9094bdfaf` SUCCESS at `c816352937e08aba4855824f8016f5f6bdbda00e`, with repeated health/auth/deployed OFF smoke PASS. Prior 'publish records' wording is completed historical work, not another outstanding task. Current checkout HEAD confirmed c816352, clean before this documentation update.
+- Step12 engineering/rehearsal can use isolated dummy data while official accounting remains OFF. Actual chart/mappings/cutover/openings/report acceptance and reconciliation, staff training and separately authorised activation are still real-launch gates. No automatic live-data deletion, old database restore over later postings or accounting activation.
+- No Step12 implementation, tests or new live records performed by this explanation request. Next is explicit Step12 execution instruction; first map existing accepted evidence to the acceptance checklist and address genuine gaps without duplicating completed work.
+
 ## 2026-10-14 14:00 WAT - Step 11 exact deployment SUCCESS / official accounting OFF
 - Functional commit `e1129183df8cffda72c45028fb2ad68d746ecbdd` committed/pushed to origin/master. Railway production release `ca724baa-63cb-4113-8e21-7d1b719114d3` observed SUCCESS at that exact full commit hash.
 - Post-success live health `/api/healthz`200 `{status:ok}`; unauthenticated Statement of Affairs workspace and version endpoints401 `{error:Not authenticated}`. Official Railway SSH executed the NEW deployed Step11 calculator/all4workflow OFF smoke plus existing foundation/report controls: PASS, zero native connections/writes.
