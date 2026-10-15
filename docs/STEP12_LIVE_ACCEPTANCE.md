@@ -1,6 +1,47 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-15 17:56 WAT. Status: original seven confirmed defects/gap CLOSED. Direct Download PDF ACCT-PDF-001 deployed/live accepted for GL/TB/BS/Management/Affairs at f72262e / Railway1fabec5e SUCCESS. Native PRINT001 still awaits corrected browser Print output; neither route certifies company launch/source completeness.
+Updated: 2026-10-15 19:50 WAT. Original seven findings/direct PDF remain CLOSED. New allocation/credit corrections, linked bank recovery/reversal and bounded OCR orientation implemented with498unit/API and4new isolated DB passes; deployment/live acceptance pending. Original four blocked source IDs retained, not recreated. Native Print still awaits actual browser output; directPDF is separate. Step12 NOT fully closed yet.
+
+## Latest Supplemental Verification (15 October 19:06 WAT)
+
+The earlier accepted coverage and financial table below are the retained14Oct
+baseline, not current all-date figures. Do not repeat those fixtures or outputs.
+
+- Seven actual preparer15/reviewer16 UI submissions/posts accepted: reviews4-10,
+  native39-45 (funding7, cash27, deposit6, bill15, schedule payment14, topup6,
+  expense payment13). Each has exactly one posted audit. Original bill1 plus
+  incremental topup1, payment2 clears payable with no duplicated expense.
+- Allocation28 FAILS preview400: UI has no original deposit bank5 mapping;
+  native receipt rehash also uses allocation's new mapping/evidence. Correct
+  retained original mapping validation, not merely a new optional field. No
+  allocation draft/journal exists. CN6/credit application30/writeoffaudit22 await
+  that dependency. No API or SQL posting substituted for missing UI acceptance.
+- Immediate browser approval rejection refresh PASS for approval5/job39; no
+  reload needed. Controlled written-off invoice23 refuses ordinary collection
+  with unchanged bank/payments; dedicated recovery remains an absent capability.
+- Early-start variant PASS: operations14 cannot authorize, Owner verified40FT
+  job40 can release Shipping before PAAR, but gate-in409 still lists required
+  PAAR/Transire/TDO/Pullout. Same-BL20FT sibling39 remains pending/unreleased.
+- New scan14 image-onlyPDF94%/correct B/L+text; sidewaysPNG15 yields42% and
+  gibberish/no suggestions. Both original byte hashes match; neither reviewed
+  automatically. Rotation normalization is not implemented; manual rotate and
+  retained new version required. This is bounded evidence, not universal OCR.
+- Native Print001 unchanged/blocker: no new native output, IAB no window.
+  Direct Download PDF acceptance is separate and was not repeated.
+
+Current partial source proof (book1/Lagos2/14-31Oct): income908, expense672.50,
+profit235.50, cash10178.50, AR6/AP0/deposit1, DrCr13339.84/closingDrCr10910,
+assets10237.50/liabilities1/equity incl earnings10236.50; BS/cash bridge0.
+43posted/4missing explicitly match the blocked chain. Expected final target after
+those four retained posts: income904, expense673.50, profit230.50, cash10178.50,
+AR/AP/deposit0, assets10231.50. Original14Oct snapshot independently unchanged
+at230.50profit/10177.50cash/13322.84DrCr. Balance equality is not completeness.
+
+Exact next point: fix STEP12-ALLOC-UI-001, then actual staff screens for28 -> CN6
+-> credit30 -> writeoff22 and final reconciliation; do not recreate sources.
+All three continuity records and dated remaining-verification JSON retain IDs,
+audits, actual snapshot and scan evidence. Owner restored; no grants/gates,
+product code or real-company launch decisions changed. Records local/uncommitted.
 
 ## Scope and Protection
 

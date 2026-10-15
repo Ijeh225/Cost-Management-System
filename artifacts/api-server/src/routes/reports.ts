@@ -232,7 +232,7 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
         .from(containerExpensePaymentsTable).leftJoin(containersTable, eq(containerExpensePaymentsTable.containerId, containersTable.id)).leftJoin(banksTable, eq(containerExpensePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(containerExpensePaymentsTable.paidAt, containerExpensePaymentsTable.branchId))),
       db.select({ id: paymentSchedulePaymentsTable.id, date: paymentSchedulePaymentsTable.paidAt, amount: paymentSchedulePaymentsTable.amount, method: paymentSchedulePaymentsTable.paymentMethod, reference: paymentSchedulePaymentsTable.reference, notes: paymentSchedulePaymentsTable.notes, vendor: paymentSchedulesTable.vendorBeneficiary, description: paymentSchedulesTable.description, bankName: banksTable.name })
         .from(paymentSchedulePaymentsTable).leftJoin(paymentSchedulesTable, eq(paymentSchedulePaymentsTable.scheduleId, paymentSchedulesTable.id)).leftJoin(banksTable, eq(paymentSchedulePaymentsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(paymentSchedulePaymentsTable.paidAt, paymentSchedulePaymentsTable.branchId))),
-      db.select({ id: bankFundAdditionsTable.id, date: bankFundAdditionsTable.createdAt, amount: bankFundAdditionsTable.amount, reference: bankFundAdditionsTable.reference, narration: bankFundAdditionsTable.narration, bankName: banksTable.name })
+      db.select({ id: bankFundAdditionsTable.id, date: bankFundAdditionsTable.createdAt, amount: bankFundAdditionsTable.amount, reference: bankFundAdditionsTable.reference, narration: bankFundAdditionsTable.narration, writeoffAuditId: bankFundAdditionsTable.writeoffAuditId, bankName: banksTable.name })
         .from(bankFundAdditionsTable).leftJoin(banksTable, eq(bankFundAdditionsTable.bankId, banksTable.id)).where(and(...byDateAndBranch(bankFundAdditionsTable.createdAt, bankFundAdditionsTable.branchId))),
       db.select({ id: bankTransfersTable.id, date: bankTransfersTable.createdAt, amount: bankTransfersTable.amount, reference: bankTransfersTable.reference, narration: bankTransfersTable.narration, fromBank: fromBank.name, toBank: toBank.name })
         .from(bankTransfersTable)
@@ -269,7 +269,7 @@ reportsRouter.get("/reports/financial-ledger", requireAuth, requireBranchMemberO
       ...overheadRows.map(row => ({ id: `overhead-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Overhead payment", description: row.description ? `${row.category ?? "Overhead"}: ${row.description}` : "Overhead payment", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.notes || null, sourceLink: "/overhead-expenses" })),
       ...containerRows.map(row => ({ id: `container-expense-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Container disbursement", description: row.containerNumber ? `${row.section ?? "Operations"} for ${row.containerNumber}` : "Container disbursement", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.narration || null, sourceLink: row.containerId ? `/containers/${row.containerId}?section=payment-history` : "/containers" })),
       ...scheduleRows.map(row => ({ id: `payment-schedule-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Payment schedule", description: row.vendor ? `${row.vendor}${row.description ? `: ${row.description}` : ""}` : "Payment schedule", amount: Number(row.amount ?? 0), method: row.method, bankName: row.bankName, reference: row.reference || row.notes || null, sourceLink: "/payment-schedules" })),
-      ...fundingRows.map(row => ({ id: `funding-${row.id}`, date: row.date.toISOString(), direction: "in" as const, source: "Bank funding", description: row.narration || "Bank fund addition", amount: Number(row.amount ?? 0), method: "bank", bankName: row.bankName, reference: row.reference || null, sourceLink: "/bank-management" })),
+      ...fundingRows.map(row => ({ id: `funding-${row.id}`, date: row.date.toISOString(), direction: Number(row.amount)<0 ? "out" as const : "in" as const, source: row.writeoffAuditId ? Number(row.amount)<0?'Debt recovery reversal':'Bad debt recovery' : "Bank funding", description: row.narration || "Bank fund addition", amount: Math.abs(Number(row.amount ?? 0)), method: "bank", bankName: row.bankName, reference: row.reference || null, sourceLink: row.writeoffAuditId?'/invoices':"/bank-management" })),
       ...transferRows.flatMap(row => [
         { id: `transfer-out-${row.id}`, date: row.date.toISOString(), direction: "out" as const, source: "Bank transfer", description: `Transfer to ${row.toBank ?? "unassigned bank"}${row.narration ? `: ${row.narration}` : ""}`, amount: Number(row.amount ?? 0), method: "bank transfer", bankName: row.fromBank ?? null, reference: row.reference || null, sourceLink: "/bank-management" },
         { id: `transfer-in-${row.id}`, date: row.date.toISOString(), direction: "in" as const, source: "Bank transfer", description: `Transfer from ${row.fromBank ?? "unassigned bank"}${row.narration ? `: ${row.narration}` : ""}`, amount: Number(row.amount ?? 0), method: "bank transfer", bankName: row.toBank ?? null, reference: row.reference || null, sourceLink: "/bank-management" },
@@ -1072,6 +1072,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
     totalVatCollected = roundMoney(totalVatCollected);
     for (const client of Object.values(revenueByClient)) client.revenue = roundMoney(client.revenue);
     const totalBadDebts = roundMoney(adjustments.badDebts.reduce((sum, row) => sum + row.amount, 0));
+    const totalRecoveries = roundMoney(adjustments.recoveries.reduce((sum, row) => sum + row.amount, 0));
 
     // ===== COST OF SALES: attributed to each container's first-ever invoice date =====
     // We query ALL non-draft invoice items globally (optionally filtered by client) to find
@@ -1276,17 +1277,17 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
 
     // When a client filter is applied, do NOT subtract company-wide overheads from that
     // client's gross profit — Net Profit only makes sense at the company level.
-    const netProfit = roundMoney(grossProfit - totalBadDebts - (clientIdNum !== null ? 0 : totalOverheads));
+    const netProfit = roundMoney(grossProfit + totalRecoveries - totalBadDebts - (clientIdNum !== null ? 0 : totalOverheads));
     const netMarginPct = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
     const avgProfitPerContainer = containerCount > 0 ? grossProfit / containerCount : 0;
 
     // ===== MONTHLY BREAKDOWN =====
     const monthKey = (d: Date) => financialDateKey(d).slice(0, 7);
     const months: Record<string, {
-      month: string; revenue: number; costOfSales: number; grossProfit: number; overheads: number; badDebts: number; netProfit: number; containerCount: number;
+      month: string; revenue: number; costOfSales: number; grossProfit: number; overheads: number; badDebts: number; recoveries: number; netProfit: number; containerCount: number;
     }> = {};
     const ensureMonth = (k: string) => {
-      if (!months[k]) months[k] = { month: k, revenue: 0, costOfSales: 0, grossProfit: 0, overheads: 0, badDebts: 0, netProfit: 0, containerCount: 0 };
+      if (!months[k]) months[k] = { month: k, revenue: 0, costOfSales: 0, grossProfit: 0, overheads: 0, badDebts: 0, recoveries: 0, netProfit: 0, containerCount: 0 };
       return months[k];
     };
 
@@ -1296,6 +1297,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
     }
     for (const note of adjustments.creditNotes) ensureMonth(monthKey(note.createdAt)).revenue -= note.netAmount;
     for (const loss of adjustments.badDebts) ensureMonth(monthKey(loss.createdAt)).badDebts += loss.amount;
+    for (const recovery of adjustments.recoveries) ensureMonth(monthKey(recovery.createdAt)).recoveries += recovery.amount;
 
     // Monthly COGS: invoiced containers attributed to their invoice month
     // Uninvoiced containers are excluded from the monthly breakdown (captured in costOfSales.uninvoicedCogs)
@@ -1315,7 +1317,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
       m.revenue = roundMoney(m.revenue);
       m.badDebts = roundMoney(m.badDebts);
       m.grossProfit = m.revenue - m.costOfSales;
-      m.netProfit = roundMoney(m.grossProfit - m.badDebts - (clientIdNum !== null ? 0 : m.overheads));
+      m.netProfit = roundMoney(m.grossProfit + m.recoveries - m.badDebts - (clientIdNum !== null ? 0 : m.overheads));
     }
     const monthly = Object.values(months).sort((a, b) => a.month.localeCompare(b.month));
 
@@ -1332,7 +1334,7 @@ reportsRouter.get("/reports/pl", requireAuth, requireBranchMemberOrAbove, async 
       adjustments: { policy: adjustments.policy, creditNotes: adjustments.creditNotes, badDebts: adjustments.badDebts,
         totalCreditNoteNet: roundMoney(adjustments.creditNotes.reduce((sum, note) => sum + note.netAmount, 0)),
         totalCreditNoteVat: roundMoney(adjustments.creditNotes.reduce((sum, note) => sum + note.vatAmount, 0)),
-        totalBadDebts, undatedBadDebts: adjustments.undatedBadDebts,
+        totalBadDebts, totalRecoveries, recoveries: adjustments.recoveries, undatedBadDebts: adjustments.undatedBadDebts,
         legacyBadDebtPayments: legacyBadDebtPayments.map(row => ({ paymentId: row.id, amount: Number(row.amount) })) },
       revenue: {
         totalRevenue,                 // ex-VAT (recognised revenue)
@@ -1514,6 +1516,7 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
     const fundAddRows = await db
       .select({
         id: bankFundAdditionsTable.id,
+        writeoffAuditId: bankFundAdditionsTable.writeoffAuditId,
         amount: bankFundAdditionsTable.amount,
         createdAt: bankFundAdditionsTable.createdAt,
         narration: bankFundAdditionsTable.narration,
@@ -1649,17 +1652,18 @@ reportsRouter.get("/reports/cashflow", requireAuth, requireBranchMemberOrAbove, 
     }
 
     for (const r of fundAddRows) {
-      inflows.push({
+      const signedAmount=Number(r.amount);
+      (signedAmount<0?outflows:inflows).push({
         id: `fa-${r.id}`,
         date: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
         type: "fund_addition",
-        direction: "in",
+        direction: signedAmount<0?'out':'in',
         description: r.narration || "Bank fund addition",
-        category: "Fund Addition",
+        category: r.writeoffAuditId?'Debt Recovery':'Fund Addition',
         bankId: r.bankId ?? null,
         bankName: r.bankName ?? null,
         reference: r.reference ?? null,
-        amount: parseFloat(r.amount as string ?? "0"),
+        amount: Math.abs(signedAmount),
       });
     }
 
@@ -2411,6 +2415,8 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       revenueByBranch.set(note.branchId, (revenueByBranch.get(note.branchId) ?? 0) - note.netAmount);
     }
     const badDebtsByBranch = new Map<number, number>();
+    const recoveriesByBranch = new Map<number, number>();
+    for (const recovery of adjustments.recoveries) recoveriesByBranch.set(recovery.branchId,(recoveriesByBranch.get(recovery.branchId)??0)+recovery.amount);
     for (const loss of adjustments.badDebts) badDebtsByBranch.set(loss.branchId, (badDebtsByBranch.get(loss.branchId) ?? 0) + loss.amount);
 
     // Outstanding receivables per branch (sum of unpaid invoice balances).
@@ -2449,7 +2455,8 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       const grossProfit = revenue - costs;
       const overheads = overheadsByBranch.get(b.id) ?? 0;
       const badDebts = roundMoney(badDebtsByBranch.get(b.id) ?? 0);
-      const netProfit = roundMoney(grossProfit - overheads - badDebts);
+      const otherIncome=roundMoney(recoveriesByBranch.get(b.id)??0);
+      const netProfit = roundMoney(grossProfit + otherIncome - overheads - badDebts);
       const marginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
       // Turnaround = gate-in → delivered (operational lifecycle), not created → closed.
@@ -2472,6 +2479,7 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
         grossProfit,
         overheads,
         badDebts,
+        otherIncome,
         netProfit,
         marginPct,
         avgTurnaroundDays: Math.round(turnaroundDays * 10) / 10,
@@ -2486,6 +2494,7 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
       grossProfit: rows.reduce((s, r) => s + r.grossProfit, 0),
       overheads: rows.reduce((s, r) => s + r.overheads, 0),
       badDebts: rows.reduce((s, r) => s + r.badDebts, 0),
+      otherIncome: rows.reduce((s, r) => s + r.otherIncome, 0),
       netProfit: rows.reduce((s, r) => s + r.netProfit, 0),
       outstandingReceivables: rows.reduce((s, r) => s + r.outstandingReceivables, 0),
     };
@@ -2498,7 +2507,7 @@ reportsRouter.get("/reports/branch-comparison", requireAuth, requireSuperAdmin, 
         revenue: FINANCIAL_BASIS.accrual,
         containerCosts: FINANCIAL_BASIS.actual_paid,
         overheads: FINANCIAL_BASIS.actual_paid,
-        summary: "Issued revenue net of dated credit notes, less actual paid costs recognised by first active invoice, paid overhead and separate audited non-cash bad debts.",
+        summary: "Issued revenue net of dated credit notes, plus separately reported debt recovery income, less actual paid costs recognised by first active invoice, paid overhead and separate audited non-cash bad debts.",
       },
       generatedAt: new Date().toISOString(),
       adjustmentPolicy: adjustments.policy,

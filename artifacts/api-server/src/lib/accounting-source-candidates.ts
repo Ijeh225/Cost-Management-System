@@ -21,6 +21,6 @@ export async function sourceCandidates(client:Client,bookId:number,branchId:numb
   const candidates=rows.slice(0,50).map(({facts:f,journal_id,journal_status,amount})=>({kind,id:f.id,amount:amount??null,
     date:financialDateKey(new Date(f.paid_at??f.created_at)),label:String(f.reference??f.credit_note_number??f.description??f.action??`${kind} #${f.id}`).slice(0,200),
     bankIds:[...new Set([f.bank_id,f.from_bank_id,f.to_bank_id].filter((v):v is number=>Number.isSafeInteger(v)&&v>0))],
-    paymentMethod:f.payment_method??null,classification:f.classification??null,journalId:journal_id??null,journalStatus:journal_status??null}));
+    paymentMethod:f.payment_method??null,classification:f.writeoff_audit_id!=null?'bad_debt_recovery':f.classification??null,journalId:journal_id??null,journalStatus:journal_status??null}));
   return {candidates,truncated:rows.length>50};
 }

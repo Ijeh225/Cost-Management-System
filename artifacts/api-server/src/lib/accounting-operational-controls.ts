@@ -29,7 +29,7 @@ export async function validateOperationalControls(client:Client,bookId:number,br
     requireAccounting(dep,"SOURCE_NOT_POSTED","Post dated source dependencies first; do not guess opening controls");
     const evidence=JSON.parse(dep.evidence);
     if(OPERATIONAL_SOURCE_KINDS.includes(evidence.source?.kind)) {
-      const current=await readOperationalSource(client,branchId,evidence.source);
+      const current=await readOperationalSource(client,branchId,evidence.source,bookId);
       requireAccounting(stableEvidence(current)===stableEvidence(evidence.source),"SOURCE_CHANGED","Posted obligation/source facts changed; explicit correction required");
     }
   }
@@ -38,7 +38,7 @@ export async function validateOperationalControls(client:Client,bookId:number,br
     const original=byKey.get(source.originalKey);
     requireAccounting(original,"ORIGINAL_NOT_POSTED","Post the original source before its operational reversal");
     const originalEvidence=JSON.parse(original.evidence);
-    requireAccounting(stableEvidence(await readOperationalSource(client,branchId,originalEvidence.source))===stableEvidence(originalEvidence.source),
+    requireAccounting(stableEvidence(await readOperationalSource(client,branchId,originalEvidence.source,bookId))===stableEvidence(originalEvidence.source),
       "SOURCE_CHANGED","Original source evidence changed after posting");
     const lines=normalizeJournal(input).lines;
     requireAccounting(original.lines.length===lines.length && original.lines.every((l,i)=>
@@ -97,7 +97,7 @@ export async function validateOperationalControls(client:Client,bookId:number,br
         && (!evidenceOf(j).source.facts?.recordedAt || evidenceOf(j).source.facts.recordedAt<=source.facts.recordedAt!));
       for(const j of creditSources) {
         const original=evidenceOf(j).source;
-        requireAccounting(stableEvidence(await readOperationalSource(client,branchId,original))===stableEvidence(original),
+        requireAccounting(stableEvidence(await readOperationalSource(client,branchId,original,bookId))===stableEvidence(original),
           "SOURCE_CHANGED","Client-credit originating facts changed after posting");
       }
       const credit=creditSources.reduce((sum,j)=>sum-value(j,mapping.clientCreditAccountId),0n);

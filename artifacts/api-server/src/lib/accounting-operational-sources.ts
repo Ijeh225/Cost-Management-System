@@ -10,7 +10,7 @@ const signed=(amount:string)=>amount.startsWith("-") ? -moneyToMinor(amount.slic
 const digest=(value:unknown)=>createHash("sha256").update(String(value ?? "")).digest("hex");
 
 // Reads/locks existing facts only. No operational data, status or balances are written.
-export async function readOperationalSource(client:Client,branchId:number,ref:OperationalRef):Promise<OperationalSource> {
+export async function readOperationalSource(client:Client,branchId:number,ref:OperationalRef,bookId?:number):Promise<OperationalSource> {
   operationalEventKey(ref);
   const datedTables=new Map([...["credit_notes","invoice_audit_log","overhead_expenses","overhead_expense_topups","bank_fund_additions","bank_transfers"].map(t=>[t,"created_at"] as const),
     ...["invoice_payments","duty_payment_transactions","container_expense_payments","expense_payments","payment_schedule_payments"].map(t=>[t,"paid_at"] as const)]);
@@ -53,10 +53,14 @@ export async function readOperationalSource(client:Client,branchId:number,ref:Op
       "SOURCE_REVIEW_REQUIRED","Explicit non-cash client-credit fact required");
     if(invoice.status==="written_off") {
       const audit=(await client.query("SELECT created_at AT TIME ZONE 'UTC' AS created_at FROM invoice_audit_log WHERE invoice_id=$1 AND action='written_off'",[invoice.id])).rows;
-      const posted=(await client.query("SELECT id FROM accounting_journals WHERE branch_id=$1 AND event_key=$2 AND status='posted'",
-        [branchId,operationalEventKey(ref)])).rows[0];
-      requireAccounting(audit.length===1 && new Date(p.paid_at)<=new Date(audit[0].created_at) && posted,
-        "SOURCE_REVIEW_REQUIRED","Only already-posted historical credit use can be revalidated after write-off; no invented recovery");
+      requireAccounting(Number.isSafeInteger(bookId),"SOURCE_REVIEW_REQUIRED","Selected accounting book required for written-off credit history");
+      const posted=(await client.query("SELECT id FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3 AND status='posted'",
+        [bookId,branchId,operationalEventKey(ref)])).rows[0];
+      const writtenOff=(await client.query(`SELECT id FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND status='posted'
+        AND event_key IN (SELECT 'source:invoice_writeoff:'||id||':v1' FROM invoice_audit_log WHERE invoice_id=$3 AND action='written_off')`,
+        [bookId,branchId,invoice.id])).rows[0];
+      requireAccounting(audit.length===1 && new Date(p.paid_at)<=new Date(audit[0].created_at) && (!writtenOff || posted),
+        "SOURCE_REVIEW_REQUIRED","Only dated pre-writeoff credit use before native writeoff, or an already-posted credit, is supported; no invented recovery");
     }
     let originalKey:string|undefined;
     if(p.entry_type==="reversal") {
@@ -144,6 +148,26 @@ export async function readOperationalSource(client:Client,branchId:number,ref:Op
   }
   if(ref.kind==="bank_funding") {
     const p=await row("bank_fund_additions"); await bank(p.bank_id);
+    if(p.writeoff_audit_id!=null) {
+      const audit=await row('invoice_audit_log',p.writeoff_audit_id);
+      const invoice=await parentInvoice(audit.invoice_id);
+      requireAccounting(audit.action==='written_off'&&invoice.status==='written_off'&&invoice.written_off_amount
+        &&date(p.created_at)>=date(audit.created_at),'SOURCE_REVIEW_REQUIRED','Dated original written-off debt required for recovery');
+      const recoveries=(await client.query('SELECT id,amount FROM bank_fund_additions WHERE writeoff_audit_id=$1 AND branch_id=$2 FOR SHARE',[audit.id,branchId])).rows;
+      const net=recoveries.reduce((s,r)=>s+signed(r.amount),0n);
+      requireAccounting(net>=0n&&net<=moneyToMinor(invoice.written_off_amount),'CONTROL_MISMATCH','Net debt recoveries exceed written-off amount');
+      let originalKey:string|undefined;
+      if(p.reversal_of_funding_id!=null) {
+        const original=await row('bank_fund_additions',p.reversal_of_funding_id);
+        requireAccounting(original.writeoff_audit_id===audit.id&&original.reversal_of_funding_id==null
+          &&original.bank_id===p.bank_id&&signed(original.amount)>0n&&signed(original.amount)===-signed(p.amount)
+          &&new Date(original.created_at)<=new Date(p.created_at),'INVALID_REVERSAL','Matching full recovery and bank required');
+        originalKey=`source:bank_funding:${original.id}:v1`;
+      }
+      return source(p.amount,p.created_at,{reference:p.reference??null,narrationHash:digest(p.narration),
+        recoveryInvoiceId:invoice.id,writeoffAuditId:audit.id,writeoffAuditHash:digest(audit.details)},
+        {bankId:p.bank_id,classification:'bad_debt_recovery',originalKey,dependencies:[`source:invoice_writeoff:${audit.id}:v1`]});
+    }
     return source(p.amount,p.created_at,{reference:p.reference ?? null,narrationHash:digest(p.narration)}, {bankId:p.bank_id});
   }
   const transfer=await row("bank_transfers");

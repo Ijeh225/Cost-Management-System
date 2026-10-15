@@ -13,6 +13,7 @@ import type { TaxConfiguration } from "../lib/accounting-tax";
 import type { AffairsRequest } from "../lib/accounting-affairs";
 import { hasRetainedInvoiceJournal } from "../lib/invoice-native-cancellation";
 import type { SourceReviewRequest } from '../lib/accounting-source-review';
+import { DEBT_RECOVERY_SQL, recordDebtRecovery } from '../lib/invoice-debt-recovery';
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 
@@ -50,7 +51,7 @@ beforeAll(async () => {
     CREATE TABLE users(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL REFERENCES branches(id),name TEXT,
     authority_level TEXT,job_function TEXT,workspace_access TEXT,access_profile_migrated_at TIMESTAMPTZ,is_active BOOLEAN NOT NULL DEFAULT true)`);
   await sql(`CREATE TABLE clients(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL);
-    CREATE TABLE banks(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL);
+    CREATE TABLE banks(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL,is_active BOOLEAN NOT NULL DEFAULT true);
     CREATE TABLE invoices(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL,client_id INTEGER,status TEXT NOT NULL,
       total NUMERIC(15,2) NOT NULL,written_off_amount NUMERIC(15,2),subtotal NUMERIC(15,2) NOT NULL DEFAULT 0,
       vat_amount NUMERIC(15,2) NOT NULL DEFAULT 0,created_at TIMESTAMP NOT NULL DEFAULT '2026-10-09 10:00:00',updated_at TIMESTAMP,invoice_number TEXT,due_date DATE);
@@ -70,7 +71,7 @@ beforeAll(async () => {
     CREATE TABLE invoice_payments(id SERIAL PRIMARY KEY,branch_id INTEGER NOT NULL,invoice_id INTEGER NOT NULL,
       amount NUMERIC(15,2) NOT NULL,paid_at TIMESTAMP NOT NULL,bank_id INTEGER,payment_method TEXT NOT NULL,
       source_deposit_id INTEGER,entry_type TEXT NOT NULL DEFAULT 'payment',reversal_of_payment_id INTEGER,reference TEXT);
-    CREATE TABLE invoice_audit_log(id SERIAL PRIMARY KEY,invoice_id INTEGER,branch_id INTEGER,action TEXT,details TEXT,created_at TIMESTAMP);
+    CREATE TABLE invoice_audit_log(id SERIAL PRIMARY KEY,invoice_id INTEGER,branch_id INTEGER,action TEXT,details TEXT,performed_by INTEGER,created_at TIMESTAMP DEFAULT now());
     CREATE TABLE duty_payment_transactions(id SERIAL PRIMARY KEY,branch_id INTEGER,container_id INTEGER,bank_id INTEGER,amount NUMERIC(15,2),
       payment_method TEXT,paid_at TIMESTAMP,entry_type TEXT,reference TEXT,narration TEXT,reversal_of_transaction_id INTEGER);
     CREATE TABLE container_expense_payments(id SERIAL PRIMARY KEY,branch_id INTEGER,container_id INTEGER,bank_id INTEGER,amount NUMERIC(15,2),
@@ -82,9 +83,10 @@ beforeAll(async () => {
     CREATE TABLE payment_schedules(id SERIAL PRIMARY KEY,branch_id INTEGER,overhead_expense_id INTEGER,amount_approved NUMERIC(15,2),status TEXT);
     CREATE TABLE payment_schedule_payments(id SERIAL PRIMARY KEY,branch_id INTEGER,schedule_id INTEGER,amount NUMERIC(15,2),bank_id INTEGER,
       payment_method TEXT,paid_at TIMESTAMP,classification TEXT,classification_reason TEXT,classified_at TIMESTAMP,classification_version INTEGER,expense_head TEXT,reference TEXT);
-    CREATE TABLE bank_fund_additions(id SERIAL PRIMARY KEY,branch_id INTEGER,bank_id INTEGER,amount NUMERIC(15,2),created_at TIMESTAMP,reference TEXT,narration TEXT);
+    CREATE TABLE bank_fund_additions(id SERIAL PRIMARY KEY,branch_id INTEGER,bank_id INTEGER,amount NUMERIC(15,2),created_at TIMESTAMP,reference TEXT,narration TEXT,added_by INTEGER);
     CREATE TABLE bank_transfers(id SERIAL PRIMARY KEY,branch_id INTEGER,from_bank_id INTEGER,to_bank_id INTEGER,amount NUMERIC(15,2),created_at TIMESTAMP,reference TEXT,narration TEXT)`);
   await ensureAccountingFoundationSchema(database as Pick<typeof pool, "connect">);
+  await sql(DEBT_RECOVERY_SQL);
 });
 
 async function settlementFixture() {
@@ -700,6 +702,81 @@ describe("Step7 invoice recognition integration", () => {
   });
 });
 describe("Step7 inactive source integration", () => {
+  it('Step12 remaining allocation uses retained receipt evidence, no bank mapping or duplicate cash, and rejects changed receipt/control',async()=>{
+    const f=await settlementFixture();await postDeposit(f);
+    const p=await settlementPayment(f,'30','deposit',f.deposit);
+    const mapping={...f.mapping,evidence:'Independent allocation evidence, deliberately different from receipt',bankAccounts:{},cashAccountId:undefined};
+    const request:SourceReviewRequest={requestId:'remaining-alloc-001',source:{kind:'invoice_payment',id:p},mapping};
+    const preview=await service.previewSourceReview(f.book,f.branch,f.preparer,request);
+    expect(preview.cashMovement).toBe('0.00');expect(preview.input.lines.map(l=>l.accountId)).toEqual([f.credit,f.ar]);
+    const review=await service.prepareSourceReview(f.book,f.branch,f.preparer,request);
+    await service.sourceReviewAction(f.book,f.branch,f.preparer,review.id,'submit','Reviewed independent allocation');
+    await service.sourceReviewAction(f.book,f.branch,f.approver,review.id,'post','Different reviewer matched original receipt control');
+    expect(await balances(f)).toEqual(new Map([[f.debit,'10000'],[f.credit,'-7000'],[f.ar,'-3000']]));
+    await expect(service.previewSettlement(f.book,f.branch,f.preparer,{kind:'invoice_payment',id:p},{...mapping,depositLiabilityAccountId:f.ar})).rejects.toMatchObject({code:'INVALID_MAPPING'});
+    await sql('UPDATE client_deposits SET amount=101 WHERE id=$1',[f.deposit]);
+    await expect(service.previewSettlement(f.book,f.branch,f.preparer,{kind:'invoice_payment',id:p},mapping)).rejects.toMatchObject({code:'SOURCE_CHANGED'});
+  },360000);
+  it('Step12 remaining pre-writeoff client credit posts before writeoff, revalidates afterward, and refuses a new backdated credit',async()=>{
+    const f=await invoiceFixture();
+    const invoice=await service.prepareInvoice(f.book,f.branch,f.preparer,f.invoice,f.invoiceMapping);await service.approveAndPost(f.book,f.branch,f.approver,invoice.id,'Original invoice');
+    const cash=await settlementPayment(f,'100');const cashJournal=await service.prepareSettlement(f.book,f.branch,f.preparer,{kind:'invoice_payment',id:cash},f.mapping);await service.approveAndPost(f.book,f.branch,f.approver,cashJournal.id,'Original receipt');
+    const note=(await sql("INSERT INTO credit_notes(invoice_id,branch_id,status,amount,credit_note_number,reason,created_at) VALUES($1,$2,'active',20,'REMAINING-CN','Reviewed net reduction','2026-10-10 12:00:00') RETURNING id",[f.invoice,f.branch])).rows[0].id;
+    const adjustment=await settlementPayment(f,'7.50','credit_note',null,null,'2026-10-10 12:00:00');await sql("UPDATE invoice_payments SET reference='REMAINING-CN' WHERE id=$1",[adjustment]);
+    const cn:OperationalMapping={currency:'NGN',policyVersion:f.mapping.policyVersion,evidence:'Original net reduction',effect:'credit_note',receivableAccountId:f.ar,clientCreditAccountId:f.credit,reductions:[{accountId:f.income,amount:'20',category:'income',evidence:'Original fee'}]};
+    await postOperational(f,{kind:'credit_note',id:note},cn);
+    const second=(await sql("INSERT INTO invoices(branch_id,client_id,status,total,subtotal) VALUES($1,$2,'sent',2,2) RETURNING id",[f.branch,f.client])).rows[0].id;
+    const item=(await sql('INSERT INTO invoice_items(invoice_id,branch_id,amount) VALUES($1,$2,2) RETURNING id',[second,f.branch])).rows[0].id;
+    const secondMap={...f.invoiceMapping,vatAccountId:undefined,vatEvidence:undefined,items:[{itemId:item,splits:[{accountId:f.income,amount:'2',treatment:'income' as const,evidence:'Second fee'}]}]};
+    const secondJ=await service.prepareInvoice(f.book,f.branch,f.preparer,second,secondMap);await service.approveAndPost(f.book,f.branch,f.approver,secondJ.id,'Second invoice');
+    const use=await settlementPayment({...f,invoice:second},'1','credit',null,null,'2026-10-10 13:00:00');
+    await sql("UPDATE invoices SET status='written_off',written_off_amount=1 WHERE id=$1",[second]);
+    const audit=(await sql("INSERT INTO invoice_audit_log(invoice_id,branch_id,action,details,created_at) VALUES($1,$2,'written_off','Stored remaining1','2026-10-10 14:00:00') RETURNING id",[second,f.branch])).rows[0].id;
+    const cm={...cn,effect:'client_credit' as const,reductions:undefined};await postOperational(f,{kind:'client_credit_application',id:use},cm);
+    const expense=await service.addAccount(f.book,f.branch,f.owner,'6100','Bad debt','expense');
+    await postOperational(f,{kind:'invoice_writeoff',id:audit},{...cm,effect:'writeoff',accountId:expense});
+    await service.prepareOperational(f.book,f.branch,f.preparer,{kind:'client_credit_application',id:use},cm);
+    const later=await settlementPayment({...f,invoice:second},'0.10','credit',null,null,'2026-10-10 13:30:00');
+    await expect(service.prepareOperational(f.book,f.branch,f.preparer,{kind:'client_credit_application',id:later},cm)).rejects.toMatchObject({code:'SOURCE_REVIEW_REQUIRED'});
+  },360000);
+  it('Step12 remaining debt recovery is capped, idempotent, immutable and independently posts/reverses cash plus income only',async()=>{
+    const f=await invoiceFixture(),expense=await service.addAccount(f.book,f.branch,f.owner,'6100','Bad debt','expense'),recoveryIncome=await service.addAccount(f.book,f.branch,f.owner,'4100','Recovery income','income');
+    const inv=await service.prepareInvoice(f.book,f.branch,f.preparer,f.invoice,f.invoiceMapping);await service.approveAndPost(f.book,f.branch,f.approver,inv.id,'Invoice');
+    await sql("UPDATE invoices SET status='written_off',written_off_amount=107.50 WHERE id=$1",[f.invoice]);
+    const audit=(await sql("INSERT INTO invoice_audit_log(invoice_id,branch_id,action,details,created_at) VALUES($1,$2,'written_off','Original107.50','2026-10-10 12:00:00') RETURNING id",[f.invoice,f.branch])).rows[0].id;
+    const request={amount:'25.00',bankId:f.bank,date:'2026-10-11',reference:'remaining-debt-recovery',reason:'Fictional received bank recovery',requestId:'remaining-debt-recovery-001'};
+    const recorded=await Promise.all([1,2].map(()=>recordDebtRecovery(database,f.invoice,f.branch,f.preparer,request)));
+    expect(recorded[0].id).toBe(recorded[1].id);
+    await expect(recordDebtRecovery(database,f.invoice,f.branch,f.preparer,{...request,amount:'26'})).rejects.toMatchObject({code:'DUPLICATE_CONFLICT'});
+    await expect(recordDebtRecovery(database,f.invoice,f.branch,f.preparer,{...request,requestId:'remaining-over-cap-001',amount:'100',reference:'remaining-cap'})).rejects.toMatchObject({code:'RECOVERY_EXCEEDS_DEBT'});
+    await expect(sql('DELETE FROM bank_fund_additions WHERE id=$1',[recorded[0].id])).rejects.toThrow('immutable');
+    const mapping:OperationalMapping={...f.mapping,effect:'income_funding',accountId:recoveryIncome};
+    await expect(service.prepareOperational(f.book,f.branch,f.preparer,{kind:'bank_funding',id:recorded[0].id},mapping)).rejects.toMatchObject({code:'SOURCE_NOT_POSTED'});
+    await postOperational(f,{kind:'invoice_writeoff',id:audit},{...mapping,effect:'writeoff',accountId:expense,receivableAccountId:f.ar});
+    const baseline=await balances(f);
+    await expect(service.prepareOperational(f.book,f.branch,f.preparer,{kind:'bank_funding',id:recorded[0].id},{...mapping,effect:'equity_funding'})).rejects.toMatchObject({code:'INVALID_MAPPING'});
+    await postOperational(f,{kind:'bank_funding',id:recorded[0].id},mapping);
+    const b=await balances(f);expect(b.get(f.debit)).toBe('2500');expect(b.get(recoveryIncome)).toBe('-2500');expect(b.get(f.ar)).toBe('0');
+    const reversed=await recordDebtRecovery(database,f.invoice,f.branch,f.owner,{...request,date:'2026-10-12',reference:'remaining-debt-reversal',reason:'Correct fictional receipt',requestId:'remaining-debt-reversal-001'},recorded[0].id);
+    await postOperational(f,{kind:'bank_funding',id:reversed.id},mapping);
+    expect((await balances(f)).get(f.debit)).toBe('0');expect((await balances(f)).get(recoveryIncome)).toBe('0');
+    for(const [id,value] of baseline)expect((await balances(f)).get(id)).toBe(value);
+    expect((await sql('SELECT status,written_off_amount FROM invoices WHERE id=$1',[f.invoice])).rows[0]).toMatchObject({status:'written_off',written_off_amount:'107.50'});
+  },360000);
+  it('Step12 remaining recovery capacity serializes different concurrent requests and rejects dates and foreign banks',async()=>{
+    const f=await settlementFixture();
+    await sql("UPDATE invoices SET status='written_off',written_off_amount=100 WHERE id=$1",[f.invoice]);
+    await sql("INSERT INTO invoice_audit_log(invoice_id,branch_id,action,details,created_at) VALUES($1,$2,'written_off','Stored100','2026-10-10 12:00:00')",[f.invoice,f.branch]);
+    const body={amount:'80',bankId:f.bank,date:'2026-10-11',reference:'remaining-capacity-1',reason:'Controlled recovery capacity',requestId:'remaining-capacity-001'};
+    const results=await Promise.allSettled([recordDebtRecovery(database,f.invoice,f.branch,f.preparer,body),recordDebtRecovery(database,f.invoice,f.branch,f.preparer,{...body,reference:'remaining-capacity-2',requestId:'remaining-capacity-002'})]);
+    expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+    expect(results.find(r=>r.status==='rejected')).toMatchObject({reason:{code:'RECOVERY_EXCEEDS_DEBT'}});
+    expect((await sql('SELECT sum(amount)::text amount FROM bank_fund_additions WHERE branch_id=$1',[f.branch])).rows[0].amount).toBe('80.00');
+    await expect(recordDebtRecovery(database,f.invoice,f.branch,f.preparer,{...body,date:'2026-10-09',requestId:'remaining-before-001'})).rejects.toMatchObject({code:'INVALID_DATE'});
+    await expect(recordDebtRecovery(database,f.invoice,f.branch,f.preparer,{...body,bankId:2147483647,requestId:'remaining-foreign-001'})).rejects.toMatchObject({code:'NOT_FOUND'});
+    await sql(DEBT_RECOVERY_SQL);await sql(DEBT_RECOVERY_SQL);
+    expect((await sql('SELECT sum(amount)::text amount FROM bank_fund_additions WHERE branch_id=$1',[f.branch])).rows[0].amount).toBe('80.00');
+  },360000);
   it("Step12 actual deposit method Bank Transfer posts once and preserves original source/evidence",async()=>{
     const f=await settlementFixture();await sql("UPDATE client_deposits SET payment_method='Bank Transfer' WHERE id=$1",[f.deposit]);
     const before=(await sql("SELECT row_to_json(d) data FROM client_deposits d WHERE id=$1",[f.deposit])).rows[0].data;

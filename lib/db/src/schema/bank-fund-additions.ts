@@ -1,6 +1,7 @@
-import { pgTable, serial, integer, numeric, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, timestamp, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { banksTable } from "./banks";
 import { usersTable } from "./users";
+import { invoiceAuditLogTable } from "./invoice-audit-log";
 
 export const bankFundAdditionsTable = pgTable("bank_fund_additions", {
   id: serial("id").primaryKey(),
@@ -8,6 +9,9 @@ export const bankFundAdditionsTable = pgTable("bank_fund_additions", {
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   narration: text("narration").notNull().default(""),
   reference: text("reference"),
+  writeoffAuditId: integer("writeoff_audit_id").references(() => invoiceAuditLogTable.id, { onDelete: "restrict" }),
+  reversalOfFundingId: integer("reversal_of_funding_id").references((): AnyPgColumn => bankFundAdditionsTable.id, { onDelete: "restrict" }),
+  recoveryRequestKey: text("recovery_request_key"),
   addedBy: integer("added_by").references(() => usersTable.id, { onDelete: "set null" }),
   branchId: integer("branch_id").notNull().default(1),
   createdAt: timestamp("created_at").notNull().defaultNow(),

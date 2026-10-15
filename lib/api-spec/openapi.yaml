@@ -19,6 +19,46 @@ tags:
     description: Container charges
 
 paths:
+  /invoices/{id}/recoveries:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: listInvoiceDebtRecoveries
+      summary: Read immutable bank-linked recovery history (finance access required)
+      responses:
+        '200': { description: Recovery bank-source history, including linked negative reversals }
+        '403': { description: Finance access required }
+        '404': { description: Invoice outside authorised scope }
+    post:
+      operationId: recordInvoiceDebtRecovery
+      summary: Record a capped bank recovery without reopening AR or posting native accounts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DebtRecoveryRequest' }
+      responses:
+        '201': { description: Single bank-source identity, or idempotent same-request replay }
+        '400': { description: Invalid date, amount, bank or original write-off }
+        '403': { description: Finance access and selected invoice branch required }
+        '409': { description: Duplicate reference or conflicting request }
+  /invoices/{id}/recoveries/{recoveryId}/reverse:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      - { name: recoveryId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      operationId: reverseInvoiceDebtRecovery
+      summary: Administrator records one immutable full same-bank recovery reversal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DebtRecoveryRequest' }
+      responses:
+        '201': { description: Linked negative bank source; separate native review required }
+        '400': { description: Full original amount, same bank and non-earlier date required }
+        '403': { description: Administrator and explicit invoice branch required }
+        '409': { description: Already reversed or conflicting identity/reference }
   /accounting/books/{bookId}/source-review/sources/{kind}/{sourceId}:
     parameters:
       - $ref: '#/components/parameters/AccountingBookId'
@@ -1752,6 +1792,17 @@ components:
       description: Omit to respect active X-Branch-Id; all requires read grants on every branch of the single selected book
       schema: { type: string }
   schemas:
+    DebtRecoveryRequest:
+      type: object
+      additionalProperties: false
+      required: [amount, bankId, date, reference, reason, requestId]
+      properties:
+        amount: { type: string, pattern: '^(0|[1-9][0-9]{0,12})(\.[0-9]{1,2})?$' }
+        bankId: { type: integer, minimum: 1 }
+        date: { type: string, format: date }
+        reference: { type: string, minLength: 1, maxLength: 200 }
+        reason: { type: string, minLength: 3, maxLength: 1000 }
+        requestId: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
     SourceReviewRef:
       type: object
       additionalProperties: false

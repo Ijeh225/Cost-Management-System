@@ -21,8 +21,23 @@ export async function extractScan(buffer: Buffer, pdf: boolean): Promise<OcrPage
       const pages: OcrPage[] = [];
       const recognize = async (bytes: Buffer, page: number) => {
         if (cancelled) throw new Error("OCR timed out");
-        const { data } = await worker!.recognize(bytes);
-        pages.push({ page, text: data.text.slice(0, 100_000), confidence: data.confidence });
+        let { data: best } = await worker!.recognize(bytes);
+        if (best.confidence < 85) {
+          const image = await loadImage(bytes);
+          // Only derived OCR pixels rotate; the stored original is immutable.
+          for (const turn of [1, 2, 3]) {
+            if (cancelled) throw new Error("OCR timed out");
+            const canvas = createCanvas(turn % 2 ? image.height : image.width, turn % 2 ? image.width : image.height);
+            const context = canvas.getContext('2d');
+            context.translate(canvas.width / 2, canvas.height / 2);
+            context.rotate(turn * Math.PI / 2);
+            context.drawImage(image, -image.width / 2, -image.height / 2);
+            const { data } = await worker!.recognize(canvas.toBuffer('image/png'));
+            if (data.text.trim().length >= 20 && data.confidence > best.confidence) best = data;
+            if (best.confidence >= 85) break;
+          }
+        }
+        pages.push({ page, text: best.text.slice(0, 100_000), confidence: best.confidence });
       };
       if (pdf) {
         const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");

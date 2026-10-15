@@ -1,8 +1,8 @@
-import { db, creditNotesTable, invoicesTable, clientsTable, invoiceAuditLogTable, invoicePaymentsTable } from "@workspace/db";
+import { db, creditNotesTable, invoicesTable, clientsTable, invoiceAuditLogTable, invoicePaymentsTable, bankFundAdditionsTable } from "@workspace/db";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { creditNoteSplit } from "./financial-reporting.js";
 
-export const INVOICE_ADJUSTMENT_POLICY = "Credit notes reduce proportional net sales and invoice VAT on the note date. Bad debt is a separate non-cash loss on the audited write-off date; it does not grant automatic VAT relief. This is a management-report convention, not a tax-filing certification.";
+export const INVOICE_ADJUSTMENT_POLICY = "Credit notes reduce proportional net sales and invoice VAT on the note date. Bad debt is a separate non-cash loss on the audited write-off date; it does not grant automatic VAT relief. Linked debt recoveries/reversals are separate other income on their bank-record date, not new invoice sales or VAT. This is a management-report convention, not a tax-filing certification.";
 
 type Scope = { branchId?: number | null; clientId?: number | null; from?: Date | null; to?: Date | null };
 
@@ -43,5 +43,10 @@ export async function loadInvoiceAdjustments(scope: Scope = {}) {
     ...row, createdAt: new Date(row.createdAt!),
     amount: Math.max(0, Number(row.writtenOffAmount ?? row.remaining)),
   })).filter(row => inPeriod(row.createdAt));
-  return { creditNotes, badDebts, undatedBadDebts, policy: INVOICE_ADJUSTMENT_POLICY };
+  const recoveries=(await db.select({id:bankFundAdditionsTable.id,invoiceId:invoicesTable.id,invoiceNumber:invoicesTable.invoiceNumber,
+    branchId:invoicesTable.branchId,clientId:invoicesTable.clientId,amount:bankFundAdditionsTable.amount,createdAt:bankFundAdditionsTable.createdAt})
+    .from(bankFundAdditionsTable).innerJoin(invoiceAuditLogTable,eq(bankFundAdditionsTable.writeoffAuditId,invoiceAuditLogTable.id))
+    .innerJoin(invoicesTable,eq(invoiceAuditLogTable.invoiceId,invoicesTable.id)).where(and(...invoiceConditions,eq(invoiceAuditLogTable.action,'written_off'))))
+    .filter(r=>inPeriod(r.createdAt)).map(r=>({...r,amount:Number(r.amount)}));
+  return { creditNotes, badDebts, recoveries, undatedBadDebts, policy: INVOICE_ADJUSTMENT_POLICY };
 }

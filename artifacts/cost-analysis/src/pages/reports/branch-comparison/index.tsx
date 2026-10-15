@@ -57,7 +57,7 @@ export default function BranchComparisonPage() {
   const exportCSV = () => {
     if (!rows.length) return;
     const headers = ["Branch", "Containers", "Revenue (₦)", "Costs (₦)", "Gross Profit (₦)", "Margin %", "Avg Turnaround (days)", "Outstanding AR (₦)"];
-    headers.splice(5, 0, "Actual Paid Overhead (NGN)", "Non-cash Bad Debt (NGN)", "Net Profit (NGN)");
+    headers.splice(5, 0, "Actual Paid Overhead (NGN)", "Non-cash Bad Debt (NGN)", "Recovery Income (NGN)", "Net Profit (NGN)");
     const lines = [headers.join(",")];
     for (const r of rows) {
       lines.push([
@@ -68,6 +68,7 @@ export default function BranchComparisonPage() {
         r.grossProfit.toFixed(2),
         r.overheads.toFixed(2),
         (r.badDebts ?? 0).toFixed(2),
+        (r.otherIncome ?? 0).toFixed(2),
         r.netProfit.toFixed(2),
         r.marginPct.toFixed(2),
         r.avgTurnaroundDays.toFixed(1),
@@ -238,7 +239,7 @@ export default function BranchComparisonPage() {
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-orange-400">{formatCurrency(r.overheads)}</td>
                         <td className="px-4 py-3 text-right font-mono text-destructive">{formatCurrency(r.badDebts ?? 0)}</td>
-                        <td className={`px-4 py-3 text-right font-mono font-semibold ${r.netProfit >= 0 ? "text-emerald-400" : "text-destructive"}`}>{formatCurrency(r.netProfit)}</td>
+                        <td className={`px-4 py-3 text-right font-mono font-semibold ${r.netProfit >= 0 ? "text-emerald-400" : "text-destructive"}`}>{formatCurrency(r.netProfit)}{r.otherIncome!==undefined&&r.otherIncome!==0&&<p className="text-xs font-normal">Includes recovery income {formatCurrency(r.otherIncome)}</p>}</td>
                         <td className={`px-4 py-3 text-right font-mono ${r.marginPct >= 0 ? "text-emerald-400" : "text-destructive"}`}>
                           {r.marginPct.toFixed(1)}%
                         </td>

@@ -1,4 +1,4 @@
-import { createCanvas } from "@napi-rs/canvas";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import PDFDocument from "pdfkit";
 import { describe, expect, it } from "vitest";
 import { extractScan } from "../lib/document-ocr.js";
@@ -30,5 +30,17 @@ describe("local OCR quality and PDF rendering", () => {
   }, 90000);
   it("fails visibly on an unreadable image instead of returning a reviewed result", async () => {
     await expect(extractScan(Buffer.from("not an image"), false)).rejects.toThrow();
+  }, 90000);
+  it.each([1, 2, 3])("normalizes quarter-turn %i for OCR without replacing original bytes", async turn => {
+    const image = await loadImage(sampleScan());
+    const canvas = createCanvas(turn % 2 ? image.height : image.width, turn % 2 ? image.width : image.height);
+    const context = canvas.getContext('2d');
+    context.translate(canvas.width / 2, canvas.height / 2); context.rotate(turn * Math.PI / 2);
+    context.drawImage(image, -image.width / 2, -image.height / 2);
+    const bytes = canvas.toBuffer('image/png'), original = Buffer.from(bytes);
+    const pages = await extractScan(bytes, false);
+    expect(bytes.equals(original)).toBe(true);
+    expect(pages[0].text).toContain('CAP02-001');
+    expect(suggestFields(pages).map(f => f.value)).toEqual(['CAP02-001', 'NGN500.00', '2026-10-05']);
   }, 90000);
 });

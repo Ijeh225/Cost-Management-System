@@ -103,6 +103,8 @@ export function buildOperationalJournal(bookId: number, source: OperationalSourc
     line(mapping.bankAccounts?.[String(source.toBankId)],"asset",amount,0n);
     line(mapping.bankAccounts?.[String(source.fromBankId)],"asset",0n,amount);
   } else if (source.kind === "bank_funding") {
+    requireAccounting(source.classification!=='bad_debt_recovery'||mapping.effect==='income_funding',
+      'INVALID_MAPPING','Debt recovery must use an explicitly reviewed income head, never capital, AR, VAT or a second write-off');
     const category=({equity_funding:"equity",loan_funding:"liability",asset_funding:"asset",income_funding:"income",liability_funding:"liability"} as Partial<Record<OperationalMapping["effect"],AccountCategory>>)[mapping.effect];
     requireAccounting(category,"MAPPING_REQUIRED","Funding purpose must be explicitly reviewed, never inferred from narration");
     line(mapping.bankAccounts?.[String(source.bankId)],"asset",amount,0n); line(mapping.accountId,category,0n,amount); cashMovement=amount;

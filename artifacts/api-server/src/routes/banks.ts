@@ -402,6 +402,7 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
           id: bankFundAdditionsTable.id,
           amount: bankFundAdditionsTable.amount,
           narration: bankFundAdditionsTable.narration,
+          writeoffAuditId: bankFundAdditionsTable.writeoffAuditId,
           reference: bankFundAdditionsTable.reference,
           createdAt: bankFundAdditionsTable.createdAt,
         })
@@ -413,12 +414,12 @@ banksRouter.get("/banks/:id/transactions", requireBranchAdminOrAbove, async (req
           id: `fund_addition_${f.id}`,
           date: f.createdAt,
           type: "fund_addition" as const,
-          description: `Fund addition${f.narration ? ` — ${f.narration}` : ""}`,
+          description: `${f.writeoffAuditId ? 'Debt recovery' : 'Fund addition'}${f.narration ? ` — ${f.narration}` : ""}`,
           reference: f.reference ?? null,
           clientName: null,
           invoiceNumber: null,
-          debit: 0,
-          credit: parseFloat(f.amount),
+          debit: Number(f.amount)<0?Math.abs(Number(f.amount)):0,
+          credit: Math.max(0,Number(f.amount)),
         });
       }
     }

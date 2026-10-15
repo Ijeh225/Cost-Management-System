@@ -53,6 +53,7 @@ function downloadCsv(data: ProfitLossResponse, filename: string) {
   }
   lines.push(`Overheads,TOTAL Overheads,${data.overheads.total.toFixed(2)}`);
   lines.push(`Non-cash adjustments,Bad debt write-offs,${(data.adjustments?.totalBadDebts ?? 0).toFixed(2)}`);
+  lines.push(`Other income,Bad debt recoveries net of reversals,${(data.adjustments?.totalRecoveries ?? 0).toFixed(2)}`);
   lines.push(`Revenue adjustments,Credit-note net reductions,${(data.adjustments?.totalCreditNoteNet ?? 0).toFixed(2)}`);
   lines.push(`Profit,Net Profit,${data.netProfit.toFixed(2)}`);
   lines.push(`Profit,Net Margin %,${data.netMarginPct.toFixed(2)}`);
@@ -72,9 +73,9 @@ function downloadCsv(data: ProfitLossResponse, filename: string) {
   if (data.monthly.length > 1) {
     lines.push("");
     lines.push("Monthly Breakdown");
-    lines.push("Month,Containers,Revenue,Cost of Sales,Gross Profit,Overheads,Non-cash Bad Debt,Net Profit");
+    lines.push("Month,Containers,Revenue,Cost of Sales,Gross Profit,Overheads,Non-cash Bad Debt,Debt Recovery Income,Net Profit");
     for (const m of data.monthly) {
-      lines.push(`${esc(fmtMonth(m.month))},${m.containerCount},${m.revenue.toFixed(2)},${m.costOfSales.toFixed(2)},${m.grossProfit.toFixed(2)},${m.overheads.toFixed(2)},${(m.badDebts ?? 0).toFixed(2)},${m.netProfit.toFixed(2)}`);
+      lines.push(`${esc(fmtMonth(m.month))},${m.containerCount},${m.revenue.toFixed(2)},${m.costOfSales.toFixed(2)},${m.grossProfit.toFixed(2)},${m.overheads.toFixed(2)},${(m.badDebts ?? 0).toFixed(2)},${(m.recoveries??0).toFixed(2)},${m.netProfit.toFixed(2)}`);
     }
   }
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -280,6 +281,7 @@ export default function ProfitLossPrint() {
               </tr>
 
               <tr><td className="lbl">Bad debt write-offs (non-cash)</td><td className="amt">{fmt(data.adjustments?.totalBadDebts ?? 0)}</td></tr>
+              <tr><td className="lbl">Other income: bad debt recoveries, net of reversals</td><td className="amt">{fmt(data.adjustments?.totalRecoveries ?? 0)}</td></tr>
               <tr className={`net ${netProfit < 0 ? "negative" : ""}`}>
                 <td className="lbl">{overheads.appliedToNet ? `Net Profit (${fmtPct(netMarginPct)})` : `Client Result (company overheads excluded)`}</td>
                 <td className="amt">{fmt(netProfit)}</td>
@@ -335,6 +337,7 @@ export default function ProfitLossPrint() {
                   <th className="right">Gross Profit (₦)</th>
                   <th className="right">Overheads (₦)</th>
                   <th className="right">Non-cash Bad Debt</th>
+                  <th className="right">Recovery Income</th>
                   <th className="right">Net Profit (₦)</th>
                 </tr>
               </thead>
@@ -348,6 +351,7 @@ export default function ProfitLossPrint() {
                     <td className={`right ${m.grossProfit < 0 ? "neg" : "pos"}`}>{fmt(m.grossProfit)}</td>
                     <td className="right">{fmt(m.overheads)}</td>
                     <td className="right">{fmt(m.badDebts ?? 0)}</td>
+                    <td className="right">{fmt(m.recoveries ?? 0)}</td>
                     <td className={`right ${m.netProfit < 0 ? "neg" : "pos"}`}>{fmt(m.netProfit)}</td>
                   </tr>
                 ))}

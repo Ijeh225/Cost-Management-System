@@ -151,6 +151,8 @@ export type ProfitLossResponse = {
     totalCreditNoteNet: number;
     totalCreditNoteVat: number;
     totalBadDebts: number;
+    totalRecoveries?: number;
+    recoveries?: Array<{id:number;invoiceId:number;invoiceNumber:string;amount:number;createdAt:string}>;
     undatedBadDebts: number[];
     legacyBadDebtPayments: Array<{ paymentId: number; amount: number }>;
     creditNotes: Array<{ id: number; creditNoteNumber: string; invoiceNumber: string; amount: number; netAmount: number; vatAmount: number; createdAt: string }>;
@@ -199,6 +201,7 @@ export type ProfitLossResponse = {
   monthly: Array<{
     month: string;
     badDebts?: number;
+    recoveries?: number;
     revenue: number;
     costOfSales: number;
     grossProfit: number;
@@ -449,6 +452,7 @@ export type BranchComparisonRow = {
   grossProfit: number;
   overheads: number;
   badDebts?: number;
+  otherIncome?: number;
   netProfit: number;
   marginPct: number;
   avgTurnaroundDays: number;
@@ -469,6 +473,7 @@ export type BranchComparisonResponse = {
     grossProfit: number;
     overheads: number;
     badDebts?: number;
+    otherIncome?: number;
     netProfit: number;
     outstandingReceivables: number;
   };

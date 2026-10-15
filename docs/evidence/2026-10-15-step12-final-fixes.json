@@ -1,0 +1,11 @@
+{
+  "scope": "Owner-approved remaining Step12 corrections; retained dummy sources only",
+  "status": "implemented_isolated_tests_pass_release_live_acceptance_pending",
+  "unitAndHttpTests": { "files": 63, "passed": 498, "priorNetworkSkips": 3 },
+  "isolatedPostgres": { "passed": 4, "namespaceOnly": true, "publicSourceBaselinePreserved": true, "tunnelsClosed": true, "cases": ["Retained deposit mapping, independent allocation evidence, no second cash and changed-source/control refusal", "Pre-writeoff credit, later revalidation, refusal of newly backdated credit after native writeoff", "Capped idempotent immutable bank-linked recovery, original writeoff dependency, exact independent income post/reversal", "Different concurrent recovery requests cannot exceed capacity; dates/bank scope/migration idempotency"] },
+  "ocr": { "localTestsPassed": 6, "quarterTurns": [90, 180, 270], "originalBytesPreserved": true, "liveRetestDocumentId": 15 },
+  "nativePrint": { "contractsPassed": 3, "actualOutputStatus": "pending_supported_native_browser_output", "directDownloadPdfIsNotNativeProof": true },
+  "protection": { "codeBeforeFixes": "dd2d8db2c96ac527b1b166f06485c7cea7cd072c", "protectedOriginalTagUnchanged": true, "newPrivateBackupDirectory": "C:/Users/SONOFGRACE/.codex/private-backups/step12-remaining-2026-10-15-1945", "archiveBytes": 448413, "sha256": "7b5d2e0c7470beea27d54e0e51b7a3758bf2db44de221845dcfe6c5b3d270a1f", "tablesRestored": 77, "financialBaselineVerified": true, "temporaryRestoreDatabaseRemoved": true },
+  "reuse": { "invoiceId": 23, "writeoffAuditId": 22, "uiChain": ["invoice_payment:28", "credit_note:6", "client_credit_application:30", "invoice_writeoff:22"], "acceptedReviewsNotRepeated": [4,5,6,7,8,9,10], "scanId": 15 },
+  "recoveryScope": "Bank receipts and linked full same-bank reversals only. Not cash-only recovery, new invoice sales, VAT adjustment, reopened AR, automatic native posting, external bank instruction or actual company launch approval."
+}

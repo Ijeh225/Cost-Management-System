@@ -6,6 +6,7 @@ import { runScheduledReportDelivery } from "./lib/report-delivery";
 import { runScheduledAiProactiveBriefings } from "./lib/ai-proactive-intelligence";
 import { getDocumentStorageConfigurationError } from "./lib/document-storage";
 import { ensureInvoicePaymentReversalSchema, ensureInvoiceCashSettlementSchema } from "./lib/invoice-payment-reversal-schema";
+import { DEBT_RECOVERY_SQL } from "./lib/invoice-debt-recovery";
 import { ensurePaymentClassificationSchema } from "./lib/payment-classification-schema";
 import { ensureShipmentSchema } from "./lib/shipment-schema";
 import { ensureAccountingFoundationSchema } from "./lib/accounting-schema";
@@ -791,6 +792,7 @@ async function runStartupMigrations() {
     await runMigration("invoice_cash_settlements_v1", async () => {
       await ensureInvoiceCashSettlementSchema(pool);
     });
+    await runMigration("invoice_debt_recovery_v1", async () => { await pool.query(DEBT_RECOVERY_SQL); });
     await runMigration("standalone_payment_classification_v1", async () => {
       await ensurePaymentClassificationSchema(pool);
     });

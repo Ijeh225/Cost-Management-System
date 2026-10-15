@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DebtRecovery } from '@/components/invoices/DebtRecovery';
 import { Link, useParams } from "wouter";
 import {
   useGetInvoice, useUpdateInvoice, useRecordPayment, useReverseInvoicePayment,
@@ -941,6 +942,7 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
       )}
+      {isWrittenOff&&<DebtRecovery key={invoice.id} invoiceId={invoice.id} writtenOffAmount={invoice.writtenOffAmount??0} canReverse={isAdmin}/>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-border/50">

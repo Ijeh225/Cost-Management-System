@@ -328,13 +328,17 @@ export class NativeAccounting {
           WHERE source_deposit_id=$1 AND (paid_at,id)<=($2::timestamptz AT TIME ZONE 'UTC',$3)`, [deposit.id, row.paid_at, row.id])).rows[0];
         requireAccounting(moneyToMinor(allocated.amount) <= moneyToMinor(deposit.amount),
           "SOURCE_REVIEW_REQUIRED", "Deposit allocation exceeds the received deposit");
-        const depositJournal = (await client.query(`SELECT status,payload_hash FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3`,
+        const depositJournal = (await client.query(`SELECT status,payload_hash,evidence FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3`,
           [bookId, branchId, settlementEventKey({ kind: "client_deposit", id: deposit.id })])).rows[0];
         requireAccounting(depositJournal?.status === "posted", "DEPOSIT_NOT_POSTED", "Post the deposit receipt before its allocation; opening liabilities need a separate approved workflow");
-        const receipt = buildSettlementJournal(bookId, { kind: "client_deposit", id: deposit.id, branchId, clientId: deposit.client_id,
-          amount: deposit.amount, bankId: deposit.bank_id, paymentMethod: deposit.payment_method,
-          accountingDate: financialDateKey(new Date(deposit.created_at)) }, mapping);
-        requireAccounting(journalHash(normalizeJournal(receipt.input)) === depositJournal.payload_hash,
+        const retained = JSON.parse(depositJournal.evidence);
+        requireAccounting(retained.mapping?.depositLiabilityAccountId === mapping.depositLiabilityAccountId,
+          "INVALID_MAPPING", "Allocation must use the originally posted deposit liability control");
+        // Revalidate the receipt with its own retained mapping/evidence. An
+        // allocation has independent review evidence and no second bank receipt.
+        const originalReceipt = await this.settlementDraft(client, bookId, branchId, actorId,
+          { kind: "client_deposit", id: deposit.id }, retained.mapping, "read");
+        requireAccounting(journalHash(normalizeJournal(originalReceipt.input)) === depositJournal.payload_hash,
           "SOURCE_CHANGED", "Deposit receipt evidence changed after posting; review before allocating");
       }
       if (row.entry_type === "reversal") {
@@ -401,7 +405,7 @@ export class NativeAccounting {
     const book=(await client.query("SELECT * FROM accounting_books WHERE id=$1",[bookId])).rows[0];
     requireAccounting(book?.status==="approved" && book.policy_version===mapping.policyVersion && book.currency===mapping.currency,
       "BOOK_NOT_APPROVED","Matching approved currency/policy required");
-    const source=await readOperationalSource(client,branchId,ref);
+    const source=await readOperationalSource(client,branchId,ref,bookId);
     const alreadyPosted=(await client.query("SELECT status FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3",
       [bookId,branchId,`source:${source.kind}:${source.id}:v1`])).rows[0]?.status==="posted";
     const direct=source.kind==="duty_payment" || source.kind==="container_payment"&&["shipping","terminal"].includes(String(source.facts.section));
@@ -445,7 +449,7 @@ export class NativeAccounting {
       for(const row of earlier) {
         const posted=JSON.parse(row.evidence);
         if(OPERATIONAL_SOURCE_KINDS.includes(posted.source.kind)) {
-          const current=buildOperationalJournal(bookId,await readOperationalSource(client,branchId,posted.source),posted.mapping);
+          const current=buildOperationalJournal(bookId,await readOperationalSource(client,branchId,posted.source,bookId),posted.mapping);
           requireAccounting(journalHash(normalizeJournal(current.input))===row.payload_hash,"SOURCE_CHANGED","Earlier adjustment facts changed after posting");
         } else {
           const current=await this.settlementDraft(client,bookId,branchId,actorId,posted.source,posted.mapping,"read");
@@ -1121,14 +1125,14 @@ export class NativeAccounting {
         const items=(await client.query("SELECT id,amount::text FROM invoice_items WHERE invoice_id=$1 AND branch_id=$2 ORDER BY id",[id,branchId])).rows;
         return {...row,kind,items};
       }
-      const source=await readOperationalSource(client,branchId,{kind,id});
+      const source=await readOperationalSource(client,branchId,{kind,id},bookId);
       return {id,kind,status:source.originalKey?"reversal":"payment",total:source.amount,date:source.accountingDate,section:String(source.facts.section??""),bankId:source.bankId??null,items:[]};
     },true);
   }
   private async configuredDraft(client:Client,bookId:number,branchId:number,actorId:number,request:ConfiguredSourceRequest) {
     await this.permission(client,bookId,branchId,actorId,"read");
     if(request.kind==="duty_reversal") {
-      const source=await readOperationalSource(client,branchId,{kind:"duty_payment",id:request.id});
+      const source=await readOperationalSource(client,branchId,{kind:"duty_payment",id:request.id},bookId);
       requireAccounting(source.originalKey,"INVALID_REVERSAL","Use a recorded full duty reversal, not a new cash entry");
       const original=(await client.query("SELECT evidence FROM accounting_journals WHERE book_id=$1 AND branch_id=$2 AND event_key=$3 AND status='posted'",[bookId,branchId,source.originalKey])).rows[0];
       requireAccounting(original,"ORIGINAL_NOT_POSTED","Post original reviewed duty first");
@@ -1151,7 +1155,7 @@ export class NativeAccounting {
           items:request.items??items.map(i=>({itemId:i.id,code:request.taxCode}))}};
       return this.invoiceDraft(client,bookId,branchId,actorId,request.id,mapping,"read");
     }
-    const source=await readOperationalSource(client,branchId,{kind:request.kind,id:request.id});
+    const source=await readOperationalSource(client,branchId,{kind:request.kind,id:request.id},bookId);
     requireAccounting(!source.originalKey,"INVALID_REVERSAL","Duty reversals must reuse original retained rules");
     const mapping:OperationalMapping={currency:"NGN",policyVersion:config.payload.policyVersion,evidence:request.evidence,effect:"expense",
       accountId:config.payload[directExpenseHead(source.kind,source.facts.section)],
