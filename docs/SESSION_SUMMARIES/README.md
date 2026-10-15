@@ -1,5 +1,7 @@
 # Session Summaries
 
+- Latest 2026-10-15 17:56 WAT: [Download PDF deployed/live accepted](2026-10-15-step12-status.md). f72262e/Railway1fabec5e SUCCESS/healthok; five real IAB downloads,51pages inspected, GL75rows/28totals/TB/BS/Management/Affairs reconcile. ACCT-PDF-001 CLOSED; no finance writes/duplicate libraries or backend. Final evidence publication follows. Native PRINT001 remains separate awaiting browser Print output; actual-company launch gates unchanged.
+
 - Latest 2026-10-15 17:40 WAT: [Direct accounting PDF implementation/local acceptance](2026-10-15-step12-status.md). Owner approved; reused installed exporter for five applied snapshots, no finance writes/duplicate backend.8new+3existing contracts/490API/fullbuild PASS, five actual fixture PDFs content/layout inspected. Release/live IAB downloads pending; native PRINT001 remains distinct and OPEN. Exact continuation retainedbook1/Oct14/Affairs1, no replacement fixtures.
 
 - Latest 2026-10-15 17:10 WAT: [No print window; direct PDF proposal only](2026-10-15-step12-status.md). Owner confirms no IAB window; retained GL readable/logs empty, no PDF or repeated print. Source has CSV/browser print, no direct PDF. Download PDF proposed pending approval, not implemented; separate export would not prove native print pagination. Original fixes closed/PRINT001 awaiting proof; notes local/uncommitted.

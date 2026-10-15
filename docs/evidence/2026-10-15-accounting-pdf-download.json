@@ -1,7 +1,7 @@
 {
-  "updatedAt": "2026-10-15T17:40:00+01:00",
+  "updatedAt": "2026-10-15T17:56:00+01:00",
   "feature": "ACCT-PDF-001",
-  "status": "implemented_locally_release_and_live_acceptance_pending",
+  "status": "CLOSED_implemented_deployed_and_live_downloads_accepted",
   "approval": "Owner requested Download PDF implementation, duplicate review, testing, three continuity records, commit, push and deploy.",
   "reports": ["general-ledger", "trial-balance", "balance-sheet", "management-accounts", "statement-of-affairs"],
   "implementation": {
@@ -25,7 +25,31 @@
     "correctedLocalFindings": ["Named library imports required for actual Node renderer", "Source Exceptions table heading orphan caught visually; pageBreak avoid and repeated headers added"],
     "warnings": ["Existing sourcemap/chunk build warnings", "Poppler Symbol/ArialUnicode display-font warnings; inspected Helvetica text legible"]
   },
-  "release": null,
-  "liveDownloads": [],
+  "release": {
+    "commit": "f72262e23c513b59609317dd9b36bbc420f765ae",
+    "remote": "origin/master",
+    "railwayDeploymentId": "1fabec5e-89bf-4d54-a324-9aa3e078bc63",
+    "status": "SUCCESS",
+    "health": { "endpoint": "/api/healthz", "status": "ok" }
+  },
+  "liveDownloads": [
+    { "report": "general-ledger", "file": "general-ledger_1_2026-10-14_2026-10-14.pdf", "bytes": 38685, "pages": 18, "sha256": "0baf620e5d51e14f6646ea1019a6404741565775e36107a951e9692a972570ca", "snapshot": "2026-10-15T16:47:59.906Z" },
+    { "report": "trial-balance", "file": "trial-balance_1_2026-10-14_2026-10-14.pdf", "bytes": 15924, "pages": 8, "sha256": "899e17a10d2c2ebdfe6ee29346a6175691da783b694b8b1e31314056c1d16189", "snapshot": "2026-10-15T16:50:13.629Z" },
+    { "report": "balance-sheet", "file": "balance-sheet_1_2026-10-14_2026-10-14.pdf", "bytes": 14634, "pages": 8, "sha256": "061f23f043a9c0461fb2a0fb0e37d68fa9df5bca9e65f1f9f22a640a07be2705", "snapshot": "2026-10-15T16:50:58.936Z" },
+    { "report": "management-accounts", "file": "management-accounts_1_2026-10-14_2026-10-14.pdf", "bytes": 28727, "pages": 15, "sha256": "4ecedc9b9fc9302b01ae4a31a51a7c4900cf69dd7cca229d80eb63ec1ce3df4c", "snapshot": "2026-10-15T16:51:39.575Z" },
+    { "report": "statement-of-affairs", "file": "statement-of-affairs_1_2026-10-14.pdf", "bytes": 5087, "pages": 2, "sha256": "7cd77a26106ebffa6a27197a2a1501142314a045920e0523dd53970f31c103bc", "snapshot": "2026-10-14T13:49:20.165Z" }
+  ],
+  "liveVerification": {
+    "browser": "User-selected Codex in-app browser, existing Owner session, real UI Download PDF events and local saved paths",
+    "downloadFolder": "C:/Users/SONOFGRACE/Downloads",
+    "scope": "Four reports: existing TEST ONLY book1, whole selected book, both dates 14Oct2026, all accounts. Affairs: retained approved version1/book1/branch2, not a new valuation.",
+    "dataChecks": ["75 original GL transaction rows and 28 unique account total rows match retained UI", "All 28 TB account values/totals match UI", "Period Dr/Cr 13322.84", "TB closing debit/credit 10900.00", "Balance Sheet assets/equity 10230.50", "Management income900/expense669.50/profit230.50/cash10177.50", "Affairs assets100.01/liabilities20/net80.01, original two audits, unknown-not-zero and reviewer16 retained"],
+    "outputChecks": ["All 51 pages text-extracted and rendered", "All pages reviewed as overview contact sheets; detailed sample pages additionally visually inspected", "Every page footer and safe bounds checked", "No active annotations/external OpenAction", "Scope/policy/completeness/source exceptions and classification warnings retained"],
+    "branchChange": "Previous valuation Download PDF disappears immediately on branch change; returned to original scope without new records",
+    "capturedApplicationWarningsOrErrors": [],
+    "harnessNotes": ["Initial native date-fill tool operation did not persist; existing explicit date-link parameters plus Apply Filters produced verified correct scopes; no wrong-date PDF downloaded or app date defect established", "Independent Affairs reviewer-label casing assertion corrected in harness, not product", "Unrelated CUA telemetry403 logs did not prevent actual app reads or downloads"],
+    "proofScreenshot": "tmp/step12-live/accounting-download-pdf-live.png",
+    "productionWrites": []
+  },
   "boundaries": ["Generated local fixtures are not live downloads", "Native browser print issue STEP12-PRINT-001 remains OPEN awaiting actual corrected native output", "No universal Unicode, maximum-volume or statutory/company source-completeness certification", "Retained TEST ONLY accounting remains unchanged; actual company launch gates separate"]
 }

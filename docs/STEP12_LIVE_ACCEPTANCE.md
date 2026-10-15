@@ -1,6 +1,6 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-15 13:39 WAT. Status: original seven confirmed defects/gap CLOSED; current output/posted-selection checks extended. Actual8page GL PDF inspected; new Low pagination correction deployed at a1158b4 / Railway3e5942f1 SUCCESS. Native reprint/other output checks pending, not staff-launch approval.
+Updated: 2026-10-15 17:56 WAT. Status: original seven confirmed defects/gap CLOSED. Direct Download PDF ACCT-PDF-001 deployed/live accepted for GL/TB/BS/Management/Affairs at f72262e / Railway1fabec5e SUCCESS. Native PRINT001 still awaits corrected browser Print output; neither route certifies company launch/source completeness.
 
 ## Scope and Protection
 
@@ -33,7 +33,7 @@ wipe the live app or restore the old archive over later test postings.
 | Approval and tasks | Review4 rejection visible immediately in API, assigned correction task5, resubmit/approve/lock; task4 completed | Immediate browser rejection refresh not newly observed |
 | Documents and AI | Text versions12/13 retained/indexed/download bytes match; foreign retrieval404; explicit content query44 routes to document_search, exact vendor reader returns14 only | Not a new scan/PDF/OCR accuracy benchmark or every AI query |
 | Native reports | GL/TB/BS/management API controls; actual staff GL drill-down, BS equation, management/UI and 390px TB accepted | Legacy operational reports have different dates/populations/bases |
-| Outputs | Actual15438byte Management CSV includes native35/36 once/net0/profit230.50/cash10177.50. Actual TB4pages/BS4pages/Management8pages fully inspected for wholebook1/Oct15carry-forward; amounts/warnings/columns/layout PASS for those scopes. Actual15page Oct14GL28accounts/DrCr13322.84 content PASS. ApprovedAffairs1UI/1903byteCSV net80.01/warnings/audit PASS | Low STEP12-PRINT-001 robust repeating-thead correction515182b/Railway13083454 SUCCESS;3structural checks/fullbuild/fresh28liveheaders PASS, awaits actual native pagination. Nonzero Oct14Management and approved Affairs PDF pending. Three preparedtabs handedoff. No statutory/company source completeness implied; earlier outputs retained |
+| Outputs | Existing CSV/native outputs retained. NEW directDownloadPDF five actual files GL18/TB8/BS8/Management15/Affairs2pages: all75GLtransactions/28accounttotals and TBvalues match UI; DrCr13322.84/BS10230.50/profit230.50/cash10177.50/Affairs80.01 match. All51pages extracted/rendered/overview-inspected, detailed samples checked; bounds/footers/warnings/context retained | Direct output acceptance is separate from native browser print pagination. Native STEP12-PRINT-001 robust repeating-thead correction515182b/Railway13083454 SUCCESS still awaits actual corrected browser Print output. No statutory/company source completeness or universal font/volume acceptance implied |
 | Period restrictions | Empty future November period2 close/reopen audit, missing review and branch-only close refused, closed-date journal refused | Deployed-engine test; no false closure/certification of October |
 | Selected staff source review | Real preparer15/reviewer16 selected two new dummy own transfers3/4; preview/draft/submit/return1/correct3/post2and3(native35/36), retained correction history and same-record public retries, actual role403, mobile390px and exact lookup accepted | New live write UI case is own-bank transfer; other source adapters retain prior service/isolation acceptance, not an assertion of fresh UI writes for all eleven families |
 | Supporting modules | 29 live module/data endpoints returned200 with role negatives accepted | Availability is not complete UI/calculation acceptance of every module |
@@ -123,7 +123,7 @@ warning must not be removed just because a trial balance balances.
 | STEP12-INV-002 | Medium | CLOSED:483unit/API/build, exact57aa5c7/9cfa3c3a SUCCESS; same21detail/listzero outstanding/AR exclusion/original total retained PASS |
 | STEP12-SOURCE-UI-001 | High implementation gap | CLOSED at6dc7df1/Railway824c31ee SUCCESS:490units/7HTTP/3realDB/build and real15/16 selected transfer submission/return/correction/independentpost/retry/role/mobile/exactlookup accepted |
 | STEP12-PRINT-001 | Low layout | Original8page and later15page GL PDFs split context/table. a1158b4/Railway3e5942f1 SUCCESS, but later files not proven from known fresh tab; caching not confirmed. Follow-up singlecontext inside repeatingthead515182b/Railway13083454 SUCCESS/3durablechecks/fullbuild/fresh28DOMheaders PASS. Await actual corrected native PDF, not CLOSED. Owner confirmed no IAB print window; separate direct Download PDF does not prove this native-print route |
-| ACCT-PDF-001 | Approved read-only export | 15Oct17:40WAT: direct GL/TB/BS/Management/Affairs PDF locally implemented using applied authorised snapshots/existing libraries;8newtests/3printcontracts/490API PASS; five generated fixtures inspected. Final build, exact release and actual live downloads pending; not a replacement for native PRINT001 acceptance |
+| ACCT-PDF-001 | Approved read-only export | CLOSED15Oct17:56WAT: direct GL/TB/BS/Management/Affairs current authorised snapshot exports;8newtests/3printcontracts/490API/fullbuild PASS. f72262e/Railway1fabec5e SUCCESS/healthok; five actual IABdownloads/51pages reconcile, no finance writes. Branch-change hides old valuation button. Not a replacement for native PRINT001 acceptance |
 
 ## Exact Continuation and Launch Gates
 
@@ -191,3 +191,18 @@ precedence over older interim milestones.
 Invoices and Duty/Shipping/Terminal VAT recognition retain the existing configured
 tax review controls above this new section. Native trial balance equality does
 not certify historical source completeness or actual company launch readiness.
+
+### Download Accounting PDFs
+
+1. Open General Ledger, Trial Balance, Balance Sheet or Management Accounts.
+   Choose the authorised book/branch and dates, then Apply Filters. Confirm the
+   applied report header before exporting; unapplied field edits are not a report.
+2. Click Download PDF. The current snapshot downloads directly without a print
+   window. Wait for Preparing PDF to finish; an error is shown if preparation
+   fails. Changing the authorised scope while loading cancels an obsolete export.
+3. For Statement of Affairs, select its book/branch and Inspect the existing
+   retained valuation first. Download PDF preserves that version, decision, audit
+   and unknown-value limitations; it does not prepare a replacement or post money.
+4. Retain the scope/date/policy/source-coverage warnings with the file. CSV and
+   browser Print remain separate options. Equality or successful download is not
+   certification of complete company records or statutory reporting compliance.
