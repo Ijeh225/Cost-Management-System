@@ -1,6 +1,6 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-14 19:39 WAT. Status: controlled source-review gap CLOSED; broader launch/print gates remain, not staff-launch approval.
+Updated: 2026-10-15 13:22 WAT. Status: all seven confirmed defects/gap CLOSED; current output/posted-selection checks extended. Native print/PDF blocked pending actual saved output; broader coverage/launch gates remain, not staff-launch approval.
 
 ## Scope and Protection
 
@@ -33,10 +33,12 @@ wipe the live app or restore the old archive over later test postings.
 | Approval and tasks | Review4 rejection visible immediately in API, assigned correction task5, resubmit/approve/lock; task4 completed | Immediate browser rejection refresh not newly observed |
 | Documents and AI | Text versions12/13 retained/indexed/download bytes match; foreign retrieval404; explicit content query44 routes to document_search, exact vendor reader returns14 only | Not a new scan/PDF/OCR accuracy benchmark or every AI query |
 | Native reports | GL/TB/BS/management API controls; actual staff GL drill-down, BS equation, management/UI and 390px TB accepted | Legacy operational reports have different dates/populations/bases |
-| Outputs | Actual final management CSV15300bytes, scope/warnings/profit230.50/cash10177.50 verified; prior14551byte snapshot retained; screenshot/mobile evidence retained | Live native print layout/PDF not verified |
+| Outputs | Actual current management CSV15438bytes on2026-10-15 includes native35/36 once/net0; scope/warnings/profit230.50/cash10177.50 verified. Prior15300/14551byte snapshots and screenshot/mobile evidence retained | Live native print layout/PDF not verified; native preview inaccessible to browser tools; owner acknowledged Save as PDF request, output awaited |
 | Period restrictions | Empty future November period2 close/reopen audit, missing review and branch-only close refused, closed-date journal refused | Deployed-engine test; no false closure/certification of October |
 | Selected staff source review | Real preparer15/reviewer16 selected two new dummy own transfers3/4; preview/draft/submit/return1/correct3/post2and3(native35/36), retained correction history and same-record public retries, actual role403, mobile390px and exact lookup accepted | New live write UI case is own-bank transfer; other source adapters retain prior service/isolation acceptance, not an assertion of fresh UI writes for all eleven families |
 | Supporting modules | 29 live module/data endpoints returned200 with role negatives accepted | Availability is not complete UI/calculation acceptance of every module |
+| Posted generic selections | Eleven real UI selections across ten families on2026-10-15 resolve original journals/read-only; includes cash receipt20 and noncash allocation21. Old credit allocation17 inspected only | Selection/no-duplicate UI acceptance, not fresh submission/posting for all families; no historical mappings guessed |
+| Normal-suite network skips | Three document concurrency checks are intentionally skipped without CAP02_NETWORK_TEST; separately passed on Railway in the2026-10-05six-case run, current condition/evidence reviewed | Not outstanding Step12 accounting tests; no fresh concurrency run claimed today |
 
 ## Current Financial Proof
 
@@ -60,7 +62,7 @@ offsetting tiny cancellation control:
 | AR / AP / unapplied deposits | 0.00 / 0.00 / 0.00 |
 | Assets = capital10000 + profit230.50 | 10,230.50 |
 | Balance-sheet and profit-to-cash bridge differences | 0.00 |
-| Historical period debits = credits before native35/36 | 13,322.82 |
+| Current period debits = credits after native35/36, live UI2026-10-15 | 13,322.84 |
 
 An independent deployed-source review matched all28 account controls before the
 additional offsetting penny control, with no new missing/draft/stale sources.
@@ -69,6 +71,9 @@ confirmed by final source revalidation with all28 controls and32posted sources.
 After the selected source-review acceptance, two opposite own-bank postings35/36
 bring source coverage to34posted; all28 closing controls, profit/cash and bank5/6
 still match exactly. There are no pending draft/submitted reviews from this test.
+The2026-10-15read-only UI/CSV check confirms unchanged profit/cash and current
+period debits/credits13322.84; the prior13322.82 snapshot precedes35/36. Today
+did not rerun independent full-source reconciliation or mutate postings.
 Historical
 31pre-cutover and3unclassified fixtures remain disclosed. Read-only report
 views do not persist that independent control checklist. Their completeness

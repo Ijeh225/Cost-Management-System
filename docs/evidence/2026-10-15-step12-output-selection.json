@@ -1,0 +1,44 @@
+{
+  "verifiedAt": "2026-10-15T13:22:00+01:00",
+  "scope": "Existing TEST ONLY book1 / branch2, through2026-10-14; real Owner browser read-only checks",
+  "liveWrites": false,
+  "currentManagementUi": {
+    "periodDebit": "13322.84", "periodCredit": "13322.84", "closingDifference": "0.00",
+    "income": "900.00", "expense": "669.50", "profit": "230.50", "cash": "10177.50",
+    "balanceSheetDifference": "0.00", "profitBridgeDifference": "0.00"
+  },
+  "actualCsv": {
+    "filename": "management-accounts_1_2026-10-14_2026-10-14 (2).csv",
+    "bytes": 15438,
+    "sha256": "d700b4d36b49a81d3e0e6db37cb17fb8840119fd298ac08204b96ae34b1a25cd",
+    "snapshotGeneratedAt": "2026-10-15T12:16:29.567Z",
+    "parsedTotalsMatch": true,
+    "finalTransfers35and36EachOnceAndNetZero": true,
+    "completenessAndCashClassificationWarningsRetained": true,
+    "limitation": "CSV is not native PDF/print layout or fully classified statutory cash flow"
+  },
+  "postedUiSelections": [
+    {"family":"client_deposit","sourceId":5,"journalId":6,"readOnly":true},
+    {"family":"invoice_payment","sourceId":20,"journalId":5,"readOnly":true},
+    {"family":"invoice_payment","sourceId":21,"journalId":7,"readOnly":true},
+    {"family":"credit_note","sourceId":3,"journalId":18,"readOnly":true},
+    {"family":"invoice_writeoff","sourceId":14,"journalId":19,"readOnly":true},
+    {"family":"overhead","sourceId":11,"journalId":13,"readOnly":true},
+    {"family":"overhead_topup","sourceId":5,"journalId":25,"readOnly":true},
+    {"family":"expense_payment","sourceId":12,"journalId":26,"readOnly":true},
+    {"family":"schedule_payment","sourceId":10,"journalId":17,"readOnly":true},
+    {"family":"bank_funding","sourceId":3,"journalId":3,"readOnly":true},
+    {"family":"bank_transfer","sourceId":3,"journalId":36,"readOnly":true}
+  ],
+  "oldCreditApplication17": "Selectable pre-cutover record only; no mappings, preview, draft or journal created",
+  "normalSuiteSkips": "Three CAP02 network-only document races; separately accepted in2026-10-05six-case Railway run, not rerun today",
+  "nativePrint": {
+    "status":"BLOCKED_AWAITING_ACTUAL_PDF",
+    "actualPrintButtonAttempted":true,
+    "nativePreviewAccessibleToTools":false,
+    "ownerAcknowledgedPdfRequest":true,
+    "pdfReceived":false,
+    "noLayoutPassClaimed":true
+  },
+  "boundary":"No new per-family submit/post, browser rejection-refresh, broad role/scenario acceptance or actual company launch certification claimed"
+}
