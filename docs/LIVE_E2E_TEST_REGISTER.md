@@ -1,5 +1,10 @@
 # Live End-to-End Test Register
 
+## 2026-10-15 14:09 WAT - Exact robust print release SUCCESS; output-only handoff
+-515182b11fc1daf42289dc51695908da54733377/Railway13083454-1dd9-4564-8ef7-30ca352c4a01 SUCCESS; healthok. FreshGLsnapshot13:08:34.971Z has28/28accountcontext rows inthead/colspan6 plus actual deployed header break-insideavoid rule. Actual live DrCr13322.84unchanged. STEP12-PRINT-001 deployed/awaiting nativePDF, not CLOSED by DOM.
+- PASS retained approvedAffairs1 UI and1903byte actual CSV: assets100.01-liabilities20=net80.01; unknown bookvalue blank,4warnings/2originalaudit events/version1approved retained. No new valuation/journal/source/grant/flag. Existing old-tab extension blockage recovered via fresh samebrowser tab, no security changes.
+- Batched owner handoff asks only native SaveasPDF: ledger final.pdf from preparedfresh14:08WATGL/Oct14only, management14.pdf from fresh14:08WATwholebook/Oct14only, affairs.pdf from approved1. User not asked for new figures or another financial test. Await actual files; inspect metadata/scope/pages before closure. TB/BS/ManagementOct15carry-forward acceptance remains bounded; fullcompany launch/coverage limits unchanged.
+
 ## 2026-10-15 13:59 WAT - Saved report PDF results; GL pagination still open
 - PASS actual native TB4pages/BS4pages: whole TEST ONLY book1/Oct15carry-forward. All pages text/render/visual checked; TB28unique rows/OpeningDr=Cr10900/Period0/ClosingDr=Cr10900; BSassets=equity10230.50/liabilities0/equation0/yearprofit230.50. Warnings/scope/columns retained. Not Oct14period acceptance.
 - PASS actual Management8page output content/layout for Oct15empty day only: periodzero/cash10177.50/yearprofit230.50/BS10230.50. Nonzero Oct14pack still not saved/verified. No new writes or tests fabricated from done replies.
