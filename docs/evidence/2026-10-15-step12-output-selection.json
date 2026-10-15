@@ -33,12 +33,26 @@
   "oldCreditApplication17": "Selectable pre-cutover record only; no mappings, preview, draft or journal created",
   "normalSuiteSkips": "Three CAP02 network-only document races; separately accepted in2026-10-05six-case Railway run, not rerun today",
   "nativePrint": {
-    "status":"BLOCKED_AWAITING_ACTUAL_PDF",
+    "status":"ACTUAL_GL_PDF_REVIEWED_LOW_PAGINATION_FIX_AWAITING_RELEASE_REPRINT",
     "actualPrintButtonAttempted":true,
     "nativePreviewAccessibleToTools":false,
     "ownerAcknowledgedPdfRequest":true,
-    "pdfReceived":false,
-    "noLayoutPassClaimed":true
+    "pdfReceived":true,
+    "pdfFoundLocallyAfterAcknowledgement":true,
+    "bytes":427108,
+    "sha256":"42ce0a3a37db7b8b31347482e5ba27e9aee29be99a1fb0315b8c2ece1e501cc6",
+    "pages":8,
+    "scope":"Whole book1/all accounts/zero+inactive/2026-10-15 only; not original Oct14branch2account9 handoff",
+    "all28AccountsOnce":true,
+    "all8PagesRenderedAndVisuallyInspected":true,
+    "columnsAndClosingCarryForwardFiguresRetained":true,
+    "warningsRetainedAndAppShellExcluded":true,
+    "finding":"Low STEP12-PRINT-001: account heading/opening paragraph detached from table at page break",
+    "correction":"Print-only paragraph break-after:avoid and table wrapper break-before:avoid",
+    "localVerification":"Frontend typecheck,4parsed print-only CSS contracts,fullrailway:build PASS",
+    "nativeReprintAfterCorrection":false,
+    "otherReportPdfsAccepted":false,
+    "noBlanketLayoutPassClaimed":true
   },
   "boundary":"No new per-family submit/post, browser rejection-refresh, broad role/scenario acceptance or actual company launch certification claimed"
 }

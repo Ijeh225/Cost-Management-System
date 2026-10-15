@@ -1,6 +1,6 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-15 13:22 WAT. Status: all seven confirmed defects/gap CLOSED; current output/posted-selection checks extended. Native print/PDF blocked pending actual saved output; broader coverage/launch gates remain, not staff-launch approval.
+Updated: 2026-10-15 13:29 WAT. Status: original seven confirmed defects/gap CLOSED; current output/posted-selection checks extended. Actual8page GL PDF inspected; new Low pagination correction verified locally, deployment/native reprint pending. Broader output/coverage/launch gates remain, not staff-launch approval.
 
 ## Scope and Protection
 
@@ -33,7 +33,7 @@ wipe the live app or restore the old archive over later test postings.
 | Approval and tasks | Review4 rejection visible immediately in API, assigned correction task5, resubmit/approve/lock; task4 completed | Immediate browser rejection refresh not newly observed |
 | Documents and AI | Text versions12/13 retained/indexed/download bytes match; foreign retrieval404; explicit content query44 routes to document_search, exact vendor reader returns14 only | Not a new scan/PDF/OCR accuracy benchmark or every AI query |
 | Native reports | GL/TB/BS/management API controls; actual staff GL drill-down, BS equation, management/UI and 390px TB accepted | Legacy operational reports have different dates/populations/bases |
-| Outputs | Actual current management CSV15438bytes on2026-10-15 includes native35/36 once/net0; scope/warnings/profit230.50/cash10177.50 verified. Prior15300/14551byte snapshots and screenshot/mobile evidence retained | Live native print layout/PDF not verified; native preview inaccessible to browser tools; owner acknowledged Save as PDF request, output awaited |
+| Outputs | Actual current management CSV15438bytes on2026-10-15 includes native35/36 once/net0; scope/warnings/profit230.50/cash10177.50 verified. Actual user-saved8page GL PDF427108bytes inspected fully; all28accounts/carry-forward figures/warnings retained, no clipped columns | GL PDF is Oct15wholebook/allaccounts/zero+inactive, no dated transaction rows. Low STEP12-PRINT-001 heading/table pagination correction awaits release/native reprint; other report PDFs not accepted. Prior snapshots retained |
 | Period restrictions | Empty future November period2 close/reopen audit, missing review and branch-only close refused, closed-date journal refused | Deployed-engine test; no false closure/certification of October |
 | Selected staff source review | Real preparer15/reviewer16 selected two new dummy own transfers3/4; preview/draft/submit/return1/correct3/post2and3(native35/36), retained correction history and same-record public retries, actual role403, mobile390px and exact lookup accepted | New live write UI case is own-bank transfer; other source adapters retain prior service/isolation acceptance, not an assertion of fresh UI writes for all eleven families |
 | Supporting modules | 29 live module/data endpoints returned200 with role negatives accepted | Availability is not complete UI/calculation acceptance of every module |
@@ -122,6 +122,7 @@ warning must not be removed just because a trial balance balances.
 | STEP12-INV-001 | High | CLOSED: isolated/race tests, exact5dc9974/85a0e30d SUCCESS; truly unpaid20/native33 and retained18refusal PASS |
 | STEP12-INV-002 | Medium | CLOSED:483unit/API/build, exact57aa5c7/9cfa3c3a SUCCESS; same21detail/listzero outstanding/AR exclusion/original total retained PASS |
 | STEP12-SOURCE-UI-001 | High implementation gap | CLOSED at6dc7df1/Railway824c31ee SUCCESS:490units/7HTTP/3realDB/build and real15/16 selected transfer submission/return/correction/independentpost/retry/role/mobile/exactlookup accepted |
+| STEP12-PRINT-001 | Low layout | Actual Chrome8page GL print keeps title/opening paragraph at page end but table on next page. Narrow print-only break-chain correction passes types/4parsed contracts/fullbuild; deployment/native reprint pending, not CLOSED |
 
 ## Exact Continuation and Launch Gates
 

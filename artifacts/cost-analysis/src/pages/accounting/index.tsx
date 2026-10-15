@@ -86,12 +86,13 @@ function AccountingPage({kind,userId,activeBranchId}:{kind:AccountingReport["kin
       #native-accounting-report { position:static; width:100%; border:0; padding:0; background:white; color:black; }
       #native-accounting-report * { color:black!important; background:transparent!important; box-shadow:none!important; }
       #native-accounting-report .no-print { display:none!important; }
-      #native-accounting-report .report-table { overflow:visible; }
+      #native-accounting-report .report-table { overflow:visible; break-before:avoid; }
       #native-accounting-report table { min-width:0!important; font-size:9px; }
       #native-accounting-report thead { display:table-header-group; }
       #native-accounting-report tr { break-inside:avoid; }
       #native-accounting-report .grid { break-inside:avoid; }
       #native-accounting-report h3, #native-accounting-report caption { break-after:avoid; }
+      #native-accounting-report section > p { break-after:avoid; }
     }`}</style>
     <header className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="flex items-center gap-2 text-2xl font-bold"><BookOpen className="h-6 w-6 text-primary"/>{reportTitle(kind)}</h1><p className="mt-1 text-sm text-muted-foreground">Read-only posted native accounting. Existing Financial Ledger and operational dashboards remain separate.</p></div><nav aria-label="Accounting reports" className="flex flex-wrap gap-3 text-sm">{(["general-ledger","trial-balance","balance-sheet","management-accounts"] as const).map(k=><Link key={k} className="text-primary underline" href={`/accounting/${k}`}>{reportTitle(k)}</Link>)}</nav></header>
     {catalog.isLoading ? <Status>Checking accounting availability and authorised books...</Status> : catalog.error ? <ErrorMessage error={catalog.error}/> : catalog.data?.status==="inactive" ? <Status><ShieldCheck className="mb-2 h-6 w-6 text-primary"/><strong>Official Accounting Is Inactive</strong><p className="mt-2">{catalog.data.message}</p><p className="mt-2">These screens are ready for approved native books. They do not guess balances from cash reports or create accounting entries.</p></Status> : <>

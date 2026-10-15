@@ -1,5 +1,7 @@
 # Session Summaries
 
+- Latest 2026-10-15 13:29 WAT: [Actual PDF inspected; print-only correction ready](2026-10-15-step12-status.md). User-saved8page GL PDF found/full-content/all-page visual checks accepted; new Low STEP12-PRINT-001 orphan account headings/table pagination found and narrow print-only fix locally verified (types/4CSScontracts/fullbuild). Exact release/new native PDF still required; earlier no-file blocker superseded. Original seven fixes stay CLOSED, no financial writes.
+
 - Latest 2026-10-15 13:22 WAT: [Pending Step12 checks resumed](2026-10-15-step12-status.md). Current management UI/15438byte CSV accepted, Dr=Cr13322.84/profit230.50/cash10177.50. Eleven posted selections across ten source families read-only, no duplicate preparation/writes; three normal-suite network skips already separately passed in prior CAP02 run. Native print/PDF still blocked pending owner's actual PDF; acknowledged ok, no file yet. Actual company launch requirements/coverage limits retained.
 
 - Latest 2026-10-15 12:04 WAT: [Step12 deployment and completion status](2026-10-15-step12-status.md). Latest e60adcc / Railway da710d6a SUCCESS and public health=ok verified. All seven confirmed defects/gap CLOSED; native print/PDF verification and explicit coverage limits remain, with actual company launch prerequisites separate. Read-only check, no repeated financial records or flag changes. Older entries below are historical.
