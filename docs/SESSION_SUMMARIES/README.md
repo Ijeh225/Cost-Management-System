@@ -1,5 +1,15 @@
 # Session Summaries
 
+- Latest 2026-10-15 17:40 WAT: [Direct accounting PDF implementation/local acceptance](2026-10-15-step12-status.md). Owner approved; reused installed exporter for five applied snapshots, no finance writes/duplicate backend.8new+3existing contracts/490API/fullbuild PASS, five actual fixture PDFs content/layout inspected. Release/live IAB downloads pending; native PRINT001 remains distinct and OPEN. Exact continuation retainedbook1/Oct14/Affairs1, no replacement fixtures.
+
+- Latest 2026-10-15 17:10 WAT: [No print window; direct PDF proposal only](2026-10-15-step12-status.md). Owner confirms no IAB window; retained GL readable/logs empty, no PDF or repeated print. Source has CSV/browser print, no direct PDF. Download PDF proposed pending approval, not implemented; separate export would not prove native print pagination. Original fixes closed/PRINT001 awaiting proof; notes local/uncommitted.
+
+- Latest 2026-10-15 17:07 WAT: [IAB restored and actual print attempt](2026-10-15-step12-status.md). User-selected in-appbrowser works: Ownerlogin/retainedGLbook1Oct14/28theadcontextsPASS. Newtab2visible/handoff; existingRailwayuntouched. PrintSnapshotattempttimesout,nativewindow/fileunobserved; askwhetherSavewindowappeared. No financialwrites; correctedGL/nonzeroManagement/AffairsPDFpending; noteslocal/uncommitted.
+
+- Latest 2026-10-15 16:57 WAT: [Reconnection acknowledged; tool policy still unavailable](2026-10-15-step12-status.md). Inventory retry and fresh CUA reset still cannot load browser policy before app access; no newPDF/print/data changes. Do not keep asking owner to reconnect or invent an app bug. Resume from actual three outputs when browser works/files arrive; local notes uncommitted, previous releases retained.
+
+- Latest 2026-10-15 16:51 WAT: [Output continuation needs Chrome reconnect](2026-10-15-step12-status.md).183a480/Railwayf91aef28 SUCCESS confirmed; no newer PDF than13:51. Previous Chrome session unavailable/new connection no accessible tabs; print never clicked/no app writes. Owner reconnect required, then resume retained three output checks; PRINT001 not CLOSED. New notes local/uncommitted.
+
 - Latest 2026-10-15 14:09 WAT: [Robust print release and exact output handoff](2026-10-15-step12-status.md).515182b/Railway13083454 SUCCESS/healthok; freshGL28theadcontexts/DrCr13322.84PASS, nativepaginationnotclosed. ApprovedAffairs1UI/CSV80.01netPASS, no replacement. Await three nativePDFs frompreparedGL/Oct14Management/Affairs; user-onlySavecontrols, no financialwrites.
 
 - Latest 2026-10-15 13:59 WAT: [Actual PDF results and robust GL table header](2026-10-15-step12-status.md). Native TB/BS/Management carry-forward PDFs accepted for actualOct15scope; nonzeroManagement still pending. Latest15page day14GL amounts28accounts/DrCr13322.84PASS but orphan context persists; not false CLOSED/caching claim. Accountcontext moved into repeatingthead;3durable checks/fullbuildPASS. Publish/deploy/native output next; no financial writes.

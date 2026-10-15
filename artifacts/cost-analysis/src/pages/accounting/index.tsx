@@ -8,6 +8,7 @@ import { useBranchScope } from "@/components/layout/branch-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from "@/components/ui/dialog";
 import { StatementSnapshot } from "./statements";
+import { PdfDownloadButton } from "./pdf-download";
 
 const reportTitle=(kind:AccountingReport["kind"])=>({"general-ledger":"General Ledger","trial-balance":"Trial Balance","balance-sheet":"Balance Sheet","management-accounts":"Management Accounts"})[kind];
 
@@ -114,7 +115,7 @@ function AccountingPage({kind,userId,activeBranchId}:{kind:AccountingReport["kin
       </form>
       {options.isLoading && bookId && <Status>Loading authorised chart and periods...</Status>}{options.error && <ErrorMessage error={options.error}/>}
       {report.isLoading && applied && <Status>Reading posted journals and checking source coverage...</Status>}{report.error && applied && <ErrorMessage error={report.error}/>}
-      {snapshot && <><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={report.isFetching} onClick={()=>report.refetch()}><RefreshCw className="mr-2 h-4 w-4"/>Refresh</Button><Button variant="outline" onClick={download}><Download className="mr-2 h-4 w-4"/>Export Snapshot CSV</Button><Button variant="outline" onClick={()=>window.print()}><Printer className="mr-2 h-4 w-4"/>Print Snapshot</Button>{report.isFetching && <span role="status" className="self-center text-sm">Refreshing this scope; current snapshot stays visible...</span>}</div><ReportSnapshot report={snapshot} onJournal={setJournalId}/></>}
+      {snapshot && <><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={report.isFetching} onClick={()=>report.refetch()}><RefreshCw className="mr-2 h-4 w-4"/>Refresh</Button><Button variant="outline" onClick={download}><Download className="mr-2 h-4 w-4"/>Export Snapshot CSV</Button><PdfDownloadButton source={snapshot} disabled={report.isFetching || !!report.error}/><Button variant="outline" onClick={()=>window.print()}><Printer className="mr-2 h-4 w-4"/>Print Snapshot</Button>{report.isFetching && <span role="status" className="self-center text-sm">Refreshing this scope; current snapshot stays visible...</span>}</div><ReportSnapshot report={snapshot} onJournal={setJournalId}/></>}
     </>}
     <JournalDetails scope={scope} id={journalId} onClose={()=>setJournalId(null)}/>
   </div>;

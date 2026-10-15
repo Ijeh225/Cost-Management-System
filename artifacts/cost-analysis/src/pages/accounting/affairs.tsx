@@ -5,6 +5,7 @@ import { useAccountingCatalog,useAffairsWorkspace,useAffairsVersion,useAffairsCo
 import { useAuth } from "@/components/layout/auth-provider";
 import { useBranchScope } from "@/components/layout/branch-provider";
 import { Button } from "@/components/ui/button";
+import { PdfDownloadButton } from "./pdf-download";
 const field="w-full min-w-0 rounded-lg border bg-background px-3 py-2 text-sm";
 const fresh=():AffairsRequest=>({requestId:crypto.randomUUID(),asOf:"",title:"",scopeEvidence:"",limitations:"",lines:[]});
 const line=():AffairsLine=>({key:crypto.randomUUID(),category:"asset",name:"",value:"",bookValue:null,basis:"estimate",basisExplanation:"",evidence:""});
@@ -54,7 +55,7 @@ function Workspace({scope,userId}:{scope:AccountingScope;userId:number}) {
       <section className="rounded-xl border p-4"><h2 className="font-semibold">Retained Valuation Versions</h2>{data.truncated&&<p>Latest 200 versions shown; older IDs remain retrievable.</p>}{data.versions.map(v=><div className="flex flex-wrap items-center justify-between gap-2 border-t py-3 text-sm" key={v.id}><p>#{v.id} {v.title} | {v.asOf} | <strong>{v.state}</strong>{v.superseded?" - historical / superseded":""}</p><Button variant="outline" onClick={()=>{setSelected(v.id);setReason("");command.reset();}}>Inspect Valuation #{v.id}</Button></div>)}{!data.versions.length&&<p className="text-sm">No valuation entered. This does not mean assets or liabilities are zero.</p>}</section>
     </>}
     {detail.isLoading&&<Notice>Loading retained evidence...</Notice>}{detail.error&&<Notice error>{failure(detail.error)}</Notice>}
-    {entry&&!detail.error&&<div className="flex flex-wrap gap-2"><Button variant="outline" disabled={detail.isFetching||busy} onClick={download}>Export Valuation CSV</Button><Button variant="outline" disabled={detail.isFetching||busy} onClick={()=>window.print()}>Print Valuation</Button></div>}
+    {entry&&!detail.error&&<div className="flex flex-wrap gap-2"><Button variant="outline" disabled={detail.isFetching||busy} onClick={download}>Export Valuation CSV</Button><PdfDownloadButton source={entry} disabled={detail.isFetching||busy}/><Button variant="outline" disabled={detail.isFetching||busy} onClick={()=>window.print()}>Print Valuation</Button></div>}
     </div>
     {entry&&!detail.error&&<><Snapshot entry={entry}/><div className="print:hidden space-y-3">
       {entry.state==="pending"&&<><label className="block">Decision reason / review evidence<textarea className={field} maxLength={2000} value={reason} onChange={e=>setReason(e.target.value)}/></label><div className="flex flex-wrap gap-2">

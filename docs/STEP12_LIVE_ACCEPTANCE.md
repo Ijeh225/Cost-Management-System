@@ -122,7 +122,8 @@ warning must not be removed just because a trial balance balances.
 | STEP12-INV-001 | High | CLOSED: isolated/race tests, exact5dc9974/85a0e30d SUCCESS; truly unpaid20/native33 and retained18refusal PASS |
 | STEP12-INV-002 | Medium | CLOSED:483unit/API/build, exact57aa5c7/9cfa3c3a SUCCESS; same21detail/listzero outstanding/AR exclusion/original total retained PASS |
 | STEP12-SOURCE-UI-001 | High implementation gap | CLOSED at6dc7df1/Railway824c31ee SUCCESS:490units/7HTTP/3realDB/build and real15/16 selected transfer submission/return/correction/independentpost/retry/role/mobile/exactlookup accepted |
-| STEP12-PRINT-001 | Low layout | Original8page and later15page GL PDFs split context/table. a1158b4/Railway3e5942f1 SUCCESS, but later files not proven from known fresh tab; caching not confirmed. Follow-up singlecontext inside repeatingthead515182b/Railway13083454 SUCCESS/3durablechecks/fullbuild/fresh28DOMheaders PASS. Await actual corrected native PDF from14:08WATpreparedtab, not CLOSED |
+| STEP12-PRINT-001 | Low layout | Original8page and later15page GL PDFs split context/table. a1158b4/Railway3e5942f1 SUCCESS, but later files not proven from known fresh tab; caching not confirmed. Follow-up singlecontext inside repeatingthead515182b/Railway13083454 SUCCESS/3durablechecks/fullbuild/fresh28DOMheaders PASS. Await actual corrected native PDF, not CLOSED. Owner confirmed no IAB print window; separate direct Download PDF does not prove this native-print route |
+| ACCT-PDF-001 | Approved read-only export | 15Oct17:40WAT: direct GL/TB/BS/Management/Affairs PDF locally implemented using applied authorised snapshots/existing libraries;8newtests/3printcontracts/490API PASS; five generated fixtures inspected. Final build, exact release and actual live downloads pending; not a replacement for native PRINT001 acceptance |
 
 ## Exact Continuation and Launch Gates
 

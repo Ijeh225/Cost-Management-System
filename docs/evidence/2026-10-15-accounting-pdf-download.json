@@ -1,0 +1,31 @@
+{
+  "updatedAt": "2026-10-15T17:40:00+01:00",
+  "feature": "ACCT-PDF-001",
+  "status": "implemented_locally_release_and_live_acceptance_pending",
+  "approval": "Owner requested Download PDF implementation, duplicate review, testing, three continuity records, commit, push and deploy.",
+  "reports": ["general-ledger", "trial-balance", "balance-sheet", "management-accounts", "statement-of-affairs"],
+  "implementation": {
+    "librariesReused": ["jspdf 4.2.1", "jspdf-autotable 5.0.7"],
+    "source": "Existing authorised applied report or retained valuation object; no new API request or finance calculation",
+    "precision": "Original decimal strings through existing formatAccountingMoney; no floating-point recalc",
+    "scopeControls": ["lazy import", "busy and disabled state", "visible error", "current-snapshot identity", "unmount cancellation", "refresh/error disabled"],
+    "layout": ["A4 landscape reports / portrait Affairs", "repeated report identity and page count", "table context and columns in repeated head", "avoid orphan whole tables/rows"],
+    "preserved": ["CSV", "browser Print", "applied filters", "policy/cutover", "source coverage/exceptions", "truncation/completeness warnings", "valuation state/history/audit", "unknown amounts distinct from zero"],
+    "productionWrites": [],
+    "dependenciesAdded": []
+  },
+  "localVerification": {
+    "exportTests": { "passed": 8, "command": "node --test scripts/accounting-pdf-export.test.mjs" },
+    "nativePrintContractTests": { "passed": 3, "command": "node --test scripts/accounting-print-contract.test.mjs" },
+    "apiSuite": { "filesPassed": 62, "testsPassed": 490, "existingNetworkSkips": 3 },
+    "finalRailwayBuild": "PASS including all workspace typechecks, frontend and server production builds",
+    "generatedFixturePages": { "general-ledger": 11, "trial-balance": 3, "balance-sheet": 3, "management-accounts": 11, "statement-of-affairs": 2 },
+    "independentPdfChecks": ["all model fields and amounts retained", "all warnings/context retained", "correct page counters", "all nonempty glyphs inside page margins", "no annotations or external active OpenAction"],
+    "visualChecks": "Representative GL/TB/BS/Management pages and both Affairs pages; not every page individually",
+    "correctedLocalFindings": ["Named library imports required for actual Node renderer", "Source Exceptions table heading orphan caught visually; pageBreak avoid and repeated headers added"],
+    "warnings": ["Existing sourcemap/chunk build warnings", "Poppler Symbol/ArialUnicode display-font warnings; inspected Helvetica text legible"]
+  },
+  "release": null,
+  "liveDownloads": [],
+  "boundaries": ["Generated local fixtures are not live downloads", "Native browser print issue STEP12-PRINT-001 remains OPEN awaiting actual corrected native output", "No universal Unicode, maximum-volume or statutory/company source-completeness certification", "Retained TEST ONLY accounting remains unchanged; actual company launch gates separate"]
+}
