@@ -1,5 +1,5 @@
 {
-  "verifiedAt": "2026-10-15T13:22:00+01:00",
+  "verifiedAt": "2026-10-15T13:59:00+01:00",
   "scope": "Existing TEST ONLY book1 / branch2, through2026-10-14; real Owner browser read-only checks",
   "liveWrites": false,
   "currentManagementUi": {
@@ -33,7 +33,7 @@
   "oldCreditApplication17": "Selectable pre-cutover record only; no mappings, preview, draft or journal created",
   "normalSuiteSkips": "Three CAP02 network-only document races; separately accepted in2026-10-05six-case Railway run, not rerun today",
   "nativePrint": {
-    "status":"ACTUAL_GL_PDF_REVIEWED_LOW_PAGINATION_FIX_AWAITING_RELEASE_REPRINT",
+    "status":"ACTUAL_REPORT_PDFS_REVIEWED_ROBUST_GL_HEADER_FOLLOWUP_AWAITING_RELEASE_AND_OUTPUT",
     "actualPrintButtonAttempted":true,
     "nativePreviewAccessibleToTools":false,
     "ownerAcknowledgedPdfRequest":true,
@@ -48,11 +48,22 @@
     "columnsAndClosingCarryForwardFiguresRetained":true,
     "warningsRetainedAndAppShellExcluded":true,
     "finding":"Low STEP12-PRINT-001: account heading/opening paragraph detached from table at page break",
-    "correction":"Print-only paragraph break-after:avoid and table wrapper break-before:avoid",
-    "localVerification":"Frontend typecheck,4parsed print-only CSS contracts,fullrailway:build PASS",
+    "correction":"Follow-up: single account code/name/category/opening/closing row inside actual repeating thead; break-inside:avoid on thead",
+    "localVerification":"Three durable AST/PostCSS checks and fullrailway:build/typechecks PASS; not native pagination proof",
+    "deployedCommit":"a1158b4241c0a28ccc46cf79d2c2c89ad8db3bcc",
+    "deploymentId":"3e5942f1-8ffc-4ee8-b259-088f9c2464b3",
+    "deploymentStatus":"SUCCESS",
+    "freshLivePrintRulesObserved":true,
     "nativeReprintAfterCorrection":false,
-    "otherReportPdfsAccepted":false,
+    "otherReportPdfsAccepted":"TB/BS/Management carry-forward Oct15 scopes only; nonzero Oct14 Management and Affairs pending",
     "noBlanketLayoutPassClaimed":true
   },
+  "laterActualPdfs": [
+    {"filename":"trial bal.pdf","bytes":368305,"sha256":"494364c4b862ad97cfaebe32ff04103ce5f722fff7657baee06c945182db8fc3","pages":4,"scope":"Whole book1/2026-10-15 only","allPagesVisuallyReviewed":true,"result":"28unique rows; opening and closing Dr=Cr10900; period0/0; layout PASS for actual scope"},
+    {"filename":"balance sheet.pdf","bytes":344909,"sha256":"d94573b7af97bc4d97aa024d7a65b6252bcbf239d89ff2b9016d003e18b2c82c","pages":4,"scope":"Whole book1/2026-10-15 only","allPagesVisuallyReviewed":true,"result":"Assets=equity10230.50; liabilities0; equation0; yearprofit230.50; layout PASS"},
+    {"filename":"managememt account.pdf","bytes":456351,"sha256":"ca5101360f349f75184046239f897fe4b06fec959c81e21dc29733a3ccd51e2b","pages":8,"scope":"Whole book1/2026-10-15 only","allPagesVisuallyReviewed":true,"result":"Empty-day period0; cash10177.50/yearprofit230.50/BS10230.50; layout PASS, not nonzero14Octpack"},
+    {"filename":"general ledger day 14.pdf","bytes":721350,"sha256":"3d13f07ea7dfd23fcbc7d478b860ab1b902876f9045de0057fec4a6ae32c8503","pages":15,"scope":"Whole book1/2026-10-14 through2026-10-15","allPagesVisuallyReviewed":false,"result":"Content totals13322.84 each side; page1/4 retain orphan headings; known fresh handoff identity not confirmed"},
+    {"filename":"day 14.pdf","bytes":720715,"sha256":"447db846ab2b2a756c74d88bd21b29f0ab2c6ff9bbbde490669b8d996e74d83c","pages":15,"scope":"Whole book1/2026-10-14 only","snapshot":"2026-10-15T12:51:25.557Z","allPagesExtracted":true,"allPagesVisuallyReviewed":false,"result":"28unique accounts; parsed deduplicated footer debit=credit13322.84; first page still orphans1010; not CLOSED; different from handoff12:49:27/range14-15"}
+  ],
   "boundary":"No new per-family submit/post, browser rejection-refresh, broad role/scenario acceptance or actual company launch certification claimed"
 }

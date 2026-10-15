@@ -44,10 +44,14 @@ function ReportSnapshot({report,onJournal}:{report:AccountingReport;onJournal:(i
         <thead><tr>{["Account","Category","Opening Dr","Opening Cr","Period Dr","Period Cr","Closing Dr","Closing Cr"].map(h=><th scope="col" key={h} className="p-2 text-right first:text-left">{h}</th>)}</tr></thead>
         <tbody>{report.rows.map(a=><tr key={a.id} className="border-t"><th scope="row" className="p-2 text-left font-medium"><span>{a.code} {a.name}{!a.active && " (inactive)"}</span><Link className="no-print block text-xs text-primary underline" href={`/accounting/general-ledger?accountId=${a.id}&bookId=${report.book.id}&branchId=${report.scope==="whole_book" ? "all" : report.branches[0]!.id}&from=${report.filter.from}&to=${report.filter.to}`}>View account ledger</Link></th><td>{a.category}</td>{[a.openingSides.debit,a.openingSides.credit,a.debit,a.credit,a.closingSides.debit,a.closingSides.credit].map((v,i)=><td key={i} className="p-2 text-right"><Value>{v}</Value></td>)}</tr>)}</tbody>
         <tfoot><tr className="border-t font-bold"><th colSpan={2} className="p-2 text-left">Totals</th>{[report.totals.openingDebit,report.totals.openingCredit,report.totals.debit,report.totals.credit,report.totals.closingDebit,report.totals.closingCredit].map((v,i)=><td key={i} className="p-2 text-right"><Value>{v}</Value></td>)}</tr></tfoot></table></div> :
-      report.rows.map(a=><section key={a.id} className="space-y-2"><h3 className="font-semibold">{a.code} - {a.name} <span className="text-xs text-muted-foreground">{a.category}{!a.active && " / inactive"}</span></h3>
-        <p className="text-sm">Opening signed balance: <Value>{a.opening}</Value> | Closing signed balance: <Value>{a.closing}</Value></p>
+      report.rows.map(a=><section key={a.id} className="space-y-2">
         <div className="overflow-x-auto report-table"><table className="w-full min-w-[760px] text-sm"><caption className="sr-only">{a.name} posted transactions; positive running balance is debit, negative is credit</caption>
-          <thead><tr>{["Date","Journal / source","Narration / memo","Debit","Credit","Running Dr (+) / Cr (-)"].map(h=><th scope="col" key={h} className="p-2 text-left">{h}</th>)}</tr></thead>
+          <thead>
+            {/* Keep account context inside the repeating header, not detached across a print page break. */}
+            <tr data-ledger-account={a.code}><th colSpan={6} className="pb-2 text-left font-normal"><h3 className="text-base font-semibold">{a.code} - {a.name} <span className="text-xs text-muted-foreground">{a.category}{!a.active && " / inactive"}</span></h3>
+              <p className="mt-2 text-sm">Opening signed balance: <Value>{a.opening}</Value> | Closing signed balance: <Value>{a.closing}</Value></p>
+            </th></tr>
+            <tr>{["Date","Journal / source","Narration / memo","Debit","Credit","Running Dr (+) / Cr (-)"].map(h=><th scope="col" key={h} className="p-2 text-left">{h}</th>)}</tr></thead>
           <tbody>{a.entries.map(e=><tr key={e.id} className="border-t"><td className="p-2 whitespace-nowrap">{e.date}</td><td className="p-2"><button className="text-primary underline" onClick={()=>onJournal(e.journalId)}>Journal #{e.journalId}</button><p className="break-all text-xs">{e.eventKey}</p><p className="text-xs">Branch #{e.branchId}</p></td><td className="p-2 max-w-sm break-words">{e.narration}<p className="text-xs text-muted-foreground">{e.memo}</p></td>{[e.debit,e.credit,e.balance].map((v,i)=><td key={i} className="p-2 text-right"><Value>{v}</Value></td>)}</tr>)}</tbody>
           <tfoot><tr className="border-t font-semibold"><th colSpan={3} className="p-2 text-left">Period movements / closing</th>{[a.debit,a.credit,a.closing].map((v,i)=><td key={i} className="p-2 text-right"><Value>{v}</Value></td>)}</tr></tfoot></table></div>
       </section>)}
@@ -88,7 +92,7 @@ function AccountingPage({kind,userId,activeBranchId}:{kind:AccountingReport["kin
       #native-accounting-report .no-print { display:none!important; }
       #native-accounting-report .report-table { overflow:visible; break-before:avoid; }
       #native-accounting-report table { min-width:0!important; font-size:9px; }
-      #native-accounting-report thead { display:table-header-group; }
+      #native-accounting-report thead { display:table-header-group; break-inside:avoid; }
       #native-accounting-report tr { break-inside:avoid; }
       #native-accounting-report .grid { break-inside:avoid; }
       #native-accounting-report h3, #native-accounting-report caption { break-after:avoid; }

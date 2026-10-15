@@ -1,5 +1,9 @@
 # Session Summaries
 
+- Latest 2026-10-15 13:59 WAT: [Actual PDF results and robust GL table header](2026-10-15-step12-status.md). Native TB/BS/Management carry-forward PDFs accepted for actualOct15scope; nonzeroManagement still pending. Latest15page day14GL amounts28accounts/DrCr13322.84PASS but orphan context persists; not false CLOSED/caching claim. Accountcontext moved into repeatingthead;3durable checks/fullbuildPASS. Publish/deploy/native output next; no financial writes.
+
+- Latest 2026-10-15 13:39 WAT: [Print release verified; native output handoff](2026-10-15-step12-status.md). a1158b4/Railway3e5942f1 SUCCESS, healthok/live print rules confirmed. Owner asked to save four prepared PDF snapshots; new pagination issue awaits actual reprint, not CLOSED. Affairs output separately pending, extension UI blocks its selection. No financial writes; original seven fixes stay CLOSED.
+
 - Latest 2026-10-15 13:29 WAT: [Actual PDF inspected; print-only correction ready](2026-10-15-step12-status.md). User-saved8page GL PDF found/full-content/all-page visual checks accepted; new Low STEP12-PRINT-001 orphan account headings/table pagination found and narrow print-only fix locally verified (types/4CSScontracts/fullbuild). Exact release/new native PDF still required; earlier no-file blocker superseded. Original seven fixes stay CLOSED, no financial writes.
 
 - Latest 2026-10-15 13:22 WAT: [Pending Step12 checks resumed](2026-10-15-step12-status.md). Current management UI/15438byte CSV accepted, Dr=Cr13322.84/profit230.50/cash10177.50. Eleven posted selections across ten source families read-only, no duplicate preparation/writes; three normal-suite network skips already separately passed in prior CAP02 run. Native print/PDF still blocked pending owner's actual PDF; acknowledged ok, no file yet. Actual company launch requirements/coverage limits retained.
