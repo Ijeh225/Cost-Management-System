@@ -1,8 +1,43 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-15 19:50 WAT. Original seven findings/direct PDF remain CLOSED. New allocation/credit corrections, linked bank recovery/reversal and bounded OCR orientation implemented with498unit/API and4new isolated DB passes; deployment/live acceptance pending. Original four blocked source IDs retained, not recreated. Native Print still awaits actual browser output; directPDF is separate. Step12 NOT fully closed yet.
+Updated: 2026-10-15 20:14 WAT. Original seven findings/direct PDF remain CLOSED. New allocation/credit corrections, linked bank-only debt recovery/reversal and bounded OCR orientation deployed ef8a855 / exact Railway198cae52 SUCCESS/migration/health; actual live UI acceptance PASS below. Native Print still awaits actual browser output; directPDF is separate. Step12 NOT fully closed because native output remains unverified. Actual-company launch requirements and historical completeness warnings remain separate.
 
-## Latest Supplemental Verification (15 October 19:06 WAT)
+## Current Supplemental Acceptance (15 October 20:14 WAT)
+
+- High allocation CLOSED: retained allocation28/review11/native46; CN6/12/47,
+  credit30/13/48 and writeoffaudit22/14/49 actual preparer15/reviewer16 screens
+  independently posted once. No API/SQL replacement for initial staff writes.
+- Dedicated bank-only recovery LIVE PASS on written-off invoice23:
+  source8/.25/review15/native50, exact linked reversal9/-.25/review16/native51.
+  Positive native profit230.75/cash10178.75; reversal restores230.50/10178.50.
+  Operational Bank, Financial Ledger, Cash Flow and legacy P&L delta agree;
+  exactly one receipt and opposite linked reversal, no second invoice payment.
+  Original invoice/writeoff/settlement rows/service sales/VAT unchanged.
+- Same original sidewaysPNG15 re-indexed:42 ->94%, correct B/L and phrase,
+  original SHA256/bytes unchanged. Owner UI confirms94.0% and review-required
+  suggestion. No new upload/version/automatic field approval. Local quarterturn
+  tests90/180/270 PASS; bounded English OCR, not every scan quality/layout.
+- Final book1/Lagos2/14-31Oct: income904/expense673.50/profit230.50,
+  cash10178.50/bank5=10153.50/6=25/ARAPdeposit0/assets10231.50,
+  GLDrCr13347.34/closingTB10905/BS-cash-profit bridges0;49posted/0currentmissing.
+  Historical31precutover/3reviewrequired and cash classification-30 remain
+  disclosed. Equal debits/credits do not certify complete company books.
+- Four new actual isolated PostgreSQL cases,498API/3prior skips,6OCR,
+  fulltypes/build and3printcontracts PASS. Fresh private archive restored77tables.
+- NativePrint001 still blocked: IAB no window/no new native output. Latest
+  Downloads are earlier accepted direct exports, not native pagination proof.
+  One asynchronous owner Chrome PDF request remains unanswered. Inspect fresh
+  GL14Oct output, then remaining native Management/Affairs outputs when provided;
+  do not recreate fixtures or repeat accepted five direct downloads.
+
+Evidence: `docs/evidence/2026-10-15-step12-final-fixes.json` retains original
+pre-recovery, positive-recovery and final snapshots, UI reviews, signed cash
+rows and scan bytes. Owner session restored; original checkpoint/gates unchanged.
+
+## Historical Supplemental Verification (15 October 19:06 WAT)
+
+The following failures/partial totals describe the discovery state only. The
+20:14 acceptance above supersedes allocation, recovery and rotated-scan statuses.
 
 The earlier accepted coverage and financial table below are the retained14Oct
 baseline, not current all-date figures. Do not repeat those fixtures or outputs.

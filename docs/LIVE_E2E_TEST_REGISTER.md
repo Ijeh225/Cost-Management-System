@@ -1,5 +1,23 @@
 # Live End-to-End Test Register
 
+## 2026-10-15 20:14 WAT - Final remaining-fix live results (supersedes earlier FAIL/BLOCKED financial/scan statuses)
+| Check | Current result | Exact evidence / boundary |
+| --- | --- | --- |
+| STEP12-ALLOC-UI-001 | CLOSED / live UI PASS | Retained28/review11/native46; original deposit mapping/evidence revalidated, no fake allocation bank mapping or second cash. |
+| Dependent credit/writeoff staff writes | PASS | CN6/12/47, application30/13/48, writeoffaudit22/14/49, preparer15/reviewer16 actual screens, one posted audit each. |
+| Written-off debt recovery | Implemented / live PASS, bank-only | Invoice23, sole bank cash source8/.25, review15/native50; linked immutable reversal9/-.25/review16/native51. Actual owner/preparer/reviewer screens. Bank/cash/native/legacy P&L +.25 then0, exact two cash rows/directions; service sales/VAT/writeoff/invoice payments unchanged. No ordinary invoice receipt or duplicate cash source. Cash-only recovery explicitly unsupported here. |
+| STEP12-SCAN-ROTATION-001 | CLOSED / reproduced fixture PASS | Same originalPNG15 reindex,42 ->94%; correct B/L/phrase, owner UI94.0%/review-required suggestion;210768bytes/hash unchanged. No duplicate/new version or automatic field acceptance. Local90/180/270 coverage is bounded, not arbitrary scan guarantee. |
+| Final current-source reconciliation | PASS | Book1/Lagos2/14-31Oct income904/expense673.50/profit230.50/cash10178.50/ARAPdeposit0/assets10231.50;DrCr13347.34/closingTB10905, bridges0;49posted/0currentmissing. Historical31precutover/3reviewrequired/unclassifiedcash-30 retained. |
+| STEP12-PRINT-001 | BLOCKED actual native output only | No fresh browser-generated PDF/window; latest files are earlier accepted direct exports. Owner asked once asynchronously for Chrome Print Snapshot PDF. 3printcontracts/directPDF do not prove native pagination; do not repeat financial fixtures. |
+
+Functional release ef8a855 / Railway198cae52 SUCCESS/migration/health confirmed. Four new isolated DB tests,498API/3prior skips,6OCR and fulltypes/build PASS. Protected checkpoint/private backup unchanged. `docs/evidence/2026-10-15-step12-final-fixes.json` retains before/positive/after snapshots, actual UI/audits, correct cash directions and scan bytes. Exact stop: Owner restored, all software/live finance+scan items accepted; inspect actual new native GL/Management/Affairs output when available. Not overall company launch certification or unconditional Step12 closure. This final acceptance record accompanies the evidence-only publication; no additional financial writes are needed.
+
+## 2026-10-15 20:04 WAT - Retained allocation/credit/writeoff UI chain PASS
+- STEP12-ALLOC-UI-001 CLOSED: preparer15/reviewer16 actual screens, allocation28/review11/native46; dependent CN6/12/47, application30/13/48, writeoffaudit22/14/49 each independently posted once. Cash effect0 for all four. Test book profit230.50/cash10178.50/ARAPdeposit0,47posted/0currentmissing. Historical31precutover/3reviewrequired retained. Full actual snapshots in final-fixes JSON; no duplicate records. Recovery and scan live acceptance still pending; native output not claimed.
+
+## 2026-10-15 20:00 WAT - Exact remaining-fix release confirmed
+- ef8a855f821a825e232df9ae28aa44cfd6adcba8 / Railway198cae52-222b-4ae1-8aef-8fc881080d49 SUCCESS; healthok. Existing28/CN6/credit30/writeoff22 live15/16screen checks now proceeding. Deployment is not their pass. Native print requests actual Chrome PDF only; direct export not repeated. New source fixtures not recreated.
+
 ## 2026-10-15 19:50 WAT - Corrections locally/isolated verified; not deployed/live closed yet
 - PASS4new isolated network PostgreSQL cases: retained-mapping allocation/no duplicatecash/changedsource and wrongcontrol refusal; prewriteoff credit/no postwriteoff backdating; capped/idempotent/immutable bank recovery with originalwriteoff dependency and exact independent income post/reversal; different concurrent recovery requests cap/date/foreignbank/idempotent migration. Public11source baseline/owned namespace cleanup/tunnel closure preserved. Three source tests505.72s plus capacity51.98s, not another completed live-fixture run.
 - PASS498unit/API/63files with3unchanged network skips;5new HTTP security/strict-body controls and6OCRtests (3newquarterturns). Types/build PASS, nativeprint3contracts PASS, actualprint pending. Backup fullrestore77tables/baseline verified; archive private, original checkpoint untouched.

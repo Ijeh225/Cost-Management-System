@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 const mode = process.argv[2];
-assert(['probe', 'fixtures', 'inspect', 'controls', 'controls-finish', 'early-finalize', 'scan-verify', 'record-local', 'verify'].includes(mode));
+assert(['probe', 'fixtures', 'inspect', 'controls', 'controls-finish', 'early-finalize', 'scan-verify', 'record-local', 'verify-corrected', 'verify-recovery', 'verify-recovery-receipt', 'reindex-scan', 'finalize-local', 'verify'].includes(mode));
 assert(process.argv.includes('--confirm=STEP12-GAPS-20261015'));
 let input = ''; for await (const chunk of process.stdin) input += chunk;
 const credentials = JSON.parse(input); input = '';
@@ -29,7 +29,54 @@ async function session(email, password) {
   csrf = (await request('GET', '/auth/csrf')).token;
   return { user: login.user, request };
 }
-if (mode === 'record-local') {
+if (mode === 'finalize-local') {
+  const path = 'docs/evidence/2026-10-15-step12-final-fixes.json';
+  const saved = JSON.parse(await readFile(path, 'utf8'));
+  const final = saved.recoveryFinal, receipt = saved.recoveryReceipt, baseline = saved.correctedChain;
+  assert(final && receipt && baseline && saved.scanLive);
+  const isTestRecovery = row => row.reference?.startsWith('STEP12-FINAL-20261015-');
+  const bank = final.bankTransactions.filter(isTestRecovery);
+  assert.equal(bank.length, 2);
+  assert.deepEqual(bank.map(row => [row.id, row.debit, row.credit]).sort(),
+    [['fund_addition_8', 0, .25], ['fund_addition_9', .25, 0]]);
+  const ledger = final.ledger.entries.filter(isTestRecovery);
+  assert.equal(ledger.length, 2);
+  assert.deepEqual(ledger.map(row => [row.id, row.direction, row.amount]).sort(),
+    [['funding-8', 'in', .25], ['funding-9', 'out', .25]]);
+  const cash = [...final.cashflow.inflows, ...final.cashflow.outflows].filter(isTestRecovery);
+  assert.equal(cash.length, 2);
+  assert.deepEqual(cash.map(row => [row.id, row.direction, row.amount, row.category]).sort(),
+    [['fa-8', 'in', .25, 'Debt Recovery'], ['fa-9', 'out', .25, 'Debt Recovery']]);
+  for (const snapshot of [receipt, final]) {
+    assert.deepEqual(snapshot.legacy.revenue, baseline.legacy.revenue);
+    assert.equal(snapshot.legacy.adjustments.totalCreditNoteVat, baseline.legacy.adjustments.totalCreditNoteVat);
+    assert.deepEqual(snapshot.invoice.payments, baseline.invoice.payments);
+    assert.equal(snapshot.invoice.status, 'written_off');
+    assert.equal(snapshot.invoice.writtenOffAmount, 1);
+  }
+  assert.equal(final.report.totals.debit, '13347.34');
+  assert.equal(final.report.totals.credit, '13347.34');
+  assert.equal(final.report.totals.closingDebit, '10905.00');
+  assert.equal(final.report.totals.closingCredit, '10905.00');
+  assert.equal(final.report.coverage[0].counts.posted, 49);
+  assert.equal(final.report.coverage[0].counts.missing ?? 0, 0);
+  saved.uiEvents = JSON.parse(await readFile('tmp/step12-live/remaining-ui-events.json', 'utf8'));
+  for (const [reviewId, journalId] of [[11, 46], [12, 47], [13, 48], [14, 49], [15, 50], [16, 51]]) {
+    const posts = saved.uiEvents.filter(event => event.action === 'independent_reviewer_UI_posted' && event.reviewId === reviewId);
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0].journalId, journalId);
+  }
+  assert(saved.uiEvents.some(event => event.action === 'owner_UI_corrected_original_scan15' && event.detail.includes('94.0%')));
+  saved.status = 'deployed_live_financial_and_ocr_acceptance_pass_native_print_output_blocked';
+  saved.finishedAt = new Date().toISOString();
+  saved.finalControls = { bankDirectionAndSingleCashSource: 'PASS', invoiceSalesVatAndSettlementsUnchanged: 'PASS',
+    debitAndCredit: '13347.34', closingTrialBalance: '10905.00', currentSourcesPosted: 49, missingCurrentSources: 0,
+    allocation: 'CLOSED_LIVE_UI_PASS', recovery: 'BANK_ONLY_LIVE_UI_AND_INDEPENDENT_POST_REVERSAL_PASS',
+    scan: 'SAME_FILE_42_TO_94_PERCENT_ORIGINAL_BYTES_UNCHANGED', nativePrint: 'BLOCKED_NO_NEW_NATIVE_BROWSER_OUTPUT',
+    scope: 'TEST ONLY book1, Lagos2, 14-31 October; historical completeness and cash classifications remain disclosed, not company launch certification' };
+  await writeFile(path, JSON.stringify(saved, null, 2) + '\n');
+  console.log(JSON.stringify({ status: saved.status, controls: saved.finalControls }));
+} else if (mode === 'record-local') {
   const saved = JSON.parse(await readFile(evidencePath,'utf8'));
   saved.uiEvents = JSON.parse(await readFile('tmp/step12-live/remaining-ui-events.json','utf8'));
   saved.status = 'verification_batch_executed_with_confirmed_defect_and_explicit_blockers';
@@ -44,6 +91,78 @@ if (mode === 'record-local') {
   saved.continuation = 'Fix retained original deposit-mapping validation/UI exposure, then resume ONLY allocation28 -> credit note6 -> client credit application30 -> writeoffaudit22 with actual preparer15/reviewer16 screens; expected completed totals are retained separately. Do not recreate sources or repeat seven accepted new UI cases.';
   await writeFile(evidencePath,JSON.stringify(saved,null,2)+'\n');
   console.log(JSON.stringify({status:saved.status,finishedAt:saved.finishedAt,uiEventCount:saved.uiEvents.length,findings:saved.findings.map(f=>({id:f.id,status:f.status}))}));
+} else if (mode === 'reindex-scan') {
+  const path='docs/evidence/2026-10-15-step12-final-fixes.json',saved=JSON.parse(await readFile(path,'utf8'));
+  assert(!saved.scanLive,'Existing corrected scan acceptance retained; do not repeat');
+  const owner=await session(credentials.email,credentials.password);
+  try {
+    const before=await owner.request('GET','/documents/15');
+    const original=JSON.parse(await readFile(evidencePath,'utf8')).scans.scans.find(s=>s.documentId===15);
+    assert.equal(createHash('sha256').update(before).digest('hex'),original.sha256);
+    const retried=await owner.request('POST','/containers/39/documents/15/intelligence/retry',{});
+    const extraction=await owner.request('GET','/containers/39/document-readiness/15/extraction');
+    assert(extraction.pages[0].confidence>=85);assert(extraction.pages[0].text.includes('cobalt scan lantern'));
+    assert.equal(extraction.suggestions.find(s=>s.field==='identifier')?.value,'STEP12-GAPS-20261015-BL');
+    const after=await owner.request('GET','/documents/15');assert(before.equals(after));
+    saved.scanLive={at:new Date().toISOString(),documentId:15,retried,extraction,originalSha256:original.sha256,originalBytesUnchanged:true};
+    await writeFile(path,JSON.stringify(saved,null,2)+'\n');console.log(JSON.stringify({documentId:15,confidence:extraction.pages[0].confidence,suggestions:extraction.suggestions,originalBytesUnchanged:true}));
+  } finally{await owner.request('POST','/auth/logout',{},200,'all');}
+} else if (mode === 'verify-corrected' || mode === 'verify-recovery' || mode === 'verify-recovery-receipt') {
+  const path='docs/evidence/2026-10-15-step12-final-fixes.json';
+  const saved=JSON.parse(await readFile(path,'utf8'));
+  const owner=await session(credentials.email,credentials.password);
+  try {
+    const workspace=await owner.request('GET','/accounting/books/1/source-review?branchId=2');
+    const chain=[];
+    for(const [kind,id] of [['invoice_payment',28],['credit_note',6],['client_credit_application',30],['invoice_writeoff',22]]) {
+      const reviews=workspace.reviews.filter(r=>r.source.kind===kind&&r.source.id===id);
+      assert.equal(reviews.length,1);const review=await owner.request('GET',`/accounting/books/1/source-review/${reviews[0].id}?branchId=2`);
+      assert.equal(review.state,'posted');assert.equal(review.preparedBy,15);assert.equal(review.reviewedBy,16);
+      assert.equal(review.audit.filter(a=>a.action==='source_review_posted').length,1);chain.push(review);
+    }
+    const report=await owner.request('GET','/accounting/books/1/reports/management-accounts?branchId=2&from=2026-10-14&to=2026-10-31');
+    assert.equal(report.statements.receivables.total,'0.00');assert.equal(report.statements.payables.total,'0.00');
+    assert.equal(report.statements.balanceSheet.difference,'0.00');assert.equal(report.statements.cashFlow.profitBridge.difference,'0.00');
+    const bank=await owner.request('GET','/banks/5/transactions');
+    const legacy=await owner.request('GET','/reports/pl?from=2026-10-14&to=2026-10-31&costBasis=actual_paid');
+    const recoveries=await owner.request('GET','/invoices/23/recoveries');
+    const invoice=await owner.request('GET','/invoices/23');assert.equal(invoice.status,'written_off');assert.equal(invoice.writtenOffAmount,1);
+    const ledger=await owner.request('GET','/reports/financial-ledger?from=2026-10-14&to=2026-10-31');
+    const cashflow=await owner.request('GET','/reports/cashflow?from=2026-10-14&to=2026-10-31&bankId=5');
+    const payload={at:new Date().toISOString(),chain,report,bank5:bank.closingBalance,bankTransactions:bank.transactions,legacy,ledger,cashflow,recoveries,invoice:{id:invoice.id,status:invoice.status,totalPaid:invoice.totalPaid,writtenOffAmount:invoice.writtenOffAmount,payments:invoice.payments}};
+    if(mode==='verify-corrected') {
+      assert.equal(recoveries.length,0,'Do not overwrite the pre-recovery checkpoint');
+      assert.equal(report.statements.profitAndLoss.income,'904.00');assert.equal(report.statements.profitAndLoss.expense,'673.50');assert.equal(report.statements.profitAndLoss.profit,'230.50');
+      assert.equal(report.statements.cashFlow.closing,'10178.50');assert.equal(bank.closingBalance,10153.50);assert.equal(report.coverage[0].counts.missing??0,0);
+      saved.correctedChain=payload;
+    } else if(mode==='verify-recovery-receipt') {
+      assert(saved.correctedChain);
+      const testRows=recoveries.filter(r=>r.reference?.startsWith('STEP12-FINAL-20261015-'));
+      assert.equal(testRows.length,1);assert.equal(testRows[0].amount,'0.25');
+      assert.equal(bank.closingBalance,saved.correctedChain.bank5+.25);
+      assert(Math.abs(legacy.netProfit-saved.correctedChain.legacy.netProfit-.25)<.00001);
+      assert.equal(legacy.adjustments.totalRecoveries,.25);assert.equal(report.statements.profitAndLoss.profit,'230.75');assert.equal(report.statements.cashFlow.closing,'10178.75');
+      const review=workspace.reviews.find(r=>r.source.kind==='bank_funding'&&r.source.id===testRows[0].id);assert(review);assert.equal(review.state,'posted');assert.equal(review.preparedBy,15);assert.equal(review.reviewedBy,16);
+      assert.equal(invoice.totalPaid,saved.correctedChain.invoice.totalPaid);payload.recoveryReview=review;
+      saved.recoveryReceipt=payload;
+    } else {
+      assert(saved.correctedChain);
+      const testRows=recoveries.filter(r=>r.reference?.startsWith('STEP12-FINAL-20261015-'));
+      assert.equal(testRows.length,2);assert.equal(testRows.reduce((s,r)=>s+Number(r.amount),0),0);
+      const original=testRows.find(r=>!r.reversalOfFundingId),reverse=testRows.find(r=>r.reversalOfFundingId);
+      assert.equal(reverse.reversalOfFundingId,original.id);assert.equal(original.amount,'0.25');assert.equal(reverse.amount,'-0.25');
+      for(const r of testRows) {
+        const review=workspace.reviews.find(x=>x.source.kind==='bank_funding'&&x.source.id===r.id);assert(review);assert.equal(review.state,'posted');assert.equal(review.preparedBy,15);assert.equal(review.reviewedBy,16);
+      }
+      assert.equal(bank.closingBalance,saved.correctedChain.bank5);assert.equal(legacy.netProfit,saved.correctedChain.legacy.netProfit);
+      assert.equal(legacy.adjustments.totalRecoveries,0);assert.equal(report.statements.profitAndLoss.profit,'230.50');assert.equal(report.statements.cashFlow.closing,'10178.50');
+      assert.equal(invoice.payments.length,saved.correctedChain.invoice.payments.length);assert.equal(report.coverage[0].counts.missing??0,0);
+      payload.recoveryReviews=workspace.reviews.filter(r=>r.source.kind==='bank_funding'&&testRows.some(t=>t.id===r.source.id));
+      saved.recoveryFinal=payload;
+    }
+    saved.uiEvents=JSON.parse(await readFile('tmp/step12-live/remaining-ui-events.json','utf8'));
+    await writeFile(path,JSON.stringify(saved,null,2)+'\n');console.log(JSON.stringify({mode,chain:chain.map(r=>({id:r.id,source:r.source,journalId:r.journalId})),profit:report.statements.profitAndLoss.profit,cash:report.statements.cashFlow.closing,bank5:bank.closingBalance,legacyNetProfit:legacy.netProfit,sourceCounts:report.coverage[0].counts,recoveries}));
+  } finally {await owner.request('POST','/auth/logout',{},200,'all');}
 } else if (mode === 'probe') {
   const owner = await session(credentials.email, credentials.password);
   assert.equal(owner.user.id, 1);
