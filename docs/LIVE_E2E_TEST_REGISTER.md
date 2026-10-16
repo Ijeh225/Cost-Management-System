@@ -1,5 +1,10 @@
 # Live End-to-End Test Register
 
+## 2026-10-16 12:44 WAT - PRINT001 correction deployed; live DOM PASS, native output still pending
+-7ad1f977256ec7670a9014cd9c22a056b5933a5a / exactRailwaycc519eae-8099-4ac8-8fd4-7635eed12d04 SUCCESS/publichealthok.16focused regressions/fulltypes/build PASS. SameexistingGL, not duplicate exporter/calculation; no financial data/API/schema changes.
+- Actual Owner UI wholebook1/14Oct ApplyFilters snapshot11:41:18Z PASS:28accounts/75entries/28single-last-body summaries/0tfoot/9empty groupedsections; realthead+firstcontent/emptyprintguards present, DrCr13322.84/difference0/historicalwarnings unchanged. Actual28summaries and all75rows retained in2026-10-16-step12-print-live-dom.json, linked correction evidence. Ordinary existing Owner sign-in refreshed after expiry, no password/grants changed.
+- Native pagination NOT yet PASS: one owner request for fresh Chrome GENERAL LEDGER FIXED 16 OCT.pdf after deployed refresh, oldfailed12:13output/directPDF not substituted. PRINT001 statusFIXED_DEPLOYED_AWAITING_NATIVE_ACCEPTANCE, not CLOSED. Next inspect newGL28totalcopies/noorphanheaders/unchangedrows, then other pending nativeManagement/Affairs outputs; no repeated accounting writes. Records/evidence accompany final publication.
+
 ## 2026-10-16 12:35 WAT - Print release candidate accepted locally
 -16print/export checks and complete production types/build PASS; only existing nonfatal warnings. Native closing row/empty-account grouping correction is frontend-only; no changes to sources, decimal amounts, direct exporter, APIs or database. Protected checkpoint unchanged. Publish/deploy and actual liveDOM read-back next; actual Chrome PDF still required before PRINT001 closure. Evidence2026-10-16-step12-print-fix.json; original failed PDF retained.
 

@@ -1,0 +1,411 @@
+{
+  "accounts": [
+    {
+      "bodyRows": 1,
+      "code": "1000",
+      "empty": "true",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.00\t0.00\t0.00",
+      "transactions": []
+    },
+    {
+      "bodyRows": 25,
+      "code": "1010",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t10,877.53\t725.03\t10,152.50",
+      "transactions": [
+        "2026-10-14\tJournal #3\n\nsource:bank_funding:3:v1\n\nBranch #2\n\n\tReviewed bank_funding #3\n\n\t10,000.00\t0.00\t10,000.00",
+        "2026-10-14\tJournal #5\n\nsource:invoice_payment:20:v1\n\nBranch #2\n\n\tCash settlement: invoice_payment #20\n\n\t400.00\t0.00\t10,400.00",
+        "2026-10-14\tJournal #6\n\nsource:client_deposit:5:v1\n\nBranch #2\n\n\tCash settlement: client_deposit #5\n\n\t300.00\t0.00\t10,700.00",
+        "2026-10-14\tJournal #8\n\nsource:duty_payment:8:v1\n\nBranch #2\n\n\tReviewed duty_payment #8\n\n\t0.00\t107.50\t10,592.50",
+        "2026-10-14\tJournal #9\n\nsource:duty_payment:9:v1\n\nBranch #2\n\n\tReviewed duty_payment #9\n\n\t107.50\t0.00\t10,700.00",
+        "2026-10-14\tJournal #10\n\nsource:duty_payment:10:v1\n\nBranch #2\n\n\tReviewed duty_payment #10\n\n\t0.00\t107.50\t10,592.50",
+        "2026-10-14\tJournal #11\n\nsource:container_payment:3:v1\n\nBranch #2\n\n\tReviewed container_payment #3\n\n\t0.00\t107.50\t10,485.00",
+        "2026-10-14\tJournal #12\n\nsource:container_payment:4:v1\n\nBranch #2\n\n\tReviewed container_payment #4\n\n\t0.00\t107.50\t10,377.50",
+        "2026-10-14\tJournal #14\n\nsource:expense_payment:10:v1\n\nBranch #2\n\n\tReviewed expense_payment #10\n\n\t0.00\t60.00\t10,317.50",
+        "2026-10-14\tJournal #15\n\nsource:expense_payment:11:v1\n\nBranch #2\n\n\tReviewed expense_payment #11\n\n\t0.00\t40.00\t10,277.50",
+        "2026-10-14\tJournal #16\n\nsource:schedule_payment:9:v1\n\nBranch #2\n\n\tReviewed schedule_payment #9\n\n\t0.00\t50.00\t10,227.50",
+        "2026-10-14\tJournal #17\n\nsource:schedule_payment:10:v1\n\nBranch #2\n\n\tReviewed schedule_payment #10\n\n\t0.00\t30.00\t10,197.50",
+        "2026-10-14\tJournal #20\n\nsource:bank_transfer:2:v1\n\nBranch #2\n\n\tReviewed bank_transfer #2\n\n\t0.00\t25.00\t10,172.50",
+        "2026-10-14\tJournal #22\n\nsource:invoice_payment:23:v1\n\nBranch #2\n\n\tCash settlement: invoice_payment #23\n\n\t0.01\t0.00\t10,172.51",
+        "2026-10-14\tJournal #23\n\nsource:invoice_payment:24:v1\n\nBranch #2\n\n\tCash settlement: invoice_payment #24\n\n\t0.00\t0.01\t10,172.50",
+        "2026-10-14\tJournal #26\n\nsource:expense_payment:12:v1\n\nBranch #2\n\n\tReviewed expense_payment #12\n\n\t0.00\t20.00\t10,152.50",
+        "2026-10-14\tJournal #27\n\nsource:schedule_payment:11:v1\n\nBranch #2\n\n\tReviewed schedule_payment #11\n\n\t0.00\t20.00\t10,132.50",
+        "2026-10-14\tJournal #28\n\nsource:bank_funding:4:v1\n\nBranch #2\n\n\tReviewed bank_funding #4\n\n\t20.00\t0.00\t10,152.50",
+        "2026-10-14\tJournal #29\n\nsource:bank_funding:5:v1\n\nBranch #2\n\n\tReviewed bank_funding #5\n\n\t50.00\t0.00\t10,202.50",
+        "2026-10-14\tJournal #30\n\nsource:schedule_payment:12:v1\n\nBranch #2\n\n\tReviewed schedule_payment #12\n\n\t0.00\t50.00\t10,152.50",
+        "2026-10-14\tJournal #31\n\nsource:schedule_payment:13:v1\n\nBranch #2\n\n\tReviewed schedule_payment #13\n\n\t0.00\t0.01\t10,152.49",
+        "2026-10-14\tJournal #32\n\nsource:bank_funding:6:v1\n\nBranch #2\n\n\tReviewed bank_funding #6\n\n\t0.01\t0.00\t10,152.50",
+        "2026-10-14\tJournal #35\n\nsource:bank_transfer:4:v1\n\nBranch #2\n\n\tReviewed bank_transfer #4\n\n\t0.01\t0.00\t10,152.51",
+        "2026-10-14\tJournal #36\n\nsource:bank_transfer:3:v1\n\nBranch #2\n\n\tReviewed bank_transfer #3\n\n\t0.00\t0.01\t10,152.50"
+      ]
+    },
+    {
+      "bodyRows": 4,
+      "code": "1011",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t25.01\t0.01\t25.00",
+      "transactions": [
+        "2026-10-14\tJournal #20\n\nsource:bank_transfer:2:v1\n\nBranch #2\n\n\tReviewed bank_transfer #2\n\n\t25.00\t0.00\t25.00",
+        "2026-10-14\tJournal #35\n\nsource:bank_transfer:4:v1\n\nBranch #2\n\n\tReviewed bank_transfer #4\n\n\t0.00\t0.01\t24.99",
+        "2026-10-14\tJournal #36\n\nsource:bank_transfer:3:v1\n\nBranch #2\n\n\tReviewed bank_transfer #3\n\n\t0.01\t0.00\t25.00"
+      ]
+    },
+    {
+      "bodyRows": 12,
+      "code": "1100",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t1,000.03\t1,000.03\t0.00",
+      "transactions": [
+        "2026-10-14\tJournal #4\n\nsource:invoice:17:v1\n\nBranch #2\n\n\tIssued invoice #17 - reviewed recognition\n\n\t1,000.00\t0.00\t1,000.00",
+        "2026-10-14\tJournal #5\n\nsource:invoice_payment:20:v1\n\nBranch #2\n\n\tCash settlement: invoice_payment #20\n\n\t0.00\t400.00\t600.00",
+        "2026-10-14\tJournal #7\n\nsource:invoice_payment:21:v1\n\nBranch #2\n\n\tDeposit allocation: invoice_payment #21\n\n\t0.00\t300.00\t300.00",
+        "2026-10-14\tJournal #18\n\nsource:credit_note:3:v1\n\nBranch #2\n\n\tReviewed credit_note #3\n\n\t0.00\t100.00\t200.00",
+        "2026-10-14\tJournal #19\n\nsource:invoice_writeoff:14:v1\n\nBranch #2\n\n\tReviewed invoice_writeoff #14\n\n\t0.00\t200.00\t0.00",
+        "2026-10-14\tJournal #21\n\nsource:invoice:18:v1\n\nBranch #2\n\n\tIssued invoice #18 - reviewed recognition\n\n\t0.01\t0.00\t0.01",
+        "2026-10-14\tJournal #22\n\nsource:invoice_payment:23:v1\n\nBranch #2\n\n\tCash settlement: invoice_payment #23\n\n\t0.00\t0.01\t0.00",
+        "2026-10-14\tJournal #23\n\nsource:invoice_payment:24:v1\n\nBranch #2\n\n\tCash settlement: invoice_payment #24\n\n\t0.01\t0.00\t0.01",
+        "2026-10-14\tJournal #24\n\nsource:credit_note:4:v1\n\nBranch #2\n\n\tReviewed credit_note #4\n\n\t0.00\t0.01\t0.00",
+        "2026-10-14\tJournal #33\n\nsource:invoice:20:v1\n\nBranch #2\n\n\tIssued invoice #20 - reviewed recognition\n\n\t0.01\t0.00\t0.01",
+        "2026-10-14\tJournal #34\n\nsource:credit_note:5:v1\n\nBranch #2\n\n\tReviewed credit_note #5\n\n\t0.00\t0.01\t0.00"
+      ]
+    },
+    {
+      "bodyRows": 3,
+      "code": "1120",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.01\t0.01\t0.00",
+      "transactions": [
+        "2026-10-14\tJournal #31\n\nsource:schedule_payment:13:v1\n\nBranch #2\n\n\tReviewed schedule_payment #13\n\n\t0.01\t0.00\t0.01",
+        "2026-10-14\tJournal #32\n\nsource:bank_funding:6:v1\n\nBranch #2\n\n\tReviewed bank_funding #6\n\n\t0.00\t0.01\t0.00"
+      ]
+    },
+    {
+      "bodyRows": 2,
+      "code": "1200",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t50.00\t0.00\t50.00",
+      "transactions": [
+        "2026-10-14\tJournal #16\n\nsource:schedule_payment:9:v1\n\nBranch #2\n\n\tReviewed schedule_payment #9\n\n\t50.00\t0.00\t50.00"
+      ]
+    },
+    {
+      "bodyRows": 3,
+      "code": "1300",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t20.00\t20.00\t0.00",
+      "transactions": [
+        "2026-10-14\tJournal #27\n\nsource:schedule_payment:11:v1\n\nBranch #2\n\n\tReviewed schedule_payment #11\n\n\t20.00\t0.00\t20.00",
+        "2026-10-14\tJournal #28\n\nsource:bank_funding:4:v1\n\nBranch #2\n\n\tReviewed bank_funding #4\n\n\t0.00\t20.00\t0.00"
+      ]
+    },
+    {
+      "bodyRows": 3,
+      "code": "1390",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.12\t0.12\t0.00",
+      "transactions": [
+        "2026-10-14\tJournal #1\n\nadjustment:step12_manual_depreciation_20261014\n\nBranch #2\n\n\tSTEP12 TEST ONLY exact depreciation 0.12\n\n\t0.00\t0.12\t-0.12",
+        "2026-10-14\tJournal #2\n\nreversal:1\n\nBranch #2\n\n\tReversal of journal 1\n\n\t0.12\t0.00\t0.00"
+      ]
+    },
+    {
+      "bodyRows": 4,
+      "code": "1400",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t10.50\t7.50\t3.00",
+      "transactions": [
+        "2026-10-14\tJournal #8\n\nsource:duty_payment:8:v1\n\nBranch #2\n\n\tReviewed duty_payment #8\n\n\t7.50\t0.00\t7.50",
+        "2026-10-14\tJournal #9\n\nsource:duty_payment:9:v1\n\nBranch #2\n\n\tReviewed duty_payment #9\n\n\t0.00\t7.50\t0.00",
+        "2026-10-14\tJournal #12\n\nsource:container_payment:4:v1\n\nBranch #2\n\n\tReviewed container_payment #4\n\n\t3.00\t0.00\t3.00"
+      ]
+    },
+    {
+      "bodyRows": 6,
+      "code": "2000",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t120.00\t120.00\t0.00",
+      "transactions": [
+        "2026-10-14\tJournal #13\n\nsource:overhead:11:v1\n\nBranch #2\n\n\tReviewed overhead #11\n\n\t0.00\t100.00\t-100.00",
+        "2026-10-14\tJournal #14\n\nsource:expense_payment:10:v1\n\nBranch #2\n\n\tReviewed expense_payment #10\n\n\t60.00\t0.00\t-40.00",
+        "2026-10-14\tJournal #15\n\nsource:expense_payment:11:v1\n\nBranch #2\n\n\tReviewed expense_payment #11\n\n\t40.00\t0.00\t0.00",
+        "2026-10-14\tJournal #25\n\nsource:overhead_topup:5:v1\n\nBranch #2\n\n\tReviewed overhead_topup #5\n\n\t0.00\t20.00\t-20.00",
+        "2026-10-14\tJournal #26\n\nsource:expense_payment:12:v1\n\nBranch #2\n\n\tReviewed expense_payment #12\n\n\t20.00\t0.00\t0.00"
+      ]
+    },
+    {
+      "bodyRows": 3,
+      "code": "2100",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t300.00\t300.00\t0.00",
+      "transactions": [
+        "2026-10-14\tJournal #6\n\nsource:client_deposit:5:v1\n\nBranch #2\n\n\tCash settlement: client_deposit #5\n\n\t0.00\t300.00\t-300.00",
+        "2026-10-14\tJournal #7\n\nsource:invoice_payment:21:v1\n\nBranch #2\n\n\tDeposit allocation: invoice_payment #21\n\n\t300.00\t0.00\t0.00"
+      ]
+    },
+    {
+      "bodyRows": 1,
+      "code": "2200",
+      "empty": "true",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.00\t0.00\t0.00",
+      "transactions": []
+    },
+    {
+      "bodyRows": 1,
+      "code": "2210",
+      "empty": "true",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.00\t0.00\t0.00",
+      "transactions": []
+    },
+    {
+      "bodyRows": 1,
+      "code": "2300",
+      "empty": "true",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.00\t0.00\t0.00",
+      "transactions": []
+    },
+    {
+      "bodyRows": 1,
+      "code": "2310",
+      "empty": "true",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.00\t0.00\t0.00",
+      "transactions": []
+    },
+    {
+      "bodyRows": 3,
+      "code": "2400",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t50.00\t50.00\t0.00",
+      "transactions": [
+        "2026-10-14\tJournal #29\n\nsource:bank_funding:5:v1\n\nBranch #2\n\n\tReviewed bank_funding #5\n\n\t0.00\t50.00\t-50.00",
+        "2026-10-14\tJournal #30\n\nsource:schedule_payment:12:v1\n\nBranch #2\n\n\tReviewed schedule_payment #12\n\n\t50.00\t0.00\t0.00"
+      ]
+    },
+    {
+      "bodyRows": 2,
+      "code": "3000",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.00\t10,000.00\t-10,000.00",
+      "transactions": [
+        "2026-10-14\tJournal #3\n\nsource:bank_funding:3:v1\n\nBranch #2\n\n\tReviewed bank_funding #3\n\n\t0.00\t10,000.00\t-10,000.00"
+      ]
+    },
+    {
+      "bodyRows": 1,
+      "code": "3100",
+      "empty": "true",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.00\t0.00\t0.00",
+      "transactions": []
+    },
+    {
+      "bodyRows": 7,
+      "code": "4000",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t100.02\t1,000.02\t-900.00",
+      "transactions": [
+        "2026-10-14\tJournal #4\n\nsource:invoice:17:v1\n\nBranch #2\n\n\tIssued invoice #17 - reviewed recognition\n\n\t0.00\t1,000.00\t-1,000.00",
+        "2026-10-14\tJournal #18\n\nsource:credit_note:3:v1\n\nBranch #2\n\n\tReviewed credit_note #3\n\n\t100.00\t0.00\t-900.00",
+        "2026-10-14\tJournal #21\n\nsource:invoice:18:v1\n\nBranch #2\n\n\tIssued invoice #18 - reviewed recognition\n\n\t0.00\t0.01\t-900.01",
+        "2026-10-14\tJournal #24\n\nsource:credit_note:4:v1\n\nBranch #2\n\n\tReviewed credit_note #4\n\n\t0.01\t0.00\t-900.00",
+        "2026-10-14\tJournal #33\n\nsource:invoice:20:v1\n\nBranch #2\n\n\tIssued invoice #20 - reviewed recognition\n\n\t0.00\t0.01\t-900.01",
+        "2026-10-14\tJournal #34\n\nsource:credit_note:5:v1\n\nBranch #2\n\n\tReviewed credit_note #5\n\n\t0.01\t0.00\t-900.00"
+      ]
+    },
+    {
+      "bodyRows": 1,
+      "code": "4100",
+      "empty": "true",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.00\t0.00\t0.00",
+      "transactions": []
+    },
+    {
+      "bodyRows": 1,
+      "code": "5000",
+      "empty": "true",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.00\t0.00\t0.00",
+      "transactions": []
+    },
+    {
+      "bodyRows": 4,
+      "code": "5010",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t207.50\t100.00\t107.50",
+      "transactions": [
+        "2026-10-14\tJournal #8\n\nsource:duty_payment:8:v1\n\nBranch #2\n\n\tReviewed duty_payment #8\n\n\t100.00\t0.00\t100.00",
+        "2026-10-14\tJournal #9\n\nsource:duty_payment:9:v1\n\nBranch #2\n\n\tReviewed duty_payment #9\n\n\t0.00\t100.00\t0.00",
+        "2026-10-14\tJournal #10\n\nsource:duty_payment:10:v1\n\nBranch #2\n\n\tReviewed duty_payment #10\n\n\t107.50\t0.00\t107.50"
+      ]
+    },
+    {
+      "bodyRows": 2,
+      "code": "5020",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t107.50\t0.00\t107.50",
+      "transactions": [
+        "2026-10-14\tJournal #11\n\nsource:container_payment:3:v1\n\nBranch #2\n\n\tReviewed container_payment #3\n\n\t107.50\t0.00\t107.50"
+      ]
+    },
+    {
+      "bodyRows": 2,
+      "code": "5030",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t104.50\t0.00\t104.50",
+      "transactions": [
+        "2026-10-14\tJournal #12\n\nsource:container_payment:4:v1\n\nBranch #2\n\n\tReviewed container_payment #4\n\n\t104.50\t0.00\t104.50"
+      ]
+    },
+    {
+      "bodyRows": 4,
+      "code": "6000",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t150.00\t0.00\t150.00",
+      "transactions": [
+        "2026-10-14\tJournal #13\n\nsource:overhead:11:v1\n\nBranch #2\n\n\tReviewed overhead #11\n\n\t100.00\t0.00\t100.00",
+        "2026-10-14\tJournal #17\n\nsource:schedule_payment:10:v1\n\nBranch #2\n\n\tReviewed schedule_payment #10\n\n\t30.00\t0.00\t130.00",
+        "2026-10-14\tJournal #25\n\nsource:overhead_topup:5:v1\n\nBranch #2\n\n\tReviewed overhead_topup #5\n\n\t20.00\t0.00\t150.00"
+      ]
+    },
+    {
+      "bodyRows": 1,
+      "code": "6010",
+      "empty": "true",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.00\t0.00\t0.00",
+      "transactions": []
+    },
+    {
+      "bodyRows": 2,
+      "code": "6100",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t200.00\t0.00\t200.00",
+      "transactions": [
+        "2026-10-14\tJournal #19\n\nsource:invoice_writeoff:14:v1\n\nBranch #2\n\n\tReviewed invoice_writeoff #14\n\n\t200.00\t0.00\t200.00"
+      ]
+    },
+    {
+      "bodyRows": 3,
+      "code": "6200",
+      "empty": "false",
+      "footerCount": 0,
+      "headingGroup": "THEAD",
+      "totalIsLast": true,
+      "totalRows": 1,
+      "totalText": "Period movements / closing\t0.12\t0.12\t0.00",
+      "transactions": [
+        "2026-10-14\tJournal #1\n\nadjustment:step12_manual_depreciation_20261014\n\nBranch #2\n\n\tSTEP12 TEST ONLY exact depreciation 0.12\n\n\t0.12\t0.00\t0.12",
+        "2026-10-14\tJournal #2\n\nreversal:1\n\nBranch #2\n\n\tReversal of journal 1\n\n\t0.00\t0.12\t0.00"
+      ]
+    }
+  ],
+  "at": "2026-10-16T11:41:37.188Z",
+  "controlsText": "General Ledger - STEP12 TEST ONLY - 20261014 - NOT OFFICIAL COMPANY BOOKS\n\nPosted double entry | NGN | 2026-10-14 through 2026-10-14\n\nWhole selected book: E2E-20260901-Lagos, E2E-20260901-Abuja | Policy step12-dummy-20261014-v1 | Cutover 2026-10-14\n\nSnapshot: 2026-10-16T11:41:18.434Z | Account: all | Period: custom dates | Zero accounts: true | Unused inactive: false\n\nReporting Controls\nPosted native journals only; existing budgeted/cash reports are separate.\nDebit/credit equality does not prove correct source coverage or independently reconciled control balances.\nIndependent dated account controls have not been supplied for this read-only view.\nInactive accounts with posted history are retained; zero-account visibility follows the selected filters.\nUnposted, historical, stale or unclassified source exceptions remain; review the coverage register before relying on these figures.\n\nPeriod debit\n\n13,322.84\n\nPeriod credit\n\n13,322.84\n\nClosing difference\n\n0.00\n\nDisplayed debit/credit equality: Balanced. Source completeness: Not independently confirmed.\n\nTEST ONLY Cash posted transactions; positive running balance is debit, negative is credit\n1000 - TEST ONLY Cash asset\n\nOpening signed balance: 0.00 | Closing signed balance: 0.00\n\n\nDate\tJournal / source\tNarration / memo\tDebit\tCredit\tRunning Dr (+) / Cr (-)\nPeriod movements / closing\t0.00\t0.00\t0.00\nTEST ONLY Bank accounts (one subaccount per bank) posted transactions; positive running balance is debit, negative is credit\n1010 - TEST ONLY Bank accounts (one subaccount per bank) asset\n\nOpening signed balance: 0.00 | Closing signed balance: 10,152.50\n\n\nDate\tJournal / source\tNarration / memo\tDebit\tCredit\tRunning Dr (+) / Cr (-)\n2026-",
+  "header": "General Ledger - STEP12 TEST ONLY - 20261014 - NOT OFFICIAL COMPANY BOOKS\n\nPosted double entry | NGN | 2026-10-14 through 2026-10-14\n\nWhole selected book: E2E-20260901-Lagos, E2E-20260901-Abuja | Policy step12-dummy-20261014-v1 | Cutover 2026-10-14\n\nSnapshot: 2026-10-16T11:41:18.434Z | Account: all | Period: custom dates | Zero accounts: true | Unused inactive: false",
+  "printRules": "@media print {\n      @page { size: A4 landscape; margin: 10mm; }\n      body { background:white!important; }\n      body *:not(:has(#native-accounting-report)):not(#native-accounting-report):not(#native-accounting-report *) { display:none!important; }\n      body *:has(#native-accounting-report) { display:block!important; position:static!important; height:auto!important; min-height:0!important; max-height:none!important; width:auto!important; overflow:visible!important; padding:0!important; margin:0!important; background:white!important; }\n      #native-accounting-report { position:static; width:100%; border:0; padding:0; background:white; color:black; }\n      #native-accounting-report * { color:black!important; background:transparent!important; box-shadow:none!important; }\n      #native-accounting-report .no-print { display:none!important; }\n      #native-accounting-report .report-table { overflow:visible; break-before:avoid; }\n      #native-accounting-report table { min-width:0!important; font-size:9px; }\n      #native-accounting-report thead { display:table-header-group; break-inside:avoid; break-after:avoid; }\n      #native-accounting-report [data-ledger-empty=\"true\"] { break-inside:avoid; }\n      #native-accounting-report [data-ledger-empty] tbody > tr:first-child { break-before:avoid; }\n      #native-accounting-report tr { break-inside:avoid; }\n      #native-accounting-report .grid { break-inside:avoid; }\n      #native-accounting-report h3, #native-accounting-report caption { break-after:avoid; }\n      #native-accounting-report section > p { break-after:avoid; }\n    }",
+  "url": "https://donclimaxmanagementapp.com/accounting/general-ledger?bookId=1&branchId=all&from=2026-10-14&to=2026-10-14"
+}

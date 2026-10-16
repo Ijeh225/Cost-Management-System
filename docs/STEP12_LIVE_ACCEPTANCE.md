@@ -1,6 +1,17 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-16 12:35 WAT. Existing nativeGL layout corrected at source: normal final summary row, empty-account grouping/first-content guards, existing continuation header retained.16focused tests/fulltypes/build PASS. Publishing/exactdeployment/liveDOM/fresh nativePDF pending; PRINT001 not CLOSED. Original finance/directPDF acceptances unchanged. Actual-company launch requirements remain separate.
+Updated: 2026-10-16 12:44 WAT. NativeGL correction7ad1f97 pushed/deployed exactRailwaycc519eae SUCCESS/healthok.16focused tests/fulltypes/build and actual live28summaries/75entries/0tfoot/printguards PASS. Fresh actual Chrome page-break verification still pending; PRINT001 not CLOSED. Original finance/directPDF acceptances and actual-company launch requirements remain unchanged.
+
+## Print Correction Deployed Read-Back (16 October 12:44 WAT)
+
+Actual Owner UI appliedbook1/wholebook/14Oct snapshot11:41:18Z retains
+28accounts/75entries/28single final body summaries/0GLtfoot/9emptysectionguards,
+existing repeatedthead and firstcontent guards. DrCr13322.84/diff0 and source
+warnings unchanged. Live DOM proof retained separately. Functional7ad1f97 /
+Railwaycc519eae SUCCESS/healthok. No financial/data/API changes. Owner asked once
+for fresh ChromeGENERAL LEDGER FIXED 16 OCT.pdf afterrefresh; actual pagination
+remains unverified, not replaced by DOM/unit checks or accepted direct exports.
+Next inspect new nativeGL, plus separately pending nativeManagement/Affairs.
 
 ## Print Correction Local Acceptance (16 October 12:35 WAT)
 

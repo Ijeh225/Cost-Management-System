@@ -1,7 +1,7 @@
 {
   "issue": "STEP12-PRINT-001",
-  "updatedAt": "2026-10-16T12:35:00+01:00",
-  "status": "implemented_local_tests_pass_pending_release_live_dom_and_fresh_native_output",
+  "updatedAt": "2026-10-16T12:44:00+01:00",
+  "status": "implemented_deployed_live_dom_pass_fresh_native_output_pending",
   "failedNativeOutputEvidence": "docs/evidence/2026-10-16-step12-native-print-review.json",
   "duplicateReview": {
     "existingTemplateReused": "artifacts/cost-analysis/src/pages/accounting/index.tsx ReportSnapshot",
@@ -27,6 +27,33 @@
     "railwayBuildAndAllTypechecks": "PASS",
     "buildWarnings": ["Existing nonfatal sourcemap warnings", "Existing chunk-size warning"],
     "gitDiffCheck": "PASS"
+  },
+  "release": {
+    "commit": "7ad1f977256ec7670a9014cd9c22a056b5933a5a",
+    "remote": "origin/master",
+    "railwayDeployment": "cc519eae-8099-4ac8-8fd4-7635eed12d04",
+    "observedStatus": "SUCCESS",
+    "publicHealth": "ok"
+  },
+  "liveVerification": {
+    "method": "Actual owner UI in selected Codex in-app browser, full navigation into deployed code and Apply Filters; DOM-only read-back, no accounting writes",
+    "scope": "TEST ONLY book1, whole book branches2+3, both dates14Oct2026",
+    "snapshot": "2026-10-16T11:41:18.434Z",
+    "accounts": 28,
+    "transactionRows": 75,
+    "singleLastBodyTotals": 28,
+    "ledgerFooters": 0,
+    "compactEmptySections": 9,
+    "repeatingContextRetained": true,
+    "deployedFirstContentAndEmptySectionPrintGuardsPresent": true,
+    "periodDebit": "13322.84",
+    "periodCredit": "13322.84",
+    "closingDifference": "0.00",
+    "warningsAndCoverageRetained": true,
+    "evidence": "docs/evidence/2026-10-16-step12-print-live-dom.json",
+    "proofScreenshot": "tmp/step12-live/print-layout-deployed.png",
+    "notNativePaginationProof": true,
+    "ownerSession": "Existing authorized credentials refreshed after overnight expiry, no password or grant change"
   },
   "productionWrites": [],
   "databaseOrApiChanges": [],
