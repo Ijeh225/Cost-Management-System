@@ -1,6 +1,6 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-16 13:00 WAT. Native28single-summary/75unchangedrow result PASS. Populated-header refinement6cc54b6 now deployed exactRailwaya58574e6 SUCCESS/healthok;16focused/fulltypes/buildPASS. NEWpost-refinement nativeChromePDF requested, not yetavailable. PRINT001 awaiting finalnativeacceptance, not CLOSED; priorpartialPDF notsubstituted. Finance/directPDF acceptances unchanged.
+Updated: 2026-10-16 13:04 WAT. Secondactualnative16pagePDF preserves75rows/28values/28single summaries but same2populatedheaders stillorphan. Keep-together hints insufficient inChrome. Explicit populatedaccount fresh-page start now implemented, compactempty/oversizedcontinuation retained; morepagestradeoff disclosed.16focusedtestsPASS/fullbuildrunning; release/newnativecheck next. PRINT001notCLOSED, finance/directPDFacceptances unchanged.
 
 ## Print Correction Deployed Read-Back (16 October 12:44 WAT)
 

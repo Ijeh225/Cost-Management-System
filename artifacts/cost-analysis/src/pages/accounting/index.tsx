@@ -97,6 +97,7 @@ function AccountingPage({kind,userId,activeBranchId}:{kind:AccountingReport["kin
       #native-accounting-report table { min-width:0!important; font-size:9px; }
       #native-accounting-report thead { display:table-header-group; break-inside:avoid; break-after:avoid; }
       #native-accounting-report [data-ledger-empty] { break-inside:avoid; }
+      #native-accounting-report [data-ledger-empty="false"] { break-before:page; }
       #native-accounting-report [data-ledger-empty] tbody > tr:first-child { break-before:avoid; }
       #native-accounting-report tr { break-inside:avoid; }
       #native-accounting-report .grid { break-inside:avoid; }

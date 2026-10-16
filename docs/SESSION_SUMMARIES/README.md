@@ -1,5 +1,7 @@
 # Session Summaries
 
+- Latest 2026-10-16 13:04 WAT: [Explicit populated-account print starts](2026-10-15-step12-status.md). Secondnative16pagePDF still shows2headingorphans despitekeep-together hints;75rows/28totals continuePASS. Added fresh-page start forpopulatedaccounts only, compactempty/longcontinuation retained, morepagestradeoffdisclosed.16testsPASS/fullbuildrunning; exactrelease/newnativeoutput next, PRINT001notclosed. Bothpartialoutputsretained/nofinancialchanges.
+
 - Latest 2026-10-16 13:00 WAT: [Both print corrections deployed; final native check pending](2026-10-15-step12-status.md). First freshChromePDF proved28single totals/75unchangedrows, but2populatedheadersstillorphan;6cc54b6/Railwaya58574e6 SUCCESSrefineswhole short-account grouping.16focused/fulltypes/buildPASS/nofinancechanges. Owner requestedNEWpost-refinementPDF; latestfile12:46stillold. Exactnextnativeinspection, notrepeatfinance or falsePRINT001closure. Final records/evidence accompany publication.
 
 - Latest 2026-10-16 12:49 WAT: [Native totals pass; residual populated-heading case](2026-10-15-step12-status.md). Owner's19page post-releaseChromePDF has75unchangedrows/28summarycopies PASS;1011p4/1120p6 still orphan. Existing grouping extended to populated short accounts, no new exporter/financial changes;16testsPASS/fullbuild running. Refined release/native check next; PRINT001 still partial, earlier successful deploy not false full closure.

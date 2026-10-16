@@ -1,7 +1,7 @@
 {
   "issue": "STEP12-PRINT-001",
   "updatedAt": "2026-10-16T13:00:00+01:00",
-  "status": "native_totals_pass_populated_grouping_refinement_deployed_final_native_reprint_pending",
+  "status": "native_totals_pass_keep_together_hints_fail_explicit_populated_page_start_tested_release_pending",
   "failedNativeOutputEvidence": "docs/evidence/2026-10-16-step12-native-print-review.json",
   "duplicateReview": {
     "existingTemplateReused": "artifacts/cost-analysis/src/pages/accounting/index.tsx ReportSnapshot",
@@ -78,5 +78,18 @@
     },
     "nativeAcceptance": "fresh output required after refined deployment"
   },
-  "nativeAcceptance": "Partial native result recorded, not CLOSED; fresh PDF required after populated-account grouping refinement"
+  "secondNativeReprint": {
+    "evidence": "docs/evidence/2026-10-16-step12-native-print-final.json",
+    "financialContentAndSingleSummaries": "PASS",
+    "headerGrouping": "FAIL_SAME_1011_PAGE4_1120_PAGE6"
+  },
+  "explicitAccountStart": {
+    "change": "Populated accounts start on a fresh print page; empty accounts remain compact and long accounts retain continuation headers",
+    "tradeoff": "More paper/pages for deterministic separate populated-account starts; no amounts or accounting data changed",
+    "focusedTests": "16 PASS",
+    "fullTypesAndProductionBuild": "PASS",
+    "release": "pending",
+    "nativeAcceptance": "pending new deployed native output"
+  },
+  "nativeAcceptance": "Repeated totals accepted natively; header correction still requires native output after explicit account-start release"
 }

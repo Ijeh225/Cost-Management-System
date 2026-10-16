@@ -1,5 +1,12 @@
 # Live End-to-End Test Register
 
+## 2026-10-16 13:05 WAT - Explicit page-start local verification PASS
+-16focused/fulltypes/productionbuildPASS on populated-account fresh-page rule. Screen/data/export preserved, print-only. Publishing then exactrelease/newnativecheck; totals/content alreadynativePASS, headingsnotyetaccepted. No API/schema/financechanges, no repeatedfinancialfixtures.
+
+## 2026-10-16 13:04 WAT - Second native output: totals/content PASS, same two heading failures
+-16page nativegeneral ledger day14.pdf NEW.pdf/snapshot12:00:37Z/hash617e73d2307d93793d8e1ea7529f2daad8eaeb1df1c8d944e813f3033f8f245a preserves75rows/28correctsummaryvalues/exactly28copies. Same1011p4/1120p6 headers still orphan after all-section avoid hints; actualpages confirmed. Evidence2026-10-16-step12-native-print-final.json records actual FAIL, not final acceptance.
+- Current correction explicitly starts populated accounts on fresh print pages (morepages/readabilitytradeoff disclosed), compact empty sections/oversizedcontinuation/repeatedheaders preserved.16regressionsPASS/fullbuild running. SamePRINT001, no new financial/API/data changes or repeatedcash tests. Next release/newnative verification, not false closure from hints.
+
 ## 2026-10-16 13:00 WAT - Current print status and exact continuation
 - Repeatingtotals nativePASS28/28, unchanged75rows. Headergrouping refinement6cc54b6 deployed exactRailwaya58574e6 SUCCESS/healthok,16focused/fulltypes/buildPASS. No financial/data changes. PRINT001 remains FIXED_DEPLOYED_AWAITING_FINAL_NATIVE_ACCEPTANCE, not CLOSED.
 - No file newer than first-revision12:46 GENERAL LEDGER T.pdf atlastcheck. Owner pendingfreshChrome14OctwholebookPDF request; inspectnewoutputfor28totals/75rows/noheader-onlyblocks/longcontinuation beforeclosure. Preserve original/partialPDFs and evidence; no repeatedfinancefixtures. Records accompany finalpublication; separate nativeManagement/Affairs outputs stillpending.

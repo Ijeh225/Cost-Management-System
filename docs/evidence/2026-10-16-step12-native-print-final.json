@@ -1,0 +1,72 @@
+{
+  "verifiedAt": "2026-10-16T12:01:54.171975+00:00",
+  "issue": "STEP12-PRINT-001",
+  "result": "CONFIRMED_NATIVE_LAYOUT_FAIL_FINANCIAL_CONTENT_PASS",
+  "input": {
+    "file": "general ledger day 14.pdf NEW.pdf",
+    "bytes": 744919,
+    "sha256": "617e73d2307d93793d8e1ea7529f2daad8eaeb1df1c8d944e813f3033f8f245a",
+    "pages": 16,
+    "producer": "Skia/PDF m154",
+    "creator": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+    "snapshot": "2026-10-16T12:00:37.803Z"
+  },
+  "scope": {
+    "bookId": 1,
+    "branches": [
+      2,
+      3
+    ],
+    "from": "2026-10-14",
+    "to": "2026-10-14"
+  },
+  "content": {
+    "transactionRows": 75,
+    "uniqueAccounts": 28,
+    "allRowsEventJournalDebitCreditAndRunningBalanceMatchAcceptedReference": true,
+    "all28AccountTotalValuesMatchAcceptedReference": true,
+    "periodDebit": "13322.84",
+    "periodCredit": "13322.84",
+    "closingDifference": "0.00",
+    "warningsAndHistoricalExceptionsRetained": true
+  },
+  "reference": {
+    "file": "general-ledger_1_2026-10-14_2026-10-14.pdf",
+    "sha256": "0baf620e5d51e14f6646ea1019a6404741565775e36107a951e9692a972570ca",
+    "alreadyAcceptedDirectDownload": true,
+    "notRegenerated": true
+  },
+  "layout": {
+    "actualTotalCopies": 28,
+    "expectedAccountTotalRows": 28,
+    "repeatedTotalPagesByAccount": {},
+    "headerOnlyBlocks": [
+      {
+        "page": 4,
+        "account": "1011",
+        "rows": 0,
+        "totals": 0
+      },
+      {
+        "page": 6,
+        "account": "1120",
+        "rows": 0,
+        "totals": 0
+      }
+    ],
+    "visualReview": "All16pages rendered; pages4/6 individually inspected confirm identical populated header-only cases",
+    "renderFolder": "tmp/pdfs/2026-10-16-native-final"
+  },
+  "sourceTrace": {
+    "file": "artifacts/cost-analysis/src/pages/accounting/index.tsx",
+    "testedFunctionalCommit": "6cc54b6a7f1ef6725c57a1d147871d4c66b79f7d",
+    "cause": "Repeated totals remain corrected. Whole-section/table-header keep-together hints still permit Chrome to print two populated account headers without their first rows.",
+    "correctionRequired": "Start populated accounts explicitly on a fresh print page; empty accounts remain compact, and oversized accounts retain normal continuation headers. More pages is the deliberate readability tradeoff."
+  },
+  "remaining": [
+    "Correct native GL pagination and inspect a fresh browser-generated GL output",
+    "Native nonzero Management Accounts and retained approved Statement of Affairs outputs still not supplied"
+  ],
+  "applicationChanges": [],
+  "liveWrites": []
+}
