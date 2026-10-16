@@ -1,5 +1,18 @@
 # Live End-to-End Test Register
 
+## 2026-10-16 13:18 WAT - Current PRINT001 result
+| Component | Result | Evidence / next action |
+| --- | --- | --- |
+| Repeated account totals | Native PASS | Both post-first-fix PDFs contain exactly 28 summaries and 75 unchanged source rows. |
+| Heading correction implementation | Deployed | Latest `04e3a7c`, exact Railway `8f048055-5b0c-4322-ba46-b1443c6201c0` SUCCESS/health ok; populated accounts start on fresh pages, empty accounts compact, long-account headers retained. |
+| Focused regressions and production build | PASS | 16 print/export tests, all typechecks/frontend/server build. No finance/API/data changes. |
+| Latest native heading acceptance | Pending actual output | Owner request after latest release is outstanding. Latest 13:01 PDF predates it. Inspect new scope/75 rows/28 totals/zero header-only blocks and all rendered pages; do not close from tests or reuse the old file. |
+
+Implementation is committed/pushed/deployed, not a failed deployment. PRINT001 remains awaiting final native acceptance, not CLOSED. Native Management/Affairs checks are separately pending. All original/partial evidence is retained; no new financial transactions or duplicate tests. This record accompanies final publication.
+
+## 2026-10-16 13:14 WAT - Explicit populated account starts deployed
+-04e3a7cf485fb49468c8ac388ca248dbe602f71a / Railway8f048055-5b0c-4322-ba46-b1443c6201c0 SUCCESS/publichealthok,16focused/fullbuildPASS. Owner newChromePDF request active afterthisrelease; expected morepages/accountstarts explained. Prior28totals/75rows nativePASS retained, remaining heading acceptance awaits actualnewfile, not assumed. No financechanges or repeatedfixtures.
+
 ## 2026-10-16 13:05 WAT - Explicit page-start local verification PASS
 -16focused/fulltypes/productionbuildPASS on populated-account fresh-page rule. Screen/data/export preserved, print-only. Publishing then exactrelease/newnativecheck; totals/content alreadynativePASS, headingsnotyetaccepted. No API/schema/financechanges, no repeatedfinancialfixtures.
 

@@ -1,6 +1,6 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-16 13:04 WAT. Secondactualnative16pagePDF preserves75rows/28values/28single summaries but same2populatedheaders stillorphan. Keep-together hints insufficient inChrome. Explicit populatedaccount fresh-page start now implemented, compactempty/oversizedcontinuation retained; morepagestradeoff disclosed.16focusedtestsPASS/fullbuildrunning; release/newnativecheck next. PRINT001notCLOSED, finance/directPDFacceptances unchanged.
+Updated: 2026-10-16 13:18 WAT. Explicit populated-account page starts are deployed: `04e3a7c` / exact Railway `8f048055` SUCCESS/health ok. 16 focused tests and full production typechecks/build PASS. Totals are already natively accepted (28 summaries/75 unchanged rows); fresh post-this-release native heading output remains pending. Old 13:01 file predates this rule, not acceptance. PRINT001 not CLOSED; finance/direct PDF acceptances unchanged. More pages are the disclosed readability tradeoff, with empty accounts compact and long-account continuation retained.
 
 ## Print Correction Deployed Read-Back (16 October 12:44 WAT)
 

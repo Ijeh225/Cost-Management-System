@@ -1,7 +1,7 @@
 {
   "issue": "STEP12-PRINT-001",
-  "updatedAt": "2026-10-16T13:00:00+01:00",
-  "status": "native_totals_pass_keep_together_hints_fail_explicit_populated_page_start_tested_release_pending",
+  "updatedAt": "2026-10-16T13:18:00+01:00",
+  "status": "native_totals_pass_explicit_populated_account_start_deployed_new_native_output_pending",
   "failedNativeOutputEvidence": "docs/evidence/2026-10-16-step12-native-print-review.json",
   "duplicateReview": {
     "existingTemplateReused": "artifacts/cost-analysis/src/pages/accounting/index.tsx ReportSnapshot",
@@ -76,7 +76,7 @@
       "observedStatus": "SUCCESS",
       "publicHealth": "ok"
     },
-    "nativeAcceptance": "fresh output required after refined deployment"
+    "nativeAcceptance": "Second native output confirmed two populated header-only blocks; superseded by explicit populated-account starts"
   },
   "secondNativeReprint": {
     "evidence": "docs/evidence/2026-10-16-step12-native-print-final.json",
@@ -88,8 +88,14 @@
     "tradeoff": "More paper/pages for deterministic separate populated-account starts; no amounts or accounting data changed",
     "focusedTests": "16 PASS",
     "fullTypesAndProductionBuild": "PASS",
-    "release": "pending",
+    "release": {
+      "commit": "04e3a7cf485fb49468c8ac388ca248dbe602f71a",
+      "remote": "origin/master",
+      "railwayDeployment": "8f048055-5b0c-4322-ba46-b1443c6201c0",
+      "observedStatus": "SUCCESS",
+      "publicHealth": "ok"
+    },
     "nativeAcceptance": "pending new deployed native output"
   },
-  "nativeAcceptance": "Repeated totals accepted natively; header correction still requires native output after explicit account-start release"
+  "nativeAcceptance": "Repeated totals accepted natively; explicit account-start release is successful but actual new native output remains pending. Latest PDF at last check was generated before this release."
 }

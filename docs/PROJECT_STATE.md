@@ -1,5 +1,15 @@
 # Project State
 
+## 2026-10-16 13:18 WAT - Print release complete; exact native-output handoff
+- Latest functional commit `04e3a7c` is pushed and deployed: Railway `8f048055-5b0c-4322-ba46-b1443c6201c0` SUCCESS, public health `ok`. All 16 focused print/export tests and complete production typechecks/build pass. No financial data, calculations, APIs, schema, permissions or accounting gates changed. Original protected checkpoint is unchanged.
+- Repeated totals are already confirmed fixed in two actual owner-saved PDFs: 28 single summaries, 75 unchanged transaction rows. Chrome ignored keep-together hints for two short populated accounts, so the latest release explicitly begins populated accounts on fresh print pages. Empty accounts stay compact; long accounts retain continuation headers. Extra pages are a deliberate readability tradeoff, disclosed to owner.
+- Actual heading pagination after `04e3a7c` is **not yet accepted**. Owner has one pending fresh-PDF request after this release. At last check Downloads still ends with the 13:01 `general ledger day 14.pdf NEW.pdf`, which predates this release and must not be reused as proof. Exact next action: inspect the new native PDF for correct scope, all 75 rows, 28 summaries, no header-only account blocks, and intact multi-page continuation; render/inspect all pages before closing PRINT001. Other native Management/Affairs outputs remain separate pending checks. Do not repeat financial fixtures.
+- All three records, session index, acceptance matrix and evidence accompany this final publication. IAB is left at its expired login while owner uses Chrome; avoid a competing login during the outstanding save. Current implementation is committed, not unfinished local code; remaining acceptance requires the owner's actual browser-generated output.
+
+## 2026-10-16 13:14 WAT - Explicit account-start print release SUCCESS, native verification active
+-04e3a7cf485fb49468c8ac388ca248dbe602f71a pushed; exactRailway8f048055-5b0c-4322-ba46-b1443c6201c0 SUCCESS/publichealthok/buildhealthcheckPASS.16focused/fulltypes/buildPASS. Populated account sections explicitly start on fresh print pages; emptysectionscompact/longcontinuation/repeatedheaders and singlefinaltotals retained. Morepages deliberate, no data/API/finance/permissions changes.
+- Owner asked NEWrefreshedChrome14Oct/book1/wholebook nativePDF after this exactrelease. Prior two post-fix files are partial failures, never substituted for this version. No newfile yet; waiting for DONE then immediate75row/28total/0headeronly and visualallpage review. No further software edits assumed before actual result.
+
 ## 2026-10-16 13:05 WAT - Explicit populated-account starts locally verified, publishing
 -16focusedtests and fulltypes/productionbuild PASS on explicit populated-account page-start rule. Normal screen/data/directPDF unchanged; print only, no API/schema/finance writes. Publishing current rule/test and actual secondpartialPDF evidence with3records. Morepages tradeoff explicit, repeatedtotals nativePASS remains; headernativeacceptance still pending after new exactrelease. No fresh financialtests needed.
 

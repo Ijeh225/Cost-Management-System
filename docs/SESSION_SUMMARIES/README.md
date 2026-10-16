@@ -1,5 +1,7 @@
 # Session Summaries
 
+- Latest 2026-10-16 13:18 WAT: [Print release complete; native heading check pending](2026-10-15-step12-status.md). `04e3a7c` / Railway `8f048055` SUCCESS/health ok, 16 focused/full-build PASS. Totals already native PASS (28 summaries/75 rows); explicit populated-account page starts deployed after Chrome ignored keep-together hints. Fresh post-release PDF requested, not yet supplied; old 13:01 file is not proof. Exact next inspection retained, no financial retests or false PRINT001 closure.
+
 - Latest 2026-10-16 13:04 WAT: [Explicit populated-account print starts](2026-10-15-step12-status.md). Secondnative16pagePDF still shows2headingorphans despitekeep-together hints;75rows/28totals continuePASS. Added fresh-page start forpopulatedaccounts only, compactempty/longcontinuation retained, morepagestradeoffdisclosed.16testsPASS/fullbuildrunning; exactrelease/newnativeoutput next, PRINT001notclosed. Bothpartialoutputsretained/nofinancialchanges.
 
 - Latest 2026-10-16 13:00 WAT: [Both print corrections deployed; final native check pending](2026-10-15-step12-status.md). First freshChromePDF proved28single totals/75unchangedrows, but2populatedheadersstillorphan;6cc54b6/Railwaya58574e6 SUCCESSrefineswhole short-account grouping.16focused/fulltypes/buildPASS/nofinancechanges. Owner requestedNEWpost-refinementPDF; latestfile12:46stillold. Exactnextnativeinspection, notrepeatfinance or falsePRINT001closure. Final records/evidence accompany publication.
