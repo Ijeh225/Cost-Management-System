@@ -1,5 +1,16 @@
 # Live End-to-End Test Register
 
+## 2026-10-16 13:26 WAT - PRINT001 CLOSED on actual native output
+| Component | Result | Evidence / next action |
+| --- | --- | --- |
+| Single final totals | Native PASS | Exactly28 summaries for28 accounts, no repeats; all values match accepted reference. |
+| Account headings and continuation | Native PASS | Zero header-only blocks across26 rendered pages;1011/1120 start with rows on5/8; long1010 repeats context on2-4 and totals only at its end. All-page overview and8 detailed-page visual checks accepted. |
+| Financial content | PASS | All75 account/journal/source/debit/credit/running-balance rows match accepted reference; Dr=Cr13322.84/difference0; correct TEST ONLY book1/whole book/both dates14Oct, warnings retained. |
+| Deployed source | SUCCESS | Functional04e3a7c previously accepted; latest equivalent-code7cf518f exact Railwayd5a2410e-430c-4754-a2ee-111909a3a290 SUCCESS/publichealthok. Prior16 focused tests/fulltypes/build PASS. |
+| Separate native output checks | Still pending | Nonzero Management Accounts14Oct and approved Statement of Affairs valuation1; already accepted direct PDFs are not native-print proof. No repeated financial fixtures required. |
+
+Actual `general-ledger NEW PDF.pdf`,763329bytes/26pages/snapshot12:19:10.866Z/hash3fb861d51676ca9a674e9196af5b71d59d4c489a48e95a9896ce2e75bbffc79c is retained unchanged. Evidence `docs/evidence/2026-10-16-step12-native-print-verified.json`. Both GL layout failures are CLOSED; earlier FAIL/pending entries below are historical. This is read-only output acceptance plus records, no app/finance/schema/grant/gate changes. More pages are intentional; source completeness is not independently certified.
+
 ## 2026-10-16 13:18 WAT - Current PRINT001 result
 | Component | Result | Evidence / next action |
 | --- | --- | --- |

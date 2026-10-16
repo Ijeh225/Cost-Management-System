@@ -1,7 +1,7 @@
 {
   "issue": "STEP12-PRINT-001",
-  "updatedAt": "2026-10-16T13:18:00+01:00",
-  "status": "native_totals_pass_explicit_populated_account_start_deployed_new_native_output_pending",
+  "updatedAt": "2026-10-16T13:26:00+01:00",
+  "status": "CLOSED_NATIVE_LAYOUT_AND_FINANCIAL_CONTENT_PASS",
   "failedNativeOutputEvidence": "docs/evidence/2026-10-16-step12-native-print-review.json",
   "duplicateReview": {
     "existingTemplateReused": "artifacts/cost-analysis/src/pages/accounting/index.tsx ReportSnapshot",
@@ -95,7 +95,27 @@
       "observedStatus": "SUCCESS",
       "publicHealth": "ok"
     },
-    "nativeAcceptance": "pending new deployed native output"
+    "nativeAcceptance": "PASS: actual26page Chrome output,75 unchanged transaction rows,28 single summaries,zero header-only blocks; all pages rendered/overview-reviewed and8 detailed checks"
   },
-  "nativeAcceptance": "Repeated totals accepted natively; explicit account-start release is successful but actual new native output remains pending. Latest PDF at last check was generated before this release."
+  "nativeAcceptance": {
+    "status": "PASS_CLOSED",
+    "evidence": "docs/evidence/2026-10-16-step12-native-print-verified.json",
+    "file": "general-ledger NEW PDF.pdf",
+    "sha256": "3fb861d51676ca9a674e9196af5b71d59d4c489a48e95a9896ce2e75bbffc79c",
+    "snapshot": "2026-10-16T12:19:10.866Z",
+    "pages": 26,
+    "rows": 75,
+    "singleSummaries": 28,
+    "headerOnlyBlocks": 0,
+    "allRowsAndAccountValuesMatchAcceptedReference": true,
+    "remainingSeparateNativeChecks": ["Nonzero Management Accounts14Oct", "Approved Statement of Affairs valuation1"]
+  },
+  "latestEquivalentCodeRelease": {
+    "commit": "7cf518f74f340ffabdd5e17e3cb3eda0dd5209aa",
+    "railwayDeployment": "d5a2410e-430c-4754-a2ee-111909a3a290",
+    "observedStatus": "SUCCESS",
+    "publicHealth": "ok",
+    "observedAt": "2026-10-16T13:25:00+01:00",
+    "functionalCodeUnchangedFrom": "04e3a7cf485fb49468c8ac388ca248dbe602f71a"
+  }
 }

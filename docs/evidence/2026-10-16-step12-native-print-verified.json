@@ -1,0 +1,67 @@
+{
+  "verifiedAt": "2026-10-16T12:22:56.542404+00:00",
+  "issue": "STEP12-PRINT-001",
+  "result": "NATIVE_LAYOUT_AND_FINANCIAL_CONTENT_PASS",
+  "input": {
+    "file": "general-ledger NEW PDF.pdf",
+    "bytes": 763329,
+    "sha256": "3fb861d51676ca9a674e9196af5b71d59d4c489a48e95a9896ce2e75bbffc79c",
+    "pages": 26,
+    "producer": "Skia/PDF m154",
+    "creator": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+    "snapshot": "2026-10-16T12:19:10.866Z"
+  },
+  "scope": {
+    "bookId": 1,
+    "branches": [
+      2,
+      3
+    ],
+    "from": "2026-10-14",
+    "to": "2026-10-14"
+  },
+  "content": {
+    "transactionRows": 75,
+    "uniqueAccounts": 28,
+    "allRowsEventJournalDebitCreditAndRunningBalanceMatchAcceptedReference": true,
+    "all28AccountTotalValuesMatchAcceptedReference": true,
+    "periodDebit": "13322.84",
+    "periodCredit": "13322.84",
+    "closingDifference": "0.00",
+    "warningsAndHistoricalExceptionsRetained": true
+  },
+  "reference": {
+    "file": "general-ledger_1_2026-10-14_2026-10-14.pdf",
+    "sha256": "0baf620e5d51e14f6646ea1019a6404741565775e36107a951e9692a972570ca",
+    "alreadyAcceptedDirectDownload": true,
+    "notRegenerated": true
+  },
+  "layout": {
+    "actualTotalCopies": 28,
+    "expectedAccountTotalRows": 28,
+    "repeatedTotalPagesByAccount": {},
+    "headerOnlyBlocks": [],
+    "visualReview": "All26 pages rendered and contact-sheet reviewed; pages1,4,5,7,8,14,25,26 individually inspected. No observed clipping, overlaps or detached account headings. Populated accounts start on fresh pages; empty sections remain compact. Long1010 repeats context on2-4 with one summary at its end. Formerly detached1011/1120 now start with rows on5/8.",
+    "renderFolder": "tmp/pdfs/2026-10-16-native-verified",
+    "detailedPages": [1, 4, 5, 7, 8, 14, 25, 26],
+    "intentionalExtraPages": "Fresh page starts for populated accounts, not repeated financial data"
+  },
+  "sourceTrace": {
+    "file": "artifacts/cost-analysis/src/pages/accounting/index.tsx",
+    "originalCause": "Native tfoot repeated totals, and Chrome printed account headers alone despite keep-together hints for two short populated accounts.",
+    "deployedCorrection": "Single closing row after entries in normal tbody; populated accounts explicitly start on fresh pages, empty-account grouping and repeating continuation context retained.",
+    "functionalCommit": "04e3a7cf485fb49468c8ac388ca248dbe602f71a",
+    "latestEquivalentCodeCommit": "7cf518f74f340ffabdd5e17e3cb3eda0dd5209aa",
+    "latestEquivalentCodeDeployment": "d5a2410e-430c-4754-a2ee-111909a3a290",
+    "observedDeploymentStatus": "SUCCESS",
+    "publicHealth": "ok"
+  },
+  "issueStatus": "CLOSED",
+  "remaining": [
+    "Separate native nonzero Management Accounts14Oct output still not supplied",
+    "Separate retained approved Statement of Affairs valuation1 native output still not supplied",
+    "Actual company source coverage and launch approvals remain distinct from this TEST ONLY native print acceptance"
+  ],
+  "applicationChanges": [],
+  "liveWrites": []
+}
