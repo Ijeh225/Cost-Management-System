@@ -1,5 +1,23 @@
 # Live End-to-End Test Register
 
+## 2026-10-16 12:35 WAT - Print release candidate accepted locally
+-16print/export checks and complete production types/build PASS; only existing nonfatal warnings. Native closing row/empty-account grouping correction is frontend-only; no changes to sources, decimal amounts, direct exporter, APIs or database. Protected checkpoint unchanged. Publish/deploy and actual liveDOM read-back next; actual Chrome PDF still required before PRINT001 closure. Evidence2026-10-16-step12-print-fix.json; original failed PDF retained.
+
+## 2026-10-16 12:34 WAT - PRINT001 narrow correction / local regression PASS
+- Existing GL template amended, no duplicate report: closing totals last row in normal tbody (not repeatedtfoot), empty-account header/summary kept together; true multi-page headers preserved with first-content guards. No finance/API/schema changes, old test records untouched.
+-16print/export tests PASS (8native contracts/render cases +8unchanged direct-export cases); actual renderer cases0/1/120rows with28accounts preserve exact once-per-account summary, all source IDs, warnings and input snapshots. Fulltypes/build running; exactdeployment/live DOM/nativePDF verification pending. PRINT001 remains OPEN until real Chrome output checked, not closed by markup assertions.
+
+## 2026-10-16 12:22 WAT - STEP12-PRINT-001 actual native PDF received and reviewed
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Native output availability / correct scope | PASS | Owner DONE; fresh GENERAL LEDGER TODAY.pdf,18pages/756952bytes, Skia/PDFm154,16Oct11:12:35Z snapshot;book1/wholebook/14Oct only. SHA256d68e3fbb90a4dab171c0e005218979e9cd91a7c4247713c838883e7e852bdbac. Not a new direct export. |
+| Native financial content | PASS | All75 transaction rows/account-journal-source/debit-credit-running match accepted directPDF;28account total values correct;DrCr13322.84/difference0, historical warnings retained. No financial writes/repeated tests. |
+| Native account totals pagination | FAIL / same Low PRINT001 |36total copies for28accounts.1010 repeats2/3/4;1100pages5/6,1120pages6/7,2100pages9/10,3000pages11/12,4000pages12/13,5010pages13/14. Defaulttfoot repeated byChrome; summary can precede unfinished transactions. |
+| Native header/content grouping | FAIL / same PRINT001 | Header-only1000/page1,2300/page10,6010/page15. Repeatingthead retains context but not first-content/empty-account grouping. All18pages rendered/overview reviewed,1/2/6/7 detailed. |
+| Other native outputs | Still pending | Nonzero Management Accounts and approved Affairs native outputs not newly provided. Prior accepted directPDFs remain separate/unchanged. |
+
+Exact next action: narrow print-only non-repeating closing summary and first-row/zero-account grouping correction, then fresh native GL output. No duplicate issue ID or financial retest, no app implementation in this review turn. Updated3records/evidence locally, uncommitted. Original allocation/recovery/scan closures remain; Step12 NOT fully closed. Evidence `docs/evidence/2026-10-16-step12-native-print-review.json` supersedes the prior no-file status only.
+
 ## 2026-10-15 20:14 WAT - Final remaining-fix live results (supersedes earlier FAIL/BLOCKED financial/scan statuses)
 | Check | Current result | Exact evidence / boundary |
 | --- | --- | --- |

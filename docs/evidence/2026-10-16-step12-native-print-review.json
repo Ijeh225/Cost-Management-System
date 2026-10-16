@@ -1,0 +1,107 @@
+{
+  "verifiedAt": "2026-10-16T11:22:10.880724+00:00",
+  "issue": "STEP12-PRINT-001",
+  "result": "CONFIRMED_NATIVE_LAYOUT_FAIL_FINANCIAL_CONTENT_PASS",
+  "input": {
+    "file": "GENERAL LEDGER TODAY.pdf",
+    "bytes": 756952,
+    "sha256": "d68e3fbb90a4dab171c0e005218979e9cd91a7c4247713c838883e7e852bdbac",
+    "pages": 18,
+    "producer": "Skia/PDF m154",
+    "creator": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+    "snapshot": "2026-10-16T11:12:35.368Z"
+  },
+  "scope": {
+    "bookId": 1,
+    "branches": [
+      2,
+      3
+    ],
+    "from": "2026-10-14",
+    "to": "2026-10-14"
+  },
+  "content": {
+    "transactionRows": 75,
+    "uniqueAccounts": 28,
+    "allRowsEventJournalDebitCreditAndRunningBalanceMatchAcceptedReference": true,
+    "all28AccountTotalValuesMatchAcceptedReference": true,
+    "periodDebit": "13322.84",
+    "periodCredit": "13322.84",
+    "closingDifference": "0.00",
+    "warningsAndHistoricalExceptionsRetained": true
+  },
+  "reference": {
+    "file": "general-ledger_1_2026-10-14_2026-10-14.pdf",
+    "sha256": "0baf620e5d51e14f6646ea1019a6404741565775e36107a951e9692a972570ca",
+    "alreadyAcceptedDirectDownload": true,
+    "notRegenerated": true
+  },
+  "layout": {
+    "actualTotalCopies": 36,
+    "expectedAccountTotalRows": 28,
+    "repeatedTotalPagesByAccount": {
+      "1010": [
+        2,
+        3,
+        4
+      ],
+      "1100": [
+        5,
+        6
+      ],
+      "1120": [
+        6,
+        7
+      ],
+      "2100": [
+        9,
+        10
+      ],
+      "3000": [
+        11,
+        12
+      ],
+      "4000": [
+        12,
+        13
+      ],
+      "5010": [
+        13,
+        14
+      ]
+    },
+    "headerOnlyBlocks": [
+      {
+        "page": 1,
+        "account": "1000",
+        "rows": 0,
+        "totals": 0
+      },
+      {
+        "page": 10,
+        "account": "2300",
+        "rows": 0,
+        "totals": 0
+      },
+      {
+        "page": 15,
+        "account": "6010",
+        "rows": 0,
+        "totals": 0
+      }
+    ],
+    "visualReview": "All18pages rendered/contact-sheet reviewed; pages1,2,6,7 individually inspected",
+    "renderFolder": "tmp/pdfs/2026-10-16-native-gl"
+  },
+  "sourceTrace": {
+    "file": "artifacts/cost-analysis/src/pages/accounting/index.tsx",
+    "cause": "Account totals remain in a native tfoot with default repeating footer behaviour; repeated thead can print without first body/empty-account content. No non-repeating footer/empty-account grouping guard.",
+    "correctionRequired": "Print each account closing summary once at its real end; retain account context with first body row or zero-account summary. Retain repeating context for true multi-page accounts."
+  },
+  "remaining": [
+    "Correct native GL pagination and inspect a fresh browser-generated GL output",
+    "Native nonzero Management Accounts and retained approved Statement of Affairs outputs still not supplied"
+  ],
+  "applicationChanges": [],
+  "liveWrites": []
+}

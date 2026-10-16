@@ -1,0 +1,35 @@
+{
+  "issue": "STEP12-PRINT-001",
+  "updatedAt": "2026-10-16T12:35:00+01:00",
+  "status": "implemented_local_tests_pass_pending_release_live_dom_and_fresh_native_output",
+  "failedNativeOutputEvidence": "docs/evidence/2026-10-16-step12-native-print-review.json",
+  "duplicateReview": {
+    "existingTemplateReused": "artifacts/cost-analysis/src/pages/accounting/index.tsx ReportSnapshot",
+    "existingTestsExtended": "scripts/accounting-print-contract.test.mjs",
+    "existingContinuationHeadersRetained": true,
+    "newDependencies": [],
+    "duplicateExportersOrCalculations": false
+  },
+  "changes": [
+    "One closing summary after entries in the same normal tbody, not a repeating native tfoot",
+    "Empty account sections keep their header and summary together",
+    "Existing full repeated account/column header retained, first-content break guards added",
+    "Nonempty long accounts remain free to continue over pages"
+  ],
+  "preserved": ["Report source and decimal amounts", "Journal/source identities", "Warnings and coverage", "Trial Balance totals markup", "CSV and direct PDF export", "Screen layout", "Permissions and gates"],
+  "tests": {
+    "command": "node --test scripts/accounting-print-contract.test.mjs scripts/accounting-pdf-export.test.mjs",
+    "passed": 16,
+    "failed": 0,
+    "nativeStructureAndActualRender": 8,
+    "existingDirectExport": 8,
+    "renderCases": { "accountCount": 28, "transactionCounts": [0, 1, 120], "oneFinalRowPerAccount": true, "noLedgerFooter": true, "sourcesRetained": true, "inputSnapshotUnchanged": true },
+    "railwayBuildAndAllTypechecks": "PASS",
+    "buildWarnings": ["Existing nonfatal sourcemap warnings", "Existing chunk-size warning"],
+    "gitDiffCheck": "PASS"
+  },
+  "productionWrites": [],
+  "databaseOrApiChanges": [],
+  "protectedCheckpoint": "c816352937e08aba4855824f8016f5f6bdbda00e",
+  "nativeAcceptance": "Fresh Chrome Print Snapshot PDF still required; source/SSR checks are not pagination proof"
+}

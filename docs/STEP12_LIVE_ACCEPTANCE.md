@@ -1,6 +1,32 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-15 20:14 WAT. Original seven findings/direct PDF remain CLOSED. New allocation/credit corrections, linked bank-only debt recovery/reversal and bounded OCR orientation deployed ef8a855 / exact Railway198cae52 SUCCESS/migration/health; actual live UI acceptance PASS below. Native Print still awaits actual browser output; directPDF is separate. Step12 NOT fully closed because native output remains unverified. Actual-company launch requirements and historical completeness warnings remain separate.
+Updated: 2026-10-16 12:35 WAT. Existing nativeGL layout corrected at source: normal final summary row, empty-account grouping/first-content guards, existing continuation header retained.16focused tests/fulltypes/build PASS. Publishing/exactdeployment/liveDOM/fresh nativePDF pending; PRINT001 not CLOSED. Original finance/directPDF acceptances unchanged. Actual-company launch requirements remain separate.
+
+## Print Correction Local Acceptance (16 October 12:35 WAT)
+
+Reused existing ReportSnapshot and original contract test file, no new exporter
+or dependency/calculation. One normaltbody final total replaces GLtfoot;
+compact empty accounts stay together, long accounts still flow.16focused checks
+include8native structure/actual rendered snapshot cases and8unchanged directPDF
+tests. All workspace typechecks and frontend/server production build PASS.
+Exact deployed liveDOM and a new owner-saved Chrome PDF remain necessary before
+native layout acceptance. No new finance/API/schema writes. Evidence:
+`docs/evidence/2026-10-16-step12-print-fix.json`.
+
+## Native Output Review (16 October 12:22 WAT)
+
+Owner's GENERAL LEDGER TODAY.pdf is actual18pageChrome/Skia output for
+TEST ONLY book1, wholebook, both dates14Oct. All75transaction rows and28account
+total values match the already accepted direct export;DrCr13322.84/difference0.
+All18pages rendered/contact-sheet inspected,1/2/6/7 detailed. Nativeprint001
+remains FAIL/Low:36account-total copies for28accounts (default repeatedtfoot),
+plus header-only blocks1000p1/2300p10/6010p15. Example1120summary prints on6
+before its source rows7. Correct non-repeating final totals and group first
+content/empty-account summary with its header, then inspect fresh native GL.
+Actual nonzero Management/Affairs native outputs still not supplied. No appcode
+or financial records changed by this review. Evidence:
+`docs/evidence/2026-10-16-step12-native-print-review.json`. Prior no-file wording
+below is historical; other accepted live controls remain unchanged.
 
 ## Current Supplemental Acceptance (15 October 20:14 WAT)
 
