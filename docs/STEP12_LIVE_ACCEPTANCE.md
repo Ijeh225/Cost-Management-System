@@ -1,6 +1,6 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-16 12:49 WAT. Post-release nativeGL19page PDF now received:75unchangedrows/28correctaccount values/exactly28summarycopies PASS, but two populated short-account headers still orphan1011p4/1120p6. Existing grouping rule refined to all ledger sections;16regressionsPASS/fullbuild running, refinedrelease/nativePDF next. PRINT001 partially fixed, not CLOSED. Finance/directPDF acceptances unchanged.
+Updated: 2026-10-16 13:00 WAT. Native28single-summary/75unchangedrow result PASS. Populated-header refinement6cc54b6 now deployed exactRailwaya58574e6 SUCCESS/healthok;16focused/fulltypes/buildPASS. NEWpost-refinement nativeChromePDF requested, not yetavailable. PRINT001 awaiting finalnativeacceptance, not CLOSED; priorpartialPDF notsubstituted. Finance/directPDF acceptances unchanged.
 
 ## Print Correction Deployed Read-Back (16 October 12:44 WAT)
 

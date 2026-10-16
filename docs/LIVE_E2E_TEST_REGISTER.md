@@ -1,5 +1,12 @@
 # Live End-to-End Test Register
 
+## 2026-10-16 13:00 WAT - Current print status and exact continuation
+- Repeatingtotals nativePASS28/28, unchanged75rows. Headergrouping refinement6cc54b6 deployed exactRailwaya58574e6 SUCCESS/healthok,16focused/fulltypes/buildPASS. No financial/data changes. PRINT001 remains FIXED_DEPLOYED_AWAITING_FINAL_NATIVE_ACCEPTANCE, not CLOSED.
+- No file newer than first-revision12:46 GENERAL LEDGER T.pdf atlastcheck. Owner pendingfreshChrome14OctwholebookPDF request; inspectnewoutputfor28totals/75rows/noheader-onlyblocks/longcontinuation beforeclosure. Preserve original/partialPDFs and evidence; no repeatedfinancefixtures. Records accompany finalpublication; separate nativeManagement/Affairs outputs stillpending.
+
+## 2026-10-16 12:56 WAT - Grouping refinement exact release SUCCESS
+-6cc54b6a7f1ef6725c57a1d147871d4c66b79f7d / Railwaya58574e6-cef4-4239-9e62-234e29c9cb97 SUCCESS/healthok,16focused/fulltypes/buildPASS. Whole short-populated section grouping now released, no forcedpages/heights or financechanges. Owner requestedNEWnativePDF afterrefresh; actual refined pagination still pending, priorpartialPDF not substituted. IAB session returnedlogin while Chromeowner active; avoid re-login until owner finishes print. Next newfile inspection, no repeated financial tests.
+
 ## 2026-10-16 12:50 WAT - Populated grouping refinement local PASS
 -16regressions/fulltypes/frontend-server productionbuildPASS on refinedall-account section grouping. Same report/data, no forcedpageperaccount/fixedheight/duplicatefirstrow. Original post-fix nativePDF remains partial: totals/contentPASS/two populated headingsFAIL. Publishing refinement then actual native recheck; do not reuse earlier snapshot or close from tests alone.
 
