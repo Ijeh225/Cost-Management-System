@@ -1,6 +1,6 @@
 # Step12 Live Accounting Acceptance
 
-Updated: 2026-10-16 12:44 WAT. NativeGL correction7ad1f97 pushed/deployed exactRailwaycc519eae SUCCESS/healthok.16focused tests/fulltypes/build and actual live28summaries/75entries/0tfoot/printguards PASS. Fresh actual Chrome page-break verification still pending; PRINT001 not CLOSED. Original finance/directPDF acceptances and actual-company launch requirements remain unchanged.
+Updated: 2026-10-16 12:49 WAT. Post-release nativeGL19page PDF now received:75unchangedrows/28correctaccount values/exactly28summarycopies PASS, but two populated short-account headers still orphan1011p4/1120p6. Existing grouping rule refined to all ledger sections;16regressionsPASS/fullbuild running, refinedrelease/nativePDF next. PRINT001 partially fixed, not CLOSED. Finance/directPDF acceptances unchanged.
 
 ## Print Correction Deployed Read-Back (16 October 12:44 WAT)
 

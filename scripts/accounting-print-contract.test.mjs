@@ -59,13 +59,14 @@ test("Ledger closing totals are the last normal body row, never a repeating foot
   for (const value of ["a.debit", "a.credit", "a.closing"]) assert.ok(row.getText(ast).includes(value));
 });
 
-test("Only empty ledger sections stay whole; real multi-page accounts can flow", () => {
+test("Short populated and empty ledger sections stay whole without forced per-account pages", () => {
   const section = elements.find(node => tag(node) === "section" && attribute(node, "data-ledger-empty"));
   assert.ok(section);
   assert.equal(attribute(section, "data-ledger-empty").initializer.expression.getText(ast), "a.entries.length===0");
-  assert.deepEqual(declarations('#native-accounting-report [data-ledger-empty="true"]', "break-inside"), ["avoid"]);
+  assert.deepEqual(declarations("#native-accounting-report [data-ledger-empty]", "break-inside"), ["avoid"]);
   assert.deepEqual(declarations("#native-accounting-report [data-ledger-empty] tbody > tr:first-child", "break-before"), ["avoid"]);
-  assert.deepEqual(declarations("#native-accounting-report [data-ledger-empty]", "break-inside"), []);
+  assert.deepEqual(declarations("#native-accounting-report [data-ledger-empty]", "break-before"), []);
+  assert.deepEqual(declarations("#native-accounting-report [data-ledger-empty]", "height"), []);
 });
 
 // Render the actual snapshot functions, not a second hand-written report template.

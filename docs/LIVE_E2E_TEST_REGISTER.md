@@ -1,5 +1,13 @@
 # Live End-to-End Test Register
 
+## 2026-10-16 12:50 WAT - Populated grouping refinement local PASS
+-16regressions/fulltypes/frontend-server productionbuildPASS on refinedall-account section grouping. Same report/data, no forcedpageperaccount/fixedheight/duplicatefirstrow. Original post-fix nativePDF remains partial: totals/contentPASS/two populated headingsFAIL. Publishing refinement then actual native recheck; do not reuse earlier snapshot or close from tests alone.
+
+## 2026-10-16 12:49 WAT - Actual post-fix native output: totals PASS, two populated headers FAIL
+- Owner's GENERAL LEDGER T.pdf19pages/snapshot11:45:51Z/hash047e28de317a7fd33b233f376e87900796ce346a3eee852dd244e40a88eee018 confirms75unchangedrows/28correcttotals and exactly28summarycopies. Repeated totals now native PASS, no cash/accounting change. Original empty header-only cases resolved.
+- Same PRINT001 remains partially FAIL:1011page4 and1120page6 headings detach before source rows. Actual pages rendered/visually confirmed. Refined existing grouping rule to prefer whole sections for short populated accounts too, without forcedpageperaccount/heights/duplicatedfirstrow; longtables may continue.16focused regressions PASS again, fullbuild running. Requires exact refined release and native reprint, no false closure.
+-4130a98 evidence-only deployment2b182e05 SUCCESS confirmed. Native evidence2026-10-16-step12-native-print-acceptance.json retains partial results and originalbadPDFs. No new financial tests or duplicate issue ID.
+
 ## 2026-10-16 12:44 WAT - PRINT001 correction deployed; live DOM PASS, native output still pending
 -7ad1f977256ec7670a9014cd9c22a056b5933a5a / exactRailwaycc519eae-8099-4ac8-8fd4-7635eed12d04 SUCCESS/publichealthok.16focused regressions/fulltypes/build PASS. SameexistingGL, not duplicate exporter/calculation; no financial data/API/schema changes.
 - Actual Owner UI wholebook1/14Oct ApplyFilters snapshot11:41:18Z PASS:28accounts/75entries/28single-last-body summaries/0tfoot/9empty groupedsections; realthead+firstcontent/emptyprintguards present, DrCr13322.84/difference0/historicalwarnings unchanged. Actual28summaries and all75rows retained in2026-10-16-step12-print-live-dom.json, linked correction evidence. Ordinary existing Owner sign-in refreshed after expiry, no password/grants changed.

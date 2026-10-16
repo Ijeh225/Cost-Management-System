@@ -1,0 +1,72 @@
+{
+  "verifiedAt": "2026-10-16T11:47:52.370609+00:00",
+  "issue": "STEP12-PRINT-001",
+  "result": "CONFIRMED_NATIVE_LAYOUT_FAIL_FINANCIAL_CONTENT_PASS",
+  "input": {
+    "file": "GENERAL LEDGER T.pdf",
+    "bytes": 758557,
+    "sha256": "047e28de317a7fd33b233f376e87900796ce346a3eee852dd244e40a88eee018",
+    "pages": 19,
+    "producer": "Skia/PDF m154",
+    "creator": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+    "snapshot": "2026-10-16T11:45:51.517Z"
+  },
+  "scope": {
+    "bookId": 1,
+    "branches": [
+      2,
+      3
+    ],
+    "from": "2026-10-14",
+    "to": "2026-10-14"
+  },
+  "content": {
+    "transactionRows": 75,
+    "uniqueAccounts": 28,
+    "allRowsEventJournalDebitCreditAndRunningBalanceMatchAcceptedReference": true,
+    "all28AccountTotalValuesMatchAcceptedReference": true,
+    "periodDebit": "13322.84",
+    "periodCredit": "13322.84",
+    "closingDifference": "0.00",
+    "warningsAndHistoricalExceptionsRetained": true
+  },
+  "reference": {
+    "file": "general-ledger_1_2026-10-14_2026-10-14.pdf",
+    "sha256": "0baf620e5d51e14f6646ea1019a6404741565775e36107a951e9692a972570ca",
+    "alreadyAcceptedDirectDownload": true,
+    "notRegenerated": true
+  },
+  "layout": {
+    "actualTotalCopies": 28,
+    "expectedAccountTotalRows": 28,
+    "repeatedTotalPagesByAccount": {},
+    "headerOnlyBlocks": [
+      {
+        "page": 4,
+        "account": "1011",
+        "rows": 0,
+        "totals": 0
+      },
+      {
+        "page": 6,
+        "account": "1120",
+        "rows": 0,
+        "totals": 0
+      }
+    ],
+    "visualReview": "All19pages rendered and contact-sheet overview inspected; pages4/6 individually inspected confirm two populated-account header-only blocks",
+    "renderFolder": "tmp/pdfs/2026-10-16-native-fixed"
+  },
+  "sourceTrace": {
+    "file": "artifacts/cost-analysis/src/pages/accounting/index.tsx",
+    "testedFunctionalCommit": "7ad1f977256ec7670a9014cd9c22a056b5933a5a",
+    "cause": "Duplicate totals and zero-account grouping are corrected. Chrome still detaches two populated short-table headers because whole-section grouping covered only empty accounts; thead/first-body break guards alone did not prevent it.",
+    "correctionRequired": "Extend whole-section break avoidance to all ledger accounts, permitting natural oversized-table continuation, then inspect fresh native output. Preserve the now accepted 28 single final summaries."
+  },
+  "remaining": [
+    "Refine populated short-account grouping and inspect fresh native output; repeated totals already PASS",
+    "Native nonzero Management Accounts and retained approved Statement of Affairs outputs still not supplied"
+  ],
+  "applicationChanges": [],
+  "liveWrites": []
+}

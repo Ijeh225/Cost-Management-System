@@ -1,5 +1,7 @@
 # Session Summaries
 
+- Latest 2026-10-16 12:49 WAT: [Native totals pass; residual populated-heading case](2026-10-15-step12-status.md). Owner's19page post-releaseChromePDF has75unchangedrows/28summarycopies PASS;1011p4/1120p6 still orphan. Existing grouping extended to populated short accounts, no new exporter/financial changes;16testsPASS/fullbuild running. Refined release/native check next; PRINT001 still partial, earlier successful deploy not false full closure.
+
 - Latest 2026-10-16 12:44 WAT: [Native print fix deployed; live structure PASS](2026-10-15-step12-status.md).7ad1f97/Railwaycc519eae SUCCESS/healthok,16focused/fullbuildPASS. Owner actualbook1/wholebook/14Oct shows28accounts/75rows/28single final summaries/0tfoot/compactempty guards/unchangedDrCr13322.84. No finance/API/data changes. Fresh Chrome PDF requested once; actual pagination pending, PRINT001 not CLOSED. Final evidence publication retained; no duplicate test records.
 
 - Latest 2026-10-16 12:35 WAT: [Print correction implemented and locally verified](2026-10-15-step12-status.md). ExistingGL final normally grouped summary replaces repeatingfooter, compact empty accounts kept together/long continuation headers retained.16focused tests/fulltypes/build PASS, no finance/API/data changes; publishing now. Exact deployment/liveDOM/nativePDF still separate pending; PRINT001 not falsely closed. Evidence2026-10-16-step12-print-fix.json.

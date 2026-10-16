@@ -1,7 +1,7 @@
 {
   "issue": "STEP12-PRINT-001",
   "updatedAt": "2026-10-16T12:44:00+01:00",
-  "status": "implemented_deployed_live_dom_pass_fresh_native_output_pending",
+  "status": "first_native_totals_pass_populated_grouping_refinement_tested_release_pending",
   "failedNativeOutputEvidence": "docs/evidence/2026-10-16-step12-native-print-review.json",
   "duplicateReview": {
     "existingTemplateReused": "artifacts/cost-analysis/src/pages/accounting/index.tsx ReportSnapshot",
@@ -58,5 +58,19 @@
   "productionWrites": [],
   "databaseOrApiChanges": [],
   "protectedCheckpoint": "c816352937e08aba4855824f8016f5f6bdbda00e",
-  "nativeAcceptance": "Fresh Chrome Print Snapshot PDF still required; source/SSR checks are not pagination proof"
+  "firstNativeReprint": {
+    "evidence": "docs/evidence/2026-10-16-step12-native-print-acceptance.json",
+    "totals": "PASS_28_COPIES_FOR_28_ACCOUNTS",
+    "financialContent": "PASS_ALL_75_ROWS_AND_28_ACCOUNT_VALUES",
+    "emptyAccountGrouping": "PASS_ORIGINAL_REPRODUCTIONS",
+    "populatedAccountGrouping": "FAIL_1011_PAGE4_AND_1120_PAGE6"
+  },
+  "groupingRefinement": {
+    "change": "Existing whole-section break avoidance now covers populated short accounts as well as empty accounts; no forced page breaks/heights or duplicated first transaction",
+    "focusedTests": "16 PASS on refined source",
+    "fullProductionBuildAndTypechecks": "PASS on refined source",
+    "release": "pending",
+    "nativeAcceptance": "fresh output required after refined deployment"
+  },
+  "nativeAcceptance": "Partial native result recorded, not CLOSED; fresh PDF required after populated-account grouping refinement"
 }
