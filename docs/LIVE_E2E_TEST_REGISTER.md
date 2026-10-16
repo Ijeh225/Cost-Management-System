@@ -1,5 +1,14 @@
 # Live End-to-End Test Register
 
+## 2026-10-16 15:39 WAT - Final native-print acceptance COMPLETE
+| Output | Final result | Actual evidence |
+| --- | --- | --- |
+| General Ledger | Native PASS / PRINT001 CLOSED, not repeated | Prior26page/75transaction/28single-summary/zeroheader-only acceptance retained. |
+| Nonzero Management Accounts | Native PASS, not repeated | Prior10page/92table-row/24cash-source-once/all-page acceptance retained. |
+| Approved Statement of Affairs1 | Native PASS / CLOSED | New actual Print Valuation..pdf,168359bytes/2pages/Chrome154Skia/hash32b8ac8e9535dbf7a1cd2ad00d5aeb6abee8bbfa718a9d1eb1e66e21cbb8fc84. Entire retained UI text present and key facts match accepted reference; book1/branch2/version1/14Oct/APPROVED/preparer1/reviewer16,100.01assets/20liabilities/80.01net, estimated equipment/unknown-not-zero amount/supplier evidence, both original audits once and limitations intact. Both rendered pages individually reviewed: no observed clipping/overlap/detached heading/missing text. |
+
+Evidence `docs/evidence/2026-10-16-step12-native-affairs.json` now CLOSED_NATIVE_OUTPUT_PASS; original handoff preserved. Poppler emitted2Type3 bounding-box warnings with no observed visual defect. No repeat GL/Management/finance tests, replacement valuation, financial/app/schema/grant/gate write or physical printing. Remaining native-print checks: NONE. Real company launch approvals, openings, history/reconciliation/training remain distinct requirements, not failed QA checks. All3 records/index/matrix updated for evidence publication; c5d5085 earlier publication retained. Older pending rows below are history.
+
 ## 2026-10-16 15:08 WAT - Remaining output status
 | Output | Current result | Evidence / exact continuation |
 | --- | --- | --- |

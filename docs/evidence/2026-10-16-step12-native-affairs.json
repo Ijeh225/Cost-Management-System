@@ -1,8 +1,14 @@
 {
-  "updatedAt": "2026-10-16T15:08:00+01:00",
+  "updatedAt": "2026-10-16T15:38:57.217115+01:00",
   "check": "Step12 native Statement of Affairs output",
-  "status": "APPROVED_EXISTING_UI_ACCEPTED_NATIVE_PDF_PENDING",
-  "scope": {"bookId": 1, "branchId": 2, "valuationId": 1, "version": 1, "asOf": "2026-10-14"},
+  "status": "CLOSED_NATIVE_OUTPUT_PASS",
+  "scope": {
+    "bookId": 1,
+    "branchId": 2,
+    "valuationId": 1,
+    "version": 1,
+    "asOf": "2026-10-14"
+  },
   "actualUi": {
     "title": "STEP12 TEST ONLY internal valuation",
     "status": "approved",
@@ -13,25 +19,76 @@
     "reviewerId": 16,
     "preparedAt": "2026-10-14T13:49:18.867Z",
     "reviewedAt": "2026-10-14T13:49:20.165Z",
-    "asset": {"name": "Dummy equipment", "valuation": "100.01", "basis": "estimated", "bookValue": null, "evidence": "STEP12 fictional survey", "identity": "equipment"},
-    "liability": {"name": "Dummy supplier", "valuation": "20.00", "basis": "declared_book_value", "bookValue": "20.00", "evidence": "STEP12 fictional supplier confirmation", "identity": "supplier"},
+    "asset": {
+      "name": "Dummy equipment",
+      "valuation": "100.01",
+      "basis": "estimated",
+      "bookValue": null,
+      "evidence": "STEP12 fictional survey",
+      "identity": "equipment"
+    },
+    "liability": {
+      "name": "Dummy supplier",
+      "valuation": "20.00",
+      "basis": "declared_book_value",
+      "bookValue": "20.00",
+      "evidence": "STEP12 fictional supplier confirmation",
+      "identity": "supplier"
+    },
     "estimatedLines": 1,
     "unknownBookValues": 1,
-    "auditEvents": ["affairs_prepared", "affairs_approved"],
-    "warningsRetained": ["Simulated incomplete records; not statutory certification", "Valuation schedule is not a posted Balance Sheet or client statement", "No ledger postings are created", "Unknown book values are not zero balances"],
+    "auditEvents": [
+      "affairs_prepared",
+      "affairs_approved"
+    ],
+    "warningsRetained": [
+      "Simulated incomplete records; not statutory certification",
+      "Valuation schedule is not a posted Balance Sheet or client statement",
+      "No ledger postings are created",
+      "Unknown book values are not zero balances"
+    ],
     "rawDomEvidence": "tmp/step12-live/native-final/affairs-dom.json",
     "proofScreenshot": "tmp/step12-live/native-final/affairs-screen.png"
   },
   "nativeOutput": {
-    "status": "PENDING_ACTUAL_CHROME_PDF",
+    "status": "PASS",
     "requestedFile": "STATEMENT OF AFFAIRS NATIVE FINAL.pdf",
     "action": "Existing Print Valuation, Save as PDF in Downloads, not physical printing or the already accepted direct Download PDF",
     "toolingBoundary": "Previous native control stopped because Chrome URL could not be safely determined. Do not bypass that guard or substitute direct PDF export.",
     "handoffTab": "2003695602",
-    "requestedAt": "2026-10-16T15:08:00+01:00"
+    "requestedAt": "2026-10-16T15:08:00+01:00",
+    "file": "Print Valuation..pdf",
+    "bytes": 168359,
+    "pages": 2,
+    "sha256": "32b8ac8e9535dbf7a1cd2ad00d5aeb6abee8bbfa718a9d1eb1e66e21cbb8fc84",
+    "producer": "Skia/PDF m154",
+    "creator": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+    "creationDate": "2026-10-16T14:36:13+00:00",
+    "verifiedAt": "2026-10-16T14:38:57.226694+00:00",
+    "entireRetainedAppliedDomContentPresent": true,
+    "keyValuesEvidenceWarningsAndAuditMatchAcceptedDirectReference": true,
+    "approvedVersionAndPreparersRetained": true,
+    "auditEventsEachPrintOnce": true,
+    "unknownBookValueNotReportedAsZero": true,
+    "reference": {
+      "file": "statement-of-affairs_1_2026-10-14.pdf",
+      "sha256": "7cd77a26106ebffa6a27197a2a1501142314a045920e0523dd53970f31c103bc",
+      "previouslyAcceptedDirectExportNotRegenerated": true
+    },
+    "visualReview": {
+      "renderFolder": "tmp/pdfs/2026-10-16-native-affairs",
+      "pagesRenderedAndIndividuallyInspected": [
+        1,
+        2
+      ],
+      "result": "PASS: intact complete schedules on page1, Audit History begins with both events on page2; no observed clipping, overlaps, detached headings or missing text; page numbers1/2 and2/2 intact",
+      "rendererWarnings": "Poppler emitted two Type3 glyph bounding-box warnings; both rendered pages inspected with no observed missing glyph or visible layout defect"
+    }
   },
   "liveFinancialWrites": [],
   "newValuations": [],
   "applicationCodeChanges": [],
-  "completedTestsRepeated": []
+  "completedTestsRepeated": [],
+  "remainingNativePrintChecks": [],
+  "remainingCompanyLaunchGates": "Real chart/entity/tax approvals, opening schedules, source coverage and independent reconciliation, training and launch acceptance remain separate from TEST ONLY QA"
 }
