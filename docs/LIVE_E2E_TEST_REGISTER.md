@@ -1,5 +1,18 @@
 # Live End-to-End Test Register
 
+## 2026-10-16 15:08 WAT - Remaining output status
+| Output | Current result | Evidence / exact continuation |
+| --- | --- | --- |
+| General Ledger | CLOSED, not repeated | Existing26page native acceptance retained. |
+| Nonzero Management Accounts | Native PASS | New10page owner Chrome PDF/92rows across11tables,24cash rows once, all10pages individually inspected; verified JSON retained. |
+| Statement of Affairs valuation1 | Original approved UI PASS; native output PENDING | Existing book1/branch2/as-of14Oct/version1: assets100.01/liabilities20/net80.01, estimated equipment/unknown book value/supplier evidence and original2audit events intact. No new valuation or approval/posting. Owner asked once for native Print Valuation PDF; tab2003695602 prepared and marked for continuation. On DONE inspect actual scope/values/evidence/warnings/audit and all rendered pages, then close only if passed. |
+
+`docs/evidence/2026-10-16-step12-native-affairs.json` records the precise handoff and prior native-control guard. No guard bypass, direct-export substitute, new financial data or duplicated accepted tests. Records/index/matrix updated; company launch/source-completeness requirements remain distinct.
+
+## 2026-10-16 15:04 WAT - Native nonzero Management Accounts PASS
+- Actual owner-saved10page `managememt account.pdf NEW.pdf`,539096bytes/hash4446ca324bd58c4f3c911bac5b1b8fcab5cb90291f6a6a51fc69d21e974e2f5a/snapshot13:57:49.136Z: book1/wholebook2+3/14Oct,92 printed data rows/11tables match applied UI.18BS/10P&L/24cash rows and totals match retained direct reference;24cash rows printed once. Income900/expense669.50/profit230.50/cash10177.50/equity10230.50/DrCr13322.84/difference0;13 warnings retained. All10pages rendered/individually visually accepted, no observed clipping/overlap/missing continuation. Applied report header establishes whole-book scope despite older branchId=2 URL footer.
+- Evidence `docs/evidence/2026-10-16-step12-native-management-verified.json`. GL PRINT001 remains CLOSED; do not repeat completed financial/GL tests. Last remaining native output check: approved Statement of Affairs valuation1/net80.01, using its existing Print Valuation. No app/data/permission/gate writes. Prior native tool safety stop was a tooling limitation, not a confirmed app error. Records currently local until publication.
+
 ## 2026-10-16 13:26 WAT - PRINT001 CLOSED on actual native output
 | Component | Result | Evidence / next action |
 | --- | --- | --- |

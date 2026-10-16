@@ -1,0 +1,112 @@
+{
+  "verifiedAt": "2026-10-16T14:03:54.905845+00:00",
+  "check": "Step12 native nonzero Management Accounts",
+  "result": "PASS",
+  "input": {
+    "file": "managememt account.pdf NEW.pdf",
+    "bytes": 539096,
+    "pages": 10,
+    "sha256": "4446ca324bd58c4f3c911bac5b1b8fcab5cb90291f6a6a51fc69d21e974e2f5a",
+    "producer": "Skia/PDF m154",
+    "snapshot": "2026-10-16T13:57:49.136Z"
+  },
+  "scope": {
+    "bookId": 1,
+    "branchIds": [
+      2,
+      3
+    ],
+    "wholeBook": true,
+    "from": "2026-10-14",
+    "to": "2026-10-14"
+  },
+  "appliedScopeAuthority": "Printed applied header, not the older branchId=2 browser URL footer",
+  "metrics": {
+    "periodDebit": "13,322.84",
+    "periodCredit": "13,322.84",
+    "income": "900.00",
+    "expenses": "669.50",
+    "netProfit": "230.50",
+    "identifiedCash": "10,177.50",
+    "equityIncludingEarnings": "10,230.50",
+    "difference": "0.00"
+  },
+  "tables": [
+    {
+      "caption": "Posted assets, liabilities and equity",
+      "dataRows": 18
+    },
+    {
+      "caption": "Posted accrual performance by account",
+      "dataRows": 10
+    },
+    {
+      "caption": "Identified cash reconciliation",
+      "dataRows": 9
+    },
+    {
+      "caption": "Profit-to-cash bridge: balance movements, not a second cash calculation",
+      "dataRows": 15
+    },
+    {
+      "caption": "Cash source drilldown",
+      "dataRows": 24
+    },
+    {
+      "caption": "Receivables aging buckets",
+      "dataRows": 6
+    },
+    {
+      "caption": "Receivables source balances",
+      "dataRows": 0
+    },
+    {
+      "caption": "Payables aging buckets",
+      "dataRows": 6
+    },
+    {
+      "caption": "Payables source balances",
+      "dataRows": 0
+    },
+    {
+      "caption": "Posted branch performance (one selected book, not legal-group consolidation)",
+      "dataRows": 1
+    },
+    {
+      "caption": "Item-allocated income and source-allocated expenses",
+      "dataRows": 3
+    }
+  ],
+  "allPrintedTableDataRowsMatchAppliedDom": true,
+  "acceptedReferenceComparison": "All18 balance-sheet rows,10 income/expense account rows,24 cash-source rows and key control metrics match; other printed table rows compared to captured applied DOM",
+  "dataRowsCompared": 92,
+  "cashSourceRowsEachPrintedOnce": 24,
+  "retainedReportingWarnings": 13,
+  "reference": {
+    "file": "management-accounts_1_2026-10-14_2026-10-14.pdf",
+    "sha256": "4ecedc9b9fc9302b01ae4a31a51a7c4900cf69dd7cca229d80eb63ec1ce3df4c",
+    "previouslyAcceptedDirectExportNotRegenerated": true
+  },
+  "visualReview": {
+    "renderFolder": "tmp/pdfs/2026-10-16-native-management",
+    "pagesRenderedAndIndividuallyInspected": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "result": "PASS: readable landscape tables, repeated continuation column headers, no observed clipping/overlap/missing rows; full warnings and branch coverage retained"
+  },
+  "remaining": [
+    "Native Statement of Affairs for retained approved valuation1"
+  ],
+  "liveFinancialWrites": [],
+  "applicationCodeChanges": [],
+  "completedTestsRepeated": []
+}

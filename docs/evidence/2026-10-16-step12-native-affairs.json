@@ -1,0 +1,37 @@
+{
+  "updatedAt": "2026-10-16T15:08:00+01:00",
+  "check": "Step12 native Statement of Affairs output",
+  "status": "APPROVED_EXISTING_UI_ACCEPTED_NATIVE_PDF_PENDING",
+  "scope": {"bookId": 1, "branchId": 2, "valuationId": 1, "version": 1, "asOf": "2026-10-14"},
+  "actualUi": {
+    "title": "STEP12 TEST ONLY internal valuation",
+    "status": "approved",
+    "assets": "100.01",
+    "liabilities": "20.00",
+    "netAssets": "80.01",
+    "preparerId": 1,
+    "reviewerId": 16,
+    "preparedAt": "2026-10-14T13:49:18.867Z",
+    "reviewedAt": "2026-10-14T13:49:20.165Z",
+    "asset": {"name": "Dummy equipment", "valuation": "100.01", "basis": "estimated", "bookValue": null, "evidence": "STEP12 fictional survey", "identity": "equipment"},
+    "liability": {"name": "Dummy supplier", "valuation": "20.00", "basis": "declared_book_value", "bookValue": "20.00", "evidence": "STEP12 fictional supplier confirmation", "identity": "supplier"},
+    "estimatedLines": 1,
+    "unknownBookValues": 1,
+    "auditEvents": ["affairs_prepared", "affairs_approved"],
+    "warningsRetained": ["Simulated incomplete records; not statutory certification", "Valuation schedule is not a posted Balance Sheet or client statement", "No ledger postings are created", "Unknown book values are not zero balances"],
+    "rawDomEvidence": "tmp/step12-live/native-final/affairs-dom.json",
+    "proofScreenshot": "tmp/step12-live/native-final/affairs-screen.png"
+  },
+  "nativeOutput": {
+    "status": "PENDING_ACTUAL_CHROME_PDF",
+    "requestedFile": "STATEMENT OF AFFAIRS NATIVE FINAL.pdf",
+    "action": "Existing Print Valuation, Save as PDF in Downloads, not physical printing or the already accepted direct Download PDF",
+    "toolingBoundary": "Previous native control stopped because Chrome URL could not be safely determined. Do not bypass that guard or substitute direct PDF export.",
+    "handoffTab": "2003695602",
+    "requestedAt": "2026-10-16T15:08:00+01:00"
+  },
+  "liveFinancialWrites": [],
+  "newValuations": [],
+  "applicationCodeChanges": [],
+  "completedTestsRepeated": []
+}
